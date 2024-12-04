@@ -70,22 +70,26 @@ impl Initializer for RegularInit {
     /// Errors if the configuration could not be updated.
     fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
         // Initialize configurations
+        let roots = match params.workspace_folders.as_ref() {
+            Some(roots) => roots
+                .iter()
+                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .collect(),
+            #[allow(deprecated)] // `params.root_path` is marked as deprecated
+            None => params
+                .root_uri
+                .as_ref()
+                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
+                .into_iter()
+                .collect(),
+        };
         let mut config = Config {
             const_config: ConstConfig::from(&params),
             compile: CompileConfig {
-                roots: match params.workspace_folders.as_ref() {
-                    Some(roots) => roots
-                        .iter()
-                        .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
-                        .collect(),
-                    #[allow(deprecated)] // `params.root_path` is marked as deprecated
-                    None => params
-                        .root_uri
-                        .as_ref()
-                        .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
-                        .or_else(|| Some(Path::new(&params.root_path?).into()))
-                        .into_iter()
-                        .collect(),
+                entry_resolver: EntryResolver {
+                    roots,
+                    ..Default::default()
                 },
                 font_opts: std::mem::take(&mut self.font_opts),
                 ..CompileConfig::default()
@@ -465,17 +469,125 @@ impl From<&InitializeParams> for ConstConfig {
     }
 }
 
+/// Entry resolver
+#[derive(Debug, Default, Clone)]
+pub struct EntryResolver {
+    /// Specifies the root path of the project manually.
+    pub root_path: Option<ImmutPath>,
+    /// The workspace roots from initialization.
+    pub roots: Vec<ImmutPath>,
+    /// Typst extra arguments.
+    pub typst_extra_args: Option<CompileExtraOpts>,
+}
+
+impl EntryResolver {
+    /// Determines the root directory for the entry file.
+    pub fn root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+        if let Some(path) = &self.root_path {
+            return Some(path.clone());
+        }
+
+        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
+            return Some(root.clone());
+        }
+
+        if let Some(entry) = entry {
+            for root in self.roots.iter() {
+                if entry.starts_with(root) {
+                    return Some(root.clone());
+                }
+            }
+
+            if !self.roots.is_empty() {
+                log::warn!("entry is not in any set root directory");
+            }
+
+            if let Some(parent) = entry.parent() {
+                return Some(parent.into());
+            }
+        }
+
+        if !self.roots.is_empty() {
+            return Some(self.roots[0].clone());
+        }
+
+        None
+    }
+
+    /// Determines the entry state.
+    pub fn entry(&self, entry: Option<ImmutPath>) -> EntryState {
+        // todo: formalize untitled path
+        // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
+        // let root_dir = self.determine_root(if is_untitled { None } else {
+        // entry.as_ref() });
+        let root_dir = self.root(entry.as_ref());
+
+        let entry = match (entry, root_dir) {
+            // (Some(entry), Some(root)) if is_untitled => Some(EntryState::new_rooted(
+            //     root,
+            //     Some(FileId::new(None, VirtualPath::new(entry))),
+            // )),
+            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
+                Ok(stripped) => Some(EntryState::new_rooted(
+                    root,
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                )),
+                Err(err) => {
+                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    EntryState::new_rootless(entry)
+                }
+            },
+            (Some(entry), None) => EntryState::new_rootless(entry),
+            (None, Some(root)) => Some(EntryState::new_workspace(root)),
+            (None, None) => None,
+        };
+
+        entry.unwrap_or_else(|| match self.root(None) {
+            Some(root) => EntryState::new_workspace(root),
+            None => EntryState::new_detached(),
+        })
+    }
+
+    /// Determines the default entry path.
+    pub fn default_entry(&self) -> Option<ImmutPath> {
+        let extras = self.typst_extra_args.as_ref()?;
+        // todo: pre-compute this when updating config
+        if let Some(entry) = &extras.entry {
+            if entry.is_relative() {
+                let root = self.root(None)?;
+                return Some(root.join(entry).as_path().into());
+            }
+        }
+        extras.entry.clone()
+    }
+
+    /// Validates the configuration.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if let Some(root) = &self.root_path {
+            if !root.is_absolute() {
+                bail!("rootPath must be an absolute path: {root:?}");
+            }
+        }
+
+        if let Some(extra_args) = &self.typst_extra_args {
+            if let Some(root) = &extra_args.root_dir {
+                if !root.is_absolute() {
+                    bail!("typstExtraArgs.root must be an absolute path: {root:?}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct CompileConfig {
-    /// The workspace roots from initialization.
-    pub roots: Vec<ImmutPath>,
     /// The output directory for PDF export.
     pub output_path: PathPattern,
     /// The mode of PDF export.
     pub export_pdf: ExportMode,
-    /// Specifies the root path of the project manually.
-    pub root_path: Option<ImmutPath>,
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
     /// Whether to ignore system fonts
@@ -496,6 +608,8 @@ pub struct CompileConfig {
     pub has_default_entry_path: bool,
     /// The inputs for the language server protocol.
     pub lsp_inputs: ImmutDict,
+    /// The entry resolver.
+    pub entry_resolver: EntryResolver,
 }
 
 impl CompileConfig {
@@ -518,7 +632,6 @@ impl CompileConfig {
 
         self.output_path = deser_or_default!("outputPath", PathPattern);
         self.export_pdf = deser_or_default!("exportPdf", ExportMode);
-        self.root_path = try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into()));
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
@@ -585,7 +698,10 @@ impl CompileConfig {
         self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
         self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
 
-        self.has_default_entry_path = self.determine_default_entry_path().is_some();
+        self.entry_resolver.root_path =
+            try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into()));
+        self.entry_resolver.typst_extra_args = self.typst_extra_args.clone();
+        self.has_default_entry_path = self.entry_resolver.default_entry().is_some();
         self.lsp_inputs = {
             let mut dict = TypstDict::default();
 
@@ -612,86 +728,6 @@ impl CompileConfig {
         self.validate()
     }
 
-    /// Determines the root directory for the entry file.
-    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
-        if let Some(path) = &self.root_path {
-            return Some(path.clone());
-        }
-
-        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
-            return Some(root.clone());
-        }
-
-        if let Some(entry) = entry {
-            for root in self.roots.iter() {
-                if entry.starts_with(root) {
-                    return Some(root.clone());
-                }
-            }
-
-            if !self.roots.is_empty() {
-                log::warn!("entry is not in any set root directory");
-            }
-
-            if let Some(parent) = entry.parent() {
-                return Some(parent.into());
-            }
-        }
-
-        if !self.roots.is_empty() {
-            return Some(self.roots[0].clone());
-        }
-
-        None
-    }
-
-    /// Determines the entry state.
-    pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
-        // todo: formalize untitled path
-        // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
-        // let root_dir = self.determine_root(if is_untitled { None } else {
-        // entry.as_ref() });
-        let root_dir = self.determine_root(entry.as_ref());
-
-        let entry = match (entry, root_dir) {
-            // (Some(entry), Some(root)) if is_untitled => Some(EntryState::new_rooted(
-            //     root,
-            //     Some(FileId::new(None, VirtualPath::new(entry))),
-            // )),
-            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
-                Ok(stripped) => Some(EntryState::new_rooted(
-                    root,
-                    Some(FileId::new(None, VirtualPath::new(stripped))),
-                )),
-                Err(err) => {
-                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
-                    EntryState::new_rootless(entry)
-                }
-            },
-            (Some(entry), None) => EntryState::new_rootless(entry),
-            (None, Some(root)) => Some(EntryState::new_workspace(root)),
-            (None, None) => None,
-        };
-
-        entry.unwrap_or_else(|| match self.determine_root(None) {
-            Some(root) => EntryState::new_workspace(root),
-            None => EntryState::new_detached(),
-        })
-    }
-
-    /// Determines the default entry path.
-    pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
-        let extras = self.typst_extra_args.as_ref()?;
-        // todo: pre-compute this when updating config
-        if let Some(entry) = &extras.entry {
-            if entry.is_relative() {
-                let root = self.determine_root(None)?;
-                return Some(root.join(entry).as_path().into());
-            }
-        }
-        extras.entry.clone()
-    }
-
     /// Determines the font options.
     pub fn determine_font_opts(&self) -> CompileFontArgs {
         let mut opts = self.font_opts.clone();
@@ -714,7 +750,7 @@ impl CompileConfig {
         let root = OnceCell::new();
         for path in opts.font_paths.iter_mut() {
             if path.is_relative() {
-                if let Some(root) = root.get_or_init(|| self.determine_root(None)) {
+                if let Some(root) = root.get_or_init(|| self.entry_resolver.root(None)) {
                     let p = std::mem::take(path);
                     *path = root.join(p);
                 }
@@ -800,25 +836,14 @@ impl CompileConfig {
             self.system_fonts,
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font),
-            self.determine_root(self.determine_default_entry_path().as_ref()),
+            self.entry_resolver
+                .root(self.entry_resolver.default_entry().as_ref()),
         )
     }
 
     /// Validates the configuration.
     pub fn validate(&self) -> anyhow::Result<()> {
-        if let Some(root) = &self.root_path {
-            if !root.is_absolute() {
-                bail!("rootPath must be an absolute path: {root:?}");
-            }
-        }
-
-        if let Some(extra_args) = &self.typst_extra_args {
-            if let Some(root) = &extra_args.root_dir {
-                if !root.is_absolute() {
-                    bail!("typstExtraArgs.root must be an absolute path: {root:?}");
-                }
-            }
-        }
+        self.entry_resolver.validate()?;
 
         Ok(())
     }
@@ -1000,7 +1025,10 @@ mod tests {
 
         assert_eq!(config.compile.output_path, PathPattern::new("out"));
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
-        assert_eq!(config.compile.root_path, Some(ImmutPath::from(root_path)));
+        assert_eq!(
+            config.compile.entry_resolver.root_path,
+            Some(ImmutPath::from(root_path))
+        );
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
         assert_eq!(config.formatter_mode, FormatterMode::Typstyle);
         assert_eq!(

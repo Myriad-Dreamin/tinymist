@@ -24,7 +24,9 @@ use sync_lsp::{
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
-use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
+use tinymist::{
+    CompileConfig, Config, EntryResolver, LanguageState, RegularInit, SuperInit, UserActionTask,
+};
 use tinymist_query::package::PackageInfo;
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
@@ -163,10 +165,13 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
     with_stdio_transport(args.mirror.clone(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
-
+        let roots = vec![ImmutPath::from(root_path)];
         let config = Config {
             compile: CompileConfig {
-                roots: vec![ImmutPath::from(root_path)],
+                entry_resolver: EntryResolver {
+                    roots,
+                    ..Default::default()
+                },
                 font_opts: args.compile.font,
                 ..CompileConfig::default()
             },
@@ -205,9 +210,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let state = service.state_mut().unwrap();
 
-        let entry = state
-            .compile_config()
-            .determine_entry(Some(input.as_path().into()));
+        let entry = state.entry_resolver().entry(Some(input.as_path().into()));
 
         let snap = state.primary().snapshot().unwrap();
 
