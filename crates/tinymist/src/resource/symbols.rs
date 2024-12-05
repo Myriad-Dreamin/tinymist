@@ -948,13 +948,25 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 impl LanguageState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
-        let snap = snap.receive().await.map_err(z_internal_error)?;
+        let snap = snap.receive().await.map_err(internal_error)?;
 
         let mut symbols = ResourceSymbolMap::new();
-        use typst::symbols::{emoji, sym};
-        populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
+        // use typst::symbols::{emoji, sym};
+        let std = snap
+            .world
+            .library
+            .std
+            .scope()
+            .ok_or_else(|| internal_error("cannot get std scope"))?;
+        let sym = std
+            .get("sym")
+            .ok_or_else(|| internal_error("cannot get sym"))?;
+
+        if let Some(scope) = sym.scope() {
+            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
+        }
+
         // todo: disabling emoji module, as there is performant issue on emojis
-        let _ = emoji;
         // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
         const PRELUDE: &str = r#"#show math.equation: set text(font: (
@@ -1134,8 +1146,6 @@ fn trait_symbol_fonts(
                     | FrameItem::Image(_, _, _)
                     | FrameItem::Link(_, _)
                     | FrameItem::Tag(_) => continue,
-                    #[cfg(not(feature = "no-content-hint"))]
-                    FrameItem::ContentHint(_) => continue,
                 };
 
                 let font = text.font.clone();
@@ -1192,7 +1202,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch.char() as u32,
+                unicode: ch as u32,
                 glyphs: vec![],
             },
         );

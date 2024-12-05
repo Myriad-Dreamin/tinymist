@@ -2,12 +2,12 @@
 
 use comemo::Track;
 use ecow::*;
+use reflexo::typst::TypstDocument;
 use typst::engine::{Engine, Route, Sink, Traced};
-use typst::eval::Vm;
-use typst::foundations::{Context, Label, Scopes, Styles, Value};
+use typst::foundations::{Label, Styles, Value};
 use typst::introspection::Introspector;
-use typst::model::{BibliographyElem, Document};
-use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
+use typst::model::BibliographyElem;
+use typst::syntax::{ast, LinkedNode, SyntaxKind, SyntaxNode};
 use typst::World;
 
 /// Try to determine a set of possible values for an expression.
@@ -42,7 +42,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 }
             }
 
-            return typst::trace(world, node.span());
+            return typst::trace::<TypstDocument>(world, node.span());
         }
     };
 
@@ -62,7 +62,8 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
     let introspector = Introspector::default();
     let traced = Traced::default();
     let mut sink = Sink::new();
-    let engine = Engine {
+    let mut engine = Engine {
+        routines: &typst::ROUTINES,
         world: world.track(),
         route: Route::default(),
         introspector: introspector.track(),
@@ -70,15 +71,11 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
         sink: sink.track_mut(),
     };
 
-    let context = Context::none();
-    let mut vm = Vm::new(
-        engine,
-        context.track(),
-        Scopes::new(Some(world.library())),
-        Span::detached(),
-    );
-    let module = typst::eval::import(&mut vm, source.clone(), source_span, true)
+    let module = source
+        .clone()
+        .cast::<typst::foundations::Str>()
         .ok()
+        .and_then(|source| typst_eval::import(&mut engine, source.as_str(), source_span).ok())
         .map(Value::Module);
 
     (Some(source), module)
@@ -103,7 +100,7 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
+pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.
@@ -136,9 +133,9 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
     let split = output.len();
 
     // Bibliography keys.
-    for (key, detail) in BibliographyElem::keys(document.introspector.track()) {
+    for (label, detail) in BibliographyElem::keys(document.introspector.track()) {
         output.push(DynLabel {
-            label: Label::new(key.as_str()),
+            label,
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,

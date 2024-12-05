@@ -191,7 +191,7 @@ impl CompletionContext<'_> {
 
         let cursor_mode = interpret_mode_at(Some(node));
         let is_content = value.ty() == Type::of::<Content>()
-            || value.ty() == Type::of::<typst::symbols::Symbol>();
+            || value.ty() == Type::of::<typst::foundations::Symbol>();
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
         let rng = node.range();

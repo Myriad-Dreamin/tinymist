@@ -5,7 +5,6 @@ use reflexo_typst::debug_loc::{ElementPoint, SourceSpanOffset};
 use reflexo_typst::TypstDocument;
 use reflexo_vec2svg::IncrSvgDocServer;
 use tokio::sync::{broadcast, mpsc};
-use typst::model::Document;
 
 use crate::{debug_loc::SpanInterner, outline::Outline};
 
@@ -35,7 +34,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
     renderer: IncrSvgDocServer,
     resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -45,7 +44,7 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
         resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -156,7 +155,7 @@ impl RenderActor {
 
 pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 
     span_interner: SpanInterner,
@@ -165,7 +164,7 @@ pub struct OutlineRenderActor {
 impl OutlineRenderActor {
     pub fn new(
         signal: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {

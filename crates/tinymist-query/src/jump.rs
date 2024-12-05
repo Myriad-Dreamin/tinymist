@@ -4,7 +4,7 @@
 
 use std::num::NonZeroUsize;
 
-use typst::model::Document;
+use reflexo_typst::TypstDocument;
 use typst::{
     layout::{Frame, FrameItem, Point, Position},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
@@ -12,7 +12,11 @@ use typst::{
 use typst_shim::syntax::LinkedNodeExt;
 
 /// Find the output location in the document for a cursor position.
-pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> Option<Position> {
+pub fn jump_from_cursor(
+    document: &TypstDocument,
+    source: &Source,
+    cursor: usize,
+) -> Option<Position> {
     let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     if node.kind() != SyntaxKind::Text {
         return None;
@@ -47,7 +51,7 @@ pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> 
 }
 
 /// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
+pub fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
     for (mut pos, item) in frame.items() {
         if let FrameItem::Group(group) = item {
             // TODO: Handle transformation.
@@ -62,7 +66,8 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                     return Some(pos);
                 }
                 if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    let glyph_span = glyph.span.0.into_raw();
+                    let dis = glyph_span.get().abs_diff(span.into_raw().get());
                     if dis < *min_dis {
                         *min_dis = dis;
                         *p = pos;

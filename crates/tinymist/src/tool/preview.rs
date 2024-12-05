@@ -17,7 +17,7 @@ use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tokio::sync::{mpsc, oneshot};
-use typst::layout::{Frame, FrameItem, Point, Position};
+use typst::layout::{Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
@@ -688,7 +688,7 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
     let span = node.span();
     for (i, page) in document.pages.iter().enumerate() {
         let t_dis = min_dis;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+        if let Some(pos) = tinymist_query::find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
             return Some(Position {
                 page: NonZeroUsize::new(i + 1)?,
                 point: pos,
@@ -707,36 +707,6 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
         page: NonZeroUsize::new(ppage + 1)?,
         point: p,
     })
-}
-
-/// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
-        if let FrameItem::Group(group) = item {
-            // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
-                return Some(point + pos);
-            }
-        }
-
-        if let FrameItem::Text(text) = item {
-            for glyph in &text.glyphs {
-                if glyph.span.0 == span {
-                    return Some(pos);
-                }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
-                    if dis < *min_dis {
-                        *min_dis = dis;
-                        *p = pos;
-                    }
-                }
-                pos.x += glyph.x_advance.at(text.size);
-            }
-        }
-    }
-
-    None
 }
 
 fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
