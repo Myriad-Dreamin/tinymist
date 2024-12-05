@@ -283,8 +283,12 @@ pub(crate) fn sig_of_type(
             }
 
             for (name, ty) in sig_ty.named_params() {
-                let doc = docstring.named.get(name).unwrap();
-                let default = doc.default.clone();
+                let docstring = docstring.named.get(name);
+                let default = Some(
+                    docstring
+                        .and_then(|doc| doc.default.clone())
+                        .unwrap_or_else(|| "unknown".into()),
+                );
                 let ty = ty.clone();
 
                 if matches!(name.as_ref(), "fill" | "stroke" | "size") {
@@ -293,7 +297,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: name.clone(),
-                    docs: Some(doc.docs.clone()),
+                    docs: docstring.map(|doc| doc.docs.clone()),
                     default,
                     ty,
                     attrs: ParamAttrs::named(),
