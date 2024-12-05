@@ -557,7 +557,9 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
         if let Some(ast::Imports::Items(items)) = import.imports();
         if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
         then {
-            ctx.from = ctx.leaf.offset();
+            if ctx.leaf.kind() == SyntaxKind::Ident {
+                ctx.from = ctx.leaf.offset();
+            }
             let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| path.iter().take_while(|ident| ident.span() != ctx.leaf.span()).collect());
             import_item_completions(ctx, items, path.unwrap_or_default(), &source);
             return true;
