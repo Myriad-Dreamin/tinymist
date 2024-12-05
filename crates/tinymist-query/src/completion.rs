@@ -215,7 +215,6 @@ impl StatefulRequest for CompletionRequest {
 
                     true
                 });
-                log::info!("ident_prefix: done {:?} on {:?}", ident_prefix, completions);
 
                 // if modifying some arguments, we need to truncate and add a comma
                 if !is_callee && cursor != rng.end && is_arg_like_context(&ident_like) {
