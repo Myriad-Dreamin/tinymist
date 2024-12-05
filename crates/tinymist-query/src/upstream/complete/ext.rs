@@ -424,6 +424,7 @@ impl CompletionContext<'_> {
         let filter = |c: &CompletionKindChecker| {
             match surrounding_syntax {
                 SurroundingSyntax::Regular => true,
+                SurroundingSyntax::ImportList => false,
                 SurroundingSyntax::Selector => 'selector: {
                     for func in &c.functions {
                         if func.element().is_some() {
@@ -564,6 +565,7 @@ pub(crate) enum SurroundingSyntax {
     Regular,
     Selector,
     ShowTransform,
+    ImportList,
     SetRule,
 }
 
@@ -579,6 +581,23 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
         match parent.kind() {
             SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
                 return Some(Regular);
+            }
+            SyntaxKind::ImportItemPath
+            | SyntaxKind::ImportItems
+            | SyntaxKind::RenamedImportItem => {
+                return Some(ImportList);
+            }
+            SyntaxKind::ModuleImport => {
+                let colon = parent.children().find(|s| s.kind() == SyntaxKind::Colon);
+                let Some(colon) = colon else {
+                    return Some(Regular);
+                };
+
+                if leaf.offset() >= colon.offset() {
+                    return Some(ImportList);
+                } else {
+                    return Some(Regular);
+                }
             }
             SyntaxKind::Named => {
                 return Some(Regular);
@@ -1332,6 +1351,7 @@ fn type_completion(
 /// Complete call and set rule parameters.
 pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     use crate::syntax::get_check_target;
+    use SurroundingSyntax::*;
 
     let check_target = get_check_target(ctx.leaf.clone());
     crate::log_debug_ct!("complete_type: pos {:?} -> {check_target:#?}", ctx.leaf);
@@ -1379,7 +1399,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     let scope = ctx.surrounding_syntax();
 
     crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
-    if matches!((scope, &ty), (SurroundingSyntax::Regular, None)) {
+    if matches!((scope, &ty), (Regular, None)) || matches!(scope, ImportList) {
         return None;
     }
 
@@ -1407,6 +1427,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
 
     match scope {
         SurroundingSyntax::Regular => {}
+        SurroundingSyntax::ImportList => {}
         SurroundingSyntax::Selector => {
             ctx.snippet_completion(
                 "text selector",
@@ -1507,6 +1528,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
 
     match scope {
         SurroundingSyntax::Regular => {}
+        SurroundingSyntax::ImportList => {}
         SurroundingSyntax::Selector => {
             ctx.enrich("", ": ${}");
         }
