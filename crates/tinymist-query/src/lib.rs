@@ -84,7 +84,7 @@ mod prelude;
 
 use std::sync::Arc;
 
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use typst::syntax::Source;
 
 /// The physical position in a document.
@@ -98,7 +98,7 @@ pub struct VersionedDocument {
     /// The version of the document.
     pub version: usize,
     /// The compiled document.
-    pub document: Arc<TypstDocument>,
+    pub document: Arc<TypstPagedDocument>,
 }
 
 /// A request handler with given syntax information.

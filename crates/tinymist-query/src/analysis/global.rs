@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use reflexo::debug_loc::DataSource;
 use reflexo::hash::{hash128, FxDashMap};
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
 use tinymist_world::LspWorld;
@@ -882,7 +882,7 @@ impl SharedContext {
     /// only generated when the document is available.
     pub fn tooltip(
         &self,
-        document: Option<&TypstDocument>,
+        document: Option<&TypstPagedDocument>,
         source: &Source,
         cursor: usize,
     ) -> Option<Tooltip> {

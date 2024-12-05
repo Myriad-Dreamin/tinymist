@@ -2,7 +2,7 @@
 
 use comemo::Track;
 use ecow::*;
-use reflexo::typst::TypstDocument;
+use reflexo::typst::TypstPagedDocument;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Label, Styles, Value};
 use typst::introspection::Introspector;
@@ -42,7 +42,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 }
             }
 
-            return typst::trace::<TypstDocument>(world, node.span());
+            return typst::trace::<TypstPagedDocument>(world, node.span());
         }
     };
 
@@ -100,7 +100,7 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
+pub fn analyze_labels(document: &TypstPagedDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.

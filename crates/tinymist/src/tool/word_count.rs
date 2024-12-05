@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
-use reflexo_typst::{debug_loc::SourceSpanOffset, exporter_utils::map_err, TypstDocument};
+use reflexo_typst::{debug_loc::SourceSpanOffset, exporter_utils::map_err, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use typst::{syntax::Span, text::TextItem};
 use unicode_script::{Script, UnicodeScript};
@@ -25,7 +25,7 @@ pub struct WordsCount {
 }
 
 /// Count words in a document.
-pub fn word_count(doc: &TypstDocument) -> WordsCount {
+pub fn word_count(doc: &TypstPagedDocument) -> WordsCount {
     // the mapping is still not use, so we prevent the warning here
     let _ = TextContent::map_back_spans;
 
@@ -97,7 +97,7 @@ pub struct TextExporter {}
 
 impl TextExporter {
     /// Collect text content from a document.
-    pub fn collect(&self, output: &TypstDocument) -> typst::diag::SourceResult<String> {
+    pub fn collect(&self, output: &TypstPagedDocument) -> typst::diag::SourceResult<String> {
         let w = std::io::BufWriter::new(Vec::new());
 
         let mut d = TextExportWorker { w };
@@ -113,7 +113,7 @@ struct TextExportWorker {
 }
 
 impl TextExportWorker {
-    fn doc(&mut self, doc: &TypstDocument) -> io::Result<()> {
+    fn doc(&mut self, doc: &TypstPagedDocument) -> io::Result<()> {
         for page in doc.pages.iter() {
             self.frame(&page.frame)?;
         }
@@ -159,7 +159,7 @@ pub struct TextContent {
     /// A string of the content for slicing.
     pub content: String,
     /// annotating document.
-    pub doc: Arc<TypstDocument>,
+    pub doc: Arc<TypstPagedDocument>,
 }
 
 impl TextContent {
@@ -197,7 +197,7 @@ struct SpanMapper {
 }
 
 impl SpanMapper {
-    fn doc(&mut self, doc: &TypstDocument) {
+    fn doc(&mut self, doc: &TypstPagedDocument) {
         for page in doc.pages.iter() {
             self.frame(&page.frame);
         }
