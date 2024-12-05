@@ -3,6 +3,7 @@
 use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
+use typst::utils::PicoStr;
 
 use super::{prelude::*, InsTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
@@ -157,7 +158,7 @@ fn find_ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::new(name);
+    let label = Label::new(PicoStr::intern(name));
     let sel = Selector::Label(label);
 
     // if it is a label, we put the selection range to itself

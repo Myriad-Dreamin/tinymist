@@ -460,7 +460,7 @@ impl Ord for Decl {
             (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
             (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
             (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
-            _ => self.span().number().cmp(&other.span().number()),
+            _ => self.span().into_raw().cmp(&other.span().into_raw()),
         };
 
         base.then_with(|| self.name().cmp(other.name()))

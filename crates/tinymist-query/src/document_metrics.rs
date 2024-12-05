@@ -2,11 +2,11 @@ use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use reflexo::debug_loc::DataSource;
+use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
-    model::Document,
     syntax::Span,
     text::TextItem,
 };
@@ -142,7 +142,7 @@ struct DocumentMetricsWorker<'a> {
 }
 
 impl DocumentMetricsWorker<'_> {
-    fn work(&mut self, doc: &Document) -> Option<()> {
+    fn work(&mut self, doc: &TypstDocument) -> Option<()> {
         for page in &doc.pages {
             self.work_frame(&page.frame)?;
         }
@@ -166,8 +166,6 @@ impl DocumentMetricsWorker<'_> {
             | FrameItem::Image(..)
             | FrameItem::Tag(..)
             | FrameItem::Link(..) => Some(()),
-            #[cfg(not(feature = "no-content-hint"))]
-            FrameItem::ContentHint(..) => Some(()),
         }
     }
 

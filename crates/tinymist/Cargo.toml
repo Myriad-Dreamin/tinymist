@@ -87,7 +87,7 @@ rayon.workspace = true
 typst-ansi-hl = "0.2.0"
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "preview"]
+default = ["cli", "embed-fonts", "preview"]
 
 cli = ["sync-lsp/clap"]
 

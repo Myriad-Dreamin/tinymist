@@ -84,7 +84,8 @@ mod prelude;
 
 use std::sync::Arc;
 
-use typst::{model::Document as TypstDocument, syntax::Source};
+use reflexo_typst::TypstDocument;
+use typst::syntax::Source;
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;

@@ -2,13 +2,14 @@ use std::fmt::Write;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
+use reflexo_typst::TypstDocument;
 use typst::engine::Sink;
-use typst::eval::CapturesVisitor;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
-use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
+use typst::utils::PicoStr;
 use typst::World;
+use typst_eval::CapturesVisitor;
 use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};
 
@@ -22,7 +23,7 @@ use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 /// when the document is available.
 pub fn tooltip_(
     world: &dyn World,
-    document: Option<&Document>,
+    document: Option<&TypstDocument>,
     source: &Source,
     cursor: usize,
 ) -> Option<Tooltip> {
@@ -156,7 +157,7 @@ fn length_tooltip(length: Length) -> Option<Tooltip> {
 }
 
 /// Tooltip for a hovered reference or label.
-fn label_tooltip(document: &Document, leaf: &LinkedNode) -> Option<Tooltip> {
+fn label_tooltip(document: &TypstDocument, leaf: &LinkedNode) -> Option<Tooltip> {
     let target = match leaf.kind() {
         SyntaxKind::RefMarker => leaf.text().trim_start_matches('@'),
         SyntaxKind::Label => leaf.text().trim_start_matches('<').trim_end_matches('>'),
@@ -170,7 +171,7 @@ fn label_tooltip(document: &Document, leaf: &LinkedNode) -> Option<Tooltip> {
         ..
     } in analyze_labels(document).0
     {
-        if label.as_str() == target {
+        if label.into_inner() == PicoStr::intern(target) {
             return Some(Tooltip::Text(detail?));
         }
     }
