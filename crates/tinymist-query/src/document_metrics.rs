@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use reflexo::debug_loc::DataSource;
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use serde::{Deserialize, Serialize};
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
@@ -142,7 +142,7 @@ struct DocumentMetricsWorker<'a> {
 }
 
 impl DocumentMetricsWorker<'_> {
-    fn work(&mut self, doc: &TypstDocument) -> Option<()> {
+    fn work(&mut self, doc: &TypstPagedDocument) -> Option<()> {
         for page in &doc.pages {
             self.work_frame(&page.frame)?;
         }

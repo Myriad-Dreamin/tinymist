@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 // use reflexo_typst::font::GlyphId;
 use reflexo_typst::{
-    vector::font::GlyphId, world::EntryState, ShadowApi, TaskInputs, TypstDocument, TypstFont,
+    vector::font::GlyphId, world::EntryState, ShadowApi, TaskInputs, TypstFont, TypstPagedDocument,
 };
 use sync_lsp::LspResult;
 
@@ -1106,7 +1106,7 @@ impl LanguageState {
 }
 
 fn trait_symbol_fonts(
-    doc: &TypstDocument,
+    doc: &TypstPagedDocument,
     symbols: &[String],
 ) -> HashMap<String, (TypstFont, GlyphId)> {
     use typst::layout::Frame;
@@ -1127,7 +1127,7 @@ fn trait_symbol_fonts(
     }
 
     impl Worker<'_> {
-        fn work(&mut self, doc: &TypstDocument) {
+        fn work(&mut self, doc: &TypstPagedDocument) {
             for (pg, s) in doc.pages.iter().zip(self.symbols.iter()) {
                 self.active = s;
                 self.work_frame(&pg.frame);

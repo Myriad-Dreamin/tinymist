@@ -5,7 +5,7 @@ use std::ops::Range;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::TextEdit;
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
@@ -801,7 +801,7 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 /// Context for autocompletion.
 pub struct CompletionContext<'a> {
     pub ctx: &'a mut LocalContext,
-    pub document: Option<&'a TypstDocument>,
+    pub document: Option<&'a TypstPagedDocument>,
     pub text: &'a str,
     pub before: &'a str,
     pub after: &'a str,
@@ -825,7 +825,7 @@ impl<'a> CompletionContext<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ctx: &'a mut LocalContext,
-        document: Option<&'a TypstDocument>,
+        document: Option<&'a TypstPagedDocument>,
         source: &'a Source,
         cursor: usize,
         explicit: bool,

@@ -2861,7 +2861,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "base64",
  "bitvec",
@@ -2887,7 +2886,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "codespan-reporting",
  "comemo 0.4.0",
@@ -2916,7 +2914,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst-shim"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "cfg-if",
  "typst",
@@ -2926,7 +2923,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "bitvec",
  "comemo 0.4.0",
@@ -2951,7 +2947,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "base64",
  "comemo 0.4.0",
@@ -2964,7 +2959,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "indexmap 2.7.0",
  "log",
@@ -2978,7 +2972,6 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly%2Fv0.5.3#94f9064117cfd130a7afcd87424315a54d9468cd"
 dependencies = [
  "chrono",
  "codespan-reporting",

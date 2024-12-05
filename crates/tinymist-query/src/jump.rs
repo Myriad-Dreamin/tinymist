@@ -4,7 +4,7 @@
 
 use std::num::NonZeroUsize;
 
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use typst::{
     layout::{Frame, FrameItem, Point, Position},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
@@ -13,7 +13,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 /// Find the output location in the document for a cursor position.
 pub fn jump_from_cursor(
-    document: &TypstDocument,
+    document: &TypstPagedDocument,
     source: &Source,
     cursor: usize,
 ) -> Option<Position> {

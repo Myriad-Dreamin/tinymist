@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
-use reflexo_typst::TypstDocument;
+use reflexo_typst::TypstPagedDocument;
 use typst::engine::Sink;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
@@ -23,7 +23,7 @@ use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 /// when the document is available.
 pub fn tooltip_(
     world: &dyn World,
-    document: Option<&TypstDocument>,
+    document: Option<&TypstPagedDocument>,
     source: &Source,
     cursor: usize,
 ) -> Option<Tooltip> {
@@ -157,7 +157,7 @@ fn length_tooltip(length: Length) -> Option<Tooltip> {
 }
 
 /// Tooltip for a hovered reference or label.
-fn label_tooltip(document: &TypstDocument, leaf: &LinkedNode) -> Option<Tooltip> {
+fn label_tooltip(document: &TypstPagedDocument, leaf: &LinkedNode) -> Option<Tooltip> {
     let target = match leaf.kind() {
         SyntaxKind::RefMarker => leaf.text().trim_start_matches('@'),
         SyntaxKind::Label => leaf.text().trim_start_matches('<').trim_end_matches('>'),

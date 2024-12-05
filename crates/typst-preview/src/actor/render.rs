@@ -34,7 +34,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+    document: Arc<std::sync::RwLock<Option<TypstDocument>>>,
     renderer: IncrSvgDocServer,
     resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -44,7 +44,7 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+        document: Arc<std::sync::RwLock<Option<TypstDocument>>>,
         resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -155,7 +155,7 @@ impl RenderActor {
 
 pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+    document: Arc<std::sync::RwLock<Option<TypstDocument>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 
     span_interner: SpanInterner,
@@ -164,7 +164,7 @@ pub struct OutlineRenderActor {
 impl OutlineRenderActor {
     pub fn new(
         signal: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+        document: Arc<std::sync::RwLock<Option<TypstDocument>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {

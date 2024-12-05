@@ -11,7 +11,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
-use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstFileId, TypstPagedDocument};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
@@ -675,7 +675,11 @@ impl Notification for NotifDocumentOutline {
 }
 
 /// Find the output location in the document for a cursor position.
-fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Option<Position> {
+fn jump_from_cursor(
+    document: &TypstPagedDocument,
+    source: &Source,
+    cursor: usize,
+) -> Option<Position> {
     let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     if node.kind() != SyntaxKind::Text {
         return None;

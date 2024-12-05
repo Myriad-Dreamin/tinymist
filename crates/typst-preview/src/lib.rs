@@ -8,6 +8,7 @@ pub use actor::editor::{
 };
 pub use args::*;
 pub use outline::Outline;
+use reflexo_typst::TypstDocument;
 
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
@@ -15,7 +16,6 @@ use futures::sink::SinkExt;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Error;
-use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
@@ -197,7 +197,7 @@ pub struct PreviewBuilder {
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
     webview_conn: BroadcastChannel<WebviewActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<std::sync::RwLock<Option<TypstDocument>>>,
 
     compile_watcher: OnceCell<Arc<CompileWatcher>>,
 }
@@ -400,7 +400,7 @@ pub struct MemoryFilesShort {
 pub struct CompileWatcher {
     task_id: String,
     refresh_style: RefreshStyle,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<std::sync::RwLock<Option<TypstDocument>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -418,7 +418,7 @@ impl CompileWatcher {
 
     pub fn notify_compile(
         &self,
-        res: Result<Arc<Document>, CompileStatus>,
+        res: Result<TypstDocument, CompileStatus>,
         is_on_saved: bool,
         is_by_entry_update: bool,
     ) {
@@ -455,5 +455,5 @@ struct DataPlane {
     enable_partial_rendering: bool,
     invert_colors: String,
     renderer_tx: broadcast::Sender<RenderActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<std::sync::RwLock<Option<TypstDocument>>>,
 }

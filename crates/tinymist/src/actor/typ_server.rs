@@ -18,15 +18,20 @@ use reflexo_typst::{
     watch_deps,
     world::{CompilerFeat, CompilerUniverse, CompilerWorld},
     CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, GenericExporter,
-    Revising, TaskInputs, TypstDocument, WorldDeps,
+    Revising, TaskInputs, TypstPagedDocument, WorldDeps,
 };
-use typst::diag::{SourceDiagnostic, SourceResult, Warned};
+use typst::{
+    diag::{SourceDiagnostic, SourceResult, Warned},
+    html::HtmlDocument,
+};
 use typst_shim::utils::Deferred;
 
 use crate::task::CacheTask;
 
-type CompileRawResult = Deferred<(SourceResult<Warned<Arc<TypstDocument>>>, CompileEnv)>;
+type CompileRawResult = Deferred<(SourceResult<Warned<Arc<TypstPagedDocument>>>, CompileEnv)>;
+type HtmlCompileRawResult = Deferred<(SourceResult<Warned<Arc<HtmlDocument>>>, CompileEnv)>;
 type DocState = std::sync::OnceLock<CompileRawResult>;
+type HtmlDocState = std::sync::OnceLock<HtmlCompileRawResult>;
 
 /// A signal that possibly triggers an export.
 ///
@@ -51,8 +56,12 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     pub world: Arc<CompilerWorld<F>>,
     /// Compiling the document.
     doc_state: Arc<DocState>,
+    /// Compiling the document.
+    html_doc_state: Arc<HtmlDocState>,
     /// The last successfully compiled document.
-    pub success_doc: Option<Arc<TypstDocument>>,
+    pub success_doc: Option<Arc<TypstPagedDocument>>,
+    /// The last successfully compiled document.
+    pub success_html_doc: Option<Arc<HtmlDocument>>,
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
@@ -64,6 +73,18 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
                 let w = w.as_ref();
                 let mut c = std::marker::PhantomData;
                 let res = c.compile(w, &mut env);
+                (res, env)
+            })
+        })
+    }
+
+    fn start_html(&self) -> &HtmlCompileRawResult {
+        self.html_doc_state.get_or_init(|| {
+            let w = self.world.html_variant(true);
+            let mut env = self.env.clone();
+            Deferred::new(move || {
+                let mut c = std::marker::PhantomData;
+                let res = c.compile_html(&w, &mut env);
                 (res, env)
             })
         })
@@ -92,8 +113,15 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     }
 
     pub fn compile(&self) -> CompiledArtifact<F> {
-        let (doc, env) = self.start().wait().clone();
+        let doc_future = self.start();
+        let html_doc_future = self.start_html();
+        let (doc, env) = doc_future.wait().clone();
         let (doc, warnings) = match doc {
+            Ok(doc) => (Ok(doc.output), doc.warnings),
+            Err(err) => (Err(err), EcoVec::default()),
+        };
+        let (html_doc, _) = html_doc_future.wait().clone();
+        let (html_doc, html_warnings) = match html_doc {
             Ok(doc) => (Ok(doc.output), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
@@ -101,9 +129,12 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
             signal: self.flags,
             world: self.world.clone(),
             env,
-            doc,
             warnings,
+            html_warnings,
+            doc,
+            html_doc,
             success_doc: self.success_doc.clone(),
+            success_html_doc: self.success_html_doc.clone(),
         }
     }
 }
@@ -115,7 +146,9 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
             env: self.env.clone(),
             world: self.world.clone(),
             doc_state: self.doc_state.clone(),
+            html_doc_state: self.html_doc_state.clone(),
             success_doc: self.success_doc.clone(),
+            success_html_doc: self.success_html_doc.clone(),
         }
     }
 }
@@ -129,10 +162,16 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     pub env: CompileEnv,
     /// The diagnostics of the document.
     pub warnings: EcoVec<SourceDiagnostic>,
+    /// The diagnostics of the html document.
+    pub html_warnings: EcoVec<SourceDiagnostic>,
     /// The compiled document.
-    pub doc: SourceResult<Arc<TypstDocument>>,
+    pub doc: SourceResult<Arc<TypstPagedDocument>>,
+    /// The compiled document.
+    pub html_doc: SourceResult<Arc<HtmlDocument>>,
     /// The last successfully compiled document.
-    pub success_doc: Option<Arc<TypstDocument>>,
+    pub success_doc: Option<Arc<TypstPagedDocument>>,
+    /// The last successfully compiled document.
+    pub success_html_doc: Option<Arc<HtmlDocument>>,
 }
 
 impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
@@ -141,15 +180,18 @@ impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
             signal: self.signal,
             world: self.world.clone(),
             env: self.env.clone(),
-            doc: self.doc.clone(),
             warnings: self.warnings.clone(),
+            html_warnings: self.html_warnings.clone(),
+            doc: self.doc.clone(),
+            html_doc: self.html_doc.clone(),
             success_doc: self.success_doc.clone(),
+            success_html_doc: self.success_html_doc.clone(),
         }
     }
 }
 
 impl<F: CompilerFeat> CompiledArtifact<F> {
-    pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
+    pub fn success_doc(&self) -> Option<Arc<TypstPagedDocument>> {
         self.doc
             .as_ref()
             .ok()
@@ -176,7 +218,7 @@ pub enum SucceededArtifact<F: CompilerFeat> {
 }
 
 impl<F: CompilerFeat> SucceededArtifact<F> {
-    pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
+    pub fn success_doc(&self) -> Option<Arc<TypstPagedDocument>> {
         match self {
             SucceededArtifact::Compiled(artifact) => artifact.success_doc(),
             SucceededArtifact::Suspend(snapshot) => snapshot.success_doc.clone(),
@@ -306,9 +348,13 @@ pub struct CompileServerActor<F: CompilerFeat> {
     /// Estimated latest set of shadow files.
     estimated_shadow_files: HashSet<Arc<Path>>,
     /// The latest compiled document.
-    pub(crate) latest_doc: Option<Arc<TypstDocument>>,
-    /// The latest successly compiled document.
-    latest_success_doc: Option<Arc<TypstDocument>>,
+    pub(crate) latest_doc: Option<Arc<TypstPagedDocument>>,
+    /// The latest compiled html document.
+    pub(crate) latest_html_doc: Option<Arc<HtmlDocument>>,
+    /// The latest successfully compiled document.
+    latest_success_doc: Option<Arc<TypstPagedDocument>>,
+    /// The latest successfully compiled html document.
+    latest_success_html_doc: Option<Arc<HtmlDocument>>,
     /// feature set for compile_once mode.
     once_feature_set: Arc<FeatureSet>,
     /// Shared feature set for watch mode.
@@ -352,7 +398,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             estimated_shadow_files: Default::default(),
             latest_doc: None,
+            latest_html_doc: None,
             latest_success_doc: None,
+            latest_success_html_doc: None,
             once_feature_set: Arc::new(feature_set.clone()),
             watch_feature_set: Arc::new(
                 feature_set.configure(&WITH_COMPILING_STATUS_FEATURE, true),
@@ -460,6 +508,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             },
             doc_state: Arc::new(OnceLock::new()),
             success_doc: self.latest_success_doc.clone(),
+            html_doc_state: Arc::new(OnceLock::new()),
+            success_html_doc: self.latest_success_html_doc.clone(),
         }
     }
 
@@ -563,6 +613,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         if doc.is_some() {
             self.latest_success_doc.clone_from(&self.latest_doc);
         }
+        let html_doc = artifact.html_doc.ok();
+        self.latest_html_doc.clone_from(&html_doc);
+        if html_doc.is_some() {
+            self.latest_success_html_doc
+                .clone_from(&self.latest_html_doc);
+        }
 
         // Notify the new file dependencies.
         let mut deps = vec![];
@@ -633,7 +689,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                     // Reset the watch state and document state.
                     self.latest_doc = None;
+                    self.latest_html_doc = None;
                     self.latest_success_doc = None;
+                    self.latest_success_html_doc = None;
                     self.suspended_reason = no_reason();
                 }
 

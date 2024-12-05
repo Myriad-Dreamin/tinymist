@@ -28,7 +28,7 @@ use anyhow::bail;
 use log::{error, info, trace};
 use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
-    CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
+    CompileReport, EntryReader, Error, ImmutPath, TaskInputs, TypstDocument,
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
@@ -138,14 +138,21 @@ impl CompileHandler {
         &self,
         world: &LspWorld,
         errors: EcoVec<SourceDiagnostic>,
+        html_errors: EcoVec<SourceDiagnostic>,
         warnings: EcoVec<SourceDiagnostic>,
+        html_warnings: EcoVec<SourceDiagnostic>,
     ) {
         let revision = world.revision().get();
-        trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
+        log::info!("notify diagnostics({revision}): {errors:#?} {warnings:#?} {html_warnings:#?}");
 
         let diagnostics = tinymist_query::convert_diagnostics(
             world,
-            errors.iter().chain(warnings.iter()),
+            errors
+                .iter()
+                // todo: deduplicate html errors
+                .chain(html_errors.iter())
+                .chain(warnings.iter())
+                .chain(html_warnings.iter()),
             self.analysis.position_encoding,
         );
 
@@ -235,7 +242,9 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         self.notify_diagnostics(
             &snap.world,
             snap.doc.clone().err().unwrap_or_default(),
+            snap.html_doc.clone().err().unwrap_or_default(),
             snap.warnings.clone(),
+            snap.html_warnings.clone(),
         );
 
         self.export.signal(snap, snap.signal);
@@ -253,10 +262,17 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.inner.read().as_ref() {
+            // todo: html feature or not
+            // let res = snap
+            //     .doc
+            //     .clone()
+            //     .map_err(|_| typst_preview::CompileStatus::CompileError);
+            log::info!("html it: {:?}", snap.html_doc);
             let res = snap
-                .doc
+                .html_doc
                 .clone()
-                .map_err(|_| typst_preview::CompileStatus::CompileError);
+                .map_err(|_| typst_preview::CompileStatus::CompileError)
+                .map(TypstDocument::Html);
             inner.notify_compile(res, snap.signal.by_fs_events, snap.signal.by_entry_update);
         }
     }
