@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on ./ (56..58)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import_item_dot.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "table-prefix",
+    "textEdit": {
+     "newText": "table-prefix",
+     "range": {
+      "end": {
+       "character": 24,
+       "line": 1
+      },
+      "start": {
+       "character": 23,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]
