@@ -8,6 +8,7 @@ use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
+use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -40,8 +41,8 @@ pub fn autocomplete(
         || complete_type(&mut ctx).is_none() && {
             crate::log_debug_ct!("continue after completing type");
             complete_labels(&mut ctx)
-                || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
+                || complete_field_accesses(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
                 || complete_code(&mut ctx, false)
@@ -538,7 +539,7 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
         if let Some(source) = prev.children().find(|child| child.is::<ast::Expr>());
         then {
             ctx.from = ctx.cursor;
-            import_item_completions(ctx, items, &source);
+            import_item_completions(ctx, items, vec![], &source);
             return true;
         }
     }
@@ -546,16 +547,21 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
     // Behind a half-started identifier in an import list:
     // "#import "path.typ": thi|",
     if_chain! {
-        if ctx.leaf.kind() == SyntaxKind::Ident;
-        if let Some(parent) = ctx.leaf.parent();
+        if matches!(ctx.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
+        if let Some(path_ctx) = ctx.leaf.clone().parent();
+        if path_ctx.kind() == SyntaxKind::ImportItemPath;
+        if let Some(parent) = path_ctx.parent();
         if parent.kind() == SyntaxKind::ImportItems;
         if let Some(grand) = parent.parent();
         if let Some(ast::Expr::Import(import)) = grand.get().cast();
         if let Some(ast::Imports::Items(items)) = import.imports();
         if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
         then {
-            ctx.from = ctx.leaf.offset();
-            import_item_completions(ctx, items, &source);
+            if ctx.leaf.kind() == SyntaxKind::Ident {
+                ctx.from = ctx.leaf.offset();
+            }
+            let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| path.iter().take_while(|ident| ident.span() != ctx.leaf.span()).collect());
+            import_item_completions(ctx, items, path.unwrap_or_default(), &source);
             return true;
         }
     }
@@ -567,22 +573,43 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
 fn import_item_completions<'a>(
     ctx: &mut CompletionContext<'a>,
     existing: ast::ImportItems<'a>,
+    comps: Vec<ast::Ident>,
     source: &LinkedNode,
 ) {
-    let Some(value) = ctx.ctx.analyze_import(source).1 else {
+    // Select the source by `comps`
+    let value = ctx.ctx.module_by_syntax(source);
+    let value = comps
+        .iter()
+        .fold(value.as_ref(), |value, comp| value?.scope()?.get(comp));
+    let Some(scope) = value.and_then(|v| v.scope()) else {
         return;
     };
-    let Some(scope) = value.scope() else { return };
+
+    // Check imported items in the scope
+    let seen = existing
+        .iter()
+        .flat_map(|item| {
+            let item_comps = item.path().iter().collect::<Vec<_>>();
+            if item_comps.len() == comps.len() + 1
+                && item_comps
+                    .iter()
+                    .zip(comps.as_slice())
+                    .all(|(l, r)| l.as_str() == r.as_str())
+            {
+                // item_comps.len() >= 1
+                item_comps.last().cloned()
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
     if existing.iter().next().is_none() {
         ctx.snippet_completion("*", "*", "Import everything.");
     }
 
     for (name, value, _) in scope.iter() {
-        if existing
-            .iter()
-            .all(|item| item.original_name().as_str() != name)
-        {
+        if seen.iter().all(|item| item.as_str() != name) {
             ctx.value_completion(Some(name.clone()), value, false, None);
         }
     }

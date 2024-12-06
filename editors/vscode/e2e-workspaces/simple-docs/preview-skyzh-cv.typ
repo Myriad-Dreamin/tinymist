@@ -1,6 +1,6 @@
 // https://github.com/skyzh/chicv/blob/master/template/cv.typ
 
-#show heading: set text(font: "Linux Biolinum")
+// #show heading: set text(font: "Linux Biolinum")
 
 #show link: underline
 
