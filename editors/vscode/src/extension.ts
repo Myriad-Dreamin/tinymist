@@ -252,7 +252,7 @@ async function languageActivate(context: ExtensionContext) {
       await doActivate(context);
     }),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
-    commands.registerCommand("tinymist.showLog", tinymist.showLog),
+    commands.registerCommand("tinymist.showLog", () => tinymist.showLog()),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
