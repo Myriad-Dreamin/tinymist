@@ -200,6 +200,8 @@ extend-exclude = ["/.git", "fixtures", "upstream"]
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
+#
+# A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
@@ -216,6 +218,8 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
 # These patches use a different version of `reflexo`.
+#
+# A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 # reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 # world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 # typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
