@@ -13,7 +13,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Code Analysis
 
-* (Fix) Warning well-formed named parameters in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/948
+* (Fix) Warning ill-formed named parameters in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/948
   * There are potential bugs so there might be ill-formed named parameters and cause panics. We haven't fixed them but turn the panics into warnings.
 
 ### Completion
