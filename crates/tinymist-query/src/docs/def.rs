@@ -305,12 +305,18 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     let ty = type_info.type_of_span(pos)?;
 
     // todo multiple sources
+    // Must use raw result as type aliases contain the source information.
     let mut srcs = ty.sources();
     srcs.sort();
     log::info!("check variable docs of ty: {ty:?} => {srcs:?}");
     let doc_source = srcs.into_iter().next()?;
 
-    let return_ty = format_ty(Some(&ty));
+    // todo people can easily forget to simplify the type which is not good. we
+    // might find a way to ensure them at compile time.
+    //
+    // Must be simplified before formatting, to expand type aliases.
+    let simplified_ty = type_info.simplify(ty, false);
+    let return_ty = format_ty(Some(&simplified_ty));
     match doc_source {
         DocSource::Var(var) => {
             let docs = type_info
