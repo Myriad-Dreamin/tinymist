@@ -4,6 +4,28 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.12.10 - [2024-12-07]
+
+### Compiler
+
+### Editor
+
+* (Fix) Binding this context to `showLog` function in https://github.com/Myriad-Dreamin/tinymist/pull/951
+  * Otherwise, an undefined reference exception is thrown when showing logs.
+
+### Code Analysis
+
+* (Fix) Warning well-formed named parameters in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/948
+  * There are potential bugs so there might be ill-formed named parameters and cause panics. We haven't fixed them but turn the panics into warnings.
+
+### Completion
+
+* Completing on import item path by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/949
+  * The syntax was introduced in typst v0.12.0 which prevented all effective completions on import items.
+* (Fix) Only completing import items when in the same line of the module import in https://github.com/Myriad-Dreamin/tinymist/pull/952
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.8...v0.12.10
+
 ## v0.12.8 - [2024-12-03]
 
 v0.12.6 was wrongly released as v0.12.6-rc3. This release is to fix the version number.
