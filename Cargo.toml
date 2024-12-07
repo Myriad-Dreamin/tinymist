@@ -194,7 +194,7 @@ extend-exclude = ["/.git", "fixtures", "upstream"]
 
 # This patch is used to bundle a locally built HTML (frontend) of `typst-preview`.
 # The shortcoming is that you cannot install tinymist from git source then, i.e. `cargo install --git ..`, with this patch.
-# However, it is not suggested to install it in that way. The suggested way is 
+# However, it is not suggested to install it in that way. The suggested ways are: 
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
 # - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
