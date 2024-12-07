@@ -112,7 +112,7 @@ typst-pdf = "0.12.0"
 typst-syntax = "0.12.0"
 typst-assets = "0.12.0"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { version = "=0.12.6", default-features = false }
+typstyle = { version = "=0.12.8", default-features = false }
 typlite = { path = "./crates/typlite" }
 typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
