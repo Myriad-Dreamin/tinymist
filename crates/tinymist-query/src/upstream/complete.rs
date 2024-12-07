@@ -536,7 +536,7 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
         if let Some(prev) = ctx.leaf.prev_sibling();
         if let Some(ast::Expr::Import(import)) = prev.get().cast();
         if ctx.leaf.range().end <= prev.range().end ||
-            !ctx.text[prev.offset()..ctx.leaf.range().start].contains('\n');
+            !ctx.text[prev.offset()..ctx.cursor].contains('\n');
         if let Some(ast::Imports::Items(items)) = import.imports();
         if let Some(source) = prev.children().find(|child| child.is::<ast::Expr>());
         then {
