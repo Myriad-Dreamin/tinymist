@@ -192,8 +192,16 @@ extend-exclude = ["/.git", "fixtures", "upstream"]
 
 [patch.crates-io]
 
+# This patch is used to bundle a locally built HTML (frontend) of `typst-preview`.
+# The shortcoming is that you cannot install tinymist from git source then, i.e. `cargo install --git ..`, with this patch.
+# However, it is not suggested to install it in that way. The suggested ways are: 
+# - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
+# - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
 
+# These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
+#
+# A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
@@ -201,6 +209,7 @@ typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 
+# These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }
 # typst-svg = { path = "../typst/crates/typst-svg" }
@@ -208,6 +217,9 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
+# These patches use a different version of `reflexo`.
+#
+# A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 # reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 # world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 # typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
@@ -215,6 +227,7 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 # shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 
+# These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
