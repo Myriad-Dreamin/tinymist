@@ -6,8 +6,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.12.10 - [2024-12-07]
 
-### Compiler
-
 ### Editor
 
 * (Fix) Binding this context to `showLog` function in https://github.com/Myriad-Dreamin/tinymist/pull/951
@@ -15,7 +13,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Code Analysis
 
-* (Fix) Warning well-formed named parameters in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/948
+* (Fix) Warning ill-formed named parameters in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/948
   * There are potential bugs so there might be ill-formed named parameters and cause panics. We haven't fixed them but turn the panics into warnings.
 
 ### Completion
