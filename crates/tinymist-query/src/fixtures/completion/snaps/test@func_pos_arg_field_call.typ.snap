@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on . (95..96)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/func_pos_arg_field_call.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "mode",
+    "labelDetails": {
+     "description": "\"code\" | \"markup\" | \"math\""
+    },
+    "sortText": "000",
+    "textEdit": {
+     "newText": "mode: ${1:}",
+     "range": {
+      "end": {
+       "character": 69,
+       "line": 2
+      },
+      "start": {
+       "character": 69,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
