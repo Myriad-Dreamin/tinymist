@@ -178,7 +178,21 @@ fn def_tooltip(
 
                         match &sym_docs {
                             Some(DefDocs::Variable(docs)) => {
-                                push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
+                                if let Some((_, long, _)) = docs.return_ty.as_ref() {
+                                    if long.as_str() == format!("@{}", def.name()) {
+                                        let ty = ctx
+                                            .literal_type_of_node(leaf)?
+                                            .repr()
+                                            .unwrap_or_else(|| "any".into());
+                                        let _ = write!(type_doc, " = {ty}");
+                                    } else {
+                                        push_result_ty(
+                                            def.name(),
+                                            docs.return_ty.as_ref(),
+                                            &mut type_doc,
+                                        );
+                                    }
+                                }
                             }
                             Some(DefDocs::Function(docs)) => {
                                 let _ = docs.print(&mut type_doc);
