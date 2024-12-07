@@ -607,7 +607,7 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
             }
             SyntaxKind::SetRule => {
                 let rule = parent.get().cast::<ast::SetRule>()?;
-                if met_args || encolsed_by(parent, rule.condition().map(|s| s.span()), leaf) {
+                if met_args || enclosed_by(parent, rule.condition().map(|s| s.span()), leaf) {
                     return Some(Regular);
                 } else {
                     return Some(SetRule);
@@ -963,7 +963,7 @@ impl FnCompletionFeat {
     }
 }
 
-fn encolsed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool {
+fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool {
     s.and_then(|s| parent.find(s)?.find(leaf.span())).is_some()
 }
 
@@ -1417,13 +1417,13 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     }
 
     let mut completions = std::mem::take(&mut ctx.completions);
-    let explict = ctx.explicit;
+    let explicit = ctx.explicit;
     ctx.explicit = true;
     let ty = Some(Ty::from_types(ctx.seen_types.iter().cloned()));
     let from_ty = std::mem::replace(&mut ctx.from_ty, ty);
     complete_code(ctx, true);
     ctx.from_ty = from_ty;
-    ctx.explicit = explict;
+    ctx.explicit = explicit;
 
     match scope {
         SurroundingSyntax::Regular => {}
