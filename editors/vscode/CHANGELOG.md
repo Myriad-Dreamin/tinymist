@@ -20,9 +20,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Completion
 
-* Completing on import item path by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/949
+* Completing on import item paths by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/949
   * The syntax was introduced in typst v0.12.0 which prevented all effective completions on import items.
-* (Fix) Only completing import items when in the same line of the module import in https://github.com/Myriad-Dreamin/tinymist/pull/952
+* (Fix) Only completing import items on the same line of the associated module import in https://github.com/Myriad-Dreamin/tinymist/pull/952
+  * Otherwise, it completes import items when the cursor is at, for example, `#import "some.typ":\n|`.
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.8...v0.12.10
 
