@@ -191,7 +191,7 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     }
 
     // Anywhere: "|".
-    if !is_triggerred_by_punc(ctx.trigger_character) && ctx.explicit {
+    if !is_triggered_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
         markup_completions(ctx);
         return true;
@@ -320,7 +320,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
     }
 
     // Behind existing atom or identifier: "$a|$" or "$abc|$".
-    if !is_triggerred_by_punc(ctx.trigger_character)
+    if !is_triggered_by_punc(ctx.trigger_character)
         && matches!(ctx.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
     {
         ctx.from = ctx.leaf.offset();
@@ -329,7 +329,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
     }
 
     // Anywhere: "$|$".
-    if !is_triggerred_by_punc(ctx.trigger_character) && ctx.explicit {
+    if !is_triggered_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
         math_completions(ctx);
         return true;
@@ -547,7 +547,7 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
     }
 
     // Behind a half-started identifier in an import list:
-    // "#import "path.typ": thi|",
+    // "#import "path.typ": th|",
     if_chain! {
         if matches!(ctx.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
         if let Some(path_ctx) = ctx.leaf.clone().parent();
@@ -1168,6 +1168,6 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     &s[rng]
 }
 
-fn is_triggerred_by_punc(trigger_character: Option<char>) -> bool {
+fn is_triggered_by_punc(trigger_character: Option<char>) -> bool {
     trigger_character.is_some_and(|c| c.is_ascii_punctuation())
 }
