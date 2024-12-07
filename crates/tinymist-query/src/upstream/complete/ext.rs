@@ -1836,7 +1836,7 @@ static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(||
             label: "in".into(),
             label_detail: Some(".in".into()),
             snippet: "(${_} in ${node})".into(),
-            description: "wrap as let expression".into(),
+            description: "wrap with in expression".into(),
             parsed_snippet: OnceLock::new(),
         },
     ]
