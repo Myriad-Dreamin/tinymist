@@ -6,8 +6,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.12.10 - [2024-12-07]
 
-### Compiler
-
 ### Editor
 
 * (Fix) Binding this context to `showLog` function in https://github.com/Myriad-Dreamin/tinymist/pull/951
