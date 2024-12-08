@@ -569,8 +569,25 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
         }
     }
 
+    // Behind a comma in an import list:
+    // "#import "path.typ": this,|".
+    if_chain! {
+        if matches!(ctx.leaf.kind(), SyntaxKind::Comma);
+        if let Some(parent) = ctx.leaf.clone().parent();
+        if parent.kind() == SyntaxKind::ImportItems;
+        if let Some(grand) = parent.parent();
+        if let Some(ast::Expr::Import(import)) = grand.get().cast();
+        if let Some(ast::Imports::Items(items)) = import.imports();
+        if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
+        then {
+            import_item_completions(ctx, items, vec![], &source);
+            ctx.enrich(" ", "");
+            return true;
+        }
+    }
+
     // Behind a half-started identifier in an import list:
-    // "#import "path.typ": th|",
+    // "#import "path.typ": th|".
     if_chain! {
         if matches!(ctx.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
         if let Some(path_ctx) = ctx.leaf.clone().parent();
