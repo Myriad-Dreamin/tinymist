@@ -21,7 +21,7 @@ use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
 use ext::*;
-pub use ext::{complete_path, CompletionFeat, PostfixSnippet};
+pub use ext::{complete_path, CompletionFeat, PostfixSnippet, to_lsp_snippet};
 
 /// Autocomplete a cursor position in a source file.
 ///
