@@ -529,14 +529,37 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
         }
     }
 
+    // On the colon marker of an import list:
+    // "#import "path.typ":|"
+    if_chain! {
+        if matches!(ctx.leaf.kind(), SyntaxKind::Colon);
+        if let Some(parent) = ctx.leaf.clone().parent();
+        if let Some(ast::Expr::Import(import)) = parent.get().cast();
+        if !matches!(import.imports(), Some(ast::Imports::Wildcard));
+        if let Some(source) = parent.children().find(|child| child.is::<ast::Expr>());
+        then {
+            let items = match import.imports() {
+                Some(ast::Imports::Items(items)) => items,
+                _ => Default::default(),
+            };
+
+            ctx.from = ctx.cursor;
+
+            import_item_completions(ctx, items, vec![], &source);
+            if items.iter().next().is_some() {
+                ctx.enrich("", ", ");
+            }
+            return true;
+        }
+    }
+
     // Behind an import list:
     // "#import "path.typ": |",
     // "#import "path.typ": a, b, |".
     if_chain! {
         if let Some(prev) = ctx.leaf.prev_sibling();
         if let Some(ast::Expr::Import(import)) = prev.get().cast();
-        if ctx.leaf.range().end <= prev.range().end ||
-            !ctx.text[prev.offset()..ctx.cursor].contains('\n');
+        if !ctx.text[prev.offset()..ctx.cursor].contains('\n');
         if let Some(ast::Imports::Items(items)) = import.imports();
         if let Some(source) = prev.children().find(|child| child.is::<ast::Expr>());
         then {
