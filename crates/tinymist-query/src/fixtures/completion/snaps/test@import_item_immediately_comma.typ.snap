@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (42..43)
+description: Completion on / (49..50)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/import_item.typ
+input_file: crates/tinymist-query/src/fixtures/completion/import_item_immediately_comma.typ
 snapshot_kind: text
 ---
 [
@@ -11,16 +11,16 @@ snapshot_kind: text
   "items": [
    {
     "kind": 3,
-    "label": "aa",
+    "label": "bcd",
     "textEdit": {
-     "newText": "aa",
+     "newText": " bcd",
      "range": {
       "end": {
-       "character": 20,
+       "character": 23,
        "line": 1
       },
       "start": {
-       "character": 20,
+       "character": 23,
        "line": 1
       }
      }
