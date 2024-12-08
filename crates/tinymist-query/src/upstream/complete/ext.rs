@@ -4,9 +4,12 @@ use std::sync::OnceLock;
 
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
-use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionTextEdit, InsertTextFormat, TextEdit,
+};
+use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
@@ -257,17 +260,25 @@ impl CompletionContext<'_> {
                 // range: Some(range),
                 ..Default::default()
             };
+            let base_item = CompletionItem {
+                kind: Some(CompletionItemKind::SNIPPET),
+                label: snippet.label.clone().into(),
+                detail: Some(snippet.description.clone().into()),
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                ..Default::default()
+            };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..self.from, &src),
-                    new_text: node_before_before_cursor.into(),
+                    new_text: to_lsp_snippet(&eco_format!(
+                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
+                    )),
                 };
 
-                self.completions.push(Completion {
-                    apply: Some(eco_format!("{node_before}{node_content}{node_after}")),
-                    additional_text_edits: Some(vec![before]),
-                    ..base.clone()
+                self.completions2.push(CompletionItem {
+                    text_edit: Some(CompletionTextEdit::Edit(before)),
+                    ..base_item.clone()
                 });
             } else {
                 let before = TextEdit {
@@ -1901,6 +1912,21 @@ static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(||
         },
     ]
 });
+
+static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+/// Adds numbering to placeholders in snippets
+pub fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+    let mut counter = 1;
+    let result =
+        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
+            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
+            counter += 1;
+            substitution
+        });
+
+    result.to_string()
+}
 
 #[cfg(test)]
 mod tests {
