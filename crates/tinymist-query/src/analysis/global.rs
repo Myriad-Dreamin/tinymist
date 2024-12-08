@@ -32,9 +32,8 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
-    scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope,
-    ModuleDependency,
+    construct_module_dependencies, get_deref_target, resolve_id_by_path, scan_workspace_files,
+    Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope, ModuleDependency,
 };
 use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
@@ -385,16 +384,6 @@ impl LocalContext {
     pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
         self.const_eval(rr)
             .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
-    }
-
-    /// Get module import at location.
-    pub fn module_ins_at(&mut self, def_fid: TypstFileId, cursor: usize) -> Option<Value> {
-        let def_src = self.source_by_id(def_fid).ok()?;
-        let def_root = LinkedNode::new(def_src.root());
-        let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
-        let mod_import = mod_exp.parent()?.clone();
-        let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
-        self.analyze_import(mod_import_node.source().to_untyped()).1
     }
 
     pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {

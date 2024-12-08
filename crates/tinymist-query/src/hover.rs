@@ -216,7 +216,7 @@ fn star_tooltip(ctx: &mut LocalContext, mut node: &LinkedNode) -> Option<HoverCo
     }
 
     let import_node = node.cast::<ast::ModuleImport>()?;
-    let scope_val = ctx.analyze_import(import_node.source().to_untyped()).1?;
+    let scope_val = ctx.module_by_syntax(import_node.source().to_untyped())?;
 
     let scope_items = scope_val.scope()?.iter();
     let mut names = scope_items.map(|item| item.0.as_str()).collect::<Vec<_>>();
