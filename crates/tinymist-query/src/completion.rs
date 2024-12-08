@@ -8,7 +8,7 @@ use crate::{
     analysis::{BuiltinTy, InsTy, Ty},
     prelude::*,
     syntax::{is_ident_like, DerefTarget},
-    upstream::{autocomplete, complete_path, CompletionContext, to_lsp_snippet},
+    upstream::{autocomplete, complete_path, to_lsp_snippet, CompletionContext},
     StatefulRequest,
 };
 
