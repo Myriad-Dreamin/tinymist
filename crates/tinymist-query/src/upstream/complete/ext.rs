@@ -424,7 +424,7 @@ impl CompletionContext<'_> {
         let filter = |c: &CompletionKindChecker| {
             match surrounding_syntax {
                 SurroundingSyntax::Regular => true,
-                SurroundingSyntax::ImportList => false,
+                SurroundingSyntax::StringContent | SurroundingSyntax::ImportList => false,
                 SurroundingSyntax::Selector => 'selector: {
                     for func in &c.functions {
                         if func.element().is_some() {
@@ -563,6 +563,7 @@ impl CompletionContext<'_> {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SurroundingSyntax {
     Regular,
+    StringContent,
     Selector,
     ShowTransform,
     ImportList,
@@ -572,6 +573,11 @@ pub(crate) enum SurroundingSyntax {
 fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
     use SurroundingSyntax::*;
     let mut met_args = false;
+
+    if matches!(leaf.kind(), SyntaxKind::Str) {
+        return Some(StringContent);
+    }
+
     while let Some(parent) = leaf.parent() {
         crate::log_debug_ct!(
             "check_surrounding_syntax: {:?}::{:?}",
@@ -1075,68 +1081,144 @@ pub fn value_to_completion_kind(value: &Value) -> CompletionKind {
 //     ctx.completions.push(compl);
 // }
 
-fn type_completion(
-    ctx: &mut CompletionContext<'_>,
-    infer_type: &Ty,
-    docs: Option<&str>,
-) -> Option<()> {
-    // Prevent duplicate completions from appearing.
-    if !ctx.seen_types.insert(infer_type.clone()) {
-        return Some(());
+struct TypeCompletionContext<'a, 'b> {
+    ctx: &'a mut CompletionContext<'b>,
+    filter: &'a dyn Fn(&Ty) -> bool,
+}
+
+impl TypeCompletionContext<'_, '_> {
+    fn snippet_completion(&mut self, label: &str, apply: &str, detail: &str) {
+        if !(self.filter)(&Ty::Any) {
+            return;
+        }
+
+        self.ctx.snippet_completion(label, apply, detail);
     }
 
-    crate::log_debug_ct!("type_completion: {infer_type:?}");
-
-    match infer_type {
-        Ty::Any => return None,
-        Ty::Tuple(..) | Ty::Array(..) => {
-            ctx.snippet_completion("()", "(${})", "An array.");
+    fn type_completion(&mut self, infer_type: &Ty, docs: Option<&str>) -> Option<()> {
+        // Prevent duplicate completions from appearing.
+        if !self.ctx.seen_types.insert(infer_type.clone()) {
+            return Some(());
         }
-        Ty::Dict(..) => {
-            ctx.snippet_completion("()", "(${})", "A dictionary.");
-        }
-        Ty::Boolean(_b) => {
-            ctx.snippet_completion("false", "false", "No / Disabled.");
-            ctx.snippet_completion("true", "true", "Yes / Enabled.");
-        }
-        Ty::Param(p) => {
-            // todo: variadic
 
-            let docs = docs.or_else(|| p.docs.as_deref());
-            if p.attrs.positional {
-                type_completion(ctx, &p.ty, docs);
-            }
-            if !p.attrs.named {
-                return Some(());
-            }
+        crate::log_debug_ct!("type_completion: {infer_type:?}");
 
-            let f = &p.name;
-            if ctx.seen_field(f.clone()) {
-                return Some(());
+        match infer_type {
+            Ty::Any => return None,
+            Ty::Pattern(_) => return None,
+            Ty::Args(_) => return None,
+            Ty::Func(_) => return None,
+            Ty::With(_) => return None,
+            Ty::Select(_) => return None,
+            Ty::Var(_) => return None,
+            Ty::Unary(_) => return None,
+            Ty::Binary(_) => return None,
+            Ty::If(_) => return None,
+            Ty::Union(u) => {
+                for info in u.as_ref() {
+                    self.type_completion(info, docs);
+                }
             }
-
-            let mut rev_stream = ctx.before.chars().rev();
-            let ch = rev_stream.find(|c| !typst::syntax::is_id_continue(*c));
-            // skip label/ref completion.
-            // todo: more elegant way
-            if matches!(ch, Some('<' | '@')) {
-                return Some(());
+            Ty::Let(e) => {
+                for ut in e.ubs.iter() {
+                    self.type_completion(ut, docs);
+                }
+                for lt in e.lbs.iter() {
+                    self.type_completion(lt, docs);
+                }
             }
+            Ty::Tuple(..) | Ty::Array(..) => {
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+                self.snippet_completion("()", "(${})", "An array.");
+            }
+            Ty::Dict(..) => {
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+                self.snippet_completion("()", "(${})", "A dictionary.");
+            }
+            Ty::Boolean(_b) => {
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+                self.snippet_completion("false", "false", "No / Disabled.");
+                self.snippet_completion("true", "true", "Yes / Enabled.");
+            }
+            Ty::Builtin(v) => {
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+                self.builtin_type_completion(v, docs);
+            }
+            Ty::Value(v) => {
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+                let docs = v.syntax.as_ref().map(|s| s.doc.as_ref()).or(docs);
 
-            ctx.completions.push(Completion {
-                kind: CompletionKind::Field,
-                label: f.into(),
-                apply: Some(eco_format!("{}: ${{}}", f)),
-                label_detail: p.ty.describe(),
-                detail: docs.map(Into::into),
-                command: ctx.ctx.analysis.trigger_on_snippet_with_param_hint(true),
-                ..Completion::default()
-            });
-        }
-        Ty::Builtin(v) => match v {
-            BuiltinTy::None => ctx.snippet_completion("none", "none", "Nothing."),
+                if let Value::Type(ty) = &v.val {
+                    self.type_completion(&Ty::Builtin(BuiltinTy::Type(*ty)), docs);
+                } else if v.val.ty() == Type::of::<NoneValue>() {
+                    self.type_completion(&Ty::Builtin(BuiltinTy::None), docs);
+                } else if v.val.ty() == Type::of::<AutoValue>() {
+                    self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
+                } else {
+                    self.ctx.value_completion(None, &v.val, true, docs);
+                }
+            }
+            Ty::Param(p) => {
+                // todo: variadic
+
+                let docs = docs.or_else(|| p.docs.as_deref());
+                if p.attrs.positional {
+                    self.type_completion(&p.ty, docs);
+                }
+                if !p.attrs.named {
+                    return Some(());
+                }
+
+                let f = &p.name;
+                if self.ctx.seen_field(f.clone()) {
+                    return Some(());
+                }
+                if !(self.filter)(infer_type) {
+                    return None;
+                }
+
+                let mut rev_stream = self.ctx.before.chars().rev();
+                let ch = rev_stream.find(|c| !typst::syntax::is_id_continue(*c));
+                // skip label/ref completion.
+                // todo: more elegant way
+                if matches!(ch, Some('<' | '@')) {
+                    return Some(());
+                }
+
+                self.ctx.completions.push(Completion {
+                    kind: CompletionKind::Field,
+                    label: f.into(),
+                    apply: Some(eco_format!("{}: ${{}}", f)),
+                    label_detail: p.ty.describe(),
+                    detail: docs.map(Into::into),
+                    command: self
+                        .ctx
+                        .ctx
+                        .analysis
+                        .trigger_on_snippet_with_param_hint(true),
+                    ..Completion::default()
+                });
+            }
+        };
+
+        Some(())
+    }
+
+    fn builtin_type_completion(&mut self, v: &BuiltinTy, docs: Option<&str>) -> Option<()> {
+        match v {
+            BuiltinTy::None => self.snippet_completion("none", "none", "Nothing."),
             BuiltinTy::Auto => {
-                ctx.snippet_completion("auto", "auto", "A smart default.");
+                self.snippet_completion("auto", "auto", "A smart default.");
             }
             BuiltinTy::Clause => return None,
             BuiltinTy::Undef => return None,
@@ -1150,54 +1232,60 @@ fn type_completion(
             BuiltinTy::Module(..) => return None,
 
             BuiltinTy::Path(p) => {
-                let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
+                let source = self.ctx.ctx.source_by_id(self.ctx.root.span().id()?).ok()?;
 
-                ctx.completions2.extend(
-                    complete_path(ctx.ctx, Some(ctx.leaf.clone()), &source, ctx.cursor, p)
-                        .into_iter()
-                        .flatten(),
+                self.ctx.completions2.extend(
+                    complete_path(
+                        self.ctx.ctx,
+                        Some(self.ctx.leaf.clone()),
+                        &source,
+                        self.ctx.cursor,
+                        p,
+                    )
+                    .into_iter()
+                    .flatten(),
                 );
             }
             BuiltinTy::Args => return None,
             BuiltinTy::Stroke => {
-                ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
-                ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Color), docs);
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
+                self.snippet_completion("()", "(${})", "Stroke dictionary.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Color), docs);
+                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Color => {
-                ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
-                ctx.snippet_completion(
+                self.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
+                self.snippet_completion(
                     "rgb()",
                     "rgb(${r}, ${g}, ${b}, ${a})",
                     "A custom RGBA color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "cmyk()",
                     "cmyk(${c}, ${m}, ${y}, ${k})",
                     "A custom CMYK color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "oklab()",
                     "oklab(${l}, ${a}, ${b}, ${alpha})",
                     "A custom Oklab color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "oklch()",
                     "oklch(${l}, ${chroma}, ${hue}, ${alpha})",
                     "A custom Oklch color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "color.linear-rgb()",
                     "color.linear-rgb(${r}, ${g}, ${b}, ${a})",
                     "A custom linear RGBA color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "color.hsv()",
                     "color.hsv(${h}, ${s}, ${v}, ${a})",
                     "A custom HSVA color.",
                 );
-                ctx.snippet_completion(
+                self.snippet_completion(
                     "color.hsl()",
                     "color.hsl(${h}, ${s}, ${l}, ${a})",
                     "A custom HSLA color.",
@@ -1207,7 +1295,7 @@ fn type_completion(
             BuiltinTy::TextLang => {
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
                     let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
-                    ctx.completions.push(Completion {
+                    self.ctx.completions.push(Completion {
                         kind: CompletionKind::Syntax,
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
@@ -1220,7 +1308,7 @@ fn type_completion(
             BuiltinTy::TextRegion => {
                 for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
                     let detail = eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.name);
-                    ctx.completions.push(Completion {
+                    self.ctx.completions.push(Completion {
                         kind: CompletionKind::Syntax,
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
@@ -1232,66 +1320,70 @@ fn type_completion(
             }
             BuiltinTy::Dir => {}
             BuiltinTy::TextFont => {
-                ctx.font_completions();
+                self.ctx.font_completions();
             }
             BuiltinTy::Margin => {
-                ctx.snippet_completion("()", "(${})", "Margin dictionary.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion("()", "(${})", "Margin dictionary.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Inset => {
-                ctx.snippet_completion("()", "(${})", "Inset dictionary.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion("()", "(${})", "Inset dictionary.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Outset => {
-                ctx.snippet_completion("()", "(${})", "Outset dictionary.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion("()", "(${})", "Outset dictionary.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Radius => {
-                ctx.snippet_completion("()", "(${})", "Radius dictionary.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion("()", "(${})", "Radius dictionary.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Length => {
-                ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
-                ctx.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
-                ctx.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
-                ctx.snippet_completion("in", "${1}in", "Inch length unit.");
-                ctx.snippet_completion("em", "${1}em", "Em length unit.");
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
+                self.snippet_completion("pt", "${1}pt", "Point length unit.");
+                self.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
+                self.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
+                self.snippet_completion("in", "${1}in", "Inch length unit.");
+                self.snippet_completion("em", "${1}em", "Em length unit.");
+                self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
             }
             BuiltinTy::Float => {
-                ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
+                self.snippet_completion(
+                    "exponential notation",
+                    "${1}e${0}",
+                    "Exponential notation",
+                );
             }
             BuiltinTy::Label => {
-                ctx.label_completions(false);
+                self.ctx.label_completions(false);
             }
             BuiltinTy::CiteLabel => {
-                ctx.label_completions(true);
+                self.ctx.label_completions(true);
             }
             BuiltinTy::RefLabel => {
-                ctx.ref_completions();
+                self.ctx.ref_completions();
             }
             BuiltinTy::TypeType(ty) | BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
                     let docs = docs.or(Some("Nothing."));
-                    type_completion(ctx, &Ty::Builtin(BuiltinTy::None), docs);
+                    self.type_completion(&Ty::Builtin(BuiltinTy::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
                     let docs = docs.or(Some("A smart default."));
-                    type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
+                    self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
-                    ctx.snippet_completion("false", "false", "No / Disabled.");
-                    ctx.snippet_completion("true", "true", "Yes / Enabled.");
+                    self.snippet_completion("false", "false", "No / Disabled.");
+                    self.snippet_completion("true", "true", "Yes / Enabled.");
                 } else if *ty == Type::of::<Color>() {
-                    type_completion(ctx, &Ty::Builtin(BuiltinTy::Color), docs);
+                    self.type_completion(&Ty::Builtin(BuiltinTy::Color), docs);
                 } else if *ty == Type::of::<Label>() {
-                    ctx.label_completions(false)
+                    self.ctx.label_completions(false)
                 } else if *ty == Type::of::<Func>() {
-                    ctx.snippet_completion(
+                    self.snippet_completion(
                         "function",
                         "(${params}) => ${output}",
                         "A custom function.",
                     );
                 } else {
-                    ctx.completions.push(Completion {
+                    self.ctx.completions.push(Completion {
                         kind: CompletionKind::Syntax,
                         label: ty.short_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
@@ -1301,47 +1393,17 @@ fn type_completion(
                 }
             }
             BuiltinTy::Element(e) => {
-                ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
+                self.ctx.value_completion(
+                    Some(e.name().into()),
+                    &Value::Func((*e).into()),
+                    true,
+                    docs,
+                );
             }
-        },
-        Ty::Pattern(_) => return None,
-        Ty::Args(_) => return None,
-        Ty::Func(_) => return None,
-        Ty::With(_) => return None,
-        Ty::Select(_) => return None,
-        Ty::Union(u) => {
-            for info in u.as_ref() {
-                type_completion(ctx, info, docs);
-            }
-        }
-        Ty::Let(e) => {
-            for ut in e.ubs.iter() {
-                type_completion(ctx, ut, docs);
-            }
-            for lt in e.lbs.iter() {
-                type_completion(ctx, lt, docs);
-            }
-        }
-        Ty::Var(_) => return None,
-        Ty::Unary(_) => return None,
-        Ty::Binary(_) => return None,
-        Ty::If(_) => return None,
-        Ty::Value(v) => {
-            let docs = v.syntax.as_ref().map(|s| s.doc.as_ref()).or(docs);
+        };
 
-            if let Value::Type(ty) = &v.val {
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Type(*ty)), docs);
-            } else if v.val.ty() == Type::of::<NoneValue>() {
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::None), docs);
-            } else if v.val.ty() == Type::of::<AutoValue>() {
-                type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
-            } else {
-                ctx.value_completion(None, &v.val, true, docs);
-            }
-        }
-    };
-
-    Some(())
+        Some(())
+    }
 }
 
 // if ctx.before.ends_with(':') {
@@ -1409,7 +1471,20 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     }
 
     if let Some(ty) = ty {
-        type_completion(ctx, &ty, None);
+        let filter = |ty: &Ty| match scope {
+            SurroundingSyntax::StringContent => match ty {
+                Ty::Builtin(BuiltinTy::Path(..) | BuiltinTy::TextFont) => true,
+                Ty::Value(val) => matches!(val.val, Value::Str(..)),
+                Ty::Builtin(BuiltinTy::Type(ty)) => *ty == Type::of::<typst::foundations::Str>(),
+                _ => false,
+            },
+            _ => true,
+        };
+        let mut ctx = TypeCompletionContext {
+            ctx,
+            filter: &filter,
+        };
+        ctx.type_completion(&ty, None);
     }
 
     let mut completions = std::mem::take(&mut ctx.completions);
@@ -1422,9 +1497,8 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     ctx.explicit = explicit;
 
     match scope {
-        SurroundingSyntax::Regular => {}
-        SurroundingSyntax::ImportList => {}
-        SurroundingSyntax::Selector => {
+        Regular | StringContent | ImportList | SetRule => {}
+        Selector => {
             ctx.snippet_completion(
                 "text selector",
                 "\"${text}\"",
@@ -1437,7 +1511,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 "Replace matches of a regular expression.",
             );
         }
-        SurroundingSyntax::ShowTransform => {
+        ShowTransform => {
             ctx.snippet_completion(
                 "replacement",
                 "[${content}]",
@@ -1456,7 +1530,6 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 "Transform the element with a function.",
             );
         }
-        SurroundingSyntax::SetRule => {}
     }
 
     // ctx.strict_scope_completions(false, |value| value.ty() == *ty);
@@ -1526,13 +1599,10 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         ctx.enrich(" ", "");
     }
     match scope {
-        SurroundingSyntax::Regular => {}
-        SurroundingSyntax::ImportList => {}
-        SurroundingSyntax::Selector => {
+        Regular | ImportList | ShowTransform | SetRule | StringContent => {}
+        Selector => {
             ctx.enrich("", ": ${}");
         }
-        SurroundingSyntax::ShowTransform => {}
-        SurroundingSyntax::SetRule => {}
     }
 
     crate::log_debug_ct!("sort_and_explicit_code_completion: {:?}", ctx.completions);
