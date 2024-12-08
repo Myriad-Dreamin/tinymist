@@ -90,6 +90,11 @@ impl HttpsRegistry {
         let cache_dir = self.storage().package_cache_path().cloned();
         data_dir.into_iter().chain(cache_dir).collect::<Vec<_>>()
     }
+
+    /// Set list of packages for testing.
+    pub fn test_package_list(&self, f: impl FnOnce() -> Vec<(PackageSpec, Option<EcoString>)>) {
+        self.storage().index.get_or_init(f);
+    }
 }
 
 impl PackageRegistry for HttpsRegistry {

@@ -1461,7 +1461,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     let scope = ctx.surrounding_syntax();
 
     crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
-    if matches!((scope, &ty), (Regular, None)) || matches!(scope, ImportList) {
+    if matches!((scope, &ty), (Regular | StringContent, None)) || matches!(scope, ImportList) {
         return None;
     }
 

@@ -285,6 +285,12 @@ impl DerefMut for LocalContext {
 }
 
 impl LocalContext {
+    /// Set list of packages for LSP-based completion.
+    #[cfg(test)]
+    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<(PackageSpec, Option<EcoString>)>) {
+        self.world.registry.test_package_list(f);
+    }
+
     /// Set the files for LSP-based completion.
     #[cfg(test)]
     pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
