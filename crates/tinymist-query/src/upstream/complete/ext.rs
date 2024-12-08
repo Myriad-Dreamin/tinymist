@@ -1905,7 +1905,7 @@ static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(||
 static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
 /// Adds numbering to placeholders in snippets
-fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+pub fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
     let mut counter = 1;
     let result =
         TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {

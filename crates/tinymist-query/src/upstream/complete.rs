@@ -25,8 +25,8 @@ use crate::snippet::{
 use crate::syntax::InterpretMode;
 
 mod ext;
-pub use ext::CompletionFeat;
 use ext::*;
+pub use ext::{to_lsp_snippet, CompletionFeat};
 
 /// Autocomplete a cursor position in a source file.
 ///
