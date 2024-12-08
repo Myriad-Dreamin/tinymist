@@ -24,19 +24,6 @@ pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     Some(node)
 }
 
-pub(crate) fn find_expr_in_import(mut node: LinkedNode) -> Option<LinkedNode> {
-    while let Some(parent) = node.parent() {
-        if matches!(
-            parent.kind(),
-            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
-        ) {
-            return Some(node);
-        }
-        node = parent.clone();
-    }
-    None
-}
-
 pub fn node_ancestors<'a, 'b>(
     node: &'b LinkedNode<'a>,
 ) -> impl Iterator<Item = &'b LinkedNode<'a>> {
