@@ -942,12 +942,7 @@ impl<'a> CompletionContext<'a> {
     }
 
     /// Add a snippet completion.
-    fn snippet_completion(
-        &mut self,
-        label: &'static str,
-        snippet: &'static str,
-        docs: &'static str,
-    ) {
+    fn snippet_completion(&mut self, label: &str, snippet: &str, docs: &str) {
         self.completions.push(Completion {
             kind: CompletionKind::Syntax,
             label: label.into(),
