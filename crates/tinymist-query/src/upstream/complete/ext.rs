@@ -1412,10 +1412,6 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         type_completion(ctx, &ty, None);
     }
 
-    if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
-        ctx.enrich(" ", "");
-    }
-
     let mut completions = std::mem::take(&mut ctx.completions);
     let explicit = ctx.explicit;
     ctx.explicit = true;
@@ -1526,6 +1522,9 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         }
     }
 
+    if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
+        ctx.enrich(" ", "");
+    }
     match scope {
         SurroundingSyntax::Regular => {}
         SurroundingSyntax::ImportList => {}
