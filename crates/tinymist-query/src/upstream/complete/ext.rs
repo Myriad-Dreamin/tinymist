@@ -3,9 +3,12 @@ use std::ops::Deref;
 
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
-use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionTextEdit, InsertTextFormat, TextEdit,
+};
+use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
-use regex::Regex;
+use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
@@ -223,17 +226,25 @@ impl CompletionContext<'_> {
                 // range: Some(range),
                 ..Default::default()
             };
+            let base_item = CompletionItem {
+                kind: Some(CompletionItemKind::SNIPPET),
+                label: snippet.label.clone().into(),
+                detail: Some(snippet.description.clone().into()),
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                ..Default::default()
+            };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..self.from, &src),
-                    new_text: node_before_before_cursor.into(),
+                    new_text: to_lsp_snippet(&eco_format!(
+                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
+                    )),
                 };
 
-                self.completions.push(Completion {
-                    apply: Some(eco_format!("{node_before}{node_content}{node_after}")),
-                    additional_text_edits: Some(vec![before]),
-                    ..base.clone()
+                self.completions2.push(CompletionItem {
+                    text_edit: Some(CompletionTextEdit::Edit(before)),
+                    ..base_item.clone()
                 });
             } else {
                 let before = TextEdit {
@@ -1794,6 +1805,116 @@ pub fn symbol_label_detail(ch: char) -> EcoString {
         '\u{200A}' => "hair space".into(),
         _ => format!("\\u{{{:04x}}}", ch as u32).into(),
     }
+}
+
+static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(|| {
+    vec![
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Content,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: eco_format!("text fill"),
+            label_detail: Some(eco_format!(".text fill")),
+            snippet: "text(fill: ${}, ${node})".into(),
+            description: eco_format!("wrap with text fill"),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Content,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: eco_format!("text size"),
+            label_detail: Some(eco_format!(".text size")),
+            snippet: "text(size: ${}, ${node})".into(),
+            description: eco_format!("wrap with text size"),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Content,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: eco_format!("align"),
+            label_detail: Some(eco_format!(".align")),
+            snippet: "align(${}, ${node})".into(),
+            description: eco_format!("wrap with alignment"),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "if".into(),
+            label_detail: Some(".if".into()),
+            snippet: "if ${node} { ${} }".into(),
+            description: "wrap as if expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "else".into(),
+            label_detail: Some(".else".into()),
+            snippet: "if not ${node} { ${} }".into(),
+            description: "wrap as if not expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "none".into(),
+            label_detail: Some(".if none".into()),
+            snippet: "if ${node} == none { ${} }".into(),
+            description: "wrap as if expression to check none-ish".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "notnone".into(),
+            label_detail: Some(".if not none".into()),
+            snippet: "if ${node} != none { ${} }".into(),
+            description: "wrap as if expression to check none-ish".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "return".into(),
+            label_detail: Some(".return".into()),
+            snippet: "return ${node}".into(),
+            description: "wrap as return expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "tup".into(),
+            label_detail: Some(".tup".into()),
+            snippet: "(${node}, ${})".into(),
+            description: "wrap as tuple (array) expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "let".into(),
+            label_detail: Some(".let".into()),
+            snippet: "let ${_} = ${node}".into(),
+            description: "wrap as let expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+    ]
+});
+
+static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+/// Adds numbering to placeholders in snippets
+fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+    let mut counter = 1;
+    let result =
+        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
+            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
+            counter += 1;
+            substitution
+        });
+
+    result.to_string()
 }
 
 #[cfg(test)]
