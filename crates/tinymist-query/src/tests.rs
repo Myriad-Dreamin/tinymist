@@ -1,4 +1,5 @@
 use core::fmt;
+use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use std::{
     collections::{HashMap, HashSet},
@@ -7,6 +8,7 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
+use reflexo_typst::package::PackageSpec;
 use reflexo_typst::world::EntryState;
 use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
@@ -85,6 +87,12 @@ pub fn run_with_ctx<T>(
     })
     .snapshot(w);
 
+    ctx.test_package_list(|| {
+        vec![(
+            PackageSpec::from_str("@preview/example:0.1.0").unwrap(),
+            Some("example package (mock).".into()),
+        )]
+    });
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)
