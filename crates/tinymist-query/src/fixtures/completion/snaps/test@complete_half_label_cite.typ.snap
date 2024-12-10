@@ -29,27 +29,6 @@ snapshot_kind: text
       }
      }
     }
-   },
-   {
-    "kind": 18,
-    "label": "test",
-    "labelDetails": {
-     "description": "H"
-    },
-    "sortText": "004",
-    "textEdit": {
-     "newText": "test>",
-     "range": {
-      "end": {
-       "character": 7,
-       "line": 3
-      },
-      "start": {
-       "character": 7,
-       "line": 3
-      }
-     }
-    }
    }
   ]
  }

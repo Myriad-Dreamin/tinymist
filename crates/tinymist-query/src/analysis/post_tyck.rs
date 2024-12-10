@@ -189,11 +189,11 @@ impl<'a> PostTypeChecker<'a> {
             node.kind(),
         );
 
-        Ty::or(self_ty, contextual_self_ty)
+        Ty::union(self_ty, contextual_self_ty)
     }
 
     fn check_or(&mut self, node: &LinkedNode, ty: Option<Ty>) -> Option<Ty> {
-        Ty::or(self.check(node), ty)
+        Ty::union(self.check(node), ty)
     }
 
     fn check_target(&mut self, node: Option<CheckTarget>, context_ty: Option<Ty>) -> Option<Ty> {
@@ -310,7 +310,7 @@ impl<'a> PostTypeChecker<'a> {
                     .then_some(Ty::Builtin(BuiltinTy::Label));
                 let ty = self.check_or(target, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
-                Ty::or(ty, label_ty)
+                ty.or(label_ty)
             }
         }
     }

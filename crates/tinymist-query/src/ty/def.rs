@@ -144,7 +144,7 @@ impl Ty {
         matches!(self, Ty::Dict(..))
     }
 
-    pub(crate) fn or(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
+    pub(crate) fn union(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
         Some(match (lhs, rhs) {
             (Some(lhs), Some(rhs)) => Ty::from_types([lhs, rhs].into_iter()),
             (Some(ty), None) | (None, Some(ty)) => ty,
