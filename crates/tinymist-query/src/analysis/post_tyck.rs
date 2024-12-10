@@ -193,15 +193,7 @@ impl<'a> PostTypeChecker<'a> {
     }
 
     fn check_context_or(&mut self, context: &LinkedNode, context_ty: Option<Ty>) -> Option<Ty> {
-        let checked_context = self.check(context);
-        if checked_context.is_some() && context_ty.is_some() {
-            let c = checked_context?;
-            let s = context_ty?;
-
-            Some(Ty::from_types([c, s].into_iter()))
-        } else {
-            checked_context.or(context_ty)
-        }
+        Ty::or(self.check(context), context_ty)
     }
 
     fn check_target(&mut self, node: Option<CheckTarget>, context_ty: Option<Ty>) -> Option<Ty> {
@@ -210,14 +202,14 @@ impl<'a> PostTypeChecker<'a> {
         };
         crate::log_debug_ct!("post check target: {node:?}");
 
-        match node {
+        match &node {
             CheckTarget::Param {
                 callee,
                 args: _,
                 target,
                 is_set,
             } => {
-                let callee = self.check_context_or(&callee, context_ty)?;
+                let callee = self.check_context_or(callee, context_ty)?;
                 crate::log_debug_ct!(
                     "post check call target: ({callee:?})::{target:?} is_set: {is_set}"
                 );
@@ -226,7 +218,7 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check call sig: {target:?} {sig:?}");
                 let mut resp = SignatureReceiver::default();
 
-                match &target {
+                match target {
                     ParamTarget::Named(n) => {
                         let ident = n.cast::<ast::Ident>()?.into();
                         let ty = sig.primary().get_named(&ident)?;
@@ -255,7 +247,7 @@ impl<'a> PostTypeChecker<'a> {
 
                         // names
                         for field in sig.primary().named() {
-                            if is_set && !field.attrs.settable {
+                            if *is_set && !field.attrs.settable {
                                 continue;
                             }
 
@@ -268,7 +260,7 @@ impl<'a> PostTypeChecker<'a> {
                 Some(resp.finalize())
             }
             CheckTarget::Element { container, target } => {
-                let container_ty = self.check_context_or(&container, context_ty)?;
+                let container_ty = self.check_context_or(container, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
@@ -276,8 +268,8 @@ impl<'a> PostTypeChecker<'a> {
                 self.check_element_of(
                     &container_ty,
                     false,
-                    &container,
-                    &mut check_signature(&mut resp, &target),
+                    container,
+                    &mut check_signature(&mut resp, target),
                 );
 
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
@@ -287,7 +279,7 @@ impl<'a> PostTypeChecker<'a> {
                 container,
                 is_before,
             } => {
-                let container_ty = self.check_context_or(&container, context_ty)?;
+                let container_ty = self.check_context_or(container, context_ty)?;
                 crate::log_debug_ct!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
@@ -299,7 +291,7 @@ impl<'a> PostTypeChecker<'a> {
                 self.check_element_of(
                     &container_ty,
                     false,
-                    &container,
+                    container,
                     &mut check_signature(&mut resp, &target),
                 );
 
@@ -311,11 +303,14 @@ impl<'a> PostTypeChecker<'a> {
                     allow_package: true,
                 }),
             )),
-            CheckTarget::LabelError(..) => Some(Ty::Builtin(BuiltinTy::Label)),
-            CheckTarget::Label(target) | CheckTarget::Normal(target) => {
-                let ty = self.check_context_or(&target, context_ty)?;
-                crate::log_debug_ct!("post check target normal: {ty:?}");
-                Some(ty)
+            CheckTarget::LabelError(target)
+            | CheckTarget::Label(target)
+            | CheckTarget::Normal(target) => {
+                let label_ty = matches!(node, CheckTarget::LabelError(_))
+                    .then_some(Ty::Builtin(BuiltinTy::Label));
+                let ty = self.check_context_or(target, context_ty);
+                crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
+                Ty::or(ty, label_ty)
             }
         }
     }

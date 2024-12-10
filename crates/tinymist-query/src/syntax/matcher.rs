@@ -561,15 +561,16 @@ pub fn get_check_target_by_context<'a>(
     context: LinkedNode<'a>,
     node: LinkedNode<'a>,
 ) -> Option<CheckTarget<'a>> {
+    use DerefTarget::*;
     let context_deref_target = get_deref_target(context.clone(), node.offset())?;
     let node_deref_target = get_deref_target(node.clone(), node.offset())?;
 
     match context_deref_target {
-        DerefTarget::Callee(callee)
+        Callee(callee)
             if matches!(
                 node_deref_target,
-                DerefTarget::Normal(..) | DerefTarget::Label(..) | DerefTarget::Ref(..)
-            ) && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
+                Normal(..) | Label(..) | LabelError(..) | Ref(..)
+            ) && !matches!(node_deref_target, Callee(..)) =>
         {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {

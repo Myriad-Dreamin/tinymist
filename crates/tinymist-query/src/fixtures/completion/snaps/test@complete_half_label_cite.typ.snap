@@ -1,0 +1,56 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on t (56..57)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/complete_half_label_cite.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 18,
+    "label": "tarry",
+    "labelDetails": {
+     "description": "Harry Potter and the Order of the Phoenix"
+    },
+    "sortText": "003",
+    "textEdit": {
+     "newText": "tarry>",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "test",
+    "labelDetails": {
+     "description": "H"
+    },
+    "sortText": "004",
+    "textEdit": {
+     "newText": "test>",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
