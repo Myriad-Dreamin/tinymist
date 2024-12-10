@@ -122,19 +122,6 @@ impl StatefulRequest for CompletionRequest {
             }
         }
 
-        // Do some completion specific to the deref target
-        let mut ident_like = None;
-        let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
-        if matches!(
-            deref_target,
-            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..))
-        ) {
-            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if is_ident_like(&node) {
-                ident_like = Some(node);
-            }
-        }
-
         let mut completion_items_rest = None;
         let is_incomplete = false;
 
@@ -161,10 +148,20 @@ impl StatefulRequest for CompletionRequest {
         // is_incomplete = ic;
         let _ = ic;
 
-        let replace_range;
-        if ident_like.as_ref().is_some_and(|i| i.offset() == offset) {
-            let ident_like = ident_like.unwrap();
-            let mut rng = ident_like.range();
+        // Filter and determine range to replace
+        let mut from_ident = None;
+        let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
+        if matches!(
+            deref_target,
+            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..))
+        ) {
+            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+            if is_ident_like(&node) && node.offset() == offset {
+                from_ident = Some(node);
+            }
+        }
+        let replace_range = if let Some(from_ident) = from_ident {
+            let mut rng = from_ident.range();
             let ident_prefix = source.text()[rng.start..cursor].to_string();
 
             completions.retain(|c| {
@@ -184,7 +181,7 @@ impl StatefulRequest for CompletionRequest {
             });
 
             // if modifying some arguments, we need to truncate and add a comma
-            if !is_callee && cursor != rng.end && is_arg_like_context(&ident_like) {
+            if !is_callee && cursor != rng.end && is_arg_like_context(&from_ident) {
                 // extend comma
                 for c in completions.iter_mut() {
                     let apply = match &mut c.apply {
@@ -204,10 +201,10 @@ impl StatefulRequest for CompletionRequest {
                 rng.end = cursor;
             }
 
-            replace_range = ctx.to_lsp_range(rng, &source);
+            ctx.to_lsp_range(rng, &source)
         } else {
-            replace_range = ctx.to_lsp_range(offset..cursor, &source);
-        }
+            ctx.to_lsp_range(offset..cursor, &source)
+        };
 
         let completions = completions.iter().map(|typst_completion| {
             let typst_snippet = typst_completion
