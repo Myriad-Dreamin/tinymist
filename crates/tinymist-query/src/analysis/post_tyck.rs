@@ -305,6 +305,11 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
+            CheckTarget::ImportPath(..) | CheckTarget::IncludePath(..) => Some(Ty::Builtin(
+                crate::ty::BuiltinTy::Path(crate::ty::PathPreference::Source {
+                    allow_package: true,
+                }),
+            )),
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
                 crate::log_debug_ct!("post check target normal: {ty:?}");

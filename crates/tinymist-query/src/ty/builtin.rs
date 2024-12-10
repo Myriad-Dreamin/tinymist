@@ -15,7 +15,7 @@ use crate::ty::*;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum PathPreference {
-    Source,
+    Source { allow_package: bool },
     Csv,
     Image,
     Json,
@@ -74,7 +74,7 @@ impl PathPreference {
         });
 
         match self {
-            PathPreference::Source => &SOURCE_REGSET,
+            PathPreference::Source { .. } => &SOURCE_REGSET,
             PathPreference::Csv => &CSV_REGSET,
             PathPreference::Image => &IMAGE_REGSET,
             PathPreference::Json => &JSON_REGSET,
@@ -363,7 +363,7 @@ impl BuiltinTy {
             BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
-                PathPreference::Source => "[source]",
+                PathPreference::Source { .. } => "[source]",
                 PathPreference::Csv => "[csv]",
                 PathPreference::Image => "[image]",
                 PathPreference::Json => "[json]",

@@ -333,9 +333,11 @@ impl LocalContext {
     /// Get all the source files in the workspace.
     pub fn source_files(&self) -> &Vec<TypstFileId> {
         self.caches.root_files.get_or_init(|| {
-            self.completion_files(&PathPreference::Source)
-                .copied()
-                .collect()
+            self.completion_files(&PathPreference::Source {
+                allow_package: false,
+            })
+            .copied()
+            .collect()
         })
     }
 
