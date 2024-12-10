@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on t (43..44)
+description: Completion on t (44..45)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/complete_half_label.typ
 snapshot_kind: text
@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "H2"
     },
+    "sortText": "001",
     "textEdit": {
      "newText": "test>",
      "range": {

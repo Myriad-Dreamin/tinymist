@@ -82,7 +82,7 @@ pub fn definition(
             find_bib_definition(ctx, introspector, name)
                 .or_else(|| find_ref_definition(introspector, name, ref_expr))
         }
-        DerefTarget::Normal(..) => None,
+        DerefTarget::LabelError(..) | DerefTarget::Normal(..) => None,
     }
 }
 

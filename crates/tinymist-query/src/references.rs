@@ -48,7 +48,7 @@ pub(crate) fn find_references(
 ) -> Option<Vec<LspLocation>> {
     let finding_label = match target {
         DerefTarget::VarAccess(..) | DerefTarget::Callee(..) => false,
-        DerefTarget::Label(..) | DerefTarget::Ref(..) => true,
+        DerefTarget::Label(..) | DerefTarget::LabelError(..) | DerefTarget::Ref(..) => true,
         DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) | DerefTarget::Normal(..) => {
             return None;
         }

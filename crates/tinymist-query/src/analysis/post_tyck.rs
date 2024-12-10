@@ -9,6 +9,7 @@ use super::{
     TypeScheme, TypeVar,
 };
 use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget};
+use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -306,11 +307,12 @@ impl<'a> PostTypeChecker<'a> {
                 Some(resp.finalize())
             }
             CheckTarget::ImportPath(..) | CheckTarget::IncludePath(..) => Some(Ty::Builtin(
-                crate::ty::BuiltinTy::Path(crate::ty::PathPreference::Source {
+                BuiltinTy::Path(crate::ty::PathPreference::Source {
                     allow_package: true,
                 }),
             )),
-            CheckTarget::Normal(target) => {
+            CheckTarget::LabelError(..) => Some(Ty::Builtin(BuiltinTy::Label)),
+            CheckTarget::Label(target) | CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
                 crate::log_debug_ct!("post check target normal: {ty:?}");
                 Some(ty)
