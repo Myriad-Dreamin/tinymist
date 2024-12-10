@@ -2,8 +2,10 @@
 # tinymist
 
 This crate provides a CLI that starts services for [Typst](https://typst.app/) [taɪpst]. It provides:
++ `tinymist probe`: Do nothing, which just probes that the binary is working.
 + `tinymist lsp`: A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
 + `tinymist preview`: A preview server for Typst.
++ `tinymist --help` – Learn more about the CLI.
 
 ## Usage
 

@@ -1,99 +1,18 @@
 
 # Contributing
 
-Tinymist provides a single integrated language service for Typst.
+Thank you for your interest in contributing to tinymist! There are many ways to contribute and we appreciate all of them.
 
-**Multiple Actors** – The main component, [tinymist](./crates/tinymist/), starts as a thread or process, obeying the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/). tinymist will bootstrap multiple actors, each of which provides some typst feature.
+Before contributing, you can read the [Development Guide](./docs/dev-guide.md) to learn more about the project structure and how to build and run the project.
 
-**Multi-level Analysis** – The most critical features are lsp functions, built on the [tinymist-query](./crates/tinymist-query/) crate. To achieve low latency, functions are classified into different levels of analysis.
-+ `query_source` – `SyntaxRequest` – locks and accesses a single source unit.
-+ `query_world` – `SemanticRequest` – locks and accesses multiple source units.
-+ `query_state` – `StatefulRequest` – acquires to accesses a specific version of compile results.
+## Fixing a bug or improving a feature
 
-**Optional Features** – All rest features in tinymist are optional. The significant features are enabled by default, but you can disable them with feature flags. For example, `tinymist` provides preview server features powered by `typst-preview`.
+Generally it's fine to just work on these kinds of things and put a pull-request out for it. If there is an issue accompanying it make sure to link it in the pull request description so it can be closed afterwards or linked for context.
 
-**Editor Frontends** – Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the [editor folder](./editors).
+If you want to find something to fix or work on keep a look out for the [`bug`](https://github.com/Myriad-Dreamin/tinymist/issues?q=is%3Aissue+is%3Aopen+label%3Abug) and [`enhancement`](https://github.com/Myriad-Dreamin/tinymist/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement)
+labels. Among issues, the [`good first issue`](https://github.com/Myriad-Dreamin/tinymist/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) label is a good place to start.
 
-## Installing Toolchain
+## Implementing a new feature
 
-- [Cargo](https://doc.rust-lang.org/cargo/) – Cargo is the Rust package manager.
-- [Yarn](https://yarnpkg.com/) – Yarn is a package manager that doubles down as project manager.
+It's advised to first open an issue for any kind of new feature so the team can tell upfront whether the feature is desirable or not before any implementation work happens. We want to minimize the possibility of someone putting a lot of work into a feature that is then going to waste as we deem it out of scope (be it due to generally not fitting in with tinymist, or just not having the maintenance capacity). If there already is a feature issue open but it is not clear whether it is considered accepted feel free to just drop a comment and ask!
 
-## Building and Running
-
-To build tinymist LSP:
-
-```bash
-git clone https://github.com/Myriad-Dreamin/tinymist.git
-# Debug
-cargo build
-# Release
-cargo build --release
-# RelWithDebInfo (GitHub Release)
-cargo build --profile=gh-release
-```
-
-To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension.
-
-## Local Documentation
-
-To serve the documentation locally, run:
-
-```bash
-yarn docs
-```
-
-To generate and open crate documentation, run:
-
-```bash
-yarn docs:rs --open
-```
-
-> [!Tip]  
-> Check [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to install the `shiroa` command for documentation generation.
-
-## Server Entries
-
-- `tinymist probe` – do nothing, which just probes that the binary is working.
-- `tinymist lsp` – starts the language server.
-- `tinymist preview` – starts a standalone preview server.
-
-## Running Analyzer Tests
-
-This is required if you have changed any code in `crates/tinymist-query`.
-
-To run analyzer tests for tinymist:
-
-```bash
-cargo insta test -p tinymist-query --accept
-```
-
-> [!Tip]  
-> Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
-
-## Running Syntax Grammar Tests
-
-This is required if you are going to change the textmate grammar in `syntaxes/textmate`.
-
-```bash
-# in root
-yarn test:grammar
-# Or in syntaxes/textmate
-cd syntaxes/textmate && yarn test
-```
-
-## Running E2E Tests
-
-This is required if you have changed any code in `crates/tinymist` or `crates/tinymist-query`.
-
-To run e2e tests for tinymist on Unix systems:
-
-```bash
-./scripts/e2e.sh
-```
-
-To run e2e tests for tinymist on Windows:
-
-```bash
-./scripts/e2e.ps1
-```
