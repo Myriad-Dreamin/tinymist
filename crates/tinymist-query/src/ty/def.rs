@@ -144,11 +144,10 @@ impl Ty {
         matches!(self, Ty::Dict(..))
     }
 
-    pub(crate) fn or(ty: Option<Ty>, pos: Option<Ty>) -> Option<Ty> {
-        Some(match (ty, pos) {
-            (Some(ty), Some(pos)) => Ty::from_types([ty, pos].into_iter()),
-            (Some(ty), None) => ty,
-            (None, Some(pos)) => pos,
+    pub(crate) fn union(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
+        Some(match (lhs, rhs) {
+            (Some(lhs), Some(rhs)) => Ty::from_types([lhs, rhs].into_iter()),
+            (Some(ty), None) | (None, Some(ty)) => ty,
             (None, None) => return None,
         })
     }
