@@ -9,8 +9,7 @@
 aba aba
 
 -----
-
-/// contains:test
+/// contains: test
 /// compile: base.typ
 
 #<t /* range -2..-1 */
