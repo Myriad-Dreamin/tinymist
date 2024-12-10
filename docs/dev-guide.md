@@ -1,6 +1,6 @@
 # Development Guide
 
-Tinymist provides a single integrated language service for Typst. To get a quick overview of the crates and structure of the project take a look at [Overview of Service](https://myriad-dreamin.github.io/tinymist/overview.html).
+Tinymist provides a single integrated language service for Typst. The tinymist project is arranged as follows:
 
 **The Language Server** – The main component, [tinymist](./crates/tinymist/), starts as a thread or process, obeying the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
 
@@ -13,6 +13,8 @@ Tinymist provides a single integrated language service for Typst. To get a quick
 - The document formatting feature powered by [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - The document previewing feature powered by [`typst-preview`](../crates/typst-preview/).
 - The handwritten-stroke recognizer powered by [Detypify](https://detypify.quarticcat.com/).
+
+To get a full overview of the crates and structure of the project, you could take a look at [Overview of Service](https://myriad-dreamin.github.io/tinymist/overview.html).
 
 ## Installing Toolchain
 
