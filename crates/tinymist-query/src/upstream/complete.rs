@@ -40,8 +40,7 @@ pub fn autocomplete(
     let _ = complete_comments(&mut ctx)
         || complete_type_and_syntax(&mut ctx).is_none() && {
             crate::log_debug_ct!("continue after completing type and syntax");
-            complete_labels(&mut ctx)
-                || complete_imports(&mut ctx)
+            complete_imports(&mut ctx)
                 || complete_field_accesses(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
@@ -493,20 +492,6 @@ fn field_access_completions(
         }
         _ => {}
     }
-}
-
-/// Complete labels.
-fn complete_labels(ctx: &mut CompletionContext) -> bool {
-    // A label anywhere in code: "(<la|".
-    if (ctx.leaf.kind().is_error() && ctx.leaf.text().starts_with('<'))
-        || ctx.leaf.kind() == SyntaxKind::Label
-    {
-        ctx.from = ctx.leaf.offset() + 1;
-        ctx.label_completions(false);
-        return true;
-    }
-
-    false
 }
 
 /// Complete imports.

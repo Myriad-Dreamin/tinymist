@@ -1475,7 +1475,13 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
         Some(CheckTarget::Normal(e)) if matches!(e.kind(), SyntaxKind::FieldAccess) => {
             return None;
         }
-        Some(CheckTarget::Paren { .. } | CheckTarget::Normal(..)) | None => {}
+        Some(
+            CheckTarget::Paren { .. }
+            | CheckTarget::Label(..)
+            | CheckTarget::LabelError(..)
+            | CheckTarget::Normal(..),
+        )
+        | None => {}
     }
 
     crate::log_debug_ct!("ctx.leaf {:?}", ctx.leaf.clone());

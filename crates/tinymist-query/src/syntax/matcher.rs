@@ -291,6 +291,7 @@ pub(crate) fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode 
 #[derive(Debug, Clone)]
 pub enum DerefTarget<'a> {
     Label(LinkedNode<'a>),
+    LabelError(LinkedNode<'a>),
     Ref(LinkedNode<'a>),
     VarAccess(LinkedNode<'a>),
     Callee(LinkedNode<'a>),
@@ -302,18 +303,23 @@ pub enum DerefTarget<'a> {
 impl<'a> DerefTarget<'a> {
     pub fn node(&self) -> &LinkedNode<'a> {
         match self {
-            DerefTarget::Label(node) => node,
-            DerefTarget::Ref(node) => node,
-            DerefTarget::VarAccess(node) => node,
-            DerefTarget::Callee(node) => node,
-            DerefTarget::ImportPath(node) => node,
-            DerefTarget::IncludePath(node) => node,
-            DerefTarget::Normal(_, node) => node,
+            DerefTarget::Label(node)
+            | DerefTarget::LabelError(node)
+            | DerefTarget::Ref(node)
+            | DerefTarget::VarAccess(node)
+            | DerefTarget::Callee(node)
+            | DerefTarget::ImportPath(node)
+            | DerefTarget::IncludePath(node)
+            | DerefTarget::Normal(_, node) => node,
         }
     }
 }
 
 pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'_>> {
+    if matches!(node.kind(), SyntaxKind::Error) && node.text().starts_with('<') {
+        return Some(DerefTarget::LabelError(node));
+    }
+
     /// Skips trivia nodes that are on the same line as the cursor.
     fn can_skip_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
@@ -521,6 +527,8 @@ pub enum CheckTarget<'a> {
     },
     ImportPath(LinkedNode<'a>),
     IncludePath(LinkedNode<'a>),
+    Label(LinkedNode<'a>),
+    LabelError(LinkedNode<'a>),
     Normal(LinkedNode<'a>),
 }
 
@@ -533,7 +541,9 @@ impl<'a> CheckTarget<'a> {
                 ParamTarget::Named(node) => node.clone(),
             },
             CheckTarget::Paren { container, .. } => container.clone(),
-            CheckTarget::ImportPath(node)
+            CheckTarget::Label(node)
+            | CheckTarget::LabelError(node)
+            | CheckTarget::ImportPath(node)
             | CheckTarget::IncludePath(node)
             | CheckTarget::Normal(node) => node.clone(),
         })
@@ -606,6 +616,12 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
     let deref_node = match deref_target {
         DerefTarget::Callee(callee) => {
             return get_callee_target(callee, node);
+        }
+        DerefTarget::Label(node) => {
+            return Some(CheckTarget::Label(node));
+        }
+        DerefTarget::LabelError(node) => {
+            return Some(CheckTarget::LabelError(node));
         }
         DerefTarget::ImportPath(node) => {
             return Some(CheckTarget::ImportPath(node));
@@ -868,7 +884,7 @@ mod tests {
             match kind {
                 Some(DerefTarget::VarAccess(..)) => 'v',
                 Some(DerefTarget::Normal(..)) => 'n',
-                Some(DerefTarget::Label(..)) => 'l',
+                Some(DerefTarget::Label(..) | DerefTarget::LabelError(..)) => 'l',
                 Some(DerefTarget::Ref(..)) => 'r',
                 Some(DerefTarget::Callee(..)) => 'c',
                 Some(DerefTarget::ImportPath(..)) => 'i',
@@ -888,6 +904,7 @@ mod tests {
                 Some(CheckTarget::Paren { .. }) => 'P',
                 Some(CheckTarget::ImportPath(..)) => 'i',
                 Some(CheckTarget::IncludePath(..)) => 'I',
+                Some(CheckTarget::Label(..) | CheckTarget::LabelError(..)) => 'l',
                 Some(CheckTarget::Normal(..)) => 'n',
                 None => ' ',
             }
