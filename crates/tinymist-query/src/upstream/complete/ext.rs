@@ -142,7 +142,7 @@ impl CompletionContext<'_> {
         Some((src, defines))
     }
 
-    pub fn postfix_completions(&mut self, node: &LinkedNode, value: &Value) -> Option<()> {
+    pub fn postfix_completions(&mut self, node: &LinkedNode, ty: &Type) -> Option<()> {
         if !self.ctx.analysis.completion_feat.postfix() {
             return None;
         }
@@ -156,8 +156,8 @@ impl CompletionContext<'_> {
         }
 
         let cursor_mode = interpret_mode_at(Some(node));
-        let is_content = value.ty() == Type::of::<Content>()
-            || value.ty() == Type::of::<typst::symbols::Symbol>();
+        let is_content = *ty == Type::of::<Content>()
+            || *ty == Type::of::<typst::symbols::Symbol>();
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
         let rng = node.range();
@@ -1444,7 +1444,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
     let ty = ctx
         .ctx
-        .literal_type_of_node(ctx.leaf.clone())
+        .literal_type_of_node(&ctx.leaf)
         .filter(|ty| !matches!(ty, Ty::Any));
 
     let scope = ctx.surrounding_syntax();

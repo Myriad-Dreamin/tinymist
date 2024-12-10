@@ -813,7 +813,7 @@ impl SharedContext {
         self.type_check(source).type_of_span(s)
     }
 
-    pub(crate) fn literal_type_of_node(self: &Arc<Self>, k: LinkedNode) -> Option<Ty> {
+    pub(crate) fn literal_type_of_node(self: &Arc<Self>, k: &LinkedNode) -> Option<Ty> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(&source);
