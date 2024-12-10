@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on t (43..44)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/complete_half_label.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 18,
+    "label": "test",
+    "labelDetails": {
+     "description": "H2"
+    },
+    "textEdit": {
+     "newText": "test>",
+     "range": {
+      "end": {
+       "character": 2,
+       "line": 3
+      },
+      "start": {
+       "character": 2,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

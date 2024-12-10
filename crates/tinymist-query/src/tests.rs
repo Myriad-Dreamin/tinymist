@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use std::{
@@ -10,7 +11,7 @@ use std::{
 use once_cell::sync::Lazy;
 use reflexo_typst::package::PackageSpec;
 use reflexo_typst::world::EntryState;
-use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi};
+use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, TaskInputs};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
 use typst::foundations::Bytes;
@@ -21,6 +22,7 @@ pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
 pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
+use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::syntax::find_module_level_docs;
@@ -115,16 +117,25 @@ pub fn compile_doc_for_test(
     ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
 ) -> Option<VersionedDocument> {
-    let must_compile = properties
-        .get("compile")
-        .map(|v| v.trim() == "true")
-        .unwrap_or(false);
+    let main_id = properties.get("compile").and_then(|v| match v.trim() {
+        "true" => Some(ctx.world.main()),
+        "false" => None,
+        path if path.ends_with(".typ") => {
+            let vp = VirtualPath::new(path);
+            Some(TypstFileId::new(None, vp))
+        }
+        _ => panic!("invalid value for 'compile' property: {v}"),
+    })?;
 
-    if !must_compile {
-        return None;
+    let mut world = Cow::Borrowed(&ctx.world);
+    if main_id != ctx.world.main() {
+        world = Cow::Owned(world.task(TaskInputs {
+            entry: Some(world.entry_state().select_in_workspace(main_id)),
+            ..Default::default()
+        }));
     }
 
-    let doc = typst::compile(ctx.world()).output.unwrap();
+    let doc = typst::compile(world.as_ref()).output.unwrap();
     Some(VersionedDocument {
         version: 0,
         document: Arc::new(doc),
