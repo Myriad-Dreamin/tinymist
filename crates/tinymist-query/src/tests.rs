@@ -93,7 +93,7 @@ pub fn run_with_ctx<T>(
             Some("example package (mock).".into()),
         )]
     });
-    ctx.test_completion_files(Vec::new);
+    ctx.test_completion_files(|| paths.clone());
     ctx.test_files(|| paths);
     f(&mut ctx, p)
 }
