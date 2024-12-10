@@ -21,7 +21,7 @@ use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
 use ext::*;
-pub use ext::{complete_path, CompletionFeat, PostfixSnippet};
+pub use ext::{CompletionFeat, PostfixSnippet};
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -38,8 +38,8 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_type(&mut ctx).is_none() && {
-            crate::log_debug_ct!("continue after completing type");
+        || complete_type_and_syntax(&mut ctx).is_none() && {
+            crate::log_debug_ct!("continue after completing type and syntax");
             complete_labels(&mut ctx)
                 || complete_imports(&mut ctx)
                 || complete_field_accesses(&mut ctx)
@@ -511,24 +511,6 @@ fn complete_labels(ctx: &mut CompletionContext) -> bool {
 
 /// Complete imports.
 fn complete_imports(ctx: &mut CompletionContext) -> bool {
-    // In an import path for a package:
-    // "#import "@|",
-    if_chain! {
-        if matches!(
-            ctx.leaf.parent_kind(),
-            Some(SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude)
-        );
-        if let Some(ast::Expr::Str(str)) = ctx.leaf.cast();
-        let value = str.get();
-        if value.starts_with('@');
-        then {
-            let all_versions = value.contains(':');
-            ctx.from = ctx.leaf.offset();
-            ctx.package_completions(all_versions);
-            return true;
-        }
-    }
-
     // On the colon marker of an import list:
     // "#import "path.typ":|"
     if_chain! {

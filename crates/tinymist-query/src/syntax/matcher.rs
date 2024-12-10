@@ -519,22 +519,23 @@ pub enum CheckTarget<'a> {
         container: LinkedNode<'a>,
         is_before: bool,
     },
+    ImportPath(LinkedNode<'a>),
+    IncludePath(LinkedNode<'a>),
     Normal(LinkedNode<'a>),
 }
 
 impl<'a> CheckTarget<'a> {
     pub fn node(&self) -> Option<LinkedNode<'a>> {
         Some(match self {
-            CheckTarget::Param { target, .. } => match target {
-                ParamTarget::Positional { .. } => return None,
-                ParamTarget::Named(node) => node.clone(),
-            },
-            CheckTarget::Element { target, .. } => match target {
+            CheckTarget::Param { target, .. } | CheckTarget::Element { target, .. } => match target
+            {
                 ParamTarget::Positional { .. } => return None,
                 ParamTarget::Named(node) => node.clone(),
             },
             CheckTarget::Paren { container, .. } => container.clone(),
-            CheckTarget::Normal(node) => node.clone(),
+            CheckTarget::ImportPath(node)
+            | CheckTarget::IncludePath(node)
+            | CheckTarget::Normal(node) => node.clone(),
         })
     }
 }
@@ -606,8 +607,11 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         DerefTarget::Callee(callee) => {
             return get_callee_target(callee, node);
         }
-        DerefTarget::ImportPath(node) | DerefTarget::IncludePath(node) => {
-            return Some(CheckTarget::Normal(node));
+        DerefTarget::ImportPath(node) => {
+            return Some(CheckTarget::ImportPath(node));
+        }
+        DerefTarget::IncludePath(node) => {
+            return Some(CheckTarget::IncludePath(node));
         }
         deref_target => deref_target.node().clone(),
     };
@@ -882,6 +886,8 @@ mod tests {
                 Some(CheckTarget::Param { .. }) => 'p',
                 Some(CheckTarget::Element { .. }) => 'e',
                 Some(CheckTarget::Paren { .. }) => 'P',
+                Some(CheckTarget::ImportPath(..)) => 'i',
+                Some(CheckTarget::IncludePath(..)) => 'I',
                 Some(CheckTarget::Normal(..)) => 'n',
                 None => ' ',
             }

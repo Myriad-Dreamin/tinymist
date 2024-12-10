@@ -1410,8 +1410,8 @@ impl TypeCompletionContext<'_, '_> {
 //     ctx.enrich(" ", "");
 // }
 
-/// Complete call and set rule parameters.
-pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
+/// Complete code by type or syntax.
+pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()> {
     use crate::syntax::get_check_target;
     use SurroundingSyntax::*;
 
@@ -1437,6 +1437,33 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 }
             }
             args_node = Some(args.to_untyped().clone());
+        }
+        Some(CheckTarget::ImportPath(path) | CheckTarget::IncludePath(path)) => {
+            let Some(ast::Expr::Str(str)) = path.cast() else {
+                return None;
+            };
+            ctx.from = path.offset();
+            let value = str.get();
+            if value.starts_with('@') {
+                let all_versions = value.contains(':');
+                ctx.package_completions(all_versions);
+                return Some(());
+            } else {
+                let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
+                let paths = complete_path(
+                    ctx.ctx,
+                    Some(path),
+                    &source,
+                    ctx.cursor,
+                    &crate::analysis::PathPreference::Source {
+                        allow_package: true,
+                    },
+                );
+                // todo: remove completions2
+                ctx.completions2.extend(paths.unwrap_or_default());
+            }
+
+            return Some(());
         }
         Some(CheckTarget::Normal(e))
             if (matches!(e.kind(), SyntaxKind::ContentBlock)
@@ -1610,7 +1637,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     Some(())
 }
 
-pub fn complete_path(
+fn complete_path(
     ctx: &LocalContext,
     v: Option<LinkedNode>,
     source: &Source,
