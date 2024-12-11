@@ -18,19 +18,16 @@ impl SemanticRequest for CodeLensRequest {
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
 
-        let doc_start = ctx.to_lsp_range(0..0, &source);
-
         let mut res = vec![];
 
-        let run_code_lens_cmd = |title: &str, args: Vec<JsonValue>| Command {
-            title: title.to_string(),
-            command: "tinymist.runCodeLens".to_string(),
-            arguments: Some(args),
-        };
-
+        let doc_start = ctx.to_lsp_range(0..0, &source);
         let doc_lens = |title: &str, args: Vec<JsonValue>| CodeLens {
             range: doc_start,
-            command: Some(run_code_lens_cmd(title, args)),
+            command: Some(Command {
+                title: title.to_string(),
+                command: "tinymist.runCodeLens".to_string(),
+                arguments: Some(args),
+            }),
             data: None,
         };
 
