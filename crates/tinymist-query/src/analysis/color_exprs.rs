@@ -1,34 +1,35 @@
 //! Analyze color expressions in a source file.
 use std::str::FromStr;
 
-use lsp_types::ColorInformation;
 use typst::visualize::Color;
 
-use super::prelude::*;
+use crate::prelude::*;
 
-/// Get color expressions from a source.
-pub fn get_color_exprs(ctx: &mut LocalContext, src: &Source) -> Option<Vec<ColorInformation>> {
-    let mut worker = ColorExprWorker {
-        ctx,
-        source: src.clone(),
-        colors: vec![],
-    };
-    let root = LinkedNode::new(src.root());
-    worker.collect_colors(root)?;
-    Some(worker.colors)
-}
-
-struct ColorExprWorker<'a> {
+/// Analyzes the document and provides color information.
+pub struct ColorExprWorker<'a> {
+    /// The local analysis context to work with.
     ctx: &'a mut LocalContext,
+    /// The source document to analyze.
     source: Source,
-    colors: Vec<ColorInformation>,
+    /// The color information to provide.
+    pub colors: Vec<ColorInformation>,
 }
 
-impl ColorExprWorker<'_> {
-    fn collect_colors(&mut self, node: LinkedNode) -> Option<()> {
+impl<'a> ColorExprWorker<'a> {
+    /// Creates a new color expression worker.
+    pub fn new(ctx: &'a mut LocalContext, source: Source) -> Self {
+        Self {
+            ctx,
+            source,
+            colors: vec![],
+        }
+    }
+
+    /// Starts to work.
+    pub fn work(&mut self, node: LinkedNode) -> Option<()> {
         match node.kind() {
             SyntaxKind::FuncCall => {
-                let fc = self.analyze_call(node.clone());
+                let fc = self.on_call(node.clone());
                 if fc.is_some() {
                     return Some(());
                 }
@@ -39,13 +40,13 @@ impl ColorExprWorker<'_> {
         };
 
         for child in node.children() {
-            self.collect_colors(child);
+            self.work(child);
         }
 
         Some(())
     }
 
-    fn analyze_call(&mut self, node: LinkedNode) -> Option<()> {
+    fn on_call(&mut self, node: LinkedNode) -> Option<()> {
         let call = node.cast::<ast::FuncCall>()?;
         let mut callee = call.callee();
         'check_color_fn: loop {
@@ -64,9 +65,9 @@ impl ColorExprWorker<'_> {
                 ast::Expr::Ident(ident) => {
                     // currently support rgb, luma
                     match ident.get().as_str() {
-                        "rgb" => self.analyze_rgb(&node, call)?,
+                        "rgb" => self.on_rgb(&node, call)?,
                         "luma" | "oklab" | "oklch" | "linear-rgb" | "cmyk" | "hsl" | "hsv" => {
-                            self.analyze_general(&node, call)?
+                            self.on_const_call(&node, call)?
                         }
                         _ => return None,
                     }
@@ -77,12 +78,12 @@ impl ColorExprWorker<'_> {
         }
     }
 
-    fn analyze_rgb(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
+    fn on_rgb(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
         let mut args = call.args().items();
         let hex_or_color_or_r = args.next()?;
         let g = args.next();
         match (g.is_some(), hex_or_color_or_r) {
-            (true, _) => self.analyze_general(node, call)?,
+            (true, _) => self.on_const_call(node, call)?,
             (false, ast::Arg::Pos(ast::Expr::Str(s))) => {
                 // parse hex
                 let color = typst::visualize::Color::from_str(s.get().as_str()).ok()?;
@@ -97,7 +98,7 @@ impl ColorExprWorker<'_> {
         Some(())
     }
 
-    fn analyze_general(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
+    fn on_const_call(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
         let color = self.ctx.mini_eval(ast::Expr::FuncCall(call))?.cast().ok()?;
         self.push_color(node.range(), color);
         Some(())
