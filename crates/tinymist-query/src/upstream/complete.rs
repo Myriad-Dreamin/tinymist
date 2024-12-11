@@ -19,7 +19,8 @@ use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
 use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 use crate::snippet::{
-    CompletionContextKey, PrefixSnippet, SurroundingSyntax, DEFAULT_PREFIX_SNIPPET,
+    CompletionCommand, CompletionContextKey, PrefixSnippet, SurroundingSyntax,
+    DEFAULT_PREFIX_SNIPPET,
 };
 use crate::syntax::InterpretMode;
 
@@ -670,15 +671,18 @@ impl<'a> CompletionContext<'a> {
                 continue;
             }
 
+            let analysis = &self.ctx.analysis;
+            let command = match snippet.command {
+                Some(CompletionCommand::TriggerSuggest) => analysis.trigger_suggest(true),
+                None => analysis.trigger_on_snippet(snippet.snippet.contains("${")),
+            };
+
             self.completions.push(Completion {
                 kind: CompletionKind::Syntax,
                 label: snippet.label.as_ref().into(),
                 apply: Some(snippet.snippet.as_ref().into()),
                 detail: Some(snippet.description.as_ref().into()),
-                command: self
-                    .ctx
-                    .analysis
-                    .trigger_on_snippet(snippet.snippet.contains("${")),
+                command,
                 ..Completion::default()
             });
         }

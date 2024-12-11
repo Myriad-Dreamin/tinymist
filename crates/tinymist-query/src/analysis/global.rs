@@ -145,13 +145,18 @@ impl Analysis {
         AllocStats::report(self)
     }
 
+    /// Get configured trigger suggest command.
+    pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
     /// Get configured trigger parameter hints command.
     pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
         (self.completion_feat.trigger_parameter_hints && context)
             .then_some("editor.action.triggerParameterHints")
     }
 
-    /// Get configured trigger after snippet command.
+    /// Get configured trigger suggest after snippet command.
     ///
     /// > VS Code doesn't do that... Auto triggering suggestion only happens on
     /// > typing (word starts or trigger characters). However, you can use
@@ -162,7 +167,7 @@ impl Analysis {
             return None;
         }
 
-        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+        self.trigger_suggest(context)
     }
 
     /// Get configured trigger on positional parameter hints command.
