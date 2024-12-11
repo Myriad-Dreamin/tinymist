@@ -18,7 +18,7 @@ pub use lsp_types::{
 };
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
-pub use typst::diag::{EcoString, FileResult, Tracepoint};
+pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;
 pub use typst::syntax::ast::{self, AstNode};
 pub use typst::syntax::{
