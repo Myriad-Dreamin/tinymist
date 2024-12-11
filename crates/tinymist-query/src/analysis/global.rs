@@ -66,7 +66,7 @@ pub struct Analysis {
     pub tokens_caches: Arc<Mutex<SemanticTokenCache>>,
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
-    /// The revisioned cache for analysis.
+    /// The revision-managed cache for analysis.
     pub analysis_rev_cache: Arc<Mutex<AnalysisRevCache>>,
     /// The statistics about the analyzers.
     pub stats: Arc<AnalysisStats>,
@@ -90,7 +90,7 @@ impl Analysis {
             rev_lock: lg,
             local: LocalContext {
                 tokens,
-                caches: AnalysisCaches::default(),
+                caches: AnalysisLocalCaches::default(),
                 shared: Arc::new(SharedContext {
                     slot,
                     lifetime,
@@ -189,20 +189,9 @@ pub trait PeriscopeProvider {
     }
 }
 
-/// Shared workers to limit resource usage
-#[derive(Default)]
-pub struct AnalysisGlobalWorkers {
-    /// A possible long running import dynamic analysis task
-    import: RateLimiter,
-    /// A possible long running expression dynamic analysis task
-    expression: RateLimiter,
-    /// A possible long running tooltip dynamic analysis task
-    tooltip: RateLimiter,
-}
-
 /// The local context guard that performs gc once dropped.
 pub struct LocalContextGuard {
-    /// Constructed local context
+    /// The guarded local context
     pub local: LocalContext,
     /// The revision lock
     pub rev_lock: AnalysisRevLock,
@@ -260,12 +249,13 @@ impl LocalContextGuard {
     }
 }
 
-/// The local context for analyzers.
+/// The local context for analyzers. In addition to the shared context, it also
+/// holds mutable local caches.
 pub struct LocalContext {
     /// The created semantic token context.
     pub(crate) tokens: Option<SemanticTokenContext>,
     /// Local caches for analysis.
-    pub caches: AnalysisCaches,
+    pub caches: AnalysisLocalCaches,
     /// The shared context
     pub shared: Arc<SharedContext>,
 }
@@ -1002,6 +992,9 @@ impl SharedContext {
     }
 }
 
+// Needed by recursive computation
+type DeferredCompute<T> = Arc<OnceCell<T>>;
+
 #[derive(Clone)]
 struct IncrCacheMap<K, V> {
     revision: usize,
@@ -1102,8 +1095,16 @@ impl<T: Default + Clone> CacheMap<T> {
     }
 }
 
-// Needed by recursive computation
-type DeferredCompute<T> = Arc<OnceCell<T>>;
+/// Shared workers to limit resource usage
+#[derive(Default)]
+pub struct AnalysisGlobalWorkers {
+    /// A possible long running import dynamic analysis task
+    import: RateLimiter,
+    /// A possible long running expression dynamic analysis task
+    expression: RateLimiter,
+    /// A possible long running tooltip dynamic analysis task
+    tooltip: RateLimiter,
+}
 
 /// A global (compiler server spanned) cache for all level of analysis results
 /// of a module.
@@ -1117,25 +1118,31 @@ pub struct AnalysisGlobalCaches {
     terms: CacheMap<(Value, Ty)>,
 }
 
-/// A cache for all level of analysis results of a module.
+/// A local (lsp request spanned) cache for all level of analysis results of a
+/// module.
+///
+/// You should not hold it across requests, because input like source code may
+/// change.
 #[derive(Default)]
-pub struct AnalysisCaches {
-    modules: HashMap<TypstFileId, ModuleAnalysisCache>,
+pub struct AnalysisLocalCaches {
+    modules: HashMap<TypstFileId, ModuleAnalysisLocalCache>,
     completion_files: OnceCell<Vec<TypstFileId>>,
     root_files: OnceCell<Vec<TypstFileId>>,
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
 
-/// A cache for module-level analysis results of a module.
+/// A local cache for module-level analysis results of a module.
 ///
-/// You should not holds across requests, because source code may change.
+/// You should not hold it across requests, because input like source code may
+/// change.
 #[derive(Default)]
-pub struct ModuleAnalysisCache {
+pub struct ModuleAnalysisLocalCache {
     expr_stage: OnceCell<Arc<ExprInfo>>,
     type_check: OnceCell<Arc<TypeScheme>>,
 }
 
-/// The grid cache for all level of analysis results of a module.
+/// A revision-managed (per input change) cache for all level of analysis
+/// results of a module.
 #[derive(Default)]
 pub struct AnalysisRevCache {
     default_slot: AnalysisRevSlot,
