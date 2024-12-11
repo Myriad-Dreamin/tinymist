@@ -1069,6 +1069,16 @@ impl LanguageState {
             }
             fut_stat.stat.snap();
 
+            if matches!(query, Completion(..)) {
+                // Prefetch the package index for completion.
+                if snap.world.registry.cached_index().is_none() {
+                    let registry = snap.world.registry.clone();
+                    tokio::spawn(async move {
+                        let _ = registry.download_index();
+                    });
+                }
+            }
+
             match query {
                 SemanticTokensFull(req) => snap.run_semantic(req, R::SemanticTokensFull),
                 SemanticTokensDelta(req) => snap.run_semantic(req, R::SemanticTokensDelta),

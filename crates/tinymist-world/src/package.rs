@@ -218,6 +218,11 @@ impl PackageStorage {
         }
     }
 
+    /// Get the cached package index without network access.
+    pub fn cached_index(&self) -> Option<&[(PackageSpec, Option<EcoString>)]> {
+        self.index.get().map(Vec::as_slice)
+    }
+
     /// Download the package index. The result of this is cached for efficiency.
     pub fn download_index(&self) -> &[(PackageSpec, Option<EcoString>)] {
         self.index.get_or_init(|| {
