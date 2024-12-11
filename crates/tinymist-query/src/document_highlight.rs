@@ -1,6 +1,6 @@
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, syntax::node_ancestors, SemanticRequest};
+use crate::{analysis::doc_highlight::DocumentHighlightWorker, prelude::*, SemanticRequest};
 
 /// The [`textDocument/documentHighlight`] request
 ///
@@ -21,129 +21,12 @@ impl SemanticRequest for DocumentHighlightRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)?;
 
         let root = LinkedNode::new(source.root());
-        let mut node = &root.leaf_at_compat(cursor)?;
+        let node = root.leaf_at_compat(cursor)?;
 
-        loop {
-            match node.kind() {
-                SyntaxKind::For
-                | SyntaxKind::While
-                | SyntaxKind::Break
-                | SyntaxKind::Continue
-                | SyntaxKind::LoopBreak
-                | SyntaxKind::LoopContinue => {
-                    return DocumentHighlightWorker::new(ctx, &source).highlight_loop_of(node)
-                }
-                SyntaxKind::Arrow
-                | SyntaxKind::Params
-                | SyntaxKind::Return
-                | SyntaxKind::FuncReturn => return highlight_func_returns(ctx, node),
-                _ => {}
-            }
-            node = node.parent()?;
-        }
+        let mut worker = DocumentHighlightWorker::new(ctx, &source);
+        worker.work(&node)?;
+        (!worker.annotated.is_empty()).then_some(worker.annotated)
     }
-}
-
-struct DocumentHighlightWorker<'a> {
-    ctx: &'a mut LocalContext,
-    current: &'a Source,
-    highlights: Vec<DocumentHighlight>,
-    worklist: Vec<LinkedNode<'a>>,
-}
-
-impl<'a> DocumentHighlightWorker<'a> {
-    fn new(ctx: &'a mut LocalContext, current: &'a Source) -> Self {
-        Self {
-            ctx,
-            current,
-            highlights: Vec::new(),
-            worklist: Vec::new(),
-        }
-    }
-
-    fn finish(self) -> Option<Vec<DocumentHighlight>> {
-        (!self.highlights.is_empty()).then_some(self.highlights)
-    }
-
-    fn annotate(&mut self, node: &LinkedNode) {
-        let mut rng = node.range();
-
-        // if previous node is hash
-        if rng.start > 0 && self.current.text().as_bytes()[rng.start - 1] == b'#' {
-            rng.start -= 1;
-        }
-
-        self.highlights.push(DocumentHighlight {
-            range: self.ctx.to_lsp_range(rng, self.current),
-            kind: None,
-        });
-    }
-
-    fn check<F>(&mut self, check: F)
-    where
-        F: Fn(&mut Self, LinkedNode<'a>),
-    {
-        while let Some(node) = self.worklist.pop() {
-            check(self, node);
-        }
-    }
-
-    fn check_children(&mut self, node: &LinkedNode<'a>) {
-        if node.get().children().len() == 0 {
-            return;
-        }
-
-        for child in node.children() {
-            self.worklist.push(child.clone());
-        }
-    }
-
-    fn check_loop(&mut self, node: LinkedNode<'a>) {
-        match node.kind() {
-            SyntaxKind::ForLoop
-            | SyntaxKind::WhileLoop
-            | SyntaxKind::Closure
-            | SyntaxKind::Contextual => {
-                return;
-            }
-            SyntaxKind::LoopBreak | SyntaxKind::LoopContinue => {
-                self.annotate(&node);
-                return;
-            }
-            _ => {}
-        }
-
-        self.check_children(&node);
-    }
-
-    fn highlight_loop_of(mut self, node: &'a LinkedNode<'a>) -> Option<Vec<DocumentHighlight>> {
-        let _ = self.ctx;
-
-        // find the nearest loop node
-        let loop_node = node_ancestors(node)
-            .find(|node| matches!(node.kind(), SyntaxKind::ForLoop | SyntaxKind::WhileLoop))?;
-
-        // find the first key word of the loop node
-        let keyword = loop_node.children().find(|node| node.kind().is_keyword());
-        if let Some(keyword) = keyword {
-            self.annotate(&keyword);
-        }
-
-        self.check_children(loop_node);
-        self.check(Self::check_loop);
-
-        crate::log_debug_ct!("highlights: {:?}", self.highlights);
-        self.finish()
-    }
-}
-
-fn highlight_func_returns(
-    ctx: &mut LocalContext,
-    node: &LinkedNode,
-) -> Option<Vec<DocumentHighlight>> {
-    let _ = ctx;
-    let _ = node;
-    None
 }
 
 #[cfg(test)]
