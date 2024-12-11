@@ -19,6 +19,12 @@ pub enum PostfixSnippetScope {
     Content,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum CompletionCommand {
+    TriggerSuggest,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::EnumIter)]
 pub enum SurroundingSyntax {
     Regular,
@@ -163,6 +169,8 @@ pub struct PrefixSnippet {
     pub snippet: EcoString,
     /// The snippet description.
     pub description: EcoString,
+    /// The command to execute.
+    pub command: Option<CompletionCommand>,
     /// Lazily expanded context.
     #[serde(skip)]
     pub expanded_context: OnceLock<HashSet<CompletionContextKey>>,
@@ -235,6 +243,31 @@ impl From<&ConstPrefixSnippet> for Interned<PrefixSnippet> {
             label_detail: None,
             snippet: snippet.snippet.into(),
             description: snippet.description.into(),
+            command: None,
+            expanded_context: OnceLock::new(),
+        })
+    }
+}
+
+struct ConstPrefixSnippetWithSuggest {
+    context: InterpretMode,
+    label: &'static str,
+    snippet: &'static str,
+    description: &'static str,
+}
+
+impl From<&ConstPrefixSnippetWithSuggest> for Interned<PrefixSnippet> {
+    fn from(snippet: &ConstPrefixSnippetWithSuggest) -> Self {
+        Interned::new(PrefixSnippet {
+            context: eco_vec![CompletionContext {
+                mode: ContextSelector::Positive(Some(snippet.context)),
+                syntax: ContextSelector::Positive(None),
+            }],
+            label: snippet.label.into(),
+            label_detail: None,
+            snippet: snippet.snippet.into(),
+            description: snippet.description.into(),
+            command: Some(CompletionCommand::TriggerSuggest),
             expanded_context: OnceLock::new(),
         })
     }
@@ -343,36 +376,6 @@ pub static DEFAULT_PREFIX_SNIPPET: LazyLock<Vec<Interned<PrefixSnippet>>> = Lazy
             label: "return",
             snippet: "return ${output}",
             description: "Returns early from a function.",
-        },
-        ConstPrefixSnippet {
-            context: InterpretMode::Code,
-            label: "import module",
-            snippet: "import \"${}\"",
-            description: "Imports module from another file.",
-        },
-        ConstPrefixSnippet {
-            context: InterpretMode::Code,
-            label: "import module by expression",
-            snippet: "import ${}",
-            description: "Imports items by expression.",
-        },
-        ConstPrefixSnippet {
-            context: InterpretMode::Code,
-            label: "import package",
-            snippet: "import \"@${}\": ${items}",
-            description: "Imports variables from another file.",
-        },
-        ConstPrefixSnippet {
-            context: InterpretMode::Code,
-            label: "include (file)",
-            snippet: "include \"${file}.typ\"",
-            description: "Includes content from another file.",
-        },
-        ConstPrefixSnippet {
-            context: InterpretMode::Code,
-            label: "include (package)",
-            snippet: "include \"@${}\"",
-            description: "Includes content from another file.",
         },
         ConstPrefixSnippet {
             context: InterpretMode::Code,
@@ -502,7 +505,42 @@ pub static DEFAULT_PREFIX_SNIPPET: LazyLock<Vec<Interned<PrefixSnippet>>> = Lazy
         },
     ];
 
-    SNIPPETS.iter().map(From::from).collect()
+    const SNIPPET_SUGGEST: &[ConstPrefixSnippetWithSuggest] = &[
+        ConstPrefixSnippetWithSuggest {
+            context: InterpretMode::Code,
+            label: "import module",
+            snippet: "import \"${}\"",
+            description: "Imports module from another file.",
+        },
+        ConstPrefixSnippetWithSuggest {
+            context: InterpretMode::Code,
+            label: "import module by expression",
+            snippet: "import ${}",
+            description: "Imports items by expression.",
+        },
+        ConstPrefixSnippetWithSuggest {
+            context: InterpretMode::Code,
+            label: "import (package)",
+            snippet: "import \"@${}\"",
+            description: "Imports variables from another file.",
+        },
+        ConstPrefixSnippetWithSuggest {
+            context: InterpretMode::Code,
+            label: "include (file)",
+            snippet: "include \"${}\"",
+            description: "Includes content from another file.",
+        },
+        ConstPrefixSnippetWithSuggest {
+            context: InterpretMode::Code,
+            label: "include (package)",
+            snippet: "include \"@${}\"",
+            description: "Includes content from another file.",
+        },
+    ];
+
+    let snippets = SNIPPETS.iter().map(From::from);
+    let snippets2 = SNIPPET_SUGGEST.iter().map(From::from);
+    snippets.chain(snippets2).collect()
 });
 
 pub static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(|| {

@@ -146,6 +146,11 @@ impl Analysis {
     }
 
     /// Get configured trigger parameter hints command.
+    pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
+    /// Get configured trigger parameter hints command.
     pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
         (self.completion_feat.trigger_parameter_hints && context)
             .then_some("editor.action.triggerParameterHints")
@@ -162,7 +167,7 @@ impl Analysis {
             return None;
         }
 
-        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+        self.trigger_suggest(context)
     }
 
     /// Get configured trigger on positional parameter hints command.
