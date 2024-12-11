@@ -1,4 +1,4 @@
-use crate::{analysis::get_color_exprs, prelude::*, SemanticRequest};
+use crate::{analysis::ColorExprWorker, prelude::*, SemanticRequest};
 
 /// The [`textDocument/documentColor`] request is sent from the client to the
 /// server to list all color references found in a given text document. Along
@@ -26,7 +26,10 @@ impl SemanticRequest for DocumentColorRequest {
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        get_color_exprs(ctx, &source)
+
+        let mut worker = ColorExprWorker::new(ctx, source.clone());
+        worker.work(LinkedNode::new(source.root()))?;
+        Some(worker.colors)
     }
 }
 
