@@ -2,7 +2,7 @@ pub use std::collections::HashMap;
 pub use std::iter;
 pub use std::ops::Range;
 pub use std::path::{Path, PathBuf};
-pub use std::sync::{Arc, LazyLock};
+pub use std::sync::{Arc, LazyLock, OnceLock};
 
 pub use ecow::{eco_vec, EcoVec};
 pub use itertools::{Format, Itertools};
@@ -25,6 +25,7 @@ pub use typst::syntax::{
     FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
 pub use typst::World;
+pub use typst_shim::syntax::LinkedNodeExt;
 
 pub use crate::analysis::{Definition, LocalContext};
 pub use crate::docs::DefDocs;
