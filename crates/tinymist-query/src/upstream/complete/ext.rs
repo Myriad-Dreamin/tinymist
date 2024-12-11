@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::ops::Deref;
-use std::sync::OnceLock;
 
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
@@ -18,6 +17,9 @@ use typst::visualize::Color;
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
 use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
+use crate::snippet::{
+    ParsedSnippet, PostfixSnippet, PostfixSnippetScope, SurroundingSyntax, DEFAULT_POSTFIX_SNIPPET,
+};
 use crate::syntax::{
     descending_decls, interpret_mode_at, is_ident_like, CheckTarget, DescentDecl, InterpretMode,
 };
@@ -25,42 +27,6 @@ use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeSch
 use crate::upstream::complete::complete_code;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PostfixSnippetScope {
-    /// Any "dottable" value.
-    Value,
-    /// Any value having content type.
-    Content,
-}
-
-/// A parsed snippet
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParsedSnippet {
-    node_before: EcoString,
-    node_before_before_cursor: Option<EcoString>,
-    node_after: EcoString,
-}
-
-/// A postfix completion snippet.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostfixSnippet {
-    /// The scope of the snippet.
-    pub mode: EcoVec<InterpretMode>,
-    /// The scope of the snippet.
-    pub scope: PostfixSnippetScope,
-    /// The snippet name.
-    pub label: EcoString,
-    /// The snippet name.
-    pub label_detail: Option<EcoString>,
-    /// The snippet detail.
-    pub snippet: EcoString,
-    /// The snippet description.
-    pub description: EcoString,
-    /// Lazily parsed snippet.
-    #[serde(skip)]
-    pub parsed_snippet: OnceLock<Option<ParsedSnippet>>,
-}
 
 /// Tinymist's completion features.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -558,16 +524,6 @@ impl CompletionContext<'_> {
             });
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum SurroundingSyntax {
-    Regular,
-    StringContent,
-    Selector,
-    ShowTransform,
-    ImportList,
-    SetRule,
 }
 
 fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
@@ -1839,101 +1795,6 @@ pub fn symbol_label_detail(ch: char) -> EcoString {
         _ => format!("\\u{{{:04x}}}", ch as u32).into(),
     }
 }
-
-static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(|| {
-    vec![
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Content,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: eco_format!("text fill"),
-            label_detail: Some(eco_format!(".text fill")),
-            snippet: "text(fill: ${}, ${node})".into(),
-            description: eco_format!("wrap with text fill"),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Content,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: eco_format!("text size"),
-            label_detail: Some(eco_format!(".text size")),
-            snippet: "text(size: ${}, ${node})".into(),
-            description: eco_format!("wrap with text size"),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Content,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: eco_format!("align"),
-            label_detail: Some(eco_format!(".align")),
-            snippet: "align(${}, ${node})".into(),
-            description: eco_format!("wrap with alignment"),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "if".into(),
-            label_detail: Some(".if".into()),
-            snippet: "if ${node} { ${} }".into(),
-            description: "wrap as if expression".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "else".into(),
-            label_detail: Some(".else".into()),
-            snippet: "if not ${node} { ${} }".into(),
-            description: "wrap as if not expression".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "none".into(),
-            label_detail: Some(".if none".into()),
-            snippet: "if ${node} == none { ${} }".into(),
-            description: "wrap as if expression to check none-ish".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "notnone".into(),
-            label_detail: Some(".if not none".into()),
-            snippet: "if ${node} != none { ${} }".into(),
-            description: "wrap as if expression to check none-ish".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "return".into(),
-            label_detail: Some(".return".into()),
-            snippet: "return ${node}".into(),
-            description: "wrap as return expression".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "tup".into(),
-            label_detail: Some(".tup".into()),
-            snippet: "(${node}, ${})".into(),
-            description: "wrap as tuple (array) expression".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-        PostfixSnippet {
-            scope: PostfixSnippetScope::Value,
-            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
-            label: "let".into(),
-            label_detail: Some(".let".into()),
-            snippet: "let ${_} = ${node}".into(),
-            description: "wrap as let expression".into(),
-            parsed_snippet: OnceLock::new(),
-        },
-    ]
-});
 
 #[cfg(test)]
 mod tests {

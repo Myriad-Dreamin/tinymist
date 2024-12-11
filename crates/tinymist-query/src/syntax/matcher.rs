@@ -226,7 +226,7 @@ fn can_be_ident(node: &SyntaxNode) -> bool {
 }
 
 /// A mode in which a text document is interpreted.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::EnumIter)]
 #[serde(rename_all = "camelCase")]
 pub enum InterpretMode {
     /// The position is in a comment.

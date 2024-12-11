@@ -18,10 +18,14 @@ use unscanny::Scanner;
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
 use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
+use crate::snippet::{
+    CompletionContextKey, PrefixSnippet, SurroundingSyntax, DEFAULT_PREFIX_SNIPPET,
+};
+use crate::syntax::InterpretMode;
 
 mod ext;
+pub use ext::CompletionFeat;
 use ext::*;
-pub use ext::{CompletionFeat, PostfixSnippet};
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -192,111 +196,11 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     // Anywhere: "|".
     if !is_triggered_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
-        markup_completions(ctx);
+        ctx.snippet_completions(Some(InterpretMode::Markup), None);
         return true;
     }
 
     false
-}
-
-/// Add completions for markup snippets.
-#[rustfmt::skip]
-fn markup_completions(ctx: &mut CompletionContext) {
-    ctx.snippet_completion(
-        "expression",
-        "#${}",
-        "Variables, function calls, blocks, and more.",
-    );
-
-    ctx.snippet_completion(
-        "linebreak",
-        "\\\n${}",
-        "Inserts a forced linebreak.",
-    );
-
-    ctx.snippet_completion(
-        "strong text",
-        "*${strong}*",
-        "Strongly emphasizes content by increasing the font weight.",
-    );
-
-    ctx.snippet_completion(
-        "emphasized text",
-        "_${emphasized}_",
-        "Emphasizes content by setting it in italic font style.",
-    );
-
-    ctx.snippet_completion(
-        "raw text",
-        "`${text}`",
-        "Displays text verbatim, in monospace.",
-    );
-
-    ctx.snippet_completion(
-        "code listing",
-        "```${lang}\n${code}\n```",
-        "Inserts computer code with syntax highlighting.",
-    );
-
-    ctx.snippet_completion(
-        "hyperlink",
-        "https://${example.com}",
-        "Links to a URL.",
-    );
-
-    ctx.snippet_completion(
-        "label",
-        "<${name}>",
-        "Makes the preceding element referenceable.",
-    );
-
-    ctx.snippet_completion(
-        "reference",
-        "@${name}",
-        "Inserts a reference to a label.",
-    );
-
-    ctx.snippet_completion(
-        "heading",
-        "= ${title}",
-        "Inserts a section heading.",
-    );
-
-    ctx.snippet_completion(
-        "list item",
-        "- ${item}",
-        "Inserts an item of a bullet list.",
-    );
-
-    ctx.snippet_completion(
-        "enumeration item",
-        "+ ${item}",
-        "Inserts an item of a numbered list.",
-    );
-
-    ctx.snippet_completion(
-        "enumeration item (numbered)",
-        "${number}. ${item}",
-        "Inserts an explicitly numbered list item.",
-    );
-
-    ctx.snippet_completion(
-        "term list item",
-        "/ ${term}: ${description}",
-        "Inserts an item of a term list.",
-    );
-
-    ctx.snippet_completion(
-        "math (inline)",
-        "$${x}$",
-        "Inserts an inline-level mathematical equation.",
-    );
-
-    ctx.snippet_completion(
-        "math (block)",
-        "$ ${sum_x^2} $",
-        "Inserts a block-level mathematical equation.",
-    );
 }
 
 /// Complete in math mode.
@@ -323,42 +227,20 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
         && matches!(ctx.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
     {
         ctx.from = ctx.leaf.offset();
-        math_completions(ctx);
+        ctx.scope_completions(true);
+        ctx.snippet_completions(Some(InterpretMode::Math), None);
         return true;
     }
 
     // Anywhere: "$|$".
     if !is_triggered_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
-        math_completions(ctx);
+        ctx.scope_completions(true);
+        ctx.snippet_completions(Some(InterpretMode::Math), None);
         return true;
     }
 
     false
-}
-
-/// Add completions for math snippets.
-#[rustfmt::skip]
-fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true);
-
-    ctx.snippet_completion(
-        "subscript",
-        "${x}_${2:2}",
-        "Sets something in subscript.",
-    );
-
-    ctx.snippet_completion(
-        "superscript",
-        "${x}^${2:2}",
-        "Sets something in superscript.",
-    );
-
-    ctx.snippet_completion(
-        "fraction",
-        "${x}/${y}",
-        "Inserts a fraction.",
-    );
 }
 
 /// Complete field accesses.
@@ -681,149 +563,7 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
     // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
     ctx.scope_completions(true);
 
-    ctx.snippet_completion(
-        "function call",
-        "${function}(${arguments})[${body}]",
-        "Evaluates a function.",
-    );
-
-    ctx.snippet_completion(
-        "code block",
-        "{ ${} }",
-        "Inserts a nested code block.",
-    );
-
-    ctx.snippet_completion(
-        "content block",
-        "[${content}]",
-        "Switches into markup mode.",
-    );
-
-    ctx.snippet_completion(
-        "set rule",
-        "set ${}",
-        "Sets style properties on an element.",
-    );
-
-    ctx.snippet_completion(
-        "show rule",
-        "show ${}",
-        "Redefines the look of an element.",
-    );
-
-    ctx.snippet_completion(
-        "show rule (everything)",
-        "show: ${}",
-        "Transforms everything that follows.",
-    );
-
-    ctx.snippet_completion(
-        "context expression",
-        "context ${}",
-        "Provides contextual data.",
-    );
-
-    ctx.snippet_completion(
-        "let binding",
-        "let ${name} = ${value}",
-        "Saves a value in a variable.",
-    );
-
-    ctx.snippet_completion(
-        "let binding (function)",
-        "let ${name}(${params}) = ${output}",
-        "Defines a function.",
-    );
-
-    ctx.snippet_completion(
-        "if conditional",
-        "if ${1 < 2} {\n\t${}\n}",
-        "Computes or inserts something conditionally.",
-    );
-
-    ctx.snippet_completion(
-        "if-else conditional",
-        "if ${1 < 2} {\n\t${}\n} else {\n\t${}\n}",
-        "Computes or inserts different things based on a condition.",
-    );
-
-    ctx.snippet_completion(
-        "while loop",
-        "while ${1 < 2} {\n\t${}\n}",
-        "Computes or inserts something while a condition is met.",
-    );
-
-    ctx.snippet_completion(
-        "for loop",
-        "for ${value} in ${(1, 2, 3)} {\n\t${}\n}",
-        "Computes or inserts something for each value in a collection.",
-    );
-
-    ctx.snippet_completion(
-        "for loop (with key)",
-        "for (${key}, ${value}) in ${(a: 1, b: 2)} {\n\t${}\n}",
-        "Computes or inserts something for each key and value in a collection.",
-    );
-
-    ctx.snippet_completion(
-        "break",
-        "break",
-        "Exits early from a loop.",
-    );
-
-    ctx.snippet_completion(
-        "continue",
-        "continue",
-        "Continues with the next iteration of a loop.",
-    );
-
-    ctx.snippet_completion(
-        "return",
-        "return ${output}",
-        "Returns early from a function.",
-    );
-
-    ctx.snippet_completion(
-        "import module",
-        "import \"${}\"",
-        "Imports module from another file.",
-    );
-
-    ctx.snippet_completion(
-        "import module by expression",
-        "import ${}",
-        "Imports items by expression.",
-    );
-
-    ctx.snippet_completion(
-        "import package",
-        "import \"@${}\": ${items}",
-        "Imports variables from another file.",
-    );
-
-    ctx.snippet_completion(
-        "include (file)",
-        "include \"${file}.typ\"",
-        "Includes content from another file.",
-    );
-
-    ctx.snippet_completion(
-        "include (package)",
-        "include \"@${}\"",
-        "Includes content from another file.",
-    );
-
-    ctx.snippet_completion(
-        "array literal",
-        "(${1, 2, 3})",
-        "Creates a sequence of values.",
-    );
-
-    ctx.snippet_completion(
-        "dictionary literal",
-        "(${a: 1, b: 2})",
-        "Creates a mapping from names to value.",
-    );
+    ctx.snippet_completions(Some(InterpretMode::Code), None);
 
     if !hash {
         ctx.snippet_completion(
@@ -908,6 +648,42 @@ impl<'a> CompletionContext<'a> {
         }
     }
 
+    fn snippet_completions(
+        &mut self,
+        mode: Option<InterpretMode>,
+        surrounding_syntax: Option<SurroundingSyntax>,
+    ) {
+        let mut keys = vec![CompletionContextKey::new(mode, surrounding_syntax)];
+        if mode.is_some() {
+            keys.push(CompletionContextKey::new(None, surrounding_syntax));
+        }
+        if surrounding_syntax.is_some() {
+            keys.push(CompletionContextKey::new(mode, None));
+            if mode.is_some() {
+                keys.push(CompletionContextKey::new(None, None));
+            }
+        }
+        let applies_to = |snippet: &PrefixSnippet| keys.iter().any(|key| snippet.applies_to(key));
+
+        for snippet in DEFAULT_PREFIX_SNIPPET.iter() {
+            if !applies_to(snippet) {
+                continue;
+            }
+
+            self.completions.push(Completion {
+                kind: CompletionKind::Syntax,
+                label: snippet.label.as_ref().into(),
+                apply: Some(snippet.snippet.as_ref().into()),
+                detail: Some(snippet.description.as_ref().into()),
+                command: self
+                    .ctx
+                    .analysis
+                    .trigger_on_snippet(snippet.snippet.contains("${")),
+                ..Completion::default()
+            });
+        }
+    }
+
     /// Add a snippet completion.
     fn snippet_completion(&mut self, label: &str, snippet: &str, docs: &str) {
         self.completions.push(Completion {
@@ -915,7 +691,6 @@ impl<'a> CompletionContext<'a> {
             label: label.into(),
             apply: Some(snippet.into()),
             detail: Some(docs.into()),
-            label_detail: None,
             command: self.ctx.analysis.trigger_on_snippet(snippet.contains("${")),
             ..Completion::default()
         });

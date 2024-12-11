@@ -18,6 +18,8 @@ pub(crate) type LspCompletion = lsp_types::CompletionItem;
 pub(crate) type LspCompletionKind = lsp_types::CompletionItemKind;
 pub(crate) type TypstCompletionKind = crate::upstream::CompletionKind;
 
+pub(crate) mod snippet;
+
 /// The [`textDocument/completion`] request is sent from the client to the
 /// server to compute completion items at a given cursor position.
 ///
