@@ -145,7 +145,7 @@ impl Analysis {
         AllocStats::report(self)
     }
 
-    /// Get configured trigger parameter hints command.
+    /// Get configured trigger suggest command.
     pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
         (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
     }
@@ -156,7 +156,7 @@ impl Analysis {
             .then_some("editor.action.triggerParameterHints")
     }
 
-    /// Get configured trigger after snippet command.
+    /// Get configured trigger suggest after snippet command.
     ///
     /// > VS Code doesn't do that... Auto triggering suggestion only happens on
     /// > typing (word starts or trigger characters). However, you can use
