@@ -75,13 +75,17 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   extensionState.features.renderDocs = config.renderDocs === "enable";
 
   // Configures advanced editor settings to affect the host process
-  {
+  let configWordSeparators = async () => {
     const wordSeparators = "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?";
     const config1 = vscode.workspace.getConfiguration("", { languageId: "typst" });
     await config1.update("editor.wordSeparators", wordSeparators, false, true);
     const config2 = vscode.workspace.getConfiguration("", { languageId: "typst-code" });
     await config2.update("editor.wordSeparators", wordSeparators, false, true);
-  }
+  };
+  // Runs configuration asynchronously to avoid blocking the activation
+  configWordSeparators().catch((e) =>
+    console.error("cannot change editor.wordSeparators for typst", e),
+  );
 
   // Configures advanced language configuration
   tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
