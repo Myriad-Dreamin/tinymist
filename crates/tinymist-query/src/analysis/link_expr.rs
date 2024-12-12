@@ -1,4 +1,4 @@
-//! Analyze color expressions in a source file.
+//! Analyze link expressions in a source file.
 
 use std::str::FromStr;
 
