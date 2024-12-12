@@ -635,5 +635,14 @@ pub static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::ne
             description: "wrap as let expression".into(),
             parsed_snippet: OnceLock::new(),
         },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "in".into(),
+            label_detail: Some(".in".into()),
+            snippet: "${_} in ${node}".into(),
+            description: "wrap with in expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
     ]
 });
