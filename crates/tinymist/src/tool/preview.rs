@@ -631,11 +631,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(
-        TYPST_PREVIEW_HTML,
-        args.preview_mode,
-        &format!("ws://{}", args.data_plane_host),
-    );
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
