@@ -64,144 +64,75 @@ impl SemanticRequest for InlayHintRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
-        let hints = inlay_hint(ctx, &source, range, ctx.position_encoding()).ok()?;
-        crate::log_debug_ct!(
-            "got inlay hints on {source:?} => {hints:?}",
-            source = source.id(),
-            hints = hints.len()
-        );
-        if hints.is_empty() {
-            let root = LinkedNode::new(source.root());
-            crate::log_debug_ct!("debug root {root:#?}");
-        }
+        let root = LinkedNode::new(source.root());
+        let mut worker = InlayHintWorker {
+            ctx,
+            source: &source,
+            range,
+            hints: vec![],
+        };
+        worker.work(root);
 
-        Some(hints)
+        (!worker.hints.is_empty()).then_some(worker.hints)
     }
 }
 
-fn inlay_hint(
-    ctx: &mut LocalContext,
-    source: &Source,
+const SMART: InlayHintConfig = InlayHintConfig::smart();
+
+struct InlayHintWorker<'a> {
+    ctx: &'a mut LocalContext,
+    source: &'a Source,
     range: Range<usize>,
-    encoding: PositionEncoding,
-) -> FileResult<Vec<InlayHint>> {
-    const SMART: InlayHintConfig = InlayHintConfig::smart();
+    hints: Vec<InlayHint>,
+}
 
-    struct InlayHintWorker<'a> {
-        ctx: &'a mut LocalContext,
-        source: &'a Source,
-        range: Range<usize>,
-        encoding: PositionEncoding,
-        hints: Vec<InlayHint>,
-    }
-
-    impl InlayHintWorker<'_> {
-        fn analyze(&mut self, node: LinkedNode) {
-            let rng = node.range();
-            if rng.start >= self.range.end || rng.end <= self.range.start {
-                return;
-            }
-
-            self.analyze_node(&node);
-
-            if node.get().children().len() == 0 {
-                return;
-            }
-
-            // todo: survey bad performance children?
-            for child in node.children() {
-                self.analyze(child);
-            }
+impl InlayHintWorker<'_> {
+    fn work(&mut self, node: LinkedNode) {
+        let rng = node.range();
+        if rng.start >= self.range.end || rng.end <= self.range.start {
+            return;
         }
 
-        fn analyze_node(&mut self, node: &LinkedNode) -> Option<()> {
-            // analyze node self
-            match node.kind() {
-                // Type inlay hints
-                SyntaxKind::LetBinding => {
-                    log::trace!("let binding found: {:?}", node);
-                }
-                // Assignment inlay hints
-                SyntaxKind::Eq => {
-                    log::trace!("assignment found: {:?}", node);
-                }
-                SyntaxKind::DestructAssignment => {
-                    log::trace!("destruct assignment found: {:?}", node);
-                }
-                // Parameter inlay hints
-                SyntaxKind::FuncCall => {
-                    log::trace!("func call found: {:?}", node);
-                    let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
-                    crate::log_debug_ct!("got call_info {call_info:?}");
+        self.analyze_node(&node);
 
-                    let f = node.cast::<ast::FuncCall>().unwrap();
-                    let args = f.args();
-                    let args_node = node.find(args.span())?;
+        if node.get().children().len() == 0 {
+            return;
+        }
 
-                    let check_single_pos_arg = || {
-                        let mut pos = 0;
-                        let mut has_rest = false;
-                        let mut content_pos = 0;
+        // todo: survey bad performance children?
+        for child in node.children() {
+            self.work(child);
+        }
+    }
 
-                        for arg in args.items() {
-                            let Some(arg_node) = args_node.find(arg.span()) else {
-                                continue;
-                            };
+    fn analyze_node(&mut self, node: &LinkedNode) -> Option<()> {
+        // analyze node self
+        match node.kind() {
+            // Type inlay hints
+            SyntaxKind::LetBinding => {
+                log::trace!("let binding found: {:?}", node);
+            }
+            // Assignment inlay hints
+            SyntaxKind::Eq => {
+                log::trace!("assignment found: {:?}", node);
+            }
+            SyntaxKind::DestructAssignment => {
+                log::trace!("destruct assignment found: {:?}", node);
+            }
+            // Parameter inlay hints
+            SyntaxKind::FuncCall => {
+                log::trace!("func call found: {:?}", node);
+                let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
+                crate::log_debug_ct!("got call_info {call_info:?}");
 
-                            let Some(info) = call_info.arg_mapping.get(&arg_node) else {
-                                continue;
-                            };
+                let f = node.cast::<ast::FuncCall>().unwrap();
+                let args = f.args();
+                let args_node = node.find(args.span())?;
 
-                            if info.kind != ParamKind::Named {
-                                if info.kind == ParamKind::Rest {
-                                    has_rest = true;
-                                    continue;
-                                }
-                                if info.is_content_block {
-                                    content_pos += 1;
-                                } else {
-                                    pos += 1;
-                                };
-
-                                if pos > 1 && content_pos > 1 {
-                                    break;
-                                }
-                            }
-                        }
-
-                        (pos <= if has_rest { 0 } else { 1 }, content_pos <= 1)
-                    };
-
-                    let (disable_by_single_pos_arg, disable_by_single_content_pos_arg) =
-                        if SMART.on_pos_args && SMART.off_single_pos_arg {
-                            check_single_pos_arg()
-                        } else {
-                            (false, false)
-                        };
-
-                    let disable_by_single_line_content_block = !SMART.on_content_block_args
-                        || 'one_line: {
-                            for arg in args.items() {
-                                let Some(arg_node) = args_node.find(arg.span()) else {
-                                    continue;
-                                };
-
-                                let Some(info) = call_info.arg_mapping.get(&arg_node) else {
-                                    continue;
-                                };
-
-                                if info.kind != ParamKind::Named
-                                    && info.is_content_block
-                                    && !is_one_line(self.source, &arg_node)
-                                {
-                                    break 'one_line false;
-                                }
-                            }
-
-                            true
-                        };
-
-                    let mut is_first_variadic_arg = true;
+                let check_single_pos_arg = || {
+                    let mut pos = 0;
+                    let mut has_rest = false;
+                    let mut content_pos = 0;
 
                     for arg in args.items() {
                         let Some(arg_node) = args_node.find(arg.span()) else {
@@ -212,90 +143,134 @@ fn inlay_hint(
                             continue;
                         };
 
-                        let name = &info.param_name;
-                        if name.is_empty() {
-                            continue;
-                        }
-
-                        match info.kind {
-                            ParamKind::Named => {
+                        if info.kind != ParamKind::Named {
+                            if info.kind == ParamKind::Rest {
+                                has_rest = true;
                                 continue;
                             }
-                            ParamKind::Positional
-                                if call_info.signature.primary().has_fill_or_size_or_stroke =>
-                            {
-                                continue
+                            if info.is_content_block {
+                                content_pos += 1;
+                            } else {
+                                pos += 1;
+                            };
+
+                            if pos > 1 && content_pos > 1 {
+                                break;
                             }
-                            ParamKind::Positional
-                                if !SMART.on_pos_args
-                                    || (info.is_content_block
-                                        && (disable_by_single_content_pos_arg
-                                            || disable_by_single_line_content_block))
-                                    || (!info.is_content_block && disable_by_single_pos_arg) =>
-                            {
-                                continue
-                            }
-                            ParamKind::Rest
-                                if (!SMART.on_variadic_args
-                                    || disable_by_single_pos_arg
-                                    || (!is_first_variadic_arg
-                                        && SMART.only_first_variadic_args)) =>
-                            {
-                                is_first_variadic_arg = false;
-                                continue;
-                            }
-                            ParamKind::Rest => {
-                                is_first_variadic_arg = false;
-                            }
-                            ParamKind::Positional => {}
                         }
-
-                        let pos = arg_node.range().start;
-                        let lsp_pos =
-                            typst_to_lsp::offset_to_position(pos, self.encoding, self.source);
-
-                        let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
-                            format!("..{name}:")
-                        } else {
-                            format!("{name}:")
-                        });
-
-                        self.hints.push(InlayHint {
-                            position: lsp_pos,
-                            label,
-                            kind: Some(InlayHintKind::PARAMETER),
-                            text_edits: None,
-                            tooltip: None,
-                            padding_left: None,
-                            padding_right: Some(true),
-                            data: None,
-                        });
                     }
 
-                    // todo: union signatures
+                    (pos <= if has_rest { 0 } else { 1 }, content_pos <= 1)
+                };
+
+                let (disable_by_single_pos_arg, disable_by_single_content_pos_arg) =
+                    if SMART.on_pos_args && SMART.off_single_pos_arg {
+                        check_single_pos_arg()
+                    } else {
+                        (false, false)
+                    };
+
+                let disable_by_single_line_content_block = !SMART.on_content_block_args
+                    || 'one_line: {
+                        for arg in args.items() {
+                            let Some(arg_node) = args_node.find(arg.span()) else {
+                                continue;
+                            };
+
+                            let Some(info) = call_info.arg_mapping.get(&arg_node) else {
+                                continue;
+                            };
+
+                            if info.kind != ParamKind::Named
+                                && info.is_content_block
+                                && !is_one_line(self.source, &arg_node)
+                            {
+                                break 'one_line false;
+                            }
+                        }
+
+                        true
+                    };
+
+                let mut is_first_variadic_arg = true;
+
+                for arg in args.items() {
+                    let Some(arg_node) = args_node.find(arg.span()) else {
+                        continue;
+                    };
+
+                    let Some(info) = call_info.arg_mapping.get(&arg_node) else {
+                        continue;
+                    };
+
+                    let name = &info.param_name;
+                    if name.is_empty() {
+                        continue;
+                    }
+
+                    match info.kind {
+                        ParamKind::Named => {
+                            continue;
+                        }
+                        ParamKind::Positional
+                            if call_info.signature.primary().has_fill_or_size_or_stroke =>
+                        {
+                            continue
+                        }
+                        ParamKind::Positional
+                            if !SMART.on_pos_args
+                                || (info.is_content_block
+                                    && (disable_by_single_content_pos_arg
+                                        || disable_by_single_line_content_block))
+                                || (!info.is_content_block && disable_by_single_pos_arg) =>
+                        {
+                            continue
+                        }
+                        ParamKind::Rest
+                            if (!SMART.on_variadic_args
+                                || disable_by_single_pos_arg
+                                || (!is_first_variadic_arg && SMART.only_first_variadic_args)) =>
+                        {
+                            is_first_variadic_arg = false;
+                            continue;
+                        }
+                        ParamKind::Rest => {
+                            is_first_variadic_arg = false;
+                        }
+                        ParamKind::Positional => {}
+                    }
+
+                    let pos = arg_node.range().start;
+                    let lsp_pos = self.ctx.to_lsp_pos(pos, self.source);
+
+                    let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
+                        format!("..{name}:")
+                    } else {
+                        format!("{name}:")
+                    });
+
+                    self.hints.push(InlayHint {
+                        position: lsp_pos,
+                        label,
+                        kind: Some(InlayHintKind::PARAMETER),
+                        text_edits: None,
+                        tooltip: None,
+                        padding_left: None,
+                        padding_right: Some(true),
+                        data: None,
+                    });
                 }
-                SyntaxKind::Set => {
-                    log::trace!("set rule found: {:?}", node);
-                }
-                _ => {}
+
+                // todo: union signatures
             }
-
-            None
+            SyntaxKind::Set => {
+                log::trace!("set rule found: {:?}", node);
+            }
+            _ => {}
         }
+
+        None
     }
-
-    let mut worker = InlayHintWorker {
-        ctx,
-        source,
-        range,
-        encoding,
-        hints: vec![],
-    };
-
-    let root = LinkedNode::new(source.root());
-    worker.analyze(root);
-
-    Ok(worker.hints)
 }
 
 fn is_one_line(src: &Source, arg_node: &LinkedNode<'_>) -> bool {

@@ -4,4 +4,4 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/inlay_hints/unique_positional.typ
 snapshot_kind: text
 ---
-[]
+null
