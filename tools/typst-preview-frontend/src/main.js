@@ -43,9 +43,9 @@ function retrieveWsArgs() {
     /// See [WebSocket and relative URLs](https://github.com/whatwg/websockets/issues/20)
     let urlObject = new URL("ws://127.0.0.1:23625", window.location.href);
     /// Rewrite the protocol to websocket.
-    urlObject.protocol = urlObject.protocol.replace(/^https$/, 'wss').replace(/^http$/, 'ws');
+    urlObject.protocol = urlObject.protocol.replace('https:', 'wss:').replace('http:', 'ws:');
     if (location.href.startsWith("https://")) {
-        urlObject.protocol = urlObject.protocol.replace(/^ws$/, 'wss');
+        urlObject.protocol = urlObject.protocol.replace('ws:', 'wss:');
     }
 
     /// Return a `WsArgs` object.

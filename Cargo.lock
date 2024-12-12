@@ -4157,6 +4157,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tar",
  "tinymist-assets",
  "typst",
  "typst-assets",
