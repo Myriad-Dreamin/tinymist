@@ -3,9 +3,7 @@ use std::ops::Deref;
 
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
-use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionTextEdit, InsertTextFormat, TextEdit,
-};
+use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
 use regex::{Captures, Regex};
