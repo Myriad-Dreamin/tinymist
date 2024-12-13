@@ -226,25 +226,19 @@ impl CompletionContext<'_> {
                 // range: Some(range),
                 ..Default::default()
             };
-            let base_item = CompletionItem {
-                kind: Some(CompletionItemKind::SNIPPET),
-                label: snippet.label.clone().into(),
-                detail: Some(snippet.description.clone().into()),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                ..Default::default()
-            };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..self.from, &src),
-                    new_text: to_lsp_snippet(&eco_format!(
-                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
-                    )),
+                    new_text: String::new(),
                 };
 
-                self.completions2.push(CompletionItem {
-                    text_edit: Some(CompletionTextEdit::Edit(before)),
-                    ..base_item.clone()
+                self.completions.push(Completion {
+                    apply: Some(eco_format!(
+                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
+                    )),
+                    additional_text_edits: Some(vec![before]),
+                    ..base
                 });
             } else {
                 let before = TextEdit {
