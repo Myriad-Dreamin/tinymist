@@ -2,13 +2,15 @@ use lsp_types::{
     Command, CompletionItemLabelDetails, CompletionList, CompletionTextEdit, InsertTextFormat,
     TextEdit,
 };
+use once_cell::sync::Lazy;
+use regex::{Captures, Regex};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{InsTy, Ty},
     prelude::*,
     syntax::{is_ident_like, DerefTarget},
-    upstream::{autocomplete, to_lsp_snippet, CompletionContext},
+    upstream::{autocomplete, CompletionContext},
     StatefulRequest,
 };
 
@@ -271,6 +273,22 @@ pub(crate) fn completion_kind(typst_completion_kind: TypstCompletionKind) -> Lsp
         TypstCompletionKind::File => LspCompletionKind::FILE,
         TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
     }
+}
+
+static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+
+/// Adds numbering to placeholders in snippets
+fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+    let mut counter = 1;
+    let result =
+        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
+            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
+            counter += 1;
+            substitution
+        });
+
+    result.to_string()
 }
 
 fn is_arg_like_context(mut matching: &LinkedNode) -> bool {

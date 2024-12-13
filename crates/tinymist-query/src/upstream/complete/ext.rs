@@ -4,9 +4,8 @@ use std::ops::Deref;
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
-use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
-use regex::{Captures, Regex};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
@@ -1797,21 +1796,6 @@ pub fn symbol_label_detail(ch: char) -> EcoString {
         '\u{200A}' => "hair space".into(),
         _ => format!("\\u{{{:04x}}}", ch as u32).into(),
     }
-}
-
-static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
-/// Adds numbering to placeholders in snippets
-pub fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
-    let mut counter = 1;
-    let result =
-        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
-            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
-            counter += 1;
-            substitution
-        });
-
-    result.to_string()
 }
 
 #[cfg(test)]
