@@ -17,7 +17,7 @@ pub type SrcToDocJumpInfo = DocumentPosition;
 #[derive(Debug, Clone)]
 pub enum WebviewActorRequest {
     ViewportPosition(DocumentPosition),
-    SrcToDocJump(SrcToDocJumpInfo),
+    SrcToDocJump(Vec<SrcToDocJumpInfo>),
     // CursorPosition(CursorPosition),
     CursorPaths(Vec<Vec<ElementPoint>>),
 }
@@ -27,6 +27,18 @@ fn position_req(
     DocumentPosition { page_no, x, y }: DocumentPosition,
 ) -> String {
     format!("{event},{page_no} {x} {y}")
+}
+
+fn positions_req(
+    event: &'static str,
+    positions: Vec<DocumentPosition>,
+) -> String {
+    format!("{event},")
+        + &positions
+            .iter()
+            .map(|DocumentPosition { page_no, x, y }| format!("{page_no} {x} {y}"))
+            .collect::<Vec<_>>()
+            .join(",")
 }
 
 pub struct WebviewActor<
@@ -84,7 +96,7 @@ impl<
                     trace!("WebviewActor: received message from mailbox: {:?}", msg);
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
-                            let msg = position_req("jump", jump_info);
+                            let msg = positions_req("jump", jump_info);
                             self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
                             .await.unwrap();
                         }

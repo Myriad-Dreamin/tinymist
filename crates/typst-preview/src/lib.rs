@@ -325,8 +325,8 @@ pub trait SourceFileServer {
     fn resolve_document_position(
         &self,
         _by: Location,
-    ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
-        async { Ok(None) }
+    ) -> impl Future<Output = Result<Vec<Position>, Error>> + Send {
+        async { Ok(vec![]) }
     }
 
     fn resolve_source_location(

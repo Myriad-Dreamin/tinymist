@@ -306,10 +306,23 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
             if (message[0] === "jump" || message[0] === "viewport") {
                 // todo: aware height padding
-                const [page, x, y] = dec
+                const current_page_number = svgDoc.getPartialPageNumber();
+
+                let positions = dec
                     .decode((message[1] as any).buffer)
-                    .split(" ")
-                    .map(Number);
+                    .split(",")
+
+                // choose the page, x, y closest to the current page
+                const [page, x, y] = positions.reduce((acc, cur) => {
+                    const [page, x, y] = cur.split(" ").map(Number);
+                    console.log("jump", page, x, y);
+                    alert("jump " + page + " " + x + " " + y);
+                    const current_page = current_page_number;
+                    if (Math.abs(page - current_page) < Math.abs(acc[0] - current_page)) {
+                        return [page, x, y];
+                    }
+                    return acc;
+                }, [Number.MAX_SAFE_INTEGER, 0, 0]);
 
                 let pageToJump = page;
 
