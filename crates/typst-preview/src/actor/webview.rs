@@ -29,10 +29,7 @@ fn position_req(
     format!("{event},{page_no} {x} {y}")
 }
 
-fn positions_req(
-    event: &'static str,
-    positions: Vec<DocumentPosition>,
-) -> String {
+fn positions_req(event: &'static str, positions: Vec<DocumentPosition>) -> String {
     format!("{event},")
         + &positions
             .iter()

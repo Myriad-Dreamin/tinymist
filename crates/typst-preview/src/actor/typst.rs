@@ -121,11 +121,15 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::SrcToDocJump(info.into_iter().map(|info| DocumentPosition {
-                            page_no: info.page.into(),
-                            x: info.point.x.to_pt() as f32,
-                            y: info.point.y.to_pt() as f32,
-                        }).collect()));
+                        .send(WebviewActorRequest::SrcToDocJump(
+                            info.into_iter()
+                                .map(|info| DocumentPosition {
+                                    page_no: info.page.into(),
+                                    x: info.point.x.to_pt() as f32,
+                                    y: info.point.y.to_pt() as f32,
+                                })
+                                .collect(),
+                        ));
                 }
             }
             TypstActorRequest::SyncMemoryFiles(m) => {
