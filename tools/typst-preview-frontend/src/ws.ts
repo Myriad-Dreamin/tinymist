@@ -315,8 +315,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 // choose the page, x, y closest to the current page
                 const [page, x, y] = positions.reduce((acc, cur) => {
                     const [page, x, y] = cur.split(" ").map(Number);
-                    console.log("jump", page, x, y);
-                    alert("jump " + page + " " + x + " " + y);
                     const current_page = current_page_number;
                     if (Math.abs(page - current_page) < Math.abs(acc[0] - current_page)) {
                         return [page, x, y];
