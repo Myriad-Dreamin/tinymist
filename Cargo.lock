@@ -2854,8 +2854,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15bd4cac012dcfa6ba28379e368a20b1dfd3c3ba3aba2fcaeda403e946970b55"
 dependencies = [
  "base64",
  "bitvec",
@@ -2880,8 +2878,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24741e1e58b77ecc7a8a97c815ae984150a51c9c878b2f2441a2ec09109581f4"
 dependencies = [
  "codespan-reporting",
  "comemo 0.4.0",
@@ -2909,8 +2905,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst-shim"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12d0f851e0a0be6291218f139b878baccd7adc93f952887e4afb0524408db64f"
 dependencies = [
  "cfg-if",
  "typst",
@@ -2920,8 +2914,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81666b9467fb431623a1d6a8d128700c0977acf8f7ccc796556d78dde57b8d1a"
 dependencies = [
  "bitvec",
  "comemo 0.4.0",
@@ -2946,8 +2938,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff582786a8bcd9bbf27b06d9a2d0c79499f1ecb5606564051e6a0caddaa5f2c5"
 dependencies = [
  "base64",
  "comemo 0.4.0",
@@ -2960,8 +2950,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d039aa00ced0f00094efae1d616f0c5f13dd2abeeb25be8aa434339dd79d2b5b"
 dependencies = [
  "indexmap 2.7.0",
  "log",
@@ -2975,8 +2963,6 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad7c070c089d525fdd0ecb993aaf930f468e33409086daa58f79dc68c848b77d"
 dependencies = [
  "chrono",
  "codespan-reporting",

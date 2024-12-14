@@ -228,10 +228,10 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 
 # These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-# reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
+reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
+reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
 # typstyle = { path = "../typstyle" }
