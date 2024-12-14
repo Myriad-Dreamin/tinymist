@@ -305,8 +305,16 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             }
 
             if (message[0] === "jump" || message[0] === "viewport") {
+                const rootElem =
+                    document.getElementById("typst-app")?.firstElementChild;
+               
                 // todo: aware height padding
-                const current_page_number = svgDoc.getPartialPageNumber();
+                let currentPageNumber = 1;
+                if (previewMode === PreviewMode.Slide) {
+                    currentPageNumber = svgDoc.getPartialPageNumber();
+                } else if (rootElem) {
+                    currentPageNumber = window.currentPosition(rootElem)?.page || 1;
+                }
 
                 let positions = dec
                     .decode((message[1] as any).buffer)
@@ -315,7 +323,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 // choose the page, x, y closest to the current page
                 const [page, x, y] = positions.reduce((acc, cur) => {
                     const [page, x, y] = cur.split(" ").map(Number);
-                    const current_page = current_page_number;
+                    const current_page = currentPageNumber;
                     if (Math.abs(page - current_page) < Math.abs(acc[0] - current_page)) {
                         return [page, x, y];
                     }
@@ -338,8 +346,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                     }
                 }
 
-                const rootElem =
-                    document.getElementById("typst-app")?.firstElementChild;
                 if (rootElem) {
                     /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
                     /// via `window.onscroll` event
