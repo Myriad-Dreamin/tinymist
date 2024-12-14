@@ -61,7 +61,7 @@ impl CompileHandler {
     async fn resolve_document_position(
         snap: &SucceededArtifact<LspCompilerFeat>,
         loc: Location,
-    ) -> Option<Position> {
+    ) -> Vec<Position> {
         let Location::Src(src_loc) = loc;
 
         let path = Path::new(&src_loc.filepath).to_owned();
@@ -69,14 +69,24 @@ impl CompileHandler {
         let column = src_loc.pos.column;
 
         let doc = snap.success_doc();
-        let doc = doc.as_deref()?;
+        let Some(doc) = doc.as_deref() else {
+            return vec![];
+        };
         let world = snap.world();
-
-        let relative_path = path.strip_prefix(&world.workspace_root()?).ok()?;
+        let Some(root) = world.workspace_root() else {
+            return vec![];
+        };
+        let Some(relative_path) = path.strip_prefix(root).ok() else {
+            return vec![];
+        };
 
         let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
-        let source = world.source(source_id).ok()?;
-        let cursor = source.line_column_to_byte(line, column)?;
+        let Some(source) = world.source(source_id).ok() else {
+            return vec![];
+        };
+        let Some(cursor) = source.line_column_to_byte(line, column) else {
+            return vec![];
+        };
 
         jump_from_cursor(doc, &source, cursor)
     }
@@ -115,7 +125,7 @@ impl SourceFileServer for CompileHandler {
 
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    async fn resolve_document_position(&self, loc: Location) -> Result<Option<Position>, Error> {
+    async fn resolve_document_position(&self, loc: Location) -> Result<Vec<Position>, Error> {
         let snap = self.artifact()?.receive().await?;
         Ok(Self::resolve_document_position(&snap, loc).await)
     }
@@ -675,38 +685,30 @@ impl Notification for NotifDocumentOutline {
 }
 
 /// Find the output location in the document for a cursor position.
-fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    if node.kind() != SyntaxKind::Text {
-        return None;
-    }
+fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Vec<Position> {
+    let Some(node) = LinkedNode::new(source.root())
+        .leaf_at_compat(cursor)
+        .filter(|node| node.kind() == SyntaxKind::Text)
+    else {
+        return vec![];
+    };
 
-    let mut min_dis = u64::MAX;
     let mut p = Point::default();
-    let mut ppage = 0usize;
 
     let span = node.span();
+    let mut positions: Vec<Position> = vec![];
     for (i, page) in document.pages.iter().enumerate() {
-        let t_dis = min_dis;
+        let mut min_dis = u64::MAX;
         if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            return Some(Position {
-                page: NonZeroUsize::new(i + 1)?,
-                point: pos,
-            });
-        }
-        if t_dis != min_dis {
-            ppage = i;
+            if let Some(page) = NonZeroUsize::new(i + 1) {
+                positions.push(Position { page, point: pos });
+            }
         }
     }
 
-    if min_dis == u64::MAX {
-        return None;
-    }
+    log::info!("jump_from_cursor: {positions:#?}");
 
-    Some(Position {
-        page: NonZeroUsize::new(ppage + 1)?,
-        point: p,
-    })
+    positions
 }
 
 /// Find the position of a span in a frame.

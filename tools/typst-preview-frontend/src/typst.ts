@@ -187,6 +187,62 @@ function layoutText(svg: SVGElement) {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 }
 
+window.currentPosition = function (elem: Element) {
+  const docRoot = findAncestor(elem, "typst-doc");
+  if (!docRoot) {
+    console.warn("no typst-doc found", elem);
+    return;
+  }
+
+  interface TypstPosition {
+    page: number;
+    x: number;
+    y: number;
+    distance: number;
+  }
+
+  let result: TypstPosition | undefined = undefined;
+  const windowX = window.innerWidth / 2;
+  const windowY = window.innerHeight / 2;
+  type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
+  const handlePage = (pageBBox: ScrollRect, page: number) => {
+    const x = pageBBox.left;
+    const y = pageBBox.top + pageBBox.height / 2;
+
+    const distance = Math.hypot(x - windowX, y - windowY);
+    if (result === undefined || distance < result.distance) {
+      result = { page, x, y, distance };
+    }
+  };
+
+  const renderMode = docRoot.getAttribute("data-render-mode");
+  if (renderMode === "canvas") {
+    const pages = docRoot.querySelectorAll<HTMLDivElement>(".typst-page");
+
+    for (const page of pages) {
+      const pageNumber = Number.parseInt(
+        page.getAttribute("data-page-number")!
+      );
+
+      const bbox = page.getBoundingClientRect();
+      handlePage(bbox, pageNumber);
+    }
+    return result;
+  }
+
+  const children = docRoot.children;
+  let nthPage = 0;
+  for (let i = 0; i < children.length; i++) {
+    if (children[i].tagName === "g") {
+      nthPage++;
+    }
+    const page = children[i] as SVGGElement;
+    const bbox = page.getBoundingClientRect();
+    handlePage(bbox, nthPage);
+  }
+  return result;
+};
+
 window.handleTypstLocation = function (
   elem: Element,
   pageNo: number,

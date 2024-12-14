@@ -116,26 +116,20 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve src to doc jump: {:#}", err);
                     })
-                    .ok()
-                    .flatten();
-                // impl From<TypstPosition> for DocumentPosition {
-                //     fn from(position: TypstPosition) -> Self {
-                //         Self {
-                //             page_no: position.page.into(),
-                //             x: position.point.x.to_pt() as f32,
-                //             y: position.point.y.to_pt() as f32,
-                //         }
-                //     }
-                // }
+                    .ok();
 
                 if let Some(info) = res {
                     let _ = self
                         .webview_conn_sender
-                        .send(WebviewActorRequest::SrcToDocJump(DocumentPosition {
-                            page_no: info.page.into(),
-                            x: info.point.x.to_pt() as f32,
-                            y: info.point.y.to_pt() as f32,
-                        }));
+                        .send(WebviewActorRequest::SrcToDocJump(
+                            info.into_iter()
+                                .map(|info| DocumentPosition {
+                                    page_no: info.page.into(),
+                                    x: info.point.x.to_pt() as f32,
+                                    y: info.point.y.to_pt() as f32,
+                                })
+                                .collect(),
+                        ));
                 }
             }
             TypstActorRequest::SyncMemoryFiles(m) => {
