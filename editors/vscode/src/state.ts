@@ -6,6 +6,7 @@ interface ExtensionState {
   features: {
     task: boolean;
     devKit: boolean;
+    wordSeparator: boolean;
     dragAndDrop: boolean;
     onEnter: boolean;
     preview: boolean;
@@ -22,6 +23,7 @@ interface ExtensionState {
 export const extensionState: ExtensionState = {
   features: {
     task: true,
+    wordSeparator: true,
     devKit: false,
     dragAndDrop: false,
     onEnter: false,
