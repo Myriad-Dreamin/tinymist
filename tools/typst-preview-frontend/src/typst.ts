@@ -207,11 +207,11 @@ window.currentPosition = function (elem: Element) {
   const cy = window.innerHeight * 0.5;
   type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
   const handlePage = (pageBBox: ScrollRect, page: number) => {
-    const x = cx - pageBBox.left;
-    const y = cy - pageBBox.top;
+    const x = pageBBox.left;
+    const y = pageBBox.top;
     // console.log("page", page, x, y);
 
-    const distance = Math.hypot(x, y);
+    const distance = Math.hypot(x - cx, y - cy);
     if (result === undefined || distance < result.distance) {
       result = { page, x, y, distance };
     }
