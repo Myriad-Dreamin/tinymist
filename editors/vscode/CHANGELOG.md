@@ -11,13 +11,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Editor
 
-* Configuring word separator and pattern specific for typst in https://github.com/Myriad-Dreamin/tinymist/pull/990
+* Configuring word separator and pattern specific for typst in https://github.com/Myriad-Dreamin/tinymist/pull/990 and https://github.com/Myriad-Dreamin/tinymist/pull/1002
   * Previously `some-ident` is split to `|some-|ident|` from left to right or `|some|-ident|` from right to left. Now VS Code identifies it as a single word.
+* Checking affiliated column for a hidden typst source document by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1003
 
 ### Preview
 
 * (Fix) Rewrote some code for compatibility to some old chromium core by @Parsifa1 in https://github.com/Myriad-Dreamin/tinymist/pull/995
-* Jumping to nearest position in preview from cursor by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/997
+* Jumping to nearest position in preview from cursor by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/997 and https://github.com/Myriad-Dreamin/tinymist/pull/1004
   * Partially fix [issues/626](https://github.com/Myriad-Dreamin/tinymist/issues/626), it doesn't quite work but this is the first step.
 
 ### Code Analysis
