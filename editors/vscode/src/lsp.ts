@@ -215,11 +215,40 @@ class LanguageState {
         return;
       }
 
+      function inputHasUri(
+        input: unknown,
+      ): input is vscode.TabInputText | vscode.TabInputCustom | vscode.TabInputNotebook {
+        return (
+          input instanceof vscode.TabInputText ||
+          input instanceof vscode.TabInputCustom ||
+          input instanceof vscode.TabInputNotebook
+        );
+      }
+
+      // Resolve the affiliated column if it is already opened
+      let affiliatedColumn: vscode.ViewColumn | undefined = undefined;
+      for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+          if (!tab || !inputHasUri(tab.input)) {
+            continue;
+          }
+
+          if (tab.input.uri.fsPath === jump.filepath) {
+            affiliatedColumn = group.viewColumn;
+            break;
+          }
+        }
+        if (affiliatedColumn !== undefined) {
+          break;
+        }
+      }
+
       // open this file and show in editor
       const doc =
         vscode.workspace.textDocuments.find((doc) => doc.uri.fsPath === jump.filepath) ||
         (await vscode.workspace.openTextDocument(jump.filepath));
-      const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn());
+      const col = affiliatedColumn || getSensibleTextEditorColumn();
+      const editor = await vscode.window.showTextDocument(doc, col);
       const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
       const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
       const range = new vscode.Range(startPosition, endPosition);
