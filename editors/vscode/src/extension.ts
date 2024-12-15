@@ -69,6 +69,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   config.supportHtmlInMarkdown = true;
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
+  extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
   extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
@@ -78,14 +79,18 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   let configWordSeparators = async () => {
     const wordSeparators = "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?";
     const config1 = vscode.workspace.getConfiguration("", { languageId: "typst" });
-    await config1.update("editor.wordSeparators", wordSeparators, false, true);
+    await config1.update("editor.wordSeparators", wordSeparators, true, true);
     const config2 = vscode.workspace.getConfiguration("", { languageId: "typst-code" });
-    await config2.update("editor.wordSeparators", wordSeparators, false, true);
+    await config2.update("editor.wordSeparators", wordSeparators, true, true);
   };
   // Runs configuration asynchronously to avoid blocking the activation
-  configWordSeparators().catch((e) =>
-    console.error("cannot change editor.wordSeparators for typst", e),
-  );
+  if (extensionState.features.wordSeparator) {
+    configWordSeparators().catch((e) =>
+      console.error("cannot change editor.wordSeparators for typst", e),
+    );
+  } else {
+    // console.log("skip configuring word separator on startup");
+  }
 
   // Configures advanced language configuration
   tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);

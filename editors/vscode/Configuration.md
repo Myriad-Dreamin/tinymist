@@ -24,6 +24,16 @@ Configure the root for absolute paths in typst. Hint: you can set the rootPath t
 
 - **Type**: `string` or `null`
 
+## `tinymist.configureDefaultWordSeparator`
+
+Whether to configure default word separators on startup
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`: Override the default word separators on startup
+  - `disable`: Do not override the default word separators on startup
+- **Default**: `"enable"`
+
 ## `tinymist.semanticTokens`
 
 Enable or disable semantic tokens (LSP syntax highlighting)

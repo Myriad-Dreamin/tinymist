@@ -308,6 +308,20 @@
           ],
           "default": null
         },
+        "tinymist.configureDefaultWordSeparator": {
+          "title": "Configure default word separators",
+          "description": "Whether to configure default word separators on startup",
+          "type": "string",
+          "default": "enable",
+          "enum": [
+            "enable",
+            "disable"
+          ],
+          "enumDescriptions": [
+            "Override the default word separators on startup",
+            "Do not override the default word separators on startup"
+          ]
+        },
         "tinymist.semanticTokens": {
           "title": "Semantic tokens mode",
           "description": "Enable or disable semantic tokens (LSP syntax highlighting)",
