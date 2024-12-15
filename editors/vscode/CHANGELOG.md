@@ -4,11 +4,42 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Unreleased
+## v0.12.12 - [2024-12-15]
 
-* Bumped typstyle from v0.12.6 to v0.12.10 by @Enter-tainer
-  * This verison includes massive update on comment formatting and binary operator chain formatting. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01210---2024-12-12
+* Bumped typstyle from v0.12.6 to v0.12.10 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/987
+  * This version includes massive update on comment formatting and binary operator chain formatting. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01210---2024-12-12
 
+### Editor
+
+* Configuring word separator and pattern specific for typst in https://github.com/Myriad-Dreamin/tinymist/pull/990
+  * Previously `some-ident` is split to `|some-|ident|` from left to right or `|some|-ident|` from right to left. Now VS Code identifies it as a single word.
+
+### Preview
+
+* (Fix) Rewrote some code for compatibility to some old chromium core by @Parsifa1 in https://github.com/Myriad-Dreamin/tinymist/pull/995
+* Jumping to nearest position in preview from cursor by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/997
+  * Partially fix [issues/626](https://github.com/Myriad-Dreamin/tinymist/issues/626), it doesn't quite work but this is the first step.
+
+### Code Analysis
+* (Fix) Simplified types of variables for hover tooltip by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/959
+* (Fix) Corrected two wrong usages of `analyze_import` which prevents code analysis across modules in https://github.com/Myriad-Dreamin/tinymist/pull/967
+* Checking type of labels with tolerating syntax error in https://github.com/Myriad-Dreamin/tinymist/pull/975
+  * For example, the non-closed label in `#cite(<label)` will not stop type checking and be inferred as a label from bibliography files.
+
+### Completion
+
+* (Fix) Fixed many bugs about completing import item, introduced since typst v0.12.0, by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/962
+* Checking surrounding syntax when performing type completion in https://github.com/Myriad-Dreamin/tinymist/pull/965 and https://github.com/Myriad-Dreamin/tinymist/pull/968, and https://github.com/Myriad-Dreamin/tinymist/pull/972
+  * For example, when inside of some string, it won't complete invalid results.
+* Converting prefix snippets to static data in https://github.com/Myriad-Dreamin/tinymist/pull/982
+  * This is a preparation for the future feature of customizing and context-aware snippets. For example, removing some not-useful snippets by user preference or never showing invalid snippets in markup or code mode.
+* Prefetching package index for completion in https://github.com/Myriad-Dreamin/tinymist/pull/983
+  * The server will start to fetch package index when the client first requests completion. This will reduce the latency of showing list of packages in completion.
+* Explicitly triggering suggest after completed import/include snippets in https://github.com/Myriad-Dreamin/tinymist/pull/984
+* Added `in` postfix snippet by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/963
+  * expanding `$expr.in|` to `| in $expr`.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.10...v0.12.12
 
 ## v0.12.10 - [2024-12-07]
 
