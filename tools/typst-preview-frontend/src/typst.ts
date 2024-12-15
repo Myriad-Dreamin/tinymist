@@ -202,14 +202,16 @@ window.currentPosition = function (elem: Element) {
   }
 
   let result: TypstPosition | undefined = undefined;
-  const windowX = window.innerWidth / 2;
-  const windowY = window.innerHeight / 2;
+  // The center of the window
+  const cx = window.innerWidth * 0.5;
+  const cy = window.innerHeight * 0.5;
   type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
   const handlePage = (pageBBox: ScrollRect, page: number) => {
-    const x = pageBBox.left;
-    const y = pageBBox.top + pageBBox.height / 2;
+    const x = cx - pageBBox.left;
+    const y = cy - pageBBox.top;
+    // console.log("page", page, x, y);
 
-    const distance = Math.hypot(x - windowX, y - windowY);
+    const distance = Math.hypot(x, y);
     if (result === undefined || distance < result.distance) {
       result = { page, x, y, distance };
     }
@@ -235,10 +237,14 @@ window.currentPosition = function (elem: Element) {
   for (let i = 0; i < children.length; i++) {
     if (children[i].tagName === "g") {
       nthPage++;
+      const page = children[i] as SVGGElement;
+      const bbox = page.getBoundingClientRect();
+      /// Possibly a page that is not calculated yet
+      if (bbox.bottom === 0 && bbox.top === 0) {
+        continue;
+      }
+      handlePage(bbox, nthPage);
     }
-    const page = children[i] as SVGGElement;
-    const bbox = page.getBoundingClientRect();
-    handlePage(bbox, nthPage);
   }
   return result;
 };

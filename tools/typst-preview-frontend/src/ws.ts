@@ -319,18 +319,25 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 let positions = dec
                     .decode((message[1] as any).buffer)
                     .split(",")
+                    .map((t: string) => t.trim())
+                    .filter((t: string) => t.length > 0);
 
                 // choose the page, x, y closest to the current page
                 const [page, x, y] = positions.reduce((acc, cur) => {
                     const [page, x, y] = cur.split(" ").map(Number);
                     const current_page = currentPageNumber;
-                    if (Math.abs(page - current_page) < Math.abs(acc[0] - current_page)) {
+                    // If page distance is the same, choose the last one
+                    if (Math.abs(page - current_page) <= Math.abs(acc[0] - current_page)) {
                         return [page, x, y];
                     }
                     return acc;
                 }, [Number.MAX_SAFE_INTEGER, 0, 0]);
+                // console.log("resolved", page, x, y, "from", currentPageNumber);
 
                 let pageToJump = page;
+                if (pageToJump === Number.MAX_SAFE_INTEGER) {
+                    return;
+                }
 
                 if (previewMode === PreviewMode.Slide) {
                     const pageSelector = document.getElementById("typst-page-selector") as HTMLSelectElement | undefined;
