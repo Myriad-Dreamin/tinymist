@@ -3,6 +3,9 @@ import fs from 'fs';
 
 const versionToUpload = process.argv[2];
 
+const DIST_CMD = "dist";
+// const DIST_CMD = "cargo run --manifest-path ../cargo-dist/cargo-dist/Cargo.toml --bin dist --";
+
 const run = (command) => {
     return new Promise((resolve, reject) => {
         exec(command, (error, stdout, stderr) => {
@@ -34,7 +37,10 @@ const main = async () => {
     if (fs.existsSync('target/distrib/dist-manifest.json')) {
         fs.unlinkSync('target/distrib/dist-manifest.json');
     }
-    const distManifest = await run('dist host --steps=upload --steps=release --output-format=json');
+    
+    await run(DIST_CMD + ' generate');
+
+    const distManifest = await run(DIST_CMD + ' host --steps=upload --steps=release --output-format=json');
     const distData = JSON.parse(distManifest);
     const body = distData.announcement_github_body;
     // write to file
