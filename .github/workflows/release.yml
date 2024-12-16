@@ -55,14 +55,22 @@ jobs:
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
 
+  # region: check-min-version
   min-version:
     name: Check minimum Rust version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.83.0
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check MSRV
+        run: yarn check-msrv
+      - uses: dtolnay/rust-toolchain@1.82.0
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
+  # end-region: check-min-version
 
   build:
     strategy:
