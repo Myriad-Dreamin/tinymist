@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-const ciFile = fs.readFileSync('.github/workflows/release.yml', 'utf-8');
+const ciFile = fs.readFileSync('.github/workflows/release-vscode.yml', 'utf-8');
 
 const checkMinVersion = ciFile.match(/# region: check-min-version([\s\S]+?)# end-region: check-min-version/mg);
 if (!checkMinVersion) {

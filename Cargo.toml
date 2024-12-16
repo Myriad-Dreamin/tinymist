@@ -168,6 +168,11 @@ panic = "abort"   # Abort on panic
 inherits = "release"
 debug = true
 
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [workspace.lints.rust]
 missing_docs = "warn"
 
