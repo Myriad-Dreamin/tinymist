@@ -6,8 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.12.12 - [2024-12-15]
 
-* Bumped typstyle from v0.12.6 to v0.12.10 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/987
-  * This version includes massive update on comment formatting and binary operator chain formatting. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01210---2024-12-12
+* Bumped typstyle from v0.12.6 to v0.12.12 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/987 and https://github.com/Myriad-Dreamin/tinymist/pull/1010
+  * This version includes massive update on comment formatting and binary operator chain formatting. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01211---2024-12-16
 
 ### Editor
 
