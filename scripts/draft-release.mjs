@@ -30,6 +30,10 @@ const main = async () => {
     }
 
     // run dist host command
+    // remove target/distrib/dist-manifest.json which causes stateful announce...
+    if (fs.existsSync('target/distrib/dist-manifest.json')) {
+        fs.unlinkSync('target/distrib/dist-manifest.json');
+    }
     const distManifest = await run('dist host --steps=upload --steps=release --output-format=json');
     const distData = JSON.parse(distManifest);
     const body = distData.announcement_github_body;
