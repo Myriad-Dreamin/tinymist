@@ -20,7 +20,8 @@
     "docs:rs": "cargo doc --workspace --no-deps",
     "test:grammar": "cd syntaxes/textmate && yarn run test",
     "build:typlite": "cargo build --bin typlite",
-    "typlite": "target/debug/typlite"
+    "typlite": "target/debug/typlite",
+    "check-msrv": "node scripts/check-msrv.mjs"
   },
   "dependencies": {},
   "devDependencies": {
