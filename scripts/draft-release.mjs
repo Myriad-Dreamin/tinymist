@@ -1,5 +1,3 @@
-// dist host --steps=upload --steps=release --output-format=json > target/dist-manifest.json
-
 import { exec } from 'child_process';
 import fs from 'fs';
 
@@ -34,7 +32,6 @@ const main = async () => {
     // run dist host command
     const distManifest = await run('dist host --steps=upload --steps=release --output-format=json');
     const distData = JSON.parse(distManifest);
-    // announcement_github_body
     const body = distData.announcement_github_body;
     // write to file
     fs.writeFileSync('target/announcement-dist.md', body);
