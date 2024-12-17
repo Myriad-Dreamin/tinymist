@@ -179,6 +179,36 @@ impl CompileHandler {
         }
         false
     }
+
+    fn notify_compile_inner(&self, snap: &CompiledArtifact<LspCompilerFeat>) {
+        self.notify_diagnostics(
+            &snap.world,
+            snap.doc.clone().err().unwrap_or_default(),
+            snap.warnings.clone(),
+        );
+
+        self.export.signal(snap, snap.signal);
+
+        self.editor_tx
+            .send(EditorRequest::Status(
+                self.diag_group.clone(),
+                if snap.doc.is_ok() {
+                    TinymistCompileStatusEnum::CompileSuccess
+                } else {
+                    TinymistCompileStatusEnum::CompileError
+                },
+            ))
+            .unwrap();
+
+        #[cfg(feature = "preview")]
+        if let Some(inner) = self.inner.read().as_ref() {
+            let res = snap
+                .doc
+                .clone()
+                .map_err(|_| typst_preview::CompileStatus::CompileError);
+            inner.notify_compile(res, snap.signal.by_fs_events, snap.signal.by_entry_update);
+        }
+    }
 }
 
 impl CompilationHandle<LspCompilerFeat> for CompileHandler {
@@ -232,33 +262,16 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             *n_rev = snap.world.revision().get();
         }
 
-        self.notify_diagnostics(
-            &snap.world,
-            snap.doc.clone().err().unwrap_or_default(),
-            snap.warnings.clone(),
-        );
+        self.notify_compile_inner(snap);
+    }
 
-        self.export.signal(snap, snap.signal);
-
-        self.editor_tx
-            .send(EditorRequest::Status(
-                self.diag_group.clone(),
-                if snap.doc.is_ok() {
-                    TinymistCompileStatusEnum::CompileSuccess
-                } else {
-                    TinymistCompileStatusEnum::CompileError
-                },
-            ))
-            .unwrap();
-
-        #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.read().as_ref() {
-            let res = snap
-                .doc
-                .clone()
-                .map_err(|_| typst_preview::CompileStatus::CompileError);
-            inner.notify_compile(res, snap.signal.by_fs_events, snap.signal.by_entry_update);
+    fn restore_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
+        {
+            let mut n_rev = self.notified_revision.lock();
+            *n_rev = snap.world.revision().get();
         }
+
+        self.notify_compile_inner(snap);
     }
 }
 
