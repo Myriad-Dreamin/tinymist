@@ -208,33 +208,34 @@ impl SigCheckDriver<'_> {
                     }
                 }
             }
-            Ty::Builtin(BuiltinTy::Type(e)) if self.func_as_sig() => {
+            Ty::Builtin(BuiltinTy::Type(b_ty)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
                 self.checker
-                    .check(Sig::TypeCons { val: e, at: ty }, &mut self.ctx, pol);
+                    .check(Sig::TypeCons { val: b_ty, at: ty }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Element(e)) if self.func_as_sig() => {
+            Ty::Builtin(BuiltinTy::Element(elem)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
-                let f = (*e).into();
+                let f = (*elem).into();
                 self.checker
                     .check(Sig::Value { val: &f, at: ty }, &mut self.ctx, pol);
             }
             Ty::Func(sig) if self.func_as_sig() => {
                 self.checker.check(Sig::Type(sig), &mut self.ctx, pol);
             }
-            Ty::Array(sig) if self.array_as_sig() => {
-                self.checker.check(Sig::ArrayCons(sig), &mut self.ctx, pol);
+            Ty::Array(arr) if self.array_as_sig() => {
+                self.checker.check(Sig::ArrayCons(arr), &mut self.ctx, pol);
             }
-            Ty::Tuple(tup) if self.array_as_sig() => {
-                self.checker.check(Sig::TupleCons(tup), &mut self.ctx, pol);
+            Ty::Tuple(elems) if self.array_as_sig() => {
+                self.checker
+                    .check(Sig::TupleCons(elems), &mut self.ctx, pol);
             }
             Ty::Dict(sig) if self.dict_as_sig() => {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Sig::DictCons(sig), &mut self.ctx, pol);
             }
-            Ty::With(w) if self.func_as_sig() => {
-                self.ctx.args.push(w.with.clone());
-                self.ty(&w.sig, pol);
+            Ty::With(sig) if self.func_as_sig() => {
+                self.ctx.args.push(sig.with.clone());
+                self.ty(&sig.sig, pol);
                 self.ctx.args.pop();
             }
             Ty::Select(sel) => sel.ty.bounds(pol, &mut MethodDriver(self, &sel.select)),
@@ -242,9 +243,9 @@ impl SigCheckDriver<'_> {
             Ty::Unary(_) => {}
             Ty::Binary(_) => {}
             Ty::If(_) => {}
-            Ty::Param(p) => {
+            Ty::Param(param) => {
                 // todo: keep type information
-                self.ty(&p.ty, pol);
+                self.ty(&param.ty, pol);
             }
             _ if ty.has_bounds() => ty.bounds(pol, self),
             _ => {}
@@ -302,10 +303,10 @@ impl BoundChecker for MethodDriver<'_, '_> {
                     _ => {}
                 }
             }
-            Ty::Builtin(BuiltinTy::Element(e)) => {
+            Ty::Builtin(BuiltinTy::Element(elem)) => {
                 // todo: distinguish between element and function
                 if self.is_binder() {
-                    let f = (*e).into();
+                    let f = (*elem).into();
                     self.0.checker.check(
                         Sig::Partialize(&Sig::Value { val: &f, at: ty }),
                         &mut self.0.ctx,

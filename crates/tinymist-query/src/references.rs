@@ -139,19 +139,19 @@ impl ReferencesWorker<'_> {
 
     fn push_idents<'b>(
         &mut self,
-        s: &Source,
-        u: &Url,
+        src: &Source,
+        url: &Url,
         idents: impl Iterator<Item = (&'b Span, &'b Interned<RefExpr>)>,
     ) {
-        self.push_ranges(s, u, idents.map(|e| e.0));
+        self.push_ranges(src, url, idents.map(|(span, _)| span));
     }
 
-    fn push_ranges<'b>(&mut self, s: &Source, u: &Url, rs: impl Iterator<Item = &'b Span>) {
-        self.references.extend(rs.filter_map(|span| {
+    fn push_ranges<'b>(&mut self, src: &Source, url: &Url, spans: impl Iterator<Item = &'b Span>) {
+        self.references.extend(spans.filter_map(|span| {
             // todo: this is not necessary a name span
-            let range = self.ctx.ctx.to_lsp_range(s.range(*span)?, s);
+            let range = self.ctx.ctx.to_lsp_range(src.range(*span)?, src);
             Some(LspLocation {
-                uri: u.clone(),
+                uri: url.clone(),
                 range,
             })
         }));

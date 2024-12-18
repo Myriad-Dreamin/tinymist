@@ -30,37 +30,36 @@ impl SyntaxRequest for DocumentSymbolRequest {
         source: &Source,
         position_encoding: PositionEncoding,
     ) -> Option<Self::Response> {
-        let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol)?;
-
-        let symbols = filter_document_symbols(&symbols, source, position_encoding);
+        let hierarchy = get_lexical_hierarchy(source, LexicalScopeKind::Symbol)?;
+        let symbols = symbols_in_hierarchy(&hierarchy, source, position_encoding);
         Some(DocumentSymbolResponse::Nested(symbols))
     }
 }
 
 #[allow(deprecated)]
-fn filter_document_symbols(
-    symbols: &[LexicalHierarchy],
+fn symbols_in_hierarchy(
+    hierarchy: &[LexicalHierarchy],
     source: &Source,
     position_encoding: PositionEncoding,
 ) -> Vec<DocumentSymbol> {
-    symbols
+    hierarchy
         .iter()
-        .map(|e| {
-            let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
+        .map(|hierarchy| {
+            let range =
+                typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
-                name: e.info.name.to_string(),
+                name: hierarchy.info.name.to_string(),
                 detail: None,
-                kind: e.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().try_into().unwrap(),
                 tags: None,
                 deprecated: None,
-                range: rng,
-                selection_range: rng,
-                //             .raw_range,
-                children: e
+                range,
+                selection_range: range,
+                children: hierarchy
                     .children
                     .as_ref()
-                    .map(|ch| filter_document_symbols(ch, source, position_encoding)),
+                    .map(|ch| symbols_in_hierarchy(ch, source, position_encoding)),
             }
         })
         .collect()

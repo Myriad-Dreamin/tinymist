@@ -82,7 +82,7 @@ impl LinkStrWorker {
             SyntaxKind::Include => {
                 let inc = node.cast::<ast::ModuleInclude>()?;
                 let path = inc.source();
-                self.analyze_path_exp(node, path);
+                self.analyze_path_expr(node, path);
             }
             // early exit
             k if k.is_trivia() || k.is_keyword() || k.is_error() => return Some(()),
@@ -143,14 +143,14 @@ impl LinkStrWorker {
         let arg = call.args().items().next()?;
         match arg {
             ast::Arg::Pos(s) if pos => {
-                self.analyze_path_exp(node, s);
+                self.analyze_path_expr(node, s);
             }
             _ => {}
         }
         for item in call.args().items() {
             match item {
                 ast::Arg::Named(named) if named.name().get().as_str() == key => {
-                    self.analyze_path_exp(node, named.expr());
+                    self.analyze_path_expr(node, named.expr());
                 }
                 _ => {}
             }
@@ -158,8 +158,8 @@ impl LinkStrWorker {
         Some(())
     }
 
-    fn analyze_path_exp(&mut self, node: &LinkedNode, expr: ast::Expr) -> Option<()> {
-        match expr {
+    fn analyze_path_expr(&mut self, node: &LinkedNode, path_expr: ast::Expr) -> Option<()> {
+        match path_expr {
             ast::Expr::Str(s) => self.analyze_path_str(node, s),
             ast::Expr::Array(a) => {
                 for item in a.items() {

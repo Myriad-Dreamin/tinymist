@@ -85,15 +85,15 @@ impl LspWorldExt for tinymist_world::LspWorld {
         Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
     }
 
-    fn source_by_path(&self, p: &Path) -> FileResult<Source> {
+    fn source_by_path(&self, path: &Path) -> FileResult<Source> {
         // todo: source cache
-        self.source(self.file_id_by_path(p)?)
+        self.source(self.file_id_by_path(path)?)
     }
 
-    fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
-        self.path_for_id(id).and_then(|e| {
-            path_to_url(&e)
-                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
+    fn uri_for_id(&self, fid: TypstFileId) -> Result<Url, FileError> {
+        self.path_for_id(fid).and_then(|path| {
+            path_to_url(&path)
+                .map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
         })
     }
 }
@@ -118,10 +118,10 @@ mod matcher_tests {
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos).unwrap();
 
-            let result = classify_def(node).map(|e| format!("{:?}", e.node().range()));
-            let result = result.as_deref().unwrap_or("<nil>");
+            let snap = classify_def(node).map(|def| format!("{:?}", def.node().range()));
+            let snap = snap.as_deref().unwrap_or("<nil>");
 
-            assert_snapshot!(result);
+            assert_snapshot!(snap);
         });
     }
 }
@@ -201,17 +201,17 @@ mod expr_tests {
                         decl: ident,
                         step,
                         root,
-                        val,
+                        term,
                     } = expr.as_ref();
 
                     format!(
-                        "{} -> {}, root {}, val: {val:?}",
+                        "{} -> {}, root {}, val: {term:?}",
                         source.show_expr(&Expr::Decl(ident.clone())),
                         step.as_ref()
-                            .map(|e| source.show_expr(e))
+                            .map(|expr| source.show_expr(expr))
                             .unwrap_or_default(),
                         root.as_ref()
-                            .map(|e| source.show_expr(e))
+                            .map(|expr| source.show_expr(expr))
                             .unwrap_or_default()
                     )
                 })
@@ -300,7 +300,7 @@ mod type_check_tests {
 
     use crate::tests::*;
 
-    use super::{Ty, TypeScheme};
+    use super::{Ty, TypeInfo};
 
     #[test]
     fn test() {
@@ -314,7 +314,7 @@ mod type_check_tests {
         });
     }
 
-    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeScheme);
+    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeInfo);
 
     impl fmt::Debug for TypeCheckSnapshot<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -322,21 +322,21 @@ mod type_check_tests {
             let info = self.1;
             let mut vars = info
                 .vars
-                .iter()
-                .map(|e| (e.1.name(), e.1))
+                .values()
+                .map(|bounds| (bounds.name(), bounds))
                 .collect::<Vec<_>>();
 
             vars.sort_by(|x, y| x.1.var.cmp(&y.1.var));
 
-            for (name, var) in vars {
-                writeln!(f, "{:?} = {:?}", name, info.simplify(var.as_type(), true))?;
+            for (name, bounds) in vars {
+                writeln!(f, "{name:?} = {:?}", info.simplify(bounds.as_type(), true))?;
             }
 
             writeln!(f, "=====")?;
             let mut mapping = info
                 .mapping
                 .iter()
-                .map(|e| (source.range(*e.0).unwrap_or_default(), e.1))
+                .map(|pair| (source.range(*pair.0).unwrap_or_default(), pair.1))
                 .collect::<Vec<_>>();
 
             mapping.sort_by(|x, y| {
@@ -378,14 +378,14 @@ mod post_type_check_tests {
             let text = node.get().clone().into_text();
 
             let result = ctx.type_check(&source);
-            let literal_type = post_type_check(ctx.shared_(), &result, node);
+            let post_ty = post_type_check(ctx.shared_(), &result, node);
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
             }, {
-                let literal_type = literal_type.map(|e| format!("{e:#?}"))
+                let post_ty = post_ty.map(|ty| format!("{ty:#?}"))
                     .unwrap_or_else(|| "<nil>".to_string());
-                assert_snapshot!(literal_type);
+                assert_snapshot!(post_ty);
             })
         });
     }
@@ -413,15 +413,15 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ctx.type_check(&source);
-            let literal_type = post_type_check(ctx.shared_(), &result, node);
+            let ti = ctx.type_check(&source);
+            let post_ty = post_type_check(ctx.shared_(), &ti, node);
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
             }, {
-                let literal_type = literal_type.and_then(|e| e.describe())
+                let post_ty = post_ty.and_then(|ty| ty.describe())
                     .unwrap_or_else(|| "<nil>".into());
-                assert_snapshot!(literal_type);
+                assert_snapshot!(post_ty);
             })
         });
     }

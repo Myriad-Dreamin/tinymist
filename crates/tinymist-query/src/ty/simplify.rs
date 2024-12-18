@@ -14,7 +14,7 @@ struct CompactTy {
     is_final: bool,
 }
 
-impl TypeScheme {
+impl TypeInfo {
     /// Simplify (Canonicalize) the given type with the given type scheme.
     pub fn simplify(&self, ty: Ty, principal: bool) -> Ty {
         let mut c = self.cano_cache.lock();
@@ -101,13 +101,13 @@ impl TypeSimplifier<'_, '_> {
                     self.analyze(p, pol);
                 }
             }
-            Ty::Tuple(e) => {
-                for ty in e.iter() {
+            Ty::Tuple(tup) => {
+                for ty in tup.iter() {
                     self.analyze(ty, pol);
                 }
             }
-            Ty::Array(e) => {
-                self.analyze(e, pol);
+            Ty::Array(arr) => {
+                self.analyze(arr, pol);
             }
             Ty::With(w) => {
                 self.analyze(&w.sig, pol);
@@ -193,8 +193,8 @@ impl TypeSimplifier<'_, '_> {
 
                 Ty::Dict(f.into())
             }
-            Ty::Tuple(e) => Ty::Tuple(self.transform_seq(e, pol)),
-            Ty::Array(e) => Ty::Array(self.transform(e, pol).into()),
+            Ty::Tuple(tup) => Ty::Tuple(self.transform_seq(tup, pol)),
+            Ty::Array(arr) => Ty::Array(self.transform(arr, pol).into()),
             Ty::With(w) => {
                 let sig = self.transform(&w.sig, pol).into();
                 // Negate the pol to make correct covariance

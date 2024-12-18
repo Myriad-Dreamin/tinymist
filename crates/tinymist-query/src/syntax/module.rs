@@ -123,8 +123,8 @@ pub(crate) fn scan_workspace_files<T>(
         if !de
             .path()
             .extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| ext.is_match(e))
+            .and_then(|err| err.to_str())
+            .is_some_and(|err| ext.is_match(err))
         {
             continue;
         }

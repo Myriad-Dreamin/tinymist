@@ -35,10 +35,10 @@ pub fn resolve_id_by_path(
 pub fn find_source_by_expr(
     world: &dyn World,
     current: TypstFileId,
-    e: ast::Expr,
+    import_source: ast::Expr,
 ) -> Option<Source> {
     // todo: this could be valid: import("path.typ"), where v is parenthesized
-    match e {
+    match import_source {
         ast::Expr::Str(s) => world
             .source(resolve_id_by_path(world, current, s.get().as_str())?)
             .ok(),

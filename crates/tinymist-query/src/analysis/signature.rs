@@ -6,7 +6,7 @@ use typst::foundations::Closure;
 
 use super::{
     prelude::*, BoundChecker, Definition, DocSource, ParamTy, SharedContext, SigTy, SigWithTy,
-    TypeScheme, TypeVar,
+    TypeInfo, TypeVar,
 };
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
@@ -217,7 +217,7 @@ fn analyze_type_signature(
 
 pub(crate) fn sig_of_type(
     ctx: &Arc<SharedContext>,
-    type_info: &TypeScheme,
+    type_info: &TypeInfo,
     ty: Ty,
 ) -> Option<Signature> {
     // todo multiple sources
@@ -596,8 +596,8 @@ fn analyze_closure_signature(
 
     for param in closure_ast.params().children() {
         match param {
-            ast::Param::Pos(e) => {
-                let name = format!("{}", PatternDisplay(&e));
+            ast::Param::Pos(pos) => {
+                let name = format!("{}", PatternDisplay(&pos));
                 add_param(Interned::new(ParamTy {
                     name: name.as_str().into(),
                     docs: None,
@@ -607,20 +607,20 @@ fn analyze_closure_signature(
                 }));
             }
             // todo: pattern
-            ast::Param::Named(n) => {
-                let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
+            ast::Param::Named(named) => {
+                let default = unwrap_parens(named.expr()).to_untyped().clone().into_text();
                 add_param(Interned::new(ParamTy {
-                    name: n.name().get().into(),
-                    docs: Some(eco_format!("Default value: {expr}")),
-                    default: Some(expr),
+                    name: named.name().get().into(),
+                    docs: Some(eco_format!("Default value: {default}")),
+                    default: Some(default),
                     ty: Ty::Any,
                     attrs: ParamAttrs::named(),
                 }));
             }
-            ast::Param::Spread(n) => {
-                let ident = n.sink_ident().map(|e| e.as_str());
+            ast::Param::Spread(spread) => {
+                let sink = spread.sink_ident().map(|sink| sink.as_str());
                 add_param(Interned::new(ParamTy {
-                    name: ident.unwrap_or_default().into(),
+                    name: sink.unwrap_or_default().into(),
                     docs: None,
                     default: None,
                     ty: Ty::Any,
@@ -657,7 +657,7 @@ impl fmt::Display for PatternDisplay<'_> {
                             f,
                             "{}: {}",
                             n.name().as_str(),
-                            unwrap_expr(n.expr()).to_untyped().text()
+                            unwrap_parens(n.expr()).to_untyped().text()
                         )?,
                         ast::DestructuringItem::Spread(s) => write!(
                             f,
@@ -673,10 +673,10 @@ impl fmt::Display for PatternDisplay<'_> {
     }
 }
 
-fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
-    while let ast::Expr::Parenthesized(p) = e {
-        e = p.expr();
+fn unwrap_parens(mut expr: ast::Expr) -> ast::Expr {
+    while let ast::Expr::Parenthesized(p) = expr {
+        expr = p.expr();
     }
 
-    e
+    expr
 }

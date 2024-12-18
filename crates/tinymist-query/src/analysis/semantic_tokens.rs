@@ -601,9 +601,9 @@ fn token_from_node(
 fn token_from_ident(ei: &ExprInfo, ident: &LinkedNode, modifier: &mut ModifierSet) -> TokenType {
     let resolved = ei.resolves.get(&ident.span());
     let context = if let Some(resolved) = resolved {
-        match (&resolved.root, &resolved.val) {
-            (Some(e), t) => Some(token_from_decl_expr(e, t.as_ref(), modifier)),
-            (_, Some(t)) => Some(token_from_term(t, modifier)),
+        match (&resolved.root, &resolved.term) {
+            (Some(root), term) => Some(token_from_decl_expr(root, term.as_ref(), modifier)),
+            (_, Some(ty)) => Some(token_from_term(ty, modifier)),
             _ => None,
         }
     } else {
@@ -710,7 +710,7 @@ fn token_from_hashtag(
 ) -> Option<TokenType> {
     get_expr_following_hashtag(hashtag)
         .as_ref()
-        .and_then(|e| token_from_node(ei, e, modifier))
+        .and_then(|node| token_from_node(ei, node, modifier))
 }
 
 #[cfg(test)]

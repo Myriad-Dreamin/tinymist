@@ -64,7 +64,7 @@ struct OnEnterWorker<'a> {
 impl OnEnterWorker<'_> {
     fn indent_of(&self, of: usize) -> String {
         let all_text = self.source.text();
-        let start = all_text[..of].rfind('\n').map(|e| e + 1);
+        let start = all_text[..of].rfind('\n').map(|lf_offset| lf_offset + 1);
         let indent_size = all_text[start.unwrap_or_default()..of].chars().count();
         " ".repeat(indent_size)
     }
@@ -87,7 +87,7 @@ impl OnEnterWorker<'_> {
             .children()
             .skip(leaf.index().saturating_sub(first_index))
             .take_while(skipper)
-            .filter(|e| matches!(e.kind(), SyntaxKind::LineComment))
+            .filter(|child| matches!(child.kind(), SyntaxKind::LineComment))
             .count();
 
         let comment_prefix = {

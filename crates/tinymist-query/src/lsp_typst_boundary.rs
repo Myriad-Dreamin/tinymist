@@ -70,8 +70,8 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
         return Ok(Url::parse(&format!("untitled:{}", untitled.display()))?);
     }
 
-    Url::from_file_path(path).or_else(|e| {
-        let _: () = e;
+    Url::from_file_path(path).or_else(|never| {
+        let _: () = never;
 
         anyhow::bail!("could not convert path to URI: path: {path:?}",)
     })

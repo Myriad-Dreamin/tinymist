@@ -721,7 +721,11 @@ impl<'a> CompletionContext<'a> {
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
         let w = self.world().clone();
-        let mut packages: Vec<_> = w.packages().iter().map(|e| (&e.0, e.1.clone())).collect();
+        let mut packages: Vec<_> = w
+            .packages()
+            .iter()
+            .map(|(spec, desc)| (spec, desc.clone()))
+            .collect();
         // local_packages to references and add them to the packages
         let local_packages_refs = self.ctx.local_packages();
         packages.extend(

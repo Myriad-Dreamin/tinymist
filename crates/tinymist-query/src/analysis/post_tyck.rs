@@ -6,7 +6,7 @@ use tinymist_derive::BindTyCtx;
 use super::{prelude::*, DynTypeBounds, ParamAttrs, ParamTy, SharedContext};
 use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
-    TypeScheme, TypeVar,
+    TypeInfo, TypeVar,
 };
 use crate::syntax::{classify_cursor, classify_cursor_by_context, ArgClass, CursorClass};
 use crate::ty::BuiltinTy;
@@ -15,10 +15,10 @@ use crate::ty::BuiltinTy;
 /// touching the possible related nodes.
 pub(crate) fn post_type_check(
     ctx: Arc<SharedContext>,
-    info: &TypeScheme,
+    ti: &TypeInfo,
     node: LinkedNode,
 ) -> Option<Ty> {
-    let mut checker = PostTypeChecker::new(ctx, info);
+    let mut checker = PostTypeChecker::new(ctx, ti);
     let res = checker.check(&node);
     checker.simplify(&res?)
 }
@@ -101,9 +101,9 @@ fn check_signature<'a>(
 
 pub(crate) struct PostTypeChecker<'a> {
     ctx: Arc<SharedContext>,
-    pub info: &'a TypeScheme,
+    pub info: &'a TypeInfo,
     checked: HashMap<Span, Option<Ty>>,
-    locals: TypeScheme,
+    locals: TypeInfo,
 }
 
 impl TyCtx for PostTypeChecker<'_> {
@@ -117,7 +117,7 @@ impl TyCtx for PostTypeChecker<'_> {
 }
 
 impl TyCtxMut for PostTypeChecker<'_> {
-    type Snap = <TypeScheme as TyCtxMut>::Snap;
+    type Snap = <TypeInfo as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
         self.locals.start_scope()
@@ -145,12 +145,12 @@ impl TyCtxMut for PostTypeChecker<'_> {
 }
 
 impl<'a> PostTypeChecker<'a> {
-    pub fn new(ctx: Arc<SharedContext>, info: &'a TypeScheme) -> Self {
+    pub fn new(ctx: Arc<SharedContext>, info: &'a TypeInfo) -> Self {
         Self {
             ctx,
             info,
             checked: HashMap::new(),
-            locals: TypeScheme::default(),
+            locals: TypeInfo::default(),
         }
     }
 
@@ -316,13 +316,13 @@ impl<'a> PostTypeChecker<'a> {
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
         match context.kind() {
             SyntaxKind::LetBinding => {
-                let p = context.cast::<ast::LetBinding>()?;
-                let exp = p.init()?;
-                if exp.span() != node.span() {
+                let let_binding = context.cast::<ast::LetBinding>()?;
+                let let_init = let_binding.init()?;
+                if let_init.span() != node.span() {
                     return None;
                 }
 
-                match p.kind() {
+                match let_binding.kind() {
                     ast::LetBindingKind::Closure(_c) => None,
                     ast::LetBindingKind::Normal(pattern) => {
                         self.destruct_let(pattern, node.clone())
@@ -413,8 +413,8 @@ fn sig_context_of(context: &LinkedNode) -> SigSurfaceKind {
     match context.kind() {
         SyntaxKind::Parenthesized => SigSurfaceKind::ArrayOrDict,
         SyntaxKind::Array => {
-            let c = context.cast::<ast::Array>();
-            if c.is_some_and(|e| e.items().next().is_some()) {
+            let arr = context.cast::<ast::Array>();
+            if arr.is_some_and(|arr| arr.items().next().is_some()) {
                 SigSurfaceKind::Array
             } else {
                 SigSurfaceKind::ArrayOrDict

@@ -43,16 +43,15 @@ impl SemanticRequest for SymbolRequest {
                 continue;
             };
             let uri = path_to_url(&path).unwrap();
-            let res =
-                get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).map(|symbols| {
-                    filter_document_symbols(
-                        &symbols,
-                        self.pattern.as_deref(),
-                        &source,
-                        &uri,
-                        ctx.position_encoding(),
-                    )
-                });
+            let res = get_lexical_hierarchy(&source, LexicalScopeKind::Symbol).map(|symbols| {
+                filter_document_symbols(
+                    &symbols,
+                    self.pattern.as_deref(),
+                    &source,
+                    &uri,
+                    ctx.position_encoding(),
+                )
+            });
 
             if let Some(mut res) = res {
                 symbols.append(&mut res)
@@ -65,28 +64,29 @@ impl SemanticRequest for SymbolRequest {
 
 #[allow(deprecated)]
 fn filter_document_symbols(
-    symbols: &[LexicalHierarchy],
+    hierarchy: &[LexicalHierarchy],
     query_string: Option<&str>,
     source: &Source,
     uri: &Url,
     position_encoding: PositionEncoding,
 ) -> Vec<SymbolInformation> {
-    symbols
+    hierarchy
         .iter()
-        .flat_map(|e| {
-            [e].into_iter()
-                .chain(e.children.as_deref().into_iter().flatten())
+        .flat_map(|hierarchy| {
+            [hierarchy]
+                .into_iter()
+                .chain(hierarchy.children.as_deref().into_iter().flatten())
         })
-        .flat_map(|e| {
-            if query_string.is_some_and(|s| !e.info.name.contains(s)) {
+        .flat_map(|hierarchy| {
+            if query_string.is_some_and(|s| !hierarchy.info.name.contains(s)) {
                 return None;
             }
 
-            let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
+            let rng = typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);
 
             Some(SymbolInformation {
-                name: e.info.name.to_string(),
-                kind: e.info.kind.clone().try_into().unwrap(),
+                name: hierarchy.info.name.to_string(),
+                kind: hierarchy.info.kind.clone().try_into().unwrap(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {

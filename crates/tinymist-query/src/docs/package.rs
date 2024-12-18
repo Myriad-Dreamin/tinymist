@@ -110,11 +110,11 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
             for mut child in children {
                 let span = child.decl.as_ref().map(|d| d.span());
                 let fid_range = span.and_then(|v| {
-                    v.id().and_then(|e| {
-                        let fid = file_ids.insert_full(e).0;
-                        let src = ctx.source_by_id(e).ok()?;
+                    v.id().and_then(|fid| {
+                        let allocated = file_ids.insert_full(fid).0;
+                        let src = ctx.source_by_id(fid).ok()?;
                         let rng = src.range(v)?;
-                        Some((fid, rng.start, rng.end))
+                        Some((allocated, rng.start, rng.end))
                     })
                 });
                 let child_fid = child.decl.as_ref().and_then(|d| d.file_id());
@@ -258,8 +258,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
     let err = jbase64(&res);
     let _ = writeln!(md, "<!-- begin:errors {err} -->");
     let _ = writeln!(md, "## Errors");
-    for e in res.errors {
-        let _ = writeln!(md, "- {e}");
+    for errs in res.errors {
+        let _ = writeln!(md, "- {errs}");
     }
     let _ = writeln!(md, "<!-- end:errors -->");
 
@@ -267,22 +267,24 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
 
     let files = file_ids
         .into_iter()
-        .map(|e| {
-            let pkg = e.package().map(|e| packages.insert_full(e.clone()).0);
+        .map(|fid| {
+            let pkg = fid
+                .package()
+                .map(|spec| packages.insert_full(spec.clone()).0);
 
             FileMeta {
                 package: pkg,
-                path: e.vpath().as_rootless_path().to_owned(),
+                path: fid.vpath().as_rootless_path().to_owned(),
             }
         })
         .collect();
 
     let packages = packages
         .into_iter()
-        .map(|e| PackageMeta {
-            namespace: e.namespace.clone(),
-            name: e.name.clone(),
-            version: e.version.to_string(),
+        .map(|spec| PackageMeta {
+            namespace: spec.namespace.clone(),
+            name: spec.name.clone(),
+            version: spec.version.to_string(),
             manifest: None,
         })
         .collect();

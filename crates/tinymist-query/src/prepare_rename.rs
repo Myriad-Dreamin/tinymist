@@ -63,7 +63,7 @@ pub(crate) fn prepare_renaming(
     def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
     let name = def.name().clone();
-    let (def_fid, _def_range) = def.def_at(ctx.shared()).clone()?;
+    let (def_fid, _def_range) = def.location(ctx.shared()).clone()?;
 
     if def_fid.package().is_some() {
         crate::log_debug_ct!(

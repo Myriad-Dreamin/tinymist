@@ -28,7 +28,7 @@ use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
     AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
     SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
-    TypeScheme,
+    TypeInfo,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
@@ -303,7 +303,7 @@ impl LocalContext {
         &self,
         pref: &PathPreference,
     ) -> impl Iterator<Item = &TypstFileId> {
-        let r = pref.ext_matcher();
+        let regexes = pref.ext_matcher();
         self.caches
             .completion_files
             .get_or_init(|| {
@@ -316,12 +316,12 @@ impl LocalContext {
                 }
             })
             .iter()
-            .filter(move |p| {
-                p.vpath()
+            .filter(move |fid| {
+                fid.vpath()
                     .as_rooted_path()
                     .extension()
-                    .and_then(|p| p.to_str())
-                    .is_some_and(|e| r.is_match(e))
+                    .and_then(|path| path.to_str())
+                    .is_some_and(|path| regexes.is_match(path))
             })
     }
 
@@ -416,14 +416,14 @@ impl LocalContext {
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: &Source) -> Arc<TypeScheme> {
+    pub(crate) fn type_check(&mut self, source: &Source) -> Arc<TypeInfo> {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().type_check;
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeScheme> {
+    pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeInfo> {
         let cache = &self.caches.modules.entry(id).or_default().type_check;
         cache
             .clone()
@@ -511,13 +511,13 @@ impl SharedContext {
 
     /// Convert a Typst range to a LSP range.
     pub fn to_lsp_range_(&self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
-        let w = fid
+        let ext = fid
             .vpath()
             .as_rootless_path()
             .extension()
-            .and_then(|e| e.to_str());
+            .and_then(|ext| ext.to_str());
         // yaml/yml/bib
-        if matches!(w, Some("yaml" | "yml" | "bib")) {
+        if matches!(ext, Some("yaml" | "yml" | "bib")) {
             let bytes = self.file_by_id(fid).ok()?;
             let bytes_len = bytes.len();
             let loc = loc_info(bytes)?;
@@ -578,8 +578,8 @@ impl SharedContext {
         position: LspPosition,
         shift: usize,
     ) -> Option<SyntaxClass<'s>> {
-        let (_, expr) = self.classify_pos_(source, position, shift)?;
-        expr
+        let (_, syntax) = self.classify_pos_(source, position, shift)?;
+        syntax
     }
 
     /// Classifies the syntax under position that can be operated on by IDE
@@ -714,7 +714,7 @@ impl SharedContext {
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeScheme> {
+    pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
         let mut route = TypeEnv::default();
         self.type_check_(source, &mut route)
     }
@@ -724,7 +724,7 @@ impl SharedContext {
         self: &Arc<Self>,
         source: &Source,
         route: &mut TypeEnv,
-    ) -> Arc<TypeScheme> {
+    ) -> Arc<TypeInfo> {
         use crate::analysis::type_check;
 
         let ei = self.expr_stage(source);
@@ -832,7 +832,7 @@ impl SharedContext {
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
-    pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeScheme, ty: Ty) -> Option<Signature> {
+    pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeInfo, ty: Ty) -> Option<Signature> {
         super::sig_of_type(self, ti, ty)
     }
 
@@ -980,9 +980,9 @@ impl SharedContext {
             fn work(&self, fid: TypstFileId) {
                 crate::log_debug_ct!("preload package {fid:?}");
                 let source = self.shared.source_by_id(fid).ok().unwrap();
-                let expr = self.shared.expr_stage(&source);
+                let exprs = self.shared.expr_stage(&source);
                 self.shared.type_check(&source);
-                expr.imports.iter().for_each(|(fid, _)| {
+                exprs.imports.iter().for_each(|(fid, _)| {
                     if !self.analyzed.lock().insert(*fid) {
                         return;
                     }
@@ -1044,14 +1044,14 @@ impl<K, V> IncrCacheMap<K, V> {
             let entry = global.entry(key.clone());
             use dashmap::mapref::entry::Entry;
             match entry {
-                Entry::Occupied(mut e) => {
-                    let (revision, _) = e.get();
+                Entry::Occupied(mut entry) => {
+                    let (revision, _) = entry.get();
                     if *revision < self.revision {
-                        e.insert((self.revision, res.clone()));
+                        entry.insert((self.revision, res.clone()));
                     }
                 }
-                Entry::Vacant(e) => {
-                    e.insert((self.revision, res.clone()));
+                Entry::Vacant(entry) => {
+                    entry.insert((self.revision, res.clone()));
                 }
             }
 
@@ -1146,7 +1146,7 @@ pub struct AnalysisLocalCaches {
 #[derive(Default)]
 pub struct ModuleAnalysisLocalCache {
     expr_stage: OnceCell<Arc<ExprInfo>>,
-    type_check: OnceCell<Arc<TypeScheme>>,
+    type_check: OnceCell<Arc<TypeInfo>>,
 }
 
 /// A revision-managed (per input change) cache for all level of analysis
@@ -1199,10 +1199,10 @@ impl AnalysisRevCache {
         self.manager.find_revision(revision, |slot_base| {
             log::info!("analysis revision {} is created", revision.get());
             slot_base
-                .map(|e| AnalysisRevSlot {
-                    revision: e.revision,
-                    expr_stage: e.data.expr_stage.crawl(revision.get()),
-                    type_check: e.data.type_check.crawl(revision.get()),
+                .map(|slot| AnalysisRevSlot {
+                    revision: slot.revision,
+                    expr_stage: slot.data.expr_stage.crawl(revision.get()),
+                    type_check: slot.data.type_check.crawl(revision.get()),
                 })
                 .unwrap_or_else(|| self.default_slot.clone())
         })
@@ -1234,7 +1234,7 @@ impl Drop for AnalysisRevLock {
 struct AnalysisRevSlot {
     revision: usize,
     expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
-    type_check: IncrCacheMap<u128, Arc<TypeScheme>>,
+    type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
 }
 
 impl Drop for AnalysisRevSlot {
@@ -1274,7 +1274,7 @@ fn bib_info(
 fn loc_info(bytes: Bytes) -> Option<EcoVec<(usize, String)>> {
     let mut loc = EcoVec::new();
     let mut offset = 0;
-    for line in bytes.split(|e| *e == b'\n') {
+    for line in bytes.split(|byte| *byte == b'\n') {
         loc.push((offset, String::from_utf8(line.to_owned()).ok()?));
         offset += line.len() + 1;
     }
@@ -1327,9 +1327,9 @@ pub struct SearchCtx<'a> {
 
 impl SearchCtx<'_> {
     /// Push a file to the worklist.
-    pub fn push(&mut self, id: TypstFileId) -> bool {
-        if self.searched.insert(id) {
-            self.worklist.push(id);
+    pub fn push(&mut self, fid: TypstFileId) -> bool {
+        if self.searched.insert(fid) {
+            self.worklist.push(fid);
             true
         } else {
             false
@@ -1337,9 +1337,9 @@ impl SearchCtx<'_> {
     }
 
     /// Push the dependents of a file to the worklist.
-    pub fn push_dependents(&mut self, id: TypstFileId) {
-        let deps = self.ctx.module_dependencies().get(&id);
-        let dependents = deps.map(|e| e.dependents.clone()).into_iter().flatten();
+    pub fn push_dependents(&mut self, fid: TypstFileId) {
+        let deps = self.ctx.module_dependencies().get(&fid);
+        let dependents = deps.map(|dep| dep.dependents.clone()).into_iter().flatten();
         for dep in dependents {
             self.push(dep);
         }

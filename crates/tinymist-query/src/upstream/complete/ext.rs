@@ -23,7 +23,7 @@ use crate::snippet::{
 use crate::syntax::{
     descent_decls, interpret_mode_at, is_ident_like, CursorClass, DescentDecl, InterpretMode,
 };
-use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeScheme, TypeVar};
+use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
 use crate::upstream::complete::complete_code;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
@@ -629,7 +629,7 @@ fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
 #[derive(BindTyCtx)]
 #[bind(types)]
 struct Defines {
-    types: Arc<TypeScheme>,
+    types: Arc<TypeInfo>,
     defines: BTreeMap<EcoString, Ty>,
 }
 
@@ -659,7 +659,7 @@ impl Defines {
     }
 }
 
-fn analyze_import_source(ctx: &LocalContext, types: &TypeScheme, s: ast::Expr) -> Option<Ty> {
+fn analyze_import_source(ctx: &LocalContext, types: &TypeInfo, s: ast::Expr) -> Option<Ty> {
     if let Some(res) = types.type_of_span(s.span()) {
         if !matches!(res.value(), Some(Value::Str(..))) {
             return Some(types.simplify(res, false));
@@ -1077,11 +1077,11 @@ impl TypeCompletionContext<'_, '_> {
                     self.type_completion(info, docs);
                 }
             }
-            Ty::Let(e) => {
-                for ut in e.ubs.iter() {
+            Ty::Let(bounds) => {
+                for ut in bounds.ubs.iter() {
                     self.type_completion(ut, docs);
                 }
-                for lt in e.lbs.iter() {
+                for lt in bounds.lbs.iter() {
                     self.type_completion(lt, docs);
                 }
             }
@@ -1350,10 +1350,10 @@ impl TypeCompletionContext<'_, '_> {
                     });
                 }
             }
-            BuiltinTy::Element(e) => {
+            BuiltinTy::Element(elem) => {
                 self.ctx.value_completion(
-                    Some(e.name().into()),
-                    &Value::Func((*e).into()),
+                    Some(elem.name().into()),
+                    &Value::Func((*elem).into()),
                     true,
                     docs,
                 );

@@ -37,7 +37,7 @@ impl StatefulRequest for GotoDefinitionRequest {
 
         let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax)?;
 
-        let (fid, def_range) = def.def_at(ctx.shared())?;
+        let (fid, def_range) = def.location(ctx.shared())?;
         let uri = ctx.uri_for_id(fid).ok()?;
         let range = ctx.to_lsp_range_(def_range, fid)?;
 

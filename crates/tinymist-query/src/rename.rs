@@ -58,7 +58,7 @@ impl StatefulRequest for RenameRequest {
                     self.new_name
                 };
 
-                let def_fid = def.def_at(ctx.shared())?.0;
+                let def_fid = def.location(ctx.shared())?.0;
                 let old_path = ctx.path_for_id(def_fid).ok()?;
 
                 let rename_loc = Path::new(ref_path_str.as_str());

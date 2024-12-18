@@ -58,7 +58,7 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
     use tinymist_derive::BindTyCtx;
 
-    use super::{DynTypeBounds, Interned, Ty, TyCtx, TypeScheme, TypeVar};
+    use super::{DynTypeBounds, Interned, Ty, TyCtx, TypeInfo, TypeVar};
     use crate::ty::tests::*;
     use crate::ty::ApplyChecker;
     #[test]
@@ -71,7 +71,7 @@ mod tests {
 
     #[derive(Default, BindTyCtx)]
     #[bind(0)]
-    struct CallCollector(TypeScheme, Vec<Ty>);
+    struct CallCollector(TypeInfo, Vec<Ty>);
 
     impl ApplyChecker for CallCollector {
         fn apply(

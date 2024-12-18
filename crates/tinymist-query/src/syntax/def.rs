@@ -449,7 +449,7 @@ impl Decl {
             decl: this.clone(),
             step: Some(def.clone()),
             root: Some(def),
-            val,
+            term: val,
         })
     }
 }
@@ -667,7 +667,7 @@ pub struct RefExpr {
     pub decl: DeclExpr,
     pub step: Option<Expr>,
     pub root: Option<Expr>,
-    pub val: Option<Ty>,
+    pub term: Option<Ty>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

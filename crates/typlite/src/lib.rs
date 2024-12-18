@@ -106,7 +106,7 @@ impl Typlite {
 
         let main = world
             .source(current)
-            .map_err(|e| format!("getting source for main file: {e:?}"))?;
+            .map_err(|err| format!("getting source for main file: {err:?}"))?;
 
         let worker = TypliteWorker {
             current,
@@ -456,7 +456,7 @@ impl TypliteWorker {
         world.map_shadow_by_id(main_id, main).unwrap();
 
         let document = typst::compile(&world).output;
-        let document = document.map_err(|e| {
+        let document = document.map_err(|diagnostics| {
             let mut err = String::new();
             let _ = write!(err, "compiling node: ");
             let write_span = |span: typst_syntax::Span, err: &mut String| {
@@ -483,7 +483,7 @@ impl TypliteWorker {
                 }
             };
 
-            for s in e.iter() {
+            for s in diagnostics.iter() {
                 match s.severity {
                     typst::diag::Severity::Error => {
                         let _ = write!(err, "error: ");
@@ -585,8 +585,8 @@ impl TypliteWorker {
             return Ok(Value::Content(s));
         }
         s.push('`');
-        for e in raw.lines() {
-            s.push_str(&Self::value(Self::str(e.to_untyped())?));
+        for line in raw.lines() {
+            s.push_str(&Self::value(Self::str(line.to_untyped())?));
         }
         s.push('`');
         Ok(Value::Content(s))
