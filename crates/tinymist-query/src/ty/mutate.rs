@@ -71,17 +71,17 @@ pub trait TyMutator {
         })
     }
 
-    fn mutate_param(&mut self, f: &Interned<ParamTy>, pol: bool) -> Option<ParamTy> {
-        let ty = self.mutate(&f.ty, pol)?;
-        let mut f = f.as_ref().clone();
-        f.ty = ty;
-        Some(f)
+    fn mutate_param(&mut self, param: &Interned<ParamTy>, pol: bool) -> Option<ParamTy> {
+        let ty = self.mutate(&param.ty, pol)?;
+        let mut param = param.as_ref().clone();
+        param.ty = ty;
+        Some(param)
     }
 
-    fn mutate_record(&mut self, ty: &Interned<RecordTy>, pol: bool) -> Option<RecordTy> {
-        let types = self.mutate_vec(&ty.types, pol)?;
+    fn mutate_record(&mut self, record: &Interned<RecordTy>, pol: bool) -> Option<RecordTy> {
+        let types = self.mutate_vec(&record.types, pol)?;
 
-        let rec = ty.as_ref().clone();
+        let rec = record.as_ref().clone();
         Some(RecordTy { types, ..rec })
     }
 

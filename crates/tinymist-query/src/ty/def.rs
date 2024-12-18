@@ -95,24 +95,24 @@ impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Ty::Any => f.write_str("Any"),
-            Ty::Builtin(t) => write!(f, "{t:?}"),
-            Ty::Args(a) => write!(f, "&({a:?})"),
-            Ty::Func(s) => write!(f, "{s:?}"),
-            Ty::Pattern(s) => write!(f, "{s:?}"),
-            Ty::Dict(r) => write!(f, "{r:?}"),
-            Ty::Array(a) => write!(f, "Array<{a:?}>"),
-            Ty::Tuple(t) => {
+            Ty::Builtin(ty) => write!(f, "{ty:?}"),
+            Ty::Args(args) => write!(f, "&({args:?})"),
+            Ty::Func(func) => write!(f, "{func:?}"),
+            Ty::Pattern(pat) => write!(f, "{pat:?}"),
+            Ty::Dict(record) => write!(f, "{record:?}"),
+            Ty::Array(arr) => write!(f, "Array<{arr:?}>"),
+            Ty::Tuple(elems) => {
                 f.write_str("(")?;
-                for t in t.iter() {
+                for t in elems.iter() {
                     write!(f, "{t:?}, ")?;
                 }
                 f.write_str(")")
             }
-            Ty::With(w) => write!(f, "({:?}).with(..{:?})", w.sig, w.with),
-            Ty::Select(a) => write!(f, "{a:?}"),
-            Ty::Union(u) => {
+            Ty::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
+            Ty::Select(sel) => write!(f, "{sel:?}"),
+            Ty::Union(types) => {
                 f.write_str("(")?;
-                if let Some((first, u)) = u.split_first() {
+                if let Some((first, u)) = types.split_first() {
                     write!(f, "{first:?}")?;
                     for u in u {
                         write!(f, " | {u:?}")?;
@@ -120,16 +120,16 @@ impl fmt::Debug for Ty {
                 }
                 f.write_str(")")
             }
-            Ty::Let(v) => write!(f, "({v:?})"),
-            Ty::Param(ff) => write!(f, "{:?}: {:?}", ff.name, ff.ty),
-            Ty::Var(v) => v.fmt(f),
-            Ty::Unary(u) => write!(f, "{u:?}"),
-            Ty::Binary(b) => write!(f, "{b:?}"),
-            Ty::If(i) => write!(f, "{i:?}"),
-            Ty::Value(v) => write!(f, "{v:?}", v = v.val),
-            Ty::Boolean(b) => {
-                if let Some(b) = b {
-                    write!(f, "{b}")
+            Ty::Let(bounds) => write!(f, "({bounds:?})"),
+            Ty::Param(param) => write!(f, "{:?}: {:?}", param.name, param.ty),
+            Ty::Var(var) => var.fmt(f),
+            Ty::Unary(unary) => write!(f, "{unary:?}"),
+            Ty::Binary(binary) => write!(f, "{binary:?}"),
+            Ty::If(if_expr) => write!(f, "{if_expr:?}"),
+            Ty::Value(ins_ty) => write!(f, "{:?}", ins_ty.val),
+            Ty::Boolean(truthiness) => {
+                if let Some(truthiness) = truthiness {
+                    write!(f, "{truthiness}")
                 } else {
                     f.write_str("Boolean")
                 }
@@ -224,8 +224,8 @@ impl Ty {
     /// Get the type of the type
     pub fn element(&self) -> Option<Element> {
         match self {
-            Ty::Value(v) => match &v.val {
-                Value::Func(f) => f.element(),
+            Ty::Value(ins_ty) => match &ins_ty.val {
+                Value::Func(func) => func.element(),
                 _ => None,
             },
             Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
@@ -344,7 +344,7 @@ impl NameBone {
         let mut rhs = rhs_iter.next();
 
         std::iter::from_fn(move || 'name_scanning: loop {
-            if let (Some((i, lhs_key)), Some((j, rhs_key))) = (lhs, rhs) {
+            if let (Some((idx, lhs_key)), Some((j, rhs_key))) = (lhs, rhs) {
                 match lhs_key.cmp(rhs_key) {
                     std::cmp::Ordering::Less => {
                         lhs = lhs_iter.next();
@@ -357,7 +357,7 @@ impl NameBone {
                     std::cmp::Ordering::Equal => {
                         lhs = lhs_iter.next();
                         rhs = rhs_iter.next();
-                        return Some((i, j));
+                        return Some((idx, j));
                     }
                 }
             }
@@ -436,7 +436,7 @@ pub trait TypeInterface {
     /// Iterate over the fields of a record.
     fn interface(&self) -> impl Iterator<Item = (&StrRef, &Ty)>;
     /// Get the field by bone offset.
-    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty>;
+    fn field_by_bone_offset(&self, idx: usize) -> Option<&Ty>;
     /// Get the field by name.
     fn field_by_name(&self, name: &StrRef) -> Option<&Ty> {
         self.field_by_bone_offset(self.bone().find(name)?)
@@ -499,13 +499,13 @@ impl InsTy {
     }
 
     /// Create a instance with a sapn
-    pub fn new_at(val: Value, s: Span) -> Interned<Self> {
-        let mut l = SyntaxNode::leaf(SyntaxKind::Ident, "");
-        l.synthesize(s);
+    pub fn new_at(val: Value, span: Span) -> Interned<Self> {
+        let mut name = SyntaxNode::leaf(SyntaxKind::Ident, "");
+        name.synthesize(span);
         Interned::new(Self {
             val,
             syntax: Some(Interned::new(TypeSource {
-                name_node: l,
+                name_node: name,
                 name_repr: OnceCell::new(),
                 doc: "".into(),
             })),
@@ -527,12 +527,12 @@ impl InsTy {
     pub fn span(&self) -> Span {
         self.syntax
             .as_ref()
-            .map(|s| s.name_node.span())
+            .map(|source| source.name_node.span())
             .or_else(|| {
                 Some(match &self.val {
-                    Value::Func(f) => f.span(),
-                    Value::Args(a) => a.span,
-                    Value::Content(c) => c.span(),
+                    Value::Func(func) => func.span(),
+                    Value::Args(args) => args.span,
+                    Value::Content(content) => content.span(),
                     // todo: module might have file id
                     _ => return None,
                 })
@@ -703,8 +703,8 @@ impl TypeInterface for RecordTy {
         &self.names
     }
 
-    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty> {
-        self.types.get(i)
+    fn field_by_bone_offset(&self, idx: usize) -> Option<&Ty> {
+        self.types.get(idx)
     }
 
     fn interface(&self) -> impl Iterator<Item = (&StrRef, &Ty)> {
@@ -884,8 +884,8 @@ impl TypeInterface for SigTy {
         names.zip(types)
     }
 
-    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty> {
-        self.inputs.get(i + self.name_started as usize)
+    fn field_by_bone_offset(&self, offset: usize) -> Option<&Ty> {
+        self.inputs.get(offset + self.name_started as usize)
     }
 }
 
@@ -1228,23 +1228,23 @@ impl TypeInfo {
             Ty::Var(v) => {
                 let w = self.vars.get(&v.def).unwrap();
                 match &w.bounds {
-                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
-                        let w = w.read();
-                        for l in w.lbs.iter() {
-                            store.lbs.insert_mut(l.clone());
+                    FlowVarKind::Strong(bounds) | FlowVarKind::Weak(bounds) => {
+                        let w = bounds.read();
+                        for bound in w.lbs.iter() {
+                            store.lbs.insert_mut(bound.clone());
                         }
-                        for l in w.ubs.iter() {
-                            store.ubs.insert_mut(l.clone());
+                        for bound in w.ubs.iter() {
+                            store.ubs.insert_mut(bound.clone());
                         }
                     }
                 }
             }
-            Ty::Let(v) => {
-                for l in v.lbs.iter() {
-                    store.lbs.insert_mut(l.clone());
+            Ty::Let(bounds) => {
+                for bound in bounds.lbs.iter() {
+                    store.lbs.insert_mut(bound.clone());
                 }
-                for l in v.ubs.iter() {
-                    store.ubs.insert_mut(l.clone());
+                for bound in bounds.ubs.iter() {
+                    store.ubs.insert_mut(bound.clone());
                 }
             }
             _ => {

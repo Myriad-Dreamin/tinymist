@@ -48,9 +48,9 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
 
     let module_uses = aliases
         .into_iter()
-        .map(|(k, mut v)| {
+        .map(|(fid, mut v)| {
             v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
-            (file_id_repr(k), v.into())
+            (file_id_repr(fid), v.into())
         })
         .collect();
 
@@ -113,7 +113,7 @@ struct ScanDefCtx<'a> {
 }
 
 impl ScanDefCtx<'_> {
-    fn defs(&mut self, path: EcoVec<&str>, ei: Arc<ExprInfo>) -> DefInfo {
+    fn defs(&mut self, paths: EcoVec<&str>, ei: Arc<ExprInfo>) -> DefInfo {
         let name = {
             let stem = ei.fid.vpath().as_rooted_path().file_stem();
             stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
@@ -121,8 +121,8 @@ impl ScanDefCtx<'_> {
         };
         let module_decl = Decl::module(name.clone(), ei.fid).into();
         let site = Some(self.root);
-        let p = path.clone();
-        self.def(&name, p, site.as_ref(), &module_decl, None)
+        let paths = paths.clone();
+        self.def(&name, paths, site.as_ref(), &module_decl, None)
     }
 
     fn expr(
@@ -133,7 +133,7 @@ impl ScanDefCtx<'_> {
         val: &Expr,
     ) -> DefInfo {
         match val {
-            Expr::Decl(d) => self.def(key, path, site, d, Some(val)),
+            Expr::Decl(decl) => self.def(key, path, site, decl, Some(val)),
             Expr::Ref(r) if r.root.is_some() => {
                 self.expr(key, path, site, r.root.as_ref().unwrap())
             }
@@ -170,7 +170,7 @@ impl ScanDefCtx<'_> {
     ) -> DefInfo {
         let def = self.ctx.def_of_decl(decl);
         let def_docs = def.and_then(|def| self.ctx.def_docs(&def));
-        let docs = def_docs.as_ref().map(|d| d.docs().clone());
+        let docs = def_docs.as_ref().map(|docs| docs.docs().clone());
         let children = match decl.as_ref() {
             Decl::Module(..) => decl.file_id().and_then(|fid| {
                 // only generate docs for the same package
@@ -195,10 +195,10 @@ impl ScanDefCtx<'_> {
                 let symbols = ei
                     .exports
                     .iter()
-                    .map(|(k, v)| {
+                    .map(|(name, val)| {
                         let mut path = path.clone();
-                        path.push(k);
-                        self.expr(k, path.clone(), Some(&fid), v)
+                        path.push(name);
+                        self.expr(name, path.clone(), Some(&fid), val)
                     })
                     .collect();
                 Some(symbols)
@@ -220,7 +220,8 @@ impl ScanDefCtx<'_> {
             oneliner: None,
         };
 
-        if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|d| d.file_id()).zip(site) {
+        if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|decl| decl.file_id()).zip(site)
+        {
             if span != *mod_fid {
                 head.is_external = true;
                 head.oneliner = head.docs.map(|docs| oneliner(&docs).to_owned());
@@ -229,7 +230,7 @@ impl ScanDefCtx<'_> {
         }
 
         // Insert module that is not exported
-        if let Some(fid) = head.decl.as_ref().and_then(|d| d.file_id()) {
+        if let Some(fid) = head.decl.as_ref().and_then(|del| del.file_id()) {
             // only generate docs for the same package
             if fid.package() == self.for_spec {
                 let av = self.aliases.entry(fid).or_default();

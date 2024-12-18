@@ -56,8 +56,8 @@ impl TypeChecker<'_> {
 
         for elem in elems.iter() {
             match elem {
-                ArgExpr::Pos(p) => {
-                    elements.push(self.check(p));
+                ArgExpr::Pos(pos) => {
+                    elements.push(self.check(pos));
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -99,8 +99,8 @@ impl TypeChecker<'_> {
 
         for arg in args.iter() {
             match arg {
-                ArgExpr::Pos(p) => {
-                    args_res.push(self.check(p));
+                ArgExpr::Pos(pos) => {
+                    args_res.push(self.check(pos));
                 }
                 ArgExpr::Named(n) => {
                     let (name, value) = n.as_ref();
@@ -499,10 +499,10 @@ impl TypeChecker<'_> {
         Ty::Unary(TypeUnary::new(UnaryOp::Context, body))
     }
 
-    fn check_conditional(&mut self, i: &Interned<IfExpr>) -> Ty {
-        let cond = self.check(&i.cond);
-        let then = self.check(&i.then);
-        let else_ = self.check(&i.else_);
+    fn check_conditional(&mut self, if_expr: &Interned<IfExpr>) -> Ty {
+        let cond = self.check(&if_expr.cond);
+        let then = self.check(&if_expr.then);
+        let else_ = self.check(&if_expr.else_);
 
         Ty::If(IfTy::new(cond.into(), then.into(), else_.into()))
     }

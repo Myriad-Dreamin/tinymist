@@ -85,7 +85,7 @@ impl LinkStrWorker {
                 self.analyze_path_expr(node, path);
             }
             // early exit
-            k if k.is_trivia() || k.is_keyword() || k.is_error() => return Some(()),
+            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return Some(()),
             _ => {}
         };
 

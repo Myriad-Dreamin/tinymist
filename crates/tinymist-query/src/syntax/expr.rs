@@ -41,8 +41,8 @@ pub(crate) fn expr_of(
         {
             return None;
         }
-        for (i, prev_exports) in &prev.imports {
-            let ei = ctx.exports_of(&ctx.source_by_id(*i).ok()?, route);
+        for (fid, prev_exports) in &prev.imports {
+            let ei = ctx.exports_of(&ctx.source_by_id(*fid).ok()?, route);
 
             // If there is a cycle, the expression will be stable as the source is
             // unchanged.
@@ -155,7 +155,7 @@ impl std::hash::Hash for ExprInfo {
         self.exports.hash(state);
         self.root.hash(state);
         let mut imports = self.imports.iter().collect::<Vec<_>>();
-        imports.sort_by_key(|(k, _)| *k);
+        imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
     }
 }
@@ -333,19 +333,19 @@ impl ExprWorker<'_> {
             Equation(equation) => self.check_math(equation.body().to_untyped().children()),
             Math(math) => self.check_math(math.to_untyped().children()),
             Code(code_block) => self.check_code(code_block.body()),
-            Content(c) => self.check_markup(c.body()),
+            Content(content_block) => self.check_markup(content_block.body()),
 
             Ident(ident) => self.check_ident(ident),
             MathIdent(math_ident) => self.check_math_ident(math_ident),
             Label(label) => self.check_label(label),
-            Ref(r) => self.check_ref(r),
+            Ref(ref_node) => self.check_ref(ref_node),
 
             Let(let_binding) => self.check_let(let_binding),
             Closure(closure) => self.check_closure(closure),
             Import(module_import) => self.check_module_import(module_import),
             Include(module_include) => self.check_module_include(module_include),
 
-            Parenthesized(p) => self.check(p.expr()),
+            Parenthesized(paren_expr) => self.check(paren_expr.expr()),
             Array(array) => self.check_array(array),
             Dict(dict) => self.check_dict(dict),
             Unary(unary) => self.check_unary(unary),
@@ -355,7 +355,9 @@ impl ExprWorker<'_> {
             DestructAssign(destruct_assignment) => self.check_destruct_assign(destruct_assignment),
             Set(set_rule) => self.check_set(set_rule),
             Show(show_rule) => self.check_show(show_rule),
-            Contextual(c) => Expr::Unary(UnInst::new(UnaryOp::Context, self.defer(c.body()))),
+            Contextual(contextual) => {
+                Expr::Unary(UnInst::new(UnaryOp::Context, self.defer(contextual.body())))
+            }
             Conditional(conditional) => self.check_conditional(conditional),
             While(while_loop) => self.check_while_loop(while_loop),
             For(for_loop) => self.check_for_loop(for_loop),
@@ -425,8 +427,8 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn check_label(&mut self, ident: ast::Label) -> Expr {
-        Expr::Decl(Decl::label(ident.get(), ident.span()).into())
+    fn check_label(&mut self, label: ast::Label) -> Expr {
+        Expr::Decl(Decl::label(label.get(), label.span()).into())
     }
 
     fn check_element<T: NativeElement>(&mut self, content: EcoVec<Expr>) -> Expr {
@@ -528,34 +530,36 @@ impl ExprWorker<'_> {
         match typed {
             ast::Pattern::Normal(expr) => self.check_pattern_expr(expr),
             ast::Pattern::Placeholder(..) => Pattern::Expr(Expr::Star).into(),
-            ast::Pattern::Parenthesized(p) => self.check_pattern(p.pattern()),
-            ast::Pattern::Destructuring(d) => {
+            ast::Pattern::Parenthesized(paren_expr) => self.check_pattern(paren_expr.pattern()),
+            ast::Pattern::Destructuring(destructing) => {
                 let mut inputs = eco_vec![];
                 let mut names = eco_vec![];
                 let mut spread_left = None;
                 let mut spread_right = None;
 
-                for item in d.items() {
+                for item in destructing.items() {
                     match item {
-                        ast::DestructuringItem::Pattern(p) => {
-                            inputs.push(self.check_pattern(p));
+                        ast::DestructuringItem::Pattern(pos) => {
+                            inputs.push(self.check_pattern(pos));
                         }
-                        ast::DestructuringItem::Named(n) => {
-                            let key = Decl::var(n.name()).into();
-                            let val = self.check_pattern_expr(n.expr());
+                        ast::DestructuringItem::Named(named) => {
+                            let key = Decl::var(named.name()).into();
+                            let val = self.check_pattern_expr(named.expr());
                             names.push((key, val));
                         }
-                        ast::DestructuringItem::Spread(s) => {
-                            let decl: DeclExpr = if let Some(ident) = s.sink_ident() {
+                        ast::DestructuringItem::Spread(spreading) => {
+                            let decl: DeclExpr = if let Some(ident) = spreading.sink_ident() {
                                 Decl::var(ident).into()
                             } else {
-                                Decl::spread(s.span()).into()
+                                Decl::spread(spreading.span()).into()
                             };
 
                             if inputs.is_empty() {
-                                spread_left = Some((decl, self.check_pattern_expr(s.expr())));
+                                spread_left =
+                                    Some((decl, self.check_pattern_expr(spreading.expr())));
                             } else {
-                                spread_right = Some((decl, self.check_pattern_expr(s.expr())));
+                                spread_right =
+                                    Some((decl, self.check_pattern_expr(spreading.expr())));
                             }
                         }
                     }
@@ -601,7 +605,9 @@ impl ExprWorker<'_> {
         let mod_var = typed.new_name().map(Decl::module_alias).or_else(|| {
             typed.imports().is_none().then(|| {
                 let name = match mod_expr.as_ref()? {
-                    Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => d.name().clone(),
+                    Expr::Decl(decl) if matches!(decl.as_ref(), Decl::Module { .. }) => {
+                        decl.name().clone()
+                    }
                     _ => return None,
                 };
                 // todo: package stem
@@ -631,9 +637,9 @@ impl ExprWorker<'_> {
                 Value::Module(m) => m.file_id(),
                 _ => None,
             },
-            Expr::Decl(d) => {
-                if matches!(d.as_ref(), Decl::Module { .. }) {
-                    d.file_id()
+            Expr::Decl(decl) => {
+                if matches!(decl.as_ref(), Decl::Module { .. }) {
+                    decl.file_id()
                 } else {
                     None
                 }
@@ -642,9 +648,9 @@ impl ExprWorker<'_> {
         });
 
         // Prefetch Type Check Information
-        if let Some(f) = fid {
-            crate::log_debug_ct!("prefetch type check: {f:?}");
-            self.ctx.prefetch_type_check(f);
+        if let Some(fid) = fid {
+            crate::log_debug_ct!("prefetch type check: {fid:?}");
+            self.ctx.prefetch_type_check(fid);
         }
 
         let scope = if let Some(fid) = &fid {
@@ -653,9 +659,9 @@ impl ExprWorker<'_> {
             match &mod_expr {
                 Some(Expr::Type(Ty::Value(v))) => match &v.val {
                     Value::Module(m) => Some(ExprScope::Module(m.clone())),
-                    Value::Func(f) => {
-                        if f.scope().is_some() {
-                            Some(ExprScope::Func(f.clone()))
+                    Value::Func(func) => {
+                        if func.scope().is_some() {
+                            Some(ExprScope::Func(func.clone()))
                         } else {
                             None
                         }
@@ -715,7 +721,7 @@ impl ExprWorker<'_> {
             Expr::Type(Ty::Value(val)) => {
                 self.check_import_source_val(source, &val.val, Some(&src_expr), is_import)
             }
-            Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => {
+            Expr::Decl(decl) if matches!(decl.as_ref(), Decl::Module { .. }) => {
                 return Some(src_expr.clone())
             }
 
@@ -817,7 +823,7 @@ impl ExprWorker<'_> {
                 path.push(seg);
             }
             // todo: import path
-            let (mut root, val) = match path.last().map(|d| d.name()) {
+            let (mut root, val) = match path.last().map(|decl| decl.name()) {
                 Some(name) => scope.get(name),
                 None => (None, None),
             };
@@ -973,12 +979,12 @@ impl ExprWorker<'_> {
     fn check_set(&mut self, typed: ast::SetRule) -> Expr {
         let target = self.check(typed.target());
         let args = self.check_args(typed.args());
-        let cond = typed.condition().map(|c| self.check(c));
+        let cond = typed.condition().map(|cond| self.check(cond));
         Expr::Set(SetExpr { target, args, cond }.into())
     }
 
     fn check_show(&mut self, typed: ast::ShowRule) -> Expr {
-        let selector = typed.selector().map(|s| self.check(s));
+        let selector = typed.selector().map(|selector| self.check(selector));
         let edit = self.defer(typed.transform());
         Expr::Show(ShowExpr { selector, edit }.into())
     }
@@ -1145,10 +1151,10 @@ impl ExprWorker<'_> {
         crate::log_debug_ct!("checking expr: {expr:?}");
 
         match expr {
-            ast::Expr::FieldAccess(f) => {
-                let field = Decl::ident_ref(f.field());
+            ast::Expr::FieldAccess(field_access) => {
+                let field = Decl::ident_ref(field_access.field());
 
-                let (expr, term) = self.eval_expr(f.target(), mode);
+                let (expr, term) = self.eval_expr(field_access.target(), mode);
                 let term = term.and_then(|v| {
                     // todo: use type select
                     // v.select(field.name()).ok()
@@ -1233,10 +1239,10 @@ impl ExprWorker<'_> {
 
     fn syntax_level_select(&mut self, lhs: Expr, key: &Interned<Decl>, span: Span) -> Option<Expr> {
         match &lhs {
-            Expr::Decl(d) => match d.as_ref() {
-                Decl::Module(m) => {
-                    let f = self.exports_of(m.fid);
-                    let selected = f.get(key.name())?;
+            Expr::Decl(decl) => match decl.as_ref() {
+                Decl::Module(module) => {
+                    let exports = self.exports_of(module.fid);
+                    let selected = exports.get(key.name())?;
                     let select_ref = Interned::new(RefExpr {
                         decl: key.clone(),
                         root: Some(lhs.clone()),

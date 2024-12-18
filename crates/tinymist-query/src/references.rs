@@ -200,15 +200,15 @@ mod tests {
             let result = request.request(ctx, doc);
             let mut result = result.map(|v| {
                 v.into_iter()
-                    .map(|l| {
-                        let fp = unix_slash(&url_to_path(l.uri));
+                    .map(|loc| {
+                        let fp = unix_slash(&url_to_path(loc.uri));
                         let fp = fp.strip_prefix("C:").unwrap_or(&fp);
                         format!(
                             "{fp}@{}:{}:{}:{}",
-                            l.range.start.line,
-                            l.range.start.character,
-                            l.range.end.line,
-                            l.range.end.character
+                            loc.range.start.line,
+                            loc.range.start.character,
+                            loc.range.end.line,
+                            loc.range.end.character
                         )
                     })
                     .collect::<Vec<_>>()

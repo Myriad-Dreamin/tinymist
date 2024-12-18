@@ -126,7 +126,7 @@ impl PrimarySignature {
         let pos = pos
             .iter()
             .enumerate()
-            .map(|(i, pos)| (pos, type_sig.pos(i)));
+            .map(|(idx, pos)| (pos, type_sig.pos(idx)));
         let named = named.iter().map(|x| (x, type_sig.named(&x.name)));
         let rest = rest.into_iter().map(|x| (x, type_sig.rest_param()));
 
@@ -202,9 +202,9 @@ fn analyze_type_signature(
             let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
-        SignatureTarget::Runtime(f) => {
-            let source = ctx.source_by_id(f.span().id()?).ok()?;
-            let node = source.find(f.span())?;
+        SignatureTarget::Runtime(func) => {
+            let source = ctx.source_by_id(func.span().id()?).ok()?;
+            let node = source.find(func.span())?;
             let def = classify_def_loosely(node.parent()?.clone())?;
             let type_info = ctx.type_check(&source);
             let ty = type_info.type_of_span(def.name()?.span())?;
@@ -242,13 +242,13 @@ pub(crate) fn sig_of_type(
             // todo: this will affect inlay hint: _var_with
             let (var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
-                Some(UntypedDefDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
+                Some(UntypedDefDocs::Variable(docs)) => find_alias_stack(&mut ty_ctx, &v, docs)?,
                 _ => return None,
             };
 
             let docstring = match docstring {
                 Either::Left(docstring) => docstring,
-                Either::Right(f) => return Some(wind_stack(var_with, ctx.type_of_func(f))),
+                Either::Right(func) => return Some(wind_stack(var_with, ctx.type_of_func(func))),
             };
 
             let mut param_specs = Vec::new();
@@ -373,16 +373,16 @@ type WithElem<'a> = (&'a UntypedVarDocs, Option<Interned<SigWithTy>>);
 
 fn find_alias_stack<'a>(
     ctx: &'a mut PostTypeChecker,
-    v: &Interned<TypeVar>,
-    d: &'a UntypedVarDocs,
+    var: &Interned<TypeVar>,
+    docs: &'a UntypedVarDocs,
 ) -> Option<(Vec<WithElem<'a>>, Either<&'a UntypedSignatureDocs, Func>)> {
     let mut checker = AliasStackChecker {
         ctx,
-        stack: vec![(d, None)],
+        stack: vec![(docs, None)],
         res: None,
         checking_with: true,
     };
-    Ty::Var(v.clone()).bounds(true, &mut checker);
+    Ty::Var(var.clone()).bounds(true, &mut checker);
 
     checker.res.map(|res| (checker.stack, res))
 }
@@ -416,9 +416,9 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
             Some(UntypedDefDocs::Function(sig)) => {
                 self.res = Some(Either::Left(sig));
             }
-            Some(UntypedDefDocs::Variable(d)) => {
+            Some(UntypedDefDocs::Variable(docs)) => {
                 self.checking_with = true;
-                self.stack.push((d, None));
+                self.stack.push((docs, None));
                 self.check_var_rec(u, pol);
                 self.stack.pop();
                 self.checking_with = false;
@@ -447,8 +447,8 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
                             self.check_var(&u, pol);
                         }
                         src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
-                            if let Some(f) = src.as_func() {
-                                self.res = Some(Either::Right(f));
+                            if let Some(func) = src.as_func() {
+                                self.res = Some(Either::Right(func));
                             }
                         }
                     }
@@ -482,10 +482,10 @@ pub fn func_signature(func: Func) -> Signature {
     use typst::foundations::func::Repr;
     let mut with_stack = eco_vec![];
     let mut func = func;
-    while let Repr::With(f) = func.inner() {
+    while let Repr::With(with) = func.inner() {
+        let (inner, args) = with.as_ref();
         with_stack.push(ArgsInfo {
-            items: f
-                .1
+            items: args
                 .items
                 .iter()
                 .map(|arg| ArgInfo {
@@ -494,7 +494,7 @@ pub fn func_signature(func: Func) -> Signature {
                 })
                 .collect(),
         });
-        func = f.0.clone();
+        func = inner.clone();
     }
 
     let mut pos_tys = vec![];
@@ -534,18 +534,18 @@ pub fn func_signature(func: Func) -> Signature {
 
     let ret_ty = match func.inner() {
         Repr::With(..) => unreachable!(),
-        Repr::Closure(c) => {
-            analyze_closure_signature(c.clone(), &mut add_param);
+        Repr::Closure(closure) => {
+            analyze_closure_signature(closure.clone(), &mut add_param);
             None
         }
         Repr::Element(..) | Repr::Native(..) => {
-            for p in func.params().unwrap() {
+            for param in func.params().unwrap() {
                 add_param(Interned::new(ParamTy {
-                    name: p.name.into(),
-                    docs: Some(p.docs.into()),
-                    default: p.default.map(|d| truncated_repr(&d())),
-                    ty: Ty::from_param_site(&func, p),
-                    attrs: p.into(),
+                    name: param.name.into(),
+                    docs: Some(param.docs.into()),
+                    default: param.default.map(|default| truncated_repr(&default())),
+                    ty: Ty::from_param_site(&func, param),
+                    attrs: param.into(),
                 }));
             }
 
@@ -583,12 +583,12 @@ pub fn func_signature(func: Func) -> Signature {
 }
 
 fn analyze_closure_signature(
-    c: Arc<LazyHash<Closure>>,
+    closure: Arc<LazyHash<Closure>>,
     add_param: &mut impl FnMut(Interned<ParamTy>),
 ) {
-    log::trace!("closure signature for: {:?}", c.node.kind());
+    log::trace!("closure signature for: {:?}", closure.node.kind());
 
-    let closure = &c.node;
+    let closure = &closure.node;
     let closure_ast = match closure.kind() {
         SyntaxKind::Closure => closure.cast::<ast::Closure>().unwrap(),
         _ => return,
@@ -639,30 +639,35 @@ impl fmt::Display for PatternDisplay<'_> {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => f.write_str(ident.as_str()),
             ast::Pattern::Normal(_) => f.write_str("?"), // unreachable?
             ast::Pattern::Placeholder(_) => f.write_str("_"),
-            ast::Pattern::Parenthesized(p) => {
-                write!(f, "{}", PatternDisplay(&p.pattern()))
+            ast::Pattern::Parenthesized(paren_expr) => {
+                write!(f, "{}", PatternDisplay(&paren_expr.pattern()))
             }
-            ast::Pattern::Destructuring(d) => {
+            ast::Pattern::Destructuring(destructing) => {
                 write!(f, "(")?;
                 let mut first = true;
-                for item in d.items() {
+                for item in destructing.items() {
                     if first {
                         first = false;
                     } else {
                         write!(f, ", ")?;
                     }
                     match item {
-                        ast::DestructuringItem::Pattern(p) => write!(f, "{}", PatternDisplay(&p))?,
-                        ast::DestructuringItem::Named(n) => write!(
+                        ast::DestructuringItem::Pattern(pos) => {
+                            write!(f, "{}", PatternDisplay(&pos))?
+                        }
+                        ast::DestructuringItem::Named(named) => write!(
                             f,
                             "{}: {}",
-                            n.name().as_str(),
-                            unwrap_parens(n.expr()).to_untyped().text()
+                            named.name().as_str(),
+                            unwrap_parens(named.expr()).to_untyped().text()
                         )?,
-                        ast::DestructuringItem::Spread(s) => write!(
+                        ast::DestructuringItem::Spread(spread) => write!(
                             f,
                             "..{}",
-                            s.sink_ident().map(|i| i.as_str()).unwrap_or_default()
+                            spread
+                                .sink_ident()
+                                .map(|sink| sink.as_str())
+                                .unwrap_or_default()
                         )?,
                     }
                 }
@@ -674,8 +679,8 @@ impl fmt::Display for PatternDisplay<'_> {
 }
 
 fn unwrap_parens(mut expr: ast::Expr) -> ast::Expr {
-    while let ast::Expr::Parenthesized(p) = expr {
-        expr = p.expr();
+    while let ast::Expr::Parenthesized(paren_expr) = expr {
+        expr = paren_expr.expr();
     }
 
     expr

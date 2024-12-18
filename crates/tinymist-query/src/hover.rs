@@ -71,19 +71,19 @@ impl StatefulRequest for HoverRequest {
             }
         };
 
-        if let Some(p) = ctx.analysis.periscope.clone() {
+        if let Some(provider) = ctx.analysis.periscope.clone() {
             if let Some(doc) = doc.clone() {
                 let position = jump_from_cursor(&doc.document, &source, cursor);
                 let position = position.or_else(|| {
-                    for i in 1..100 {
-                        let next_cursor = cursor + i;
+                    for idx in 1..100 {
+                        let next_cursor = cursor + idx;
                         if next_cursor < source.text().len() {
                             let position = jump_from_cursor(&doc.document, &source, next_cursor);
                             if position.is_some() {
                                 return position;
                             }
                         }
-                        let prev_cursor = cursor.checked_sub(i);
+                        let prev_cursor = cursor.checked_sub(idx);
                         if let Some(prev_cursor) = prev_cursor {
                             let position = jump_from_cursor(&doc.document, &source, prev_cursor);
                             if position.is_some() {
@@ -96,7 +96,7 @@ impl StatefulRequest for HoverRequest {
                 });
 
                 log::info!("telescope position: {:?}", position);
-                let content = position.and_then(|pos| p.periscope_at(ctx, doc, pos));
+                let content = position.and_then(|pos| provider.periscope_at(ctx, doc, pos));
                 if let Some(preview_content) = content {
                     contents = format!("{preview_content}\n---\n{contents}");
                 }
@@ -128,9 +128,9 @@ fn def_tooltip(
         Label(..) => {
             results.push(MarkedString::String(format!("Label: {}\n", def.name())));
             // todo: type repr
-            if let Some(c) = def.term.as_ref().and_then(|v| v.value()) {
-                let c = truncated_repr(&c);
-                results.push(MarkedString::String(format!("{c}")));
+            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                let repr = truncated_repr(&val);
+                results.push(MarkedString::String(format!("{repr}")));
             }
             Some(HoverContents::Array(results))
         }

@@ -98,9 +98,9 @@ impl StatefulRequest for RenameRequest {
 
                 let mut edits = HashMap::new();
 
-                for i in references {
-                    let uri = i.uri;
-                    let range = i.range;
+                for loc in references {
+                    let uri = loc.uri;
+                    let range = loc.range;
                     let edits = edits.entry(uri).or_insert_with(Vec::new);
                     edits.push(TextEdit {
                         range,
@@ -236,7 +236,7 @@ impl RenameFileWorker<'_> {
     fn rename_module_path(&mut self, span: Span, r: &RefExpr, src: &Source) -> Option<TextEdit> {
         let importing = r.root.as_ref()?.file_id();
 
-        if importing.map_or(true, |i| i != self.def_fid) {
+        if importing.map_or(true, |fid| fid != self.def_fid) {
             return None;
         }
         crate::log_debug_ct!("import: {span:?} -> {importing:?} v.s. {:?}", self.def_fid);
@@ -246,10 +246,11 @@ impl RenameFileWorker<'_> {
         let import_node = root.find(span).and_then(deref_expr)?;
         let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
             match import_node.cast::<ast::Expr>()? {
-                ast::Expr::Import(i) => {
-                    Some((i.source(), i.new_name().is_none() && i.imports().is_none()))
-                }
-                ast::Expr::Include(i) => Some((i.source(), false)),
+                ast::Expr::Import(import) => Some((
+                    import.source(),
+                    import.new_name().is_none() && import.imports().is_none(),
+                )),
+                ast::Expr::Include(include) => Some((include.source(), false)),
                 _ => None,
             }
         })?;

@@ -15,10 +15,10 @@ pub use module::*;
 pub use package::*;
 pub(crate) use tidy::*;
 
-fn file_id_repr(k: FileId) -> String {
-    if let Some(p) = k.package() {
-        format!("{p}{}", unix_slash(k.vpath().as_rooted_path()))
+fn file_id_repr(fid: FileId) -> String {
+    if let Some(spec) = fid.package() {
+        format!("{spec}{}", unix_slash(fid.vpath().as_rooted_path()))
     } else {
-        unix_slash(k.vpath().as_rooted_path())
+        unix_slash(fid.vpath().as_rooted_path())
     }
 }

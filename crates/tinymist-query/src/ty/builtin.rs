@@ -92,7 +92,7 @@ impl PathPreference {
 
     pub fn from_ext(path: &str) -> Option<Self> {
         let path = std::path::Path::new(path).extension()?.to_str()?;
-        PathPreference::iter().find(|p| p.ext_matcher().is_match(path))
+        PathPreference::iter().find(|preference| preference.ext_matcher().is_match(path))
     }
 }
 
@@ -277,8 +277,8 @@ impl fmt::Debug for BuiltinTy {
                     write!(f, "Tag({name:?})")
                 }
             }
-            BuiltinTy::Module(m) => write!(f, "{m:?}"),
-            BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
+            BuiltinTy::Module(decl) => write!(f, "{decl:?}"),
+            BuiltinTy::Path(preference) => write!(f, "Path({preference:?})"),
         }
     }
 }
@@ -442,8 +442,8 @@ macro_rules! flow_record {
     };
 }
 
-pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
-    match (f.name()?, p.name) {
+pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
+    match (func.name()?, param.name) {
         ("cbor", "path") => Some(literally(Path(PathPreference::None))),
         ("csv", "path") => Some(literally(Path(PathPreference::Csv))),
         ("image", "path") => Some(literally(Path(PathPreference::Image))),
@@ -456,13 +456,13 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
         ("raw", "syntaxes") => Some(literally(Path(PathPreference::RawSyntax))),
         ("bibliography" | "cite", "style") => Some(Ty::iter_union([
             literally(Path(PathPreference::Csl)),
-            Ty::from_cast_info(&p.input),
+            Ty::from_cast_info(&param.input),
         ])),
         ("cite", "key") => Some(Ty::iter_union([literally(CiteLabel)])),
         ("ref", "target") => Some(Ty::iter_union([literally(RefLabel)])),
         ("link", "dest") | ("footnote", "body") => Some(Ty::iter_union([
             literally(RefLabel),
-            Ty::from_cast_info(&p.input),
+            Ty::from_cast_info(&param.input),
         ])),
         ("bibliography", "path") => Some(literally(Path(PathPreference::Bibliography))),
         ("text", "size") => Some(literally(TextSize)),

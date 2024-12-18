@@ -106,23 +106,23 @@ impl fmt::Display for SigHoverDocs<'_> {
 
         fn write_param_docs(
             f: &mut fmt::Formatter<'_>,
-            p: &ParamDocsT<TypeRepr>,
+            docs: &ParamDocsT<TypeRepr>,
             kind: &str,
             is_first: &mut bool,
         ) -> fmt::Result {
             if *is_first {
                 *is_first = false;
-                write!(f, "\n\n## {}\n\n", p.name)?;
+                write!(f, "\n\n## {}\n\n", docs.name)?;
             } else {
-                write!(f, "\n\n## {} ({kind})\n\n", p.name)?;
+                write!(f, "\n\n## {} ({kind})\n\n", docs.name)?;
             }
 
             // p.cano_type.0
-            if let Some(t) = &p.cano_type {
+            if let Some(t) = &docs.cano_type {
                 write!(f, "```typc\ntype: {}\n```\n\n", t.2)?;
             }
 
-            f.write_str(p.docs.trim())?;
+            f.write_str(docs.docs.trim())?;
 
             Ok(())
         }
@@ -131,8 +131,8 @@ impl fmt::Display for SigHoverDocs<'_> {
             f.write_str("\n\n# Positional Parameters")?;
 
             let mut is_first = true;
-            for p in &docs.pos {
-                write_param_docs(f, p, "positional", &mut is_first)?;
+            for pos_docs in &docs.pos {
+                write_param_docs(f, pos_docs, "positional", &mut is_first)?;
             }
         }
 
@@ -149,8 +149,8 @@ impl fmt::Display for SigHoverDocs<'_> {
             f.write_str("\n\n# Named Parameters")?;
 
             let mut is_first = true;
-            for p in docs.named.values() {
-                write_param_docs(f, p, "named", &mut is_first)?;
+            for named_docs in docs.named.values() {
+                write_param_docs(f, named_docs, "named", &mut is_first)?;
             }
         }
 
@@ -176,10 +176,10 @@ impl SignatureDocs {
         };
 
         f.write_char('(')?;
-        for p in &self.pos {
+        for pos_docs in &self.pos {
             write_sep(f)?;
-            f.write_str(&p.name)?;
-            if let Some(t) = &p.cano_type {
+            f.write_str(&pos_docs.name)?;
+            if let Some(t) = &pos_docs.cano_type {
                 write!(f, ": {}", t.0)?;
             }
         }
@@ -199,27 +199,27 @@ impl SignatureDocs {
                 name_prints.push((v.name.clone(), ty, v.default.clone()))
             }
             name_prints.sort();
-            for (k, t, v) in name_prints {
+            for (name, ty, val) in name_prints {
                 write_sep(f)?;
-                let v = v.as_deref().unwrap_or("any");
-                let mut v = v.trim();
-                if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
-                    v = "{ .. }"
+                let val = val.as_deref().unwrap_or("any");
+                let mut default = val.trim();
+                if default.starts_with('{') && default.ends_with('}') && default.len() > 30 {
+                    default = "{ .. }"
                 }
-                if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
-                    v = "raw"
+                if default.starts_with('`') && default.ends_with('`') && default.len() > 30 {
+                    default = "raw"
                 }
-                if v.starts_with('[') && v.ends_with(']') && v.len() > 30 {
-                    v = "content"
+                if default.starts_with('[') && default.ends_with(']') && default.len() > 30 {
+                    default = "content"
                 }
-                f.write_str(&k)?;
-                if let Some(t) = t {
-                    write!(f, ": {t}")?;
+                f.write_str(&name)?;
+                if let Some(ty) = ty {
+                    write!(f, ": {ty}")?;
                 }
-                if v.contains('\n') {
-                    write!(f, " = {}", v.replace("\n", "\n  "))?;
+                if default.contains('\n') {
+                    write!(f, " = {}", default.replace("\n", "\n  "))?;
                 } else {
-                    write!(f, " = {v}")?;
+                    write!(f, " = {default}")?;
                 }
             }
         }
@@ -349,12 +349,12 @@ pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
         .pos()
         .iter()
         .enumerate()
-        .map(|(i, pos)| (pos, type_sig.pos(i)));
+        .map(|(idx, pos)| (pos, type_sig.pos(idx)));
     let named_in = sig
         .primary()
         .named()
         .iter()
-        .map(|x| (x, type_sig.named(&x.name)));
+        .map(|param| (param, type_sig.named(&param.name)));
     let rest_in = sig.primary().rest().map(|x| (x, type_sig.rest_param()));
 
     let ret_in = type_sig.body.as_ref();

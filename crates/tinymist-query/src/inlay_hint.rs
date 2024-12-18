@@ -125,8 +125,8 @@ impl InlayHintWorker<'_> {
                 let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                 crate::log_debug_ct!("got call_info {call_info:?}");
 
-                let f = node.cast::<ast::FuncCall>().unwrap();
-                let args = f.args();
+                let call = node.cast::<ast::FuncCall>().unwrap();
+                let args = call.args();
                 let args_node = node.find(args.span())?;
 
                 let check_single_pos_arg = || {

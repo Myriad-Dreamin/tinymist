@@ -104,13 +104,13 @@ impl DocCommentMatcher {
             return None;
         }
 
-        let comments = comments.iter().map(|c| match c {
-            RawComment::Line(c) => {
+        let comments = comments.iter().map(|comment| match comment {
+            RawComment::Line(line) => {
                 // strip all slash prefix
-                let text = c.trim_start_matches('/');
+                let text = line.trim_start_matches('/');
                 text
             }
-            RawComment::Block(c) => {
+            RawComment::Block(block) => {
                 fn remove_comment(text: &str) -> Option<&str> {
                     let mut text = text.strip_prefix("/*")?.strip_suffix("*/")?.trim();
                     // trip start star
@@ -120,27 +120,27 @@ impl DocCommentMatcher {
                     Some(text)
                 }
 
-                remove_comment(c).unwrap_or(c.as_str())
+                remove_comment(block).unwrap_or(block.as_str())
             }
         });
         let comments = comments.collect::<Vec<_>>();
 
-        let dedent = comments.iter().fold(usize::MAX, |acc, c| {
-            let indent = c.chars().take_while(|c| c.is_whitespace()).count();
+        let dedent = comments.iter().fold(usize::MAX, |acc, content| {
+            let indent = content.chars().take_while(|ch| ch.is_whitespace()).count();
             acc.min(indent)
         });
 
-        let size_hint = comments.iter().map(|c| c.len()).sum::<usize>();
+        let size_hint = comments.iter().map(|comment| comment.len()).sum::<usize>();
         let mut comments = comments
             .iter()
-            .map(|c| c.chars().skip(dedent).collect::<String>());
+            .map(|comment| comment.chars().skip(dedent).collect::<String>());
 
-        let res = comments.try_fold(String::with_capacity(size_hint), |mut acc, c| {
+        let res = comments.try_fold(String::with_capacity(size_hint), |mut acc, comment| {
             if !acc.is_empty() {
                 acc.push('\n');
             }
 
-            acc.push_str(&c);
+            acc.push_str(&comment);
             Some(acc)
         });
 

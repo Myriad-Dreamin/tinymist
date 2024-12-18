@@ -55,9 +55,9 @@ impl DocSource {
             Self::Builtin(BuiltinTy::Type(ty)) => Some(ty.constructor().ok()?),
             Self::Builtin(BuiltinTy::Element(ty)) => Some((*ty).into()),
             Self::Builtin(..) => None,
-            Self::Ins(i) => match &i.val {
-                foundations::Value::Func(f) => Some(f.clone()),
-                foundations::Value::Type(f) => Some(f.constructor().ok()?),
+            Self::Ins(ins_ty) => match &ins_ty.val {
+                foundations::Value::Func(func) => Some(func.clone()),
+                foundations::Value::Type(ty) => Some(ty.constructor().ok()?),
                 _ => None,
             },
         }

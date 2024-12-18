@@ -12,13 +12,13 @@ use typst_shim::utils::LazyHash;
 
 pub(crate) fn get_lexical_hierarchy(
     source: &Source,
-    g: LexicalScopeKind,
+    scope_kind: LexicalScopeKind,
 ) -> Option<EcoVec<LexicalHierarchy>> {
-    let b = std::time::Instant::now();
+    let start = std::time::Instant::now();
     let root = LinkedNode::new(source.root());
 
     let mut worker = LexicalHierarchyWorker {
-        g,
+        sk: scope_kind,
         ..LexicalHierarchyWorker::default()
     };
     worker.stack.push((
@@ -41,7 +41,7 @@ pub(crate) fn get_lexical_hierarchy(
         worker.symbreak();
     }
 
-    crate::log_debug_ct!("lexical hierarchy analysis took {:?}", b.elapsed());
+    crate::log_debug_ct!("lexical hierarchy analysis took {:?}", start.elapsed());
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 
@@ -212,7 +212,7 @@ enum IdentContext {
 
 #[derive(Default)]
 struct LexicalHierarchyWorker {
-    g: LexicalScopeKind,
+    sk: LexicalScopeKind,
     stack: Vec<(LexicalInfo, EcoVec<LexicalHierarchy>)>,
     ident_context: IdentContext,
 }
@@ -253,7 +253,7 @@ impl LexicalHierarchyWorker {
             if let LexicalKind::Heading(level) = symbol.kind {
                 'heading_break: while let Some((w, _)) = self.stack.last() {
                     match w.kind {
-                        LexicalKind::Heading(l) if l < level => break 'heading_break,
+                        LexicalKind::Heading(lvl) if lvl < level => break 'heading_break,
                         LexicalKind::Block => break 'heading_break,
                         _ if self.stack.len() <= 1 => break 'heading_break,
                         _ => {}
@@ -289,11 +289,11 @@ impl LexicalHierarchyWorker {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
                     if let Some(name) = &pattern {
-                        let p = name.cast::<ast::Pattern>().unwrap();
+                        let pat = name.cast::<ast::Pattern>().unwrap();
 
                         // special case: it will then match SyntaxKind::Closure in the inner looking
                         // up.
-                        if matches!(p, ast::Pattern::Normal(ast::Expr::Closure(..))) {
+                        if matches!(pat, ast::Pattern::Normal(ast::Expr::Closure(..))) {
                             let closure = name.clone();
                             self.get_symbols_with(closure, IdentContext::Ref)?;
                             break 'let_binding;
@@ -364,7 +364,7 @@ impl LexicalHierarchyWorker {
                         self.get_symbols_in_opt_with(ident, IdentContext::Var)?;
                     }
                 }
-                k if k.is_trivia() || k.is_keyword() || k.is_error() => {}
+                kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => {}
                 _ => {
                     for child in node.children() {
                         self.get_symbols(child)?;
@@ -408,12 +408,12 @@ impl LexicalHierarchyWorker {
     }
 
     fn get_symbols_with(&mut self, node: LinkedNode, context: IdentContext) -> anyhow::Result<()> {
-        let c = self.ident_context;
+        let parent_context = self.ident_context;
         self.ident_context = context;
 
         let res = self.get_symbols(node);
 
-        self.ident_context = c;
+        self.ident_context = parent_context;
         res
     }
 
@@ -422,18 +422,18 @@ impl LexicalHierarchyWorker {
     #[allow(deprecated)]
     fn get_ident(&self, node: &LinkedNode) -> anyhow::Result<Option<LexicalInfo>> {
         let (name, kind) = match node.kind() {
-            SyntaxKind::Label if self.g.affect_symbol() => {
+            SyntaxKind::Label if self.sk.affect_symbol() => {
                 // filter out label in code context.
-                let p = node.prev_sibling_kind();
-                if p.is_some_and(|p| {
+                let prev_kind = node.prev_sibling_kind();
+                if prev_kind.is_some_and(|prev_kind| {
                     matches!(
-                        p,
+                        prev_kind,
                         SyntaxKind::LeftBracket
                             | SyntaxKind::LeftBrace
                             | SyntaxKind::LeftParen
                             | SyntaxKind::Comma
                             | SyntaxKind::Colon
-                    ) || p.is_keyword()
+                    ) || prev_kind.is_keyword()
                 }) {
                     return Ok(None);
                 }
@@ -444,7 +444,7 @@ impl LexicalHierarchyWorker {
 
                 (name, LexicalKind::label())
             }
-            SyntaxKind::Ident if self.g.affect_symbol() => {
+            SyntaxKind::Ident if self.sk.affect_symbol() => {
                 let ast_node = node
                     .cast::<ast::Ident>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
@@ -458,11 +458,11 @@ impl LexicalHierarchyWorker {
                 (name, kind)
             }
             SyntaxKind::Equation | SyntaxKind::Raw | SyntaxKind::BlockComment
-                if self.g.affect_markup() =>
+                if self.sk.affect_markup() =>
             {
                 (EcoString::new(), LexicalKind::Block)
             }
-            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if self.g.affect_block() => {
+            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if self.sk.affect_block() => {
                 (EcoString::new(), LexicalKind::Block)
             }
             SyntaxKind::Parenthesized
@@ -470,7 +470,7 @@ impl LexicalHierarchyWorker {
             | SyntaxKind::Args
             | SyntaxKind::Array
             | SyntaxKind::Dict
-                if self.g.affect_expr() =>
+                if self.sk.affect_expr() =>
             {
                 (EcoString::new(), LexicalKind::Block)
             }
@@ -483,7 +483,7 @@ impl LexicalHierarchyWorker {
                     return Ok(None);
                 };
                 let kind = match parent.kind() {
-                    SyntaxKind::Heading if self.g.affect_heading() => LexicalKind::Heading(
+                    SyntaxKind::Heading if self.sk.affect_heading() => LexicalKind::Heading(
                         parent.cast::<ast::Heading>().unwrap().depth().get() as i16,
                     ),
                     _ => return Ok(None),

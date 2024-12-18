@@ -236,10 +236,10 @@ impl<'a> PostTypeChecker<'a> {
                         }
 
                         // truncate args
-                        let c = sig.param_shift();
+                        let shift = sig.param_shift();
                         let nth = sig
                             .primary()
-                            .get_pos(c + positional)
+                            .get_pos(shift + positional)
                             .or_else(|| sig.primary().rest());
                         if let Some(nth) = nth {
                             resp.insert(Ty::Param(nth.clone()), false);
@@ -349,8 +349,8 @@ impl<'a> PostTypeChecker<'a> {
                 };
                 self.info.type_of_span(ident.span())
             }
-            ast::Pattern::Parenthesized(p) => {
-                self.destruct_let(p.expr().to_untyped().cast()?, node)
+            ast::Pattern::Parenthesized(paren_expr) => {
+                self.destruct_let(paren_expr.expr().to_untyped().cast()?, node)
             }
             // todo: pattern matching
             ast::Pattern::Destructuring(_d) => {

@@ -44,9 +44,9 @@ pub fn analyze_call(
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
     log::trace!("func call found: {:?}", node);
-    let f = node.cast::<ast::FuncCall>()?;
+    let call = node.cast::<ast::FuncCall>()?;
 
-    let callee = f.callee();
+    let callee = call.callee();
     // todo: reduce many such patterns
     if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
         return None;
@@ -57,7 +57,7 @@ pub fn analyze_call(
         ctx,
         source,
         callee_node,
-        f.args(),
+        call.args(),
     )?))
 }
 
@@ -107,16 +107,16 @@ pub fn analyze_call_no_cache(
 
                     return;
                 }
-                PosState::Pos(i) => {
-                    if i + 1 < self.signature.pos_size() {
-                        self.state = PosState::Pos(i + 1);
+                PosState::Pos(pos) => {
+                    if pos + 1 < self.signature.pos_size() {
+                        self.state = PosState::Pos(pos + 1);
                     } else if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
                     }
 
-                    (ParamKind::Positional, self.signature.get_pos(i).unwrap())
+                    (ParamKind::Positional, self.signature.get_pos(pos).unwrap())
                 }
                 PosState::Variadic => (ParamKind::Rest, self.signature.rest().unwrap()),
                 PosState::Final => return,
