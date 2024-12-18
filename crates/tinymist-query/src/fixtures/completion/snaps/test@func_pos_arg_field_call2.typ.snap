@@ -8,27 +8,6 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 3,
-    "label": "text",
-    "labelDetails": {
-     "description": "(content, str, alternates: bool, baseline: length, bottom-edge: \"baseline\" | \"bounds\" | \"descender\" | length, cjk-latin-spacing: auto | none, costs: dictionary, dir: dir, discretionary-ligatures: bool, fallback: bool, features: array | dictionary, fill: color, font: array | text.font, fractions: bool, historical-ligatures: bool, hyphenate: auto | bool, kerning: bool, lang: text.lang, ligatures: bool, number-type: \"lining\" | \"old-style\" | auto, number-width: \"proportional\" | \"tabular\" | auto, overhang: bool, region: text.region, script: auto | str, size: text.size, slashed-zero: bool, spacing: relative, stretch: ratio, stroke: stroke, style: \"italic\" | \"normal\" | \"oblique\", stylistic-set: array | int | none, top-edge: \"ascender\" | \"baseline\" | \"bounds\" | \"cap-height\" | \"x-height\" | length, tracking: length, weight: \"black\" | \"bold\" | \"extrabold\" | \"extralight\" | \"light\" | \"medium\" | \"regular\" | \"semibold\" | \"thin\" | int) => text"
-    },
-    "textEdit": {
-     "newText": "text(${1:}), ",
-     "range": {
-      "end": {
-       "character": 71,
-       "line": 2
-      },
-      "start": {
-       "character": 70,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]
