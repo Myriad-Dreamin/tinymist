@@ -111,27 +111,27 @@ pub fn descent_decls<T>(
                     }
                 }
             }
-            (DescentItem::Parent(node, child), ast::Expr::For(f)) => {
-                let body = node.find(f.body().span());
+            (DescentItem::Parent(node, child), ast::Expr::For(for_expr)) => {
+                let body = node.find(for_expr.body().span());
                 let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
                 if !in_body {
                     return None;
                 }
 
-                for ident in f.pattern().bindings() {
+                for ident in for_expr.pattern().bindings() {
                     if let Some(t) = recv(DescentDecl::Ident(ident)) {
                         return Some(t);
                     }
                 }
             }
-            (DescentItem::Parent(node, child), ast::Expr::Closure(c)) => {
-                let body = node.find(c.body().span());
+            (DescentItem::Parent(node, child), ast::Expr::Closure(closure)) => {
+                let body = node.find(closure.body().span());
                 let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
                 if !in_body {
                     return None;
                 }
 
-                for param in c.params().children() {
+                for param in closure.params().children() {
                     match param {
                         ast::Param::Pos(pattern) => {
                             for ident in pattern.bindings() {
@@ -181,10 +181,10 @@ pub fn is_ident_like(node: &SyntaxNode) -> bool {
     }
 
     use SyntaxKind::*;
-    let k = node.kind();
-    matches!(k, Ident | MathIdent | Underscore)
-        || (matches!(k, Error) && can_be_ident(node))
-        || k.is_keyword()
+    let kind = node.kind();
+    matches!(kind, Ident | MathIdent | Underscore)
+        || (matches!(kind, Error) && can_be_ident(node))
+        || kind.is_keyword()
 }
 
 /// A mode in which a text document is interpreted.
@@ -222,9 +222,9 @@ pub(crate) fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode 
 }
 
 /// Determine the interpretation mode at the given kind (context-free).
-pub(crate) fn interpret_mode_at_kind(k: SyntaxKind) -> Option<InterpretMode> {
+pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> {
     use SyntaxKind::*;
-    Some(match k {
+    Some(match kind {
         LineComment | BlockComment => InterpretMode::Comment,
         Raw => InterpretMode::Raw,
         Str => InterpretMode::String,
@@ -672,21 +672,21 @@ pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
     };
 
     while let SyntaxKind::Named | SyntaxKind::Colon = node_parent.kind() {
-        let Some(p) = node_parent.parent() else {
+        let Some(parent) = node_parent.parent() else {
             return Some(CursorClass::Normal(node));
         };
-        node_parent = p.clone();
+        node_parent = parent.clone();
     }
 
     match node_parent.kind() {
         SyntaxKind::Args => {
-            let callee = node_ancestors(&node_parent).find_map(|p| {
-                let s = match p.cast::<ast::Expr>()? {
+            let callee = node_ancestors(&node_parent).find_map(|ancestor| {
+                let span = match ancestor.cast::<ast::Expr>()? {
                     ast::Expr::FuncCall(call) => call.callee().span(),
                     ast::Expr::Set(set) => set.target().span(),
                     _ => return None,
                 };
-                p.find(s)
+                ancestor.find(span)
             })?;
 
             let param_node = match node.kind() {

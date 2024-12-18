@@ -88,7 +88,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
 
             crate::log_debug_ct!("module: {primary} -- {parent_ident}");
 
-            let persist_fid = fid.map(|f| file_ids.insert_full(f).0);
+            let persist_fid = fid.map(|fid| file_ids.insert_full(fid).0);
 
             #[derive(Serialize)]
             struct ModuleInfo {
@@ -98,17 +98,17 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 parent_ident: EcoString,
                 aka: EcoVec<String>,
             }
-            let m = jbase64(&ModuleInfo {
+            let module_info = jbase64(&ModuleInfo {
                 prefix: primary.as_str().into(),
                 name: def.name.clone(),
                 loc: persist_fid,
                 parent_ident: parent_ident.clone(),
                 aka,
             });
-            let _ = writeln!(md, "<!-- begin:module {primary} {m} -->");
+            let _ = writeln!(md, "<!-- begin:module {primary} {module_info} -->");
 
             for mut child in children {
-                let span = child.decl.as_ref().map(|d| d.span());
+                let span = child.decl.as_ref().map(|decl| decl.span());
                 let fid_range = span.and_then(|v| {
                     v.id().and_then(|fid| {
                         let allocated = file_ids.insert_full(fid).0;
@@ -117,7 +117,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                         Some((allocated, rng.start, rng.end))
                     })
                 });
-                let child_fid = child.decl.as_ref().and_then(|d| d.file_id());
+                let child_fid = child.decl.as_ref().and_then(|decl| decl.file_id());
                 let child_fid = child_fid.or_else(|| span.and_then(Span::id)).or(fid);
                 let span = fid_range.or_else(|| {
                     let fid = child_fid?;
@@ -191,8 +191,12 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                     (Some(docs), _) if !child.is_external => {
                         let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
                         printed_docs = true;
-                        if let DefDocs::Function(f) = docs {
-                            for param in f.pos.iter().chain(f.named.values()).chain(f.rest.as_ref())
+                        if let DefDocs::Function(docs) = docs {
+                            for param in docs
+                                .pos
+                                .iter()
+                                .chain(docs.named.values())
+                                .chain(docs.rest.as_ref())
                             {
                                 let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
                                 let ty = match &param.cano_type {
@@ -350,21 +354,21 @@ mod tests {
     use crate::tests::*;
 
     fn test(pkg: PackageSpec) {
-        run_with_sources("", |verse: &mut LspUniverse, p| {
-            let path = verse.registry.resolve(&pkg).unwrap();
+        run_with_sources("", |verse: &mut LspUniverse, path| {
+            let pkg_root = verse.registry.resolve(&pkg).unwrap();
             let pi = PackageInfo {
-                path: path.as_ref().to_owned(),
+                path: pkg_root.as_ref().to_owned(),
                 namespace: pkg.namespace,
                 name: pkg.name,
                 version: pkg.version.to_string(),
             };
-            run_with_ctx(verse, p, &|a, _p| {
-                let d = package_docs(a, &pi).unwrap();
+            run_with_ctx(verse, path, &|a, _p| {
+                let docs = package_docs(a, &pi).unwrap();
                 let dest = format!(
                     "../../target/{}-{}-{}.md",
                     pi.namespace, pi.name, pi.version
                 );
-                std::fs::write(dest, d).unwrap();
+                std::fs::write(dest, docs).unwrap();
             })
         })
     }

@@ -13,8 +13,8 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         Self { f, indent: 0 }
     }
 
-    pub fn write_decl(&mut self, d: &Decl) -> fmt::Result {
-        write!(self.f, "{d:?}")
+    pub fn write_decl(&mut self, decl: &Decl) -> fmt::Result {
+        write!(self.f, "{decl:?}")
     }
 
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
@@ -105,9 +105,9 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         match arg {
             ArgExpr::Pos(pos) => self.write_expr(pos),
             ArgExpr::Named(named) => {
-                let (k, v) = named.as_ref();
-                write!(self.f, "{k:?}: ")?;
-                self.write_expr(v)
+                let (name, val) = named.as_ref();
+                write!(self.f, "{name:?}: ")?;
+                self.write_expr(val)
             }
             ArgExpr::NamedRt(named) => {
                 let (key, val) = named.as_ref();
@@ -122,38 +122,38 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         }
     }
 
-    pub fn write_pattern(&mut self, p: &Pattern) -> fmt::Result {
-        match p {
+    pub fn write_pattern(&mut self, pat: &Pattern) -> fmt::Result {
+        match pat {
             Pattern::Expr(expr) => self.write_expr(expr),
             Pattern::Simple(decl) => self.write_decl(decl),
             Pattern::Sig(sig) => self.write_pattern_sig(sig),
         }
     }
 
-    fn write_pattern_sig(&mut self, p: &PatternSig) -> fmt::Result {
+    fn write_pattern_sig(&mut self, sig: &PatternSig) -> fmt::Result {
         self.f.write_str("pat(\n")?;
         self.indent += 1;
-        for pos in &p.pos {
+        for pos in &sig.pos {
             self.write_indent()?;
             self.write_pattern(pos)?;
             self.f.write_str(",\n")?;
         }
-        for (name, pat) in &p.named {
+        for (name, named) in &sig.named {
             self.write_indent()?;
             write!(self.f, "{name:?} = ")?;
-            self.write_pattern(pat)?;
+            self.write_pattern(named)?;
             self.f.write_str(",\n")?;
         }
-        if let Some((k, rest)) = &p.spread_left {
+        if let Some((name, spread_left)) = &sig.spread_left {
             self.write_indent()?;
-            write!(self.f, "..{k:?}: ")?;
-            self.write_pattern(rest)?;
+            write!(self.f, "..{name:?}: ")?;
+            self.write_pattern(spread_left)?;
             self.f.write_str(",\n")?;
         }
-        if let Some((k, rest)) = &p.spread_right {
+        if let Some((name, spread_right)) = &sig.spread_right {
             self.write_indent()?;
-            write!(self.f, "..{k:?}: ")?;
-            self.write_pattern(rest)?;
+            write!(self.f, "..{name:?}: ")?;
+            self.write_pattern(spread_right)?;
             self.f.write_str(",\n")?;
         }
         self.indent -= 1;
@@ -339,14 +339,14 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         Self { f, indent: 0 }
     }
 
-    pub fn write_decl(&mut self, d: &Decl) -> fmt::Result {
+    pub fn write_decl(&mut self, decl: &Decl) -> fmt::Result {
         use DefKind::*;
-        let shorter = matches!(d.kind(), Function | Variable | Module);
-        if shorter && !d.name().is_empty() {
-            return write!(self.f, "{}", d.name());
+        let shorter = matches!(decl.kind(), Function | Variable | Module);
+        if shorter && !decl.name().is_empty() {
+            return write!(self.f, "{}", decl.name());
         }
 
-        write!(self.f, "{d:?}")
+        write!(self.f, "{decl:?}")
     }
 
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {

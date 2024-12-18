@@ -115,12 +115,12 @@ impl StatefulRequest for CompletionRequest {
         ) {
             let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
             if node.erroneous() {
-                let mut n = node.text().chars();
+                let mut chars = node.text().chars();
 
-                match n.next() {
-                    Some(c) if c.is_numeric() => return None,
+                match chars.next() {
+                    Some(ch) if ch.is_numeric() => return None,
                     Some('.') => {
-                        if matches!(n.next(), Some(c) if c.is_numeric()) {
+                        if matches!(chars.next(), Some(ch) if ch.is_numeric()) {
                             return None;
                         }
                     }
@@ -171,12 +171,11 @@ impl StatefulRequest for CompletionRequest {
             let mut rng = from_ident.range();
             let ident_prefix = source.text()[rng.start..cursor].to_string();
 
-            completions.retain(|c| {
-                // c.label
-                let mut prefix_matcher = c.label.chars();
+            completions.retain(|item| {
+                let mut prefix_matcher = item.label.chars();
                 'ident_matching: for ch in ident_prefix.chars() {
-                    for c in prefix_matcher.by_ref() {
-                        if c == ch {
+                    for item in prefix_matcher.by_ref() {
+                        if item == ch {
                             continue 'ident_matching;
                         }
                     }
@@ -190,12 +189,12 @@ impl StatefulRequest for CompletionRequest {
             // if modifying some arguments, we need to truncate and add a comma
             if !is_callee && cursor != rng.end && is_arg_like_context(&from_ident) {
                 // extend comma
-                for c in completions.iter_mut() {
-                    let apply = match &mut c.apply {
+                for item in completions.iter_mut() {
+                    let apply = match &mut item.apply {
                         Some(w) => w,
                         None => {
-                            c.apply = Some(c.label.clone());
-                            c.apply.as_mut().unwrap()
+                            item.apply = Some(item.label.clone());
+                            item.apply.as_mut().unwrap()
                         }
                     };
                     if apply.trim_end().ends_with(',') {
@@ -240,8 +239,8 @@ impl StatefulRequest for CompletionRequest {
                     .commit_char
                     .as_ref()
                     .map(|v| vec![v.to_string()]),
-                command: typst_completion.command.as_ref().map(|c| Command {
-                    command: c.to_string(),
+                command: typst_completion.command.as_ref().map(|cmd| Command {
+                    command: cmd.to_string(),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -326,7 +325,7 @@ mod tests {
         pkg_mode: bool,
     }
 
-    fn run(c: TestConfig) -> impl Fn(&mut LocalContext, PathBuf) {
+    fn run(config: TestConfig) -> impl Fn(&mut LocalContext, PathBuf) {
         fn test(ctx: &mut LocalContext, id: TypstFileId) {
             let source = ctx.source_by_id(id).unwrap();
             let rng = find_test_range(&source);
@@ -395,9 +394,9 @@ mod tests {
                     trigger_character,
                 };
                 results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
-                    CompletionResponse::List(l) => CompletionResponse::List(CompletionList {
-                        is_incomplete: l.is_incomplete,
-                        items: get_items(l.items),
+                    CompletionResponse::List(list) => CompletionResponse::List(CompletionList {
+                        is_incomplete: list.is_incomplete,
+                        items: get_items(list.items),
                     }),
                     CompletionResponse::Array(items) => CompletionResponse::Array(get_items(items)),
                 }));
@@ -410,7 +409,7 @@ mod tests {
         }
 
         move |ctx, path| {
-            if c.pkg_mode {
+            if config.pkg_mode {
                 let files = ctx
                     .source_files()
                     .iter()

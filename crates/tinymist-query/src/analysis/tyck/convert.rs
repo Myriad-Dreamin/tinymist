@@ -44,23 +44,23 @@ pub fn term_value(value: &Value) -> Ty {
         }
         // todo: term arguments
         Value::Args(..) => Ty::Builtin(BuiltinTy::Args),
-        Value::Plugin(p) => {
+        Value::Plugin(plugin) => {
             // todo: create infer variables for plugin functions
-            let values = p
+            let values = plugin
                 .iter()
-                .map(|k| (k.as_str().into(), Ty::Func(SigTy::any())))
+                .map(|method| (method.as_str().into(), Ty::Func(SigTy::any())))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
-        Value::Dict(d) => {
-            let values = d
+        Value::Dict(dict) => {
+            let values = dict
                 .iter()
                 .map(|(k, v)| (k.as_str().into(), term_value_rec(v, Span::detached())))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
-        Value::Module(m) => {
-            let values = m
+        Value::Module(module) => {
+            let values = module
                 .scope()
                 .iter()
                 .map(|(k, v, s)| (k.into(), term_value_rec(v, s)))
@@ -68,7 +68,7 @@ pub fn term_value(value: &Value) -> Ty {
             Ty::Dict(RecordTy::new(values))
         }
         Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),
-        Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
+        Value::Dyn(dyn_val) => Ty::Builtin(BuiltinTy::Type(dyn_val.ty())),
         Value::Func(func) => Ty::Func(func_signature(func.clone()).type_sig()),
         _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
         _ => Ty::Any,

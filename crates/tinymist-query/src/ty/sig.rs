@@ -57,23 +57,20 @@ impl<'a> Sig<'a> {
             sig => (sig, None),
         };
 
-        let sig_ins = match cano_sig {
+        let sig = match cano_sig {
             Sig::Builtin(_) => return None,
-            Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
-            Sig::TupleCons(t) => SigTy::tuple_cons(t.clone(), false),
-            Sig::DictCons(d) => SigTy::dict_cons(d, false),
+            Sig::ArrayCons(arr) => SigTy::array_cons(arr.as_ref().clone(), false),
+            Sig::TupleCons(tup) => SigTy::tuple_cons(tup.clone(), false),
+            Sig::DictCons(dict) => SigTy::dict_cons(dict, false),
             Sig::TypeCons { val, .. } => ctx.type_of_func(&val.constructor().ok()?)?,
             Sig::Value { val, .. } => ctx.type_of_func(val)?,
             // todo
             Sig::Partialize(..) => return None,
             Sig::With { .. } => return None,
-            Sig::Type(t) => t.clone(),
+            Sig::Type(ty) => ty.clone(),
         };
 
-        Some(SigShape {
-            sig: sig_ins,
-            withs,
-        })
+        Some(SigShape { sig, withs })
     }
 }
 
@@ -166,9 +163,9 @@ impl SigCheckDriver<'_> {
         )
     }
 
-    fn ty(&mut self, ty: &Ty, pol: bool) {
-        crate::log_debug_ct!("check sig: {ty:?}");
-        match ty {
+    fn ty(&mut self, at: &Ty, pol: bool) {
+        crate::log_debug_ct!("check sig: {at:?}");
+        match at {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_sig() => {
                 self.checker
                     .check(Sig::DictCons(&FLOW_STROKE_DICT), &mut self.ctx, pol);
@@ -190,19 +187,16 @@ impl SigCheckDriver<'_> {
                     .check(Sig::DictCons(&FLOW_RADIUS_DICT), &mut self.ctx, pol);
             }
             // todo: deduplicate checking early
-            Ty::Value(v) => {
+            Ty::Value(ins_ty) => {
                 if self.func_as_sig() {
-                    match &v.val {
-                        Value::Func(f) => {
+                    match &ins_ty.val {
+                        Value::Func(func) => {
                             self.checker
-                                .check(Sig::Value { val: f, at: ty }, &mut self.ctx, pol);
+                                .check(Sig::Value { val: func, at }, &mut self.ctx, pol);
                         }
-                        Value::Type(t) => {
-                            self.checker.check(
-                                Sig::TypeCons { val: t, at: ty },
-                                &mut self.ctx,
-                                pol,
-                            );
+                        Value::Type(ty) => {
+                            self.checker
+                                .check(Sig::TypeCons { val: ty, at }, &mut self.ctx, pol);
                         }
                         _ => {}
                     }
@@ -211,13 +205,13 @@ impl SigCheckDriver<'_> {
             Ty::Builtin(BuiltinTy::Type(b_ty)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
                 self.checker
-                    .check(Sig::TypeCons { val: b_ty, at: ty }, &mut self.ctx, pol);
+                    .check(Sig::TypeCons { val: b_ty, at }, &mut self.ctx, pol);
             }
             Ty::Builtin(BuiltinTy::Element(elem)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
-                let f = (*elem).into();
+                let func = (*elem).into();
                 self.checker
-                    .check(Sig::Value { val: &f, at: ty }, &mut self.ctx, pol);
+                    .check(Sig::Value { val: &func, at }, &mut self.ctx, pol);
             }
             Ty::Func(sig) if self.func_as_sig() => {
                 self.checker.check(Sig::Type(sig), &mut self.ctx, pol);
@@ -247,7 +241,7 @@ impl SigCheckDriver<'_> {
                 // todo: keep type information
                 self.ty(&param.ty, pol);
             }
-            _ if ty.has_bounds() => ty.bounds(pol, self),
+            _ if at.has_bounds() => at.bounds(pol, self),
             _ => {}
         }
     }
@@ -288,10 +282,10 @@ impl BoundChecker for MethodDriver<'_, '_> {
             // todo: deduplicate checking early
             Ty::Value(v) => {
                 match &v.val {
-                    Value::Func(f) => {
+                    Value::Func(func) => {
                         if self.is_binder() {
                             self.0.checker.check(
-                                Sig::Partialize(&Sig::Value { val: f, at: ty }),
+                                Sig::Partialize(&Sig::Value { val: func, at: ty }),
                                 &mut self.0.ctx,
                                 pol,
                             );
@@ -306,9 +300,9 @@ impl BoundChecker for MethodDriver<'_, '_> {
             Ty::Builtin(BuiltinTy::Element(elem)) => {
                 // todo: distinguish between element and function
                 if self.is_binder() {
-                    let f = (*elem).into();
+                    let func = (*elem).into();
                     self.0.checker.check(
-                        Sig::Partialize(&Sig::Value { val: &f, at: ty }),
+                        Sig::Partialize(&Sig::Value { val: &func, at: ty }),
                         &mut self.0.ctx,
                         pol,
                     );

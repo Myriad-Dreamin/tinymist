@@ -103,19 +103,19 @@ impl Analysis {
 
     /// Lock the revision in *main thread*.
     #[must_use]
-    pub fn lock_revision(&self, q: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
+    pub fn lock_revision(&self, req: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
         let mut grid = self.analysis_rev_cache.lock();
 
         AnalysisRevLock {
-            tokens: match q {
-                Some(CompilerQueryRequest::SemanticTokensFull(f)) => Some(
-                    SemanticTokenCache::acquire(self.tokens_caches.clone(), &f.path, None),
+            tokens: match req {
+                Some(CompilerQueryRequest::SemanticTokensFull(req)) => Some(
+                    SemanticTokenCache::acquire(self.tokens_caches.clone(), &req.path, None),
                 ),
-                Some(CompilerQueryRequest::SemanticTokensDelta(f)) => {
+                Some(CompilerQueryRequest::SemanticTokensDelta(req)) => {
                     Some(SemanticTokenCache::acquire(
                         self.tokens_caches.clone(),
-                        &f.path,
-                        Some(&f.previous_result_id),
+                        &req.path,
+                        Some(&req.previous_result_id),
                     ))
                 }
                 _ => None,
@@ -308,8 +308,8 @@ impl LocalContext {
             .completion_files
             .get_or_init(|| {
                 if let Some(root) = self.world.workspace_root() {
-                    scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |p| {
-                        TypstFileId::new(None, VirtualPath::new(p))
+                    scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |path| {
+                        TypstFileId::new(None, VirtualPath::new(path))
                     })
                 } else {
                     vec![]
@@ -538,28 +538,28 @@ impl SharedContext {
     }
 
     /// Resolve the uri for a file id.
-    pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
-        self.world.uri_for_id(id)
+    pub fn uri_for_id(&self, fid: TypstFileId) -> Result<Url, FileError> {
+        self.world.uri_for_id(fid)
     }
 
     /// Get file's id by its path
-    pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        self.world.file_id_by_path(p)
+    pub fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId> {
+        self.world.file_id_by_path(path)
     }
 
     /// Get the content of a file by file id.
-    pub fn file_by_id(&self, id: TypstFileId) -> FileResult<Bytes> {
-        self.world.file(id)
+    pub fn file_by_id(&self, fid: TypstFileId) -> FileResult<Bytes> {
+        self.world.file(fid)
     }
 
     /// Get the source of a file by file id.
-    pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
-        self.world.source(id)
+    pub fn source_by_id(&self, fid: TypstFileId) -> FileResult<Source> {
+        self.world.source(fid)
     }
 
     /// Get the source of a file by file path.
-    pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        self.source_by_id(self.file_id_by_path(p)?)
+    pub fn source_by_path(&self, path: &Path) -> FileResult<Source> {
+        self.source_by_id(self.file_id_by_path(path)?)
     }
 
     /// Classifies the syntax under span that can be operated on by IDE
@@ -600,12 +600,12 @@ impl SharedContext {
     /// Get the real definition of a compilation.
     /// Note: must be called after compilation.
     pub(crate) fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
-        let mut v = EcoVec::new();
-        self.world.iter_dependencies(&mut |p| {
-            v.push(p);
+        let mut deps = EcoVec::new();
+        self.world.iter_dependencies(&mut |path| {
+            deps.push(path);
         });
 
-        v
+        deps
     }
 
     /// Resolve extra font information.
@@ -808,27 +808,27 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
-    pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {
-        self.type_of_span_(&self.source_by_id(s.id()?).ok()?, s)
+    pub(crate) fn type_of_span(self: &Arc<Self>, span: Span) -> Option<Ty> {
+        self.type_of_span_(&self.source_by_id(span.id()?).ok()?, span)
     }
 
-    pub(crate) fn type_of_span_(self: &Arc<Self>, source: &Source, s: Span) -> Option<Ty> {
-        self.type_check(source).type_of_span(s)
+    pub(crate) fn type_of_span_(self: &Arc<Self>, source: &Source, span: Span) -> Option<Ty> {
+        self.type_check(source).type_of_span(span)
     }
 
-    pub(crate) fn literal_type_of_node(self: &Arc<Self>, k: LinkedNode) -> Option<Ty> {
-        let id = k.span().id()?;
+    pub(crate) fn post_type_of_node(self: &Arc<Self>, node: LinkedNode) -> Option<Ty> {
+        let id = node.span().id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(&source);
 
-        let ty = post_type_check(self.clone(), &ty_chk, k.clone())
-            .or_else(|| ty_chk.type_of_span(k.span()))?;
+        let ty = post_type_check(self.clone(), &ty_chk, node.clone())
+            .or_else(|| ty_chk.type_of_span(node.span()))?;
         Some(ty_chk.simplify(ty, false))
     }
 
     pub(crate) fn sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
         crate::log_debug_ct!("check definition func {def:?}");
-        let source = def.decl.file_id().and_then(|f| self.source_by_id(f).ok());
+        let source = def.decl.file_id().and_then(|id| self.source_by_id(id).ok());
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
@@ -896,11 +896,11 @@ impl SharedContext {
         compute: impl FnOnce(&Arc<Self>) -> Option<Signature> + Send + Sync + 'static,
     ) -> Option<Signature> {
         let res = match func {
-            SignatureTarget::Def(src, d) => self
+            SignatureTarget::Def(src, def) => self
                 .analysis
                 .caches
                 .def_signatures
-                .entry(hash128(&(src, d.clone())), self.lifetime),
+                .entry(hash128(&(src, def.clone())), self.lifetime),
             SignatureTarget::SyntaxFast(source, span) => {
                 let cache_key = (source, span, true);
                 self.analysis
@@ -1032,7 +1032,7 @@ impl<K, V> IncrCacheMap<K, V> {
 
         next.get_or_init(|| {
             let prev = self.prev.lock().get(&key).cloned();
-            let prev = prev.and_then(|p| p.get().cloned());
+            let prev = prev.and_then(|prev| prev.get().cloned());
             let prev = prev.or_else(|| {
                 let global = self.global.lock();
                 global.get(&key).map(|global| global.1.clone())
@@ -1096,8 +1096,8 @@ impl<T> CacheMap<T> {
 }
 
 impl<T: Default + Clone> CacheMap<T> {
-    fn entry(&self, k: u128, lifetime: u64) -> T {
-        let entry = self.m.entry(k);
+    fn entry(&self, key: u128, lifetime: u64) -> T {
+        let entry = self.m.entry(key);
         let entry = entry.or_insert_with(|| (lifetime, T::default()));
         entry.1.clone()
     }
@@ -1309,7 +1309,7 @@ fn find_loc(
     let line = r as u32;
     let character = match encoding {
         PositionEncoding::Utf8 => column_prefix.chars().count(),
-        PositionEncoding::Utf16 => column_prefix.chars().map(|c| c.len_utf16()).sum(),
+        PositionEncoding::Utf16 => column_prefix.chars().map(|ch| ch.len_utf16()).sum(),
     } as u32;
 
     Some(LspPosition { line, character })

@@ -95,10 +95,10 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                     crate::log_debug_ct!("syntax check tuple at {this:?} {p0:?}");
 
                     // todo: caster
-                    let selector = match p0 {
+                    let arg_offset = match p0 {
                         Ty::Value(v) => match v.val {
-                            Value::Int(i) => Ok(i as usize),
-                            Value::Float(i) => Ok(i as usize),
+                            Value::Int(arg_offset) => Ok(arg_offset as usize),
+                            Value::Float(arg_offset) => Ok(arg_offset as usize),
                             _ => Err(p0),
                         },
                         ty => Err(ty),
@@ -112,8 +112,8 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 crate::log_debug_ct!(
                                     "tuple at check on tuple elem: {cons:?} {p0:?}"
                                 );
-                                let sel = match selector {
-                                    Ok(i) => cons.get(i).cloned(),
+                                let sel = match arg_offset {
+                                    Ok(arg_offset) => cons.get(arg_offset).cloned(),
                                     Err(_) => None,
                                 };
 

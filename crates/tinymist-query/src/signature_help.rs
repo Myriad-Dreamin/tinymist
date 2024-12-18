@@ -53,7 +53,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
-        for (i, (param, ty)) in sig.params().enumerate() {
+        for (idx, (param, ty)) in sig.params().enumerate() {
             if is_set && !param.attrs.settable {
                 continue;
             }
@@ -61,7 +61,7 @@ impl SemanticRequest for SignatureHelpRequest {
             match &target {
                 ArgClass::Positional { .. } if is_set => {}
                 ArgClass::Positional { positional, .. } => {
-                    if (*positional) + param_shift == i {
+                    if (*positional) + param_shift == idx {
                         active_parameter = Some(real_offset);
                     }
                 }

@@ -883,7 +883,7 @@ impl<'a> CompletionContext<'a> {
         let label = label.unwrap_or_else(|| value.repr());
 
         let detail = docs.map(Into::into).or_else(|| match value {
-            Value::Symbol(c) => Some(symbol_detail(c.get())),
+            Value::Symbol(symbol) => Some(symbol_detail(symbol.get())),
             Value::Func(func) => func.docs().map(plain_docs_sentence),
             Value::Type(ty) => Some(plain_docs_sentence(ty.docs())),
             v => {
@@ -956,5 +956,5 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
 }
 
 fn is_triggered_by_punc(trigger_character: Option<char>) -> bool {
-    trigger_character.is_some_and(|c| c.is_ascii_punctuation())
+    trigger_character.is_some_and(|ch| ch.is_ascii_punctuation())
 }

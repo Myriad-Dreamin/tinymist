@@ -215,10 +215,10 @@ impl CallConvention {
     /// Get the function pointer of the call.
     pub fn callee(self) -> Func {
         match self {
-            CallConvention::Static(f) => f,
-            CallConvention::Method(_, f) => f,
-            CallConvention::With(f) => f,
-            CallConvention::Where(f) => f,
+            CallConvention::Static(func) => func,
+            CallConvention::Method(_, func) => func,
+            CallConvention::With(func) => func,
+            CallConvention::Where(func) => func,
         }
     }
 }
@@ -229,7 +229,7 @@ pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Optio
         let source = ctx.source_by_id(node.span().id()?).ok()?;
         let def = ctx.def_of_span(&source, None, node.span())?;
         let func_ptr = match def.term.and_then(|val| val.value()) {
-            Some(Value::Func(f)) => Some(f),
+            Some(Value::Func(func)) => Some(func),
             Some(Value::Type(ty)) => ty.constructor().ok(),
             _ => None,
         }?;
@@ -244,8 +244,8 @@ pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Optio
             let field = access.field().get();
             let values = ctx.analyze_expr(target.to_untyped());
             if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
-                if let Some(Value::Func(f)) = this.ty().scope().get(field) {
-                    return Some((this, f.clone()));
+                if let Some(Value::Func(func)) = this.ty().scope().get(field) {
+                    return Some((this, func.clone()));
                 }
 
                 None
@@ -289,18 +289,18 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 
 static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let Some(Value::Func(f)) = fn_ty.scope().get("with") else {
+    let Some(Value::Func(func)) = fn_ty.scope().get("with") else {
         return None;
     };
-    Some(f)
+    Some(func)
 });
 
 static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let Some(Value::Func(f)) = fn_ty.scope().get("where") else {
+    let Some(Value::Func(func)) = fn_ty.scope().get("where") else {
         return None;
     };
-    Some(f)
+    Some(func)
 });
 
 fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> Option<Definition> {

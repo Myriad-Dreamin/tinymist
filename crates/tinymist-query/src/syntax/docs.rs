@@ -280,40 +280,42 @@ impl DocsChecker<'_> {
             .or_else(|| self.check_type_annotation(m, name))
     }
 
-    fn check_type_annotation(&mut self, m: &Module, name: &str) -> Option<Ty> {
-        if let Some(v) = self.globals.get(name) {
-            return v.clone();
+    fn check_type_annotation(&mut self, module: &Module, name: &str) -> Option<Ty> {
+        if let Some(term) = self.globals.get(name) {
+            return term.clone();
         }
 
-        let v = m.scope().get(name)?;
+        let val = module.scope().get(name)?;
         crate::log_debug_ct!("check doc type annotation: {name:?}");
-        if let Value::Content(c) = v {
-            let annotated = c.clone().unpack::<typst::text::RawElem>().ok()?;
-            let text = annotated.text().clone().into_value().cast::<Str>().ok()?;
-            let code = typst::syntax::parse_code(&text.as_str().replace('\'', "θ"));
+        if let Value::Content(raw) = val {
+            let annotated = raw.clone().unpack::<typst::text::RawElem>().ok()?;
+            let annotated = annotated.text().clone().into_value().cast::<Str>().ok()?;
+            let code = typst::syntax::parse_code(&annotated.as_str().replace('\'', "θ"));
             let mut exprs = code.cast::<ast::Code>()?.exprs();
-            let ret = self.check_type_expr(m, exprs.next()?);
-            self.globals.insert(name.into(), ret.clone());
-            ret
+            let term = self.check_type_expr(module, exprs.next()?);
+            self.globals.insert(name.into(), term.clone());
+            term
         } else {
             None
         }
     }
 
-    fn check_type_expr(&mut self, m: &Module, s: ast::Expr) -> Option<Ty> {
-        crate::log_debug_ct!("check doc type expr: {s:?}");
-        match s {
-            ast::Expr::Ident(i) => self.check_type_ident(m, i.get().as_str()),
+    fn check_type_expr(&mut self, module: &Module, expr: ast::Expr) -> Option<Ty> {
+        crate::log_debug_ct!("check doc type expr: {expr:?}");
+        match expr {
+            ast::Expr::Ident(ident) => self.check_type_ident(module, ident.get().as_str()),
             ast::Expr::None(_)
             | ast::Expr::Auto(_)
             | ast::Expr::Bool(..)
             | ast::Expr::Int(..)
             | ast::Expr::Float(..)
             | ast::Expr::Numeric(..)
-            | ast::Expr::Str(..) => SharedContext::const_eval(s).map(|v| Ty::Value(InsTy::new(v))),
+            | ast::Expr::Str(..) => {
+                SharedContext::const_eval(expr).map(|v| Ty::Value(InsTy::new(v)))
+            }
             ast::Expr::Binary(binary) => {
                 let mut components = Vec::with_capacity(2);
-                components.push(self.check_type_expr(m, binary.lhs())?);
+                components.push(self.check_type_expr(module, binary.lhs())?);
 
                 let mut rhs = binary.rhs();
                 while let ast::Expr::Binary(binary) = rhs {
@@ -321,26 +323,27 @@ impl DocsChecker<'_> {
                         break;
                     }
 
-                    components.push(self.check_type_expr(m, binary.lhs())?);
+                    components.push(self.check_type_expr(module, binary.lhs())?);
                     rhs = binary.rhs();
                 }
 
-                components.push(self.check_type_expr(m, rhs)?);
+                components.push(self.check_type_expr(module, rhs)?);
                 Some(Ty::from_types(components.into_iter()))
             }
-            ast::Expr::FuncCall(c) => match c.callee() {
-                ast::Expr::Ident(i) => {
-                    let name = i.get().as_str();
+            ast::Expr::FuncCall(call) => match call.callee() {
+                ast::Expr::Ident(callee) => {
+                    let name = callee.get().as_str();
                     match name {
                         "array" => Some({
-                            let ast::Arg::Pos(pos) = c.args().items().next()? else {
+                            let ast::Arg::Pos(pos) = call.args().items().next()? else {
                                 return None;
                             };
 
-                            Ty::Array(self.check_type_expr(m, pos)?.into())
+                            Ty::Array(self.check_type_expr(module, pos)?.into())
                         }),
                         "tag" => Some({
-                            let ast::Arg::Pos(ast::Expr::Str(s)) = c.args().items().next()? else {
+                            let ast::Arg::Pos(ast::Expr::Str(s)) = call.args().items().next()?
+                            else {
                                 return None;
                             };
                             let pkg_id = PackageId::try_from(self.fid).ok();
@@ -354,15 +357,15 @@ impl DocsChecker<'_> {
                 }
                 _ => None,
             },
-            ast::Expr::Closure(c) => {
-                crate::log_debug_ct!("check doc closure annotation: {c:?}");
+            ast::Expr::Closure(closure) => {
+                crate::log_debug_ct!("check doc closure annotation: {closure:?}");
                 let mut pos_all = vec![];
                 let mut named_all = BTreeMap::new();
                 let mut spread_right = None;
                 let snap = self.locals.snapshot();
 
                 let sig = None.or_else(|| {
-                    for param in c.params().children() {
+                    for param in closure.params().children() {
                         match param {
                             ast::Param::Pos(ast::Pattern::Normal(ast::Expr::Ident(pos))) => {
                                 let name = pos.get().clone();
@@ -374,7 +377,9 @@ impl DocsChecker<'_> {
                                 pos_all.push(Ty::Any);
                             }
                             ast::Param::Named(named) => {
-                                let term = self.check_type_expr(m, named.expr()).unwrap_or(Ty::Any);
+                                let term = self
+                                    .check_type_expr(module, named.expr())
+                                    .unwrap_or(Ty::Any);
                                 named_all.insert(named.name().into(), term);
                             }
                             // todo: spread left/right
@@ -390,7 +395,7 @@ impl DocsChecker<'_> {
                         }
                     }
 
-                    let body = self.check_type_expr(m, c.body())?;
+                    let body = self.check_type_expr(module, closure.body())?;
                     let sig = SigTy::new(
                         pos_all.into_iter(),
                         named_all,
@@ -406,8 +411,8 @@ impl DocsChecker<'_> {
                 self.locals.rollback_to(snap);
                 sig
             }
-            ast::Expr::Dict(d) => {
-                crate::log_debug_ct!("check doc dict annotation: {d:?}");
+            ast::Expr::Dict(decl) => {
+                crate::log_debug_ct!("check doc dict annotation: {decl:?}");
                 None
             }
             _ => None,

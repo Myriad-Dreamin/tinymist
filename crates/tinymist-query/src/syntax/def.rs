@@ -81,16 +81,16 @@ impl Expr {
 
     pub(crate) fn span(&self) -> Span {
         match self {
-            Expr::Decl(d) => d.span(),
-            Expr::Select(a) => a.span,
-            Expr::Apply(a) => a.span,
+            Expr::Decl(decl) => decl.span(),
+            Expr::Select(select) => select.span,
+            Expr::Apply(apply) => apply.span,
             _ => Span::detached(),
         }
     }
 
     pub(crate) fn file_id(&self) -> Option<TypstFileId> {
         match self {
-            Expr::Decl(d) => d.file_id(),
+            Expr::Decl(decl) => decl.file_id(),
             _ => self.span().id(),
         }
     }
@@ -332,10 +332,10 @@ impl Decl {
         use std::str::FromStr;
         let name = if s.starts_with('@') {
             let spec = PackageSpec::from_str(s).ok();
-            spec.map(|p| Interned::new_str(p.name.as_str()))
+            spec.map(|spec| Interned::new_str(spec.name.as_str()))
         } else {
             let stem = Path::new(s).file_stem();
-            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
+            stem.and_then(|stem| Some(Interned::new_str(stem.to_str()?)))
         };
         name.unwrap_or_default()
     }

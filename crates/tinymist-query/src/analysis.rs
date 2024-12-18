@@ -51,8 +51,8 @@ pub(crate) trait ToFunc {
 impl ToFunc for Value {
     fn to_func(&self) -> Option<Func> {
         match self {
-            Value::Func(f) => Some(f.clone()),
-            Value::Type(t) => t.constructor().ok(),
+            Value::Func(func) => Some(func.clone()),
+            Value::Type(ty) => ty.constructor().ok(),
             _ => None,
         }
     }
@@ -61,24 +61,24 @@ impl ToFunc for Value {
 /// Extension trait for `typst::World`.
 pub trait LspWorldExt {
     /// Get file's id by its path
-    fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId>;
+    fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId>;
 
     /// Get the source of a file by file path.
-    fn source_by_path(&self, p: &Path) -> FileResult<Source>;
+    fn source_by_path(&self, path: &Path) -> FileResult<Source>;
 
     /// Resolve the uri for a file id.
-    fn uri_for_id(&self, id: TypstFileId) -> FileResult<Url>;
+    fn uri_for_id(&self, fid: TypstFileId) -> FileResult<Url>;
 }
 
 impl LspWorldExt for tinymist_world::LspWorld {
-    fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
+    fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
         let root = self.workspace_root().ok_or_else(|| {
             let reason = eco_format!("workspace root not found");
             FileError::Other(Some(reason))
         })?;
-        let relative_path = p.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
+        let relative_path = path.strip_prefix(&root).map_err(|_| {
+            let reason = eco_format!("access denied, path: {path:?}, root: {root:?}");
             FileError::Other(Some(reason))
         })?;
 
@@ -273,7 +273,7 @@ mod module_tests {
 
             dependencies.sort();
             // remove /main.typ
-            dependencies.retain(|(p, _, _)| p != "/main.typ");
+            dependencies.retain(|(path, _, _)| path != "/main.typ");
 
             let dependencies = dependencies
                 .into_iter()

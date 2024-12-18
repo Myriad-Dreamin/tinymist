@@ -54,7 +54,7 @@ impl SemanticTokenCache {
     /// Lock the token cache with an optional previous id in *main thread*.
     pub(crate) fn acquire(
         cache: Arc<Mutex<Self>>,
-        p: &Path,
+        path: &Path,
         prev: Option<&str>,
     ) -> SemanticTokenContext {
         let that = cache.clone();
@@ -70,7 +70,7 @@ impl SemanticTokenCache {
         });
         let next = NonZeroUsize::new(that.next_id).expect("id overflow");
 
-        let path = ImmutPath::from(p);
+        let path = ImmutPath::from(path);
         let manager = that.manager.entry(path.clone()).or_default();
         let _rev_lock = manager.lock(prev.unwrap_or(next));
         let prev = prev.and_then(|prev| {

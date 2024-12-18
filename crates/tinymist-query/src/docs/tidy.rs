@@ -32,14 +32,14 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     let mut return_ty = None;
     let mut break_line = None;
 
-    let mut i = lines.len();
+    let mut line_width = lines.len();
     'search: loop {
-        if i == 0 {
+        if line_width == 0 {
             break;
         }
-        i -= 1;
+        line_width -= 1;
 
-        let line = lines[i];
+        let line = lines[line_width];
         if line.is_empty() {
             continue;
         }
@@ -52,7 +52,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                     continue;
                 };
 
-                break_line = Some(i);
+                break_line = Some(line_width);
                 return_ty = Some(w.trim().into());
                 break;
             }
@@ -61,10 +61,10 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 .trim_end()
                 .strip_suffix("<!-- typlite:end:list-item 0 -->")
             else {
-                break_line = Some(i + 1);
+                break_line = Some(line_width + 1);
                 break 'search;
             };
-            let mut current_line_no = i;
+            let mut current_line_no = line_width;
 
             loop {
                 // <!-- typlite:begin:list-item -->
@@ -84,7 +84,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 buf.push(line_content);
 
                 if current_line_no == 0 {
-                    break_line = Some(i + 1);
+                    break_line = Some(line_width + 1);
                     break 'search;
                 }
                 current_line_no -= 1;
@@ -95,7 +95,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
             buf.reverse();
 
             let Some(first_line) = buf.first_mut() else {
-                break_line = Some(i + 1);
+                break_line = Some(line_width + 1);
                 break 'search;
             };
             *first_line = first_line.trim();
@@ -107,11 +107,11 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 *first_line = rest.trim();
                 Some((param_name.into(), type_content.into()))
             }) else {
-                break_line = Some(i + 1);
+                break_line = Some(line_width + 1);
                 break 'search;
             };
 
-            i = current_line_no;
+            line_width = current_line_no;
             params.push(TidyParamDocs {
                 name: param_line.0,
                 types: param_line.1,
@@ -143,15 +143,15 @@ pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
 fn match_brace(trim_start: &str) -> Option<(&str, &str)> {
     let mut brace_count = 1;
     let mut end = 0;
-    for (i, c) in trim_start.char_indices() {
-        match c {
+    for (idx, ch) in trim_start.char_indices() {
+        match ch {
             '(' => brace_count += 1,
             ')' => brace_count -= 1,
             _ => {}
         }
 
         if brace_count == 0 {
-            end = i;
+            end = idx;
             break;
         }
     }
@@ -171,9 +171,9 @@ mod tests {
     use super::TidyParamDocs;
 
     fn func(s: &str) -> String {
-        let f = super::identify_pat_docs(s).unwrap();
-        let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
-        if let Some(t) = f.return_ty {
+        let docs = super::identify_pat_docs(s).unwrap();
+        let mut res = format!(">> docs:\n{}\n<< docs", docs.docs);
+        if let Some(t) = docs.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));
         }
         for TidyParamDocs {
@@ -181,7 +181,7 @@ mod tests {
             types,
             docs,
             default: _,
-        } in f.params
+        } in docs.params
         {
             let _ = write!(res, "\n>>arg {name}: {types}\n{docs}\n<< arg");
         }
@@ -189,9 +189,9 @@ mod tests {
     }
 
     fn var(s: &str) -> String {
-        let f = super::identify_pat_docs(s).unwrap();
-        let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
-        if let Some(t) = f.return_ty {
+        let docs = super::identify_pat_docs(s).unwrap();
+        let mut res = format!(">> docs:\n{}\n<< docs", docs.docs);
+        if let Some(t) = docs.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));
         }
         res

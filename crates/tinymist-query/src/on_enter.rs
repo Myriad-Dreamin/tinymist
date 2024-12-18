@@ -91,10 +91,10 @@ impl OnEnterWorker<'_> {
             .count();
 
         let comment_prefix = {
-            let mut p = unscanny::Scanner::new(leaf.text());
-            p.eat_while('/');
-            p.eat_if('!');
-            p.before()
+            let mut scanner = unscanny::Scanner::new(leaf.text());
+            scanner.eat_while('/');
+            scanner.eat_if('!');
+            scanner.before()
         };
 
         // Continuing single-line non-doc comments (like this one :) ) is annoying

@@ -80,12 +80,12 @@ impl TypeDescriber {
         if !functions.is_empty() {
             // todo: union signature
             // only first function is described
-            let f = functions[0].clone();
+            let func = functions[0].clone();
 
             let mut res = EcoString::new();
             res.push('(');
             let mut not_first = false;
-            for ty in f.positional_params() {
+            for ty in func.positional_params() {
                 if not_first {
                     res.push_str(", ");
                 } else {
@@ -93,26 +93,26 @@ impl TypeDescriber {
                 }
                 res.push_str(self.describe_root(ty).as_deref().unwrap_or("any"));
             }
-            for (k, ty) in f.named_params() {
+            for (name, ty) in func.named_params() {
                 if not_first {
                     res.push_str(", ");
                 } else {
                     not_first = true;
                 }
-                res.push_str(k);
+                res.push_str(name);
                 res.push_str(": ");
                 res.push_str(self.describe_root(ty).as_deref().unwrap_or("any"));
             }
-            if let Some(r) = f.rest_param() {
+            if let Some(spread_right) = func.rest_param() {
                 if not_first {
                     res.push_str(", ");
                 }
                 res.push_str("..: ");
-                res.push_str(self.describe_root(r).as_deref().unwrap_or("any"));
+                res.push_str(self.describe_root(spread_right).as_deref().unwrap_or("any"));
             }
             res.push_str(") => ");
             res.push_str(
-                f.body
+                func.body
                     .as_ref()
                     .and_then(|ret| self.describe_root(ret))
                     .as_deref()
@@ -146,15 +146,15 @@ impl TypeDescriber {
     fn describe(&mut self, ty: &Ty) -> EcoString {
         match ty {
             Ty::Var(..) => {}
-            Ty::Union(tys) => {
-                self.describe_iter(tys);
+            Ty::Union(types) => {
+                self.describe_iter(types);
             }
-            Ty::Let(lb) => {
-                self.describe_iter(&lb.lbs);
-                self.describe_iter(&lb.ubs);
+            Ty::Let(bounds) => {
+                self.describe_iter(&bounds.lbs);
+                self.describe_iter(&bounds.ubs);
             }
-            Ty::Func(f) => {
-                self.functions.push(f.clone());
+            Ty::Func(func) => {
+                self.functions.push(func.clone());
             }
             Ty::Dict(..) => {
                 return "dictionary".into();

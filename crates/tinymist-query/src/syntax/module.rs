@@ -131,7 +131,7 @@ pub(crate) fn scan_workspace_files<T>(
 
         let path = de.path();
         let relative_path = match path.strip_prefix(root) {
-            Ok(p) => p,
+            Ok(path) => path,
             Err(err) => {
                 log::warn!("failed to strip prefix, path: {path:?}, root: {root:?}: {err}");
                 continue;

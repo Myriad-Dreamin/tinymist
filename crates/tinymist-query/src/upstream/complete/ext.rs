@@ -389,12 +389,12 @@ impl CompletionContext<'_> {
             functions: HashSet::default(),
         };
 
-        let filter = |c: &CompletionKindChecker| {
+        let filter = |checker: &CompletionKindChecker| {
             match surrounding_syntax {
                 SurroundingSyntax::Regular => true,
                 SurroundingSyntax::StringContent | SurroundingSyntax::ImportList => false,
                 SurroundingSyntax::Selector => 'selector: {
-                    for func in &c.functions {
+                    for func in &checker.functions {
                         if func.element().is_some() {
                             break 'selector true;
                         }
@@ -402,10 +402,10 @@ impl CompletionContext<'_> {
 
                     false
                 }
-                SurroundingSyntax::ShowTransform => !c.functions.is_empty(),
+                SurroundingSyntax::ShowTransform => !checker.functions.is_empty(),
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
-                    for func in &c.functions {
+                    for func in &checker.functions {
                         if let Some(elem) = func.element() {
                             if elem.params().iter().any(|param| param.settable) {
                                 break 'set_rule true;
@@ -749,9 +749,9 @@ impl CompletionKindChecker {
             Ty::Builtin(BuiltinTy::Element(..)) => {
                 self.functions.insert(ty.clone());
             }
-            Ty::Let(l) => {
-                for ty in l.ubs.iter().chain(l.lbs.iter()) {
-                    self.check(ty);
+            Ty::Let(bounds) => {
+                for bound in bounds.ubs.iter().chain(bounds.lbs.iter()) {
+                    self.check(bound);
                 }
             }
             Ty::Any
@@ -933,7 +933,7 @@ fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool 
 
 pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
     match ty {
-        Ty::Value(ty) => value_to_completion_kind(&ty.val),
+        Ty::Value(ins_ty) => value_to_completion_kind(&ins_ty.val),
         Ty::Func(..) | Ty::With(..) => CompletionKind::Func,
         Ty::Any => CompletionKind::Variable,
         Ty::Builtin(b) => match b {
@@ -941,8 +941,8 @@ pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
             BuiltinTy::Type(..) | BuiltinTy::TypeType(..) => CompletionKind::Type,
             _ => CompletionKind::Variable,
         },
-        Ty::Let(l) => fold_ty_kind(l.ubs.iter().chain(l.lbs.iter())),
-        Ty::Union(u) => fold_ty_kind(u.iter()),
+        Ty::Let(bounds) => fold_ty_kind(bounds.ubs.iter().chain(bounds.lbs.iter())),
+        Ty::Union(types) => fold_ty_kind(types.iter()),
         Ty::Boolean(..)
         | Ty::Param(..)
         | Ty::Var(..)
@@ -1126,19 +1126,19 @@ impl TypeCompletionContext<'_, '_> {
                     self.ctx.value_completion(None, &v.val, true, docs);
                 }
             }
-            Ty::Param(p) => {
+            Ty::Param(param) => {
                 // todo: variadic
 
-                let docs = docs.or_else(|| p.docs.as_deref());
-                if p.attrs.positional {
-                    self.type_completion(&p.ty, docs);
+                let docs = docs.or_else(|| param.docs.as_deref());
+                if param.attrs.positional {
+                    self.type_completion(&param.ty, docs);
                 }
-                if !p.attrs.named {
+                if !param.attrs.named {
                     return Some(());
                 }
 
-                let f = &p.name;
-                if self.ctx.seen_field(f.clone()) {
+                let field = &param.name;
+                if self.ctx.seen_field(field.clone()) {
                     return Some(());
                 }
                 if !(self.filter)(infer_type) {
@@ -1146,7 +1146,7 @@ impl TypeCompletionContext<'_, '_> {
                 }
 
                 let mut rev_stream = self.ctx.before.chars().rev();
-                let ch = rev_stream.find(|c| !typst::syntax::is_id_continue(*c));
+                let ch = rev_stream.find(|ch| !typst::syntax::is_id_continue(*ch));
                 // skip label/ref completion.
                 // todo: more elegant way
                 if matches!(ch, Some('<' | '@')) {
@@ -1155,9 +1155,9 @@ impl TypeCompletionContext<'_, '_> {
 
                 self.ctx.completions.push(Completion {
                     kind: CompletionKind::Field,
-                    label: f.into(),
-                    apply: Some(eco_format!("{}: ${{}}", f)),
-                    label_detail: p.ty.describe(),
+                    label: field.into(),
+                    apply: Some(eco_format!("{}: ${{}}", field)),
+                    label_detail: param.ty.describe(),
                     detail: docs.map(Into::into),
                     command: self
                         .ctx
@@ -1189,7 +1189,7 @@ impl TypeCompletionContext<'_, '_> {
             BuiltinTy::Tag(..) => return None,
             BuiltinTy::Module(..) => return None,
 
-            BuiltinTy::Path(p) => {
+            BuiltinTy::Path(preference) => {
                 let source = self.ctx.ctx.source_by_id(self.ctx.root.span().id()?).ok()?;
 
                 self.ctx.completions2.extend(
@@ -1198,7 +1198,7 @@ impl TypeCompletionContext<'_, '_> {
                         Some(self.ctx.leaf.clone()),
                         &source,
                         self.ctx.cursor,
-                        p,
+                        preference,
                     )
                     .into_iter()
                     .flatten(),
@@ -1441,7 +1441,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
     let ty = ctx
         .ctx
-        .literal_type_of_node(ctx.leaf.clone())
+        .post_type_of_node(ctx.leaf.clone())
         .filter(|ty| !matches!(ty, Ty::Any));
 
     let scope = ctx.surrounding_syntax();
@@ -1551,12 +1551,12 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     // currently, there are only path completions in ctx.completions2
     // and type/named param/positional param completions in completions
     // and all rest less relevant completions inctx.completions
-    for (i, compl) in ctx.completions2.iter_mut().enumerate() {
-        compl.sort_text = Some(format!("{i:03}"));
+    for (idx, compl) in ctx.completions2.iter_mut().enumerate() {
+        compl.sort_text = Some(format!("{idx:03}"));
     }
     let sort_base = ctx.completions2.len();
-    for (i, compl) in (completions.iter_mut().chain(ctx.completions.iter_mut())).enumerate() {
-        compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
+    for (idx, compl) in (completions.iter_mut().chain(ctx.completions.iter_mut())).enumerate() {
+        compl.sort_text = Some(eco_format!("{:03}", idx + sort_base));
     }
 
     crate::log_debug_ct!(
@@ -1566,10 +1566,10 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
     ctx.completions.append(&mut completions);
 
-    if let Some(c) = args_node {
-        crate::log_debug_ct!("content block compl: args {c:?}");
-        let is_unclosed = matches!(c.kind(), SyntaxKind::Args)
-            && c.children().fold(0i32, |acc, node| match node.kind() {
+    if let Some(node) = args_node {
+        crate::log_debug_ct!("content block compl: args {node:?}");
+        let is_unclosed = matches!(node.kind(), SyntaxKind::Args)
+            && node.children().fold(0i32, |acc, node| match node.kind() {
                 SyntaxKind::LeftParen => acc + 1,
                 SyntaxKind::RightParen => acc - 1,
                 SyntaxKind::Error if node.text() == "(" => acc + 1,
@@ -1598,10 +1598,10 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
 fn complete_path(
     ctx: &LocalContext,
-    v: Option<LinkedNode>,
+    node: Option<LinkedNode>,
     source: &Source,
     cursor: usize,
-    p: &PathPreference,
+    preference: &PathPreference,
 ) -> Option<Vec<CompletionItem>> {
     let id = source.id();
     if id.package().is_some() {
@@ -1611,12 +1611,12 @@ fn complete_path(
     let is_in_text;
     let text;
     let rng;
-    let v = v.filter(|v| v.kind() == SyntaxKind::Str);
-    if let Some(v) = v {
+    let node = node.filter(|v| v.kind() == SyntaxKind::Str);
+    if let Some(str_node) = node {
         // todo: the non-str case
-        v.cast::<ast::Str>()?;
+        str_node.cast::<ast::Str>()?;
 
-        let vr = v.range();
+        let vr = str_node.range();
         rng = vr.start + 1..vr.end - 1;
         crate::log_debug_ct!("path_of: {rng:?} {cursor}");
         if rng.start > rng.end || (cursor != rng.end && !rng.contains(&cursor)) {
@@ -1659,7 +1659,7 @@ fn complete_path(
     let folder_completions = vec![];
     let mut module_completions = vec![];
     // todo: test it correctly
-    for path in ctx.completion_files(p) {
+    for path in ctx.completion_files(preference) {
         crate::log_debug_ct!("compl_check_path: {path:?}");
 
         // Skip self smartly
@@ -1692,17 +1692,21 @@ fn complete_path(
 
     let replace_range = ctx.to_lsp_range(rng, source);
 
-    let path_priority_cmp = |a: &str, b: &str| {
+    fn is_dot_or_slash(ch: &char) -> bool {
+        matches!(*ch, '.' | '/')
+    }
+
+    let path_priority_cmp = |lhs: &str, rhs: &str| {
         // files are more important than dot started paths
-        if a.starts_with('.') || b.starts_with('.') {
+        if lhs.starts_with('.') || rhs.starts_with('.') {
             // compare consecutive dots and slashes
-            let a_prefix = a.chars().take_while(|c| *c == '.' || *c == '/').count();
-            let b_prefix = b.chars().take_while(|c| *c == '.' || *c == '/').count();
+            let a_prefix = lhs.chars().take_while(is_dot_or_slash).count();
+            let b_prefix = rhs.chars().take_while(is_dot_or_slash).count();
             if a_prefix != b_prefix {
                 return a_prefix.cmp(&b_prefix);
             }
         }
-        a.cmp(b)
+        lhs.cmp(rhs)
     };
 
     module_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));

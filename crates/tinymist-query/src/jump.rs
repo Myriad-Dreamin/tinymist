@@ -19,20 +19,20 @@ pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> 
     }
 
     let mut min_dis = u64::MAX;
-    let mut p = Point::default();
+    let mut point = Point::default();
     let mut ppage = 0usize;
 
     let span = node.span();
-    for (i, page) in document.pages.iter().enumerate() {
+    for (idx, page) in document.pages.iter().enumerate() {
         let t_dis = min_dis;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+        if let Some(point) = find_in_frame(&page.frame, span, &mut min_dis, &mut point) {
             return Some(Position {
-                page: NonZeroUsize::new(i + 1)?,
-                point: pos,
+                page: NonZeroUsize::new(idx + 1)?,
+                point,
             });
         }
         if t_dis != min_dis {
-            ppage = i;
+            ppage = idx;
         }
     }
 
@@ -42,16 +42,16 @@ pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> 
 
     Some(Position {
         page: NonZeroUsize::new(ppage + 1)?,
-        point: p,
+        point,
     })
 }
 
 /// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
+fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) -> Option<Point> {
     for (mut pos, item) in frame.items() {
         if let FrameItem::Group(group) = item {
             // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
+            if let Some(point) = find_in_frame(&group.frame, span, min_dis, res) {
                 return Some(point + pos);
             }
         }
@@ -65,7 +65,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                     let dis = glyph.span.0.number().abs_diff(span.number());
                     if dis < *min_dis {
                         *min_dis = dis;
-                        *p = pos;
+                        *res = pos;
                     }
                 }
                 pos.x += glyph.x_advance.at(text.size);

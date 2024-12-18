@@ -105,9 +105,9 @@ pub(crate) fn prepare_renaming(
 fn validate_fn_renaming(def: &Definition) -> Option<()> {
     use typst::foundations::func::Repr;
     let value = def.value();
-    let mut f = match &value {
+    let mut func = match &value {
         None => return Some(()),
-        Some(Value::Func(f)) => f,
+        Some(Value::Func(func)) => func,
         Some(..) => {
             log::info!(
                 "prepare_rename: not a function on function definition site: {:?}",
@@ -117,9 +117,9 @@ fn validate_fn_renaming(def: &Definition) -> Option<()> {
         }
     };
     loop {
-        match f.inner() {
+        match func.inner() {
             // todo: rename with site
-            Repr::With(w) => f = &w.0,
+            Repr::With(w) => func = &w.0,
             Repr::Closure(..) => return Some(()),
             // native functions can't be renamed
             Repr::Native(..) | Repr::Element(..) => return None,

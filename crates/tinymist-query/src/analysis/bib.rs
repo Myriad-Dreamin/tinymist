@@ -102,15 +102,15 @@ impl YamlBib {
         let entries = loader
             .content
             .into_iter()
-            .filter_map(|(k, span)| {
-                let k_span = map_span(k.span)?;
+            .filter_map(|(name, span)| {
+                let name_span = map_span(name.span)?;
                 let span = map_span(span)?;
                 let entry = BibEntry {
                     file_id,
-                    name_span: k_span.clone(),
+                    name_span: name_span.clone(),
                     span: span.clone(),
                 };
-                Some((k.value, entry))
+                Some((name.value, entry))
             })
             .collect();
 

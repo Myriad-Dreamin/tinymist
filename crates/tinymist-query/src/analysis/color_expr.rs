@@ -35,7 +35,7 @@ impl<'a> ColorExprWorker<'a> {
                 }
             }
             SyntaxKind::Named => {}
-            k if k.is_trivia() || k.is_keyword() || k.is_error() => return Some(()),
+            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return Some(()),
             _ => {}
         };
 
@@ -81,8 +81,8 @@ impl<'a> ColorExprWorker<'a> {
     fn on_rgb(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
         let mut args = call.args().items();
         let hex_or_color_or_r = args.next()?;
-        let g = args.next();
-        match (g.is_some(), hex_or_color_or_r) {
+        let arg = args.next();
+        match (arg.is_some(), hex_or_color_or_r) {
             (true, _) => self.on_const_call(node, call)?,
             (false, ast::Arg::Pos(ast::Expr::Str(s))) => {
                 // parse hex

@@ -60,9 +60,9 @@ impl<T> RevisionManager<T> {
     /// Lock the revision in *main thread*.
     #[must_use]
     pub fn lock(&mut self, used: NonZeroUsize) -> RevisionLock {
-        let l = self.lock_estimated();
-        l.access(used);
-        l
+        let lock = self.lock_estimated();
+        lock.access(used);
+        lock
     }
 
     /// Lock the revision in *main thread*.
