@@ -526,7 +526,9 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     }
 
     // An existing identifier: "{ pa| }".
-    if ctx.leaf.kind() == SyntaxKind::Ident {
+    if ctx.leaf.kind() == SyntaxKind::Ident
+        && !matches!(ctx.leaf.parent_kind(), Some(SyntaxKind::FieldAccess))
+    {
         ctx.from = ctx.leaf.offset();
         code_completions(ctx, false);
         return true;
