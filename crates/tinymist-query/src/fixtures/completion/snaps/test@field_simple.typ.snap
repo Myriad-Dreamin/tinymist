@@ -1,10 +1,13 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (55..56)
+description: Completion on / (51..52)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/field_simple.typ
 snapshot_kind: text
 ---
 [
- null
+ {
+  "isIncomplete": false,
+  "items": []
+ }
 ]
