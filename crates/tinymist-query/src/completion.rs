@@ -137,8 +137,8 @@ impl StatefulRequest for CompletionRequest {
 
         // Exclude it self from auto completion
         // e.g. `#let x = (1.);`
-        let self_ty = cc_ctx.leaf.cast::<ast::Expr>().and_then(|exp| {
-            let v = cc_ctx.ctx.mini_eval(exp)?;
+        let self_ty = cc_ctx.leaf.cast::<ast::Expr>().and_then(|leaf| {
+            let v = cc_ctx.ctx.mini_eval(leaf)?;
             Some(Ty::Value(InsTy::new(v)))
         });
 
@@ -227,10 +227,10 @@ impl StatefulRequest for CompletionRequest {
                 detail: typst_completion.detail.as_ref().map(String::from),
                 sort_text: typst_completion.sort_text.as_ref().map(String::from),
                 filter_text: typst_completion.filter_text.as_ref().map(String::from),
-                label_details: typst_completion.label_detail.as_ref().map(|e| {
+                label_details: typst_completion.label_detail.as_ref().map(|desc| {
                     CompletionItemLabelDetails {
                         detail: None,
-                        description: Some(e.to_string()),
+                        description: Some(desc.to_string()),
                     }
                 }),
                 text_edit: Some(text_edit),

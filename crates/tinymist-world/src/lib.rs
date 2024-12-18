@@ -178,7 +178,7 @@ impl CompileOnceArgs {
         }
 
         let relative_entry = match entry.strip_prefix(&root) {
-            Ok(e) => e,
+            Ok(relative_entry) => relative_entry,
             Err(_) => {
                 log::error!("entry path must be inside the root: {}", entry.display());
                 std::process::exit(1);

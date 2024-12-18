@@ -72,8 +72,8 @@ impl RenderActor {
                 info!("RenderActor: resolving span: {:?}", element_path);
                 let spans = match self.renderer.resolve_span_by_element_path(&element_path) {
                     Ok(spans) => spans,
-                    Err(e) => {
-                        info!("RenderActor: failed to resolve span: {}", e);
+                    Err(err) => {
+                        info!("RenderActor: failed to resolve span: {err}");
                         return false;
                     }
                 };

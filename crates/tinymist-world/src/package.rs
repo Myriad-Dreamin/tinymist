@@ -245,7 +245,7 @@ impl PackageStorage {
                     description: Option<EcoString>,
                 }
 
-                let index: Vec<RemotePackageIndex> = match serde_json::from_reader(reader) {
+                let indices: Vec<RemotePackageIndex> = match serde_json::from_reader(reader) {
                     Ok(index) => index,
                     Err(err) => {
                         log::error!("Failed to parse package index: {err} from {url}");
@@ -253,16 +253,16 @@ impl PackageStorage {
                     }
                 };
 
-                index
+                indices
                     .into_iter()
-                    .map(|e| {
+                    .map(|index| {
                         (
                             PackageSpec {
                                 namespace: "preview".into(),
-                                name: e.name,
-                                version: e.version,
+                                name: index.name,
+                                version: index.version,
                             },
-                            e.description,
+                            index.description,
                         )
                     })
                     .collect::<Vec<_>>()

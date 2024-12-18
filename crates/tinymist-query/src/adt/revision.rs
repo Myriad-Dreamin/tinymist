@@ -85,8 +85,8 @@ impl<T> RevisionManager<T> {
         let slot_base = self
             .slots
             .iter()
-            .filter(|e| e.revision <= revision.get())
-            .reduce(|a, b| if a.revision > b.revision { a } else { b });
+            .filter(|slot| slot.revision <= revision.get())
+            .reduce(|x, y| if x.revision > y.revision { x } else { y });
 
         if let Some(slot) = slot_base {
             if slot.revision == revision.get() {
@@ -120,7 +120,7 @@ impl<T> RevisionManager<T> {
             // if there is no locked revision, we only keep the latest revision
             self.slots
                 .iter()
-                .map(|e| e.revision)
+                .map(|slot| slot.revision)
                 .max())
     }
 }

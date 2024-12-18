@@ -153,20 +153,20 @@ impl Ty {
     }
 
     /// Create a union type from an iterator of types
-    pub fn from_types(e: impl ExactSizeIterator<Item = Ty>) -> Self {
-        if e.len() == 0 {
+    pub fn from_types(iter: impl ExactSizeIterator<Item = Ty>) -> Self {
+        if iter.len() == 0 {
             Ty::Any
-        } else if e.len() == 1 {
-            let mut e = e;
-            e.next().unwrap()
+        } else if iter.len() == 1 {
+            let mut iter = iter;
+            iter.next().unwrap()
         } else {
-            Self::iter_union(e)
+            Self::iter_union(iter)
         }
     }
 
     /// Create a union type from an iterator of types
-    pub fn iter_union(e: impl IntoIterator<Item = Ty>) -> Self {
-        let mut v: Vec<Ty> = e.into_iter().collect();
+    pub fn iter_union(iter: impl IntoIterator<Item = Ty>) -> Self {
+        let mut v: Vec<Ty> = iter.into_iter().collect();
         v.sort();
         Ty::Union(Interned::new(v))
     }
@@ -681,7 +681,7 @@ impl RecordTy {
     pub fn shape_fields(mut fields: Vec<(StrRef, Ty)>) -> (NameBone, Vec<Ty>) {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         let names = NameBone {
-            names: fields.iter().map(|e| e.0.clone()).collect(),
+            names: fields.iter().map(|(name, _)| name.clone()).collect(),
         };
         let types = fields.into_iter().map(|(_, ty)| ty).collect::<Vec<_>>();
 
@@ -979,10 +979,10 @@ impl SigTy {
 
         let pos = sig_stream.zip(arg_stream);
         let common_ifaces = withs
-            .map(|e| e.iter().rev())
+            .map(|args_all| args_all.iter().rev())
             .into_iter()
             .flatten()
-            .flat_map(|w| self.common_iface_fields(w))
+            .flat_map(|args| self.common_iface_fields(args))
             .chain(self.common_iface_fields(args));
         let named = common_ifaces.map(|(_, l, r)| (l, r));
 
@@ -1158,9 +1158,9 @@ impl IfTy {
     }
 }
 
-/// A type scheme on a group of syntax structures (typing)
+/// The type information on a group of syntax structures (typing)
 #[derive(Default)]
-pub struct TypeScheme {
+pub struct TypeInfo {
     /// Whether the typing is valid
     pub valid: bool,
     /// The belonging file id
@@ -1181,7 +1181,7 @@ pub struct TypeScheme {
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
 
-impl TyCtx for TypeScheme {
+impl TyCtx for TypeInfo {
     fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds> {
         let v = self.vars.get(&var.def)?;
         Some(v.bounds.bounds().read().clone())
@@ -1192,18 +1192,13 @@ impl TyCtx for TypeScheme {
     }
 }
 
-impl TypeScheme {
-    // Get the type of a definition
-    // pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
-    //     Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
-    // }
-
+impl TypeInfo {
     /// Gets the type of a syntax structure
     pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping
             .get(&site)
             .cloned()
-            .map(|e| Ty::from_types(e.into_iter()))
+            .map(|types| Ty::from_types(types.into_iter()))
     }
 
     // todo: distinguish at least, at most
@@ -1261,7 +1256,7 @@ impl TypeScheme {
     }
 }
 
-impl TyCtxMut for TypeScheme {
+impl TyCtxMut for TypeInfo {
     type Snap = ena::undo_log::Snapshot;
 
     fn start_scope(&mut self) -> Self::Snap {

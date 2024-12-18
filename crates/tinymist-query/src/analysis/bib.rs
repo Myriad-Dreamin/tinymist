@@ -70,11 +70,11 @@ impl YamlBib {
             loader
                 .content
                 .iter()
-                .flat_map(|(k, span)| [k.span.start, k.span.end, span.start, span.end])
-                .map(|e| (e, None)),
+                .flat_map(|(name, span)| [name.span.start, name.span.end, span.start, span.end])
+                .map(|offset| (offset, None)),
         );
-        span_mapper.sort_by_key(|e| e.0);
-        span_mapper.dedup_by_key(|e| e.0);
+        span_mapper.sort_by_key(|(offset, _)| *offset);
+        span_mapper.dedup_by_key(|(offset, _)| *offset);
         let mut span_cursor = 0;
         let mut byte_offset = 0;
         for (off, ch) in content.chars().chain(Some('\0')).enumerate() {
@@ -170,14 +170,14 @@ impl BibWorker {
             }
             "bib" => {
                 let bibliography = biblatex::RawBibliography::parse(content).ok()?;
-                for e in bibliography.entries {
-                    let k = e.v.key;
-                    let span = e.span;
+                for entry in bibliography.entries {
+                    let name = entry.v.key;
+                    let span = entry.span;
                     self.info.entries.insert(
-                        k.v.to_owned(),
+                        name.v.to_owned(),
                         BibEntry {
                             file_id: path,
-                            name_span: k.span,
+                            name_span: name.span,
                             span,
                         },
                     );

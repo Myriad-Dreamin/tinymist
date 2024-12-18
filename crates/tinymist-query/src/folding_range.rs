@@ -33,7 +33,7 @@ impl SyntaxRequest for FoldingRangeRequest {
     ) -> Option<Self::Response> {
         let line_folding_only = self.line_folding_only;
 
-        let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Braced)?;
+        let hierarchy = get_lexical_hierarchy(source, LexicalScopeKind::Braced)?;
 
         let mut results = vec![];
         let LspPosition { line, character } =
@@ -41,7 +41,7 @@ impl SyntaxRequest for FoldingRangeRequest {
         let loc = (line, Some(character));
 
         calc_folding_range(
-            &symbols,
+            &hierarchy,
             source,
             position_encoding,
             loc,
@@ -83,9 +83,7 @@ impl SyntaxRequest for FoldingRangeRequest {
             results.reverse();
         }
 
-        if false {
-            log::trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
-        }
+        crate::log_debug_ct!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {hierarchy:#?} results: {results:#?}");
 
         Some(results)
     }
@@ -94,30 +92,30 @@ impl SyntaxRequest for FoldingRangeRequest {
 type LoC = (u32, Option<u32>);
 
 fn calc_folding_range(
-    symbols: &[LexicalHierarchy],
+    hierarchy: &[LexicalHierarchy],
     source: &Source,
     position_encoding: PositionEncoding,
     parent_last_loc: LoC,
     last_loc: LoC,
     is_last_range: bool,
-    ranges: &mut Vec<FoldingRange>,
+    folding_ranges: &mut Vec<FoldingRange>,
 ) {
-    for (i, e) in symbols.iter().enumerate() {
-        let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
-        let is_not_last_range = i + 1 < symbols.len();
+    for (idx, child) in hierarchy.iter().enumerate() {
+        let range = typst_to_lsp::range(child.info.range.clone(), source, position_encoding);
+        let is_not_last_range = idx + 1 < hierarchy.len();
         let is_not_final_last_range = !is_last_range || is_not_last_range;
 
-        let mut range = FoldingRange {
-            start_line: rng.start.line,
-            start_character: Some(rng.start.character),
-            end_line: rng.end.line,
-            end_character: Some(rng.end.character),
+        let mut folding_range = FoldingRange {
+            start_line: range.start.line,
+            start_character: Some(range.start.character),
+            end_line: range.end.line,
+            end_character: Some(range.end.character),
             kind: None,
-            collapsed_text: Some(e.info.name.to_string()),
+            collapsed_text: Some(child.info.name.to_string()),
         };
 
         let next_start = if is_not_last_range {
-            let next = &symbols[i + 1];
+            let next = &hierarchy[idx + 1];
             let next_rng = typst_to_lsp::range(next.info.range.clone(), source, position_encoding);
             (next_rng.start.line, Some(next_rng.start.character))
         } else if is_not_final_last_range {
@@ -126,17 +124,17 @@ fn calc_folding_range(
             last_loc
         };
 
-        if matches!(e.info.kind, LexicalKind::Heading(..)) {
-            range.end_line = range.end_line.max(if is_not_last_range {
+        if matches!(child.info.kind, LexicalKind::Heading(..)) {
+            folding_range.end_line = folding_range.end_line.max(if is_not_last_range {
                 next_start.0.saturating_sub(1)
             } else {
                 next_start.0
             });
         }
 
-        if let Some(ch) = &e.children {
+        if let Some(ch) = &child.children {
             let parent_last_loc = if is_not_last_range {
-                (rng.end.line, Some(rng.end.character))
+                (range.end.line, Some(range.end.character))
             } else {
                 parent_last_loc
             };
@@ -148,11 +146,11 @@ fn calc_folding_range(
                 parent_last_loc,
                 last_loc,
                 !is_not_final_last_range,
-                ranges,
+                folding_ranges,
             );
         }
 
-        ranges.push(range);
+        folding_ranges.push(folding_range);
     }
 }
 

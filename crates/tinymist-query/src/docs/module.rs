@@ -209,7 +209,7 @@ impl ScanDefCtx<'_> {
         let mut head = DefInfo {
             name: key.to_string().into(),
             kind: decl.kind(),
-            constant: expr.map(|e| e.repr()),
+            constant: expr.map(|expr| expr.repr()),
             docs,
             parsed_docs: def_docs,
             decl: Some(decl.clone()),
@@ -223,7 +223,7 @@ impl ScanDefCtx<'_> {
         if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|d| d.file_id()).zip(site) {
             if span != *mod_fid {
                 head.is_external = true;
-                head.oneliner = head.docs.as_deref().map(oneliner).map(|e| e.to_owned());
+                head.oneliner = head.docs.map(|docs| oneliner(&docs).to_owned());
                 head.docs = None;
             }
         }

@@ -45,7 +45,7 @@ pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoS
             ..Default::default()
         })
         .convert()
-        .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
+        .map_err(|err| eco_format!("failed to convert to markdown: {err}"))?;
 
     Ok(conv.replace("```example", "```typ"))
 }

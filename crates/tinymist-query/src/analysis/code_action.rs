@@ -112,13 +112,13 @@ impl<'a> CodeActionWorker<'a> {
     }
 
     fn heading_actions(&mut self, node: &LinkedNode) -> Option<()> {
-        let h = node.cast::<ast::Heading>()?;
-        let depth = h.depth().get();
+        let heading = node.cast::<ast::Heading>()?;
+        let depth = heading.depth().get();
 
         // Only the marker is replaced, for minimal text change
         let marker = node
             .children()
-            .find(|e| e.kind() == SyntaxKind::HeadingMarker)?;
+            .find(|child| child.kind() == SyntaxKind::HeadingMarker)?;
         let marker_range = marker.range();
 
         if depth > 1 {
@@ -161,8 +161,9 @@ impl<'a> CodeActionWorker<'a> {
 
         let mut chs = node.children();
         let chs = chs.by_ref();
-        let first_dollar = chs.take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
-        let last_dollar = chs.rev().take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
+        let is_dollar = |node: &LinkedNode| node.kind() == SyntaxKind::Dollar;
+        let first_dollar = chs.take(1).find(is_dollar)?;
+        let last_dollar = chs.rev().take(1).find(is_dollar)?;
 
         // Erroneous equation is skipped.
         // For example, some unclosed equation.
@@ -242,15 +243,15 @@ impl<'a> CodeActionWorker<'a> {
         };
 
         // Prepare actions
-        let a1 = if is_block {
+        let toggle_action = if is_block {
             rewrite_action("Convert to inline equation", "")?
         } else {
             rewrite_action("Convert to block equation", " ")?
         };
-        let a2 = rewrite_action("Convert to multiple-line block equation", "\n");
+        let block_action = rewrite_action("Convert to multiple-line block equation", "\n");
 
-        self.actions.push(a1);
-        if let Some(a2) = a2 {
+        self.actions.push(toggle_action);
+        if let Some(a2) = block_action {
             self.actions.push(a2);
         }
 

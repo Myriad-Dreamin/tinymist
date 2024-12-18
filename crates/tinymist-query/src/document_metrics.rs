@@ -246,7 +246,7 @@ impl DocumentMetricsWorker<'_> {
                     full_name: font.find_name(FULL_NAME),
                     family: font.find_name(FAMILY),
                     fixed_family: Some(info.family.clone()),
-                    source: extra.map(|e| self.internal_source(e)),
+                    source: extra.map(|source| self.internal_source(source)),
                     index: Some(font.index()),
                     uses_scale: Some(font_info_value.uses),
                     uses: None,

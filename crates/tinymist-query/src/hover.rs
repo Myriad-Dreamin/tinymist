@@ -51,22 +51,22 @@ impl StatefulRequest for HoverRequest {
         let mut contents = match contents {
             HoverContents::Array(contents) => contents
                 .into_iter()
-                .map(|e| match e {
-                    MarkedString::LanguageString(e) => {
-                        format!("```{}\n{}\n```", e.language, e.value)
+                .map(|content| match content {
+                    MarkedString::LanguageString(content) => {
+                        format!("```{}\n{}\n```", content.language, content.value)
                     }
-                    MarkedString::String(e) => e,
+                    MarkedString::String(content) => content,
                 })
                 .join("\n\n---\n"),
             HoverContents::Scalar(MarkedString::String(contents)) => contents,
             HoverContents::Scalar(MarkedString::LanguageString(contents)) => {
                 format!("```{}\n{}\n```", contents.language, contents.value)
             }
-            lsp_types::HoverContents::Markup(e) => {
-                match e.kind {
-                    MarkupKind::Markdown => e.value,
+            lsp_types::HoverContents::Markup(content) => {
+                match content.kind {
+                    MarkupKind::Markdown => content.value,
                     // todo: escape
-                    MarkupKind::PlainText => e.value,
+                    MarkupKind::PlainText => content.value,
                 }
             }
         };

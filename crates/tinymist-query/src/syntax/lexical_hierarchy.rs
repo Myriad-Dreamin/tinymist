@@ -11,7 +11,7 @@ use typst::syntax::{
 use typst_shim::utils::LazyHash;
 
 pub(crate) fn get_lexical_hierarchy(
-    source: Source,
+    source: &Source,
     g: LexicalScopeKind,
 ) -> Option<EcoVec<LexicalHierarchy>> {
     let b = std::time::Instant::now();
@@ -31,8 +31,8 @@ pub(crate) fn get_lexical_hierarchy(
     ));
     let res = match worker.get_symbols(root) {
         Ok(()) => Some(()),
-        Err(e) => {
-            log::error!("lexical hierarchy analysis failed: {:?}", e);
+        Err(err) => {
+            log::error!("lexical hierarchy analysis failed: {err:?}");
             None
         }
     };
@@ -301,34 +301,34 @@ impl LexicalHierarchyWorker {
                     }
 
                     // reverse order for correct symbol affection
-                    let name_offset = pattern.as_ref().map(|e| e.offset());
+                    let name_offset = pattern.as_ref().map(|node| node.offset());
                     self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
                     self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
                 }
                 SyntaxKind::ForLoop => {
-                    let pattern = node.children().find(|n| n.is::<ast::Pattern>());
+                    let pattern = node.children().find(|child| child.is::<ast::Pattern>());
                     let iterable = node
                         .children()
-                        .skip_while(|n| n.kind() != SyntaxKind::In)
-                        .find(|e| e.is::<ast::Expr>());
+                        .skip_while(|child| child.kind() != SyntaxKind::In)
+                        .find(|child| child.is::<ast::Expr>());
 
-                    let iterable_offset = iterable.as_ref().map(|e| e.offset());
+                    let iterable_offset = iterable.as_ref().map(|node| node.offset());
                     self.get_symbols_in_opt_with(iterable, IdentContext::Ref)?;
                     self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
                     self.get_symbols_in_first_expr(node.children().rev(), iterable_offset)?;
                 }
                 SyntaxKind::Closure => {
-                    let n = node.children().next();
+                    let first_child = node.children().next();
                     let current = self.stack.last_mut().unwrap().1.len();
-                    if let Some(n) = n {
-                        if n.kind() == SyntaxKind::Ident {
-                            self.get_symbols_with(n, IdentContext::Func)?;
+                    if let Some(first_child) = first_child {
+                        if first_child.kind() == SyntaxKind::Ident {
+                            self.get_symbols_with(first_child, IdentContext::Func)?;
                         }
                     }
                     let body = node
                         .children()
                         .rev()
-                        .find(|n| n.cast::<ast::Expr>().is_some());
+                        .find(|child| child.cast::<ast::Expr>().is_some());
                     if let Some(body) = body {
                         let symbol = if current == self.stack.last().unwrap().1.len() {
                             // Closure has no updated symbol stack
@@ -398,7 +398,7 @@ impl LexicalHierarchyWorker {
     ) -> anyhow::Result<()> {
         let body = nodes.find(|n| n.is::<ast::Expr>());
         if let Some(body) = body {
-            if iterable_offset.is_some_and(|e| e >= body.offset()) {
+            if iterable_offset.is_some_and(|offset| offset >= body.offset()) {
                 return Ok(());
             }
             self.get_symbols_with(body, IdentContext::Ref)?;

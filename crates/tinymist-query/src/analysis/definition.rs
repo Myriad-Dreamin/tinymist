@@ -37,7 +37,7 @@ impl Definition {
 
     /// The location of the definition.
     // todo: cache
-    pub(crate) fn def_at(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
+    pub(crate) fn location(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
         let fid = self.decl.file_id()?;
         let span = self.decl.span();
         let range = (!span.is_detached()).then(|| ctx.source_by_id(fid).ok()?.range(span));
@@ -83,8 +83,8 @@ pub fn definition(
             };
 
             let introspector = &document?.document.introspector;
-            find_bib_definition(ctx, introspector, name)
-                .or_else(|| find_ref_definition(introspector, name, ref_expr))
+            bib_definition(ctx, introspector, name)
+                .or_else(|| ref_definition(introspector, name, ref_expr))
         }
         SyntaxClass::Label {
             node: _,
@@ -102,9 +102,9 @@ fn find_ident_definition(
     // Lexical reference
     let ident_store = use_site.clone();
     let ident_ref = match ident_store.cast::<ast::Expr>()? {
-        ast::Expr::Ident(e) => e.span(),
-        ast::Expr::MathIdent(e) => e.span(),
-        ast::Expr::FieldAccess(s) => return find_field_definition(ctx, s),
+        ast::Expr::Ident(ident) => ident.span(),
+        ast::Expr::MathIdent(ident) => ident.span(),
+        ast::Expr::FieldAccess(field_access) => return field_definition(ctx, field_access),
         _ => {
             crate::log_debug_ct!("unsupported kind {kind:?}", kind = use_site.kind());
             Span::detached()
@@ -114,8 +114,8 @@ fn find_ident_definition(
     DefResolver::new(ctx, source)?.of_span(ident_ref)
 }
 
-fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> Option<Definition> {
-    let span = fa.span();
+fn field_definition(ctx: &Arc<SharedContext>, node: ast::FieldAccess) -> Option<Definition> {
+    let span = node.span();
     let ty = ctx.type_of_span(span)?;
     crate::log_debug_ct!("find_field_definition[{span:?}]: {ty:?}");
 
@@ -134,22 +134,22 @@ fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> 
             let source = ctx.source_by_id(s.id()?).ok()?;
             DefResolver::new(ctx, &source)?.of_span(s)
         }
-        DocSource::Ins(ins) => value_to_def(ins.val.clone(), || Some(fa.field().get().into())),
+        DocSource::Ins(ins) => value_to_def(ins.val.clone(), || Some(node.field().get().into())),
         DocSource::Builtin(..) => None,
     }
 }
 
-fn find_bib_definition(
+fn bib_definition(
     ctx: &Arc<SharedContext>,
     introspector: &Introspector,
     key: &str,
 ) -> Option<Definition> {
     let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(arr) = bib_elem.path().clone().into_value() else {
+    let Value::Array(paths) = bib_elem.path().clone().into_value() else {
         return None;
     };
 
-    let bib_paths = arr.into_iter().map(Value::cast).flat_map(|e| e.ok());
+    let bib_paths = paths.into_iter().flat_map(|path| path.cast().ok());
     let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
 
     let entry = bib_info.entries.get(key)?;
@@ -160,7 +160,7 @@ fn find_bib_definition(
     Some(Definition::new(decl.into(), None))
 }
 
-fn find_ref_definition(
+fn ref_definition(
     introspector: &Introspector,
     name: &str,
     ref_expr: ast::Expr,
@@ -307,7 +307,7 @@ fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> O
     let val = Ty::Value(InsTy::new(value.clone()));
     Some(match value {
         Value::Func(func) => {
-            let name = func.name().map(|e| e.into()).or_else(name)?;
+            let name = func.name().map(|name| name.into()).or_else(name)?;
             let mut s = SyntaxNode::leaf(SyntaxKind::Ident, &name);
             s.synthesize(func.span());
 
@@ -334,9 +334,9 @@ impl DefResolver {
             return None;
         }
 
-        let expr = self.ei.resolves.get(&span).cloned()?;
-        match (&expr.root, &expr.val) {
-            (Some(expr), ty) => self.of_expr(expr, ty.as_ref()),
+        let resolved = self.ei.resolves.get(&span).cloned()?;
+        match (&resolved.root, &resolved.term) {
+            (Some(expr), term) => self.of_expr(expr, term.as_ref()),
             (None, Some(term)) => self.of_term(term),
             (None, None) => None,
         }
@@ -347,7 +347,9 @@ impl DefResolver {
 
         match expr {
             Expr::Decl(decl) => self.of_decl(decl, term),
-            Expr::Ref(r) => self.of_expr(r.root.as_ref()?, r.val.as_ref().or(term)),
+            Expr::Ref(resolved) => {
+                self.of_expr(resolved.root.as_ref()?, resolved.term.as_ref().or(term))
+            }
             _ => None,
         }
     }

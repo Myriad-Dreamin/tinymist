@@ -97,42 +97,42 @@ impl PathPreference {
 }
 
 impl Ty {
-    pub(crate) fn from_cast_info(s: &CastInfo) -> Ty {
-        match &s {
+    pub(crate) fn from_cast_info(ty: &CastInfo) -> Ty {
+        match &ty {
             CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Value(val, doc) => Ty::Value(InsTy::new_doc(val.clone(), *doc)),
             CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
-            CastInfo::Union(e) => {
-                Ty::iter_union(UnionIter(vec![e.as_slice().iter()]).map(Self::from_cast_info))
+            CastInfo::Union(types) => {
+                Ty::iter_union(UnionIter(vec![types.as_slice().iter()]).map(Self::from_cast_info))
             }
         }
     }
 
-    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo) -> Ty {
+    pub(crate) fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
         use typst::foundations::func::Repr;
-        match f.inner() {
+        match func.inner() {
             Repr::Element(..) | Repr::Native(..) => {
-                if let Some(ty) = param_mapping(f, p) {
+                if let Some(ty) = param_mapping(func, param) {
                     return ty;
                 }
             }
             Repr::Closure(_) => {}
-            Repr::With(w) => return Ty::from_param_site(&w.0, p),
+            Repr::With(w) => return Ty::from_param_site(&w.0, param),
         };
 
-        Self::from_cast_info(&p.input)
+        Self::from_cast_info(&param.input)
     }
 
-    pub(crate) fn from_return_site(f: &Func, c: &'_ CastInfo) -> Self {
+    pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
-        match f.inner() {
-            Repr::Element(e) => return Ty::Builtin(BuiltinTy::Element(*e)),
+        match func.inner() {
+            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Element(*elem)),
             Repr::Closure(_) => {}
-            Repr::With(w) => return Ty::from_return_site(&w.0, c),
+            Repr::With(w) => return Ty::from_return_site(&w.0, ty),
             Repr::Native(_) => {}
         };
 
-        Self::from_cast_info(c)
+        Self::from_cast_info(ty)
     }
 }
 
@@ -144,12 +144,12 @@ impl<'a> Iterator for UnionIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let iter = self.0.last_mut()?;
-            if let Some(e) = iter.next() {
-                match e {
-                    CastInfo::Union(e) => {
-                        self.0.push(e.as_slice().iter());
+            if let Some(ty) = iter.next() {
+                match ty {
+                    CastInfo::Union(types) => {
+                        self.0.push(types.as_slice().iter());
                     }
-                    _ => return Some(e),
+                    _ => return Some(ty),
                 }
             } else {
                 self.0.pop();
@@ -268,7 +268,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Radius => write!(f, "Radius"),
             BuiltinTy::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
             BuiltinTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
-            BuiltinTy::Element(e) => e.fmt(f),
+            BuiltinTy::Element(elem) => elem.fmt(f),
             BuiltinTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 if let Some(id) = id {

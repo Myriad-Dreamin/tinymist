@@ -31,12 +31,12 @@ fn main() -> typlite::Result<()> {
         .as_ref()
         .ok_or("Missing required argument: INPUT")?;
     let output = match args.output {
-        Some(e) if e == "-" => None,
-        Some(e) => Some(PathBuf::from(e)),
+        Some(stdout_path) if stdout_path == "-" => None,
+        Some(output_path) => Some(PathBuf::from(output_path)),
         None => Some(Path::new(input).with_extension("md")),
     };
 
-    let universe = args.compile.resolve().map_err(|e| format!("{e:?}"))?;
+    let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
     let world = universe.snapshot();
 
     let converter = Typlite::new(Arc::new(world)).with_library(lib());
@@ -45,8 +45,8 @@ fn main() -> typlite::Result<()> {
     match (conv, output) {
         (Ok(conv), None) => println!("{}", conv),
         (Ok(conv), Some(output)) => std::fs::write(output, conv.as_str()).unwrap(),
-        (Err(e), ..) => {
-            eprintln!("{e}");
+        (Err(err), ..) => {
+            eprintln!("{err}");
             std::process::exit(1);
         }
     }

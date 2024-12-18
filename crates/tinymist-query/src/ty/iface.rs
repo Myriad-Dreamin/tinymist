@@ -164,17 +164,17 @@ impl IfaceCheckDriver<'_> {
                     }
                 }
             }
-            Ty::Builtin(BuiltinTy::Type(e)) if self.value_as_iface() => {
+            Ty::Builtin(BuiltinTy::Type(b_ty)) if self.value_as_iface() => {
                 // todo: distinguish between element and function
                 self.checker
-                    .check(Iface::Type { val: e, at: ty }, &mut self.ctx, pol);
+                    .check(Iface::Type { val: b_ty, at: ty }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Element(e)) if self.value_as_iface() => {
+            Ty::Builtin(BuiltinTy::Element(elem)) if self.value_as_iface() => {
                 self.checker
-                    .check(Iface::Element { val: e, at: ty }, &mut self.ctx, pol);
+                    .check(Iface::Element { val: elem, at: ty }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Module(e)) => {
-                if let Decl::Module(m) = e.as_ref() {
+            Ty::Builtin(BuiltinTy::Module(module)) => {
+                if let Decl::Module(m) = module.as_ref() {
                     self.checker
                         .check(Iface::Module { val: m.fid, at: ty }, &mut self.ctx, pol);
                 }

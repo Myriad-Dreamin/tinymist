@@ -201,7 +201,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                     Some(ed)
                 }
             }
-            (Some(e), None) | (None, Some(e)) => Some(e),
+            (Some(info), None) | (None, Some(info)) => Some(info),
             (None, None) => None,
         };
 
@@ -241,7 +241,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 }
                 Some(rng)
             }
-            (.., Some(e)) | (Some(e), None) => Some(e),
+            (.., Some(info)) | (Some(info), None) => Some(info),
             (None, None) => None,
         }
     }

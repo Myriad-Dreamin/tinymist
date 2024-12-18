@@ -90,8 +90,8 @@ pub fn descent_decls<T>(
                             return Some(t);
                         }
                     }
-                    Some(ast::Imports::Items(e)) => {
-                        for item in e.iter() {
+                    Some(ast::Imports::Items(items)) => {
+                        for item in items.iter() {
                             if let Some(t) = recv(DescentDecl::Ident(item.bound_name())) {
                                 return Some(t);
                             }
@@ -389,13 +389,13 @@ fn possible_in_code_trivia(sk: SyntaxKind) -> bool {
 /// - Parenthesized expression.
 /// - Identifier on the right side of a dot operator (field access).
 fn classify_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
-    while let Some(e) = node.cast::<ast::Parenthesized>() {
-        node = node.find(e.expr().span())?;
+    while let Some(paren_expr) = node.cast::<ast::Parenthesized>() {
+        node = node.find(paren_expr.expr().span())?;
     }
-    if let Some(e) = node.parent() {
-        if let Some(f) = e.cast::<ast::FieldAccess>() {
-            if node.span() == f.field().span() {
-                return Some(e.clone());
+    if let Some(parent) = node.parent() {
+        if let Some(field_access) = parent.cast::<ast::FieldAccess>() {
+            if node.span() == field_access.field().span() {
+                return Some(parent.clone());
             }
         }
     }
@@ -541,7 +541,7 @@ impl ArgClass<'_> {
 /// A cursor class is either an [`SyntaxClass`] or other things under cursor.
 /// One thing is not ncessary to refer to some exact node. For example, a cursor
 /// moving after some comma in a function call is identified as a
-/// [`CursorClass::Param`].
+/// [`CursorClass::Arg`].
 #[derive(Debug, Clone)]
 pub enum CursorClass<'a> {
     /// A cursor on an argument.
@@ -608,12 +608,12 @@ pub fn classify_cursor_by_context<'a>(
 ) -> Option<CursorClass<'a>> {
     use SyntaxClass::*;
     let context_syntax = classify_syntax(context.clone(), node.offset())?;
-    let inner_syntax = classify_syntax(node.clone(), node.offset())?;
+    let node_syntax = classify_syntax(node.clone(), node.offset())?;
 
     match context_syntax {
         Callee(callee)
-            if matches!(inner_syntax, Normal(..) | Label { .. } | Ref(..))
-                && !matches!(inner_syntax, Callee(..)) =>
+            if matches!(node_syntax, Normal(..) | Label { .. } | Ref(..))
+                && !matches!(node_syntax, Callee(..)) =>
         {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {
@@ -829,7 +829,7 @@ mod tests {
     use typst::syntax::{is_newline, Source};
     use typst_shim::syntax::LinkedNodeExt;
 
-    fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
+    fn map_node(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
         let root = LinkedNode::new(source.root());
         let mut output_mapping = String::new();
@@ -853,8 +853,8 @@ mod tests {
             .collect::<String>()
     }
 
-    fn map_deref(source: &str) -> String {
-        map_base(source, |root, cursor| {
+    fn map_syntax(source: &str) -> String {
+        map_node(source, |root, cursor| {
             let node = root.leaf_at_compat(cursor);
             let kind = node.and_then(|node| classify_syntax(node, cursor));
             match kind {
@@ -870,8 +870,8 @@ mod tests {
         })
     }
 
-    fn map_check(source: &str) -> String {
-        map_base(source, |root, cursor| {
+    fn map_cursor(source: &str) -> String {
+        map_node(source, |root, cursor| {
             let node = root.leaf_at_compat(cursor);
             let kind = node.and_then(|node| classify_cursor(node));
             match kind {
@@ -889,7 +889,7 @@ mod tests {
 
     #[test]
     fn test_get_deref_target() {
-        assert_snapshot!(map_deref(r#"#let x = 1  
+        assert_snapshot!(map_syntax(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r"
@@ -901,11 +901,11 @@ Text
                    nnnnvvnnn   
         == Heading
         ");
-        assert_snapshot!(map_deref(r#"#let f(x);"#).trim(), @r"
+        assert_snapshot!(map_syntax(r#"#let f(x);"#).trim(), @r"
         #let f(x);
          nnnnv v
         ");
-        assert_snapshot!(map_deref(r#"#{
+        assert_snapshot!(map_syntax(r#"#{
   calc.  
 }"#).trim(), @r"
         #{
@@ -919,7 +919,7 @@ Text
 
     #[test]
     fn test_get_check_target() {
-        assert_snapshot!(map_check(r#"#let x = 1  
+        assert_snapshot!(map_cursor(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r"
@@ -931,31 +931,31 @@ Text
                    nnnnnnnnn   
         == Heading
         ");
-        assert_snapshot!(map_check(r#"#let f(x);"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#let f(x);"#).trim(), @r"
         #let f(x);
          nnnnn n
         ");
-        assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#f(1, 2)   Test"#).trim(), @r"
         #f(1, 2)   Test
          npppppp
         ");
-        assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#()   Test"#).trim(), @r"
         #()   Test
          ee
         ");
-        assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#(1)   Test"#).trim(), @r"
         #(1)   Test
          PPP
         ");
-        assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#(a: 1)   Test"#).trim(), @r"
         #(a: 1)   Test
          eeeeee
         ");
-        assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_cursor(r#"#(1, 2)   Test"#).trim(), @r"
         #(1, 2)   Test
          eeeeee
         ");
-        assert_snapshot!(map_check(r#"#(1, 2)  
+        assert_snapshot!(map_cursor(r#"#(1, 2)  
   Test"#).trim(), @r"
         #(1, 2)  
          eeeeee  

@@ -10,11 +10,11 @@ static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
 impl TypeChecker<'_> {
-    pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
-        Some(match root {
-            Expr::Block(seq) => self.check_block(seq),
-            Expr::Array(array) => self.check_array(array),
-            Expr::Dict(dict) => self.check_dict(dict),
+    pub(crate) fn check_syntax(&mut self, expr: &Expr) -> Option<Ty> {
+        Some(match expr {
+            Expr::Block(exprs) => self.check_block(exprs),
+            Expr::Array(elems) => self.check_array(elems),
+            Expr::Dict(elems) => self.check_dict(elems),
             Expr::Args(args) => self.check_args(args),
             // todo: check pattern correctly
             Expr::Pattern(pattern) => self.check_pattern_exp(pattern),
@@ -41,20 +41,20 @@ impl TypeChecker<'_> {
         })
     }
 
-    fn check_block(&mut self, seq: &Interned<Vec<Expr>>) -> Ty {
+    fn check_block(&mut self, exprs: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
-        for child in seq.iter() {
+        for child in exprs.iter() {
             joiner.join(self.check(child));
         }
 
         joiner.finalize()
     }
 
-    fn check_array(&mut self, array: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_array(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
         let mut elements = Vec::new();
 
-        for elem in array.iter() {
+        for elem in elems.iter() {
             match elem {
                 ArgExpr::Pos(p) => {
                     elements.push(self.check(p));
@@ -69,10 +69,10 @@ impl TypeChecker<'_> {
         Ty::Tuple(elements.into())
     }
 
-    fn check_dict(&mut self, dict: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_dict(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
         let mut fields = Vec::new();
 
-        for elem in dict.iter() {
+        for elem in elems.iter() {
             match elem {
                 ArgExpr::Named(n) => {
                     let (name, value) = n.as_ref();
@@ -122,19 +122,19 @@ impl TypeChecker<'_> {
         Ty::Args(args.into())
     }
 
-    fn check_pattern_exp(&mut self, pattern: &Interned<Pattern>) -> Ty {
-        self.check_pattern(None, pattern, &EMPTY_DOCSTRING)
+    fn check_pattern_exp(&mut self, pat: &Interned<Pattern>) -> Ty {
+        self.check_pattern(None, pat, &EMPTY_DOCSTRING)
     }
 
     fn check_pattern(
         &mut self,
         base: Option<&Interned<Decl>>,
-        pattern: &Interned<Pattern>,
+        pat: &Interned<Pattern>,
         docstring: &DocString,
     ) -> Ty {
         // todo: recursive doc constructing
-        match pattern.as_ref() {
-            Pattern::Expr(e) => self.check(e),
+        match pat.as_ref() {
+            Pattern::Expr(expr) => self.check(expr),
             Pattern::Simple(decl) => {
                 let ret = self.check_decl(decl);
                 let var_doc = docstring.as_var();
@@ -155,28 +155,28 @@ impl TypeChecker<'_> {
     fn check_pattern_sig(
         &mut self,
         base: Option<&Interned<Decl>>,
-        pattern: &PatternSig,
+        pat: &PatternSig,
         docstring: &DocString,
     ) -> (PatternTy, BTreeMap<Interned<str>, Ty>) {
         let mut pos_docs = vec![];
         let mut named_docs = BTreeMap::new();
         let mut rest_docs = None;
 
-        let mut pos = vec![];
-        let mut named = BTreeMap::new();
+        let mut pos_all = vec![];
+        let mut named_all = BTreeMap::new();
         let mut defaults = BTreeMap::new();
-        let mut rest = None;
+        let mut spread_right = None;
 
         // todo: combine with check_pattern
-        for exp in pattern.pos.iter() {
+        for pos_expr in pat.pos.iter() {
             // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
-            let res = self.check_pattern_exp(exp);
-            if let Pattern::Simple(ident) = exp.as_ref() {
+            let pos_ty = self.check_pattern_exp(pos_expr);
+            if let Pattern::Simple(ident) = pos_expr.as_ref() {
                 let name = ident.name().clone();
 
                 let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
                 if let Some(annotated) = docstring.var_ty(&name) {
-                    self.constrain(&res, annotated);
+                    self.constrain(&pos_ty, annotated);
                 }
                 pos_docs.push(TypelessParamDocs {
                     name,
@@ -194,22 +194,22 @@ impl TypeChecker<'_> {
                     attrs: ParamAttrs::positional(),
                 });
             }
-            pos.push(res);
+            pos_all.push(pos_ty);
         }
 
-        for (decl, exp) in pattern.named.iter() {
+        for (decl, named_expr) in pat.named.iter() {
             let name = decl.name().clone();
-            let res = self.check_pattern_exp(exp);
+            let named_ty = self.check_pattern_exp(named_expr);
             let var = self.get_var(decl);
-            let v = Ty::Var(var.clone());
+            let var_ty = Ty::Var(var.clone());
             if let Some(annotated) = docstring.var_ty(&name) {
-                self.constrain(&v, annotated);
+                self.constrain(&var_ty, annotated);
             }
             // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
             // optimize it, so I put a todo here.
-            self.constrain(&res, &v);
-            named.insert(name.clone(), v);
-            defaults.insert(name.clone(), res);
+            self.constrain(&named_ty, &var_ty);
+            named_all.insert(name.clone(), var_ty);
+            defaults.insert(name.clone(), named_ty);
 
             let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
             named_docs.insert(
@@ -218,7 +218,7 @@ impl TypeChecker<'_> {
                     name: name.clone(),
                     docs: param_doc.docs.clone(),
                     cano_type: (),
-                    default: Some(exp.repr()),
+                    default: Some(named_expr.repr()),
                     attrs: ParamAttrs::named(),
                 },
             );
@@ -228,7 +228,7 @@ impl TypeChecker<'_> {
         }
 
         // todo: spread left/right
-        if let Some((decl, _exp)) = &pattern.spread_right {
+        if let Some((decl, _spread_expr)) = &pat.spread_right {
             let var = self.get_var(decl);
             let name = var.name.clone();
             let param_doc = docstring
@@ -238,13 +238,13 @@ impl TypeChecker<'_> {
                 .var_docs
                 .insert(decl.clone(), param_doc.to_untyped());
 
-            let exp = Ty::Builtin(BuiltinTy::Args);
-            let v = Ty::Var(var);
+            let term = Ty::Builtin(BuiltinTy::Args);
+            let var_ty = Ty::Var(var);
             if let Some(annotated) = docstring.var_ty(&name) {
-                self.constrain(&v, annotated);
+                self.constrain(&var_ty, annotated);
             }
-            self.constrain(&exp, &v);
-            rest = Some(v);
+            self.constrain(&term, &var_ty);
+            spread_right = Some(var_ty);
 
             rest_docs = Some(TypelessParamDocs {
                 name,
@@ -256,7 +256,7 @@ impl TypeChecker<'_> {
             // todo: ..(args)
         }
 
-        let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
+        let named: Vec<(Interned<str>, Ty)> = named_all.into_iter().collect();
 
         if let Some(base) = base {
             self.info.var_docs.insert(
@@ -273,7 +273,7 @@ impl TypeChecker<'_> {
         }
 
         (
-            PatternTy::new(pos.into_iter(), named, None, rest, None),
+            PatternTy::new(pos_all.into_iter(), named, None, spread_right, None),
             defaults,
         )
     }
@@ -469,7 +469,7 @@ impl TypeChecker<'_> {
         let s = r.decl.span();
         let s = (!s.is_detached()).then_some(s);
         let of = r.root.as_ref().map(|of| self.check(of));
-        let of = of.or_else(|| r.val.clone());
+        let of = of.or_else(|| r.term.clone());
         if let Some((s, of)) = s.zip(of.as_ref()) {
             self.info.witness_at_most(s, of.clone());
         }
@@ -536,7 +536,7 @@ impl TypeChecker<'_> {
                 let ty = if decl.is_def() {
                     Some(Ty::Builtin(BuiltinTy::Module(decl.clone())))
                 } else {
-                    self.ei.get_def(decl).map(|e| self.check(&e))
+                    self.ei.get_def(decl).map(|expr| self.check(&expr))
                 };
                 if let Some(ty) = ty {
                     self.constrain(&v, &ty);

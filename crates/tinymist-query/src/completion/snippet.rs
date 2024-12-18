@@ -63,12 +63,12 @@ where
                     .get("negative")
                     .ok_or_else(|| serde::de::Error::custom("missing field `negative`"))?;
                 let negative = serde_json::from_value(negative.clone())
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+                    .map_err(|err| serde::de::Error::custom(err.to_string()))?;
                 Ok(ContextSelector::Negative(negative))
             }
             _ => {
                 let value = serde_json::from_value(value)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+                    .map_err(|err| serde::de::Error::custom(err.to_string()))?;
                 Ok(ContextSelector::Positive(Some(value)))
             }
         }
