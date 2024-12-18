@@ -5,7 +5,7 @@ use typst::syntax::Span;
 use crate::{
     analysis::{Definition, SearchCtx},
     prelude::*,
-    syntax::{get_index_info, DerefTarget, RefExpr},
+    syntax::{get_index_info, RefExpr, SyntaxClass},
     ty::Interned,
 };
 
@@ -31,9 +31,9 @@ impl StatefulRequest for ReferencesRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
+        let syntax = ctx.classify_pos(&source, self.position, 1)?;
 
-        let locations = find_references(ctx, &source, doc.as_ref(), deref_target)?;
+        let locations = find_references(ctx, &source, doc.as_ref(), syntax)?;
 
         crate::log_debug_ct!("references: {locations:?}");
         Some(locations)
@@ -44,17 +44,17 @@ pub(crate) fn find_references(
     ctx: &mut LocalContext,
     source: &Source,
     doc: Option<&VersionedDocument>,
-    target: DerefTarget<'_>,
+    syntax: SyntaxClass<'_>,
 ) -> Option<Vec<LspLocation>> {
-    let finding_label = match target {
-        DerefTarget::VarAccess(..) | DerefTarget::Callee(..) => false,
-        DerefTarget::Label(..) | DerefTarget::LabelError(..) | DerefTarget::Ref(..) => true,
-        DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) | DerefTarget::Normal(..) => {
+    let finding_label = match syntax {
+        SyntaxClass::VarAccess(..) | SyntaxClass::Callee(..) => false,
+        SyntaxClass::Label { .. } | SyntaxClass::Ref(..) => true,
+        SyntaxClass::ImportPath(..) | SyntaxClass::IncludePath(..) | SyntaxClass::Normal(..) => {
             return None;
         }
     };
 
-    let def = ctx.def_of_syntax(source, doc, target)?;
+    let def = ctx.def_of_syntax(source, doc, syntax)?;
 
     let worker = ReferencesWorker {
         ctx: ctx.fork_for_search(),

@@ -9,7 +9,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::{
     analysis::{InsTy, Ty},
     prelude::*,
-    syntax::{is_ident_like, DerefTarget},
+    syntax::{is_ident_like, SyntaxClass},
     upstream::{autocomplete, CompletionContext},
     StatefulRequest,
 };
@@ -71,7 +71,7 @@ impl StatefulRequest for CompletionRequest {
 
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
-        let (cursor, deref_target) = ctx.deref_syntax_at_(&source, self.position, 0)?;
+        let (cursor, syntax) = ctx.classify_pos_(&source, self.position, 0)?;
 
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
@@ -89,7 +89,7 @@ impl StatefulRequest for CompletionRequest {
         let explicit = false;
 
         // Skip if is the let binding item *directly*
-        if let Some(DerefTarget::VarAccess(node)) = &deref_target {
+        if let Some(SyntaxClass::VarAccess(node)) = &syntax {
             match node.parent_kind() {
                 // complete the init part of the let binding
                 Some(SyntaxKind::LetBinding) => {
@@ -110,8 +110,8 @@ impl StatefulRequest for CompletionRequest {
 
         // Skip if an error node starts with number (e.g. `1pt`)
         if matches!(
-            deref_target,
-            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..) | DerefTarget::Normal(..))
+            syntax,
+            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
         ) {
             let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
             if node.erroneous() {
@@ -157,10 +157,10 @@ impl StatefulRequest for CompletionRequest {
 
         // Filter and determine range to replace
         let mut from_ident = None;
-        let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
+        let is_callee = matches!(syntax, Some(SyntaxClass::Callee(..)));
         if matches!(
-            deref_target,
-            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..))
+            syntax,
+            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
         ) {
             let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
             if is_ident_like(&node) && node.offset() == offset {

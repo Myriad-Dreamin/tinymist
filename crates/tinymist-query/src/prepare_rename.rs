@@ -1,7 +1,7 @@
 use crate::{
     analysis::Definition,
     prelude::*,
-    syntax::{Decl, DerefTarget},
+    syntax::{Decl, SyntaxClass},
 };
 
 /// The [`textDocument/prepareRename`] request is sent from the client to the
@@ -38,17 +38,17 @@ impl StatefulRequest for PrepareRenameRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
-        if matches!(deref_target.node().kind(), SyntaxKind::FieldAccess) {
+        let syntax = ctx.classify_pos(&source, self.position, 1)?;
+        if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
             // todo: rename field access
             log::info!("prepare_rename: field access is not a definition site");
             return None;
         }
 
-        let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), deref_target.clone())?;
+        let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
+        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax.clone())?;
 
-        let (name, range) = prepare_renaming(ctx, &deref_target, &def)?;
+        let (name, range) = prepare_renaming(ctx, &syntax, &def)?;
 
         Some(PrepareRenameResponse::RangeWithPlaceholder {
             range: range.unwrap_or(origin_selection_range),
@@ -59,7 +59,7 @@ impl StatefulRequest for PrepareRenameRequest {
 
 pub(crate) fn prepare_renaming(
     ctx: &mut LocalContext,
-    deref_target: &DerefTarget,
+    deref_target: &SyntaxClass,
     def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
     let name = def.name().clone();

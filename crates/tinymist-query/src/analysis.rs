@@ -104,7 +104,7 @@ mod matcher_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::{syntax::get_def_target, tests::*};
+    use crate::{syntax::classify_def, tests::*};
 
     #[test]
     fn test() {
@@ -118,7 +118,7 @@ mod matcher_tests {
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos).unwrap();
 
-            let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
+            let result = classify_def(node).map(|e| format!("{:?}", e.node().range()));
             let result = result.as_deref().unwrap_or("<nil>");
 
             assert_snapshot!(result);
@@ -436,7 +436,7 @@ mod signature_tests {
     use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::{analyze_signature, Signature, SignatureTarget};
-    use crate::syntax::get_deref_target;
+    use crate::syntax::classify_syntax;
     use crate::tests::*;
 
     #[test]
@@ -450,7 +450,7 @@ mod signature_tests {
 
             let root = LinkedNode::new(source.root());
             let callee_node = root.leaf_at_compat(pos).unwrap();
-            let callee_node = get_deref_target(callee_node, pos).unwrap();
+            let callee_node = classify_syntax(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
             let result = analyze_signature(
