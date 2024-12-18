@@ -8,7 +8,7 @@ use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
     TypeScheme, TypeVar,
 };
-use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget};
+use crate::syntax::{classify_cursor, classify_cursor_by_context, ArgClass, CursorClass};
 use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
@@ -49,7 +49,7 @@ impl SignatureReceiver {
 
 fn check_signature<'a>(
     receiver: &'a mut SignatureReceiver,
-    target: &'a ParamTarget,
+    arg: &'a ArgClass,
 ) -> impl FnMut(&mut PostTypeChecker, Sig, &[Interned<ArgsTy>], bool) -> Option<()> + 'a {
     move |worker, sig, args, pol| {
         let (sig, _is_partialize) = match sig {
@@ -59,15 +59,15 @@ fn check_signature<'a>(
 
         let SigShape { sig: sig_ins, .. } = sig.shape(worker)?;
 
-        match &target {
-            ParamTarget::Named(n) => {
+        match &arg {
+            ArgClass::Named(n) => {
                 let ident = n.cast::<ast::Ident>()?;
                 let ty = sig_ins.named(&ident.into())?;
                 receiver.insert(ty.clone(), !pol);
 
                 Some(())
             }
-            ParamTarget::Positional {
+            ArgClass::Positional {
                 // todo: spreads
                 spreads: _,
                 positional,
@@ -182,7 +182,7 @@ impl<'a> PostTypeChecker<'a> {
             None
         };
 
-        let contextual_self_ty = self.check_target(get_check_target(node.clone()), context_ty);
+        let contextual_self_ty = self.check_cursor(classify_cursor(node.clone()), context_ty);
         crate::log_debug_ct!(
             "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
@@ -196,14 +196,14 @@ impl<'a> PostTypeChecker<'a> {
         Ty::union(self.check(node), ty)
     }
 
-    fn check_target(&mut self, node: Option<CheckTarget>, context_ty: Option<Ty>) -> Option<Ty> {
-        let Some(node) = node else {
+    fn check_cursor(&mut self, cursor: Option<CursorClass>, context_ty: Option<Ty>) -> Option<Ty> {
+        let Some(cursor) = cursor else {
             return context_ty;
         };
-        crate::log_debug_ct!("post check target: {node:?}");
+        crate::log_debug_ct!("post check target: {cursor:?}");
 
-        match &node {
-            CheckTarget::Param {
+        match &cursor {
+            CursorClass::Arg {
                 callee,
                 args: _,
                 target,
@@ -219,13 +219,13 @@ impl<'a> PostTypeChecker<'a> {
                 let mut resp = SignatureReceiver::default();
 
                 match target {
-                    ParamTarget::Named(n) => {
+                    ArgClass::Named(n) => {
                         let ident = n.cast::<ast::Ident>()?.into();
                         let ty = sig.primary().get_named(&ident)?;
                         // todo: losing docs
                         resp.insert(ty.ty.clone(), false);
                     }
-                    ParamTarget::Positional {
+                    ArgClass::Positional {
                         // todo: spreads
                         spreads: _,
                         positional,
@@ -259,7 +259,7 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CheckTarget::Element { container, target } => {
+            CursorClass::Element { container, target } => {
                 let container_ty = self.check_or(container, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
@@ -275,7 +275,7 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CheckTarget::Paren {
+            CursorClass::Paren {
                 container,
                 is_before,
             } => {
@@ -287,7 +287,7 @@ impl<'a> PostTypeChecker<'a> {
                 // e.g. completing `""` on `let x = ("|")`
                 resp.bounds.lbs.push(container_ty.clone());
 
-                let target = ParamTarget::positional_from_before(true);
+                let target = ArgClass::positional_from_before(true);
                 self.check_element_of(
                     &container_ty,
                     false,
@@ -298,15 +298,13 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CheckTarget::ImportPath(..) | CheckTarget::IncludePath(..) => Some(Ty::Builtin(
+            CursorClass::ImportPath(..) | CursorClass::IncludePath(..) => Some(Ty::Builtin(
                 BuiltinTy::Path(crate::ty::PathPreference::Source {
                     allow_package: true,
                 }),
             )),
-            CheckTarget::LabelError(target)
-            | CheckTarget::Label(target)
-            | CheckTarget::Normal(target) => {
-                let label_ty = matches!(node, CheckTarget::LabelError(_))
+            CursorClass::Label { node: target, .. } | CursorClass::Normal(target) => {
+                let label_ty = matches!(cursor, CursorClass::Label { is_error: true, .. })
                     .then_some(Ty::Builtin(BuiltinTy::Label));
                 let ty = self.check_or(target, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
@@ -331,13 +329,13 @@ impl<'a> PostTypeChecker<'a> {
                     }
                 }
             }
-            SyntaxKind::Args => self.check_target(
+            SyntaxKind::Args => self.check_cursor(
                 // todo: not well behaved
-                get_check_target_by_context(context.clone(), node.clone()),
+                classify_cursor_by_context(context.clone(), node.clone()),
                 None,
             ),
             // todo: constraint node
-            SyntaxKind::Named => self.check_target(get_check_target(context.clone()), None),
+            SyntaxKind::Named => self.check_cursor(classify_cursor(context.clone()), None),
             _ => None,
         }
     }

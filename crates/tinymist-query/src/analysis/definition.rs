@@ -5,7 +5,7 @@ use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
 use super::{prelude::*, InsTy, SharedContext};
-use crate::syntax::{Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
+use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass};
 use crate::ty::DocSource;
 use crate::VersionedDocument;
 
@@ -60,17 +60,21 @@ pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
     document: Option<&VersionedDocument>,
-    deref_target: DerefTarget,
+    syntax: SyntaxClass,
 ) -> Option<Definition> {
-    match deref_target {
+    match syntax {
         // todi: field access
-        DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => {
+        SyntaxClass::VarAccess(node) | SyntaxClass::Callee(node) => {
             find_ident_definition(ctx, source, node)
         }
-        DerefTarget::ImportPath(path) | DerefTarget::IncludePath(path) => {
+        SyntaxClass::ImportPath(path) | SyntaxClass::IncludePath(path) => {
             DefResolver::new(ctx, source)?.of_span(path.span())
         }
-        DerefTarget::Label(r) | DerefTarget::Ref(r) => {
+        SyntaxClass::Label {
+            node: r,
+            is_error: false,
+        }
+        | SyntaxClass::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
             let name = match ref_expr {
                 ast::Expr::Ref(r) => r.target(),
@@ -82,7 +86,11 @@ pub fn definition(
             find_bib_definition(ctx, introspector, name)
                 .or_else(|| find_ref_definition(introspector, name, ref_expr))
         }
-        DerefTarget::LabelError(..) | DerefTarget::Normal(..) => None,
+        SyntaxClass::Label {
+            node: _,
+            is_error: true,
+        }
+        | SyntaxClass::Normal(..) => None,
     }
 }
 

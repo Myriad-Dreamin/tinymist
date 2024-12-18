@@ -117,8 +117,8 @@ fn def_tooltip(
     cursor: usize,
 ) -> Option<HoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    let deref_target = get_deref_target(leaf.clone(), cursor)?;
-    let def = ctx.def_of_syntax(source, document, deref_target.clone())?;
+    let syntax = classify_syntax(leaf.clone(), cursor)?;
+    let def = ctx.def_of_syntax(source, document, syntax.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
@@ -147,7 +147,7 @@ fn def_tooltip(
 
             if matches!(def.decl.kind(), DefKind::Variable | DefKind::Constant) {
                 // todo: check sensible length, value highlighting
-                if let Some(values) = expr_tooltip(ctx.world(), deref_target.node()) {
+                if let Some(values) = expr_tooltip(ctx.world(), syntax.node()) {
                     match values {
                         Tooltip::Text(values) => {
                             results.push(MarkedString::String(values.into()));

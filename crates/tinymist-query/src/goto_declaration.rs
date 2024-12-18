@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{prelude::*, syntax::DerefTarget, SemanticRequest};
+use crate::{prelude::*, syntax::SyntaxClass, SemanticRequest};
 
 /// The [`textDocument/declaration`] request asks the server for the declaration
 /// location of a symbol at a given text document position.
@@ -39,7 +39,7 @@ impl SemanticRequest for GotoDeclarationRequest {
 fn find_declarations(
     _ctx: &LocalContext,
     _expr_info: Arc<crate::syntax::ExprInfo>,
-    _deref_target: DerefTarget<'_>,
+    _syntax: SyntaxClass<'_>,
 ) -> Option<Vec<Range<usize>>> {
     todo!()
 }

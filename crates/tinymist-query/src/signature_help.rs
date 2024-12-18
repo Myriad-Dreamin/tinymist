@@ -4,7 +4,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::{
     adt::interner::Interned,
     prelude::*,
-    syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
+    syntax::{classify_cursor, classify_syntax, ArgClass, CursorClass},
     LspParamInfo, SemanticRequest,
 };
 
@@ -28,18 +28,18 @@ impl SemanticRequest for SignatureHelpRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)? + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        let CheckTarget::Param {
+        let CursorClass::Arg {
             callee,
             target,
             is_set,
             ..
-        } = get_check_target(ast_node)?
+        } = classify_cursor(ast_node)?
         else {
             return None;
         };
 
-        let deref_target = get_deref_target(callee, cursor)?;
-        let def = ctx.def_of_syntax(&source, None, deref_target)?;
+        let syntax = classify_syntax(callee, cursor)?;
+        let def = ctx.def_of_syntax(&source, None, syntax)?;
         let sig = ctx.sig_of_def(def.clone())?;
         crate::log_debug_ct!("got signature {sig:?}");
 
@@ -59,13 +59,13 @@ impl SemanticRequest for SignatureHelpRequest {
             }
 
             match &target {
-                ParamTarget::Positional { .. } if is_set => {}
-                ParamTarget::Positional { positional, .. } => {
+                ArgClass::Positional { .. } if is_set => {}
+                ArgClass::Positional { positional, .. } => {
                     if (*positional) + param_shift == i {
                         active_parameter = Some(real_offset);
                     }
                 }
-                ParamTarget::Named(name) => {
+                ArgClass::Named(name) => {
                     let focus_name = focus_name
                         .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
                     if focus_name == &param.name {
@@ -106,7 +106,7 @@ impl SemanticRequest for SignatureHelpRequest {
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));
         }
 
-        if matches!(target, ParamTarget::Positional { .. }) {
+        if matches!(target, ArgClass::Positional { .. }) {
             active_parameter =
                 active_parameter.map(|x| x.min(sig.primary().pos_size().saturating_sub(1)));
         }

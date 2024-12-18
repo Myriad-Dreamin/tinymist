@@ -32,8 +32,8 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    construct_module_dependencies, get_deref_target, resolve_id_by_path, scan_workspace_files,
-    Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope, ModuleDependency,
+    classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
+    DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
 };
 use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
@@ -562,36 +562,39 @@ impl SharedContext {
         self.source_by_id(self.file_id_by_path(p)?)
     }
 
-    /// Get a syntax object at a position.
-    pub fn deref_syntax<'s>(&self, source: &'s Source, span: Span) -> Option<DerefTarget<'s>> {
+    /// Classifies the syntax under span that can be operated on by IDE
+    /// functionality.
+    pub fn classify_span<'s>(&self, source: &'s Source, span: Span) -> Option<SyntaxClass<'s>> {
         let node = LinkedNode::new(source.root()).find(span)?;
         let cursor = node.offset() + 1;
-        get_deref_target(node, cursor)
+        classify_syntax(node, cursor)
     }
 
-    /// Get a syntax object at a position.
-    pub fn deref_syntax_at<'s>(
+    /// Classifies the syntax under position that can be operated on by IDE
+    /// functionality.
+    pub fn classify_pos<'s>(
         &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
-    ) -> Option<DerefTarget<'s>> {
-        let (_, deref_target) = self.deref_syntax_at_(source, position, shift)?;
-        deref_target
+    ) -> Option<SyntaxClass<'s>> {
+        let (_, expr) = self.classify_pos_(source, position, shift)?;
+        expr
     }
 
-    /// Get a syntax object at a position.
-    pub fn deref_syntax_at_<'s>(
+    /// Classifies the syntax under position that can be operated on by IDE
+    /// functionality.
+    pub fn classify_pos_<'s>(
         &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
-    ) -> Option<(usize, Option<DerefTarget<'s>>)> {
+    ) -> Option<(usize, Option<SyntaxClass<'s>>)> {
         let offset = self.to_typst_pos(position, source)?;
         let cursor = ceil_char_boundary(source.text(), offset + shift);
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        Some((cursor, get_deref_target(node, cursor)))
+        Some((cursor, classify_syntax(node, cursor)))
     }
 
     /// Get the real definition of a compilation.
@@ -784,8 +787,8 @@ impl SharedContext {
         doc: Option<&VersionedDocument>,
         span: Span,
     ) -> Option<Definition> {
-        let target = self.deref_syntax(source, span)?;
-        definition(self, source, doc, target)
+        let expr = self.classify_span(source, span)?;
+        definition(self, source, doc, expr)
     }
 
     pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
@@ -800,9 +803,9 @@ impl SharedContext {
         self: &Arc<Self>,
         source: &Source,
         doc: Option<&VersionedDocument>,
-        deref_target: DerefTarget,
+        syntax: SyntaxClass,
     ) -> Option<Definition> {
-        definition(self, source, doc, deref_target)
+        definition(self, source, doc, syntax)
     }
 
     pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {

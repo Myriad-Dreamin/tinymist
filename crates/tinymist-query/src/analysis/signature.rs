@@ -10,7 +10,7 @@ use super::{
 };
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
-use crate::syntax::get_non_strict_def_target;
+use crate::syntax::classify_def_loosely;
 use crate::ty::{DynTypeBounds, ParamAttrs};
 use crate::ty::{InsTy, TyCtx};
 use crate::upstream::truncated_repr;
@@ -205,7 +205,7 @@ fn analyze_type_signature(
         SignatureTarget::Runtime(f) => {
             let source = ctx.source_by_id(f.span().id()?).ok()?;
             let node = source.find(f.span())?;
-            let def = get_non_strict_def_target(node.parent()?.clone())?;
+            let def = classify_def_loosely(node.parent()?.clone())?;
             let type_info = ctx.type_check(&source);
             let ty = type_info.type_of_span(def.name()?.span())?;
             Some((type_info, ty))

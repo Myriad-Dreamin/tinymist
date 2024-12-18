@@ -14,7 +14,7 @@ use crate::{
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{deref_expr, get_index_info, node_ancestors, Decl, DerefTarget, RefExpr},
+    syntax::{deref_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
     ty::Interned,
 };
 
@@ -42,15 +42,15 @@ impl StatefulRequest for RenameRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
+        let syntax = ctx.classify_pos(&source, self.position, 1)?;
 
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), deref_target.clone())?;
+        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax.clone())?;
 
-        prepare_renaming(ctx, &deref_target, &def)?;
+        prepare_renaming(ctx, &syntax, &def)?;
 
-        match deref_target {
+        match syntax {
             // todo: abs path
-            DerefTarget::ImportPath(path) | DerefTarget::IncludePath(path) => {
+            SyntaxClass::ImportPath(path) | SyntaxClass::IncludePath(path) => {
                 let ref_path_str = path.cast::<ast::Str>()?.get();
                 let new_path_str = if !self.new_name.ends_with(".typ") {
                     self.new_name + ".typ"
@@ -94,7 +94,7 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, &source, doc.as_ref(), deref_target)?;
+                let references = find_references(ctx, &source, doc.as_ref(), syntax)?;
 
                 let mut edits = HashMap::new();
 

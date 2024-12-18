@@ -21,7 +21,7 @@ use crate::snippet::{
     ParsedSnippet, PostfixSnippet, PostfixSnippetScope, SurroundingSyntax, DEFAULT_POSTFIX_SNIPPET,
 };
 use crate::syntax::{
-    descending_decls, interpret_mode_at, is_ident_like, CheckTarget, DescentDecl, InterpretMode,
+    descent_decls, interpret_mode_at, is_ident_like, CursorClass, DescentDecl, InterpretMode,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeScheme, TypeVar};
 use crate::upstream::complete::complete_code;
@@ -119,7 +119,7 @@ impl CompletionContext<'_> {
             .clone();
         defines.insert_scope(&scope);
 
-        descending_decls(self.leaf.clone(), |node| -> Option<()> {
+        descent_decls(self.leaf.clone(), |node| -> Option<()> {
             match node {
                 DescentDecl::Ident(ident) => {
                     let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
@@ -1370,15 +1370,15 @@ impl TypeCompletionContext<'_, '_> {
 
 /// Complete code by type or syntax.
 pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()> {
-    use crate::syntax::get_check_target;
+    use crate::syntax::classify_cursor;
     use SurroundingSyntax::*;
 
-    let check_target = get_check_target(ctx.leaf.clone());
-    crate::log_debug_ct!("complete_type: pos {:?} -> {check_target:#?}", ctx.leaf);
+    let cursor_class = classify_cursor(ctx.leaf.clone());
+    crate::log_debug_ct!("complete_type: pos {:?} -> {cursor_class:#?}", ctx.leaf);
     let mut args_node = None;
 
-    match check_target {
-        Some(CheckTarget::Element { container, .. }) => {
+    match cursor_class {
+        Some(CursorClass::Element { container, .. }) => {
             if let Some(container) = container.cast::<ast::Dict>() {
                 for named in container.items() {
                     if let ast::DictItem::Named(named) = named {
@@ -1387,7 +1387,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
                 }
             };
         }
-        Some(CheckTarget::Param { args, .. }) => {
+        Some(CursorClass::Arg { args, .. }) => {
             let args = args.cast::<ast::Args>()?;
             for arg in args.items() {
                 if let ast::Arg::Named(named) = arg {
@@ -1396,7 +1396,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
             }
             args_node = Some(args.to_untyped().clone());
         }
-        Some(CheckTarget::ImportPath(path) | CheckTarget::IncludePath(path)) => {
+        Some(CursorClass::ImportPath(path) | CursorClass::IncludePath(path)) => {
             let Some(ast::Expr::Str(str)) = path.cast() else {
                 return None;
             };
@@ -1423,26 +1423,21 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
             return Some(());
         }
-        Some(CheckTarget::Normal(e))
-            if (matches!(e.kind(), SyntaxKind::ContentBlock)
+        Some(CursorClass::Normal(node))
+            if (matches!(node.kind(), SyntaxKind::ContentBlock)
                 && matches!(ctx.leaf.kind(), SyntaxKind::LeftBracket)) =>
         {
-            args_node = e.parent().map(|s| s.get().clone());
+            args_node = node.parent().map(|s| s.get().clone());
         }
         // todo: complete type field
-        Some(CheckTarget::Normal(e)) if matches!(e.kind(), SyntaxKind::FieldAccess) => {
+        Some(CursorClass::Normal(node)) if matches!(node.kind(), SyntaxKind::FieldAccess) => {
             return None;
         }
-        Some(
-            CheckTarget::Paren { .. }
-            | CheckTarget::Label(..)
-            | CheckTarget::LabelError(..)
-            | CheckTarget::Normal(..),
-        )
+        Some(CursorClass::Paren { .. } | CursorClass::Label { .. } | CursorClass::Normal(..))
         | None => {}
     }
 
-    crate::log_debug_ct!("ctx.leaf {:?}", ctx.leaf.clone());
+    crate::log_debug_ct!("ctx.leaf {:?}", ctx.leaf);
 
     let ty = ctx
         .ctx
