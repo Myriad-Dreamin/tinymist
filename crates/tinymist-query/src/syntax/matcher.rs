@@ -930,6 +930,16 @@ Text
         #let f(x);
          nnnnv v
         ");
+        assert_snapshot!(map_deref(r#"#{
+  calc.  
+}"#).trim(), @r"
+        #{
+         n
+          calc.  
+        nnvvvvvnn
+        }
+        n
+        ");
     }
 
     #[test]
