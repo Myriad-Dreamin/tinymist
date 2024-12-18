@@ -98,7 +98,12 @@ impl StatefulRequest for CompletionRequest {
                     let parent_init = parent.find(parent_init.span())?;
                     parent_init.find(node.span())?;
                 }
-                Some(SyntaxKind::Closure) => return None,
+                Some(SyntaxKind::Closure) => {
+                    let parent = node.parent()?;
+                    let parent_body = parent.cast::<ast::Closure>()?.body();
+                    let parent_body = parent.find(parent_body.span())?;
+                    parent_body.find(node.span())?;
+                }
                 _ => {}
             }
         }
