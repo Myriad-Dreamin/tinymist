@@ -4272,6 +4272,7 @@ name = "typlite"
 version = "0.12.12"
 dependencies = [
  "base64",
+ "clap",
  "comemo 0.4.0",
  "ecow 0.2.3",
  "insta",
@@ -4281,16 +4282,6 @@ dependencies = [
  "typst",
  "typst-svg",
  "typst-syntax 0.12.0",
-]
-
-[[package]]
-name = "typlite-cli"
-version = "0.0.0"
-dependencies = [
- "clap",
- "ecow 0.2.3",
- "tinymist-world",
- "typlite",
 ]
 
 [[package]]
