@@ -541,7 +541,7 @@ impl ArgClass<'_> {
 /// A cursor class is either an [`SyntaxClass`] or other things under cursor.
 /// One thing is not ncessary to refer to some exact node. For example, a cursor
 /// moving after some comma in a function call is identified as a
-/// [`CursorClass::Param`].
+/// [`CursorClass::Arg`].
 #[derive(Debug, Clone)]
 pub enum CursorClass<'a> {
     /// A cursor on an argument.
@@ -608,12 +608,12 @@ pub fn classify_cursor_by_context<'a>(
 ) -> Option<CursorClass<'a>> {
     use SyntaxClass::*;
     let context_syntax = classify_syntax(context.clone(), node.offset())?;
-    let inner_syntax = classify_syntax(node.clone(), node.offset())?;
+    let node_syntax = classify_syntax(node.clone(), node.offset())?;
 
     match context_syntax {
         Callee(callee)
-            if matches!(inner_syntax, Normal(..) | Label { .. } | Ref(..))
-                && !matches!(inner_syntax, Callee(..)) =>
+            if matches!(node_syntax, Normal(..) | Label { .. } | Ref(..))
+                && !matches!(node_syntax, Callee(..)) =>
         {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {

@@ -787,8 +787,8 @@ impl SharedContext {
         doc: Option<&VersionedDocument>,
         span: Span,
     ) -> Option<Definition> {
-        let expr = self.classify_span(source, span)?;
-        definition(self, source, doc, expr)
+        let syntax = self.classify_span(source, span)?;
+        definition(self, source, doc, syntax)
     }
 
     pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
