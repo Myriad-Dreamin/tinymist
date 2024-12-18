@@ -227,13 +227,15 @@ impl CompletionContext<'_> {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..self.from, &src),
-                    new_text: node_before_before_cursor.into(),
+                    new_text: String::new(),
                 };
 
                 self.completions.push(Completion {
-                    apply: Some(eco_format!("{node_before}{node_content}{node_after}")),
+                    apply: Some(eco_format!(
+                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
+                    )),
                     additional_text_edits: Some(vec![before]),
-                    ..base.clone()
+                    ..base
                 });
             } else {
                 let before = TextEdit {
