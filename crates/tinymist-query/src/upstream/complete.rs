@@ -147,8 +147,8 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
                     Param::Spread(_) => &"..".into(),
                 };
                 log::info!("param: {param}, index: {i}");
-                doc_snippet += &format!("\n/// - {param} (${})", i + 1);
-                i += 1;
+                doc_snippet += &format!("\n/// - {param} (${}): ${}", i + 1, i + 2);
+                i += 2;
             }
             doc_snippet += &format!("\n/// -> ${}", i + 1);
             let before = TextEdit {
