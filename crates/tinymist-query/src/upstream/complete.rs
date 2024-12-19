@@ -141,6 +141,7 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
             let mut doc_snippet = "/// $0\n///".to_string();
             let mut i = 0;
             for param in c.params().children() {
+                // TODO: Properly handle Pos and Spread argument
                 let param: &EcoString = match param {
                     Param::Pos(_) => &"_".into(),
                     Param::Named(n) => n.name().get(),
