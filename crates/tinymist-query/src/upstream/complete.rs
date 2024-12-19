@@ -122,7 +122,6 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
         ctx.leaf.kind(),
         SyntaxKind::LineComment | SyntaxKind::BlockComment
     ) {
-        log::info!("Not comments");
         return false;
     }
 
