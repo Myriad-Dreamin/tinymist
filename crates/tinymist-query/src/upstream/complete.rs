@@ -8,7 +8,7 @@ use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
-use typst::syntax::ast::AstNode;
+use typst::syntax::ast::{AstNode, Param};
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -118,10 +118,53 @@ pub enum CompletionKind {
 
 /// Complete in comments. Or rather, don't!
 fn complete_comments(ctx: &mut CompletionContext) -> bool {
-    matches!(
+    if !matches!(
         ctx.leaf.kind(),
         SyntaxKind::LineComment | SyntaxKind::BlockComment
-    )
+    ) {
+        log::info!("Not comments");
+        return false;
+    }
+
+    // check if next line defines a function
+    if_chain! {
+        if let Some(next) = ctx.leaf.next_leaf();
+        if let Some(next_next) = next.next_leaf();
+        if let Some(next_next) = next_next.next_leaf();
+        if matches!(next_next.parent_kind(), Some(SyntaxKind::Closure));
+        if let Some(closure) = next_next.parent();
+        if let Some(closure) = closure.cast::<ast::Expr>();
+        if let ast::Expr::Closure(c) = closure;
+        if let Some(id) = ctx.root.span().id();
+        if let Some(src) = ctx.ctx.source_by_id(id).ok();
+        then {
+            let mut doc_snippet = "/// $0\n///".to_string();
+            let mut i = 0;
+            for param in c.params().children() {
+                let param: &EcoString = match param {
+                    Param::Pos(_) => &"_".into(),
+                    Param::Named(n) => n.name().get(),
+                    Param::Spread(_) => &"..".into(),
+                };
+                log::info!("param: {param}, index: {i}");
+                doc_snippet += &format!("\n/// - {param} (${})", i + 1);
+                i += 1;
+            }
+            doc_snippet += &format!("\n/// -> ${}", i + 1);
+            let before = TextEdit {
+                range: ctx.ctx.to_lsp_range(ctx.leaf.range().start..ctx.from, &src),
+                new_text: String::new(),
+            };
+            ctx.completions.push(Completion {
+                label: "Tidy Doc".into(),
+                apply: Some(doc_snippet.into()),
+                additional_text_edits: Some(vec![before]),
+                ..Completion::default()
+            });
+        }
+    };
+
+    true
 }
 
 /// Complete in markup mode.
