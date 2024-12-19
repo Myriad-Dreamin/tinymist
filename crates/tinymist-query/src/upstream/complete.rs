@@ -145,7 +145,13 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
                 let param: &EcoString = match param {
                     Param::Pos(_) => &"_".into(),
                     Param::Named(n) => n.name().get(),
-                    Param::Spread(_) => &"..".into(),
+                    Param::Spread(s) => {
+                        if let Some(ident) = s.sink_ident() {
+                            &eco_format!("{}", ident.get())
+                        } else {
+                            &EcoString::new()
+                        }
+                    }
                 };
                 log::info!("param: {param}, index: {i}");
                 doc_snippet += &format!("\n/// - {param} (${}): ${}", i + 1, i + 2);
