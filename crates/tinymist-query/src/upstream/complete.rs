@@ -143,7 +143,12 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
             for param in c.params().children() {
                 // TODO: Properly handle Pos and Spread argument
                 let param: &EcoString = match param {
-                    Param::Pos(_) => &"_".into(),
+                    Param::Pos(p) => {
+                        match p {
+                            ast::Pattern::Normal(ast::Expr::Ident(ident)) => ident.get(),
+                            _ => &"_".into()
+                        }
+                    }
                     Param::Named(n) => n.name().get(),
                     Param::Spread(s) => {
                         if let Some(ident) = s.sink_ident() {
