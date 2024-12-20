@@ -27,6 +27,11 @@ strum = { version = "0.26.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
+# salsa = { git = "https://github.com/salsa-rs/salsa", rev = "5f0904ae4a9a54944fbf34300b380bed13b27621" }
+# salsa-macros = { git = "https://github.com/salsa-rs/salsa", rev = "5f0904ae4a9a54944fbf34300b380bed13b27621" }
+
+salsa = { path = "../salsa/" }
+salsa-macros = { path = "../salsa/components/salsa-macros/" }
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
@@ -231,6 +236,9 @@ reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b
 reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
 reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
 reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+
+salsa = { path = "../salsa/" }
+salsa-macros = { path = "../salsa/components/salsa-macros/" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
