@@ -436,7 +436,7 @@ mod signature_tests {
     use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::{analyze_signature, Signature, SignatureTarget};
-    use crate::syntax::classify_node;
+    use crate::syntax::classify_syntax;
     use crate::tests::*;
 
     #[test]
@@ -450,7 +450,7 @@ mod signature_tests {
 
             let root = LinkedNode::new(source.root());
             let callee_node = root.leaf_at_compat(pos).unwrap();
-            let callee_node = classify_node(callee_node, pos).unwrap();
+            let callee_node = classify_syntax(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
             let result = analyze_signature(

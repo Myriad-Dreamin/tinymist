@@ -32,7 +32,7 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    classify_node, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
+    classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
     DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
 };
 use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
@@ -567,7 +567,7 @@ impl SharedContext {
     pub fn classify_span<'s>(&self, source: &'s Source, span: Span) -> Option<SyntaxClass<'s>> {
         let node = LinkedNode::new(source.root()).find(span)?;
         let cursor = node.offset() + 1;
-        classify_node(node, cursor)
+        classify_syntax(node, cursor)
     }
 
     /// Classifies the syntax under position that can be operated on by IDE
@@ -594,7 +594,7 @@ impl SharedContext {
         let cursor = ceil_char_boundary(source.text(), offset + shift);
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        Some((cursor, classify_node(node, cursor)))
+        Some((cursor, classify_syntax(node, cursor)))
     }
 
     /// Get the real definition of a compilation.

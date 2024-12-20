@@ -8,7 +8,7 @@
 pub use tinymist_analysis::import::*;
 pub(crate) mod lexical_hierarchy;
 pub use lexical_hierarchy::*;
-pub(crate) mod matcher;
+pub mod matcher;
 pub use matcher::*;
 pub(crate) mod module;
 pub use module::*;

@@ -4,7 +4,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::{
     adt::interner::Interned,
     prelude::*,
-    syntax::{classify_context, classify_node, ArgClass, SyntaxContext},
+    syntax::{classify_context, classify_syntax, ArgClass, SyntaxContext},
     LspParamInfo, SemanticRequest,
 };
 
@@ -38,7 +38,7 @@ impl SemanticRequest for SignatureHelpRequest {
             return None;
         };
 
-        let syntax = classify_node(callee, cursor)?;
+        let syntax = classify_syntax(callee, cursor)?;
         let def = ctx.def_of_syntax(&source, None, syntax)?;
         let sig = ctx.sig_of_def(def.clone())?;
         crate::log_debug_ct!("got signature {sig:?}");

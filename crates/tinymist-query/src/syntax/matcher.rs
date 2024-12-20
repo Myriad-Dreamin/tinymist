@@ -18,7 +18,7 @@
 //! - [`typst::syntax::SyntaxNode`]: Its contextual version is
 //!   [`typst::syntax::LinkedNode`], containing AST information, like inner text
 //!   and [`SyntaxKind`], on the position.
-//! - [`SyntaxClass`]: Provided by [`classify_node`], it describes the
+//! - [`SyntaxClass`]: Provided by [`classify_syntax`], it describes the
 //!   context-free syntax of the node that are more suitable for IDE operations.
 //!   For example, it identifies users' half-typed syntax like half-completed
 //!   labels and dot accesses.
@@ -269,7 +269,7 @@ pub enum InterpretMode {
 }
 
 /// Determine the interpretation mode at the given position (context-sensitive).
-pub(crate) fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
+pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
     loop {
         crate::log_debug_ct!("leaf for context: {leaf:?}");
         if let Some(t) = leaf {
@@ -600,7 +600,7 @@ impl<'a> SyntaxClass<'a> {
 
 /// Classifies node's syntax (inner syntax) that can be operated on by IDE
 /// functionality.
-pub fn classify_node(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_>> {
+pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_>> {
     if matches!(node.kind(), SyntaxKind::Error) && node.text().starts_with('<') {
         return Some(SyntaxClass::error_as_label(node));
     }
@@ -739,7 +739,7 @@ pub enum SurroundingSyntax {
     SetRule,
 }
 
-pub(crate) fn surrounding_syntax(node: &LinkedNode) -> SurroundingSyntax {
+pub fn surrounding_syntax(node: &LinkedNode) -> SurroundingSyntax {
     check_previous_syntax(node)
         .or_else(|| check_surrounding_syntax(node))
         .unwrap_or(SurroundingSyntax::Regular)
@@ -928,8 +928,8 @@ pub fn classify_context_outer<'a>(
     node: LinkedNode<'a>,
 ) -> Option<SyntaxContext<'a>> {
     use SyntaxClass::*;
-    let context_syntax = classify_node(outer.clone(), node.offset())?;
-    let node_syntax = classify_node(node.clone(), node.offset())?;
+    let context_syntax = classify_syntax(outer.clone(), node.offset())?;
+    let node_syntax = classify_syntax(node.clone(), node.offset())?;
 
     match context_syntax {
         Callee(callee)
@@ -972,7 +972,7 @@ pub fn classify_context(node: LinkedNode, cursor: Option<usize>) -> Option<Synta
     }
 
     let cursor = cursor.unwrap_or_else(|| node.offset());
-    let syntax = classify_node(node.clone(), cursor)?;
+    let syntax = classify_syntax(node.clone(), cursor)?;
 
     let normal_syntax = match syntax {
         SyntaxClass::Callee(callee) => {
@@ -1182,7 +1182,7 @@ mod tests {
     fn map_syntax(source: &str) -> String {
         map_node(source, |root, cursor| {
             let node = root.leaf_at_compat(cursor);
-            let kind = node.and_then(|node| classify_node(node, cursor));
+            let kind = node.and_then(|node| classify_syntax(node, cursor));
             match kind {
                 Some(SyntaxClass::VarAccess(..)) => 'v',
                 Some(SyntaxClass::Normal(..)) => 'n',
@@ -1305,7 +1305,7 @@ Text
             let source = Source::detached(s.to_owned());
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(cursor as usize)?;
-            let syntax = classify_node(node, cursor as usize)?;
+            let syntax = classify_syntax(node, cursor as usize)?;
             let SyntaxClass::VarAccess(var) = syntax else {
                 return None;
             };

@@ -117,7 +117,7 @@ fn def_tooltip(
     cursor: usize,
 ) -> Option<HoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    let syntax = classify_node(leaf.clone(), cursor)?;
+    let syntax = classify_syntax(leaf.clone(), cursor)?;
     let def = ctx.def_of_syntax(source, document, syntax.clone())?;
 
     let mut results = vec![];
