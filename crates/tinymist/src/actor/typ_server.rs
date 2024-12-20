@@ -4,7 +4,6 @@
 
 use std::{
     collections::HashSet,
-    ops::Deref,
     path::Path,
     sync::{Arc, OnceLock},
 };
@@ -15,18 +14,13 @@ use reflexo_typst::{
     features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     typst::prelude::EcoVec,
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-    watch_deps,
-    world::{CompilerFeat, CompilerUniverse, CompilerWorld},
-    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, GenericExporter,
-    Revising, TaskInputs, TypstDocument, WorldDeps,
+    watch_deps, CompileEnv, CompileReport, Compiler, CompilerFeat, CompilerUniverse, CompilerWorld,
+    ConsoleDiagReporter, EntryReader, GenericExporter, Revising, TaskInputs, TypstDocument,
+    WorldDeps,
 };
-use typst::diag::{SourceDiagnostic, SourceResult, Warned};
-use typst_shim::utils::Deferred;
+use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::task::CacheTask;
-
-type CompileRawResult = Deferred<(SourceResult<Warned<Arc<TypstDocument>>>, CompileEnv)>;
-type DocState = std::sync::OnceLock<CompileRawResult>;
 
 /// A signal that possibly triggers an export.
 ///
@@ -44,31 +38,16 @@ pub struct ExportSignal {
 
 pub struct CompileSnapshot<F: CompilerFeat> {
     /// The export signal for the document.
-    pub flags: ExportSignal,
+    pub signal: ExportSignal,
     /// Using env
     pub env: CompileEnv,
     /// Using world
-    pub world: Arc<CompilerWorld<F>>,
-    /// Compiling the document.
-    doc_state: Arc<DocState>,
+    pub world: CompilerWorld<F>,
     /// The last successfully compiled document.
     pub success_doc: Option<Arc<TypstDocument>>,
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
-    fn start(&self) -> &CompileRawResult {
-        self.doc_state.get_or_init(|| {
-            let w = self.world.clone();
-            let mut env = self.env.clone();
-            Deferred::new(move || {
-                let w = w.as_ref();
-                let mut c = std::marker::PhantomData;
-                let res = c.compile(w, &mut env);
-                (res, env)
-            })
-        })
-    }
-
     pub fn task(mut self, inputs: TaskInputs) -> Self {
         'check_changed: {
             if let Some(entry) = &inputs.entry {
@@ -85,25 +64,22 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
             return self;
         };
 
-        self.world = Arc::new(self.world.task(inputs));
-        self.doc_state = Arc::new(OnceLock::new());
+        self.world = self.world.task(inputs);
 
         self
     }
 
-    pub fn compile(&self) -> CompiledArtifact<F> {
-        let (doc, env) = self.start().wait().clone();
-        let (doc, warnings) = match doc {
+    pub async fn compile(self) -> CompiledArtifact<F> {
+        let mut snap = self;
+        let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
+        let (doc, warnings) = match warned {
             Ok(doc) => (Ok(doc.output), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
         CompiledArtifact {
-            signal: self.flags,
-            world: self.world.clone(),
-            env,
+            snap,
             doc,
             warnings,
-            success_doc: self.success_doc.clone(),
         }
     }
 }
@@ -111,39 +87,37 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
 impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
     fn clone(&self) -> Self {
         Self {
-            flags: self.flags,
+            signal: self.signal,
             env: self.env.clone(),
             world: self.world.clone(),
-            doc_state: self.doc_state.clone(),
             success_doc: self.success_doc.clone(),
         }
     }
 }
 
 pub struct CompiledArtifact<F: CompilerFeat> {
-    /// All the export signal for the document.
-    pub signal: ExportSignal,
-    /// Used world
-    pub world: Arc<CompilerWorld<F>>,
-    /// Used env
-    pub env: CompileEnv,
+    /// The used snapshot.
+    pub snap: CompileSnapshot<F>,
     /// The diagnostics of the document.
     pub warnings: EcoVec<SourceDiagnostic>,
     /// The compiled document.
     pub doc: SourceResult<Arc<TypstDocument>>,
-    /// The last successfully compiled document.
-    pub success_doc: Option<Arc<TypstDocument>>,
+}
+
+impl<F: CompilerFeat> std::ops::Deref for CompiledArtifact<F> {
+    type Target = CompileSnapshot<F>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.snap
+    }
 }
 
 impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
     fn clone(&self) -> Self {
         Self {
-            signal: self.signal,
-            world: self.world.clone(),
-            env: self.env.clone(),
+            snap: self.snap.clone(),
             doc: self.doc.clone(),
             warnings: self.warnings.clone(),
-            success_doc: self.success_doc.clone(),
         }
     }
 }
@@ -154,7 +128,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             .as_ref()
             .ok()
             .cloned()
-            .or_else(|| self.success_doc.clone())
+            .or_else(|| self.snap.success_doc.clone())
     }
 }
 
@@ -183,7 +157,7 @@ impl<F: CompilerFeat> SucceededArtifact<F> {
         }
     }
 
-    pub fn world(&self) -> &Arc<CompilerWorld<F>> {
+    pub fn world(&self) -> &CompilerWorld<F> {
         match self {
             SucceededArtifact::Compiled(artifact) => &artifact.world,
             SucceededArtifact::Suspend(snapshot) => &snapshot.world,
@@ -392,7 +366,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         log::debug!("CompileServerActor: initialized");
 
         // Trigger the first compilation (if active)
-        self.run_compile(reason_by_entry_change(), &mut curr_reads, false);
+        self.run_compile(reason_by_entry_change(), &mut curr_reads, false)
+            .await;
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -434,7 +409,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             // Either we have a reason to compile or we have events that want to have any
             // compilation.
             if comp_reason.any() || !curr_reads.is_empty() {
-                self.run_compile(comp_reason, &mut curr_reads, false);
+                self.run_compile(comp_reason, &mut curr_reads, false).await;
             }
         }
 
@@ -451,14 +426,13 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             self.watch_feature_set.clone()
         });
         CompileSnapshot {
-            world: Arc::new(world.clone()),
+            world,
             env: env.clone(),
-            flags: ExportSignal {
+            signal: ExportSignal {
                 by_entry_update: reason.by_entry_update,
                 by_mem_events: reason.by_memory_events,
                 by_fs_events: reason.by_fs_events,
             },
-            doc_state: Arc::new(OnceLock::new()),
             success_doc: self.latest_success_doc.clone(),
         }
     }
@@ -466,11 +440,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     /// Compile the document once.
     pub async fn compile_once(&mut self) -> CompiledArtifact<F> {
         self.run_compile(reason_by_entry_change(), &mut vec![], true)
-            .unwrap()
+            .await
+            .expect("is_once is set")
     }
 
     /// Compile the document once.
-    fn run_compile(
+    async fn run_compile(
         &mut self,
         reason: CompileReasons,
         curr_reads: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
@@ -509,8 +484,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         h.status(revision, CompileReport::Stage(id, "compiling", start));
 
-        let compile = move || {
-            let compiled = compiling.compile();
+        let compile = move || async move {
+            let compiled = compiling.compile().await;
 
             for reader in curr_reads {
                 let _ = reader.send(SucceededArtifact::Compiled(compiled.clone()));
@@ -523,7 +498,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             };
 
             let _ = ConsoleDiagReporter::default().export(
-                compiled.world.deref(),
+                &compiled.world,
                 Arc::new((compiled.env.features.clone(), rep.clone())),
             );
 
@@ -534,11 +509,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         if is_once {
-            Some(compile())
+            Some(compile().await)
         } else {
             let intr_tx = self.intr_tx.clone();
-            tokio::task::spawn_blocking(move || {
-                log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
+            tokio::task::spawn(async move {
+                let err = intr_tx.send(Interrupt::Compiled(compile().await));
+                log_send_error("compiled", err);
             });
 
             None
@@ -548,16 +524,14 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
         self.compiling = false;
 
-        let w = &artifact.world;
-
-        let compiled_revision = w.revision().get();
+        let world = &artifact.snap.world;
+        let compiled_revision = world.revision().get();
         if self.committed_revision >= compiled_revision {
             return;
         }
 
-        let doc = artifact.doc.ok();
-
         // Update state.
+        let doc = artifact.doc.ok();
         self.committed_revision = compiled_revision;
         self.latest_doc.clone_from(&doc);
         if doc.is_some() {
@@ -566,9 +540,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         // Notify the new file dependencies.
         let mut deps = vec![];
-        artifact
-            .world
-            .iter_dependencies(&mut |dep| deps.push(dep.clone()));
+        world.iter_dependencies(&mut |dep| deps.push(dep.clone()));
         send(CompilerResponse::Notify(NotifyMessage::SyncDependency(
             deps,
         )));

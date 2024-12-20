@@ -1,6 +1,5 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
-use std::ops::Deref;
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
@@ -78,7 +77,7 @@ impl ExportTask {
                 ..Default::default()
             });
 
-            let artifact = snap.compile();
+            let artifact = snap.compile().await;
             export.do_export(&kind, artifact).await
         }
     }
@@ -174,8 +173,10 @@ impl ExportConfig {
         use ExportKind::*;
         use PageSelection::*;
 
+        let CompiledArtifact { snap, doc, .. } = artifact;
+
         // Prepare the output path.
-        let entry = artifact.world.entry_state();
+        let entry = snap.world.entry_state();
         let Some(to) = self.config.output.substitute(&entry) else {
             return Ok(None);
         };
@@ -196,7 +197,7 @@ impl ExportConfig {
         }
 
         // Prepare the document.
-        let doc = artifact.doc.map_err(|_| anyhow::anyhow!("no document"))?;
+        let doc = doc.map_err(|_| anyhow::anyhow!("no document"))?;
 
         // Prepare data.
         let kind2 = kind.clone();
@@ -229,9 +230,8 @@ impl ExportConfig {
                     one,
                     pretty,
                 } => {
-                    let elements =
-                        reflexo_typst::query::retrieve(artifact.world.deref(), &selector, doc)
-                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
+                        .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
                     }
@@ -258,7 +258,7 @@ impl ExportConfig {
                 }
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
-                    let conv = Typlite::new(artifact.world)
+                    let conv = Typlite::new(Arc::new(snap.world))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 
