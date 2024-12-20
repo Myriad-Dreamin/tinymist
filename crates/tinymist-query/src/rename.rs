@@ -14,7 +14,7 @@ use crate::{
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{deref_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
+    syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
     ty::Interned,
 };
 
@@ -243,7 +243,7 @@ impl RenameFileWorker<'_> {
         // rename_importer(self.ctx, &ref_src, *span, &self.diff, edits);
 
         let root = LinkedNode::new(src.root());
-        let import_node = root.find(span).and_then(deref_expr)?;
+        let import_node = root.find(span).and_then(first_ancestor_expr)?;
         let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
             match import_node.cast::<ast::Expr>()? {
                 ast::Expr::Import(import) => Some((

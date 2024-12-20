@@ -287,7 +287,7 @@ impl<'a> PostTypeChecker<'a> {
                 // e.g. completing `""` on `let x = ("|")`
                 resp.bounds.lbs.push(container_ty.clone());
 
-                let target = ArgClass::positional_from_before(true);
+                let target = ArgClass::first_positional();
                 self.check_element_of(
                     &container_ty,
                     false,
