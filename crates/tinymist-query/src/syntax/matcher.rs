@@ -441,14 +441,15 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         node = node.prev_sibling()?;
     }
 
-    let is_dot = matches!(node.kind(), SyntaxKind::Dot)
-        || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error) && node.text() == ".");
+    let starts_with_dot = matches!(node.kind(), SyntaxKind::Dot)
+        || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
+            && node.text().starts_with("."));
 
-    if is_dot && node.offset() + 1 == cursor {
+    if starts_with_dot && node.offset() + 1 == cursor {
         let dot_target = node.clone().prev_leaf().and_then(first_ancestor_expr);
 
-        if let Some(dots_target) = dot_target {
-            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dots_target)));
+        if let Some(dot_target) = dot_target {
+            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
         }
     }
 
