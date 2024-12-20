@@ -125,9 +125,13 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
         return false;
     }
 
+    let text = ctx.leaf.get().text();
     // check if next line defines a function
     if_chain! {
+        if text == "///" || text == "/// ";
+        // hash node
         if let Some(next) = ctx.leaf.next_leaf();
+        // let node
         if let Some(next_next) = next.next_leaf();
         if let Some(next_next) = next_next.next_leaf();
         if matches!(next_next.parent_kind(), Some(SyntaxKind::Closure));
@@ -135,18 +139,11 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
         if let Some(closure) = closure.cast::<ast::Expr>();
         if let ast::Expr::Closure(c) = closure;
         then {
-            let doc_snippet = &mut "/// $0\n///";
-            let head = &ctx.text[..ctx.from];
-            if head.ends_with("///") {
-                if let Some(trimmed) = doc_snippet.strip_prefix("///") {
-                    *doc_snippet = trimmed;
-                }
-            } else if head.ends_with("//") {
-                if let Some(trimmed) = doc_snippet.strip_prefix("//") {
-                    *doc_snippet = trimmed;
-                }
+            let mut doc_snippet: String = if text == "///" {
+                " $0\n///".to_string()
+            } else {
+                "$0\n///".to_string()
             };
-            let mut doc_snippet = doc_snippet.to_string();
             let mut i = 0;
             for param in c.params().children() {
                 // TODO: Properly handle Pos and Spread argument
