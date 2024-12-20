@@ -167,7 +167,8 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
                 new_text: String::new(),
             };
             ctx.completions.push(Completion {
-                label: "Tidy Doc".into(),
+                label: "Document function".into(),
+                label_detail: Some("Tidy Document Comment".into()),
                 apply: Some(doc_snippet.into()),
                 additional_text_edits: Some(vec![before]),
                 ..Completion::default()
