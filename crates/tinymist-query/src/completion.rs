@@ -89,7 +89,8 @@ impl StatefulRequest for CompletionRequest {
         let explicit = false;
 
         // Skip if is the let binding item *directly*
-        if let Some(SyntaxClass::VarAccess(node)) = &syntax {
+        if let Some(SyntaxClass::VarAccess(var)) = &syntax {
+            let node = var.node();
             match node.parent_kind() {
                 // complete the init part of the let binding
                 Some(SyntaxKind::LetBinding) => {

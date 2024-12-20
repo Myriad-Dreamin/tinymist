@@ -5,7 +5,7 @@ use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
 use super::{prelude::*, InsTy, SharedContext};
-use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass};
+use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
 use crate::VersionedDocument;
 
@@ -63,10 +63,9 @@ pub fn definition(
     syntax: SyntaxClass,
 ) -> Option<Definition> {
     match syntax {
-        // todi: field access
-        SyntaxClass::VarAccess(node) | SyntaxClass::Callee(node) => {
-            find_ident_definition(ctx, source, node)
-        }
+        // todo: field access
+        SyntaxClass::VarAccess(node) => find_ident_definition(ctx, source, node),
+        SyntaxClass::Callee(node) => find_ident_definition(ctx, source, VarClass::Ident(node)),
         SyntaxClass::ImportPath(path) | SyntaxClass::IncludePath(path) => {
             DefResolver::new(ctx, source)?.of_span(path.span())
         }
@@ -97,16 +96,16 @@ pub fn definition(
 fn find_ident_definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
-    use_site: LinkedNode,
+    use_site: VarClass,
 ) -> Option<Definition> {
     // Lexical reference
     let ident_store = use_site.clone();
-    let ident_ref = match ident_store.cast::<ast::Expr>()? {
+    let ident_ref = match ident_store.node().cast::<ast::Expr>()? {
         ast::Expr::Ident(ident) => ident.span(),
         ast::Expr::MathIdent(ident) => ident.span(),
         ast::Expr::FieldAccess(field_access) => return field_definition(ctx, field_access),
         _ => {
-            crate::log_debug_ct!("unsupported kind {kind:?}", kind = use_site.kind());
+            crate::log_debug_ct!("unsupported kind {kind:?}", kind = use_site.node().kind());
             Span::detached()
         }
     };

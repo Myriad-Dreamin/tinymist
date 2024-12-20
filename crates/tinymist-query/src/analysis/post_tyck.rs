@@ -8,7 +8,7 @@ use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
     TypeInfo, TypeVar,
 };
-use crate::syntax::{classify_cursor, classify_cursor_by_context, ArgClass, CursorClass};
+use crate::syntax::{classify_cursor, classify_cursor_by_context, ArgClass, CursorClass, VarClass};
 use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
@@ -182,7 +182,7 @@ impl<'a> PostTypeChecker<'a> {
             None
         };
 
-        let contextual_self_ty = self.check_cursor(classify_cursor(node.clone()), context_ty);
+        let contextual_self_ty = self.check_cursor(classify_cursor(node.clone(), None), context_ty);
         crate::log_debug_ct!(
             "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
@@ -303,10 +303,14 @@ impl<'a> PostTypeChecker<'a> {
                     allow_package: true,
                 }),
             )),
-            CursorClass::Label { node: target, .. } | CursorClass::Normal(target) => {
+            CursorClass::VarAccess(VarClass::Ident(node))
+            | CursorClass::VarAccess(VarClass::FieldAccess(node))
+            | CursorClass::VarAccess(VarClass::DotAccess(node))
+            | CursorClass::Label { node, .. }
+            | CursorClass::Normal(node) => {
                 let label_ty = matches!(cursor, CursorClass::Label { is_error: true, .. })
                     .then_some(Ty::Builtin(BuiltinTy::Label));
-                let ty = self.check_or(target, context_ty);
+                let ty = self.check_or(node, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
                 ty.or(label_ty)
             }
@@ -335,7 +339,7 @@ impl<'a> PostTypeChecker<'a> {
                 None,
             ),
             // todo: constraint node
-            SyntaxKind::Named => self.check_cursor(classify_cursor(context.clone()), None),
+            SyntaxKind::Named => self.check_cursor(classify_cursor(context.clone(), None), None),
             _ => None,
         }
     }
