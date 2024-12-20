@@ -661,16 +661,16 @@ impl LanguageState {
 
         Ok(async move {
             let snap = fut.receive().await.map_err(z_internal_error)?;
-            let w = snap.world.as_ref();
+            let world = &snap.world;
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
                 let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = w.path_for_id(toml_id)?;
+                let toml_path = world.path_for_id(toml_id)?;
                 let pkg_root = toml_path.parent().ok_or_else(|| {
                     eco_format!("cannot get package root (parent of {toml_path:?})")
                 })?;
 
-                let manifest = tinymist_query::package::get_manifest(w, toml_id)?;
+                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
                 let entry_point = toml_id.join(&manifest.package.entrypoint);
 
                 Ok(EntryState::new_rooted(pkg_root.into(), Some(entry_point)))

@@ -502,7 +502,7 @@ impl QuerySnap {
     }
 
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
-        let w = self.world.as_ref();
+        let w = self.world.clone();
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
             bail!("main file is not set");
@@ -512,7 +512,7 @@ impl QuerySnap {
             anyhow::anyhow!("failed to get source: {err}")
         })?;
 
-        let mut analysis = self.analysis.snapshot_(w.clone(), self.rev_lock);
+        let mut analysis = self.analysis.snapshot_(w, self.rev_lock);
         Ok(f(&mut analysis))
     }
 }
