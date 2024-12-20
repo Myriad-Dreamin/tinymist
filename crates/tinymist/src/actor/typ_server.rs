@@ -524,17 +524,14 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
         self.compiling = false;
 
-        let w = &artifact.world;
-
-        let compiled_revision = w.revision().get();
+        let world = &artifact.snap.world;
+        let compiled_revision = world.revision().get();
         if self.committed_revision >= compiled_revision {
             return;
         }
 
-        let CompiledArtifact { snap, doc, .. } = artifact;
-        let doc = doc.ok();
-
         // Update state.
+        let doc = artifact.doc.ok();
         self.committed_revision = compiled_revision;
         self.latest_doc.clone_from(&doc);
         if doc.is_some() {
@@ -543,8 +540,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         // Notify the new file dependencies.
         let mut deps = vec![];
-        snap.world
-            .iter_dependencies(&mut |dep| deps.push(dep.clone()));
+        world.iter_dependencies(&mut |dep| deps.push(dep.clone()));
         send(CompilerResponse::Notify(NotifyMessage::SyncDependency(
             deps,
         )));
