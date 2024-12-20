@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::prelude::*;
-use crate::syntax::InterpretMode;
+use crate::syntax::{InterpretMode, SurroundingSyntax};
 use crate::ty::Interned;
 
 /// This is the poorman's type filter, which is less powerful but more steady.
@@ -23,16 +23,6 @@ pub enum PostfixSnippetScope {
 #[serde(rename_all = "camelCase")]
 pub enum CompletionCommand {
     TriggerSuggest,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::EnumIter)]
-pub enum SurroundingSyntax {
-    Regular,
-    StringContent,
-    Selector,
-    ShowTransform,
-    ImportList,
-    SetRule,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

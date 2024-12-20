@@ -33,6 +33,6 @@ pub use crate::lsp_typst_boundary::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity,
     PositionEncoding, TypstDiagnostic, TypstSeverity, TypstSpan,
 };
-pub use crate::syntax::{classify_syntax, Decl, DefKind};
+pub use crate::syntax::{classify_node, Decl, DefKind};
 pub(crate) use crate::ty::PathPreference;
 pub use crate::{SemanticRequest, StatefulRequest, VersionedDocument};

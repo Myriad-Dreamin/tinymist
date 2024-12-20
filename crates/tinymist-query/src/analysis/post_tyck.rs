@@ -8,7 +8,7 @@ use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
     TypeInfo, TypeVar,
 };
-use crate::syntax::{classify_cursor, classify_cursor_by_context, ArgClass, CursorClass, VarClass};
+use crate::syntax::{classify_context, classify_context_outer, ArgClass, SyntaxContext, VarClass};
 use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
@@ -182,7 +182,8 @@ impl<'a> PostTypeChecker<'a> {
             None
         };
 
-        let contextual_self_ty = self.check_cursor(classify_cursor(node.clone(), None), context_ty);
+        let contextual_self_ty =
+            self.check_cursor(classify_context(node.clone(), None), context_ty);
         crate::log_debug_ct!(
             "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
@@ -196,14 +197,18 @@ impl<'a> PostTypeChecker<'a> {
         Ty::union(self.check(node), ty)
     }
 
-    fn check_cursor(&mut self, cursor: Option<CursorClass>, context_ty: Option<Ty>) -> Option<Ty> {
+    fn check_cursor(
+        &mut self,
+        cursor: Option<SyntaxContext>,
+        context_ty: Option<Ty>,
+    ) -> Option<Ty> {
         let Some(cursor) = cursor else {
             return context_ty;
         };
         crate::log_debug_ct!("post check target: {cursor:?}");
 
         match &cursor {
-            CursorClass::Arg {
+            SyntaxContext::Arg {
                 callee,
                 args: _,
                 target,
@@ -259,7 +264,7 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CursorClass::Element { container, target } => {
+            SyntaxContext::Element { container, target } => {
                 let container_ty = self.check_or(container, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
@@ -275,7 +280,7 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CursorClass::Paren {
+            SyntaxContext::Paren {
                 container,
                 is_before,
             } => {
@@ -298,17 +303,17 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            CursorClass::ImportPath(..) | CursorClass::IncludePath(..) => Some(Ty::Builtin(
+            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => Some(Ty::Builtin(
                 BuiltinTy::Path(crate::ty::PathPreference::Source {
                     allow_package: true,
                 }),
             )),
-            CursorClass::VarAccess(VarClass::Ident(node))
-            | CursorClass::VarAccess(VarClass::FieldAccess(node))
-            | CursorClass::VarAccess(VarClass::DotAccess(node))
-            | CursorClass::Label { node, .. }
-            | CursorClass::Normal(node) => {
-                let label_ty = matches!(cursor, CursorClass::Label { is_error: true, .. })
+            SyntaxContext::VarAccess(VarClass::Ident(node))
+            | SyntaxContext::VarAccess(VarClass::FieldAccess(node))
+            | SyntaxContext::VarAccess(VarClass::DotAccess(node))
+            | SyntaxContext::Label { node, .. }
+            | SyntaxContext::Normal(node) => {
+                let label_ty = matches!(cursor, SyntaxContext::Label { is_error: true, .. })
                     .then_some(Ty::Builtin(BuiltinTy::Label));
                 let ty = self.check_or(node, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
@@ -335,11 +340,11 @@ impl<'a> PostTypeChecker<'a> {
             }
             SyntaxKind::Args => self.check_cursor(
                 // todo: not well behaved
-                classify_cursor_by_context(context.clone(), node.clone()),
+                classify_context_outer(context.clone(), node.clone()),
                 None,
             ),
             // todo: constraint node
-            SyntaxKind::Named => self.check_cursor(classify_cursor(context.clone(), None), None),
+            SyntaxKind::Named => self.check_cursor(classify_context(context.clone(), None), None),
             _ => None,
         }
     }

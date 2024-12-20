@@ -11,18 +11,16 @@ use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
 use typst::foundations::{AutoValue, Content, Func, Label, NoneValue, Scope, Type, Value};
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, Span, SyntaxKind, SyntaxNode};
+use typst::syntax::{ast, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
 use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
-use crate::snippet::{
-    ParsedSnippet, PostfixSnippet, PostfixSnippetScope, SurroundingSyntax, DEFAULT_POSTFIX_SNIPPET,
-};
+use crate::snippet::{ParsedSnippet, PostfixSnippet, PostfixSnippetScope, DEFAULT_POSTFIX_SNIPPET};
 use crate::syntax::{
-    interpret_mode_at, is_ident_like, previous_decls, CursorClass, InterpretMode, PreviousDecl,
-    VarClass,
+    interpret_mode_at, is_ident_like, previous_decls, surrounding_syntax, InterpretMode,
+    PreviousDecl, SurroundingSyntax, SyntaxContext, VarClass,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
 use crate::upstream::complete::{complete_code, field_access_completions};
@@ -93,9 +91,7 @@ impl CompletionContext<'_> {
     }
 
     pub(crate) fn surrounding_syntax(&mut self) -> SurroundingSyntax {
-        check_previous_syntax(&self.leaf)
-            .or_else(|| check_surrounding_syntax(&self.leaf))
-            .unwrap_or(SurroundingSyntax::Regular)
+        surrounding_syntax(&self.leaf)
     }
 
     fn defines(&mut self) -> Option<(Source, Defines)> {
@@ -529,104 +525,6 @@ impl CompletionContext<'_> {
     }
 }
 
-fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
-    use SurroundingSyntax::*;
-    let mut met_args = false;
-
-    if matches!(leaf.kind(), SyntaxKind::Str) {
-        return Some(StringContent);
-    }
-
-    while let Some(parent) = leaf.parent() {
-        crate::log_debug_ct!(
-            "check_surrounding_syntax: {:?}::{:?}",
-            parent.kind(),
-            leaf.kind()
-        );
-        match parent.kind() {
-            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
-                return Some(Regular);
-            }
-            SyntaxKind::ImportItemPath
-            | SyntaxKind::ImportItems
-            | SyntaxKind::RenamedImportItem => {
-                return Some(ImportList);
-            }
-            SyntaxKind::ModuleImport => {
-                let colon = parent.children().find(|s| s.kind() == SyntaxKind::Colon);
-                let Some(colon) = colon else {
-                    return Some(Regular);
-                };
-
-                if leaf.offset() >= colon.offset() {
-                    return Some(ImportList);
-                } else {
-                    return Some(Regular);
-                }
-            }
-            SyntaxKind::Named => {
-                return Some(Regular);
-            }
-            SyntaxKind::Args => {
-                met_args = true;
-            }
-            SyntaxKind::SetRule => {
-                let rule = parent.get().cast::<ast::SetRule>()?;
-                if met_args || enclosed_by(parent, rule.condition().map(|s| s.span()), leaf) {
-                    return Some(Regular);
-                } else {
-                    return Some(SetRule);
-                }
-            }
-            SyntaxKind::ShowRule => {
-                if met_args {
-                    return Some(Regular);
-                }
-
-                let rule = parent.get().cast::<ast::ShowRule>()?;
-                let colon = rule
-                    .to_untyped()
-                    .children()
-                    .find(|s| s.kind() == SyntaxKind::Colon);
-                let Some(colon) = colon.and_then(|colon| parent.find(colon.span())) else {
-                    // incomplete show rule
-                    return Some(Selector);
-                };
-
-                if leaf.offset() >= colon.offset() {
-                    return Some(ShowTransform);
-                } else {
-                    return Some(Selector); // query's first argument
-                }
-            }
-            _ => {}
-        }
-
-        leaf = parent;
-    }
-
-    None
-}
-
-fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
-    let mut leaf = leaf.clone();
-    if leaf.kind().is_trivia() {
-        leaf = leaf.prev_sibling()?;
-    }
-    if matches!(leaf.kind(), SyntaxKind::ShowRule | SyntaxKind::SetRule) {
-        return check_surrounding_syntax(&leaf.rightmost_leaf()?);
-    }
-
-    if matches!(leaf.kind(), SyntaxKind::Show) {
-        return Some(SurroundingSyntax::Selector);
-    }
-    if matches!(leaf.kind(), SyntaxKind::Set) {
-        return Some(SurroundingSyntax::SetRule);
-    }
-
-    None
-}
-
 #[derive(BindTyCtx)]
 #[bind(types)]
 struct Defines {
@@ -926,10 +824,6 @@ impl FnCompletionFeat {
             .min_named
             .map_or(Some(name_size), |v| Some(v.min(name_size)));
     }
-}
-
-fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool {
-    s.and_then(|s| parent.find(s)?.find(leaf.span())).is_some()
 }
 
 pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
@@ -1371,15 +1265,15 @@ impl TypeCompletionContext<'_, '_> {
 
 /// Complete code by type or syntax.
 pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()> {
-    use crate::syntax::classify_cursor;
+    use crate::syntax::classify_context;
     use SurroundingSyntax::*;
 
-    let cursor_class = classify_cursor(ctx.leaf.clone(), Some(ctx.cursor));
+    let cursor_class = classify_context(ctx.leaf.clone(), Some(ctx.cursor));
     crate::log_debug_ct!("complete_type: pos {:?} -> {cursor_class:#?}", ctx.leaf);
     let mut args_node = None;
 
     match cursor_class {
-        Some(CursorClass::Element { container, .. }) => {
+        Some(SyntaxContext::Element { container, .. }) => {
             if let Some(container) = container.cast::<ast::Dict>() {
                 for named in container.items() {
                     if let ast::DictItem::Named(named) = named {
@@ -1388,7 +1282,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
                 }
             };
         }
-        Some(CursorClass::Arg { args, .. }) => {
+        Some(SyntaxContext::Arg { args, .. }) => {
             let args = args.cast::<ast::Args>()?;
             for arg in args.items() {
                 if let ast::Arg::Named(named) = arg {
@@ -1398,7 +1292,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
             args_node = Some(args.to_untyped().clone());
         }
         // todo: complete field by types
-        Some(CursorClass::VarAccess(
+        Some(SyntaxContext::VarAccess(
             var @ (VarClass::FieldAccess { .. } | VarClass::DotAccess { .. }),
         )) => {
             let target = var.accessed_node()?;
@@ -1411,7 +1305,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
             field_access_completions(ctx, &target, &value, &styles);
             return Some(());
         }
-        Some(CursorClass::ImportPath(path) | CursorClass::IncludePath(path)) => {
+        Some(SyntaxContext::ImportPath(path) | SyntaxContext::IncludePath(path)) => {
             let Some(ast::Expr::Str(str)) = path.cast() else {
                 return None;
             };
@@ -1438,17 +1332,17 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
             return Some(());
         }
-        Some(CursorClass::Normal(node))
+        Some(SyntaxContext::Normal(node))
             if (matches!(node.kind(), SyntaxKind::ContentBlock)
                 && matches!(ctx.leaf.kind(), SyntaxKind::LeftBracket)) =>
         {
             args_node = node.parent().map(|s| s.get().clone());
         }
         Some(
-            CursorClass::VarAccess(VarClass::Ident { .. })
-            | CursorClass::Paren { .. }
-            | CursorClass::Label { .. }
-            | CursorClass::Normal(..),
+            SyntaxContext::VarAccess(VarClass::Ident { .. })
+            | SyntaxContext::Paren { .. }
+            | SyntaxContext::Label { .. }
+            | SyntaxContext::Normal(..),
         )
         | None => {}
     }

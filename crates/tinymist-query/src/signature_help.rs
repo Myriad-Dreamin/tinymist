@@ -4,7 +4,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::{
     adt::interner::Interned,
     prelude::*,
-    syntax::{classify_cursor, classify_syntax, ArgClass, CursorClass},
+    syntax::{classify_context, classify_node, ArgClass, SyntaxContext},
     LspParamInfo, SemanticRequest,
 };
 
@@ -28,17 +28,17 @@ impl SemanticRequest for SignatureHelpRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)? + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        let CursorClass::Arg {
+        let SyntaxContext::Arg {
             callee,
             target,
             is_set,
             ..
-        } = classify_cursor(ast_node, Some(cursor))?
+        } = classify_context(ast_node, Some(cursor))?
         else {
             return None;
         };
 
-        let syntax = classify_syntax(callee, cursor)?;
+        let syntax = classify_node(callee, cursor)?;
         let def = ctx.def_of_syntax(&source, None, syntax)?;
         let sig = ctx.sig_of_def(def.clone())?;
         crate::log_debug_ct!("got signature {sig:?}");

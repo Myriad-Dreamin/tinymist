@@ -19,10 +19,9 @@ use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
 use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 use crate::snippet::{
-    CompletionCommand, CompletionContextKey, PrefixSnippet, SurroundingSyntax,
-    DEFAULT_PREFIX_SNIPPET,
+    CompletionCommand, CompletionContextKey, PrefixSnippet, DEFAULT_PREFIX_SNIPPET,
 };
-use crate::syntax::InterpretMode;
+use crate::syntax::{InterpretMode, SurroundingSyntax};
 
 mod ext;
 pub use ext::CompletionFeat;
