@@ -17,7 +17,7 @@ snapshot_kind: text
     "kind": 3,
     "label": "table-prefix",
     "textEdit": {
-     "newText": "table-prefix",
+     "newText": "table-prefix(${1:})",
      "range": {
       "end": {
        "character": 24,

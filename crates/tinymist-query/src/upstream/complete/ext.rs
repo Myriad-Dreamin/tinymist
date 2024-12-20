@@ -25,7 +25,7 @@ use crate::syntax::{
     VarClass,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
-use crate::upstream::complete::complete_code;
+use crate::upstream::complete::{complete_code, field_access_completions};
 
 use crate::{completion_kind, prelude::*, LspCompletion};
 
@@ -1398,9 +1398,18 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
             args_node = Some(args.to_untyped().clone());
         }
         // todo: complete field by types
-        Some(CursorClass::VarAccess(VarClass::FieldAccess { .. }))
-        | Some(CursorClass::VarAccess(VarClass::DotAccess { .. })) => {
-            return None;
+        Some(CursorClass::VarAccess(
+            var @ (VarClass::FieldAccess { .. } | VarClass::DotAccess { .. }),
+        )) => {
+            let target = var.accessed_node()?;
+            let field = var.accessing_field()?;
+
+            let offset = field.offset(&ctx.ctx.source_by_id(target.span().id()?).ok()?)?;
+            ctx.from = offset;
+
+            let (value, styles) = ctx.ctx.analyze_expr(&target).into_iter().next()?;
+            field_access_completions(ctx, &target, &value, &styles);
+            return Some(());
         }
         Some(CursorClass::ImportPath(path) | CursorClass::IncludePath(path)) => {
             let Some(ast::Expr::Str(str)) = path.cast() else {
