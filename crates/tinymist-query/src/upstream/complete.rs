@@ -134,10 +134,19 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
         if let Some(closure) = next_next.parent();
         if let Some(closure) = closure.cast::<ast::Expr>();
         if let ast::Expr::Closure(c) = closure;
-        if let Some(id) = ctx.root.span().id();
-        if let Some(src) = ctx.ctx.source_by_id(id).ok();
         then {
-            let mut doc_snippet = "/// $0\n///".to_string();
+            let doc_snippet = &mut "/// $0\n///";
+            let head = &ctx.text[..ctx.from];
+            if head.ends_with("///") {
+                if let Some(trimmed) = doc_snippet.strip_prefix("///") {
+                    *doc_snippet = trimmed;
+                }
+            } else if head.ends_with("//") {
+                if let Some(trimmed) = doc_snippet.strip_prefix("//") {
+                    *doc_snippet = trimmed;
+                }
+            };
+            let mut doc_snippet = doc_snippet.to_string();
             let mut i = 0;
             for param in c.params().children() {
                 // TODO: Properly handle Pos and Spread argument
@@ -162,15 +171,9 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
                 i += 2;
             }
             doc_snippet += &format!("\n/// -> ${}", i + 1);
-            let before = TextEdit {
-                range: ctx.ctx.to_lsp_range(ctx.leaf.range().start..ctx.from, &src),
-                new_text: String::new(),
-            };
             ctx.completions.push(Completion {
                 label: "Document function".into(),
-                label_detail: Some("Tidy Document Comment".into()),
                 apply: Some(doc_snippet.into()),
-                additional_text_edits: Some(vec![before]),
                 ..Completion::default()
             });
         }
