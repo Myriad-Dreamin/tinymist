@@ -441,11 +441,12 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         node = node.prev_sibling()?;
     }
 
-    let starts_with_dot = matches!(node.kind(), SyntaxKind::Dot)
-        || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
-            && node.text().starts_with("."));
-
-    if starts_with_dot && node.offset() + 1 == cursor {
+    if node.offset() + 1 == cursor && {
+        // Check if the cursor is exactly after single dot.
+        matches!(node.kind(), SyntaxKind::Dot)
+            || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
+                && node.text().starts_with("."))
+    } {
         let dot_target = node.clone().prev_leaf().and_then(first_ancestor_expr);
 
         if let Some(dot_target) = dot_target {
@@ -453,7 +454,7 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         }
     }
 
-    if matches!(node.kind(), SyntaxKind::Dots) && node.offset() + 1 == cursor {
+    if node.offset() + 1 == cursor && matches!(node.kind(), SyntaxKind::Dots) {
         let dot_target = node.parent()?;
         if dot_target.kind() == SyntaxKind::Spread {
             let dot_target = dot_target.prev_leaf().and_then(first_ancestor_expr);
