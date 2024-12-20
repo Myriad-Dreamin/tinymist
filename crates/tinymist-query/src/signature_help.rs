@@ -33,7 +33,7 @@ impl SemanticRequest for SignatureHelpRequest {
             target,
             is_set,
             ..
-        } = classify_cursor(ast_node)?
+        } = classify_cursor(ast_node, Some(cursor))?
         else {
             return None;
         };

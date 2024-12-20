@@ -8,28 +8,6 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 5,
-    "label": "mode",
-    "labelDetails": {
-     "description": "\"code\" | \"markup\" | \"math\""
-    },
-    "sortText": "000",
-    "textEdit": {
-     "newText": "mode: ${1:}",
-     "range": {
-      "end": {
-       "character": 69,
-       "line": 2
-      },
-      "start": {
-       "character": 69,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]

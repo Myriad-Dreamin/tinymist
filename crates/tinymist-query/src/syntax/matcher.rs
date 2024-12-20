@@ -1,3 +1,4 @@
+use reflexo_typst::debug_loc::SourceSpanOffset;
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
@@ -255,13 +256,109 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
     })
 }
 
+/// Classes of field syntax that can be operated on by IDE functionality.
+#[derive(Debug, Clone)]
+pub enum FieldClass<'a> {
+    Field(LinkedNode<'a>),
+    DotSuffix(SourceSpanOffset),
+}
+
+impl FieldClass<'_> {
+    /// Gets the node of the field class.
+    pub fn offset(&self, source: &Source) -> Option<usize> {
+        Some(match self {
+            Self::Field(node) => node.offset(),
+            Self::DotSuffix(span_offset) => {
+                source.find(span_offset.span)?.offset() + span_offset.offset
+            }
+        })
+    }
+}
+
+/// Classes of variable (access) syntax that can be operated on by IDE
+/// functionality.
+#[derive(Debug, Clone)]
+pub enum VarClass<'a> {
+    /// An identifier expression.
+    Ident(LinkedNode<'a>),
+    /// A field access expression.
+    FieldAccess(LinkedNode<'a>),
+    /// A dot access expression, for example, `#a.|`, `$a.|$`, or `x.|.y`.
+    /// Note the cursor of the last example is on the middle of the spread
+    /// operator.
+    DotAccess(LinkedNode<'a>),
+}
+
+impl<'a> VarClass<'a> {
+    /// Gets the node of the var (access) class.
+    pub fn node(&self) -> &LinkedNode<'a> {
+        match self {
+            Self::Ident(node) | Self::FieldAccess(node) | Self::DotAccess(node) => node,
+        }
+    }
+
+    /// Gets the accessed node of the var (access) class.
+    pub fn accessed_node(&self) -> Option<LinkedNode<'a>> {
+        Some(match self {
+            Self::Ident(node) => node.clone(),
+            Self::FieldAccess(node) => {
+                let field_access = node.cast::<ast::FieldAccess>()?;
+                node.find(field_access.target().span())?
+            }
+            Self::DotAccess(node) => node.clone(),
+        })
+    }
+
+    /// Gets the accessing field of the var (access) class.
+    pub fn accessing_field(&self) -> Option<FieldClass<'a>> {
+        match self {
+            Self::FieldAccess(node) => {
+                let dot = node
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Dot))?;
+                let mut iter_after_dot =
+                    node.children().skip_while(|n| n.kind() != SyntaxKind::Dot);
+                let ident = iter_after_dot.find(|n| {
+                    matches!(
+                        n.kind(),
+                        SyntaxKind::Ident | SyntaxKind::MathIdent | SyntaxKind::Error
+                    )
+                });
+
+                let ident_case = ident.map(|ident| {
+                    if ident.text().is_empty() {
+                        FieldClass::DotSuffix(SourceSpanOffset {
+                            span: ident.span(),
+                            offset: 0,
+                        })
+                    } else {
+                        FieldClass::Field(ident)
+                    }
+                });
+
+                ident_case.or_else(|| {
+                    Some(FieldClass::DotSuffix(SourceSpanOffset {
+                        span: dot.span(),
+                        offset: 1,
+                    }))
+                })
+            }
+            Self::DotAccess(node) => Some(FieldClass::DotSuffix(SourceSpanOffset {
+                span: node.span(),
+                offset: node.range().len() + 1,
+            })),
+            Self::Ident(_) => None,
+        }
+    }
+}
+
 /// Classes of syntax that can be operated on by IDE functionality.
 #[derive(Debug, Clone)]
 pub enum SyntaxClass<'a> {
     /// A variable access expression.
     ///
     /// It can be either an identifier or a field access.
-    VarAccess(LinkedNode<'a>),
+    VarAccess(VarClass<'a>),
     /// A (content) label expression.
     Label {
         node: LinkedNode<'a>,
@@ -299,9 +396,9 @@ impl<'a> SyntaxClass<'a> {
     /// Gets the node of the syntax class.
     pub fn node(&self) -> &LinkedNode<'a> {
         match self {
+            SyntaxClass::VarAccess(cls) => cls.node(),
             SyntaxClass::Label { node, .. }
             | SyntaxClass::Ref(node)
-            | SyntaxClass::VarAccess(node)
             | SyntaxClass::Callee(node)
             | SyntaxClass::ImportPath(node)
             | SyntaxClass::IncludePath(node)
@@ -344,6 +441,28 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         node = node.prev_sibling()?;
     }
 
+    let is_dot = matches!(node.kind(), SyntaxKind::Dot)
+        || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error) && node.text() == ".");
+
+    if is_dot && node.offset() + 1 == cursor {
+        let dot_target = node.clone().prev_leaf().and_then(first_ancestor_expr);
+
+        if let Some(dots_target) = dot_target {
+            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dots_target)));
+        }
+    }
+
+    if matches!(node.kind(), SyntaxKind::Dots) && node.offset() + 1 == cursor {
+        let dot_target = node.parent()?;
+        if dot_target.kind() == SyntaxKind::Spread {
+            let dot_target = dot_target.prev_leaf().and_then(first_ancestor_expr);
+
+            if let Some(dot_target) = dot_target {
+                return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
+            }
+        }
+    }
+
     // Move to the first ancestor that is an expression.
     let ancestor = first_ancestor_expr(node)?;
     crate::log_debug_ct!("first_ancestor_expr: {ancestor:?}");
@@ -359,9 +478,10 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         ast::Expr::Ref(..) => SyntaxClass::Ref(adjusted),
         ast::Expr::FuncCall(call) => SyntaxClass::Callee(adjusted.find(call.callee().span())?),
         ast::Expr::Set(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
-        ast::Expr::Ident(..) | ast::Expr::MathIdent(..) | ast::Expr::FieldAccess(..) => {
-            SyntaxClass::VarAccess(adjusted)
+        ast::Expr::Ident(..) | ast::Expr::MathIdent(..) => {
+            SyntaxClass::VarAccess(VarClass::Ident(adjusted))
         }
+        ast::Expr::FieldAccess(..) => SyntaxClass::VarAccess(VarClass::FieldAccess(adjusted)),
         ast::Expr::Str(..) => {
             let parent = adjusted.parent()?;
             if parent.kind() == SyntaxKind::ModuleImport {
@@ -571,6 +691,10 @@ pub enum CursorClass<'a> {
         container: LinkedNode<'a>,
         is_before: bool,
     },
+    /// A variable access expression.
+    ///
+    /// It can be either an identifier or a field access.
+    VarAccess(VarClass<'a>),
     /// A cursor on an import path.
     ImportPath(LinkedNode<'a>),
     /// A cursor on an include path.
@@ -592,6 +716,7 @@ impl<'a> CursorClass<'a> {
                 ArgClass::Positional { .. } => return None,
                 ArgClass::Named(node) => node.clone(),
             },
+            CursorClass::VarAccess(cls) => cls.node().clone(),
             CursorClass::Paren { container, .. } => container.clone(),
             CursorClass::Label { node, .. }
             | CursorClass::ImportPath(node)
@@ -648,7 +773,7 @@ pub fn classify_cursor_by_context<'a>(
 }
 
 /// Classifies a cursor syntax that are preferred by type checking.
-pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
+pub fn classify_cursor(node: LinkedNode, cursor: Option<usize>) -> Option<CursorClass<'_>> {
     let mut node = node;
     if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
         loop {
@@ -660,7 +785,8 @@ pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
         }
     }
 
-    let syntax = classify_syntax(node.clone(), node.offset())?;
+    let cursor = cursor.unwrap_or_else(|| node.offset());
+    let syntax = classify_syntax(node.clone(), cursor)?;
 
     let normal_syntax = match syntax {
         SyntaxClass::Callee(callee) => {
@@ -675,7 +801,7 @@ pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
         SyntaxClass::IncludePath(node) => {
             return Some(CursorClass::IncludePath(node));
         }
-        syntax => syntax.node().clone(),
+        syntax => syntax,
     };
 
     let Some(mut node_parent) = node.parent().cloned() else {
@@ -739,7 +865,10 @@ pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
                 is_before,
             })
         }
-        _ => Some(CursorClass::Normal(normal_syntax)),
+        _ => Some(match normal_syntax {
+            SyntaxClass::VarAccess(v) => CursorClass::VarAccess(v),
+            normal_syntax => CursorClass::Normal(normal_syntax.node().clone()),
+        }),
     }
 }
 
@@ -884,11 +1013,12 @@ mod tests {
     fn map_cursor(source: &str) -> String {
         map_node(source, |root, cursor| {
             let node = root.leaf_at_compat(cursor);
-            let kind = node.and_then(|node| classify_cursor(node));
+            let kind = node.and_then(|node| classify_cursor(node, Some(cursor)));
             match kind {
                 Some(CursorClass::Arg { .. }) => 'p',
                 Some(CursorClass::Element { .. }) => 'e',
                 Some(CursorClass::Paren { .. }) => 'P',
+                Some(CursorClass::VarAccess { .. }) => 'v',
                 Some(CursorClass::ImportPath(..)) => 'i',
                 Some(CursorClass::IncludePath(..)) => 'I',
                 Some(CursorClass::Label { .. }) => 'l',
@@ -935,20 +1065,20 @@ Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r"
         #let x = 1  
-         nnnnnnnnn  
+         nnnnvvnnn  
         Text
             
         = Heading #let y = 2;  
-                   nnnnnnnnn   
+                   nnnnvvnnn   
         == Heading
         ");
         assert_snapshot!(map_cursor(r#"#let f(x);"#).trim(), @r"
         #let f(x);
-         nnnnn n
+         nnnnv v
         ");
         assert_snapshot!(map_cursor(r#"#f(1, 2)   Test"#).trim(), @r"
         #f(1, 2)   Test
-         npppppp
+         vpppppp
         ");
         assert_snapshot!(map_cursor(r#"#()   Test"#).trim(), @r"
         #()   Test
@@ -972,5 +1102,43 @@ Text
          eeeeee  
           Test
         ");
+    }
+
+    #[test]
+    fn test_access_field() {
+        fn test_fn(s: &str, cursor: i32) -> String {
+            test_fn_(s, cursor).unwrap_or_default()
+        }
+
+        fn test_fn_(s: &str, cursor: i32) -> Option<String> {
+            let cursor = if cursor < 0 {
+                s.len() as i32 + cursor
+            } else {
+                cursor
+            };
+            let source = Source::detached(s.to_owned());
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at_compat(cursor as usize)?;
+            let syntax = classify_syntax(node, cursor as usize)?;
+            let SyntaxClass::VarAccess(var) = syntax else {
+                return None;
+            };
+
+            let field = var.accessing_field()?;
+            Some(match field {
+                FieldClass::Field(ident) => format!("Field: {}", ident.text()),
+                FieldClass::DotSuffix(span_offset) => {
+                    let offset = source.find(span_offset.span)?.offset() + span_offset.offset;
+                    format!("DotSuffix: {offset:?}")
+                }
+            })
+        }
+
+        assert_snapshot!(test_fn("#(a.b)", 5), @r"Field: b");
+        assert_snapshot!(test_fn("#a.", 3), @"DotSuffix: 3");
+        assert_snapshot!(test_fn("$a.$", 3), @"DotSuffix: 3");
+        assert_snapshot!(test_fn("#(a.)", 4), @"DotSuffix: 4");
+        assert_snapshot!(test_fn("#(a..b)", 4), @"DotSuffix: 4");
+        assert_snapshot!(test_fn("#(a..b())", 4), @"DotSuffix: 4");
     }
 }

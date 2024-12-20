@@ -22,6 +22,7 @@ use crate::snippet::{
 };
 use crate::syntax::{
     interpret_mode_at, is_ident_like, previous_decls, CursorClass, InterpretMode, PreviousDecl,
+    VarClass,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
 use crate::upstream::complete::complete_code;
@@ -1373,7 +1374,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     use crate::syntax::classify_cursor;
     use SurroundingSyntax::*;
 
-    let cursor_class = classify_cursor(ctx.leaf.clone());
+    let cursor_class = classify_cursor(ctx.leaf.clone(), Some(ctx.cursor));
     crate::log_debug_ct!("complete_type: pos {:?} -> {cursor_class:#?}", ctx.leaf);
     let mut args_node = None;
 
@@ -1395,6 +1396,11 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
                 }
             }
             args_node = Some(args.to_untyped().clone());
+        }
+        // todo: complete field by types
+        Some(CursorClass::VarAccess(VarClass::FieldAccess { .. }))
+        | Some(CursorClass::VarAccess(VarClass::DotAccess { .. })) => {
+            return None;
         }
         Some(CursorClass::ImportPath(path) | CursorClass::IncludePath(path)) => {
             let Some(ast::Expr::Str(str)) = path.cast() else {
@@ -1429,11 +1435,12 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
         {
             args_node = node.parent().map(|s| s.get().clone());
         }
-        // todo: complete type field
-        Some(CursorClass::Normal(node)) if matches!(node.kind(), SyntaxKind::FieldAccess) => {
-            return None;
-        }
-        Some(CursorClass::Paren { .. } | CursorClass::Label { .. } | CursorClass::Normal(..))
+        Some(
+            CursorClass::VarAccess(VarClass::Ident { .. })
+            | CursorClass::Paren { .. }
+            | CursorClass::Label { .. }
+            | CursorClass::Normal(..),
+        )
         | None => {}
     }
 
