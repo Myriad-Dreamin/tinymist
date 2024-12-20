@@ -46,7 +46,6 @@ pub fn autocomplete(
         || complete_type_and_syntax(&mut ctx).is_none() && {
             crate::log_debug_ct!("continue after completing type and syntax");
             complete_imports(&mut ctx)
-                || complete_field_accesses(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
                 || complete_code(&mut ctx, false)
@@ -239,53 +238,6 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
         ctx.scope_completions(true);
         ctx.snippet_completions(Some(InterpretMode::Math), None);
         return true;
-    }
-
-    false
-}
-
-/// Complete field accesses.
-fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
-    // Used to determine whether trivia nodes are allowed before '.'.
-    // During an inline expression in markup mode trivia nodes exit the inline
-    // expression.
-    let in_markup: bool = matches!(
-        ctx.leaf.parent_kind(),
-        None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
-    );
-
-    // Behind an expression plus dot: "emoji.|".
-    if_chain! {
-        if ctx.leaf.kind() == SyntaxKind::Dot
-            || (ctx.leaf.kind() == SyntaxKind::Text
-                && ctx.leaf.text() == ".");
-        if ctx.leaf.range().end == ctx.cursor;
-        if let Some(prev) = ctx.leaf.prev_sibling();
-        if !in_markup || prev.range().end == ctx.leaf.range().start;
-        if prev.is::<ast::Expr>();
-        if prev.parent_kind() != Some(SyntaxKind::Markup) ||
-           prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
-        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
-        then {
-            ctx.from = ctx.cursor;
-            field_access_completions(ctx, &prev, &value, &styles);
-            return true;
-        }
-    }
-
-    // Behind a started field access: "emoji.fa|".
-    if_chain! {
-        if ctx.leaf.kind() == SyntaxKind::Ident;
-        if let Some(prev) = ctx.leaf.prev_sibling();
-        if prev.kind() == SyntaxKind::Dot;
-        if let Some(prev_prev) = prev.prev_sibling();
-        if prev_prev.is::<ast::Expr>();
-        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
-        then {
-            ctx.from = ctx.leaf.offset();
-            field_access_completions(ctx,&prev_prev, &value, &styles);
-            return true;
-        }
     }
 
     false
