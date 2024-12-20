@@ -135,6 +135,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
 
 [[package]]
+name = "append-only-vec"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7992085ec035cfe96992dd31bfd495a2ebd31969bb95f624471cb6c0b349e571"
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -142,6 +148,12 @@ checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "arc-swap"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
 name = "archery"
@@ -690,6 +702,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1137cd7e7fc0fb5d3c5a8678be38ec56e819125d8d7907411fe24ccb943faca8"
+dependencies = [
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-epoch",
+ "crossbeam-queue",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -811,6 +836,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
 dependencies = [
  "cfg-if",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "dashmap"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
  "hashbrown 0.14.5",
  "lock_api",
  "once_cell",
@@ -1375,6 +1414,15 @@ name = "hashlink"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
+dependencies = [
+ "hashbrown 0.14.5",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
  "hashbrown 0.14.5",
 ]
@@ -2745,7 +2793,7 @@ dependencies = [
  "base64",
  "bitvec",
  "comemo 0.4.0",
- "dashmap",
+ "dashmap 5.5.3",
  "ecow 0.2.3",
  "fxhash",
  "instant",
@@ -2808,7 +2856,7 @@ dependencies = [
  "bitvec",
  "comemo 0.4.0",
  "crossbeam-queue",
- "dashmap",
+ "dashmap 5.5.3",
  "flate2",
  "log",
  "parking_lot",
@@ -3199,6 +3247,41 @@ name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
+name = "salsa"
+version = "0.18.0"
+dependencies = [
+ "append-only-vec",
+ "arc-swap",
+ "crossbeam",
+ "dashmap 6.1.0",
+ "hashlink 0.9.1",
+ "indexmap 2.7.0",
+ "lazy_static",
+ "parking_lot",
+ "rayon",
+ "rustc-hash 2.1.0",
+ "salsa-macro-rules",
+ "salsa-macros",
+ "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "salsa-macro-rules"
+version = "0.1.0"
+
+[[package]]
+name = "salsa-macros"
+version = "0.18.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+ "synstructure",
+]
 
 [[package]]
 name = "same-file"
@@ -3928,7 +4011,7 @@ dependencies = [
  "biblatex",
  "chrono",
  "comemo 0.4.0",
- "dashmap",
+ "dashmap 5.5.3",
  "dirs",
  "ecow 0.2.3",
  "ena",
@@ -3952,6 +4035,8 @@ dependencies = [
  "rust_iso3166",
  "rust_iso639",
  "rustc-hash 2.1.0",
+ "salsa",
+ "salsa-macros",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3991,6 +4076,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "codespan-reporting",
  "comemo 0.4.0",
  "dirs",
  "flate2",
@@ -3998,7 +4084,10 @@ dependencies = [
  "parking_lot",
  "reflexo-typst",
  "reflexo-typst-shim",
+ "regex",
  "reqwest",
+ "salsa",
+ "salsa-macros",
  "serde",
  "serde_json",
  "tar",
@@ -5265,7 +5354,7 @@ checksum = "2a1a1c0bc9823338a3bdf8c61f994f23ac004c6fa32c08cd152984499b445e8d"
 dependencies = [
  "arraydeque",
  "encoding_rs",
- "hashlink",
+ "hashlink 0.8.4",
 ]
 
 [[package]]
