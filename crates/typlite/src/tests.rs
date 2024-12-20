@@ -21,6 +21,8 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
     let main = Source::detached(s);
     let mut universe = LspUniverseBuilder::build(
         EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
+        // todo: config
+        Default::default(),
         Default::default(),
         FONT_RESOLVER.clone(),
         Default::default(),
@@ -31,6 +33,7 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
         .unwrap();
     let world = universe.snapshot();
 
+    #[allow(clippy::arc_with_non_send_sync)]
     let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
         annotate_elem: for_docs,
         ..Default::default()

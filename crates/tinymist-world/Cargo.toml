@@ -20,16 +20,20 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 log.workspace = true
+salsa.workspace = true
+salsa-macros.workspace = true
 
 reflexo-typst.workspace = true
 reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
+codespan-reporting = "0.11"
 
 tinymist-assets = { workspace = true }
 typst-assets = { workspace = true, features = ["fonts"] }
 
 dirs.workspace = true
 parking_lot.workspace = true
+regex.workspace = true
 flate2 = "1"
 tar = "0.4"
 
@@ -42,5 +46,5 @@ reqwest = { version = "^0.12", default-features = false, features = [
 [features]
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
-[lints]
-workspace = true
+# [lints]
+# workspace = true

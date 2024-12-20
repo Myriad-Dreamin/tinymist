@@ -128,7 +128,7 @@ impl ReferencesWorker<'_> {
         let uri = self.ctx.ctx.uri_for_id(ref_fid).ok()?;
 
         let t = ei.get_refs(self.def.decl.clone());
-        self.push_idents(&ei.source, &uri, t);
+        self.push_idents(&src, &uri, t);
 
         if ei.is_exported(&self.def.decl) {
             self.ctx.push_dependents(ref_fid);

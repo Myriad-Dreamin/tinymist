@@ -119,10 +119,8 @@ impl LanguageState {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
                 }),
-                tokens_caches: Arc::default(),
                 workers: Default::default(),
                 caches: Default::default(),
-                analysis_rev_cache: Arc::default(),
                 stats: Arc::default(),
             }),
 
@@ -141,9 +139,15 @@ impl LanguageState {
             let font_resolver = font_resolver.wait().clone();
             let package_registry =
                 LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-            let verse =
-                LspUniverseBuilder::build(entry_.clone(), inputs, font_resolver, package_registry)
-                    .expect("incorrect options");
+            let verse = LspUniverseBuilder::build(
+                entry_.clone(),
+                // todo: config
+                Default::default(),
+                inputs,
+                font_resolver,
+                package_registry,
+            )
+            .expect("incorrect options");
 
             // Create the actor
             let server = CompileServerActor::new_with(

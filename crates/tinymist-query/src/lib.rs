@@ -15,7 +15,7 @@ pub mod syntax;
 pub mod ty;
 mod upstream;
 
-pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
+pub use analysis::{LocalContext, LspWorldExt};
 pub use snippet::PostfixSnippet;
 pub use upstream::{with_vm, CompletionFeat};
 
@@ -136,6 +136,14 @@ pub trait StatefulRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response>;
 }
+
+// #[salsa::db]
+// pub trait Db: tinymist_world::Db {
+//     fn ctx(&self) -> &Arc<SharedContext>;
+//     fn upcast(&self) -> &dyn tinymist_world::Db;
+// }
+
+pub use tinymist_world::Db;
 
 /// Completely disabled log
 #[macro_export]

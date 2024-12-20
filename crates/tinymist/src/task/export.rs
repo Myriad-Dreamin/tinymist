@@ -232,7 +232,7 @@ impl ExportConfig {
                     one,
                     pretty,
                 } => {
-                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
+                    let elements = reflexo_typst::query::retrieve(&snap.world.base, &selector, doc)
                         .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
@@ -260,6 +260,7 @@ impl ExportConfig {
                 }
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
+                    #[allow(clippy::arc_with_non_send_sync)]
                     let conv = Typlite::new(Arc::new(snap.world))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;

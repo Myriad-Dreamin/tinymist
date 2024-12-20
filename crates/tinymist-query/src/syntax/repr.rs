@@ -19,6 +19,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
 
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
+            Expr::Deferred(..) => self.f.write_str("Deferred(..)"),
             Expr::Block(exprs) => self.write_seq(exprs),
             Expr::Array(elems) => self.write_array(elems),
             Expr::Dict(elems) => self.write_dict(elems),
@@ -351,6 +352,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
 
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
+            Expr::Deferred(..) => self.f.write_str("Deferred(..)"),
             Expr::Block(..) => self.f.write_str("Expr(..)"),
             Expr::Array(elems) => self.write_array(elems),
             Expr::Dict(elems) => self.write_dict(elems),

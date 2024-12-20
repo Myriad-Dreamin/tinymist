@@ -1,8 +1,10 @@
-use std::num::NonZeroUsize;
+#![allow(unused)]
+
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
+use crate::Db;
 use comemo::{Track, Tracked};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
@@ -12,7 +14,7 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
 use tinymist_world::LspWorld;
-use tinymist_world::DETACHED_ENTRY;
+use tinymist_world::{LspWorldBase, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
@@ -22,26 +24,22 @@ use typst::model::Document;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 
-use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
     AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
-    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
-    TypeInfo,
+    SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty, TypeInfo,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
     classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
-    DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
+    DefKind, ExprInfo, ModuleDependency, SyntaxClass,
 };
 use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
-    lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
-    LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
+    lsp_to_typst, typst_to_lsp, ColorTheme, LspPosition, LspRange, LspWorldExt, PositionEncoding,
+    TypstRange, VersionedDocument,
 };
-
-use super::TypeEnv;
 
 /// The analysis data holds globally.
 #[derive(Default, Clone)]
@@ -62,68 +60,53 @@ pub struct Analysis {
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
     pub workers: Arc<AnalysisGlobalWorkers>,
-    /// The semantic token cache.
-    pub tokens_caches: Arc<Mutex<SemanticTokenCache>>,
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
-    /// The revision-managed cache for analysis.
-    pub analysis_rev_cache: Arc<Mutex<AnalysisRevCache>>,
     /// The statistics about the analyzers.
     pub stats: Arc<AnalysisStats>,
 }
 
 impl Analysis {
     /// Get a snapshot of the analysis data.
-    pub fn snapshot(&self, world: LspWorld) -> LocalContextGuard {
-        self.snapshot_(world, self.lock_revision(None))
+    pub fn snapshot(&self, world: LspWorld) -> LocalContext {
+        self.snapshot_(world)
     }
 
     /// Get a snapshot of the analysis data.
-    pub fn snapshot_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
+    pub fn snapshot_(&self, world: LspWorld) -> LocalContext {
         let lifetime = self.caches.lifetime.fetch_add(1, Ordering::SeqCst);
-        let slot = self
-            .analysis_rev_cache
-            .lock()
-            .find_revision(world.revision(), &lg);
-        let tokens = lg.tokens.take();
-        LocalContextGuard {
-            rev_lock: lg,
-            local: LocalContext {
-                tokens,
-                caches: AnalysisLocalCaches::default(),
-                shared: Arc::new(SharedContext {
-                    slot,
-                    lifetime,
-                    world,
-                    analysis: self.clone(),
-                }),
-            },
+        // let slot = self
+        //     .analysis_rev_cache
+        //     .lock()
+        //     .find_revision(world.revision(), &lg);
+        // let tokens = lg.tokens.take();
+        #[allow(clippy::arc_with_non_send_sync)]
+        LocalContext {
+            // todo
+            tokens: None,
+            caches: AnalysisLocalCaches::default(),
+            shared: Arc::new(SharedContext {
+                // slot: todo!(),
+                lifetime,
+                world,
+                analysis: self.clone(),
+            }),
         }
     }
 
-    /// Lock the revision in *main thread*.
-    #[must_use]
-    pub fn lock_revision(&self, req: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
-        let mut grid = self.analysis_rev_cache.lock();
-
-        AnalysisRevLock {
-            tokens: match req {
-                Some(CompilerQueryRequest::SemanticTokensFull(req)) => Some(
-                    SemanticTokenCache::acquire(self.tokens_caches.clone(), &req.path, None),
-                ),
-                Some(CompilerQueryRequest::SemanticTokensDelta(req)) => {
-                    Some(SemanticTokenCache::acquire(
-                        self.tokens_caches.clone(),
-                        &req.path,
-                        Some(&req.previous_result_id),
-                    ))
-                }
-                _ => None,
-            },
-            inner: grid.manager.lock_estimated(),
-            grid: self.analysis_rev_cache.clone(),
-        }
-    }
+    // match req {
+    //     Some(CompilerQueryRequest::SemanticTokensFull(req)) => Some(
+    //         SemanticTokenCache::acquire(self.tokens_caches.clone(), &req.path,
+    // None),     ),
+    //     Some(CompilerQueryRequest::SemanticTokensDelta(req)) => {
+    //         Some(SemanticTokenCache::acquire(
+    //             self.tokens_caches.clone(),
+    //             &req.path,
+    //             Some(&req.previous_result_id),
+    //         ))
+    //     }
+    //     _ => None,
+    // }
 
     /// Clear all cached resources.
     pub fn clear_cache(&self) {
@@ -131,8 +114,6 @@ impl Analysis {
         self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
-        self.tokens_caches.lock().clear();
-        self.analysis_rev_cache.lock().clear();
     }
 
     /// Report the statistics of the analysis.
@@ -194,65 +175,12 @@ pub trait PeriscopeProvider {
     }
 }
 
-/// The local context guard that performs gc once dropped.
-pub struct LocalContextGuard {
-    /// The guarded local context
-    pub local: LocalContext,
-    /// The revision lock
-    pub rev_lock: AnalysisRevLock,
-}
-
-impl Deref for LocalContextGuard {
-    type Target = LocalContext;
-
-    fn deref(&self) -> &Self::Target {
-        &self.local
-    }
-}
-
-impl DerefMut for LocalContextGuard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.local
-    }
-}
-
-// todo: gc in new thread
-impl Drop for LocalContextGuard {
-    fn drop(&mut self) {
-        self.gc();
-    }
-}
-
-impl LocalContextGuard {
-    fn gc(&self) {
-        let lifetime = self.lifetime;
-        loop {
-            let latest_clear_lifetime = self.analysis.caches.clear_lifetime.load(Ordering::Relaxed);
-            if latest_clear_lifetime >= lifetime {
-                return;
-            }
-
-            if self.analysis.caches.clear_lifetime.compare_exchange(
-                latest_clear_lifetime,
-                lifetime,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) != Ok(latest_clear_lifetime)
-            {
-                continue;
-            }
-
-            break;
-        }
-
-        let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
-        let caches = &self.analysis.caches;
-        caches.def_signatures.retain(|(l, _)| retainer(*l));
-        caches.static_signatures.retain(|(l, _)| retainer(*l));
-        caches.terms.retain(|(l, _)| retainer(*l));
-        caches.signatures.retain(|(l, _)| retainer(*l));
-    }
-}
+// let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
+// let caches = &self.analysis.caches;
+// caches.def_signatures.retain(|(l, _)| retainer(*l));
+// caches.static_signatures.retain(|(l, _)| retainer(*l));
+// caches.terms.retain(|(l, _)| retainer(*l));
+// caches.signatures.retain(|(l, _)| retainer(*l));
 
 /// The local context for analyzers. In addition to the shared context, it also
 /// holds mutable local caches.
@@ -349,7 +277,7 @@ impl LocalContext {
     }
 
     /// Get the world surface for Typst compiler.
-    pub fn world(&self) -> &LspWorld {
+    pub fn world(&self) -> &LspWorldBase {
         &self.shared.world
     }
 
@@ -392,15 +320,18 @@ impl LocalContext {
     pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {
         let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self, source);
 
-        let result_id = self.tokens.as_ref().map(|t| {
-            let id = t.next.revision;
-            t.next
-                .data
-                .set(tokens.clone())
-                .unwrap_or_else(|_| panic!("unexpected slot overwrite {id}"));
-            id.to_string()
-        });
-        (tokens, result_id)
+        // todo cache
+        // let result_id = self.tokens.as_ref().map(|t| {
+        //     let id = t.next.revision;
+        //     t.next
+        //         .data
+        //         .set(tokens.clone())
+        //         .unwrap_or_else(|_| panic!("unexpected slot overwrite
+        // {id}"));     id.to_string()
+        // });
+        // (tokens, result_id)
+
+        (tokens, None)
     }
 
     /// Get the expression information of a source file.
@@ -474,16 +405,11 @@ pub struct SharedContext {
     pub world: LspWorld,
     /// The analysis data
     pub analysis: Analysis,
-    /// The using analysis revision slot
-    slot: Arc<RevisionSlot<AnalysisRevSlot>>,
+    // The using analysis revision slot
+    // slot: Arc<RevisionSlot<AnalysisRevSlot>>,
 }
 
 impl SharedContext {
-    /// Get revision of current analysis
-    pub fn revision(&self) -> usize {
-        self.slot.revision
-    }
-
     /// Get the position encoding during session.
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.analysis.position_encoding
@@ -653,7 +579,7 @@ impl SharedContext {
         let mut sink = Sink::default();
 
         typst::eval::eval(
-            ((&self.world) as &dyn World).track(),
+            (self.world() as &dyn World).track(),
             traced.track(),
             sink.track_mut(),
             route.track(),
@@ -670,7 +596,7 @@ impl SharedContext {
 
         match src {
             Some(Value::Str(s)) => {
-                let id = resolve_id_by_path(&self.world, source.span().id()?, s.as_str())?;
+                let id = resolve_id_by_path(&self.world(), source.span().id()?, s.as_str())?;
                 self.module_by_id(id).ok().map(Value::Module)
             }
             _ => None,
@@ -678,74 +604,58 @@ impl SharedContext {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
-        Some(self.expr_stage(&self.source_by_id(fid).ok()?))
-    }
-
-    /// Get the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
-        let mut route = ExprRoute::default();
-        self.expr_stage_(source, &mut route)
+        self.expr_stage_(source)
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut ExprRoute,
-    ) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage_(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
-        let guard = self.query_stat(source.id(), "expr_stage");
-        self.slot.expr_stage.compute(hash128(&source), |prev| {
-            expr_of(self.clone(), source.clone(), route, guard, prev)
-        })
-    }
+        // let guard = self.query_stat(source.id(), "expr_stage");
+        // self.slot.expr_stage.compute(hash128(&source), |prev| {
+        //     expr_of(self.clone(), source.clone(), route, guard, prev)
+        // })
 
-    pub(crate) fn exports_of(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut ExprRoute,
-    ) -> Option<Arc<LazyHash<LexicalScope>>> {
-        if let Some(s) = route.get(&source.id()) {
-            return s.clone();
-        }
-
-        Some(self.expr_stage_(source, route).exports.clone())
+        let source = self.world.source_by_id(source.id()).unwrap();
+        expr_of(&self.world, source)
     }
 
     /// Get the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
-        let mut route = TypeEnv::default();
-        self.type_check_(source, &mut route)
+        self.type_check_(source)
+    }
+
+    /// Get the world surface for Typst compiler.
+    pub fn world(&self) -> &LspWorldBase {
+        &self.world
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check_(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut TypeEnv,
-    ) -> Arc<TypeInfo> {
+    pub(crate) fn type_check_(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
         use crate::analysis::type_check;
 
-        let ei = self.expr_stage(source);
-        let guard = self.query_stat(source.id(), "type_check");
-        self.slot.type_check.compute(hash128(&ei), |prev| {
-            let cache_hit = prev.and_then(|prev| {
-                // todo: recursively check changed scheme type
-                if prev.revision != ei.revision {
-                    return None;
-                }
+        // let ei = self.expr_stage(source);
+        // let guard = self.query_stat(source.id(), "type_check");
+        // self.slot.type_check.compute(hash128(&ei), |prev| {
+        //     let cache_hit = prev.and_then(|prev| {
+        //         // todo: recursively check changed scheme type
+        //         if prev.revision != ei.revision {
+        //             return None;
+        //         }
 
-                Some(prev)
-            });
+        //         Some(prev)
+        //     });
 
-            if let Some(prev) = cache_hit {
-                return prev.clone();
-            }
+        //     if let Some(prev) = cache_hit {
+        //         return prev.clone();
+        //     }
 
-            guard.miss();
-            type_check(self.clone(), ei, route)
-        })
+        //     guard.miss();
+        //     type_check(self.clone(), ei, route)
+        // })
+
+        let source = self.world.source_by_id(source.id()).unwrap();
+        type_check(&self.world, source).clone()
     }
 
     pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {
@@ -847,13 +757,13 @@ impl SharedContext {
             return (Some(v), None);
         }
         let token = &self.analysis.workers.import;
-        token.enter(|| analyze_import_(&self.world, source))
+        token.enter(|| analyze_import_(self.world(), source))
     }
 
     /// Try to load a module from the current source file.
     pub fn analyze_expr(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
         let token = &self.analysis.workers.expression;
-        token.enter(|| analyze_expr_(&self.world, source))
+        token.enter(|| analyze_expr_(self.world(), source))
     }
 
     /// Get bib info of a source file.
@@ -863,7 +773,7 @@ impl SharedContext {
         bib_paths: impl Iterator<Item = EcoString>,
     ) -> Option<Arc<BibInfo>> {
         use comemo::Track;
-        let w = &self.world;
+        let w = self.world();
         let w = (w as &dyn World).track();
 
         bib_info(w, span, bib_paths.collect())
@@ -881,12 +791,12 @@ impl SharedContext {
         cursor: usize,
     ) -> Option<Tooltip> {
         let token = &self.analysis.workers.tooltip;
-        token.enter(|| tooltip_(&self.world, document, source, cursor))
+        token.enter(|| tooltip_(self.world(), document, source, cursor))
     }
 
     /// Get the manifest of a package by file id.
     pub fn get_manifest(&self, toml_id: TypstFileId) -> StrResult<PackageManifest> {
-        crate::package::get_manifest(&self.world, toml_id)
+        crate::package::get_manifest(self.world(), toml_id)
     }
 
     /// Compute the signature of a function.
@@ -953,20 +863,6 @@ impl SharedContext {
         }
     }
 
-    /// Check on a module before really needing them. But we likely use them
-    /// after a while.
-    pub(crate) fn prefetch_type_check(self: &Arc<Self>, _fid: TypstFileId) {
-        // crate::log_debug_ct!("prefetch type check {fid:?}");
-        // let this = self.clone();
-        // rayon::spawn(move || {
-        //     let Some(source) = this.world.source(fid).ok() else {
-        //         return;
-        //     };
-        //     this.type_check(&source);
-        //     // crate::log_debug_ct!("prefetch type check end {fid:?}");
-        // });
-    }
-
     pub(crate) fn preload_package(self: Arc<Self>, entry_point: TypstFileId) {
         crate::log_debug_ct!("preload package start {entry_point:?}");
 
@@ -982,7 +878,7 @@ impl SharedContext {
                 let source = self.shared.source_by_id(fid).ok().unwrap();
                 let exprs = self.shared.expr_stage(&source);
                 self.shared.type_check(&source);
-                exprs.imports.iter().for_each(|(fid, _)| {
+                exprs.imports.iter().for_each(|fid| {
                     if !self.analyzed.lock().insert(*fid) {
                         return;
                     }
@@ -1147,100 +1043,6 @@ pub struct AnalysisLocalCaches {
 pub struct ModuleAnalysisLocalCache {
     expr_stage: OnceCell<Arc<ExprInfo>>,
     type_check: OnceCell<Arc<TypeInfo>>,
-}
-
-/// A revision-managed (per input change) cache for all level of analysis
-/// results of a module.
-#[derive(Default)]
-pub struct AnalysisRevCache {
-    default_slot: AnalysisRevSlot,
-    manager: RevisionManager<AnalysisRevSlot>,
-}
-
-impl RevisionManagerLike for AnalysisRevCache {
-    fn gc(&mut self, rev: usize) {
-        self.manager.gc(rev);
-
-        {
-            let mut max_ei = FxHashMap::default();
-            let es = self.default_slot.expr_stage.global.lock();
-            for r in es.iter() {
-                let rev: &mut usize = max_ei.entry(r.1.fid).or_default();
-                *rev = (*rev).max(r.1.revision);
-            }
-            es.retain(|_, r| r.1.revision == *max_ei.get(&r.1.fid).unwrap_or(&0));
-        }
-
-        {
-            let mut max_ti = FxHashMap::default();
-            let ts = self.default_slot.type_check.global.lock();
-            for r in ts.iter() {
-                let rev: &mut usize = max_ti.entry(r.1.fid).or_default();
-                *rev = (*rev).max(r.1.revision);
-            }
-            ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
-        }
-    }
-}
-
-impl AnalysisRevCache {
-    fn clear(&mut self) {
-        self.manager.clear();
-        self.default_slot = Default::default();
-    }
-
-    /// Find the last revision slot by revision number.
-    fn find_revision(
-        &mut self,
-        revision: NonZeroUsize,
-        lg: &AnalysisRevLock,
-    ) -> Arc<RevisionSlot<AnalysisRevSlot>> {
-        lg.inner.access(revision);
-        self.manager.find_revision(revision, |slot_base| {
-            log::info!("analysis revision {} is created", revision.get());
-            slot_base
-                .map(|slot| AnalysisRevSlot {
-                    revision: slot.revision,
-                    expr_stage: slot.data.expr_stage.crawl(revision.get()),
-                    type_check: slot.data.type_check.crawl(revision.get()),
-                })
-                .unwrap_or_else(|| self.default_slot.clone())
-        })
-    }
-}
-
-/// A lock for revision.
-pub struct AnalysisRevLock {
-    inner: RevisionLock,
-    tokens: Option<SemanticTokenContext>,
-    grid: Arc<Mutex<AnalysisRevCache>>,
-}
-
-impl Drop for AnalysisRevLock {
-    fn drop(&mut self) {
-        let mut mu = self.grid.lock();
-        let gc_revision = mu.manager.unlock(&mut self.inner);
-
-        if let Some(gc_revision) = gc_revision {
-            let grid = self.grid.clone();
-            rayon::spawn(move || {
-                grid.lock().gc(gc_revision);
-            });
-        }
-    }
-}
-
-#[derive(Default, Clone)]
-struct AnalysisRevSlot {
-    revision: usize,
-    expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
-    type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
-}
-
-impl Drop for AnalysisRevSlot {
-    fn drop(&mut self) {
-        log::info!("analysis revision {} is dropped", self.revision);
-    }
 }
 
 fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {

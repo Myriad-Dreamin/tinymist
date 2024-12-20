@@ -13,7 +13,11 @@ impl TypeChecker<'_> {
 }
 
 impl DocString {
-    fn rename_based_on(self, documenting_id: Interned<Decl>, base: &mut TypeChecker) -> DocString {
+    pub(crate) fn rename_based_on(
+        self,
+        documenting_id: Interned<Decl>,
+        base: &mut TypeChecker,
+    ) -> DocString {
         let DocString {
             docs,
             var_bounds,

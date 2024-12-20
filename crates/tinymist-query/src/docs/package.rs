@@ -355,7 +355,7 @@ mod tests {
 
     fn test(pkg: PackageSpec) {
         run_with_sources("", |verse: &mut LspUniverse, path| {
-            let pkg_root = verse.registry.resolve(&pkg).unwrap();
+            let pkg_root = verse.registry().resolve(&pkg).unwrap();
             let pi = PackageInfo {
                 path: pkg_root.as_ref().to_owned(),
                 namespace: pkg.namespace,

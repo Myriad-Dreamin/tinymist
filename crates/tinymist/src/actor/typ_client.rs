@@ -32,9 +32,9 @@ use reflexo_typst::{
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
-    analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
-    SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
+    analysis::Analysis, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver,
+    LocalContext, OnExportRequest, SemanticRequest, ServerInfoResponse, StatefulRequest,
+    VersionedDocument,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -84,12 +84,13 @@ impl CompileHandler {
     pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
         let fut = self.snapshot()?;
         let analysis = self.analysis.clone();
-        let rev_lock = analysis.lock_revision(q);
+        // let rev_lock = analysis.lock_revision(q);
+        let _ = q;
 
         Ok(QuerySnapFut {
             fut,
             analysis,
-            rev_lock,
+            // rev_lock,
         })
     }
 
@@ -445,7 +446,7 @@ impl WorldSnapFut {
 pub struct QuerySnapFut {
     fut: WorldSnapFut,
     analysis: Arc<Analysis>,
-    rev_lock: AnalysisRevLock,
+    // rev_lock: AnalysisRevLock,
 }
 
 impl QuerySnapFut {
@@ -455,7 +456,6 @@ impl QuerySnapFut {
         Ok(QuerySnap {
             snap,
             analysis: self.analysis,
-            rev_lock: self.rev_lock,
         })
     }
 }
@@ -463,7 +463,7 @@ impl QuerySnapFut {
 pub struct QuerySnap {
     pub snap: CompileSnapshot<LspCompilerFeat>,
     analysis: Arc<Analysis>,
-    rev_lock: AnalysisRevLock,
+    // rev_lock: AnalysisRevLock,
 }
 
 impl std::ops::Deref for QuerySnap {
@@ -501,7 +501,7 @@ impl QuerySnap {
         self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
     }
 
-    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
+    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContext) -> T) -> anyhow::Result<T> {
         let world = self.snap.world;
         let Some(main) = world.main_id() else {
             error!("TypstActor: main file is not set");
@@ -512,7 +512,7 @@ impl QuerySnap {
             anyhow::anyhow!("failed to get source: {err}")
         })?;
 
-        let mut analysis = self.analysis.snapshot_(world, self.rev_lock);
+        let mut analysis = self.analysis.snapshot_(world);
         Ok(f(&mut analysis))
     }
 }

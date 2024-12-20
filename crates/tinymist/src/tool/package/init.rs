@@ -32,7 +32,7 @@ pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
-    let manifest = get_manifest(world, toml_id)?;
+    let manifest = get_manifest(&world.base, toml_id)?;
 
     // Ensure that it is indeed a template.
     let Some(tmpl_info) = &manifest.template else {
@@ -54,7 +54,7 @@ pub fn init(world: &LspWorld, task: InitTask) -> StrResult<PathBuf> {
         .unwrap_or_else(|| Path::new(spec.name.as_str()).into());
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
-    let manifest = get_manifest(world, toml_id)?;
+    let manifest = get_manifest(&world.base, toml_id)?;
 
     // Ensure that it is indeed a template.
     let Some(template) = &manifest.template else {

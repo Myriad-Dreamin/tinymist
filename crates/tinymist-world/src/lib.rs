@@ -18,21 +18,27 @@ use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, ImmutPath, TypstDict};
+use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
 pub mod font;
 pub mod package;
 use package::HttpsRegistry;
+mod world;
+pub use world::*;
+mod db;
+pub use db::*;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
+
+pub trait CompilerFeat: reflexo_typst::CompilerFeat + 'static {}
 
 /// Compiler feature for LSP universe and worlds without typst.ts to implement
 /// more for tinymist. type trait of [`CompilerUniverse`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemCompilerFeatExtend;
 
-impl CompilerFeat for SystemCompilerFeatExtend {
+impl reflexo_typst::CompilerFeat for SystemCompilerFeatExtend {
     /// Uses [`TinymistFontResolver`] directly.
     type FontResolver = TinymistFontResolver;
     /// It accesses a physical file system.
@@ -41,10 +47,22 @@ impl CompilerFeat for SystemCompilerFeatExtend {
     type Registry = HttpsRegistry;
 }
 
+impl CompilerFeat for SystemCompilerFeatExtend {}
+
+/// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
+#[derive(Debug, Default, Clone, Copy)]
+pub enum ColorTheme {
+    #[default]
+    Light,
+    Dark,
+}
+
 /// The compiler universe in system environment.
 pub type TypstSystemUniverseExtend = CompilerUniverse<SystemCompilerFeatExtend>;
 /// The compiler world in system environment.
 pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
+/// The compiler world in system environment.
+pub type TypstSystemWorldExtendLocal = CompilerWorldLocal<SystemCompilerFeatExtend>;
 
 /// The font arguments for the compiler.
 #[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,6 +163,7 @@ impl CompileOnceArgs {
 
         LspUniverseBuilder::build(
             entry,
+            Default::default(),
             Arc::new(LazyHash::new(inputs)),
             Arc::new(fonts),
             package,
@@ -197,7 +216,9 @@ pub type LspCompilerFeat = SystemCompilerFeatExtend;
 /// LSP universe that spawns LSP worlds.
 pub type LspUniverse = TypstSystemUniverseExtend;
 /// LSP world.
-pub type LspWorld = TypstSystemWorldExtend;
+pub type LspWorldBase = TypstSystemWorldExtend;
+/// LSP world.
+pub type LspWorld = TypstSystemWorldExtendLocal;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<LazyHash<TypstDict>>;
 
@@ -209,12 +230,14 @@ impl LspUniverseBuilder {
     /// See [`LspCompilerFeat`] for instantiation details.
     pub fn build(
         entry: EntryState,
+        analysis_config: AnalysisConfig,
         inputs: ImmutDict,
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpsRegistry,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
             entry,
+            analysis_config,
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
             package_registry,

@@ -1181,6 +1181,12 @@ pub struct TypeInfo {
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
 
+impl fmt::Debug for TypeInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("TypeInfo")
+    }
+}
+
 impl TyCtx for TypeInfo {
     fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds> {
         let v = self.vars.get(&var.def)?;

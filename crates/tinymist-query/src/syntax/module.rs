@@ -43,10 +43,10 @@ pub fn construct_module_dependencies(
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
-                dependencies: ei.imports.keys().cloned().collect(),
+                dependencies: ei.imports.iter().cloned().collect(),
                 dependents: EcoVec::default(),
             });
-        for (dep, _) in ei.imports.clone() {
+        for dep in ei.imports.clone() {
             dependents
                 .entry(dep)
                 .or_insert_with(EcoVec::new)

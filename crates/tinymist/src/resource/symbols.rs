@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{collections::BTreeMap, ops::Deref, path::Path, sync::Arc};
 
 // use reflexo_typst::font::GlyphId;
 use reflexo_typst::{
@@ -993,7 +993,7 @@ impl LanguageState {
                 .map_err(z_internal_error)?;
 
             let sym_doc = std::marker::PhantomData
-                .compile(&forked, &mut Default::default())
+                .compile(&forked.deref(), &mut Default::default())
                 .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
                 .map_err(z_internal_error)?;
 

@@ -6,6 +6,7 @@ pub mod scopes;
 pub mod value;
 
 use core::fmt;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt::Write, sync::LazyLock};
 
@@ -14,6 +15,7 @@ pub use error::*;
 use base64::Engine;
 use scopes::Scopes;
 use tinymist_world::reflexo_typst::path::unix_slash;
+pub use tinymist_world::ColorTheme;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
 use typst::foundations::IntoValue;
 use typst::WorldExt;
@@ -37,14 +39,6 @@ pub use typst_syntax as syntax;
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 pub use tinymist_world::CompileOnceArgs;
-
-/// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
-#[derive(Debug, Default, Clone, Copy)]
-pub enum ColorTheme {
-    #[default]
-    Light,
-    Dark,
-}
 
 #[derive(Debug, Default, Clone)]
 pub struct TypliteFeat {
@@ -455,7 +449,7 @@ impl TypliteWorker {
         world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
-        let document = typst::compile(&world).output;
+        let document = typst::compile(world.deref()).output;
         let document = document.map_err(|diagnostics| {
             let mut err = String::new();
             let _ = write!(err, "compiling node: ");
@@ -707,9 +701,12 @@ impl TypliteWorker {
         let include: ast::ModuleInclude = node.cast().unwrap();
 
         let path = include.source();
-        let src =
-            tinymist_analysis::import::find_source_by_expr(self.world.as_ref(), self.current, path)
-                .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
+        let src = tinymist_analysis::import::find_source_by_expr(
+            self.world.as_ref().deref(),
+            self.current,
+            path,
+        )
+        .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
 
         self.clone().sub_file(src).map(Value::Content)
     }

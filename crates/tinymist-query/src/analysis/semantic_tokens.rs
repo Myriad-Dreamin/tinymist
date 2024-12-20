@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Semantic tokens (highlighting) support for LSP.
 
 use std::{
@@ -16,7 +18,6 @@ use strum::EnumIter;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
 use crate::{
-    adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot},
     syntax::{Expr, ExprInfo},
     ty::Ty,
     LocalContext, LspPosition, PositionEncoding,
@@ -37,80 +38,80 @@ pub(crate) fn get_semantic_tokens(ctx: &mut LocalContext, source: &Source) -> Se
     SemanticTokens::new(tokenizer.output)
 }
 
-/// A shared semantic tokens cache.
-#[derive(Default)]
-pub struct SemanticTokenCache {
-    next_id: usize,
-    // todo: clear cache after didClose
-    manager: HashMap<ImmutPath, RevisionManager<OnceLock<SemanticTokens>>>,
-}
+// A shared semantic tokens cache.
+// #[derive(Default)]
+// pub struct SemanticTokenCache {
+//     next_id: usize,
+//     // todo: clear cache after didClose
+//     manager: HashMap<ImmutPath, RevisionManager<OnceLock<SemanticTokens>>>,
+// }
 
-impl SemanticTokenCache {
-    pub(crate) fn clear(&mut self) {
-        self.next_id = 0;
-        self.manager.clear();
-    }
+// impl SemanticTokenCache {
+//     pub(crate) fn clear(&mut self) {
+//         self.next_id = 0;
+//         self.manager.clear();
+//     }
 
-    /// Lock the token cache with an optional previous id in *main thread*.
-    pub(crate) fn acquire(
-        cache: Arc<Mutex<Self>>,
-        path: &Path,
-        prev: Option<&str>,
-    ) -> SemanticTokenContext {
-        let that = cache.clone();
-        let mut that = that.lock();
+//     /// Lock the token cache with an optional previous id in *main thread*.
+//     pub(crate) fn acquire(
+//         cache: Arc<Mutex<Self>>,
+//         path: &Path,
+//         prev: Option<&str>,
+//     ) -> SemanticTokenContext {
+//         let that = cache.clone();
+//         let mut that = that.lock();
 
-        that.next_id += 1;
-        let prev = prev.and_then(|id| {
-            id.parse::<NonZeroUsize>()
-                .inspect_err(|_| {
-                    log::warn!("invalid previous id: {id}");
-                })
-                .ok()
-        });
-        let next = NonZeroUsize::new(that.next_id).expect("id overflow");
+//         that.next_id += 1;
+//         let prev = prev.and_then(|id| {
+//             id.parse::<NonZeroUsize>()
+//                 .inspect_err(|_| {
+//                     log::warn!("invalid previous id: {id}");
+//                 })
+//                 .ok()
+//         });
+//         let next = NonZeroUsize::new(that.next_id).expect("id overflow");
 
-        let path = ImmutPath::from(path);
-        let manager = that.manager.entry(path.clone()).or_default();
-        let _rev_lock = manager.lock(prev.unwrap_or(next));
-        let prev = prev.and_then(|prev| {
-            manager
-                .find_revision(prev, |_| OnceLock::new())
-                .data
-                .get()
-                .cloned()
-        });
-        let next = manager.find_revision(next, |_| OnceLock::new());
+//         let path = ImmutPath::from(path);
+//         let manager = that.manager.entry(path.clone()).or_default();
+//         let _rev_lock = manager.lock(prev.unwrap_or(next));
+//         let prev = prev.and_then(|prev| {
+//             manager
+//                 .find_revision(prev, |_| OnceLock::new())
+//                 .data
+//                 .get()
+//                 .cloned()
+//         });
+//         let next = manager.find_revision(next, |_| OnceLock::new());
 
-        SemanticTokenContext {
-            _rev_lock,
-            cache,
-            path,
-            prev,
-            next,
-        }
-    }
-}
+//         SemanticTokenContext {
+//             _rev_lock,
+//             cache,
+//             path,
+//             prev,
+//             next,
+//         }
+//     }
+// }
 
 /// A semantic token context providing incremental semantic tokens rendering.
 pub(crate) struct SemanticTokenContext {
-    _rev_lock: RevisionLock,
-    cache: Arc<Mutex<SemanticTokenCache>>,
+    // _rev_lock: RevisionLock,
+    // cache: Arc<Mutex<SemanticTokenCache>>,
     path: ImmutPath,
     pub prev: Option<SemanticTokens>,
-    pub next: Arc<RevisionSlot<OnceLock<SemanticTokens>>>,
+    // pub next: Arc<RevisionSlot<OnceLock<SemanticTokens>>>,
 }
 
 impl Drop for SemanticTokenContext {
     fn drop(&mut self) {
-        let mut cache = self.cache.lock();
-        let manager = cache.manager.get_mut(&self.path);
-        if let Some(manager) = manager {
-            let min_rev = manager.unlock(&mut self._rev_lock);
-            if let Some(min_rev) = min_rev {
-                manager.gc(min_rev);
-            }
-        }
+        // let mut cache = self.cache.lock();
+        // let manager = cache.manager.get_mut(&self.path);
+        // if let Some(manager) = manager {
+        //     let min_rev = manager.unlock(&mut self._rev_lock);
+        //     if let Some(min_rev) = min_rev {
+        //         manager.gc(min_rev);
+        //     }
+        // }
     }
 }
 

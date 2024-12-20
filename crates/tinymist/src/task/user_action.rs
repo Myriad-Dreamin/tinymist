@@ -1,6 +1,6 @@
 //! The actor that runs user actions.
 
-use std::path::PathBuf;
+use std::{ops::Deref, path::PathBuf};
 
 use anyhow::bail;
 use base64::Engine;
@@ -167,7 +167,7 @@ async fn trace_main(
         ..Default::default()
     };
     typst_timing::enable();
-    let diags = match std::marker::PhantomData.compile(w, &mut env) {
+    let diags = match std::marker::PhantomData.compile(w.deref(), &mut env) {
         Ok(res) => res.warnings,
         Err(errors) => errors,
     };

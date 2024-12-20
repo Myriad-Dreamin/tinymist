@@ -12,7 +12,7 @@ use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
+use tinymist_query::{ExportKind, LocalContext, PageSelection};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -655,7 +655,7 @@ impl LanguageState {
     pub fn within_package<T>(
         &mut self,
         info: PackageInfo,
-        f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
+        f: impl FnOnce(&mut LocalContext) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let fut = self.primary().query_snapshot().map_err(internal_error)?;
 
@@ -670,7 +670,7 @@ impl LanguageState {
                     eco_format!("cannot get package root (parent of {toml_path:?})")
                 })?;
 
-                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
+                let manifest = tinymist_query::package::get_manifest(world.deref(), toml_id)?;
                 let entry_point = toml_id.join(&manifest.package.entrypoint);
 
                 Ok(EntryState::new_rooted(pkg_root.into(), Some(entry_point)))

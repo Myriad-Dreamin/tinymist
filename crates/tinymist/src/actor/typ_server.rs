@@ -14,10 +14,10 @@ use reflexo_typst::{
     features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     typst::prelude::EcoVec,
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-    watch_deps, CompileEnv, CompileReport, Compiler, CompilerFeat, CompilerUniverse, CompilerWorld,
-    ConsoleDiagReporter, EntryReader, GenericExporter, Revising, TaskInputs, TypstDocument,
-    WorldDeps,
+    watch_deps, CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader,
+    GenericExporter, TaskInputs, TypstDocument, WorldDeps,
 };
+use tinymist_world::{CompilerFeat, CompilerUniverse, CompilerWorldLocal, Revising};
 use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::task::CacheTask;
@@ -42,7 +42,7 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     /// Using env
     pub env: CompileEnv,
     /// Using world
-    pub world: CompilerWorld<F>,
+    pub world: CompilerWorldLocal<F>,
     /// The last successfully compiled document.
     pub success_doc: Option<Arc<TypstDocument>>,
 }
@@ -71,7 +71,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
 
     pub async fn compile(self) -> CompiledArtifact<F> {
         let mut snap = self;
-        let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
+        let warned = std::marker::PhantomData.compile(&snap.world.base, &mut snap.env);
         let (doc, warnings) = match warned {
             Ok(doc) => (Ok(doc.output), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
@@ -157,7 +157,7 @@ impl<F: CompilerFeat> SucceededArtifact<F> {
         }
     }
 
-    pub fn world(&self) -> &CompilerWorld<F> {
+    pub fn world(&self) -> &CompilerWorldLocal<F> {
         match self {
             SucceededArtifact::Compiled(artifact) => &artifact.world,
             SucceededArtifact::Suspend(snapshot) => &snapshot.world,
@@ -498,7 +498,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             };
 
             let _ = ConsoleDiagReporter::default().export(
-                &compiled.world,
+                &compiled.world.base,
                 Arc::new((compiled.env.features.clone(), rep.clone())),
             );
 

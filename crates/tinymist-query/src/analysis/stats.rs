@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! Statistics about the analyzers
 
 use std::{

@@ -8,7 +8,7 @@ use reflexo::path::unix_slash;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
-use tinymist_world::LspWorld;
+use tinymist_world::LspWorldBase;
 use typst::foundations::{AutoValue, Content, Func, Label, NoneValue, Scope, Type, Value};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind, SyntaxNode};
@@ -82,7 +82,7 @@ impl CompletionFeat {
 }
 
 impl CompletionContext<'_> {
-    pub fn world(&self) -> &LspWorld {
+    pub fn world(&self) -> &LspWorldBase {
         self.ctx.world()
     }
 

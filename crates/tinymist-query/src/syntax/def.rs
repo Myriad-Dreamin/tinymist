@@ -20,6 +20,8 @@ use super::{ExprDescriber, ExprPrinter};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
+    /// A deferred expression
+    Deferred(Span),
     /// A sequence of expressions
     Block(Interned<Vec<Expr>>),
     /// An array literal

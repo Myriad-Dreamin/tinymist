@@ -5,6 +5,7 @@ use std::{
 };
 
 use ecow::eco_format;
+use tinymist_world::LspWorld;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use crate::{
@@ -74,7 +75,7 @@ impl VarDoc {
 }
 
 pub(crate) fn compute_docstring(
-    ctx: &Arc<SharedContext>,
+    ctx: &LspWorld,
     fid: TypstFileId,
     docs: String,
     kind: DefKind,
@@ -97,7 +98,7 @@ pub(crate) fn compute_docstring(
 
 struct DocsChecker<'a> {
     fid: TypstFileId,
-    ctx: &'a Arc<SharedContext>,
+    ctx: &'a LspWorld,
     /// The bounds of type variables
     var_bounds: HashMap<DeclExpr, TypeVarBounds>,
     /// Global name bindings

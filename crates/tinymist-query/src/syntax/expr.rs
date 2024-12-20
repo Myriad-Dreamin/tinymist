@@ -1,13 +1,21 @@
+#![allow(unused)]
+
 use std::ops::DerefMut;
 
+use crate::{
+    analysis::{analyze_expr_, analyze_import_},
+    Db,
+};
 use parking_lot::Mutex;
 use reflexo::hash::hash128;
 use reflexo_typst::LazyHash;
 use rpds::RedBlackTreeMapSync;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::ops::Deref;
 use tinymist_analysis::import::resolve_id_by_path;
+use tinymist_world::{LspWorld, SalsaSource};
 use typst::{
+    diag::FileResult,
     foundations::{Element, NativeElement, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
     syntax::{Span, SyntaxNode},
@@ -22,244 +30,94 @@ use crate::{
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
 
-pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
+/// Returns the semantic index for `file`.
+#[salsa::tracked(no_eq)]
+pub(crate) fn scope_of(db: &dyn Db, file: SalsaSource) -> Arc<ScopeInfo> {
+    // let _span = tracing::trace_span!("semantic_index", file =
+    // %file.path(db)).entered();
 
-pub(crate) fn expr_of(
-    ctx: Arc<SharedContext>,
-    source: Source,
-    route: &mut ExprRoute,
-    guard: QueryStatGuard,
-    prev: Option<Arc<ExprInfo>>,
-) -> Arc<ExprInfo> {
-    crate::log_debug_ct!("expr_of: {:?}", source.id());
+    let start = std::time::Instant::now();
+    log::info!("scope_of: {:?} start", file.fid(db));
+    let lexical = LexicalContext::default();
+    let source = file.must_contents(db);
 
-    route.insert(source.id(), None);
+    let c = |c: &mut ScopeChecker| {
+        Some({ c.check_in_mode(source.root().children(), InterpretMode::Markup) })
+    };
+    let scope = scope_of_impl(db, file, c, lexical, true);
+    log::info!("scope_of: {:?} in {:?}", file.fid(db), start.elapsed());
+    Arc::new(scope)
+}
 
-    let cache_hit = prev.and_then(|prev| {
-        if prev.source.len_bytes() != source.len_bytes()
-            || hash128(&prev.source) != hash128(&source)
-        {
-            return None;
+/// Returns the semantic index for `file`.
+#[salsa::tracked(no_eq)]
+pub(crate) fn expr_of(db: &dyn Db, file: SalsaSource) -> Arc<ExprInfo> {
+    let start = std::time::Instant::now();
+    log::info!("expr_of: {:?} start", file.fid(db));
+
+    let mut scope = scope_of(db, file).as_ref().clone();
+    let mut defers_all = vec![std::mem::take(&mut scope.defers)];
+    let mut info = ExprInfo::new(file.fid(db), scope);
+
+    while let Some(defers) = defers_all.pop() {
+        for (root, lexical) in defers {
+            let Some(root) = root.cast::<ast::Expr>() else {
+                log::warn!("no expr node found in file: {:?}", file.fid(db));
+                continue;
+            };
+            let mut child_scope = scope_of_impl(db, file, |c| Some(c.check(root)), lexical, false);
+            info.merge(&mut child_scope);
+            defers_all.push(child_scope.defers);
         }
-        for (fid, prev_exports) in &prev.imports {
-            let ei = ctx.exports_of(&ctx.source_by_id(*fid).ok()?, route);
-
-            // If there is a cycle, the expression will be stable as the source is
-            // unchanged.
-            if let Some(exports) = ei {
-                if prev_exports.size() != exports.size()
-                    || hash128(&prev_exports) != hash128(&exports)
-                {
-                    return None;
-                }
-            }
-        }
-
-        Some(prev)
-    });
-
-    if let Some(prev) = cache_hit {
-        route.remove(&source.id());
-        return prev;
     }
-    guard.miss();
 
-    let revision = ctx.revision();
-
-    let resolves_base = Arc::new(Mutex::new(vec![]));
-    let resolves = resolves_base.clone();
-
-    // todo: cache docs capture
-    let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let docstrings = docstrings_base.clone();
-
-    let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let exprs = exprs_base.clone();
-
-    let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let imports = imports_base.clone();
-
-    let module_docstring = Arc::new(
-        find_module_level_docs(&source)
-            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DefKind::Module))
-            .unwrap_or_default(),
-    );
-
-    let (exports, root) = {
-        let mut w = ExprWorker {
-            fid: source.id(),
-            ctx,
-            imports,
-            docstrings,
-            exprs,
-            import_buffer: Vec::new(),
-            lexical: LexicalContext::default(),
-            resolves,
-            buffer: vec![],
-            init_stage: true,
-            comment_matcher: DocCommentMatcher::default(),
-            route,
-        };
-
-        let root = source.root().cast::<ast::Markup>().unwrap();
-        w.check_root_scope(root.to_untyped().children());
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-        w.route.insert(w.fid, Some(root_scope.clone()));
-
-        w.lexical = LexicalContext::default();
-        w.buffer.clear();
-        w.import_buffer.clear();
-        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-
-        w.collect_buffer();
-        (root_scope, root)
-    };
-
-    let info = ExprInfo {
-        fid: source.id(),
-        revision,
-        source: source.clone(),
-        resolves: HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
-        module_docstring,
-        docstrings: std::mem::take(docstrings_base.lock().deref_mut()),
-        imports: HashMap::from_iter(std::mem::take(imports_base.lock().deref_mut())),
-        exports,
-        exprs: std::mem::take(exprs_base.lock().deref_mut()),
-        root,
-    };
-    crate::log_debug_ct!("expr_of end {:?}", source.id());
-
-    route.remove(&info.fid);
+    log::info!("expr_of: {:?} in {:?}", file.fid(db), start.elapsed());
     Arc::new(info)
 }
 
-#[derive(Debug)]
-pub struct ExprInfo {
-    pub fid: TypstFileId,
-    pub revision: usize,
-    pub source: Source,
-    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
-    pub module_docstring: Arc<DocString>,
-    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
-    pub exprs: FxHashMap<Span, Expr>,
-    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
-    pub exports: Arc<LazyHash<LexicalScope>>,
-    pub root: Expr,
-}
-
-impl std::hash::Hash for ExprInfo {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.revision.hash(state);
-        self.source.hash(state);
-        self.exports.hash(state);
-        self.root.hash(state);
-        let mut imports = self.imports.iter().collect::<Vec<_>>();
-        imports.sort_by_key(|(fid, _)| *fid);
-        imports.hash(state);
-    }
-}
-
-impl ExprInfo {
-    pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
-        if decl.is_def() {
-            return Some(Expr::Decl(decl.clone()));
-        }
-        let resolved = self.resolves.get(&decl.span())?;
-        Some(Expr::Ref(resolved.clone()))
-    }
-
-    pub fn get_refs(
-        &self,
-        decl: Interned<Decl>,
-    ) -> impl Iterator<Item = (&Span, &Interned<RefExpr>)> {
-        let of = Some(Expr::Decl(decl.clone()));
-        self.resolves
-            .iter()
-            .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
-                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
-                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
-                (Decl::Label(..), _) => false,
-                _ => r.decl == decl || r.root == of,
-            })
-    }
-
-    pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
-        let of = Expr::Decl(decl.clone());
-        self.exports
-            .get(decl.name())
-            .map_or(false, |export| match export {
-                Expr::Ref(ref_expr) => ref_expr.root == Some(of),
-                exprt => *exprt == of,
-            })
-    }
-
-    #[allow(dead_code)]
-    fn show(&self) {
-        use std::io::Write;
-        let vpath = self
-            .fid
-            .vpath()
-            .resolve(Path::new("target/exprs/"))
-            .unwrap();
-        let root = vpath.with_extension("root.expr");
-        std::fs::create_dir_all(root.parent().unwrap()).unwrap();
-        std::fs::write(root, format!("{}", self.root)).unwrap();
-        let scopes = vpath.with_extension("scopes.expr");
-        std::fs::create_dir_all(scopes.parent().unwrap()).unwrap();
-        {
-            let mut scopes = std::fs::File::create(scopes).unwrap();
-            for (span, expr) in self.exprs.iter() {
-                writeln!(scopes, "{span:?} -> {expr}").unwrap();
-            }
-        }
-        let imports = vpath.with_extension("imports.expr");
-        std::fs::create_dir_all(imports.parent().unwrap()).unwrap();
-        std::fs::write(imports, format!("{:#?}", self.imports)).unwrap();
-        let exports = vpath.with_extension("exports.expr");
-        std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
-        std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
-    }
-}
-
-type ConcolicExpr = (Option<Expr>, Option<Ty>);
-type ResolveVec = Vec<(Span, Interned<RefExpr>)>;
-type SyntaxNodeChildren<'a> = std::slice::Iter<'a, SyntaxNode>;
-
-#[derive(Debug, Clone)]
-struct LexicalContext {
-    mode: InterpretMode,
-    scopes: EcoVec<ExprScope>,
-    last: ExprScope,
-}
-
-impl Default for LexicalContext {
-    fn default() -> Self {
-        LexicalContext {
-            mode: InterpretMode::Markup,
-            scopes: eco_vec![],
-            last: ExprScope::Lexical(RedBlackTreeMapSync::default()),
-        }
-    }
-}
-
-pub(crate) struct ExprWorker<'a> {
-    fid: TypstFileId,
-    ctx: Arc<SharedContext>,
-    imports: Arc<Mutex<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>>,
-    import_buffer: Vec<(TypstFileId, Arc<LazyHash<LexicalScope>>)>,
-    docstrings: Arc<Mutex<FxHashMap<DeclExpr, Arc<DocString>>>>,
-    exprs: Arc<Mutex<FxHashMap<Span, Expr>>>,
-    resolves: Arc<Mutex<ResolveVec>>,
-    buffer: ResolveVec,
+fn scope_of_impl(
+    db: &dyn Db,
+    file: SalsaSource,
+    root: impl FnOnce(&mut ScopeChecker) -> Option<Expr>,
     lexical: LexicalContext,
-    init_stage: bool,
+    require_scope: bool,
+) -> ScopeInfo {
+    let source = &file.must_contents(db);
 
-    route: &'a mut ExprRoute,
-    comment_matcher: DocCommentMatcher,
+    let mut worker = ScopeChecker {
+        db,
+        source,
+        comment_matcher: DocCommentMatcher::default(),
+        resolves: ResolveVec::default(),
+        imports: FxHashSet::default(),
+        import_buffer: Vec::default(),
+        lexical,
+        info: ScopeInfo::default(),
+    };
+    let expr = root(&mut worker);
+    if require_scope {
+        worker.info.scope = Some(worker.summarize_scope());
+    }
+    worker.info.expr = expr;
+    worker.info
 }
 
-impl ExprWorker<'_> {
+pub(crate) struct ScopeChecker<'db> {
+    db: &'db dyn Db,
+    source: &'db Source,
+
+    info: ScopeInfo,
+    resolves: ResolveVec,
+    imports: FxHashSet<TypstFileId>,
+    import_buffer: Vec<TypstFileId>,
+
+    comment_matcher: DocCommentMatcher,
+    lexical: LexicalContext,
+}
+
+impl ScopeChecker<'_> {
+    fn on_file(&mut self) {}
+
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
@@ -293,13 +151,20 @@ impl ExprWorker<'_> {
         }
     }
 
+    fn world(&self) -> &LspWorld {
+        self.db.world()
+    }
+
+    fn fid(&self) -> TypstFileId {
+        self.source.id()
+    }
+
     fn check_docstring(&mut self, decl: &DeclExpr, kind: DefKind) {
         if let Some(docs) = self.comment_matcher.collect() {
-            let docstring = compute_docstring(&self.ctx, self.fid, docs, kind);
+            let docstring =
+                compute_docstring(self.db.world(), self.fid(), docs, kind).map(Arc::new);
             if let Some(docstring) = docstring {
-                self.docstrings
-                    .lock()
-                    .insert(decl.clone(), Arc::new(docstring));
+                self.info.docstrings.push((decl.clone(), docstring));
             }
         }
     }
@@ -314,9 +179,9 @@ impl ExprWorker<'_> {
 
     fn check(&mut self, m: ast::Expr) -> Expr {
         let s = m.span();
-        let ret = self.do_check(m);
-        self.exprs.lock().insert(s, ret.clone());
-        ret
+        let expr = self.do_check(m);
+        self.info.exprs.push((s, expr.clone()));
+        expr
     }
 
     fn do_check(&mut self, m: ast::Expr) -> Expr {
@@ -650,7 +515,7 @@ impl ExprWorker<'_> {
         // Prefetch Type Check Information
         if let Some(fid) = fid {
             crate::log_debug_ct!("prefetch type check: {fid:?}");
-            self.ctx.prefetch_type_check(fid);
+            // self.ctx.prefetch_type_check(fid);
         }
 
         let scope = if let Some(fid) = &fid {
@@ -707,8 +572,8 @@ impl ExprWorker<'_> {
     ) -> Option<Expr> {
         let src = self.eval_expr(source, InterpretMode::Code);
         let src_expr = self.fold_expr_and_val(src).or_else(|| {
-            self.ctx
-                .analyze_expr(source.to_untyped())
+            // todo: caches
+            analyze_expr_(self.world().deref(), source.to_untyped())
                 .into_iter()
                 .find_map(|(v, _)| match v {
                     Value::Str(s) => Some(Expr::Type(Ty::Value(InsTy::new(Value::Str(s))))),
@@ -733,7 +598,7 @@ impl ExprWorker<'_> {
     }
 
     fn check_import_dyn(&mut self, source: ast::Expr, src_expr: &Expr) -> Option<Expr> {
-        let src_or_module = self.ctx.analyze_import(source.to_untyped());
+        let src_or_module = analyze_import_(self.world().deref(), source.to_untyped());
         crate::log_debug_ct!("checking import source dyn: {src_or_module:?}");
 
         match src_or_module {
@@ -772,7 +637,7 @@ impl ExprWorker<'_> {
         src: &str,
         is_import: bool,
     ) -> Option<Expr> {
-        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src)?;
+        let fid = resolve_id_by_path(self.world().deref(), self.fid(), src)?;
         let name = Decl::calc_path_stem(src);
         let module = Expr::Decl(Decl::module(name.clone(), fid).into());
 
@@ -1038,12 +903,6 @@ impl ExprWorker<'_> {
         self.check_in_mode(children, InterpretMode::Math)
     }
 
-    fn check_root_scope(&mut self, children: SyntaxNodeChildren) {
-        self.init_stage = true;
-        self.check_in_mode(children, InterpretMode::Markup);
-        self.init_stage = false;
-    }
-
     fn check_in_mode(&mut self, children: SyntaxNodeChildren, mode: InterpretMode) -> Expr {
         let old_mode = self.lexical.mode;
         self.lexical.mode = mode;
@@ -1058,9 +917,7 @@ impl ExprWorker<'_> {
                 self.comment_matcher.reset();
                 continue;
             }
-            if !self.init_stage {
-                self.comment_matcher.process(n);
-            }
+            self.comment_matcher.process(n);
         }
 
         self.lexical.mode = old_mode;
@@ -1102,13 +959,13 @@ impl ExprWorker<'_> {
     }
 
     fn resolve_as_(&mut self, s: Span, r: Interned<RefExpr>) {
-        self.buffer.push((s, r.clone()));
+        self.resolves.push((s, r.clone()));
     }
 
     fn resolve_ident(&mut self, decl: DeclExpr, mode: InterpretMode) -> Expr {
         let r: Interned<RefExpr> = self.resolve_ident_(decl, mode).into();
         let s = r.decl.span();
-        self.buffer.push((s, r.clone()));
+        self.resolves.push((s, r.clone()));
         Expr::Ref(r)
     }
 
@@ -1125,19 +982,14 @@ impl ExprWorker<'_> {
     }
 
     fn defer(&mut self, expr: ast::Expr) -> Expr {
-        if self.init_stage {
-            Expr::Star
-        } else {
-            self.check(expr)
-        }
+        let expr = expr.to_untyped();
+        self.info.defers.push((expr.clone(), self.lexical.clone()));
+        Expr::Deferred(expr.span())
     }
 
+    // todo: useless
     fn collect_buffer(&mut self) {
-        let mut resolves = self.resolves.lock();
-        resolves.extend(self.buffer.drain(..));
-        drop(resolves);
-        let mut imports = self.imports.lock();
-        imports.extend(self.import_buffer.drain(..));
+        self.imports.extend(self.import_buffer.drain(..));
     }
 
     fn const_eval_expr(&self, expr: ast::Expr) -> Option<Value> {
@@ -1190,9 +1042,10 @@ impl ExprWorker<'_> {
             }
         }
 
+        // todo
         let scope = match mode {
-            InterpretMode::Math => self.ctx.world.library.math.scope(),
-            InterpretMode::Markup | InterpretMode::Code => self.ctx.world.library.global.scope(),
+            InterpretMode::Math => self.world().library().math.scope(),
+            InterpretMode::Markup | InterpretMode::Code => self.world().library().global.scope(),
             _ => return (None, None),
         };
 
@@ -1260,15 +1113,193 @@ impl ExprWorker<'_> {
     }
 
     fn exports_of(&mut self, fid: TypstFileId) -> LexicalScope {
-        let imported = self
-            .ctx
+        self.import_buffer.push(fid);
+        self.db
             .source_by_id(fid)
             .ok()
-            .and_then(|src| self.ctx.exports_of(&src, self.route))
-            .unwrap_or_default();
-        let res = imported.as_ref().deref().clone();
-        self.import_buffer.push((fid, imported));
-        res
+            .and_then(|src| scope_of(self.db, src).scope.clone())
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ScopeInfo {
+    expr: Option<Expr>,
+    docstrings: Vec<(DeclExpr, Arc<DocString>)>,
+    defers: Vec<(SyntaxNode, LexicalContext)>,
+    scope: Option<LexicalScope>,
+    exprs: Vec<(Span, Expr)>,
+    resolves: Vec<(Span, Interned<RefExpr>)>,
+    imports: Vec<TypstFileId>,
+    // pub fid: TypstFileId,
+    // pub revision: usize,
+    // pub source: Source,
+    // pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    // pub module_docstring: Arc<DocString>,
+    // pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    // pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+    // pub exports: Arc<LazyHash<LexicalScope>>,
+    // pub root: Expr,
+}
+
+#[derive(Debug)]
+pub struct ExprInfo {
+    pub fid: TypstFileId,
+    pub expr: Expr,
+    pub exports: LexicalScope,
+    pub exprs: FxHashMap<Span, Expr>,
+    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    // pub source: Source,
+    pub module_docstring: Arc<DocString>,
+    pub imports: FxHashSet<TypstFileId>,
+    // pub exports: Arc<LazyHash<LexicalScope>>,
+}
+
+// todo: hash
+// impl std::hash::Hash for ExprInfo {
+//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+// self.revision.hash(state);
+// self.source.hash(state);
+// self.exports.hash(state);
+// self.fid.hash(state);
+// self.expr.hash(state);
+// self.exports.hash(state);
+// self.module_docstring.hash(state);
+
+// let mut imports = self.imports.iter().collect::<Vec<_>>();
+// imports.sort_by_key(|(fid, _)| *fid);
+// imports.hash(state);
+//     }
+// }
+
+impl ExprInfo {
+    fn new(fid: TypstFileId, scope: ScopeInfo) -> Self {
+        Self {
+            fid,
+            module_docstring: Arc::new(DocString::default()),
+            expr: scope.expr.unwrap(),
+            exports: scope.scope.unwrap(),
+            exprs: scope.exprs.into_iter().collect(),
+            docstrings: scope.docstrings.into_iter().collect(),
+            resolves: scope.resolves.into_iter().collect(),
+            imports: scope.imports.into_iter().collect(),
+        }
+    }
+
+    fn merge(&mut self, scope: &mut ScopeInfo) {
+        self.exprs.extend(scope.exprs.drain(..));
+        self.docstrings.extend(scope.docstrings.drain(..));
+        self.resolves.extend(scope.resolves.drain(..));
+    }
+
+    pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
+        if decl.is_def() {
+            return Some(Expr::Decl(decl.clone()));
+        }
+        let resolved = self.resolves.get(&decl.span())?;
+        Some(Expr::Ref(resolved.clone()))
+    }
+
+    pub fn get_refs(
+        &self,
+        decl: Interned<Decl>,
+    ) -> impl Iterator<Item = (&Span, &Interned<RefExpr>)> {
+        let of = Some(Expr::Decl(decl.clone()));
+        self.resolves
+            .iter()
+            .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
+                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
+                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
+                (Decl::Label(..), _) => false,
+                _ => r.decl == decl || r.root == of,
+            })
+    }
+
+    pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
+        let of = Expr::Decl(decl.clone());
+        self.exports
+            .get(decl.name())
+            .map_or(false, |export| match export {
+                Expr::Ref(ref_expr) => ref_expr.root == Some(of),
+                exprt => *exprt == of,
+            })
+    }
+
+    #[allow(dead_code)]
+    fn show(&self) {
+        // use std::io::Write;
+        // let vpath = self
+        //     .fid
+        //     .vpath()
+        //     .resolve(Path::new("target/exprs/"))
+        //     .unwrap();
+        // let root = vpath.with_extension("root.expr");
+        // std::fs::create_dir_all(root.parent().unwrap()).unwrap();
+        // std::fs::write(root, format!("{}", self.root)).unwrap();
+        // let scopes = vpath.with_extension("scopes.expr");
+        // std::fs::create_dir_all(scopes.parent().unwrap()).unwrap();
+        // {
+        //     let mut scopes = std::fs::File::create(scopes).unwrap();
+        //     for (span, expr) in self.exprs.iter() {
+        //         writeln!(scopes, "{span:?} -> {expr}").unwrap();
+        //     }
+        // }
+        // let imports = vpath.with_extension("imports.expr");
+        // std::fs::create_dir_all(imports.parent().unwrap()).unwrap();
+        // std::fs::write(imports, format!("{:#?}", self.imports)).unwrap();
+        // let exports = vpath.with_extension("exports.expr");
+        // std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
+        // std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
+
+        todo!()
+    }
+}
+
+// #[derive(Debug)]
+// pub struct ExprInfo {
+//     pub fid: TypstFileId,
+//     pub revision: usize,
+//     pub source: Source,
+//     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+//     pub module_docstring: Arc<DocString>,
+//     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+//     pub exprs: FxHashMap<Span, Expr>,
+//     pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+//     pub exports: Arc<LazyHash<LexicalScope>>,
+//     pub root: Expr,
+// }
+
+// impl std::hash::Hash for ExprInfo {
+//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+//         self.revision.hash(state);
+//         self.source.hash(state);
+//         self.exports.hash(state);
+//         self.root.hash(state);
+//         let mut imports = self.imports.iter().collect::<Vec<_>>();
+//         imports.sort_by_key(|(fid, _)| *fid);
+//         imports.hash(state);
+//     }
+// }
+
+type ConcolicExpr = (Option<Expr>, Option<Ty>);
+type ResolveVec = Vec<(Span, Interned<RefExpr>)>;
+type SyntaxNodeChildren<'a> = std::slice::Iter<'a, SyntaxNode>;
+
+#[derive(Debug, Clone)]
+struct LexicalContext {
+    mode: InterpretMode,
+    scopes: EcoVec<ExprScope>,
+    last: ExprScope,
+}
+
+impl Default for LexicalContext {
+    fn default() -> Self {
+        LexicalContext {
+            mode: InterpretMode::Markup,
+            scopes: eco_vec![],
+            last: ExprScope::Lexical(RedBlackTreeMapSync::default()),
+        }
     }
 }
 

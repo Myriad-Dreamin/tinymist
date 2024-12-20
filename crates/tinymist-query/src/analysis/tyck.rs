@@ -4,14 +4,19 @@ use std::sync::OnceLock;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
+use tinymist_world::SalsaSource;
 
 use super::{
-    prelude::*, BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
+    func_signature, prelude::*, BuiltinTy, DynTypeBounds, FlowVarKind, TyCtxMut, TypeInfo, TypeVar,
     TypeVarBounds,
 };
 use crate::{
-    syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
+    syntax::{
+        expr::{expr_of, ExprInfo},
+        Decl, DeclExpr, Expr, UnaryOp,
+    },
     ty::*,
+    Db,
 };
 
 mod apply;
@@ -25,55 +30,206 @@ pub(crate) use convert::*;
 pub(crate) use select::*;
 
 #[derive(Default)]
-pub struct TypeEnv {
-    visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
-    exprs: FxHashMap<TypstFileId, Option<Arc<ExprInfo>>>,
+pub struct TypeEnv {}
+
+#[salsa::input]
+pub struct SalsaSourceScc {
+    pub src: TypstFileId,
+    #[return_ref]
+    pub contents: Vec<SalsaSource>,
+    #[return_ref]
+    pub exprs: FxHashMap<TypstFileId, Arc<ExprInfo>>,
+}
+
+// todo: scc detection
+#[salsa::tracked(no_eq)]
+fn scc_index(db: &dyn Db, file: SalsaSource) -> SalsaSourceScc {
+    let worker = SccWorker {
+        db,
+        contents: Default::default(),
+        exprs: Default::default(),
+        marked: Default::default(),
+        dfn: Default::default(),
+        low: Default::default(),
+        scc: Default::default(),
+        pre: 0,
+        stack: Default::default(),
+        on_stack: Default::default(),
+        count: 0,
+    };
+
+    worker.work(file)
+}
+
+struct SccWorker<'a> {
+    db: &'a dyn Db,
+    contents: FxHashMap<TypstFileId, SalsaSource>,
+    exprs: FxHashMap<TypstFileId, Arc<ExprInfo>>,
+    marked: FxHashSet<TypstFileId>,
+    dfn: FxHashMap<TypstFileId, usize>,
+    low: FxHashMap<TypstFileId, usize>,
+    scc: FxHashMap<TypstFileId, SalsaSourceScc>,
+    pre: usize,
+    stack: Vec<TypstFileId>,
+    on_stack: FxHashSet<TypstFileId>,
+    count: usize,
+}
+
+impl SccWorker<'_> {
+    fn work(mut self, file: SalsaSource) -> SalsaSourceScc {
+        self.tarjan(file);
+
+        *self.scc.get(&file.fid(self.db)).unwrap()
+    }
+
+    fn tarjan(&mut self, file: SalsaSource) {
+        self.contents.insert(file.fid(self.db), file);
+        let fid = file.fid(self.db);
+        if self.marked.contains(&fid) {
+            return;
+        }
+        self.marked.insert(fid);
+        self.dfn.insert(fid, self.pre);
+        self.low.insert(fid, self.pre);
+        self.pre += 1;
+        self.stack.push(fid);
+        self.on_stack.insert(fid);
+
+        let ei = expr_of(self.db, file);
+        self.exprs.insert(fid, ei.clone());
+        for dep in ei.imports.iter() {
+            if !self.marked.contains(dep) {
+                let Ok(scc) = self.db.source_by_id(*dep) else {
+                    // todo: mark
+                    continue;
+                };
+
+                self.tarjan(scc);
+                if self.low[&fid] > self.low[dep] {
+                    self.low.insert(fid, self.low[dep]);
+                }
+            } else if self.on_stack.contains(dep) && self.low[&fid] > self.dfn[dep] {
+                self.low.insert(fid, self.dfn[dep]);
+            }
+        }
+
+        if self.dfn[&fid] == self.low[&fid] {
+            let mut exprs = HashMap::default();
+            let mut contents = vec![];
+            while let Some(w) = self.stack.pop() {
+                self.on_stack.remove(&w);
+                exprs.insert(w, self.exprs.get(&w).unwrap().clone());
+                contents.push(*self.contents.get(&w).unwrap());
+                if w == fid {
+                    break;
+                }
+            }
+            contents.sort();
+            for w in contents.iter() {
+                let scc = SalsaSourceScc::new(self.db, fid, contents.clone(), exprs.clone());
+                self.scc.insert(w.fid(self.db), scc);
+            }
+            self.count += 1;
+        }
+    }
 }
 
 /// Type checking at the source unit level.
-pub(crate) fn type_check(
-    ctx: Arc<SharedContext>,
-    ei: Arc<ExprInfo>,
-    env: &mut TypeEnv,
-) -> Arc<TypeInfo> {
-    let mut info = TypeInfo::default();
-    info.valid = true;
-    info.fid = Some(ei.fid);
-    info.revision = ei.revision;
+#[salsa::tracked(return_ref, no_eq)]
+pub fn type_check(db: &dyn Db, file: SalsaSource) -> Arc<TypeInfo> {
+    type_check_scc(db, scc_index(db, file))
+        .info
+        .get(&file.fid(db))
+        .unwrap()
+        .clone()
+}
 
-    env.visiting.insert(ei.fid, Arc::new(TypeInfo::default()));
-
-    // Retrieve expression information for the source.
-    let root = ei.root.clone();
-
-    let mut checker = TypeChecker {
-        ctx,
-        ei,
-        info,
-        env,
-        call_cache: Default::default(),
-        module_exports: Default::default(),
+/// Type checking at the source unit level.
+#[salsa::tracked(no_eq)]
+fn type_check_scc(db: &dyn Db, scc: SalsaSourceScc) -> Arc<SccTypeInfo> {
+    let contents = scc.contents(db);
+    let exprs = scc.exprs(db);
+    let Some(ei) = exprs.get(&contents[0].fid(db)) else {
+        log::warn!("No expr info for {:?}", contents[0].fid(db));
+        return Default::default();
     };
+    let mut type_env = TypeChecker {
+        db,
+        // ctx: db.ctx().clone(),
+        ei: ei.clone(),
+        info: TypeInfo::default(),
+        module_exports: &mut Default::default(),
+        call_cache: &mut Default::default(),
+        visited: Default::default(),
+        visiting: Default::default(),
+        exprs,
+    };
+    for file in contents {
+        let begin = std::time::Instant::now();
+        log::info!("scc_index: {:?} start", file.fid(db));
+        if type_env.visited.contains_key(&file.fid(db)) {
+            continue;
+        }
+
+        type_check_impl(&mut type_env, file);
+        let info = Arc::new(std::mem::take(&mut type_env.info));
+        type_env.visited.insert_mut(file.fid(db), info);
+        log::info!(
+            "type_check_scc: {:?} in {:?}",
+            file.fid(db),
+            begin.elapsed()
+        );
+    }
+
+    Arc::new(SccTypeInfo {
+        info: type_env.visited.clone(),
+    })
+}
+
+#[derive(Debug, Default)]
+struct SccTypeInfo {
+    info: rpds::RedBlackTreeMapSync<TypstFileId, Arc<TypeInfo>>,
+}
+
+fn type_check_impl(checker: &mut TypeChecker, scc: &SalsaSource) {
+    let Some(ei) = checker.exprs.get(&scc.fid(checker.db)) else {
+        log::warn!("No expr info for {:?}", scc.fid(checker.db));
+        return;
+    };
+    // Retrieve expression information for the source.
+    let root = ei.expr.clone();
+
+    checker.ei = ei.clone();
 
     let type_check_start = std::time::Instant::now();
 
     checker.check(&root);
 
-    let exports = checker
-        .ei
-        .exports
-        .clone()
-        .into_iter()
-        .map(|(k, v)| (k.clone(), checker.check(v)))
-        .collect();
-    checker.info.exports = exports;
-
     let elapsed = type_check_start.elapsed();
     crate::log_debug_ct!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
+}
 
-    checker.env.visiting.remove(&checker.ei.fid);
+/// The type information on a group of syntax structures (typing)
+#[derive(Debug, Default)]
+pub struct TypeInfo2 {
+    // /// Whether the typing is valid
+    // pub valid: bool,
+    // /// The belonging file id
+    // pub fid: Option<TypstFileId>,
+    // /// The revision used
+    // pub revision: usize,
+    // /// The exported types
+    // pub exports: FxHashMap<StrRef, Ty>,
+    // /// The typing on definitions
+    // pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
+    // /// The checked documentation of definitions
+    // pub var_docs: FxHashMap<DeclExpr, Arc<UntypedDefDocs>>,
+    // /// The local binding of the type variable
+    // pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
+    // /// The typing on syntax structures
+    // pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
 
-    Arc::new(checker.info)
+    // pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
 
 type CallCacheDesc = (
@@ -83,15 +239,18 @@ type CallCacheDesc = (
 );
 
 pub(crate) struct TypeChecker<'a> {
-    ctx: Arc<SharedContext>,
+    db: &'a dyn Db,
+    // ctx: Arc<SharedContext>,
     ei: Arc<ExprInfo>,
 
     info: TypeInfo,
-    module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
+    module_exports: &'a mut FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
 
-    call_cache: FxHashSet<CallCacheDesc>,
+    call_cache: &'a mut FxHashSet<CallCacheDesc>,
 
-    env: &'a mut TypeEnv,
+    visited: rpds::RedBlackTreeMapSync<TypstFileId, Arc<TypeInfo>>,
+    visiting: rpds::RedBlackTreeMapSync<TypstFileId, &'a mut TypeInfo>,
+    exprs: &'a FxHashMap<TypstFileId, Arc<ExprInfo>>,
 }
 
 impl TyCtx for TypeChecker<'_> {
@@ -120,11 +279,15 @@ impl TyCtxMut for TypeChecker<'_> {
     }
 
     fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        Some(self.ctx.type_of_func(func.clone()).type_sig())
+        // Some(type_of_func(self.db, func.clone()).type_sig())
+        // todo: cache me
+        Some(func_signature(func.clone()).type_sig())
     }
 
     fn type_of_value(&mut self, val: &Value) -> Ty {
-        self.ctx.type_of_value(val)
+        // type_of_value(self.db, val)
+        // todo: cache me
+        term_value(val)
     }
 
     fn check_module_item(&mut self, fid: TypstFileId, name: &StrRef) -> Option<Ty> {
@@ -133,13 +296,7 @@ impl TyCtxMut for TypeChecker<'_> {
             .or_default()
             .clone()
             .get_or_init(|| {
-                let ei = self
-                    .env
-                    .exprs
-                    .entry(fid)
-                    .or_insert_with(|| self.ctx.expr_stage_by_id(fid))
-                    .clone()?;
-
+                let ei = self.exprs.get(&fid)?.clone();
                 Some(self.check(ei.exports.get(name)?))
             })
             .clone()
@@ -169,10 +326,21 @@ impl TypeChecker<'_> {
 
     fn get_var(&mut self, decl: &DeclExpr) -> Interned<TypeVar> {
         crate::log_debug_ct!("get_var {decl:?}");
-        let entry = self.info.vars.entry(decl.clone()).or_insert_with(|| {
-            let name = decl.name().clone();
-            let decl = decl.clone();
+        let bounds = self.info.vars.get(decl);
+        if let Some(bounds) = bounds {
+            return bounds.var.clone();
+        }
+        let name = decl.name().clone();
+        let var = TypeVar {
+            name: name.clone(),
+            def: decl.clone(),
+        };
+        self.info.vars.insert(
+            decl.clone(),
+            TypeVarBounds::new(var.clone(), Default::default()),
+        );
 
+        let entry = {
             // Check External variables
             let init = decl.file_id().and_then(|fid| {
                 if fid == self.ei.fid {
@@ -181,14 +349,34 @@ impl TypeChecker<'_> {
 
                 crate::log_debug_ct!("import_ty {name} from {fid:?}");
 
-                let ext_def_use_info = self.ctx.expr_stage_by_id(fid)?;
-                let source = &ext_def_use_info.source;
-                // todo: check types in cycle
-                let ext_type_info = if let Some(scheme) = self.env.visiting.get(&source.id()) {
-                    scheme.clone()
-                } else {
-                    self.ctx.clone().type_check_(source, self.env)
-                };
+                let ext_def_use_info = self.exprs.get(&fid);
+                let (ext_def_use_info, ext_type_info) =
+                    if let Some(scheme) = self.visiting.get(&fid) {
+                        (ext_def_use_info?.clone(), &**scheme)
+                    } else if let Some(ext_def_use_info) = ext_def_use_info {
+                        let scc = self.db.source_by_id(fid).ok()?;
+                        let visiting = self.visiting.insert(fid, &mut self.info);
+                        let mut type_checker = TypeChecker {
+                            db: self.db,
+                            // ctx: self.ctx.clone(),
+                            ei: ext_def_use_info.clone(),
+                            info: TypeInfo::default(),
+                            module_exports: self.module_exports,
+                            call_cache: self.call_cache,
+                            visited: self.visited.clone(),
+                            visiting,
+                            exprs: self.exprs,
+                        };
+
+                        type_check_impl(&mut type_checker, &scc);
+                        let info = Arc::new(type_checker.info);
+                        self.visited.insert_mut(fid, info);
+                        (ext_def_use_info.clone(), self.visited.get(&fid)?.as_ref())
+                    } else {
+                        let file = self.db.source_by_id(fid).ok()?;
+                        let expr = expr_of(self.db, file);
+                        (expr, type_check(self.db, file).as_ref())
+                    };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 
                 // todo: rest expressions
@@ -207,10 +395,10 @@ impl TypeChecker<'_> {
                 Some(ext_type_info.to_bounds(def))
             });
 
-            TypeVarBounds::new(TypeVar { name, def: decl }, init.unwrap_or_default())
-        });
-
+            TypeVarBounds::new(var, init.unwrap_or_default())
+        };
         let var = entry.var.clone();
+        self.info.vars.insert(decl.clone(), entry);
 
         let s = decl.span();
         if !s.is_detached() {
