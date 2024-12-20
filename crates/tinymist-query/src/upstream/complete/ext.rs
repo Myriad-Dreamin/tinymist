@@ -21,7 +21,7 @@ use crate::snippet::{
     ParsedSnippet, PostfixSnippet, PostfixSnippetScope, SurroundingSyntax, DEFAULT_POSTFIX_SNIPPET,
 };
 use crate::syntax::{
-    descent_decls, interpret_mode_at, is_ident_like, CursorClass, DescentDecl, InterpretMode,
+    interpret_mode_at, is_ident_like, previous_decls, CursorClass, InterpretMode, PreviousDecl,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
 use crate::upstream::complete::complete_code;
@@ -119,19 +119,19 @@ impl CompletionContext<'_> {
             .clone();
         defines.insert_scope(&scope);
 
-        descent_decls(self.leaf.clone(), |node| -> Option<()> {
+        previous_decls(self.leaf.clone(), |node| -> Option<()> {
             match node {
-                DescentDecl::Ident(ident) => {
+                PreviousDecl::Ident(ident) => {
                     let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
                     defines.insert_ty(ty, ident.get());
                 }
-                DescentDecl::ImportSource(src) => {
+                PreviousDecl::ImportSource(src) => {
                     let ty = analyze_import_source(self.ctx, &defines.types, src)?;
                     let name = ty.name().as_ref().into();
                     defines.insert_ty(ty, &name);
                 }
                 // todo: cache completion items
-                DescentDecl::ImportAll(mi) => {
+                PreviousDecl::ImportAll(mi) => {
                     let ty = analyze_import_source(self.ctx, &defines.types, mi.source())?;
                     ty.iface_surface(true, &mut ScopeChecker(&mut defines, self.ctx));
                 }

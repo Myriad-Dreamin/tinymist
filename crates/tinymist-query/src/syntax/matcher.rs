@@ -2,45 +2,47 @@ use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
 
-/// Finds the ancestors of a node lazily.
+/// Returns the ancestor iterator of the given node.
 pub fn node_ancestors<'a, 'b>(
     node: &'b LinkedNode<'a>,
 ) -> impl Iterator<Item = &'b LinkedNode<'a>> {
     std::iter::successors(Some(node), |node| node.parent())
 }
 
-/// Finds the expression target.
-pub fn deref_expr(node: LinkedNode) -> Option<LinkedNode> {
+/// Finds the first ancestor node that is an expression.
+pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
     node_ancestors(&node).find(|n| n.is::<ast::Expr>()).cloned()
 }
 
-/// A descent syntax item.
-pub enum DescentItem<'a> {
-    /// When the iterator is on a sibling node.
-    Sibling(&'a LinkedNode<'a>),
-    /// When the iterator is crossing a parent node.
+/// A node that is an ancestor of the given node or the previous sibling
+/// of some ancestor.
+pub enum PreviousItem<'a> {
+    /// When the iterator is crossing an ancesstor node.
     Parent(&'a LinkedNode<'a>, &'a LinkedNode<'a>),
+    /// When the iterator is on a sibling node of some ancestor.
+    Sibling(&'a LinkedNode<'a>),
 }
 
-impl<'a> DescentItem<'a> {
+impl<'a> PreviousItem<'a> {
     pub fn node(&self) -> &'a LinkedNode<'a> {
         match self {
-            DescentItem::Sibling(node) => node,
-            DescentItem::Parent(node, _) => node,
+            PreviousItem::Sibling(node) => node,
+            PreviousItem::Parent(node, _) => node,
         }
     }
 }
 
-/// Finds the descent items starting from the given position.
-pub fn descent_items<T>(
+/// Finds the previous items (in the scope) starting from the given position
+/// inclusively. See [`PreviousItem`] for the possible items.
+pub fn previous_items<T>(
     node: LinkedNode,
-    mut recv: impl FnMut(DescentItem) -> Option<T>,
+    mut recv: impl FnMut(PreviousItem) -> Option<T>,
 ) -> Option<T> {
     let mut ancestor = Some(node);
     while let Some(node) = &ancestor {
         let mut sibling = Some(node.clone());
         while let Some(node) = &sibling {
-            if let Some(v) = recv(DescentItem::Sibling(node)) {
+            if let Some(v) = recv(PreviousItem::Sibling(node)) {
                 return Some(v);
             }
 
@@ -48,7 +50,7 @@ pub fn descent_items<T>(
         }
 
         if let Some(parent) = node.parent() {
-            if let Some(v) = recv(DescentItem::Parent(parent, node)) {
+            if let Some(v) = recv(PreviousItem::Parent(parent, node)) {
                 return Some(v);
             }
 
@@ -62,37 +64,38 @@ pub fn descent_items<T>(
     None
 }
 
-pub enum DescentDecl<'a> {
+pub enum PreviousDecl<'a> {
     Ident(ast::Ident<'a>),
     ImportSource(ast::Expr<'a>),
     ImportAll(ast::ModuleImport<'a>),
 }
 
-/// Finds the descent decls starting from the given position.
-pub fn descent_decls<T>(
+/// Finds the previous decls starting from the given position. It checks
+/// [`PreviousItem`] and returns the found decls.
+pub fn previous_decls<T>(
     node: LinkedNode,
-    mut recv: impl FnMut(DescentDecl) -> Option<T>,
+    mut recv: impl FnMut(PreviousDecl) -> Option<T>,
 ) -> Option<T> {
-    descent_items(node, |node| {
-        match (&node, node.node().cast::<ast::Expr>()?) {
-            (DescentItem::Sibling(..), ast::Expr::Let(lb)) => {
+    previous_items(node, |item| {
+        match (&item, item.node().cast::<ast::Expr>()?) {
+            (PreviousItem::Sibling(..), ast::Expr::Let(lb)) => {
                 for ident in lb.kind().bindings() {
-                    if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                    if let Some(t) = recv(PreviousDecl::Ident(ident)) {
                         return Some(t);
                     }
                 }
             }
-            (DescentItem::Sibling(..), ast::Expr::Import(mi)) => {
+            (PreviousItem::Sibling(..), ast::Expr::Import(import)) => {
                 // import items
-                match mi.imports() {
+                match import.imports() {
                     Some(ast::Imports::Wildcard) => {
-                        if let Some(t) = recv(DescentDecl::ImportAll(mi)) {
+                        if let Some(t) = recv(PreviousDecl::ImportAll(import)) {
                             return Some(t);
                         }
                     }
                     Some(ast::Imports::Items(items)) => {
                         for item in items.iter() {
-                            if let Some(t) = recv(DescentDecl::Ident(item.bound_name())) {
+                            if let Some(t) = recv(PreviousDecl::Ident(item.bound_name())) {
                                 return Some(t);
                             }
                         }
@@ -101,31 +104,31 @@ pub fn descent_decls<T>(
                 }
 
                 // import it self
-                if let Some(new_name) = mi.new_name() {
-                    if let Some(t) = recv(DescentDecl::Ident(new_name)) {
+                if let Some(new_name) = import.new_name() {
+                    if let Some(t) = recv(PreviousDecl::Ident(new_name)) {
                         return Some(t);
                     }
-                } else if mi.imports().is_none() {
-                    if let Some(t) = recv(DescentDecl::ImportSource(mi.source())) {
+                } else if import.imports().is_none() {
+                    if let Some(t) = recv(PreviousDecl::ImportSource(import.source())) {
                         return Some(t);
                     }
                 }
             }
-            (DescentItem::Parent(node, child), ast::Expr::For(for_expr)) => {
-                let body = node.find(for_expr.body().span());
+            (PreviousItem::Parent(parent, child), ast::Expr::For(for_expr)) => {
+                let body = parent.find(for_expr.body().span());
                 let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
                 if !in_body {
                     return None;
                 }
 
                 for ident in for_expr.pattern().bindings() {
-                    if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                    if let Some(t) = recv(PreviousDecl::Ident(ident)) {
                         return Some(t);
                     }
                 }
             }
-            (DescentItem::Parent(node, child), ast::Expr::Closure(closure)) => {
-                let body = node.find(closure.body().span());
+            (PreviousItem::Parent(parent, child), ast::Expr::Closure(closure)) => {
+                let body = parent.find(closure.body().span());
                 let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
                 if !in_body {
                     return None;
@@ -133,21 +136,21 @@ pub fn descent_decls<T>(
 
                 for param in closure.params().children() {
                     match param {
-                        ast::Param::Pos(pattern) => {
-                            for ident in pattern.bindings() {
-                                if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                        ast::Param::Pos(pos) => {
+                            for ident in pos.bindings() {
+                                if let Some(t) = recv(PreviousDecl::Ident(ident)) {
                                     return Some(t);
                                 }
                             }
                         }
-                        ast::Param::Named(n) => {
-                            if let Some(t) = recv(DescentDecl::Ident(n.name())) {
+                        ast::Param::Named(named) => {
+                            if let Some(t) = recv(PreviousDecl::Ident(named.name())) {
                                 return Some(t);
                             }
                         }
-                        ast::Param::Spread(s) => {
-                            if let Some(sink_ident) = s.sink_ident() {
-                                if let Some(t) = recv(DescentDecl::Ident(sink_ident)) {
+                        ast::Param::Spread(spread) => {
+                            if let Some(sink_ident) = spread.sink_ident() {
+                                if let Some(t) = recv(PreviousDecl::Ident(sink_ident)) {
                                     return Some(t);
                                 }
                             }
@@ -277,6 +280,23 @@ pub enum SyntaxClass<'a> {
 }
 
 impl<'a> SyntaxClass<'a> {
+    /// Creates a label syntax class.
+    pub fn label(node: LinkedNode<'a>) -> Self {
+        Self::Label {
+            node,
+            is_error: false,
+        }
+    }
+
+    /// Creates an error label syntax class.
+    pub fn error_as_label(node: LinkedNode<'a>) -> Self {
+        Self::Label {
+            node,
+            is_error: true,
+        }
+    }
+
+    /// Gets the node of the syntax class.
     pub fn node(&self) -> &LinkedNode<'a> {
         match self {
             SyntaxClass::Label { node, .. }
@@ -286,20 +306,6 @@ impl<'a> SyntaxClass<'a> {
             | SyntaxClass::ImportPath(node)
             | SyntaxClass::IncludePath(node)
             | SyntaxClass::Normal(_, node) => node,
-        }
-    }
-
-    pub fn label(node: LinkedNode<'a>) -> Self {
-        Self::Label {
-            node,
-            is_error: false,
-        }
-    }
-
-    pub fn error_as_label(node: LinkedNode<'a>) -> Self {
-        Self::Label {
-            node,
-            is_error: true,
         }
     }
 }
@@ -318,18 +324,18 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         }
 
         // Get the trivia text before the cursor.
-        let pref = node.text().as_bytes();
-        let pref = if node.range().contains(&cursor) {
-            &pref[..cursor - node.offset()]
+        let previous_text = node.text().as_bytes();
+        let previous_text = if node.range().contains(&cursor) {
+            &previous_text[..cursor - node.offset()]
         } else {
-            pref
+            previous_text
         };
 
         // The deref target should be on the same line as the cursor.
         // Assuming the underlying text is utf-8 encoded, we can check for newlines by
         // looking for b'\n'.
         // todo: if we are in markup mode, we should check if we are at start of node
-        !pref.contains(&b'\n')
+        !previous_text.contains(&b'\n')
     }
 
     // Move to the first non-trivia node before the cursor.
@@ -339,37 +345,37 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     }
 
     // Move to the first ancestor that is an expression.
-    let ancestor = deref_expr(node)?;
-    crate::log_debug_ct!("deref expr: {ancestor:?}");
+    let ancestor = first_ancestor_expr(node)?;
+    crate::log_debug_ct!("first_ancestor_expr: {ancestor:?}");
 
     // Unwrap all parentheses to get the actual expression.
-    let cano_expr = classify_lvalue(ancestor)?;
-    crate::log_debug_ct!("deref lvalue: {cano_expr:?}");
+    let adjusted = adjust_expr(ancestor)?;
+    crate::log_debug_ct!("adjust_expr: {adjusted:?}");
 
     // Identify convenient expression kinds.
-    let expr = cano_expr.cast::<ast::Expr>()?;
+    let expr = adjusted.cast::<ast::Expr>()?;
     Some(match expr {
-        ast::Expr::Label(..) => SyntaxClass::label(cano_expr),
-        ast::Expr::Ref(..) => SyntaxClass::Ref(cano_expr),
-        ast::Expr::FuncCall(call) => SyntaxClass::Callee(cano_expr.find(call.callee().span())?),
-        ast::Expr::Set(set) => SyntaxClass::Callee(cano_expr.find(set.target().span())?),
+        ast::Expr::Label(..) => SyntaxClass::label(adjusted),
+        ast::Expr::Ref(..) => SyntaxClass::Ref(adjusted),
+        ast::Expr::FuncCall(call) => SyntaxClass::Callee(adjusted.find(call.callee().span())?),
+        ast::Expr::Set(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) | ast::Expr::FieldAccess(..) => {
-            SyntaxClass::VarAccess(cano_expr)
+            SyntaxClass::VarAccess(adjusted)
         }
         ast::Expr::Str(..) => {
-            let parent = cano_expr.parent()?;
+            let parent = adjusted.parent()?;
             if parent.kind() == SyntaxKind::ModuleImport {
-                SyntaxClass::ImportPath(cano_expr)
+                SyntaxClass::ImportPath(adjusted)
             } else if parent.kind() == SyntaxKind::ModuleInclude {
-                SyntaxClass::IncludePath(cano_expr)
+                SyntaxClass::IncludePath(adjusted)
             } else {
-                SyntaxClass::Normal(cano_expr.kind(), cano_expr)
+                SyntaxClass::Normal(adjusted.kind(), adjusted)
             }
         }
         _ if expr.hash()
-            || matches!(cano_expr.kind(), SyntaxKind::MathIdent | SyntaxKind::Error) =>
+            || matches!(adjusted.kind(), SyntaxKind::MathIdent | SyntaxKind::Error) =>
         {
-            SyntaxClass::Normal(cano_expr.kind(), cano_expr)
+            SyntaxClass::Normal(adjusted.kind(), adjusted)
         }
         _ => return None,
     })
@@ -377,18 +383,18 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
 
 /// Whether the node might be in code trivia. This is a bit internal so please
 /// check the caller to understand it.
-fn possible_in_code_trivia(sk: SyntaxKind) -> bool {
+fn possible_in_code_trivia(kind: SyntaxKind) -> bool {
     !matches!(
-        interpret_mode_at_kind(sk),
+        interpret_mode_at_kind(kind),
         Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
     )
 }
 
-/// Finds a more canonical expression target.
+/// Adjusts an expression node to a more suitable one for classification.
 /// It is not formal, but the following cases are forbidden:
 /// - Parenthesized expression.
 /// - Identifier on the right side of a dot operator (field access).
-fn classify_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
+fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(paren_expr) = node.cast::<ast::Parenthesized>() {
         node = node.find(paren_expr.expr().span())?;
     }
@@ -412,6 +418,7 @@ pub enum DefClass<'a> {
 }
 
 impl DefClass<'_> {
+    /// Gets the node of the def class.
     pub fn node(&self) -> &LinkedNode {
         match self {
             DefClass::Let(node) => node,
@@ -419,10 +426,7 @@ impl DefClass<'_> {
         }
     }
 
-    pub fn name_range(&self) -> Option<Range<usize>> {
-        self.name().map(|node| node.range())
-    }
-
+    /// Gets the name node of the def class.
     pub fn name(&self) -> Option<LinkedNode> {
         match self {
             DefClass::Let(node) => {
@@ -445,15 +449,20 @@ impl DefClass<'_> {
             }
         }
     }
+
+    /// Gets the name's range in code of the def class.
+    pub fn name_range(&self) -> Option<Range<usize>> {
+        self.name().map(|node| node.range())
+    }
 }
 
 // todo: whether we should distinguish between strict and loose def classes
-/// Classifies a definition under cursor loosely.
+/// Classifies a definition loosely.
 pub fn classify_def_loosely(node: LinkedNode) -> Option<DefClass<'_>> {
     classify_def_(node, false)
 }
 
-/// Classifies a definition under cursor strictly.
+/// Classifies a definition strictly.
 pub fn classify_def(node: LinkedNode) -> Option<DefClass<'_>> {
     classify_def_(node, true)
 }
@@ -468,29 +477,29 @@ fn classify_def_(node: LinkedNode, strict: bool) -> Option<DefClass<'_>> {
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
-    crate::log_debug_ct!("def expr: {ancestor:?}");
-    let ancestor = classify_lvalue(ancestor)?;
-    crate::log_debug_ct!("def lvalue: {ancestor:?}");
+    crate::log_debug_ct!("ancestor: {ancestor:?}");
+    let adjusted = adjust_expr(ancestor)?;
+    crate::log_debug_ct!("adjust_expr: {adjusted:?}");
 
-    let may_ident = ancestor.cast::<ast::Expr>()?;
+    let may_ident = adjusted.cast::<ast::Expr>()?;
     if strict && !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
         return None;
     }
 
-    Some(match may_ident {
+    let expr = may_ident;
+    Some(match expr {
         // todo: label, reference
-        // todo: import
         // todo: include
         ast::Expr::FuncCall(..) => return None,
         ast::Expr::Set(..) => return None,
-        ast::Expr::Let(..) => DefClass::Let(ancestor),
-        ast::Expr::Import(..) => DefClass::Import(ancestor),
+        ast::Expr::Let(..) => DefClass::Let(adjusted),
+        ast::Expr::Import(..) => DefClass::Import(adjusted),
         // todo: parameter
         ast::Expr::Ident(..)
         | ast::Expr::MathIdent(..)
         | ast::Expr::FieldAccess(..)
         | ast::Expr::Closure(..) => {
-            let mut ancestor = ancestor;
+            let mut ancestor = adjusted;
             while !ancestor.is::<ast::LetBinding>() {
                 ancestor = ancestor.parent()?.clone();
             }
@@ -498,16 +507,16 @@ fn classify_def_(node: LinkedNode, strict: bool) -> Option<DefClass<'_>> {
             DefClass::Let(ancestor)
         }
         ast::Expr::Str(..) => {
-            let parent = ancestor.parent()?;
+            let parent = adjusted.parent()?;
             if parent.kind() != SyntaxKind::ModuleImport {
                 return None;
             }
 
             DefClass::Import(parent.clone())
         }
-        _ if may_ident.hash() => return None,
+        _ if expr.hash() => return None,
         _ => {
-            crate::log_debug_ct!("unsupported kind {kind:?}", kind = ancestor.kind());
+            crate::log_debug_ct!("unsupported kind {:?}", adjusted.kind());
             return None;
         }
     })
@@ -527,18 +536,19 @@ pub enum ArgClass<'a> {
 }
 
 impl ArgClass<'_> {
-    pub(crate) fn positional_from_before(before: bool) -> Self {
+    /// Creates the class refer to the first positional argument.
+    pub(crate) fn first_positional() -> Self {
         ArgClass::Positional {
             spreads: EcoVec::new(),
-            positional: if before { 0 } else { 1 },
+            positional: 0,
             is_spread: false,
         }
     }
 }
 
-/// Classes of syntax under cursor that are preferred by type checking.
+/// Classes of syntax that are preferred by type checking.
 ///
-/// A cursor class is either an [`SyntaxClass`] or other things under cursor.
+/// A cursor class is either an [`SyntaxClass`] or other things.
 /// One thing is not ncessary to refer to some exact node. For example, a cursor
 /// moving after some comma in a function call is identified as a
 /// [`CursorClass::Arg`].
@@ -575,6 +585,7 @@ pub enum CursorClass<'a> {
 }
 
 impl<'a> CursorClass<'a> {
+    /// Gets the node of the cursor class.
     pub fn node(&self) -> Option<LinkedNode<'a>> {
         Some(match self {
             CursorClass::Arg { target, .. } | CursorClass::Element { target, .. } => match target {
@@ -601,7 +612,7 @@ enum ArgSourceKind {
     Dict,
 }
 
-/// Classifies a cursor expression by context.
+/// Classifies a cursor syntax by context that are preferred by type checking.
 pub fn classify_cursor_by_context<'a>(
     context: LinkedNode<'a>,
     node: LinkedNode<'a>,
@@ -636,7 +647,7 @@ pub fn classify_cursor_by_context<'a>(
     }
 }
 
-/// Classifies an expression under cursor that are preferred by type checking.
+/// Classifies a cursor syntax that are preferred by type checking.
 pub fn classify_cursor(node: LinkedNode) -> Option<CursorClass<'_>> {
     let mut node = node;
     if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
