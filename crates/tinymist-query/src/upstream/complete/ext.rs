@@ -9,7 +9,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
-use typst::foundations::{AutoValue, Content, Func, Label, NoneValue, Scope, Type, Value};
+use typst::foundations::{
+    fields_on, AutoValue, Func, Label, NoneValue, Scope, StyleChain, Styles, Type, Value,
+};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
@@ -23,8 +25,7 @@ use crate::syntax::{
     PreviousDecl, SurroundingSyntax, SyntaxContext, VarClass,
 };
 use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
-use crate::upstream::complete::{complete_code, field_access_completions};
-
+use crate::upstream::complete::complete_code;
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 /// Tinymist's completion features.
@@ -139,7 +140,7 @@ impl CompletionContext<'_> {
         Some((src, defines))
     }
 
-    pub fn postfix_completions(&mut self, node: &LinkedNode, value: &Value) -> Option<()> {
+    pub fn postfix_completions(&mut self, node: &LinkedNode, ty: Ty) -> Option<()> {
         if !self.ctx.analysis.completion_feat.postfix() {
             return None;
         }
@@ -153,8 +154,7 @@ impl CompletionContext<'_> {
         }
 
         let cursor_mode = interpret_mode_at(Some(node));
-        let is_content = value.ty() == Type::of::<Content>()
-            || value.ty() == Type::of::<typst::symbols::Symbol>();
+        let is_content = ty.is_content(&());
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
         let rng = node.range();
@@ -254,12 +254,13 @@ impl CompletionContext<'_> {
         Some(())
     }
 
-    pub fn ufcs_completions(&mut self, node: &LinkedNode, value: &Value) {
+    /// Make ufcs-style completions. Note: you must check that node is a content
+    /// before calling this. Todo: ufcs completions for other types.
+    pub fn ufcs_completions(&mut self, node: &LinkedNode) {
         if !self.ctx.analysis.completion_feat.any_ufcs() {
             return;
         }
 
-        let _ = value;
         let surrounding_syntax = self.surrounding_syntax();
         if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
             return;
@@ -521,6 +522,104 @@ impl CompletionContext<'_> {
                 detail,
                 ..Completion::default()
             });
+        }
+    }
+    /// Add completions for all fields on a node.
+    fn field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
+        let (value, styles) = self.ctx.analyze_expr(target).into_iter().next()?;
+        self.value_field_access_completions(target, &value, &styles);
+
+        Some(())
+    }
+
+    /// Add completions for all fields on a value.
+    fn value_field_access_completions(
+        &mut self,
+        node: &LinkedNode,
+        value: &Value,
+        styles: &Option<Styles>,
+    ) {
+        for (name, value, _) in value.ty().scope().iter() {
+            self.value_completion(Some(name.clone()), value, true, None);
+        }
+
+        if let Some(scope) = value.scope() {
+            for (name, value, _) in scope.iter() {
+                self.value_completion(Some(name.clone()), value, true, None);
+            }
+        }
+
+        for &field in fields_on(value.ty()) {
+            // Complete the field name along with its value. Notes:
+            // 1. No parentheses since function fields cannot currently be called
+            // with method syntax;
+            // 2. We can unwrap the field's value since it's a field belonging to
+            // this value's type, so accessing it should not fail.
+            self.value_completion(
+                Some(field.into()),
+                &value.field(field).unwrap(),
+                false,
+                None,
+            );
+        }
+
+        self.postfix_completions(node, Ty::Value(InsTy::new(value.clone())));
+
+        match value {
+            Value::Symbol(symbol) => {
+                for modifier in symbol.modifiers() {
+                    if let Ok(modified) = symbol.clone().modified(modifier) {
+                        self.completions.push(Completion {
+                            kind: CompletionKind::Symbol(modified.get()),
+                            label: modifier.into(),
+                            label_detail: Some(symbol_label_detail(modified.get())),
+                            ..Completion::default()
+                        });
+                    }
+                }
+
+                self.ufcs_completions(node);
+            }
+            Value::Content(content) => {
+                for (name, value) in content.fields() {
+                    self.value_completion(Some(name.into()), &value, false, None);
+                }
+
+                self.ufcs_completions(node);
+            }
+            Value::Dict(dict) => {
+                for (name, value) in dict.iter() {
+                    self.value_completion(Some(name.clone().into()), value, false, None);
+                }
+            }
+            Value::Func(func) => {
+                // Autocomplete get rules.
+                if let Some((elem, styles)) = func.element().zip(styles.as_ref()) {
+                    for param in elem.params().iter().filter(|param| !param.required) {
+                        if let Some(value) = elem
+                            .field_id(param.name)
+                            .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
+                        {
+                            self.value_completion(
+                                Some(param.name.into()),
+                                &value.unwrap(),
+                                false,
+                                None,
+                            );
+                        }
+                    }
+                }
+            }
+            Value::Plugin(plugin) => {
+                for name in plugin.iter() {
+                    self.completions.push(Completion {
+                        kind: CompletionKind::Func,
+                        label: name.clone(),
+                        ..Completion::default()
+                    })
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -1301,8 +1400,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
             let offset = field.offset(&ctx.ctx.source_by_id(target.span().id()?).ok()?)?;
             ctx.from = offset;
 
-            let (value, styles) = ctx.ctx.analyze_expr(&target).into_iter().next()?;
-            field_access_completions(ctx, &target, &value, &styles);
+            ctx.field_access_completions(&target);
             return Some(());
         }
         Some(SyntaxContext::ImportPath(path) | SyntaxContext::IncludePath(path)) => {

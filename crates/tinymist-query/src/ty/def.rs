@@ -242,15 +242,19 @@ impl Ty {
         self.satisfy(ctx, |ty: &Ty, _pol| {
             res = res || {
                 match ty {
-                    Ty::Value(v) => matches!(v.val, Value::Content(..)),
+                    Ty::Value(v) => is_content_builtin_type(&v.val.ty()),
                     Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
-                    Ty::Builtin(BuiltinTy::Type(v)) => *v == Type::of::<Content>(),
+                    Ty::Builtin(BuiltinTy::Type(v)) => is_content_builtin_type(v),
                     _ => false,
                 }
             }
         });
         res
     }
+}
+
+fn is_content_builtin_type(ty: &Type) -> bool {
+    *ty == Type::of::<Content>() || *ty == Type::of::<typst::symbols::Symbol>()
 }
 
 /// A function parameter type
