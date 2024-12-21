@@ -327,7 +327,7 @@ impl CompileClientActor {
         let snap = self.snapshot()?;
 
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let export = self.handle.export.oneshot(snap, Some(entry), kind);
+        let export = self.handle.export.factory.oneshot(snap, Some(entry), kind);
         just_future(async move {
             let res = export.await?;
 

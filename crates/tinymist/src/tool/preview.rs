@@ -59,7 +59,7 @@ impl CompileHandler {
     }
 
     async fn resolve_document_position(
-        snap: &SucceededArtifact<LspCompilerFeat>,
+        snap: SucceededArtifact<LspCompilerFeat>,
         loc: Location,
     ) -> Vec<Position> {
         let Location::Src(src_loc) = loc;
@@ -127,7 +127,7 @@ impl SourceFileServer for CompileHandler {
     /// We treat it as UTF-8 now.
     async fn resolve_document_position(&self, loc: Location) -> Result<Vec<Position>, Error> {
         let snap = self.artifact()?.receive().await?;
-        Ok(Self::resolve_document_position(&snap, loc).await)
+        Ok(Self::resolve_document_position(snap, loc).await)
     }
 
     async fn resolve_source_location(

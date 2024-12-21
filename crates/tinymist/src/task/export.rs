@@ -41,7 +41,7 @@ pub struct ExportUserConfig {
 
 #[derive(Clone, Default)]
 pub struct ExportTask {
-    factory: SyncTaskFactory<ExportConfig>,
+    pub factory: SyncTaskFactory<ExportConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
@@ -62,14 +62,16 @@ impl ExportTask {
         let task = self.factory.task();
         task.signal(snap, s, self);
     }
+}
 
+impl SyncTaskFactory<ExportConfig> {
     pub fn oneshot(
         &self,
         snap: WorldSnapFut,
         entry: Option<EntryState>,
         kind: ExportKind,
     ) -> impl Future<Output = anyhow::Result<Option<PathBuf>>> {
-        let export = self.factory.task();
+        let export = self.task();
         async move {
             let snap = snap.receive().await?;
             let snap = snap.task(TaskInputs {
