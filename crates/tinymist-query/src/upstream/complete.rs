@@ -6,7 +6,7 @@ use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
-use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
+use typst::foundations::{format_str, repr, Repr, Value};
 use typst::model::Document;
 use typst::syntax::ast::{AstNode, Param};
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
@@ -295,92 +295,6 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
     }
 
     false
-}
-
-/// Add completions for all fields on a value.
-fn field_access_completions(
-    ctx: &mut CompletionContext,
-    node: &LinkedNode,
-    value: &Value,
-    styles: &Option<Styles>,
-) {
-    for (name, value, _) in value.ty().scope().iter() {
-        ctx.value_completion(Some(name.clone()), value, true, None);
-    }
-
-    if let Some(scope) = value.scope() {
-        for (name, value, _) in scope.iter() {
-            ctx.value_completion(Some(name.clone()), value, true, None);
-        }
-    }
-
-    for &field in fields_on(value.ty()) {
-        // Complete the field name along with its value. Notes:
-        // 1. No parentheses since function fields cannot currently be called
-        // with method syntax;
-        // 2. We can unwrap the field's value since it's a field belonging to
-        // this value's type, so accessing it should not fail.
-        ctx.value_completion(
-            Some(field.into()),
-            &value.field(field).unwrap(),
-            false,
-            None,
-        );
-    }
-
-    ctx.postfix_completions(node, value);
-
-    match value {
-        Value::Symbol(symbol) => {
-            for modifier in symbol.modifiers() {
-                if let Ok(modified) = symbol.clone().modified(modifier) {
-                    ctx.completions.push(Completion {
-                        kind: CompletionKind::Symbol(modified.get()),
-                        label: modifier.into(),
-                        label_detail: Some(symbol_label_detail(modified.get())),
-                        ..Completion::default()
-                    });
-                }
-            }
-
-            ctx.ufcs_completions(node, value);
-        }
-        Value::Content(content) => {
-            for (name, value) in content.fields() {
-                ctx.value_completion(Some(name.into()), &value, false, None);
-            }
-
-            ctx.ufcs_completions(node, value);
-        }
-        Value::Dict(dict) => {
-            for (name, value) in dict.iter() {
-                ctx.value_completion(Some(name.clone().into()), value, false, None);
-            }
-        }
-        Value::Func(func) => {
-            // Autocomplete get rules.
-            if let Some((elem, styles)) = func.element().zip(styles.as_ref()) {
-                for param in elem.params().iter().filter(|param| !param.required) {
-                    if let Some(value) = elem
-                        .field_id(param.name)
-                        .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
-                    {
-                        ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
-                    }
-                }
-            }
-        }
-        Value::Plugin(plugin) => {
-            for name in plugin.iter() {
-                ctx.completions.push(Completion {
-                    kind: CompletionKind::Func,
-                    label: name.clone(),
-                    ..Completion::default()
-                })
-            }
-        }
-        _ => {}
-    }
 }
 
 /// Complete imports.
