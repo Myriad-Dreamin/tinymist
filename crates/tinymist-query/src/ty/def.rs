@@ -777,7 +777,7 @@ impl SigTy {
             inputs: Interned::new(vec![inp]),
             body: Some(ret),
             names: NameBone::empty(),
-            name_started: 0,
+            name_started: 1,
             spread_left: false,
             spread_right: false,
         })
@@ -791,11 +791,12 @@ impl SigTy {
         } else {
             Ty::Tuple(elems.clone())
         };
+        let name_started = elems.len() as u32;
         Interned::new(Self {
             inputs: elems,
             body: Some(ret),
             names: NameBone::empty(),
-            name_started: 0,
+            name_started,
             spread_left: false,
             spread_right: false,
         })
@@ -814,7 +815,7 @@ impl SigTy {
             inputs: named.types.clone(),
             body: Some(ret),
             names: named.names.clone(),
-            name_started: 0,
+            name_started: 1,
             spread_left: false,
             spread_right: false,
         })
