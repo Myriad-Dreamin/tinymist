@@ -815,7 +815,7 @@ impl SigTy {
             inputs: named.types.clone(),
             body: Some(ret),
             names: named.names.clone(),
-            name_started: 1,
+            name_started: 0,
             spread_left: false,
             spread_right: false,
         })

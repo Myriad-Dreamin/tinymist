@@ -7,7 +7,7 @@ snapshot_kind: text
 "a" = (1, )
 "f" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
 "" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
-"x" = Any
+"x" = Type(int)
 "b" = (Type(str), )
 =====
 5..6 -> @a
