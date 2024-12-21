@@ -71,6 +71,7 @@ pub enum LexicalVarKind {
 pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
+    LineComment,
     Block,
 }
 
@@ -97,7 +98,7 @@ impl TryFrom<LexicalKind> for SymbolKind {
             LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
             LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
             LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..) | LexicalKind::Block => Err(()),
+            LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::LineComment => Err(()),
         }
     }
 }
@@ -461,6 +462,9 @@ impl LexicalHierarchyWorker {
                 if self.sk.affect_markup() =>
             {
                 (EcoString::new(), LexicalKind::Block)
+            }
+            SyntaxKind::LineComment if self.sk.affect_markup() => {
+                (EcoString::new(), LexicalKind::LineComment)
             }
             SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if self.sk.affect_block() => {
                 (EcoString::new(), LexicalKind::Block)
