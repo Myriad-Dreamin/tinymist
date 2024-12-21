@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
 use typst::foundations::{
-    fields_on, AutoValue, Func, Label, NoneValue, Scope, StyleChain, Styles, Type, Value,
+    fields_on, AutoValue, Func, Label, NoneValue, Scope, StyleChain, Type, Value,
 };
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind, SyntaxNode};
@@ -24,7 +24,9 @@ use crate::syntax::{
     interpret_mode_at, is_ident_like, previous_decls, surrounding_syntax, InterpretMode,
     PreviousDecl, SurroundingSyntax, SyntaxContext, VarClass,
 };
-use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeVar};
+use crate::ty::{
+    DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
+};
 use crate::upstream::complete::complete_code;
 use crate::{completion_kind, prelude::*, LspCompletion};
 
@@ -95,7 +97,7 @@ impl CompletionContext<'_> {
         surrounding_syntax(&self.leaf)
     }
 
-    fn defines(&mut self) -> Option<(Source, Defines)> {
+    fn scope_defs(&mut self) -> Option<(Source, Defines)> {
         let src = self.ctx.source_by_id(self.root.span().id()?).ok()?;
 
         let mut defines = Defines {
@@ -131,7 +133,14 @@ impl CompletionContext<'_> {
                 // todo: cache completion items
                 PreviousDecl::ImportAll(mi) => {
                     let ty = analyze_import_source(self.ctx, &defines.types, mi.source())?;
-                    ty.iface_surface(true, &mut ScopeChecker(&mut defines, self.ctx));
+                    ty.iface_surface(
+                        true,
+                        &mut CompletionScopeChecker {
+                            check_kind: ScopeCheckKind::Import,
+                            defines: &mut defines,
+                            ctx: self.ctx,
+                        },
+                    );
                 }
             }
             None
@@ -266,7 +275,7 @@ impl CompletionContext<'_> {
             return;
         }
 
-        let Some((src, defines)) = self.defines() else {
+        let Some((src, defines)) = self.scope_defs() else {
             return;
         };
 
@@ -370,13 +379,16 @@ impl CompletionContext<'_> {
     }
 
     /// Add completions for definitions that are available at the cursor.
-    ///
-    /// Filters the global/math scope with the given filter.
     pub fn scope_completions(&mut self, parens: bool) {
-        let Some((_, defines)) = self.defines() else {
+        let Some((_, defines)) = self.scope_defs() else {
             return;
         };
 
+        self.def_completions(defines, parens);
+    }
+
+    /// Add completions for definitions.
+    fn def_completions(&mut self, defines: Defines, parens: bool) {
         let defines = defines.defines;
 
         let surrounding_syntax = self.surrounding_syntax();
@@ -526,19 +538,39 @@ impl CompletionContext<'_> {
     }
     /// Add completions for all fields on a node.
     fn field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
-        let (value, styles) = self.ctx.analyze_expr(target).into_iter().next()?;
-        self.value_field_access_completions(target, &value, &styles);
+        self.value_field_access_completions(target)
+            .or_else(|| self.type_field_access_completions(target))
+    }
 
+    /// Add completions for all fields on a type.
+    fn type_field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
+        let ty = self
+            .ctx
+            .post_type_of_node(target.clone())
+            .filter(|ty| !matches!(ty, Ty::Any));
+        crate::log_debug_ct!("type_field_access_completions_on: {target:?} -> {ty:?}");
+
+        let src = self.ctx.source_by_id(self.root.span().id()?).ok()?;
+        let mut defines = Defines {
+            types: self.ctx.type_check(&src),
+            defines: Default::default(),
+        };
+        ty?.iface_surface(
+            true,
+            &mut CompletionScopeChecker {
+                check_kind: ScopeCheckKind::FieldAccess,
+                defines: &mut defines,
+                ctx: self.ctx,
+            },
+        );
+
+        self.def_completions(defines, true);
         Some(())
     }
 
     /// Add completions for all fields on a value.
-    fn value_field_access_completions(
-        &mut self,
-        node: &LinkedNode,
-        value: &Value,
-        styles: &Option<Styles>,
-    ) {
+    fn value_field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
+        let (value, styles) = self.ctx.analyze_expr(target).into_iter().next()?;
         for (name, value, _) in value.ty().scope().iter() {
             self.value_completion(Some(name.clone()), value, true, None);
         }
@@ -563,7 +595,7 @@ impl CompletionContext<'_> {
             );
         }
 
-        self.postfix_completions(node, Ty::Value(InsTy::new(value.clone())));
+        self.postfix_completions(target, Ty::Value(InsTy::new(value.clone())));
 
         match value {
             Value::Symbol(symbol) => {
@@ -578,14 +610,14 @@ impl CompletionContext<'_> {
                     }
                 }
 
-                self.ufcs_completions(node);
+                self.ufcs_completions(target);
             }
             Value::Content(content) => {
                 for (name, value) in content.fields() {
                     self.value_completion(Some(name.into()), &value, false, None);
                 }
 
-                self.ufcs_completions(node);
+                self.ufcs_completions(target);
             }
             Value::Dict(dict) => {
                 for (name, value) in dict.iter() {
@@ -621,6 +653,8 @@ impl CompletionContext<'_> {
             }
             _ => {}
         }
+
+        Some(())
     }
 }
 
@@ -668,11 +702,40 @@ fn analyze_import_source(ctx: &LocalContext, types: &TypeInfo, s: ast::Expr) -> 
     Some(Ty::Value(InsTy::new_at(m, s.span())))
 }
 
-#[derive(BindTyCtx)]
-#[bind(0)]
-struct ScopeChecker<'a>(&'a mut Defines, &'a mut LocalContext);
+enum ScopeCheckKind {
+    Import,
+    FieldAccess,
+}
 
-impl IfaceChecker for ScopeChecker<'_> {
+#[derive(BindTyCtx)]
+#[bind(defines)]
+struct CompletionScopeChecker<'a> {
+    check_kind: ScopeCheckKind,
+    defines: &'a mut Defines,
+    ctx: &'a mut LocalContext,
+}
+
+impl CompletionScopeChecker<'_> {
+    fn is_only_importable(&self) -> bool {
+        matches!(self.check_kind, ScopeCheckKind::Import)
+    }
+
+    fn is_field_access(&self) -> bool {
+        matches!(self.check_kind, ScopeCheckKind::FieldAccess)
+    }
+
+    fn type_methods(&mut self, ty: Type) {
+        for name in fields_on(ty) {
+            self.defines.insert((*name).into(), Ty::Any);
+        }
+        for (name, value, _) in ty.scope().iter() {
+            let ty = Ty::Value(InsTy::new(value.clone()));
+            self.defines.insert(name.into(), ty);
+        }
+    }
+}
+
+impl IfaceChecker for CompletionScopeChecker<'_> {
     fn check(
         &mut self,
         iface: Iface,
@@ -681,32 +744,59 @@ impl IfaceChecker for ScopeChecker<'_> {
     ) -> Option<()> {
         match iface {
             // dict is not importable
+            Iface::Dict(d) if !self.is_only_importable() => {
+                for (name, term) in d.interface() {
+                    self.defines.insert(name.as_ref().into(), term.clone());
+                }
+            }
+            Iface::Value { val, .. } if !self.is_only_importable() => {
+                for (name, value) in val.iter() {
+                    let term = Ty::Value(InsTy::new(value.clone()));
+                    self.defines.insert(name.clone().into(), term);
+                }
+            }
             Iface::Dict(..) | Iface::Value { .. } => {}
+            Iface::Element { val, .. } if self.is_field_access() => {
+                // 255 is the magic "label"
+                for field_id in 0u8..254u8 {
+                    let Some(field_name) = val.field_name(field_id) else {
+                        continue;
+                    };
+                    self.defines.insert(field_name.into(), Ty::Any);
+                }
+            }
+            Iface::Type { val, .. } if self.is_field_access() => {
+                self.type_methods(*val);
+            }
+            Iface::Func { .. } if self.is_field_access() => {
+                self.type_methods(Type::of::<Func>());
+            }
             Iface::Element { val, .. } => {
-                self.0.insert_scope(val.scope());
+                self.defines.insert_scope(val.scope());
             }
             Iface::Type { val, .. } => {
-                self.0.insert_scope(val.scope());
+                self.defines.insert_scope(val.scope());
             }
             Iface::Func { val, .. } => {
                 if let Some(s) = val.scope() {
-                    self.0.insert_scope(s);
+                    self.defines.insert_scope(s);
                 }
             }
             Iface::Module { val, .. } => {
-                let ti = self.1.type_check_by_id(val);
+                let ti = self.ctx.type_check_by_id(val);
                 if !ti.valid {
-                    self.0.insert_scope(self.1.module_by_id(val).ok()?.scope());
+                    self.defines
+                        .insert_scope(self.ctx.module_by_id(val).ok()?.scope());
                 } else {
                     for (name, ty) in ti.exports.iter() {
                         // todo: Interned -> EcoString here
                         let ty = ti.simplify(ty.clone(), false);
-                        self.0.insert(name.as_ref().into(), ty);
+                        self.defines.insert(name.as_ref().into(), ty);
                     }
                 }
             }
             Iface::ModuleVal { val, .. } => {
-                self.0.insert_scope(val.scope());
+                self.defines.insert_scope(val.scope());
             }
         }
         None
