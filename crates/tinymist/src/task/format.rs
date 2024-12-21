@@ -6,6 +6,7 @@ use lsp_types::TextEdit;
 use sync_lsp::{just_future, SchedulableResponse};
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
+use typstyle_core::PrinterConfig;
 
 use super::SyncTaskFactory;
 use crate::FormatterMode;
@@ -39,8 +40,15 @@ impl FormatTask {
             match c.mode {
                 FormatterMode::Typstyle => {
                     let cw = c.width as usize;
-                    let res = typstyle_core::Typstyle::new_with_src(src.clone(), cw).pretty_print();
-                    Ok(calc_diff(src, res, c.position_encoding))
+                    let res = typstyle_core::Typstyle::new_with_src(
+                        src.clone(),
+                        PrinterConfig::new_with_width(cw),
+                    )
+                    .pretty_print();
+                    match res {
+                        Ok(res) => Ok(calc_diff(src, res, c.position_encoding)),
+                        Err(_) => Ok(None),
+                    }
                 }
                 FormatterMode::Typstfmt => {
                     let config = typstfmt_lib::Config {
