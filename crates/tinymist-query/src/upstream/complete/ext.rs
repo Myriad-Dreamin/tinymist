@@ -103,6 +103,7 @@ impl CompletionContext<'_> {
         let mut defines = Defines {
             types: self.ctx.type_check(&src),
             defines: Default::default(),
+            docs: Default::default(),
         };
 
         let in_math = matches!(
@@ -389,6 +390,7 @@ impl CompletionContext<'_> {
 
     /// Add completions for definitions.
     fn def_completions(&mut self, defines: Defines, parens: bool) {
+        let default_docs = defines.docs;
         let defines = defines.defines;
 
         let surrounding_syntax = self.surrounding_syntax();
@@ -452,15 +454,18 @@ impl CompletionContext<'_> {
                 continue;
             }
 
+            let docs = default_docs.get(&name).cloned();
+
             let label_detail = ty.describe().map(From::from).or_else(|| Some("any".into()));
 
             crate::log_debug_ct!("scope completions!: {name} {ty:?} {label_detail:?}");
-            let detail = label_detail.clone();
+            let detail = docs.or_else(|| label_detail.clone());
 
             if !kind_checker.functions.is_empty() {
                 let base = Completion {
                     kind: CompletionKind::Func,
                     label_detail,
+                    detail,
                     command: self.ctx.analysis.trigger_on_snippet_with_param_hint(true),
                     ..Default::default()
                 };
@@ -554,6 +559,7 @@ impl CompletionContext<'_> {
         let mut defines = Defines {
             types: self.ctx.type_check(&src),
             defines: Default::default(),
+            docs: Default::default(),
         };
         ty?.iface_surface(
             true,
@@ -663,6 +669,7 @@ impl CompletionContext<'_> {
 struct Defines {
     types: Arc<TypeInfo>,
     defines: BTreeMap<EcoString, Ty>,
+    docs: BTreeMap<EcoString, EcoString>,
 }
 
 impl Defines {
@@ -758,11 +765,25 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Dict(..) | Iface::Value { .. } => {}
             Iface::Element { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
+                let styles = StyleChain::default();
                 for field_id in 0u8..254u8 {
                     let Some(field_name) = val.field_name(field_id) else {
                         continue;
                     };
-                    self.defines.insert(field_name.into(), Ty::Any);
+
+                    let sample_value = val.field_from_styles(field_id, styles).ok();
+                    let ty = sample_value.map_or(Ty::Any, |v| Ty::Builtin(BuiltinTy::Type(v.ty())));
+
+                    self.defines.insert(field_name.into(), ty);
+
+                    let param_docs = val
+                        .params()
+                        .iter()
+                        .find(|p| p.name == field_name)
+                        .map(|p| p.docs.into());
+                    if let Some(docs) = param_docs {
+                        self.defines.docs.insert(field_name.into(), docs);
+                    }
                 }
             }
             Iface::Type { val, .. } if self.is_field_access() => {
