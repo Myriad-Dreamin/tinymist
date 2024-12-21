@@ -39,16 +39,11 @@ impl FormatTask {
         just_future(async move {
             match c.mode {
                 FormatterMode::Typstyle => {
-                    let cw = c.width as usize;
-                    let res = typstyle_core::Typstyle::new_with_src(
-                        src.clone(),
-                        PrinterConfig::new_with_width(cw),
-                    )
-                    .pretty_print();
-                    match res {
-                        Ok(res) => Ok(calc_diff(src, res, c.position_encoding)),
-                        Err(_) => Ok(None),
-                    }
+                    let config = PrinterConfig::new_with_width(c.width as usize);
+                    let res = typstyle_core::Typstyle::new_with_src(src.clone(), config)
+                        .pretty_print()
+                        .ok();
+                    Ok(res.and_then(|res| calc_diff(src, res, c.position_encoding)))
                 }
                 FormatterMode::Typstfmt => {
                     let config = typstfmt_lib::Config {
