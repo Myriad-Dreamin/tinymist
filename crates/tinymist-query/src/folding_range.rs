@@ -149,9 +149,9 @@ fn calc_folding_range(
             last_line_comment_end_range = Some(folding_range.clone());
             continue;
         }
-        if let Some(last_end_range) = &last_line_comment_end_range {
-            folding_ranges.push(last_end_range.clone());
-            last_line_comment_end_range = None;
+        if let Some(mut last_end_range) = last_line_comment_end_range.take() {
+            last_end_range.kind = Some(lsp_types::FoldingRangeKind::Comment);
+            folding_ranges.push(last_end_range);
         }
         if let Some(ch) = &child.children {
             let parent_last_loc = if is_not_last_range {
