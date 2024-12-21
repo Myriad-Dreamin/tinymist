@@ -290,6 +290,7 @@ impl LexicalHierarchyWorker {
                     let w = self.stack.last_mut();
                     match w {
                         Some((w, _))
+                            // TODO: This check is not good enough.
                             if w.kind == LexicalKind::LineComment
                                 && w.range.end == node.range().start - 1 =>
                         {
