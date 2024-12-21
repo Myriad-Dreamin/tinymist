@@ -286,6 +286,36 @@ impl LexicalHierarchyWorker {
         } else {
             // todo: for loop variable
             match node.kind() {
+                SyntaxKind::LineComment => {
+                    let last = self.stack.last().map(|(w, _)| w.clone());
+                    if let Some(w) = last {
+                        if w.kind == LexicalKind::LineComment
+                            && w.range.end == node.range().start - 1
+                        {
+                            self.stack.pop();
+                            self.stack.push((
+                                LexicalInfo {
+                                    name: "".into(),
+                                    kind: LexicalKind::LineComment,
+                                    range: Range {
+                                        start: w.range.start,
+                                        end: node.range().end,
+                                    },
+                                },
+                                eco_vec![],
+                            ));
+                        } else {
+                            self.stack.push((
+                                LexicalInfo {
+                                    name: "".into(),
+                                    kind: LexicalKind::LineComment,
+                                    range: node.range(),
+                                },
+                                eco_vec![],
+                            ));
+                        }
+                    }
+                }
                 SyntaxKind::LetBinding => 'let_binding: {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
@@ -462,9 +492,6 @@ impl LexicalHierarchyWorker {
                 if self.sk.affect_markup() =>
             {
                 (EcoString::new(), LexicalKind::Block)
-            }
-            SyntaxKind::LineComment if self.sk.affect_markup() => {
-                (EcoString::new(), LexicalKind::LineComment)
             }
             SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if self.sk.affect_block() => {
                 (EcoString::new(), LexicalKind::Block)

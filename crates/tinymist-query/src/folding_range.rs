@@ -100,7 +100,6 @@ fn calc_folding_range(
     is_last_range: bool,
     folding_ranges: &mut Vec<FoldingRange>,
 ) {
-    let mut last_line_comment_end_range: Option<FoldingRange> = None;
     for (idx, child) in hierarchy.iter().enumerate() {
         let range = typst_to_lsp::range(child.info.range.clone(), source, position_encoding);
         let is_not_last_range = idx + 1 < hierarchy.len();
@@ -134,25 +133,9 @@ fn calc_folding_range(
         }
 
         if matches!(child.info.kind, LexicalKind::LineComment) {
-            if let Some(last_end_range) = &mut last_line_comment_end_range {
-                if last_end_range.end_line == range.start.line - 1
-                    && range.start.character == last_end_range.start_character.unwrap_or(0)
-                {
-                    last_end_range.end_line = range.end.line;
-                    last_end_range.end_character = Some(range.end.character);
-                } else {
-                    folding_ranges.push(last_end_range.clone());
-                    last_line_comment_end_range = Some(folding_range.clone());
-                }
-                continue;
-            }
-            last_line_comment_end_range = Some(folding_range.clone());
-            continue;
+            folding_range.kind = Some(lsp_types::FoldingRangeKind::Comment);
         }
-        if let Some(mut last_end_range) = last_line_comment_end_range.take() {
-            last_end_range.kind = Some(lsp_types::FoldingRangeKind::Comment);
-            folding_ranges.push(last_end_range);
-        }
+
         if let Some(ch) = &child.children {
             let parent_last_loc = if is_not_last_range {
                 (range.end.line, Some(range.end.character))
