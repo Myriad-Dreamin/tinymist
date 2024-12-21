@@ -8,7 +8,7 @@ use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
-use typst::syntax::ast::AstNode;
+use typst::syntax::ast::{AstNode, Param};
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -116,10 +116,65 @@ pub enum CompletionKind {
 
 /// Complete in comments. Or rather, don't!
 fn complete_comments(ctx: &mut CompletionContext) -> bool {
-    matches!(
+    if !matches!(
         ctx.leaf.kind(),
         SyntaxKind::LineComment | SyntaxKind::BlockComment
-    )
+    ) {
+        return false;
+    }
+
+    let text = ctx.leaf.get().text();
+    // check if next line defines a function
+    if_chain! {
+        if text == "///" || text == "/// ";
+        // hash node
+        if let Some(next) = ctx.leaf.next_leaf();
+        // let node
+        if let Some(next_next) = next.next_leaf();
+        if let Some(next_next) = next_next.next_leaf();
+        if matches!(next_next.parent_kind(), Some(SyntaxKind::Closure));
+        if let Some(closure) = next_next.parent();
+        if let Some(closure) = closure.cast::<ast::Expr>();
+        if let ast::Expr::Closure(c) = closure;
+        then {
+            let mut doc_snippet: String = if text == "///" {
+                " $0\n///".to_string()
+            } else {
+                "$0\n///".to_string()
+            };
+            let mut i = 0;
+            for param in c.params().children() {
+                // TODO: Properly handle Pos and Spread argument
+                let param: &EcoString = match param {
+                    Param::Pos(p) => {
+                        match p {
+                            ast::Pattern::Normal(ast::Expr::Ident(ident)) => ident.get(),
+                            _ => &"_".into()
+                        }
+                    }
+                    Param::Named(n) => n.name().get(),
+                    Param::Spread(s) => {
+                        if let Some(ident) = s.sink_ident() {
+                            &eco_format!("{}", ident.get())
+                        } else {
+                            &EcoString::new()
+                        }
+                    }
+                };
+                log::info!("param: {param}, index: {i}");
+                doc_snippet += &format!("\n/// - {param} (${}): ${}", i + 1, i + 2);
+                i += 2;
+            }
+            doc_snippet += &format!("\n/// -> ${}", i + 1);
+            ctx.completions.push(Completion {
+                label: "Document function".into(),
+                apply: Some(doc_snippet.into()),
+                ..Completion::default()
+            });
+        }
+    };
+
+    true
 }
 
 /// Complete in markup mode.
