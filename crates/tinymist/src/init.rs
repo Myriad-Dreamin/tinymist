@@ -396,16 +396,16 @@ impl Config {
 
     /// Get the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
-        let max_line_length = self.formatter_print_width.unwrap_or(120) as usize;
+        let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
 
         FormatUserConfig {
             config: match self.formatter_mode {
                 FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
-                    typstyle_core::PrinterConfig::new_with_width(max_line_length),
+                    typstyle_core::PrinterConfig::new_with_width(formatter_print_width),
                 )),
                 FormatterMode::Typstfmt => {
                     FormatterConfig::Typstfmt(Box::new(typstfmt_lib::Config {
-                        max_line_length,
+                        max_line_length: formatter_print_width,
                         ..typstfmt_lib::Config::default()
                     }))
                 }
