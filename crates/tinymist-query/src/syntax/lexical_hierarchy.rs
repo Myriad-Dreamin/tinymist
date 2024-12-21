@@ -72,6 +72,7 @@ pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
     Block,
+    LineComment,
 }
 
 impl LexicalKind {
@@ -97,7 +98,7 @@ impl TryFrom<LexicalKind> for SymbolKind {
             LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
             LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
             LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..) | LexicalKind::Block => Err(()),
+            LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::LineComment => Err(()),
         }
     }
 }
@@ -285,6 +286,39 @@ impl LexicalHierarchyWorker {
         } else {
             // todo: for loop variable
             match node.kind() {
+                SyntaxKind::LineComment => {
+                    let w = self.stack.last_mut();
+                    match w {
+                        Some((w, _))
+                            if w.kind == LexicalKind::LineComment
+                                && w.range.end == node.range().start - 1 =>
+                        {
+                            let w = self.stack.pop().unwrap();
+                            self.stack.push((
+                                LexicalInfo {
+                                    name: "<line comment>".into(),
+                                    kind: LexicalKind::LineComment,
+                                    range: Range {
+                                        start: w.0.range.start,
+                                        end: node.range().end,
+                                    },
+                                },
+                                eco_vec![],
+                            ));
+                        }
+                        _ => {
+                            self.stack.push((
+                                LexicalInfo {
+                                    name: "<line comment>".into(),
+                                    kind: LexicalKind::LineComment,
+                                    range: node.range(),
+                                },
+                                eco_vec![],
+                            ));
+                        }
+                    };
+                }
+
                 SyntaxKind::LetBinding => 'let_binding: {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 

@@ -132,6 +132,10 @@ fn calc_folding_range(
             });
         }
 
+        if child.info.kind == LexicalKind::LineComment {
+            folding_range.kind = Some(lsp_types::FoldingRangeKind::Comment);
+        }
+
         if let Some(ch) = &child.children {
             let parent_last_loc = if is_not_last_range {
                 (range.end.line, Some(range.end.character))
