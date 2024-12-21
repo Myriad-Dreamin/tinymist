@@ -135,7 +135,9 @@ fn calc_folding_range(
 
         if matches!(child.info.kind, LexicalKind::LineComment) {
             if let Some(last_end_range) = &mut last_line_comment_end_range {
-                if last_end_range.end_line == range.start.line - 1 && range.start.character == 0 {
+                if last_end_range.end_line == range.start.line - 1
+                    && range.start.character == last_end_range.start_character.unwrap_or(0)
+                {
                     last_end_range.end_line = range.end.line;
                     last_end_range.end_character = Some(range.end.character);
                 } else {
@@ -145,11 +147,12 @@ fn calc_folding_range(
                 continue;
             }
             last_line_comment_end_range = Some(folding_range.clone());
-        } else if let Some(last_end_range) = &last_line_comment_end_range {
+            continue;
+        }
+        if let Some(last_end_range) = &last_line_comment_end_range {
             folding_ranges.push(last_end_range.clone());
             last_line_comment_end_range = None;
         }
-
         if let Some(ch) = &child.children {
             let parent_last_loc = if is_not_last_range {
                 (range.end.line, Some(range.end.character))
@@ -167,7 +170,6 @@ fn calc_folding_range(
                 folding_ranges,
             );
         }
-
         folding_ranges.push(folding_range);
     }
 }

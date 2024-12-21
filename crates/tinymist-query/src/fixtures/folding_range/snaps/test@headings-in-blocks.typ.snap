@@ -15,6 +15,13 @@ snapshot_kind: text
   },
   {
    "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 4,
+   "startCharacter": 4,
+   "startLine": 4
+  },
+  {
+   "collapsedText": "",
    "endCharacter": 13,
    "endLine": 6,
    "startCharacter": 10,
