@@ -182,15 +182,20 @@ impl<'a> PostTypeChecker<'a> {
             None
         };
 
-        let contextual_self_ty =
-            self.check_cursor(classify_context(node.clone(), None), context_ty);
+        let can_penetrate_context = !(matches!(context.kind(), SyntaxKind::FieldAccess) && {
+            let field_access = context.cast::<ast::FieldAccess>()?;
+            field_access.field().span() == node.span()
+        });
+
+        let contextual_self_ty = can_penetrate_context
+            .then(|| self.check_cursor(classify_context(node.clone(), None), context_ty));
         crate::log_debug_ct!(
             "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
             node.kind(),
         );
 
-        Ty::union(self_ty, contextual_self_ty)
+        Ty::union(self_ty, contextual_self_ty.flatten())
     }
 
     fn check_or(&mut self, node: &LinkedNode, ty: Option<Ty>) -> Option<Ty> {
