@@ -9,10 +9,13 @@ import { activeTypstEditor, base64Encode, loadHTMLFile } from "../util";
 const USER_PACKAGE_VERSION = "0.0.1";
 const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
 
-interface ToolDescriptor {
+interface CommandDescriptor {
   command: string;
   title: string;
   description: string;
+}
+
+interface ToolDescriptor extends CommandDescriptor {
   toolId: EditorToolName;
 }
 
@@ -49,6 +52,30 @@ const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
   },
 };
 
+interface QuickCmdDescriptor extends CommandDescriptor {
+  execute: (context: vscode.ExtensionContext) => any;
+}
+
+const QuickCmdDesc: Record<string, QuickCmdDescriptor> = {
+  // tinymist.runWorkspaceFormatting
+  formatWorkspaceFiles: {
+    command: "tinymist.formatWorkspaceFiles",
+    title: "Workspace Formatting",
+    description: "Run Workspace Formatting",
+    execute: async () => {
+      runWorkspaceFormatting([]);
+    },
+  },
+  formatDependedFiles: {
+    command: "tinymist.formatDependedFiles",
+    title: "Depended Files Formatting",
+    description: "Run Depended Files Formatting",
+    execute: async () => {
+      runWorkspaceFormatting([{ scope: "dependencies" }]);
+    },
+  },
+};
+
 export function toolFeatureActivate(context: vscode.ExtensionContext) {
   const toolView = new ToolViewProvider();
 
@@ -57,6 +84,11 @@ export function toolFeatureActivate(context: vscode.ExtensionContext) {
     ...Object.values(toolDesc).map((desc) =>
       vscode.commands.registerCommand(desc.command, async () => {
         await editorTool(context, desc.toolId);
+      }),
+    ),
+    ...Object.values(QuickCmdDesc).map((desc) =>
+      vscode.commands.registerCommand(desc.command, async () => {
+        return await desc.execute(context);
       }),
     ),
   );
@@ -626,7 +658,29 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
     }
   }
 }
+async function runWorkspaceFormatting(formatArgs: any) {
+  const lspEdit = await tinymist.executeCommand("tinymist.runWorkspaceFormatting", formatArgs);
+  if (!lspEdit) {
+    return;
+  }
 
+  const edit = await (await tinymist.getClient()).protocol2CodeConverter.asWorkspaceEdit(lspEdit);
+  // confirm the edit
+  if (edit.size === 0) {
+    vscode.window.showInformationMessage("No file will be modified.");
+    return;
+  }
+
+  const plural = edit.size !== 1 ? "s" : "";
+  const answer = await vscode.window.showInformationMessage(
+    `${edit.size} file${plural} will be modified.`,
+    "Yes",
+    "No",
+  );
+  if (answer === "Yes") {
+    await vscode.workspace.applyEdit(edit);
+  }
+}
 class ToolViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   constructor() {}
 
@@ -637,8 +691,9 @@ class ToolViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 
   getChildren(): Thenable<vscode.TreeItem[]> {
+    const descriptors = [...Object.values(toolDesc), ...Object.values(QuickCmdDesc)];
     return Promise.resolve([
-      ...Object.values(toolDesc).map((desc) => {
+      ...descriptors.map((desc) => {
         return new CommandItem({
           title: desc.title,
           command: desc.command,

@@ -336,6 +336,29 @@ impl LocalContext {
         })
     }
 
+    /// Get all depended files in the workspace, inclusively.
+    pub fn depended_source_files(&self) -> Vec<TypstFileId> {
+        let mut ids = self.depended_files();
+        let preference = PathPreference::Source {
+            allow_package: false,
+        };
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids
+    }
+
+    /// Get all depended files in the workspace, inclusively.
+    pub fn depended_files(&self) -> Vec<TypstFileId> {
+        let mut ids = vec![];
+
+        for dep in self.dependencies() {
+            if let Ok(ref_fid) = self.file_id_by_path(&dep) {
+                ids.push(ref_fid);
+            }
+        }
+
+        ids
+    }
+
     /// Get the module dependencies of the workspace.
     pub fn module_dependencies(&mut self) -> &HashMap<TypstFileId, ModuleDependency> {
         if self.caches.module_deps.get().is_some() {

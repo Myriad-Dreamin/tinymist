@@ -12,7 +12,7 @@ use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
+use tinymist_query::{ExportKind, LocalContextGuard, PageSelection, WorkspaceFormattingRequest};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -206,6 +206,17 @@ impl LanguageState {
             .map_err(|e| internal_error(format!("cannot highlight: {e}")))?;
 
         just_ok(JsonValue::String(output))
+    }
+
+    /// Run workspace formatting.
+    pub fn workspace_formatting(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        let WorkspaceFormattingRequest { scope } =
+            get_arg_or_default!(args[0] as WorkspaceFormattingRequest);
+        run_query!(req_id, self.WorkspaceFormatting(scope))
     }
 
     /// Clear all cached resources.

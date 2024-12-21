@@ -240,6 +240,29 @@ mod polymorphic {
         pub path: PathBuf,
     }
 
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub enum WorkspaceScope {
+        /// All documents in the workspace.
+        Workspace,
+        /// All depended documents in the workspace.
+        Dependencies,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct WorkspaceFormattingRequest {
+        /// The path of the document to get semantic tokens for.
+        pub scope: WorkspaceScope,
+    }
+
+    impl Default for WorkspaceFormattingRequest {
+        fn default() -> Self {
+            Self {
+                scope: WorkspaceScope::Workspace,
+            }
+        }
+    }
+
     #[derive(Debug, Clone)]
     pub struct ServerInfoRequest {}
 
@@ -284,6 +307,7 @@ mod polymorphic {
         SemanticTokensFull(SemanticTokensFullRequest),
         SemanticTokensDelta(SemanticTokensDeltaRequest),
         Formatting(FormattingRequest),
+        WorkspaceFormatting(WorkspaceFormattingRequest),
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
         InteractCodeContext(InteractCodeContextRequest),
@@ -322,6 +346,7 @@ mod polymorphic {
                 Self::SemanticTokensFull(..) => PinnedFirst,
                 Self::SemanticTokensDelta(..) => PinnedFirst,
                 Self::Formatting(..) => ContextFreeUnique,
+                Self::WorkspaceFormatting(..) => PinnedFirst,
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,
                 Self::InteractCodeContext(..) => PinnedFirst,
@@ -358,6 +383,7 @@ mod polymorphic {
                 Self::SemanticTokensFull(req) => &req.path,
                 Self::SemanticTokensDelta(req) => &req.path,
                 Self::Formatting(req) => &req.path,
+                Self::WorkspaceFormatting(..) => return None,
                 Self::FoldingRange(req) => &req.path,
                 Self::SelectionRange(req) => &req.path,
                 Self::InteractCodeContext(req) => &req.path,
@@ -395,6 +421,7 @@ mod polymorphic {
         SemanticTokensFull(Option<SemanticTokensResult>),
         SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
         Formatting(Option<Vec<TextEdit>>),
+        WorkspaceFormatting(Option<WorkspaceEdit>),
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
@@ -431,6 +458,7 @@ mod polymorphic {
                 Self::SemanticTokensFull(res) => serde_json::to_value(res),
                 Self::SemanticTokensDelta(res) => serde_json::to_value(res),
                 Self::Formatting(res) => serde_json::to_value(res),
+                Self::WorkspaceFormatting(res) => serde_json::to_value(res),
                 Self::FoldingRange(res) => serde_json::to_value(res),
                 Self::SelectionRange(res) => serde_json::to_value(res),
                 Self::InteractCodeContext(res) => serde_json::to_value(res),

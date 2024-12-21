@@ -26,6 +26,8 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use anyhow::bail;
 use log::{error, info, trace};
+use lsp_types::WorkspaceEdit;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
     CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
@@ -35,6 +37,7 @@ use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
+    WorkspaceFormattingRequest, WorkspaceScope,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -47,7 +50,7 @@ use super::{
 };
 use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
-    task::{ExportTask, ExportUserConfig},
+    task::{ExportTask, ExportUserConfig, FormatTask},
     world::{LspCompilerFeat, LspWorld},
     CompileConfig,
 };
@@ -349,6 +352,51 @@ impl CompileClientActor {
 
             log::info!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
+        })
+    }
+
+    // todo: where to put this?
+    pub fn workspace_formatting(
+        &self,
+        formatter: FormatTask,
+        req: WorkspaceFormattingRequest,
+    ) -> QueryFuture {
+        log::info!("TypstActor: workspace formatting: {req:?}");
+        let snap = self.query_snapshot()?;
+        just_future(async move {
+            let snap = snap.receive().await?;
+            match req.scope {
+                WorkspaceScope::Workspace => {}
+                WorkspaceScope::Dependencies => {
+                    snap.clone().compile().await;
+                }
+            };
+            let res = snap.run_analysis(|ctx| {
+                let file_ids = match req.scope {
+                    WorkspaceScope::Workspace => ctx.source_files().clone(),
+                    WorkspaceScope::Dependencies => ctx.depended_source_files(),
+                };
+
+                let changes = file_ids
+                    .into_par_iter()
+                    .flat_map(|fid| {
+                        if fid.package().is_some() {
+                            return None;
+                        }
+
+                        let url = ctx.uri_for_id(fid).ok()?;
+                        let source = ctx.source_by_id(fid).ok()?;
+                        let edit = formatter.run(source.clone())?;
+                        Some((url, edit))
+                    })
+                    .collect::<HashMap<_, _>>();
+
+                (!changes.is_empty()).then(|| WorkspaceEdit::new(changes))
+            })?;
+
+            Ok(tinymist_query::CompilerQueryResponse::WorkspaceFormatting(
+                res,
+            ))
         })
     }
 }

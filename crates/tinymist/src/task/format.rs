@@ -3,7 +3,6 @@
 use std::iter::zip;
 
 use lsp_types::TextEdit;
-use sync_lsp::{just_future, SchedulableResponse};
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
@@ -66,23 +65,20 @@ impl FormatTask {
         self.factory.mutate(|data| *data = c);
     }
 
-    pub fn run(&self, src: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
+    pub fn run(&self, src: Source) -> Option<Vec<TextEdit>> {
         let c = self.factory.task();
-        just_future(async move {
-            let formatted = match &c.config {
-                FormatterConfig::Typstyle(config) => {
-                    typstyle_core::Typstyle::new_with_src(src.clone(), config.as_ref().clone())
-                        .pretty_print()
-                        .ok()
-                }
-                FormatterConfig::Typstfmt(config) => {
-                    Some(typstfmt_lib::format(src.text(), **config))
-                }
-                FormatterConfig::Disable => None,
-            };
 
-            Ok(formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding)))
-        })
+        let formatted = match &c.config {
+            FormatterConfig::Typstyle(config) => {
+                typstyle_core::Typstyle::new_with_src(src.clone(), config.as_ref().clone())
+                    .pretty_print()
+                    .ok()
+            }
+            FormatterConfig::Typstfmt(config) => Some(typstfmt_lib::format(src.text(), **config)),
+            FormatterConfig::Disable => None,
+        };
+
+        formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding))
     }
 }
 

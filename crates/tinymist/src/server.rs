@@ -234,6 +234,10 @@ impl LanguageState {
             .with_notification::<DidSaveTextDocument>(State::did_save)
             .with_notification::<DidChangeConfiguration>(State::did_change_configuration)
             // commands
+            .with_command_(
+                "tinymist.runWorkspaceFormatting",
+                State::workspace_formatting,
+            )
             .with_command_("tinymist.exportPdf", State::export_pdf)
             .with_command_("tinymist.exportSvg", State::export_svg)
             .with_command_("tinymist.exportPng", State::export_png)
@@ -718,7 +722,11 @@ impl LanguageState {
         let source = self
             .query_source(path, |source: typst::syntax::Source| Ok(source))
             .map_err(|e| internal_error(format!("could not format document: {e}")))?;
-        self.client.schedule(req_id, self.formatter.run(source))
+        let formatter = self.formatter.clone();
+        self.client.schedule(
+            req_id,
+            just_future(async move { Ok(formatter.run(source)) }),
+        )
     }
 
     fn inlay_hint(&mut self, req_id: RequestId, params: InlayHintParams) -> ScheduledResult {
@@ -1029,6 +1037,9 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
+            WorkspaceFormatting(req) => {
+                return primary().workspace_formatting(self.formatter.clone(), req)
+            }
             OnExport(req) => return primary().on_export(req),
             ServerInfo(_) => return primary().collect_server_info(),
             _ => return Self::query_on(primary(), is_pinning, query),
