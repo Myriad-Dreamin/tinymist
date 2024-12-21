@@ -17,6 +17,7 @@ snapshot_kind: text
    "collapsedText": "",
    "endCharacter": 27,
    "endLine": 4,
+   "kind": "comment",
    "startCharacter": 4,
    "startLine": 4
   },
