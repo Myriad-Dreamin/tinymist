@@ -1,5 +1,7 @@
 //! Type checking on source file
 
+use typst::foundations::{Element, Type};
+
 use super::*;
 use crate::analysis::ParamAttrs;
 use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedDefDocs};
@@ -434,11 +436,56 @@ impl TypeChecker<'_> {
     }
 
     fn check_show(&mut self, show: &Interned<ShowExpr>) -> Ty {
-        let _selector = show.selector.as_ref().map(|sel| self.check(sel));
-        // todo: infer it type by selector
-        let _transform = self.check(&show.edit);
+        let selector = show.selector.as_ref().map(|sel| self.check(sel));
+        let transform = self.check(&show.edit);
 
+        self.constraint_show(selector, transform);
         Ty::Builtin(BuiltinTy::None)
+    }
+
+    fn constraint_show(&mut self, selector: Option<Ty>, transform: Ty) -> Option<()> {
+        crate::log_debug_ct!("show on {selector:?}, transform {transform:?}");
+
+        let selected = match selector {
+            Some(selector) => self.content_by_selector(selector)?,
+            None => Ty::Builtin(BuiltinTy::Content),
+        };
+
+        let show_fact = Ty::Func(SigTy::unary(selected, Ty::Any));
+        crate::log_debug_ct!("check show_fact type {show_fact:?} value: {transform:?}");
+        self.constrain(&transform, &show_fact);
+
+        Some(())
+    }
+
+    fn content_by_selector(&mut self, selector: Ty) -> Option<Ty> {
+        crate::log_debug_ct!("check selector {selector:?}");
+
+        Some(match selector {
+            Ty::Builtin(BuiltinTy::Type(ty)) => {
+                if ty == Type::of::<typst::foundations::Regex>() {
+                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                } else {
+                    return None;
+                }
+            }
+            Ty::Builtin(BuiltinTy::Element(..)) => selector,
+            Ty::Value(ins_ty) => match &ins_ty.val {
+                Value::Str(..) => {
+                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                }
+                Value::Content(c) => Ty::Builtin(BuiltinTy::Element(c.elem())),
+                Value::Dyn(c) => {
+                    if c.ty() == Type::of::<typst::foundations::Regex>() {
+                        Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                    } else {
+                        return None;
+                    }
+                }
+                _ => return None,
+            },
+            _ => return None,
+        })
     }
 
     // todo: merge with func call, and regard difference (may be here)
