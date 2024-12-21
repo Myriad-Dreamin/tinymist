@@ -447,7 +447,7 @@ impl TypeChecker<'_> {
         crate::log_debug_ct!("show on {selector:?}, transform {transform:?}");
 
         let selected = match selector {
-            Some(selector) => self.content_by_selector(selector)?,
+            Some(selector) => Self::content_by_selector(selector)?,
             None => Ty::Builtin(BuiltinTy::Content),
         };
 
@@ -458,10 +458,11 @@ impl TypeChecker<'_> {
         Some(())
     }
 
-    fn content_by_selector(&mut self, selector: Ty) -> Option<Ty> {
+    fn content_by_selector(selector: Ty) -> Option<Ty> {
         crate::log_debug_ct!("check selector {selector:?}");
 
         Some(match selector {
+            Ty::With(with) => return Self::content_by_selector(with.sig.as_ref().clone()),
             Ty::Builtin(BuiltinTy::Type(ty)) => {
                 if ty == Type::of::<typst::foundations::Regex>() {
                     Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
@@ -475,8 +476,15 @@ impl TypeChecker<'_> {
                     Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
                 }
                 Value::Content(c) => Ty::Builtin(BuiltinTy::Element(c.elem())),
-                Value::Dyn(c) => {
-                    if c.ty() == Type::of::<typst::foundations::Regex>() {
+                Value::Func(f) => {
+                    if let Some(elem) = f.element() {
+                        Ty::Builtin(BuiltinTy::Element(elem))
+                    } else {
+                        return None;
+                    }
+                }
+                Value::Dyn(value) => {
+                    if value.ty() == Type::of::<typst::foundations::Regex>() {
                         Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
                     } else {
                         return None;
