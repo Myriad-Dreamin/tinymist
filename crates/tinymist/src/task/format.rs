@@ -6,16 +6,48 @@ use lsp_types::TextEdit;
 use sync_lsp::{just_future, SchedulableResponse};
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
-use typstyle_core::PrinterConfig;
 
 use super::SyncTaskFactory;
-use crate::FormatterMode;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
+pub enum FormatterConfig {
+    Typstyle(Box<typstyle_core::PrinterConfig>),
+    Typstfmt(Box<typstfmt_lib::Config>),
+    Disable,
+}
+
+impl FormatterConfig {
+    /// The configuration structs doesn't implement `PartialEq`, so bad.
+    pub fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Typstyle(a), Self::Typstyle(b)) => {
+                a.tab_spaces == b.tab_spaces
+                    && a.max_width == b.max_width
+                    && a.chain_width_ratio == b.chain_width_ratio
+                    && a.blank_lines_upper_bound == b.blank_lines_upper_bound
+            }
+            (Self::Typstfmt(a), Self::Typstfmt(b)) => {
+                let a = serde_json::to_value(a).ok();
+                let b = serde_json::to_value(b).ok();
+                a == b
+            }
+            (Self::Disable, Self::Disable) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct FormatUserConfig {
-    pub mode: FormatterMode,
-    pub width: u32,
+    pub config: FormatterConfig,
     pub position_encoding: PositionEncoding,
+}
+
+impl FormatUserConfig {
+    /// The configuration structs doesn't implement `PartialEq`, so bad.
+    pub fn eq(&self, other: &Self) -> bool {
+        self.config.eq(&other.config) && self.position_encoding == other.position_encoding
+    }
 }
 
 #[derive(Clone)]
@@ -37,21 +69,16 @@ impl FormatTask {
     pub fn run(&self, src: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
         let c = self.factory.task();
         just_future(async move {
-            let formatted = match c.mode {
-                FormatterMode::Typstyle => typstyle_core::Typstyle::new_with_src(
-                    src.clone(),
-                    PrinterConfig::new_with_width(c.width as usize),
-                )
-                .pretty_print()
-                .ok(),
-                FormatterMode::Typstfmt => Some(typstfmt_lib::format(
-                    src.text(),
-                    typstfmt_lib::Config {
-                        max_line_length: c.width as usize,
-                        ..typstfmt_lib::Config::default()
-                    },
-                )),
-                FormatterMode::Disable => None,
+            let formatted = match &c.config {
+                FormatterConfig::Typstyle(config) => {
+                    typstyle_core::Typstyle::new_with_src(src.clone(), config.as_ref().clone())
+                        .pretty_print()
+                        .ok()
+                }
+                FormatterConfig::Typstfmt(config) => {
+                    Some(typstfmt_lib::format(src.text(), **config))
+                }
+                FormatterConfig::Disable => None,
             };
 
             Ok(formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding)))
