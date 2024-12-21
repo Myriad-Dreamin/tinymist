@@ -13,7 +13,7 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::FormatUserConfig;
+use task::{FormatUserConfig, FormatterConfig};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, EntryResolver, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -396,9 +396,21 @@ impl Config {
 
     /// Get the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
+        let max_line_length = self.formatter_print_width.unwrap_or(120) as usize;
+
         FormatUserConfig {
-            mode: self.formatter_mode,
-            width: self.formatter_print_width.unwrap_or(120),
+            config: match self.formatter_mode {
+                FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
+                    typstyle_core::PrinterConfig::new_with_width(max_line_length),
+                )),
+                FormatterMode::Typstfmt => {
+                    FormatterConfig::Typstfmt(Box::new(typstfmt_lib::Config {
+                        max_line_length,
+                        ..typstfmt_lib::Config::default()
+                    }))
+                }
+                FormatterMode::Disable => FormatterConfig::Disable,
+            },
             position_encoding: self.const_config.position_encoding,
         }
     }
@@ -1087,8 +1099,8 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert_eq!(config.mode, FormatterMode::Disable);
-        assert_eq!(config.width, 120);
+        assert!(matches!(config.config, FormatterConfig::Disable));
+        // assert_eq!(config.width, 120);
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 }
