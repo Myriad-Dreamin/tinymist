@@ -20,7 +20,7 @@ use reflexo::TakeAs;
 
 /// Please uses this if you believe all mutations are fast
 #[derive(Clone, Default)]
-struct SyncTaskFactory<T>(Arc<std::sync::RwLock<Arc<T>>>);
+pub struct SyncTaskFactory<T>(Arc<std::sync::RwLock<Arc<T>>>);
 
 impl<T> SyncTaskFactory<T> {
     pub fn new(config: T) -> Self {
@@ -41,7 +41,7 @@ impl<T: Clone> SyncTaskFactory<T> {
     }
 }
 
-type FoldFuture = Pin<Box<dyn Future<Output = Option<()>> + Send + Sync>>;
+type FoldFuture = Pin<Box<dyn Future<Output = Option<()>> + Send>>;
 
 #[derive(Default)]
 struct FoldingState {
