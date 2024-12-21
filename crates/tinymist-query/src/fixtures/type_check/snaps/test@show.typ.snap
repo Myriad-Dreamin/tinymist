@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/show.typ
+snapshot_kind: text
+---
+"" = (Any) => Any.it
+"it" = Element(text)
+=====
+26..31 -> Type(regex)
+26..40 -> Type(regex)
+42..44 -> @it
+42..51 -> @
+48..50 -> @it
+48..51 -> @v"it".it
