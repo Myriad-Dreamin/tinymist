@@ -226,7 +226,7 @@ impl TypeChecker<'_> {
         var
     }
 
-    fn constrain_call(
+    fn constrain_sig_inputs(
         &mut self,
         sig: &Interned<SigTy>,
         args: &Interned<SigTy>,
@@ -390,6 +390,10 @@ impl TypeChecker<'_> {
                     matches!(lhs, Ty::Builtin(..)),
                 );
                 self.constrain(lhs, &rhs.lhs);
+            }
+            (Ty::Func(lhs), Ty::Func(rhs)) => {
+                crate::log_debug_ct!("constrain func {lhs:?} ⪯ {rhs:?}");
+                self.constrain_sig_inputs(lhs, rhs, None);
             }
             (Ty::Value(lhs), rhs) => {
                 crate::log_debug_ct!("constrain value {lhs:?} ⪯ {rhs:?}");

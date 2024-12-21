@@ -144,7 +144,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
         let Some(SigShape { sig, withs }) = sig.shape(self.base) else {
             return;
         };
-        self.base.constrain_call(&sig, args, withs);
+        self.base.constrain_sig_inputs(&sig, args, withs);
 
         if let Some(callee) = callee.clone() {
             self.base.info.witness_at_least(self.call_site, callee);
