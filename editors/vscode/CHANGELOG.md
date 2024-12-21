@@ -8,6 +8,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 *We now use [cargo-dist](https://github.com/axodotdev/cargo-dist) to build and release binaries. The registries should prefer to using these binaries over that for VS Code (or VSCodium) extensions.* These following suffixes are used for VS Code (or VSCodium) extensions: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `linux-armhf`, `darwin-x64`, `darwin-arm64`, `alpine-x64`, `alpine-arm64`, and `web`. If you have any problems with changes, please report them to [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues).
 
+* Bumped typstyle to v0.12.13 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1047
+  * This version fixes a bugs that removes comments in math equations in some cases. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01213---2024-12-21
+
 ## v0.12.12 - [2024-12-15]
 
 * Bumped typstyle from v0.12.6 to v0.12.12 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/987 and https://github.com/Myriad-Dreamin/tinymist/pull/1010
