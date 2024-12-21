@@ -760,7 +760,10 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
             leaf.kind()
         );
         match parent.kind() {
-            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
+            SyntaxKind::CodeBlock
+            | SyntaxKind::ContentBlock
+            | SyntaxKind::Equation
+            | SyntaxKind::Closure => {
                 return Some(Regular);
             }
             SyntaxKind::ImportItemPath
