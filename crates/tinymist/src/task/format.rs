@@ -37,24 +37,24 @@ impl FormatTask {
     pub fn run(&self, src: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
         let c = self.factory.task();
         just_future(async move {
-            match c.mode {
-                FormatterMode::Typstyle => {
-                    let config = PrinterConfig::new_with_width(c.width as usize);
-                    let res = typstyle_core::Typstyle::new_with_src(src.clone(), config)
-                        .pretty_print()
-                        .ok();
-                    Ok(res.and_then(|res| calc_diff(src, res, c.position_encoding)))
-                }
-                FormatterMode::Typstfmt => {
-                    let config = typstfmt_lib::Config {
+            let formatted = match c.mode {
+                FormatterMode::Typstyle => typstyle_core::Typstyle::new_with_src(
+                    src.clone(),
+                    PrinterConfig::new_with_width(c.width as usize),
+                )
+                .pretty_print()
+                .ok(),
+                FormatterMode::Typstfmt => Some(typstfmt_lib::format(
+                    src.text(),
+                    typstfmt_lib::Config {
                         max_line_length: c.width as usize,
                         ..typstfmt_lib::Config::default()
-                    };
-                    let res = typstfmt_lib::format(src.text(), config);
-                    Ok(calc_diff(src, res, c.position_encoding))
-                }
-                FormatterMode::Disable => Ok(None),
-            }
+                    },
+                )),
+                FormatterMode::Disable => None,
+            };
+
+            Ok(formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding)))
         })
     }
 }
