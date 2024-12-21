@@ -297,7 +297,7 @@ impl LexicalHierarchyWorker {
                             let w = self.stack.pop().unwrap();
                             self.stack.push((
                                 LexicalInfo {
-                                    name: "<line comment>".into(),
+                                    name: "".into(),
                                     kind: LexicalKind::LineComment,
                                     range: Range {
                                         start: w.0.range.start,
@@ -310,7 +310,7 @@ impl LexicalHierarchyWorker {
                         _ => {
                             self.stack.push((
                                 LexicalInfo {
-                                    name: "<line comment>".into(),
+                                    name: "".into(),
                                     kind: LexicalKind::LineComment,
                                     range: node.range(),
                                 },
