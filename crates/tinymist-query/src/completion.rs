@@ -7,7 +7,7 @@ use regex::{Captures, Regex};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{InsTy, Ty},
+    analysis::term_value,
     prelude::*,
     syntax::{is_ident_like, SyntaxClass},
     upstream::{autocomplete, CompletionContext},
@@ -140,7 +140,7 @@ impl StatefulRequest for CompletionRequest {
         // e.g. `#let x = (1.);`
         let self_ty = cc_ctx.leaf.cast::<ast::Expr>().and_then(|leaf| {
             let v = cc_ctx.ctx.mini_eval(leaf)?;
-            Some(Ty::Value(InsTy::new(v)))
+            Some(term_value(&v))
         });
 
         if let Some(self_ty) = self_ty {

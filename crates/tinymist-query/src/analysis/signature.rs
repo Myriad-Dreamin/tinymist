@@ -11,8 +11,7 @@ use super::{
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::classify_def_loosely;
-use crate::ty::{DynTypeBounds, ParamAttrs};
-use crate::ty::{InsTy, TyCtx};
+use crate::ty::{DynTypeBounds, ParamAttrs, TyCtx};
 use crate::upstream::truncated_repr;
 
 /// Describes a function signature.
@@ -490,7 +489,7 @@ pub fn func_signature(func: Func) -> Signature {
                 .iter()
                 .map(|arg| ArgInfo {
                     name: arg.name.clone().map(From::from),
-                    term: Some(Ty::Value(InsTy::new(arg.value.v.clone()))),
+                    term: Some(Ty::from_value(&arg.value.v)),
                 })
                 .collect(),
         });

@@ -10,6 +10,12 @@ use crate::{
 
 impl Ty {
     /// Describe the given type.
+    pub fn truncated_repr(&self) -> Option<EcoString> {
+        // todo: truncate me
+        self.repr()
+    }
+
+    /// Describe the given type.
     pub fn repr(&self) -> Option<EcoString> {
         let mut worker = TypeDescriber {
             repr: true,

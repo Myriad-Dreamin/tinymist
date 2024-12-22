@@ -4,7 +4,7 @@ use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
-use super::{prelude::*, InsTy, SharedContext};
+use super::{prelude::*, LitTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
 use crate::VersionedDocument;
@@ -179,7 +179,7 @@ fn ref_definition(
                 // otherwise, it is estimated to the span of the pointed content
                 Decl::content(elem.span())
             };
-            (decl, Some(Ty::Value(InsTy::new(Value::Content(elem)))))
+            (decl, Some(Ty::Lit(LitTy::Content(Some(elem)))))
         }
         _ => return None,
     };
@@ -302,8 +302,9 @@ static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     Some(func)
 });
 
+// todo: migrate me to type_to_def
 fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> Option<Definition> {
-    let val = Ty::Value(InsTy::new(value.clone()));
+    let val = Ty::from_value(&value);
     Some(match value {
         Value::Func(func) => {
             let name = func.name().map(|name| name.into()).or_else(name)?;

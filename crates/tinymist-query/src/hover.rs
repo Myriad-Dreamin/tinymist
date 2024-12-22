@@ -6,7 +6,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::analysis::get_link_exprs_in;
 use crate::jump_from_cursor;
 use crate::prelude::*;
-use crate::upstream::{expr_tooltip, route_of_value, truncated_repr, Tooltip};
+use crate::upstream::{expr_tooltip, route_of_value, Tooltip};
 
 /// The [`textDocument/hover`] request asks the server for hover information at
 /// a given text document position.
@@ -127,10 +127,13 @@ fn def_tooltip(
     match def.decl.as_ref() {
         Label(..) => {
             results.push(MarkedString::String(format!("Label: {}\n", def.name())));
+            // if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+            //     let repr = truncated_repr(&val);
+            //     results.push(MarkedString::String(format!("{repr}")));
+            // }
             // todo: type repr
-            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
-                let repr = truncated_repr(&val);
-                results.push(MarkedString::String(format!("{repr}")));
+            if let Some(val) = def.term.as_ref().and_then(|v| v.truncated_repr()) {
+                results.push(MarkedString::String(val.into()));
             }
             Some(HoverContents::Array(results))
         }

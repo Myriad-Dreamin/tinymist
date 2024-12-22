@@ -22,7 +22,7 @@ use typst::{
 use super::{BoundPred, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    analysis::LitTy,
+    analysis::{term_value, LitTy},
     docs::UntypedDefDocs,
     syntax::{DeclExpr, UnaryOp},
 };
@@ -150,6 +150,11 @@ impl Ty {
             (Some(ty), None) | (None, Some(ty)) => ty,
             (None, None) => return None,
         })
+    }
+
+    /// Create a type from a value
+    pub fn from_value(val: &Value) -> Self {
+        term_value(val)
     }
 
     /// Create a union type from an iterator of types

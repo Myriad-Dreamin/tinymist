@@ -395,15 +395,15 @@ impl TypeChecker<'_> {
                 crate::log_debug_ct!("constrain func {lhs:?} ⪯ {rhs:?}");
                 self.constrain_sig_inputs(lhs, rhs, None);
             }
-            (Ty::Value(lhs), rhs) => {
-                crate::log_debug_ct!("constrain value {lhs:?} ⪯ {rhs:?}");
+            (Ty::Lit(lhs), rhs) => {
+                crate::log_debug_ct!("constrain lit {lhs:?} ⪯ {rhs:?}");
                 let _ = TypeInfo::witness_at_most;
                 // if !lhs.1.is_detached() {
                 //     self.info.witness_at_most(lhs.1, rhs.clone());
                 // }
             }
-            (lhs, Ty::Value(rhs)) => {
-                crate::log_debug_ct!("constrain value {lhs:?} ⪯ {rhs:?}");
+            (lhs, Ty::Lit(rhs)) => {
+                crate::log_debug_ct!("constrain lit {lhs:?} ⪯ {rhs:?}");
                 // if !rhs.1.is_detached() {
                 //     self.info.witness_at_least(rhs.1, lhs.clone());
                 // }
@@ -569,9 +569,9 @@ impl Joiner {
             (Ty::Tuple(..), _) => self.definite = Ty::undef(),
             // todo: mystery flow none
             // todo: possible some style (auto)
+            // todo: value join
             (Ty::Lit(ty), Ty::Lit(LitTy::None)) => self.definite = Ty::Lit(ty),
             (Ty::Lit(..), _) => self.definite = Ty::undef(),
-            // todo: value join
             (Ty::Value(ins_ty), Ty::Lit(LitTy::None)) => self.definite = Ty::Value(ins_ty),
             (Ty::Value(..), _) => self.definite = Ty::undef(),
             (Ty::Func(func), Ty::Lit(LitTy::None)) => self.definite = Ty::Func(func),
