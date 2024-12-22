@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (62..63)
+description: Completion on ) (95..96)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/func_pos_arg_field_simple.typ
 snapshot_kind: text
@@ -8,6 +8,27 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 6,
+    "label": "text",
+    "labelDetails": {
+     "description": "any"
+    },
+    "textEdit": {
+     "newText": "text",
+     "range": {
+      "end": {
+       "character": 69,
+       "line": 2
+      },
+      "start": {
+       "character": 69,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]
