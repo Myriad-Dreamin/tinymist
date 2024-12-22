@@ -294,6 +294,7 @@ impl LexicalHierarchyWorker {
                     let w = self.stack.last_mut();
                     let mut rng = node.range();
                     if let Some((w, _)) = w {
+                        // TODO: not so good either
                         if w.kind == LexicalKind::Space {
                             self.stack.pop().unwrap();
                             let w = self.stack.last_mut();
