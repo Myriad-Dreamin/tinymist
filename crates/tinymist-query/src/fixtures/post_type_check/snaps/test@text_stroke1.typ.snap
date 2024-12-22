@@ -5,4 +5,4 @@ expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_stroke1.typ
 snapshot_kind: text
 ---
-( ⪰ "cap": Any | "dash": Any | "join": Any | "miter-limit": Any | "paint": Any | ("butt" | "round" | "square"))
+( ⪰ "cap": Any | "dash": Any | "join": Any | "miter-limit": Any | "paint": Any | "thickness": Any)

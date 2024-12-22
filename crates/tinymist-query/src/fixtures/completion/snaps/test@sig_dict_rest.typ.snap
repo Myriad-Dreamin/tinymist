@@ -12,7 +12,7 @@ snapshot_kind: text
    {
     "kind": 5,
     "label": "cap",
-    "sortText": "003",
+    "sortText": "000",
     "textEdit": {
      "newText": "cap: ${1:}",
      "range": {
