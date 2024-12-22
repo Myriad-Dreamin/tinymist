@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/show_raw_where.typ
+snapshot_kind: text
+---
+"" = (Any) => Any.it
+"it" = Element(raw)
+=====
+26..29 -> Func(raw)
+26..35 -> (Func(raw) | Func(raw).where)
+26..49 -> (Func(raw)).with(..("block": false) => any)
+51..53 -> @it
+51..60 -> @
+57..59 -> @it
+57..60 -> @v"it".it
