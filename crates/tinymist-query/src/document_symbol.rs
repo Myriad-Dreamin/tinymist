@@ -46,9 +46,7 @@ fn symbols_in_hierarchy(
 ) -> Vec<DocumentSymbol> {
     hierarchy
         .iter()
-        .filter(|hierarchy|
-            TryInto::<SymbolKind>::try_into(hierarchy.info.kind.clone()).is_ok()
-        )
+        .filter(|hierarchy| TryInto::<SymbolKind>::try_into(hierarchy.info.kind.clone()).is_ok())
         .map(|hierarchy| {
             let range =
                 typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);

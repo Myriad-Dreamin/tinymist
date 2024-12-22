@@ -73,6 +73,7 @@ pub enum LexicalKind {
     Var(LexicalVarKind),
     Block,
     LineComment,
+    Space,
 }
 
 impl LexicalKind {
@@ -98,7 +99,10 @@ impl TryFrom<LexicalKind> for SymbolKind {
             LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
             LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
             LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::LineComment => Err(()),
+            LexicalKind::Var(..)
+            | LexicalKind::Block
+            | LexicalKind::LineComment
+            | LexicalKind::Space => Err(()),
         }
     }
 }
@@ -288,38 +292,38 @@ impl LexicalHierarchyWorker {
             match node.kind() {
                 SyntaxKind::LineComment => {
                     let w = self.stack.last_mut();
-                    match w {
-                        Some((w, _))
-                            // TODO: This check is not good enough.
-                            if w.kind == LexicalKind::LineComment
-                                && w.range.end == node.range().start - 1 =>
-                        {
-                            let w = self.stack.pop().unwrap();
-                            self.stack.push((
-                                LexicalInfo {
-                                    name: "".into(),
-                                    kind: LexicalKind::LineComment,
-                                    range: Range {
-                                        start: w.0.range.start,
-                                        end: node.range().end,
-                                    },
-                                },
-                                eco_vec![],
-                            ));
+                    let mut rng = node.range();
+                    if let Some((w, _)) = w {
+                        if w.kind == LexicalKind::Space {
+                            self.stack.pop().unwrap();
+                            let w = self.stack.last_mut();
+                            if let Some((w, _)) = w {
+                                if w.kind == LexicalKind::LineComment {
+                                    rng.start = w.range.start;
+                                    self.stack.pop().unwrap();
+                                }
+                            }
                         }
-                        _ => {
-                            self.stack.push((
-                                LexicalInfo {
-                                    name: "".into(),
-                                    kind: LexicalKind::LineComment,
-                                    range: node.range(),
-                                },
-                                eco_vec![],
-                            ));
-                        }
-                    };
+                    }
+                    self.stack.push((
+                        LexicalInfo {
+                            name: "".into(),
+                            kind: LexicalKind::LineComment,
+                            range: rng,
+                        },
+                        eco_vec![],
+                    ));
                 }
-
+                SyntaxKind::Space => {
+                    self.stack.push((
+                        LexicalInfo {
+                            name: "".into(),
+                            kind: LexicalKind::Space,
+                            range: node.range(),
+                        },
+                        eco_vec![],
+                    ));
+                }
                 SyntaxKind::LetBinding => 'let_binding: {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
