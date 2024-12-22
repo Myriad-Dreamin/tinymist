@@ -17,14 +17,14 @@ snapshot_kind: text
     },
     "sortText": "000",
     "textEdit": {
-     "newText": "<Russell:1908",
+     "newText": "Russell:1908",
      "range": {
       "end": {
        "character": 16,
        "line": 10
       },
       "start": {
-       "character": 16,
+       "character": 13,
        "line": 10
       }
      }
@@ -38,14 +38,14 @@ snapshot_kind: text
     },
     "sortText": "001",
     "textEdit": {
-     "newText": "<Rus",
+     "newText": "Rus",
      "range": {
       "end": {
        "character": 16,
        "line": 10
       },
       "start": {
-       "character": 16,
+       "character": 13,
        "line": 10
       }
      }
@@ -59,14 +59,14 @@ snapshot_kind: text
     },
     "sortText": "003",
     "textEdit": {
-     "newText": "<Russell:1908",
+     "newText": "Russell:1908",
      "range": {
       "end": {
        "character": 16,
        "line": 10
       },
       "start": {
-       "character": 16,
+       "character": 13,
        "line": 10
       }
      }

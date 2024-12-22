@@ -17,14 +17,14 @@ snapshot_kind: text
     },
     "sortText": "000",
     "textEdit": {
-     "newText": "<harry>",
+     "newText": "harry>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 13,
+       "character": 7,
        "line": 3
       }
      }
@@ -38,14 +38,14 @@ snapshot_kind: text
     },
     "sortText": "001",
     "textEdit": {
-     "newText": "<electronic>",
+     "newText": "electronic>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 13,
+       "character": 7,
        "line": 3
       }
      }
@@ -59,14 +59,14 @@ snapshot_kind: text
     },
     "sortText": "002",
     "textEdit": {
-     "newText": "<electronic>",
+     "newText": "electronic>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 13,
+       "character": 7,
        "line": 3
       }
      }
@@ -80,14 +80,14 @@ snapshot_kind: text
     },
     "sortText": "004",
     "textEdit": {
-     "newText": "<harry>",
+     "newText": "harry>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 13,
+       "character": 7,
        "line": 3
       }
      }

@@ -596,6 +596,16 @@ impl<'a> SyntaxClass<'a> {
             | SyntaxClass::Normal(_, node) => node,
         }
     }
+
+    /// Gets the content offset at which the completion should be triggered.
+    pub fn complete_offset(&self) -> Option<usize> {
+        match self {
+            // `<label`
+            //   ^ node.offset() + 1
+            SyntaxClass::Label { node, .. } => Some(node.offset() + 1),
+            _ => None,
+        }
+    }
 }
 
 /// Classifies node's syntax (inner syntax) that can be operated on by IDE
