@@ -308,18 +308,18 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => Some(Ty::Lit(
-                LitTy::Path(crate::ty::PathPreference::Source {
+            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => {
+                Some(Ty::Lit(LitTy::Path(crate::ty::PathPreference::Source {
                     allow_package: true,
-                }),
-            )),
+                })))
+            }
             SyntaxContext::VarAccess(VarClass::Ident(node))
             | SyntaxContext::VarAccess(VarClass::FieldAccess(node))
             | SyntaxContext::VarAccess(VarClass::DotAccess(node))
             | SyntaxContext::Label { node, .. }
             | SyntaxContext::Normal(node) => {
                 let label_ty = matches!(cursor, SyntaxContext::Label { is_error: true, .. })
-                    .then_some(Ty::Lit(LitTy::Label));
+                    .then_some(Ty::Lit(LitTy::Label(None)));
                 let ty = self.check_or(node, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
                 ty.or(label_ty)

@@ -162,7 +162,7 @@ impl IfaceCheckDriver<'_> {
                 }
             }
             // todo: more builtin types to check
-            Ty::Lit(LitTy::Content) if self.value_as_iface() => {
+            Ty::Lit(LitTy::Content(..)) if self.value_as_iface() => {
                 let ty = Type::of::<typst::foundations::Content>();
                 self.checker
                     .check(Iface::Type { val: &ty, at }, &mut self.ctx, pol);

@@ -17,7 +17,7 @@ use crate::{
     analysis::{QueryStatGuard, SharedContext},
     prelude::*,
     syntax::{find_module_level_docs, DefKind},
-    ty::{LitTy, InsTy, Interned, Ty},
+    ty::{InsTy, Interned, LitTy, Ty},
 };
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
@@ -370,15 +370,15 @@ impl ExprWorker<'_> {
                     .map_or_else(none_expr, |body| self.check(body)),
             )),
 
-            Text(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            Raw(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            Link(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Text(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            Raw(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            Link(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
             Space(..) => Expr::Type(Ty::Lit(LitTy::Space)),
-            Linebreak(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            Parbreak(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            Escape(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            Shorthand(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            SmartQuote(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Linebreak(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            Parbreak(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            Escape(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            Shorthand(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            SmartQuote(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
 
             Strong(strong) => {
                 let body = self.check_inline_markup(strong.body());
@@ -406,8 +406,8 @@ impl ExprWorker<'_> {
                 self.check_element::<TermsElem>(eco_vec![term, description])
             }
 
-            MathAlignPoint(..) => Expr::Type(Ty::Lit(LitTy::Content)),
-            MathShorthand(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            MathAlignPoint(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
+            MathShorthand(..) => Expr::Type(Ty::Lit(LitTy::Content(Option::None))),
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }

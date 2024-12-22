@@ -43,7 +43,7 @@ pub fn term_value(value: &Value) -> Ty {
             Ty::Tuple(values.into())
         }
         // todo: term arguments
-        Value::Args(..) => Ty::Lit(LitTy::Args),
+        Value::Args(args) => Ty::Lit(LitTy::Args(Some(args.clone()))),
         Value::Plugin(plugin) => {
             // todo: create infer variables for plugin functions
             let values = plugin
@@ -70,8 +70,29 @@ pub fn term_value(value: &Value) -> Ty {
         Value::Type(ty) => Ty::Lit(LitTy::TypeType(*ty)),
         Value::Dyn(dyn_val) => Ty::Lit(LitTy::Type(dyn_val.ty())),
         Value::Func(func) => Ty::Func(func_signature(func.clone()).type_sig()),
-        _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
-        _ => Ty::Any,
+        Value::None => Ty::Lit(LitTy::None),
+        Value::Auto => Ty::Lit(LitTy::Auto),
+        Value::Bool(val) => Ty::Boolean(Some(*val)),
+        Value::Int(val) => Ty::Lit(LitTy::Int(Some(*val))),
+        Value::Float(val) => Ty::Lit(LitTy::Float(Some(*val))),
+        Value::Decimal(val) => Ty::Lit(LitTy::Decimal(Some(*val))),
+        Value::Length(val) => Ty::Lit(LitTy::Length(Some(*val))),
+        Value::Angle(val) => Ty::Lit(LitTy::Angle(Some(*val))),
+        Value::Ratio(val) => Ty::Lit(LitTy::Ratio(Some(*val))),
+        Value::Relative(val) => Ty::Lit(LitTy::Relative(Some(*val))),
+        Value::Fraction(val) => Ty::Lit(LitTy::Fraction(Some(*val))),
+        Value::Color(val) => Ty::Lit(LitTy::Color(Some(*val))),
+        Value::Gradient(val) => Ty::Lit(LitTy::Gradient(Some(val.clone()))),
+        Value::Pattern(val) => Ty::Lit(LitTy::Pattern(Some(val.clone()))),
+        Value::Symbol(val) => Ty::Lit(LitTy::Symbol(Some(val.clone()))),
+        Value::Version(val) => Ty::Lit(LitTy::Version(Some(val.clone()))),
+        Value::Str(val) => Ty::Lit(LitTy::Str(Some(val.clone()))),
+        Value::Bytes(val) => Ty::Lit(LitTy::Bytes(Some(val.clone()))),
+        Value::Datetime(val) => Ty::Lit(LitTy::Datetime(Some(*val))),
+        Value::Duration(val) => Ty::Lit(LitTy::Duration(Some(*val))),
+        Value::Content(val) => Ty::Lit(LitTy::Content(Some(val.clone()))),
+        Value::Styles(val) => Ty::Lit(LitTy::Styles(Some(val.clone()))),
+        Value::Label(val) => Ty::Lit(LitTy::Label(Some(*val))),
     }
 }
 

@@ -1,13 +1,21 @@
 use core::fmt;
+use std::hash::{Hash, Hasher};
 
 use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::CastInfo;
+use typst::layout::{Fr, Rel};
 use typst::{
-    foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
-    layout::Length,
+    foundations::{
+        Args as TypstArgs, AutoValue, Bytes, Content as TypstContent, Datetime as TypstDatetime,
+        Decimal, Duration as TypstDuration, Dynamic, Func, Label, Module as TypstModule, NoneValue,
+        ParamInfo, Plugin as TypstPlugin, Str, Styles as TypstStyles, Type, Value, Version,
+    },
+    layout::{Angle as TypstAngle, Length as TypstLength, Ratio as TypstRatio},
+    symbols::Symbol as TypstSymbol,
+    visualize::{Color as TypstColor, Gradient as TypstGradient, Pattern as TypstPattern},
 };
 
 use crate::syntax::Decl;
@@ -194,32 +202,30 @@ impl TryFrom<TypstFileId> for PackageId {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone)]
 pub enum LitTy {
     Clause,
     Undef,
-    Content,
     Space,
+    /// The value that indicates the absence of a meaningful value.
     None,
     Break,
     Continue,
     Infer,
     FlowNone,
+    /// A value that indicates some smart default behavior.
     Auto,
 
-    Args,
-    Color,
     TextSize,
     TextFont,
     TextLang,
     TextRegion,
 
-    Label,
+    /// A label: `<intro>`.
+    Label(Option<Label>),
     CiteLabel,
     RefLabel,
     Dir,
-    Length,
-    Float,
 
     Stroke,
     Margin,
@@ -233,6 +239,330 @@ pub enum LitTy {
     Element(typst::foundations::Element),
     Module(Interned<Decl>),
     Path(PathPreference),
+
+    /// An integer: `120`.
+    Int(Option<i64>),
+    /// A floating-point number: `1.2`, `10e-4`.
+    Float(Option<f64>),
+    /// A length: `12pt`, `3cm`, `1.5em`, `1em - 2pt`.
+    Length(Option<TypstLength>),
+    /// An angle: `1.5rad`, `90deg`.
+    Angle(Option<TypstAngle>),
+    /// A ratio: `50%`.
+    Ratio(Option<TypstRatio>),
+    /// A relative length, combination of a ratio and a length: `20% + 5cm`.
+    Relative(Option<Rel<TypstLength>>),
+    /// A fraction: `1fr`.
+    Fraction(Option<Fr>),
+    /// A color value: `#f79143ff`.
+    Color(Option<TypstColor>),
+    /// A gradient value: `gradient.linear(...)`.
+    Gradient(Option<TypstGradient>),
+    /// A pattern fill: `pattern(...)`.
+    Pattern(Option<TypstPattern>),
+    /// A symbol: `arrow.l`.
+    Symbol(Option<TypstSymbol>),
+    /// A version.
+    Version(Option<Version>),
+    /// A string: `"string"`.
+    Str(Option<Str>),
+    /// Raw bytes.
+    Bytes(Option<Bytes>),
+    /// A datetime
+    Datetime(Option<TypstDatetime>),
+    /// A decimal value: `decimal("123.4500")`
+    Decimal(Option<Decimal>),
+    /// A duration
+    Duration(Option<TypstDuration>),
+    /// A content value: `[*Hi* there]`.
+    Content(Option<TypstContent>),
+    /// Content styles.
+    Styles(Option<TypstStyles>),
+    /// Captured arguments to a function.
+    Args(Option<TypstArgs>),
+    /// A module.
+    BuiltinModule(TypstModule),
+    /// A WebAssembly plugin.
+    Plugin(TypstPlugin),
+    /// A dynamic value.
+    Dyn(Dynamic),
+}
+
+impl Hash for LitTy {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Clause => {}
+            Self::Undef => {}
+            Self::Space => {}
+            Self::None => {}
+            Self::Break => {}
+            Self::Continue => {}
+            Self::Infer => {}
+            Self::FlowNone => {}
+            Self::Auto => {}
+
+            Self::TextSize => {}
+            Self::TextFont => {}
+            Self::TextLang => {}
+            Self::TextRegion => {}
+
+            Self::Label(v) => v.hash(state),
+            Self::CiteLabel => {}
+            Self::RefLabel => {}
+            Self::Dir => {}
+
+            Self::Stroke => {}
+            Self::Margin => {}
+            Self::Inset => {}
+            Self::Outset => {}
+            Self::Radius => {}
+
+            Self::Tag(v) => v.hash(state),
+            Self::Type(v) => v.hash(state),
+            Self::TypeType(v) => v.hash(state),
+            Self::Element(v) => v.hash(state),
+            Self::Module(v) => v.hash(state),
+            Self::Path(v) => v.hash(state),
+
+            Self::Int(v) => v.hash(state),
+            Self::Float(Some(v)) => v.to_bits().hash(state),
+            Self::Float(Option::None) => 0u8.hash(state),
+            Self::Length(v) => v.hash(state),
+            Self::Angle(v) => v.hash(state),
+            Self::Ratio(v) => v.hash(state),
+            Self::Relative(v) => v.hash(state),
+            Self::Fraction(v) => v.hash(state),
+            Self::Color(v) => v.hash(state),
+            Self::Gradient(v) => v.hash(state),
+            Self::Pattern(v) => v.hash(state),
+            Self::Symbol(v) => v.hash(state),
+            Self::Version(v) => v.hash(state),
+            Self::Str(v) => v.hash(state),
+            Self::Bytes(v) => v.hash(state),
+            Self::Datetime(v) => v.hash(state),
+            Self::Decimal(v) => v.hash(state),
+            Self::Duration(v) => v.hash(state),
+            Self::Content(v) => v.hash(state),
+            Self::Styles(v) => v.hash(state),
+            Self::Args(v) => v.hash(state),
+            Self::BuiltinModule(v) => v.hash(state),
+            Self::Plugin(v) => v.hash(state),
+            Self::Dyn(v) => v.hash(state),
+        }
+    }
+}
+
+impl PartialEq for LitTy {
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+            && match (self, other) {
+                (Self::Clause, Self::Clause) => true,
+                (Self::Undef, Self::Undef) => true,
+                (Self::Space, Self::Space) => true,
+                (Self::None, Self::None) => true,
+                (Self::Break, Self::Break) => true,
+                (Self::Continue, Self::Continue) => true,
+                (Self::Infer, Self::Infer) => true,
+                (Self::FlowNone, Self::FlowNone) => true,
+                (Self::Auto, Self::Auto) => true,
+
+                (Self::TextSize, Self::TextSize) => true,
+                (Self::TextFont, Self::TextFont) => true,
+                (Self::TextLang, Self::TextLang) => true,
+                (Self::TextRegion, Self::TextRegion) => true,
+
+                (Self::Label(v1), Self::Label(v2)) => v1 == v2,
+                (Self::CiteLabel, Self::CiteLabel) => true,
+                (Self::RefLabel, Self::RefLabel) => true,
+                (Self::Dir, Self::Dir) => true,
+
+                (Self::Stroke, Self::Stroke) => true,
+                (Self::Margin, Self::Margin) => true,
+                (Self::Inset, Self::Inset) => true,
+                (Self::Outset, Self::Outset) => true,
+                (Self::Radius, Self::Radius) => true,
+
+                (Self::Tag(v1), Self::Tag(v2)) => v1 == v2,
+                (Self::Type(v1), Self::Type(v2)) => v1 == v2,
+                (Self::TypeType(v1), Self::TypeType(v2)) => v1 == v2,
+                (Self::Element(v1), Self::Element(v2)) => v1 == v2,
+                (Self::Module(v1), Self::Module(v2)) => v1 == v2,
+                (Self::Path(v1), Self::Path(v2)) => v1 == v2,
+
+                (Self::Int(v1), Self::Int(v2)) => v1 == v2,
+                (Self::Float(Some(v1)), Self::Float(Some(v2))) => v1.to_bits() == v2.to_bits(),
+                (Self::Float(Option::None), Self::Float(Option::None)) => true,
+                (Self::Length(v1), Self::Length(v2)) => v1 == v2,
+                (Self::Angle(v1), Self::Angle(v2)) => v1 == v2,
+                (Self::Ratio(v1), Self::Ratio(v2)) => v1 == v2,
+                (Self::Relative(v1), Self::Relative(v2)) => v1 == v2,
+                (Self::Fraction(v1), Self::Fraction(v2)) => v1 == v2,
+                (Self::Color(v1), Self::Color(v2)) => v1 == v2,
+                (Self::Gradient(v1), Self::Gradient(v2)) => v1 == v2,
+                (Self::Pattern(v1), Self::Pattern(v2)) => v1 == v2,
+                (Self::Symbol(v1), Self::Symbol(v2)) => v1 == v2,
+                (Self::Version(v1), Self::Version(v2)) => v1 == v2,
+                (Self::Str(v1), Self::Str(v2)) => v1 == v2,
+                (Self::Bytes(v1), Self::Bytes(v2)) => v1 == v2,
+                (Self::Datetime(v1), Self::Datetime(v2)) => v1 == v2,
+                (Self::Decimal(v1), Self::Decimal(v2)) => v1 == v2,
+                (Self::Duration(v1), Self::Duration(v2)) => v1 == v2,
+                (Self::Content(v1), Self::Content(v2)) => v1 == v2,
+                (Self::Styles(v1), Self::Styles(v2)) => v1 == v2,
+                (Self::Args(v1), Self::Args(v2)) => v1 == v2,
+                (Self::BuiltinModule(v1), Self::BuiltinModule(v2)) => v1 == v2,
+                (Self::Plugin(v1), Self::Plugin(v2)) => v1 == v2,
+                (Self::Dyn(v1), Self::Dyn(v2)) => v1 == v2,
+                _ => false,
+            }
+    }
+}
+
+// Hash, PartialEq, PartialOrd, Ord
+
+// , PartialEq, Eq, PartialOrd, Ord, Hash)]
+
+impl Eq for LitTy {}
+
+impl PartialOrd for LitTy {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LitTy {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Clause, Self::Clause) => std::cmp::Ordering::Equal,
+            (Self::Undef, Self::Undef) => std::cmp::Ordering::Equal,
+            (Self::Space, Self::Space) => std::cmp::Ordering::Equal,
+            (Self::None, Self::None) => std::cmp::Ordering::Equal,
+            (Self::Break, Self::Break) => std::cmp::Ordering::Equal,
+            (Self::Continue, Self::Continue) => std::cmp::Ordering::Equal,
+            (Self::Infer, Self::Infer) => std::cmp::Ordering::Equal,
+            (Self::FlowNone, Self::FlowNone) => std::cmp::Ordering::Equal,
+            (Self::Auto, Self::Auto) => std::cmp::Ordering::Equal,
+
+            (Self::TextSize, Self::TextSize) => std::cmp::Ordering::Equal,
+            (Self::TextFont, Self::TextFont) => std::cmp::Ordering::Equal,
+            (Self::TextLang, Self::TextLang) => std::cmp::Ordering::Equal,
+            (Self::TextRegion, Self::TextRegion) => std::cmp::Ordering::Equal,
+
+            (Self::Label(v1), Self::Label(v2)) => v1.cmp(v2),
+            (Self::CiteLabel, Self::CiteLabel) => std::cmp::Ordering::Equal,
+            (Self::RefLabel, Self::RefLabel) => std::cmp::Ordering::Equal,
+            (Self::Dir, Self::Dir) => std::cmp::Ordering::Equal,
+
+            (Self::Stroke, Self::Stroke) => std::cmp::Ordering::Equal,
+            (Self::Margin, Self::Margin) => std::cmp::Ordering::Equal,
+            (Self::Inset, Self::Inset) => std::cmp::Ordering::Equal,
+            (Self::Outset, Self::Outset) => std::cmp::Ordering::Equal,
+            (Self::Radius, Self::Radius) => std::cmp::Ordering::Equal,
+
+            (Self::Tag(v1), Self::Tag(v2)) => v1.cmp(v2),
+            (Self::Type(v1), Self::Type(v2)) => v1.cmp(v2),
+            (Self::TypeType(v1), Self::TypeType(v2)) => v1.cmp(v2),
+            (Self::Element(v1), Self::Element(v2)) => v1.cmp(v2),
+            (Self::Module(v1), Self::Module(v2)) => v1.cmp(v2),
+            (Self::Path(v1), Self::Path(v2)) => v1.cmp(v2),
+
+            (Self::Int(v1), Self::Int(v2)) => v1.cmp(v2),
+            (Self::Float(Some(v1)), Self::Float(Some(v2))) => v1.to_bits().cmp(&v2.to_bits()),
+            (Self::Float(Option::None), Self::Float(Option::None)) => std::cmp::Ordering::Equal,
+            (Self::Float(Some(_)), Self::Float(Option::None)) => std::cmp::Ordering::Greater,
+            (Self::Float(Option::None), Self::Float(Some(_))) => std::cmp::Ordering::Less,
+            (Self::Length(v1), Self::Length(v2)) => {
+                v1.partial_cmp(v2).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Self::Angle(v1), Self::Angle(v2)) => v1.cmp(v2),
+            (Self::Ratio(v1), Self::Ratio(v2)) => v1.cmp(v2),
+            (Self::Relative(v1), Self::Relative(v2)) => {
+                v1.partial_cmp(v2).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Self::Fraction(v1), Self::Fraction(v2)) => v1.cmp(v2),
+            (Self::Color(v1), Self::Color(v2)) => hash_cmp(v1, v2),
+            (Self::Gradient(v1), Self::Gradient(v2)) => hash_cmp(v1, v2),
+            (Self::Pattern(v1), Self::Pattern(v2)) => hash_cmp(v1, v2),
+            (Self::Symbol(v1), Self::Symbol(v2)) => hash_cmp(v1, v2),
+            (Self::Version(v1), Self::Version(v2)) => v1.cmp(v2),
+            (Self::Str(v1), Self::Str(v2)) => v1.cmp(v2),
+            (Self::Bytes(v1), Self::Bytes(v2)) => hash_cmp(v1, v2),
+            (Self::Datetime(v1), Self::Datetime(v2)) => {
+                v1.partial_cmp(v2).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (Self::Decimal(v1), Self::Decimal(v2)) => v1.cmp(v2),
+            (Self::Duration(v1), Self::Duration(v2)) => v1.cmp(v2),
+            (Self::Content(v1), Self::Content(v2)) => hash_cmp(v1, v2),
+            (Self::Styles(v1), Self::Styles(v2)) => hash_cmp(v1, v2),
+            (Self::Args(v1), Self::Args(v2)) => hash_cmp(v1, v2),
+            (Self::BuiltinModule(v1), Self::BuiltinModule(v2)) => hash_cmp(v1, v2),
+            (Self::Plugin(v1), Self::Plugin(v2)) => hash_cmp(v1, v2),
+            (Self::Dyn(v1), Self::Dyn(v2)) => hash_cmp(v1, v2),
+
+            (Self::Clause, _) => std::cmp::Ordering::Less,
+            (Self::Undef, _) => std::cmp::Ordering::Less,
+            (Self::Space, _) => std::cmp::Ordering::Less,
+            (Self::None, _) => std::cmp::Ordering::Less,
+            (Self::Break, _) => std::cmp::Ordering::Less,
+            (Self::Continue, _) => std::cmp::Ordering::Less,
+            (Self::Infer, _) => std::cmp::Ordering::Less,
+            (Self::FlowNone, _) => std::cmp::Ordering::Less,
+            (Self::Auto, _) => std::cmp::Ordering::Less,
+
+            (Self::TextSize, _) => std::cmp::Ordering::Less,
+            (Self::TextFont, _) => std::cmp::Ordering::Less,
+            (Self::TextLang, _) => std::cmp::Ordering::Less,
+            (Self::TextRegion, _) => std::cmp::Ordering::Less,
+
+            (Self::Label(..), _) => std::cmp::Ordering::Less,
+            (Self::CiteLabel, _) => std::cmp::Ordering::Less,
+            (Self::RefLabel, _) => std::cmp::Ordering::Less,
+            (Self::Dir, _) => std::cmp::Ordering::Less,
+
+            (Self::Stroke, _) => std::cmp::Ordering::Less,
+            (Self::Margin, _) => std::cmp::Ordering::Less,
+            (Self::Inset, _) => std::cmp::Ordering::Less,
+            (Self::Outset, _) => std::cmp::Ordering::Less,
+            (Self::Radius, _) => std::cmp::Ordering::Less,
+
+            (Self::Tag(..), _) => std::cmp::Ordering::Less,
+            (Self::Type(..), _) => std::cmp::Ordering::Less,
+            (Self::TypeType(..), _) => std::cmp::Ordering::Less,
+            (Self::Element(..), _) => std::cmp::Ordering::Less,
+            (Self::Module(..), _) => std::cmp::Ordering::Less,
+            (Self::Path(..), _) => std::cmp::Ordering::Less,
+
+            (Self::Int(..), _) => std::cmp::Ordering::Less,
+            (Self::Float(..), _) => std::cmp::Ordering::Less,
+            (Self::Length(..), _) => std::cmp::Ordering::Less,
+            (Self::Angle(..), _) => std::cmp::Ordering::Less,
+            (Self::Ratio(..), _) => std::cmp::Ordering::Less,
+            (Self::Relative(..), _) => std::cmp::Ordering::Less,
+            (Self::Fraction(..), _) => std::cmp::Ordering::Less,
+            (Self::Color(..), _) => std::cmp::Ordering::Less,
+            (Self::Gradient(..), _) => std::cmp::Ordering::Less,
+            (Self::Pattern(..), _) => std::cmp::Ordering::Less,
+            (Self::Symbol(..), _) => std::cmp::Ordering::Less,
+            (Self::Version(..), _) => std::cmp::Ordering::Less,
+            (Self::Str(..), _) => std::cmp::Ordering::Less,
+            (Self::Bytes(..), _) => std::cmp::Ordering::Less,
+            (Self::Datetime(..), _) => std::cmp::Ordering::Less,
+            (Self::Decimal(..), _) => std::cmp::Ordering::Less,
+            (Self::Duration(..), _) => std::cmp::Ordering::Less,
+            (Self::Content(..), _) => std::cmp::Ordering::Less,
+            (Self::Styles(..), _) => std::cmp::Ordering::Less,
+            (Self::Args(..), _) => std::cmp::Ordering::Less,
+            (Self::BuiltinModule(..), _) => std::cmp::Ordering::Less,
+            (Self::Plugin(..), _) => std::cmp::Ordering::Less,
+
+            (Self::Dyn(..), _) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+fn hash_cmp<T: Hash>(v1: &T, v2: &T) -> std::cmp::Ordering {
+    reflexo_typst::hash::hash128(v1).cmp(&reflexo_typst::hash::hash128(v2))
 }
 
 impl fmt::Debug for LitTy {
@@ -240,7 +570,7 @@ impl fmt::Debug for LitTy {
         match self {
             LitTy::Clause => f.write_str("Clause"),
             LitTy::Undef => f.write_str("Undef"),
-            LitTy::Content => f.write_str("Content"),
+            LitTy::Content(Option::None) => f.write_str("Content"),
             LitTy::Space => f.write_str("Space"),
             LitTy::None => f.write_str("None"),
             LitTy::Break => f.write_str("Break"),
@@ -249,18 +579,20 @@ impl fmt::Debug for LitTy {
             LitTy::FlowNone => f.write_str("FlowNone"),
             LitTy::Auto => f.write_str("Auto"),
 
-            LitTy::Args => write!(f, "Args"),
-            LitTy::Color => write!(f, "Color"),
+            LitTy::Int(Option::None) => write!(f, "Integer"),
+            LitTy::Datetime(Option::None) => write!(f, "Datetime"),
+            LitTy::Args(Option::None) => write!(f, "Args"),
+            LitTy::Color(Option::None) => write!(f, "Color"),
             LitTy::TextSize => write!(f, "TextSize"),
             LitTy::TextFont => write!(f, "TextFont"),
             LitTy::TextLang => write!(f, "TextLang"),
             LitTy::TextRegion => write!(f, "TextRegion"),
             LitTy::Dir => write!(f, "Dir"),
-            LitTy::Length => write!(f, "Length"),
-            LitTy::Label => write!(f, "Label"),
+            LitTy::Length(Option::None) => write!(f, "Length"),
+            LitTy::Label(Option::None) => write!(f, "Label"),
             LitTy::CiteLabel => write!(f, "CiteLabel"),
             LitTy::RefLabel => write!(f, "RefLabel"),
-            LitTy::Float => write!(f, "Float"),
+            LitTy::Float(Option::None) => write!(f, "Float"),
             LitTy::Stroke => write!(f, "Stroke"),
             LitTy::Margin => write!(f, "Margin"),
             LitTy::Inset => write!(f, "Inset"),
@@ -279,6 +611,31 @@ impl fmt::Debug for LitTy {
             }
             LitTy::Module(decl) => write!(f, "{decl:?}"),
             LitTy::Path(preference) => write!(f, "Path({preference:?})"),
+
+            Int(Some(v)) => write!(f, "Int({v:?})"),
+            Float(Some(v)) => write!(f, "Float({v:?})"),
+            Length(Some(v)) => write!(f, "Length({v:?})"),
+            Angle(v) => write!(f, "Angle({v:?})"),
+            Ratio(v) => write!(f, "Ratio({v:?})"),
+            Relative(v) => write!(f, "Relative({v:?})"),
+            Fraction(v) => write!(f, "Fraction({v:?})"),
+            Color(Some(v)) => write!(f, "Color({v:?})"),
+            Gradient(v) => write!(f, "Gradient({v:?})"),
+            Pattern(v) => write!(f, "Pattern({v:?})"),
+            Symbol(v) => write!(f, "Symbol({v:?})"),
+            LitTy::Label(Some(v)) => write!(f, "Label({v:?})"),
+            LitTy::Version(v) => write!(f, "Version({v:?})"),
+            LitTy::Str(v) => write!(f, "Str({v:?})"),
+            LitTy::Bytes(v) => write!(f, "Bytes({v:?})"),
+            Datetime(Some(v)) => write!(f, "Datetime({v:?})"),
+            LitTy::Decimal(v) => write!(f, "Decimal({v:?})"),
+            Duration(v) => write!(f, "Duration({v:?})"),
+            Content(Some(v)) => write!(f, "Content({v:?})"),
+            Styles(v) => write!(f, "Styles({v:?})"),
+            Args(Some(v)) => write!(f, "Args({v:?})"),
+            BuiltinModule(v) => write!(f, "BuiltinModule({v:?})"),
+            Plugin(v) => write!(f, "Plugin({v:?})"),
+            Dyn(v) => write!(f, "Dyn({v:?})"),
         }
     }
 }
@@ -300,19 +657,19 @@ impl LitTy {
             return Ty::Lit(LitTy::None);
         }
         if builtin == Type::of::<typst::visualize::Color>() {
-            return Color.literally();
+            return Color(Option::None).literally();
         }
         if builtin == Type::of::<bool>() {
             return Ty::Lit(LitTy::None);
         }
         if builtin == Type::of::<f64>() {
-            return Float.literally();
+            return Float(Option::None).literally();
         }
-        if builtin == Type::of::<Length>() {
-            return Length.literally();
+        if builtin == Type::of::<TypstLength>() {
+            return Length(Option::None).literally();
         }
-        if builtin == Type::of::<Content>() {
-            return Ty::Lit(LitTy::Content);
+        if builtin == Type::of::<TypstContent>() {
+            return Ty::Lit(LitTy::Content(Option::None));
         }
 
         LitTy::Type(builtin).literally()
@@ -322,7 +679,7 @@ impl LitTy {
         let res = match self {
             LitTy::Clause => "any",
             LitTy::Undef => "any",
-            LitTy::Content => "content",
+            LitTy::Content(Option::None) => "content",
             LitTy::Space => "content",
             LitTy::None => "none",
             LitTy::Break => "break",
@@ -331,16 +688,18 @@ impl LitTy {
             LitTy::FlowNone => "none",
             LitTy::Auto => "auto",
 
-            LitTy::Args => "arguments",
-            LitTy::Color => "color",
+            LitTy::Int(Option::None) => "int",
+            LitTy::Datetime(Option::None) => "datetime",
+            LitTy::Args(Option::None) => "arguments",
+            LitTy::Color(Option::None) => "color",
             LitTy::TextSize => "text.size",
             LitTy::TextFont => "text.font",
             LitTy::TextLang => "text.lang",
             LitTy::TextRegion => "text.region",
             LitTy::Dir => "dir",
-            LitTy::Length => "length",
-            LitTy::Float => "float",
-            LitTy::Label => "label",
+            LitTy::Length(Option::None) => "length",
+            LitTy::Float(Option::None) => "float",
+            LitTy::Label(Option::None) => "label",
             LitTy::CiteLabel => "cite-label",
             LitTy::RefLabel => "ref-label",
             LitTy::Stroke => "stroke",
@@ -375,6 +734,31 @@ impl LitTy {
                 PathPreference::RawTheme => "[theme]",
                 PathPreference::RawSyntax => "[syntax]",
             },
+
+            Int(Some(v)) => return eco_format!("Int({v:?})"),
+            Float(Some(v)) => return eco_format!("Float({v:?})"),
+            Length(Some(v)) => return eco_format!("Length({v:?})"),
+            Angle(v) => return eco_format!("Angle({v:?})"),
+            Ratio(v) => return eco_format!("Ratio({v:?})"),
+            Relative(v) => return eco_format!("Relative({v:?})"),
+            Fraction(v) => return eco_format!("Fraction({v:?})"),
+            Color(Some(v)) => return eco_format!("Color({v:?})"),
+            Gradient(v) => return eco_format!("Gradient({v:?})"),
+            Pattern(v) => return eco_format!("Pattern({v:?})"),
+            Symbol(v) => return eco_format!("Symbol({v:?})"),
+            LitTy::Label(v) => return eco_format!("Label({v:?})"),
+            LitTy::Version(v) => return eco_format!("Version({v:?})"),
+            LitTy::Str(v) => return eco_format!("Str({v:?})"),
+            LitTy::Bytes(v) => return eco_format!("Bytes({v:?})"),
+            Datetime(Some(v)) => return eco_format!("Datetime({v:?})"),
+            LitTy::Decimal(v) => return eco_format!("Decimal({v:?})"),
+            Duration(v) => return eco_format!("Duration({v:?})"),
+            Content(v) => return eco_format!("Content({v:?})"),
+            Styles(v) => return eco_format!("Styles({v:?})"),
+            Args(v) => return eco_format!("Args({v:?})"),
+            BuiltinModule(v) => return eco_format!("BuiltinModule({v:?})"),
+            Plugin(v) => return eco_format!("Plugin({v:?})"),
+            Dyn(v) => return eco_format!("Dyn({v:?})"),
         };
 
         res.into()
@@ -480,7 +864,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
             | "box" | "block" | "table" | "regular",
             "fill",
-        ) => Some(literally(Color)),
+        ) => Some(literally(Color(Option::None))),
         (
             // todo: table.cell
             "table" | "cell" | "block" | "box" | "circle" | "ellipse" | "rect" | "square",
@@ -495,8 +879,8 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
                     Ty::Value(InsTy::new(Value::Type(Type::of::<i64>()))),
-                    literally(Length),
-                    Ty::Array(literally(Length).into()),
+                    literally(Length(Option::None)),
+                    Ty::Array(literally(Length(Option::None)).into()),
                 )
             });
             Some(COLUMN_TYPE.clone())
@@ -505,7 +889,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
-                    Ty::Array(Ty::Lit(Length).into()),
+                    Ty::Array(Ty::Lit(Length(Option::None)).into()),
                 )
             });
             Some(PATTERN_SIZE_TYPE.clone())
@@ -535,74 +919,74 @@ static FLOW_STROKE_DASH_TYPE: Lazy<Ty> = Lazy::new(|| {
         "dash-dotted",
         "densely-dash-dotted",
         "loosely-dash-dotted",
-        Ty::Array(flow_union!("dot", literally(Float)).into()),
+        Ty::Array(flow_union!("dot", literally(Float(Option::None))).into()),
         Ty::Dict(flow_record!(
-            "array" => Ty::Array(flow_union!("dot", literally(Float)).into()),
-            "phase" => literally(Length),
+            "array" => Ty::Array(flow_union!("dot", literally(Float(Option::None))).into()),
+            "phase" => literally(Length(Option::None)),
         ))
     )
 });
 
 pub static FLOW_STROKE_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
-        "paint" => literally(Color),
-        "thickness" => literally(Length),
+        "paint" => literally(Color(Option::None)),
+        "thickness" => literally(Length(Option::None)),
         "cap" => flow_union!("butt", "round", "square"),
         "join" => flow_union!("miter", "round", "bevel"),
         "dash" => FLOW_STROKE_DASH_TYPE.clone(),
-        "miter-limit" => literally(Float),
+        "miter-limit" => literally(Float(Option::None)),
     )
 });
 
 pub static FLOW_MARGIN_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
-        "top" => literally(Length),
-        "right" => literally(Length),
-        "bottom" => literally(Length),
-        "left" => literally(Length),
-        "inside" => literally(Length),
-        "outside" => literally(Length),
-        "x" => literally(Length),
-        "y" => literally(Length),
-        "rest" => literally(Length),
+        "top" => literally(Length(Option::None)),
+        "right" => literally(Length(Option::None)),
+        "bottom" => literally(Length(Option::None)),
+        "left" => literally(Length(Option::None)),
+        "inside" => literally(Length(Option::None)),
+        "outside" => literally(Length(Option::None)),
+        "x" => literally(Length(Option::None)),
+        "y" => literally(Length(Option::None)),
+        "rest" => literally(Length(Option::None)),
     )
 });
 
 pub static FLOW_INSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
-        "top" => literally(Length),
-        "right" => literally(Length),
-        "bottom" => literally(Length),
-        "left" => literally(Length),
-        "x" => literally(Length),
-        "y" => literally(Length),
-        "rest" => literally(Length),
+        "top" => literally(Length(Option::None)),
+        "right" => literally(Length(Option::None)),
+        "bottom" => literally(Length(Option::None)),
+        "left" => literally(Length(Option::None)),
+        "x" => literally(Length(Option::None)),
+        "y" => literally(Length(Option::None)),
+        "rest" => literally(Length(Option::None)),
     )
 });
 
 pub static FLOW_OUTSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
-        "top" => literally(Length),
-        "right" => literally(Length),
-        "bottom" => literally(Length),
-        "left" => literally(Length),
-        "x" => literally(Length),
-        "y" => literally(Length),
-        "rest" => literally(Length),
+        "top" => literally(Length(Option::None)),
+        "right" => literally(Length(Option::None)),
+        "bottom" => literally(Length(Option::None)),
+        "left" => literally(Length(Option::None)),
+        "x" => literally(Length(Option::None)),
+        "y" => literally(Length(Option::None)),
+        "rest" => literally(Length(Option::None)),
     )
 });
 
 pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
-        "top" => literally(Length),
-        "right" => literally(Length),
-        "bottom" => literally(Length),
-        "left" => literally(Length),
-        "top-left" => literally(Length),
-        "top-right" => literally(Length),
-        "bottom-left" => literally(Length),
-        "bottom-right" => literally(Length),
-        "rest" => literally(Length),
+        "top" => literally(Length(Option::None)),
+        "right" => literally(Length(Option::None)),
+        "bottom" => literally(Length(Option::None)),
+        "left" => literally(Length(Option::None)),
+        "top-left" => literally(Length(Option::None)),
+        "top-right" => literally(Length(Option::None)),
+        "bottom-left" => literally(Length(Option::None)),
+        "bottom-right" => literally(Length(Option::None)),
+        "rest" => literally(Length(Option::None)),
     )
 });
 

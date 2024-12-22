@@ -243,7 +243,7 @@ impl Ty {
             res = res || {
                 match ty {
                     Ty::Value(v) => is_content_builtin_type(&v.val.ty()),
-                    Ty::Lit(LitTy::Content | LitTy::Element(..)) => true,
+                    Ty::Lit(LitTy::Content(..) | LitTy::Element(..)) => true,
                     Ty::Lit(LitTy::Type(v)) => is_content_builtin_type(v),
                     _ => false,
                 }

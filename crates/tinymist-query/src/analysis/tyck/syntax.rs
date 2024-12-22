@@ -240,7 +240,7 @@ impl TypeChecker<'_> {
                 .var_docs
                 .insert(decl.clone(), param_doc.to_untyped());
 
-            let term = Ty::Lit(LitTy::Args);
+            let term = Ty::Lit(LitTy::Args(None));
             let var_ty = Ty::Var(var);
             if let Some(annotated) = docstring.var_ty(&name) {
                 self.constrain(&var_ty, annotated);
@@ -448,7 +448,7 @@ impl TypeChecker<'_> {
 
         let selected = match selector {
             Some(selector) => Self::content_by_selector(selector)?,
-            None => Ty::Lit(LitTy::Content),
+            None => Ty::Lit(LitTy::Content(None)),
         };
 
         let show_fact = Ty::Func(SigTy::unary(selected, Ty::Any));
@@ -534,7 +534,7 @@ impl TypeChecker<'_> {
         if let Some(body) = content_ref.body.as_ref() {
             self.check(body);
         }
-        Ty::Lit(LitTy::Content)
+        Ty::Lit(LitTy::Content(None))
     }
 
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
@@ -543,7 +543,7 @@ impl TypeChecker<'_> {
     }
 
     fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
-        Ty::Lit(LitTy::Content)
+        Ty::Lit(LitTy::Content(None))
     }
 
     fn check_contextual(&mut self, expr: &Interned<Expr>) -> Ty {
@@ -583,7 +583,7 @@ impl TypeChecker<'_> {
         let v = Ty::Var(self.get_var(decl));
         match decl.kind() {
             DefKind::Reference => {
-                self.constrain(&v, &Ty::Lit(LitTy::Label));
+                self.constrain(&v, &Ty::Lit(LitTy::Label(None)));
             }
             DefKind::Module => {
                 let ty = if decl.is_def() {

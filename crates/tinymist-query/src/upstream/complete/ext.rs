@@ -969,37 +969,8 @@ impl FnCompletionFeat {
                         self.check_sig(&sig, pos);
                     }
                 }
-                LitTy::TypeType(..) => {}
-                LitTy::Clause
-                | LitTy::Undef
-                | LitTy::Content
-                | LitTy::Space
-                | LitTy::None
-                | LitTy::Break
-                | LitTy::Continue
-                | LitTy::Infer
-                | LitTy::FlowNone
-                | LitTy::Auto
-                | LitTy::Args
-                | LitTy::Color
-                | LitTy::TextSize
-                | LitTy::TextFont
-                | LitTy::TextLang
-                | LitTy::TextRegion
-                | LitTy::Label
-                | LitTy::CiteLabel
-                | LitTy::RefLabel
-                | LitTy::Dir
-                | LitTy::Length
-                | LitTy::Float
-                | LitTy::Stroke
-                | LitTy::Margin
-                | LitTy::Inset
-                | LitTy::Outset
-                | LitTy::Radius
-                | LitTy::Tag(..)
-                | LitTy::Module(..)
-                | LitTy::Path(..) => {}
+                // todo: exhaustive
+                _ => {}
             },
             Ty::Any
             | Ty::Boolean(..)
@@ -1288,7 +1259,7 @@ impl TypeCompletionContext<'_, '_> {
             LitTy::Space => return None,
             LitTy::Break => return None,
             LitTy::Continue => return None,
-            LitTy::Content => return None,
+            LitTy::Content(..) => return None,
             LitTy::Infer => return None,
             LitTy::FlowNone => return None,
             LitTy::Tag(..) => return None,
@@ -1309,14 +1280,14 @@ impl TypeCompletionContext<'_, '_> {
                     .flatten(),
                 );
             }
-            LitTy::Args => return None,
+            LitTy::Args(..) => return None,
             LitTy::Stroke => {
                 self.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
                 self.snippet_completion("()", "(${})", "Stroke dictionary.");
-                self.type_completion(&Ty::Lit(LitTy::Color), docs);
-                self.type_completion(&Ty::Lit(LitTy::Length), docs);
+                self.type_completion(&Ty::Lit(LitTy::Color(None)), docs);
+                self.type_completion(&Ty::Lit(LitTy::Length(None)), docs);
             }
-            LitTy::Color => {
+            LitTy::Color(..) => {
                 self.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
                 self.snippet_completion(
                     "rgb()",
@@ -1387,21 +1358,21 @@ impl TypeCompletionContext<'_, '_> {
             }
             LitTy::Margin => {
                 self.snippet_completion("()", "(${})", "Margin dictionary.");
-                self.type_completion(&Ty::Lit(LitTy::Length), docs);
+                self.type_completion(&Ty::Lit(LitTy::Length(None)), docs);
             }
             LitTy::Inset => {
                 self.snippet_completion("()", "(${})", "Inset dictionary.");
-                self.type_completion(&Ty::Lit(LitTy::Length), docs);
+                self.type_completion(&Ty::Lit(LitTy::Length(None)), docs);
             }
             LitTy::Outset => {
                 self.snippet_completion("()", "(${})", "Outset dictionary.");
-                self.type_completion(&Ty::Lit(LitTy::Length), docs);
+                self.type_completion(&Ty::Lit(LitTy::Length(None)), docs);
             }
             LitTy::Radius => {
                 self.snippet_completion("()", "(${})", "Radius dictionary.");
-                self.type_completion(&Ty::Lit(LitTy::Length), docs);
+                self.type_completion(&Ty::Lit(LitTy::Length(None)), docs);
             }
-            LitTy::Length => {
+            LitTy::Length(..) => {
                 self.snippet_completion("pt", "${1}pt", "Point length unit.");
                 self.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
                 self.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
@@ -1409,14 +1380,14 @@ impl TypeCompletionContext<'_, '_> {
                 self.snippet_completion("em", "${1}em", "Em length unit.");
                 self.type_completion(&Ty::Lit(LitTy::Auto), docs);
             }
-            LitTy::Float => {
+            LitTy::Float(..) => {
                 self.snippet_completion(
                     "exponential notation",
                     "${1}e${0}",
                     "Exponential notation",
                 );
             }
-            LitTy::Label => {
+            LitTy::Label(..) => {
                 self.ctx.label_completions(false);
             }
             LitTy::CiteLabel => {
@@ -1436,7 +1407,7 @@ impl TypeCompletionContext<'_, '_> {
                     self.snippet_completion("false", "false", "No / Disabled.");
                     self.snippet_completion("true", "true", "Yes / Enabled.");
                 } else if *ty == Type::of::<Color>() {
-                    self.type_completion(&Ty::Lit(LitTy::Color), docs);
+                    self.type_completion(&Ty::Lit(LitTy::Color(None)), docs);
                 } else if *ty == Type::of::<Label>() {
                     self.ctx.label_completions(false)
                 } else if *ty == Type::of::<Func>() {
@@ -1463,6 +1434,8 @@ impl TypeCompletionContext<'_, '_> {
                     docs,
                 );
             }
+            // todo: exhaustive
+            _ => {}
         };
 
         Some(())
