@@ -1,10 +1,14 @@
 use reflexo_typst::EntryReader;
 use tinymist_world::LspWorld;
+use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};
 
 /// Stores diagnostics for files.
-pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
+pub type DiagnosticsMap = HashMap<Url, Vec<Diagnostic>>;
+
+type TypstDiagnostic = typst::diag::SourceDiagnostic;
+type TypstSeverity = typst::diag::Severity;
 
 /// Context for converting Typst diagnostics to LSP diagnostics.
 struct LocalDiagContext<'a> {
@@ -49,7 +53,7 @@ pub fn convert_diagnostics<'a>(
 fn convert_diagnostic(
     ctx: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
-) -> anyhow::Result<(Url, LspDiagnostic)> {
+) -> anyhow::Result<(Url, Diagnostic)> {
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
@@ -72,7 +76,7 @@ fn convert_diagnostic(
 
     let tracepoints = diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding)?;
 
-    let diagnostic = LspDiagnostic {
+    let diagnostic = Diagnostic {
         range: lsp_range,
         severity: Some(lsp_severity),
         message: lsp_message,
@@ -94,7 +98,7 @@ fn tracepoint_to_relatedinformation(
         let source = ctx.source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {
-            let lsp_range = typst_to_lsp::range(typst_range, &source, position_encoding);
+            let lsp_range = to_lsp_range(typst_range, &source, position_encoding);
 
             return Ok(Some(DiagnosticRelatedInformation {
                 location: LspLocation {
@@ -127,7 +131,7 @@ fn diagnostic_related_information(
     Ok(tracepoints)
 }
 
-fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(TypstFileId, TypstSpan)> {
+fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(TypstFileId, Span)> {
     iter::once(typst_diagnostic.span)
         .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
         .find_map(|span| Some((span.id()?, span)))
@@ -135,7 +139,7 @@ fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(TypstFileId
 
 fn diagnostic_range(
     source: &Source,
-    typst_span: TypstSpan,
+    typst_span: Span,
     position_encoding: PositionEncoding,
 ) -> LspRange {
     // Due to nvaner/typst-lsp#241 and maybe typst/typst#2035, we sometimes fail to
@@ -147,16 +151,16 @@ fn diagnostic_range(
     match source.find(typst_span) {
         Some(node) => {
             let typst_range = node.range();
-            typst_to_lsp::range(typst_range, source, position_encoding)
+            to_lsp_range(typst_range, source, position_encoding)
         }
         None => LspRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
     }
 }
 
-fn diagnostic_severity(typst_severity: TypstSeverity) -> LspSeverity {
+fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
     match typst_severity {
-        TypstSeverity::Error => LspSeverity::ERROR,
-        TypstSeverity::Warning => LspSeverity::WARNING,
+        TypstSeverity::Error => DiagnosticSeverity::ERROR,
+        TypstSeverity::Warning => DiagnosticSeverity::WARNING,
     }
 }
 

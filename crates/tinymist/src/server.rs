@@ -23,7 +23,7 @@ use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
 use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
+    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     PositionEncoding, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
@@ -977,7 +977,7 @@ impl LanguageState {
             let replacement = change.text;
             match change.range {
                 Some(lsp_range) => {
-                    let range = lsp_to_typst::range(lsp_range, position_encoding, &meta.content)
+                    let range = to_typst_range(lsp_range, position_encoding, &meta.content)
                         .expect("invalid range");
                     meta.content.edit(range, &replacement);
                 }

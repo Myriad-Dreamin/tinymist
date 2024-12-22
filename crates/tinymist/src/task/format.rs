@@ -4,7 +4,7 @@ use std::iter::zip;
 
 use lsp_types::TextEdit;
 use sync_lsp::{just_future, SchedulableResponse};
-use tinymist_query::{typst_to_lsp, PositionEncoding};
+use tinymist_query::{to_lsp_range, PositionEncoding};
 use typst::syntax::Source;
 
 use super::SyncTaskFactory;
@@ -85,7 +85,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
     let replace = prefix..old.len() - suffix;
     let with = &new[prefix..new.len() - suffix];
 
-    let range = typst_to_lsp::range(replace, &prev, encoding);
+    let range = to_lsp_range(replace, &prev, encoding);
 
     Some(vec![TextEdit {
         new_text: with.to_owned(),

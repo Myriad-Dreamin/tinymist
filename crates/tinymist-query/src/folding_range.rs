@@ -37,7 +37,7 @@ impl SyntaxRequest for FoldingRangeRequest {
 
         let mut results = vec![];
         let LspPosition { line, character } =
-            typst_to_lsp::offset_to_position(source.text().len(), position_encoding, source);
+            to_lsp_position(source.text().len(), position_encoding, source);
         let loc = (line, Some(character));
 
         calc_folding_range(
@@ -101,7 +101,7 @@ fn calc_folding_range(
     folding_ranges: &mut Vec<FoldingRange>,
 ) {
     for (idx, child) in hierarchy.iter().enumerate() {
-        let range = typst_to_lsp::range(child.info.range.clone(), source, position_encoding);
+        let range = to_lsp_range(child.info.range.clone(), source, position_encoding);
         let is_not_last_range = idx + 1 < hierarchy.len();
         let is_not_final_last_range = !is_last_range || is_not_last_range;
 
@@ -116,7 +116,7 @@ fn calc_folding_range(
 
         let next_start = if is_not_last_range {
             let next = &hierarchy[idx + 1];
-            let next_rng = typst_to_lsp::range(next.info.range.clone(), source, position_encoding);
+            let next_rng = to_lsp_range(next.info.range.clone(), source, position_encoding);
             (next_rng.start.line, Some(next_rng.start.character))
         } else if is_not_final_last_range {
             parent_last_loc
