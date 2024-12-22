@@ -1,0 +1,77 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on e (57..58)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/label_middle.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 18,
+    "label": "abcd",
+    "labelDetails": {
+     "description": "sequence(..)"
+    },
+    "sortText": "000",
+    "textEdit": {
+     "newText": "abcd>",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 3
+      },
+      "start": {
+       "character": 2,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "abef",
+    "labelDetails": {
+     "description": "sequence(..)"
+    },
+    "sortText": "001",
+    "textEdit": {
+     "newText": "abef>",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 3
+      },
+      "start": {
+       "character": 2,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "efg",
+    "labelDetails": {
+     "description": "sequence(..)"
+    },
+    "sortText": "002",
+    "textEdit": {
+     "newText": "efg>",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 3
+      },
+      "start": {
+       "character": 2,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

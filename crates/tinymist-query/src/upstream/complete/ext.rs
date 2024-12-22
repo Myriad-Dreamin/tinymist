@@ -22,7 +22,7 @@ use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
 use crate::snippet::{ParsedSnippet, PostfixSnippet, PostfixSnippetScope, DEFAULT_POSTFIX_SNIPPET};
 use crate::syntax::{
     interpret_mode_at, is_ident_like, previous_decls, surrounding_syntax, InterpretMode,
-    PreviousDecl, SurroundingSyntax, SyntaxContext, VarClass,
+    PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext, VarClass,
 };
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
@@ -1478,11 +1478,12 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     use crate::syntax::classify_context;
     use SurroundingSyntax::*;
 
-    let cursor_class = classify_context(ctx.leaf.clone(), Some(ctx.cursor));
-    crate::log_debug_ct!("complete_type: pos {:?} -> {cursor_class:#?}", ctx.leaf);
+    let syntax_context = classify_context(ctx.leaf.clone(), Some(ctx.cursor));
+    let syntax = classify_syntax(ctx.leaf.clone(), ctx.cursor);
+    crate::log_debug_ct!("complete_type: pos {:?} -> {syntax_context:#?}", ctx.leaf);
     let mut args_node = None;
 
-    match cursor_class {
+    match syntax_context {
         Some(SyntaxContext::Element { container, .. }) => {
             if let Some(container) = container.cast::<ast::Dict>() {
                 for named in container.items() {
@@ -1571,8 +1572,12 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     }
 
     // adjust the completion position
+    // todo: syntax class seems not being considering `is_ident_like`
+    // todo: merge ident_content_offset and label_content_offset
     if is_ident_like(&ctx.leaf) {
         ctx.from = ctx.leaf.offset();
+    } else if let Some(offset) = syntax.as_ref().and_then(SyntaxClass::complete_offset) {
+        ctx.from = offset;
     }
 
     if let Some(ty) = ty {
