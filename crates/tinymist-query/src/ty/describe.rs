@@ -169,15 +169,15 @@ impl TypeDescriber {
             Ty::With(w) => {
                 return self.describe(&w.sig);
             }
-            Ty::Builtin(BuiltinTy::Content | BuiltinTy::Space) => {
+            Ty::Lit(LitTy::Content | LitTy::Space) => {
                 return "content".into();
             }
             // Doesn't provide any information, hence we doesn't describe it intermediately here.
-            Ty::Any | Ty::Builtin(BuiltinTy::Clause | BuiltinTy::Undef | BuiltinTy::Infer) => {}
-            Ty::Builtin(BuiltinTy::FlowNone | BuiltinTy::None) => {
+            Ty::Any | Ty::Lit(LitTy::Clause | LitTy::Undef | LitTy::Infer) => {}
+            Ty::Lit(LitTy::FlowNone | LitTy::None) => {
                 return "none".into();
             }
-            Ty::Builtin(BuiltinTy::Auto) => {
+            Ty::Lit(LitTy::Auto) => {
                 return "auto".into();
             }
             Ty::Boolean(..) if self.repr => {
@@ -189,7 +189,7 @@ impl TypeDescriber {
             Ty::Boolean(Some(b)) => {
                 return eco_format!("{b}");
             }
-            Ty::Builtin(b) => {
+            Ty::Lit(b) => {
                 return b.describe();
             }
             Ty::Value(v) if matches!(v.val, Value::Module(..)) => {

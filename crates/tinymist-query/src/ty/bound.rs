@@ -44,7 +44,7 @@ where
 pub enum DocSource {
     Var(Interned<TypeVar>),
     Ins(Interned<InsTy>),
-    Builtin(BuiltinTy),
+    Builtin(LitTy),
 }
 
 impl DocSource {
@@ -52,8 +52,8 @@ impl DocSource {
     pub fn as_func(&self) -> Option<Func> {
         match self {
             Self::Var(..) => None,
-            Self::Builtin(BuiltinTy::Type(ty)) => Some(ty.constructor().ok()?),
-            Self::Builtin(BuiltinTy::Element(ty)) => Some((*ty).into()),
+            Self::Builtin(LitTy::Type(ty)) => Some(ty.constructor().ok()?),
+            Self::Builtin(LitTy::Element(ty)) => Some((*ty).into()),
             Self::Builtin(..) => None,
             Self::Ins(ins_ty) => match &ins_ty.val {
                 foundations::Value::Func(func) => Some(func.clone()),
@@ -73,7 +73,7 @@ impl Ty {
     /// Convert type to doc source
     pub fn as_source(&self) -> Option<DocSource> {
         match self {
-            Ty::Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
+            Ty::Lit(ty @ (LitTy::Type(..) | LitTy::Element(..))) => {
                 Some(DocSource::Builtin(ty.clone()))
             }
             Ty::Value(ty) => match &ty.val {
@@ -96,7 +96,7 @@ impl Ty {
                 return;
             }
             match ty {
-                Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
+                Any | Boolean(_) | If(..) | Lit(..) | Value(..) => {}
                 Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) | Pattern(..) => {}
                 Unary(..) | Binary(..) => {}
                 Param(ty) => {

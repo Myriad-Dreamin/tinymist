@@ -240,7 +240,7 @@ impl TypeChecker<'_> {
                 .var_docs
                 .insert(decl.clone(), param_doc.to_untyped());
 
-            let term = Ty::Builtin(BuiltinTy::Args);
+            let term = Ty::Lit(LitTy::Args);
             let var_ty = Ty::Var(var);
             if let Some(annotated) = docstring.var_ty(&name) {
                 self.constrain(&var_ty, annotated);
@@ -285,7 +285,7 @@ impl TypeChecker<'_> {
             self.check(content);
         }
 
-        Ty::Builtin(BuiltinTy::Element(element.elem))
+        Ty::Lit(LitTy::Element(element.elem))
     }
 
     fn check_unary(&mut self, unary: &Interned<UnExpr>) -> Ty {
@@ -422,7 +422,7 @@ impl TypeChecker<'_> {
 
         let term = match &let_expr.body {
             Some(expr) => self.check(expr),
-            None => Ty::Builtin(BuiltinTy::None),
+            None => Ty::Lit(LitTy::None),
         };
         if let Some(annotated) = &docstring.res_ty {
             self.constrain(&term, annotated);
@@ -432,7 +432,7 @@ impl TypeChecker<'_> {
         let pat = self.check_pattern(None, &let_expr.pattern, docstring);
         self.constrain(&value, &pat);
 
-        Ty::Builtin(BuiltinTy::None)
+        Ty::Lit(LitTy::None)
     }
 
     fn check_show(&mut self, show: &Interned<ShowExpr>) -> Ty {
@@ -440,7 +440,7 @@ impl TypeChecker<'_> {
         let transform = self.check(&show.edit);
 
         self.constraint_show(selector, transform);
-        Ty::Builtin(BuiltinTy::None)
+        Ty::Lit(LitTy::None)
     }
 
     fn constraint_show(&mut self, selector: Option<Ty>, transform: Ty) -> Option<()> {
@@ -448,7 +448,7 @@ impl TypeChecker<'_> {
 
         let selected = match selector {
             Some(selector) => Self::content_by_selector(selector)?,
-            None => Ty::Builtin(BuiltinTy::Content),
+            None => Ty::Lit(LitTy::Content),
         };
 
         let show_fact = Ty::Func(SigTy::unary(selected, Ty::Any));
@@ -463,29 +463,27 @@ impl TypeChecker<'_> {
 
         Some(match selector {
             Ty::With(with) => return Self::content_by_selector(with.sig.as_ref().clone()),
-            Ty::Builtin(BuiltinTy::Type(ty)) => {
+            Ty::Lit(LitTy::Type(ty)) => {
                 if ty == Type::of::<typst::foundations::Regex>() {
-                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                    Ty::Lit(LitTy::Element(Element::of::<typst::text::TextElem>()))
                 } else {
                     return None;
                 }
             }
-            Ty::Builtin(BuiltinTy::Element(..)) => selector,
+            Ty::Lit(LitTy::Element(..)) => selector,
             Ty::Value(ins_ty) => match &ins_ty.val {
-                Value::Str(..) => {
-                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
-                }
-                Value::Content(c) => Ty::Builtin(BuiltinTy::Element(c.elem())),
+                Value::Str(..) => Ty::Lit(LitTy::Element(Element::of::<typst::text::TextElem>())),
+                Value::Content(c) => Ty::Lit(LitTy::Element(c.elem())),
                 Value::Func(f) => {
                     if let Some(elem) = f.element() {
-                        Ty::Builtin(BuiltinTy::Element(elem))
+                        Ty::Lit(LitTy::Element(elem))
                     } else {
                         return None;
                     }
                 }
                 Value::Dyn(value) => {
                     if value.ty() == Type::of::<typst::foundations::Regex>() {
-                        Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                        Ty::Lit(LitTy::Element(Element::of::<typst::text::TextElem>()))
                     } else {
                         return None;
                     }
@@ -536,16 +534,16 @@ impl TypeChecker<'_> {
         if let Some(body) = content_ref.body.as_ref() {
             self.check(body);
         }
-        Ty::Builtin(BuiltinTy::Content)
+        Ty::Lit(LitTy::Content)
     }
 
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
         self.check_ref(&import.decl);
-        Ty::Builtin(BuiltinTy::None)
+        Ty::Lit(LitTy::None)
     }
 
     fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
-        Ty::Builtin(BuiltinTy::Content)
+        Ty::Lit(LitTy::Content)
     }
 
     fn check_contextual(&mut self, expr: &Interned<Expr>) -> Ty {
@@ -585,11 +583,11 @@ impl TypeChecker<'_> {
         let v = Ty::Var(self.get_var(decl));
         match decl.kind() {
             DefKind::Reference => {
-                self.constrain(&v, &Ty::Builtin(BuiltinTy::Label));
+                self.constrain(&v, &Ty::Lit(LitTy::Label));
             }
             DefKind::Module => {
                 let ty = if decl.is_def() {
-                    Some(Ty::Builtin(BuiltinTy::Module(decl.clone())))
+                    Some(Ty::Lit(LitTy::Module(decl.clone())))
                 } else {
                     self.ei.get_def(decl).map(|expr| self.check(&expr))
                 };

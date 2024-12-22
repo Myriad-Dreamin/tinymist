@@ -43,7 +43,7 @@ pub fn term_value(value: &Value) -> Ty {
             Ty::Tuple(values.into())
         }
         // todo: term arguments
-        Value::Args(..) => Ty::Builtin(BuiltinTy::Args),
+        Value::Args(..) => Ty::Lit(LitTy::Args),
         Value::Plugin(plugin) => {
             // todo: create infer variables for plugin functions
             let values = plugin
@@ -67,8 +67,8 @@ pub fn term_value(value: &Value) -> Ty {
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
-        Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),
-        Value::Dyn(dyn_val) => Ty::Builtin(BuiltinTy::Type(dyn_val.ty())),
+        Value::Type(ty) => Ty::Lit(LitTy::TypeType(*ty)),
+        Value::Dyn(dyn_val) => Ty::Lit(LitTy::Type(dyn_val.ty())),
         Value::Func(func) => Ty::Func(func_signature(func.clone()).type_sig()),
         _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
         _ => Ty::Any,
@@ -77,8 +77,8 @@ pub fn term_value(value: &Value) -> Ty {
 
 pub fn term_value_rec(value: &Value, s: Span) -> Ty {
     match value {
-        Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),
-        Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
+        Value::Type(ty) => Ty::Lit(LitTy::TypeType(*ty)),
+        Value::Dyn(v) => Ty::Lit(LitTy::Type(v.ty())),
         Value::None
         | Value::Auto
         | Value::Array(..)

@@ -9,7 +9,7 @@ use super::{
     TypeInfo, TypeVar,
 };
 use crate::syntax::{classify_context, classify_context_outer, ArgClass, SyntaxContext, VarClass};
-use crate::ty::BuiltinTy;
+use crate::ty::LitTy;
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -308,8 +308,8 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => Some(Ty::Builtin(
-                BuiltinTy::Path(crate::ty::PathPreference::Source {
+            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => Some(Ty::Lit(
+                LitTy::Path(crate::ty::PathPreference::Source {
                     allow_package: true,
                 }),
             )),
@@ -319,7 +319,7 @@ impl<'a> PostTypeChecker<'a> {
             | SyntaxContext::Label { node, .. }
             | SyntaxContext::Normal(node) => {
                 let label_ty = matches!(cursor, SyntaxContext::Label { is_error: true, .. })
-                    .then_some(Ty::Builtin(BuiltinTy::Label));
+                    .then_some(Ty::Lit(LitTy::Label));
                 let ty = self.check_or(node, context_ty);
                 crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
                 ty.or(label_ty)

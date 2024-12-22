@@ -158,7 +158,7 @@ impl TypeSimplifier<'_, '_> {
             Ty::Value(_v) => {}
             Ty::Any => {}
             Ty::Boolean(_) => {}
-            Ty::Builtin(_) => {}
+            Ty::Lit(_) => {}
         }
     }
 
@@ -246,7 +246,7 @@ impl TypeSimplifier<'_, '_> {
             Ty::Value(ins_ty) => Ty::Value(ins_ty.clone()),
             Ty::Any => Ty::Any,
             Ty::Boolean(truthiness) => Ty::Boolean(*truthiness),
-            Ty::Builtin(ty) => Ty::Builtin(ty.clone()),
+            Ty::Lit(ty) => Ty::Lit(ty.clone()),
         }
     }
 

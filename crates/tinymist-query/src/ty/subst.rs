@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn test_ty() {
         use super::*;
-        let ty = Ty::Builtin(BuiltinTy::Clause);
+        let ty = Ty::Lit(LitTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
     }

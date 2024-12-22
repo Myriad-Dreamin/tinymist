@@ -101,7 +101,7 @@ impl Ty {
         match &ty {
             CastInfo::Any => Ty::Any,
             CastInfo::Value(val, doc) => Ty::Value(InsTy::new_doc(val.clone(), *doc)),
-            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            CastInfo::Type(ty) => Ty::Lit(LitTy::Type(*ty)),
             CastInfo::Union(types) => {
                 Ty::iter_union(UnionIter(vec![types.as_slice().iter()]).map(Self::from_cast_info))
             }
@@ -126,7 +126,7 @@ impl Ty {
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
         match func.inner() {
-            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Element(*elem)),
+            Repr::Element(elem) => return Ty::Lit(LitTy::Element(*elem)),
             Repr::Closure(_) => {}
             Repr::With(w) => return Ty::from_return_site(&w.0, ty),
             Repr::Native(_) => {}
@@ -195,7 +195,7 @@ impl TryFrom<TypstFileId> for PackageId {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BuiltinTy {
+pub enum LitTy {
     Clause,
     Undef,
     Content,
@@ -235,41 +235,41 @@ pub enum BuiltinTy {
     Path(PathPreference),
 }
 
-impl fmt::Debug for BuiltinTy {
+impl fmt::Debug for LitTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BuiltinTy::Clause => f.write_str("Clause"),
-            BuiltinTy::Undef => f.write_str("Undef"),
-            BuiltinTy::Content => f.write_str("Content"),
-            BuiltinTy::Space => f.write_str("Space"),
-            BuiltinTy::None => f.write_str("None"),
-            BuiltinTy::Break => f.write_str("Break"),
-            BuiltinTy::Continue => f.write_str("Continue"),
-            BuiltinTy::Infer => f.write_str("Infer"),
-            BuiltinTy::FlowNone => f.write_str("FlowNone"),
-            BuiltinTy::Auto => f.write_str("Auto"),
+            LitTy::Clause => f.write_str("Clause"),
+            LitTy::Undef => f.write_str("Undef"),
+            LitTy::Content => f.write_str("Content"),
+            LitTy::Space => f.write_str("Space"),
+            LitTy::None => f.write_str("None"),
+            LitTy::Break => f.write_str("Break"),
+            LitTy::Continue => f.write_str("Continue"),
+            LitTy::Infer => f.write_str("Infer"),
+            LitTy::FlowNone => f.write_str("FlowNone"),
+            LitTy::Auto => f.write_str("Auto"),
 
-            BuiltinTy::Args => write!(f, "Args"),
-            BuiltinTy::Color => write!(f, "Color"),
-            BuiltinTy::TextSize => write!(f, "TextSize"),
-            BuiltinTy::TextFont => write!(f, "TextFont"),
-            BuiltinTy::TextLang => write!(f, "TextLang"),
-            BuiltinTy::TextRegion => write!(f, "TextRegion"),
-            BuiltinTy::Dir => write!(f, "Dir"),
-            BuiltinTy::Length => write!(f, "Length"),
-            BuiltinTy::Label => write!(f, "Label"),
-            BuiltinTy::CiteLabel => write!(f, "CiteLabel"),
-            BuiltinTy::RefLabel => write!(f, "RefLabel"),
-            BuiltinTy::Float => write!(f, "Float"),
-            BuiltinTy::Stroke => write!(f, "Stroke"),
-            BuiltinTy::Margin => write!(f, "Margin"),
-            BuiltinTy::Inset => write!(f, "Inset"),
-            BuiltinTy::Outset => write!(f, "Outset"),
-            BuiltinTy::Radius => write!(f, "Radius"),
-            BuiltinTy::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
-            BuiltinTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
-            BuiltinTy::Element(elem) => elem.fmt(f),
-            BuiltinTy::Tag(tag) => {
+            LitTy::Args => write!(f, "Args"),
+            LitTy::Color => write!(f, "Color"),
+            LitTy::TextSize => write!(f, "TextSize"),
+            LitTy::TextFont => write!(f, "TextFont"),
+            LitTy::TextLang => write!(f, "TextLang"),
+            LitTy::TextRegion => write!(f, "TextRegion"),
+            LitTy::Dir => write!(f, "Dir"),
+            LitTy::Length => write!(f, "Length"),
+            LitTy::Label => write!(f, "Label"),
+            LitTy::CiteLabel => write!(f, "CiteLabel"),
+            LitTy::RefLabel => write!(f, "RefLabel"),
+            LitTy::Float => write!(f, "Float"),
+            LitTy::Stroke => write!(f, "Stroke"),
+            LitTy::Margin => write!(f, "Margin"),
+            LitTy::Inset => write!(f, "Inset"),
+            LitTy::Outset => write!(f, "Outset"),
+            LitTy::Radius => write!(f, "Radius"),
+            LitTy::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
+            LitTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
+            LitTy::Element(elem) => elem.fmt(f),
+            LitTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 if let Some(id) = id {
                     write!(f, "Tag({name:?}) of {id:?}")
@@ -277,13 +277,13 @@ impl fmt::Debug for BuiltinTy {
                     write!(f, "Tag({name:?})")
                 }
             }
-            BuiltinTy::Module(decl) => write!(f, "{decl:?}"),
-            BuiltinTy::Path(preference) => write!(f, "Path({preference:?})"),
+            LitTy::Module(decl) => write!(f, "{decl:?}"),
+            LitTy::Path(preference) => write!(f, "Path({preference:?})"),
         }
     }
 }
 
-impl BuiltinTy {
+impl LitTy {
     pub fn from_value(builtin: &Value) -> Ty {
         if let Value::Bool(v) = builtin {
             return Ty::Boolean(Some(*v));
@@ -294,16 +294,16 @@ impl BuiltinTy {
 
     pub fn from_builtin(builtin: Type) -> Ty {
         if builtin == Type::of::<AutoValue>() {
-            return Ty::Builtin(BuiltinTy::Auto);
+            return Ty::Lit(LitTy::Auto);
         }
         if builtin == Type::of::<NoneValue>() {
-            return Ty::Builtin(BuiltinTy::None);
+            return Ty::Lit(LitTy::None);
         }
         if builtin == Type::of::<typst::visualize::Color>() {
             return Color.literally();
         }
         if builtin == Type::of::<bool>() {
-            return Ty::Builtin(BuiltinTy::None);
+            return Ty::Lit(LitTy::None);
         }
         if builtin == Type::of::<f64>() {
             return Float.literally();
@@ -312,46 +312,46 @@ impl BuiltinTy {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return Ty::Builtin(BuiltinTy::Content);
+            return Ty::Lit(LitTy::Content);
         }
 
-        BuiltinTy::Type(builtin).literally()
+        LitTy::Type(builtin).literally()
     }
 
     pub(crate) fn describe(&self) -> EcoString {
         let res = match self {
-            BuiltinTy::Clause => "any",
-            BuiltinTy::Undef => "any",
-            BuiltinTy::Content => "content",
-            BuiltinTy::Space => "content",
-            BuiltinTy::None => "none",
-            BuiltinTy::Break => "break",
-            BuiltinTy::Continue => "continue",
-            BuiltinTy::Infer => "any",
-            BuiltinTy::FlowNone => "none",
-            BuiltinTy::Auto => "auto",
+            LitTy::Clause => "any",
+            LitTy::Undef => "any",
+            LitTy::Content => "content",
+            LitTy::Space => "content",
+            LitTy::None => "none",
+            LitTy::Break => "break",
+            LitTy::Continue => "continue",
+            LitTy::Infer => "any",
+            LitTy::FlowNone => "none",
+            LitTy::Auto => "auto",
 
-            BuiltinTy::Args => "arguments",
-            BuiltinTy::Color => "color",
-            BuiltinTy::TextSize => "text.size",
-            BuiltinTy::TextFont => "text.font",
-            BuiltinTy::TextLang => "text.lang",
-            BuiltinTy::TextRegion => "text.region",
-            BuiltinTy::Dir => "dir",
-            BuiltinTy::Length => "length",
-            BuiltinTy::Float => "float",
-            BuiltinTy::Label => "label",
-            BuiltinTy::CiteLabel => "cite-label",
-            BuiltinTy::RefLabel => "ref-label",
-            BuiltinTy::Stroke => "stroke",
-            BuiltinTy::Margin => "margin",
-            BuiltinTy::Inset => "inset",
-            BuiltinTy::Outset => "outset",
-            BuiltinTy::Radius => "radius",
-            BuiltinTy::TypeType(..) => "type",
-            BuiltinTy::Type(ty) => ty.short_name(),
-            BuiltinTy::Element(ty) => ty.name(),
-            BuiltinTy::Tag(tag) => {
+            LitTy::Args => "arguments",
+            LitTy::Color => "color",
+            LitTy::TextSize => "text.size",
+            LitTy::TextFont => "text.font",
+            LitTy::TextLang => "text.lang",
+            LitTy::TextRegion => "text.region",
+            LitTy::Dir => "dir",
+            LitTy::Length => "length",
+            LitTy::Float => "float",
+            LitTy::Label => "label",
+            LitTy::CiteLabel => "cite-label",
+            LitTy::RefLabel => "ref-label",
+            LitTy::Stroke => "stroke",
+            LitTy::Margin => "margin",
+            LitTy::Inset => "inset",
+            LitTy::Outset => "outset",
+            LitTy::Radius => "radius",
+            LitTy::TypeType(..) => "type",
+            LitTy::Type(ty) => ty.short_name(),
+            LitTy::Element(ty) => ty.name(),
+            LitTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 return if let Some(id) = id {
                     eco_format!("tag {name} of {id:?}")
@@ -359,8 +359,8 @@ impl BuiltinTy {
                     eco_format!("tag {name}")
                 };
             }
-            BuiltinTy::Module(m) => return eco_format!("module({})", m.name()),
-            BuiltinTy::Path(s) => match s {
+            LitTy::Module(m) => return eco_format!("module({})", m.name()),
+            LitTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
                 PathPreference::Source { .. } => "[source]",
@@ -381,7 +381,7 @@ impl BuiltinTy {
     }
 }
 
-use BuiltinTy::*;
+use LitTy::*;
 
 fn literally(s: impl FlowBuiltinLiterally) -> Ty {
     s.literally()
@@ -397,9 +397,9 @@ impl FlowBuiltinLiterally for &str {
     }
 }
 
-impl FlowBuiltinLiterally for BuiltinTy {
+impl FlowBuiltinLiterally for LitTy {
     fn literally(self) -> Ty {
-        Ty::Builtin(self.clone())
+        Ty::Lit(self.clone())
     }
 }
 
@@ -505,7 +505,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
-                    Ty::Array(Ty::Builtin(Length).into()),
+                    Ty::Array(Ty::Lit(Length).into()),
                 )
             });
             Some(PATTERN_SIZE_TYPE.clone())
@@ -517,8 +517,8 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             | "ellipse" | "circle" | "polygon" | "box" | "block" | "table" | "line" | "cell"
             | "hline" | "vline" | "regular",
             "stroke",
-        ) => Some(Ty::Builtin(Stroke)),
-        ("page", "margin") => Some(Ty::Builtin(Margin)),
+        ) => Some(Ty::Lit(Stroke)),
+        ("page", "margin") => Some(Ty::Lit(Margin)),
         _ => Option::None,
     }
 }

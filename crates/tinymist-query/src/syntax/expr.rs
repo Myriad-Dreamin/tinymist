@@ -17,7 +17,7 @@ use crate::{
     analysis::{QueryStatGuard, SharedContext},
     prelude::*,
     syntax::{find_module_level_docs, DefKind},
-    ty::{BuiltinTy, InsTy, Interned, Ty},
+    ty::{LitTy, InsTy, Interned, Ty},
 };
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
@@ -322,8 +322,8 @@ impl ExprWorker<'_> {
     fn do_check(&mut self, m: ast::Expr) -> Expr {
         use ast::Expr::*;
         match m {
-            None(_) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
-            Auto(..) => Expr::Type(Ty::Builtin(BuiltinTy::Auto)),
+            None(_) => Expr::Type(Ty::Lit(LitTy::None)),
+            Auto(..) => Expr::Type(Ty::Lit(LitTy::Auto)),
             Bool(bool) => Expr::Type(Ty::Value(InsTy::new(Value::Bool(bool.get())))),
             Int(int) => Expr::Type(Ty::Value(InsTy::new(Value::Int(int.get())))),
             Float(float) => Expr::Type(Ty::Value(InsTy::new(Value::Float(float.get())))),
@@ -361,8 +361,8 @@ impl ExprWorker<'_> {
             Conditional(conditional) => self.check_conditional(conditional),
             While(while_loop) => self.check_while_loop(while_loop),
             For(for_loop) => self.check_for_loop(for_loop),
-            Break(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
-            Continue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
+            Break(..) => Expr::Type(Ty::Lit(LitTy::Break)),
+            Continue(..) => Expr::Type(Ty::Lit(LitTy::Continue)),
             Return(func_return) => Expr::Unary(UnInst::new(
                 UnaryOp::Return,
                 func_return
@@ -370,15 +370,15 @@ impl ExprWorker<'_> {
                     .map_or_else(none_expr, |body| self.check(body)),
             )),
 
-            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Space(..) => Expr::Type(Ty::Builtin(BuiltinTy::Space)),
-            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            Text(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Raw(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Link(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Space(..) => Expr::Type(Ty::Lit(LitTy::Space)),
+            Linebreak(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Parbreak(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Escape(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            Shorthand(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            SmartQuote(..) => Expr::Type(Ty::Lit(LitTy::Content)),
 
             Strong(strong) => {
                 let body = self.check_inline_markup(strong.body());
@@ -406,8 +406,8 @@ impl ExprWorker<'_> {
                 self.check_element::<TermsElem>(eco_vec![term, description])
             }
 
-            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            MathAlignPoint(..) => Expr::Type(Ty::Lit(LitTy::Content)),
+            MathShorthand(..) => Expr::Type(Ty::Lit(LitTy::Content)),
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }
@@ -417,7 +417,7 @@ impl ExprWorker<'_> {
                 let top = attach.top().unwrap_or_default().to_untyped().clone();
                 self.check_math([base, bottom, top].iter())
             }
-            MathPrimes(..) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
+            MathPrimes(..) => Expr::Type(Ty::Lit(LitTy::None)),
             MathFrac(frac) => {
                 let num = frac.num().to_untyped().clone();
                 let denom = frac.denom().to_untyped().clone();
@@ -1280,7 +1280,7 @@ fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
 }
 
 fn none_expr() -> Expr {
-    Expr::Type(Ty::Builtin(BuiltinTy::None))
+    Expr::Type(Ty::Lit(LitTy::None))
 }
 
 #[cfg(test)]

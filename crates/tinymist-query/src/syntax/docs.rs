@@ -14,7 +14,7 @@ use crate::{
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{
-        BuiltinTy, DynTypeBounds, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeVar,
+        LitTy, DynTypeBounds, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeVar,
         TypeVarBounds,
     },
 };
@@ -260,10 +260,10 @@ impl DocsChecker<'_> {
             let shorts = values
                 .clone()
                 .into_iter()
-                .map(|ty| (ty.short_name(), Ty::Builtin(BuiltinTy::Type(ty))));
+                .map(|ty| (ty.short_name(), Ty::Lit(LitTy::Type(ty))));
             let longs = values
                 .into_iter()
-                .map(|ty| (ty.long_name(), Ty::Builtin(BuiltinTy::Type(ty))));
+                .map(|ty| (ty.long_name(), Ty::Lit(LitTy::Type(ty))));
             let builtins = [
                 ("any", Ty::Any),
                 ("bool", Ty::Boolean(None)),
@@ -347,7 +347,7 @@ impl DocsChecker<'_> {
                                 return None;
                             };
                             let pkg_id = PackageId::try_from(self.fid).ok();
-                            Ty::Builtin(BuiltinTy::Tag(Box::new((
+                            Ty::Lit(LitTy::Tag(Box::new((
                                 s.get().into(),
                                 pkg_id.map(From::from),
                             ))))

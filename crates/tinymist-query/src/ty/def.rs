@@ -22,7 +22,7 @@ use typst::{
 use super::{BoundPred, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    analysis::BuiltinTy,
+    analysis::LitTy,
     docs::UntypedDefDocs,
     syntax::{DeclExpr, UnaryOp},
 };
@@ -46,8 +46,8 @@ pub enum Ty {
     /// A boolean type, can be `false`, `true`, or both (boolean type).
     /// `t := false | true`
     Boolean(Option<bool>),
-    /// All possible types in typst.
-    Builtin(BuiltinTy),
+    /// All possible trivial types in typst.
+    Lit(LitTy),
     /// A possible typst instance of some type.
     Value(Interned<InsTy>),
     /// A parameter type
@@ -95,7 +95,7 @@ impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Ty::Any => f.write_str("Any"),
-            Ty::Builtin(ty) => write!(f, "{ty:?}"),
+            Ty::Lit(ty) => write!(f, "{ty:?}"),
             Ty::Args(args) => write!(f, "&({args:?})"),
             Ty::Func(func) => write!(f, "{func:?}"),
             Ty::Pattern(pat) => write!(f, "{pat:?}"),
@@ -174,14 +174,14 @@ impl Ty {
     /// Create an undefined type (which will emit an error)
     /// A that type is annotated if the syntax structure causes an type error
     pub const fn undef() -> Self {
-        Ty::Builtin(BuiltinTy::Undef)
+        Ty::Lit(LitTy::Undef)
     }
 
     /// Get name of the type
     pub fn name(&self) -> Interned<str> {
         match self {
             Ty::Var(v) => v.name.clone(),
-            Ty::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
+            Ty::Lit(LitTy::Module(m)) => m.name().clone(),
             ty => ty
                 .value()
                 .and_then(|v| Some(Interned::new_str(v.name()?)))
@@ -215,8 +215,8 @@ impl Ty {
     pub fn value(&self) -> Option<Value> {
         match self {
             Ty::Value(v) => Some(v.val.clone()),
-            Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
-            Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+            Ty::Lit(LitTy::Element(v)) => Some(Value::Func((*v).into())),
+            Ty::Lit(LitTy::Type(ty)) => Some(Value::Type(*ty)),
             _ => None,
         }
     }
@@ -228,7 +228,7 @@ impl Ty {
                 Value::Func(func) => func.element(),
                 _ => None,
             },
-            Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
+            Ty::Lit(LitTy::Element(v)) => Some(*v),
             _ => None,
         }
     }
@@ -243,8 +243,8 @@ impl Ty {
             res = res || {
                 match ty {
                     Ty::Value(v) => is_content_builtin_type(&v.val.ty()),
-                    Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
-                    Ty::Builtin(BuiltinTy::Type(v)) => is_content_builtin_type(v),
+                    Ty::Lit(LitTy::Content | LitTy::Element(..)) => true,
+                    Ty::Lit(LitTy::Type(v)) => is_content_builtin_type(v),
                     _ => false,
                 }
             }
@@ -1421,7 +1421,7 @@ mod tests {
     #[test]
     fn test_ty() {
         use super::*;
-        let ty = Ty::Builtin(BuiltinTy::Clause);
+        let ty = Ty::Lit(LitTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
     }

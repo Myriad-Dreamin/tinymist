@@ -117,23 +117,23 @@ impl IfaceCheckDriver<'_> {
         crate::log_debug_ct!("check iface ty: {at:?}");
 
         match at {
-            Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_iface() => {
+            Ty::Lit(LitTy::Stroke) if self.dict_as_iface() => {
                 self.checker
                     .check(Iface::Dict(&FLOW_STROKE_DICT), &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Margin) if self.dict_as_iface() => {
+            Ty::Lit(LitTy::Margin) if self.dict_as_iface() => {
                 self.checker
                     .check(Iface::Dict(&FLOW_MARGIN_DICT), &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Inset) if self.dict_as_iface() => {
+            Ty::Lit(LitTy::Inset) if self.dict_as_iface() => {
                 self.checker
                     .check(Iface::Dict(&FLOW_INSET_DICT), &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Outset) if self.dict_as_iface() => {
+            Ty::Lit(LitTy::Outset) if self.dict_as_iface() => {
                 self.checker
                     .check(Iface::Dict(&FLOW_OUTSET_DICT), &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Radius) if self.dict_as_iface() => {
+            Ty::Lit(LitTy::Radius) if self.dict_as_iface() => {
                 self.checker
                     .check(Iface::Dict(&FLOW_RADIUS_DICT), &mut self.ctx, pol);
             }
@@ -162,21 +162,21 @@ impl IfaceCheckDriver<'_> {
                 }
             }
             // todo: more builtin types to check
-            Ty::Builtin(BuiltinTy::Content) if self.value_as_iface() => {
+            Ty::Lit(LitTy::Content) if self.value_as_iface() => {
                 let ty = Type::of::<typst::foundations::Content>();
                 self.checker
                     .check(Iface::Type { val: &ty, at }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Type(ty)) if self.value_as_iface() => {
+            Ty::Lit(LitTy::Type(ty)) if self.value_as_iface() => {
                 // todo: distinguish between element and function
                 self.checker
                     .check(Iface::Type { val: ty, at }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Element(elem)) if self.value_as_iface() => {
+            Ty::Lit(LitTy::Element(elem)) if self.value_as_iface() => {
                 self.checker
                     .check(Iface::Element { val: elem, at }, &mut self.ctx, pol);
             }
-            Ty::Builtin(BuiltinTy::Module(module)) => {
+            Ty::Lit(LitTy::Module(module)) => {
                 if let Decl::Module(m) = module.as_ref() {
                     self.checker
                         .check(Iface::Module { val: m.fid, at }, &mut self.ctx, pol);

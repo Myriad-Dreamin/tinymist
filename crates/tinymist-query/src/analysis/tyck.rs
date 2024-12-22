@@ -6,7 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    prelude::*, BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
+    prelude::*, DynTypeBounds, FlowVarKind, LitTy, SharedContext, TyCtxMut, TypeInfo, TypeVar,
     TypeVarBounds,
 };
 use crate::{
@@ -256,7 +256,7 @@ impl TypeChecker<'_> {
 
         fn is_ty(ty: &Ty) -> bool {
             match ty {
-                Ty::Builtin(BuiltinTy::Type(..)) => true,
+                Ty::Lit(LitTy::Type(..)) => true,
                 Ty::Value(val) => matches!(val.val, Value::Type(..)),
                 _ => false,
             }
@@ -310,54 +310,54 @@ impl TypeChecker<'_> {
                     self.constrain(lhs, ty);
                 }
             }
-            (lhs, Ty::Builtin(BuiltinTy::Stroke)) => {
+            (lhs, Ty::Lit(LitTy::Stroke)) => {
                 // empty array is also a constructing dict but we can safely ignore it during
                 // type checking, since no fields are added yet.
                 if lhs.is_dict() {
                     self.constrain(lhs, &FLOW_STROKE_DICT_TYPE);
                 }
             }
-            (Ty::Builtin(BuiltinTy::Stroke), rhs) => {
+            (Ty::Lit(LitTy::Stroke), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_STROKE_DICT_TYPE, rhs);
                 }
             }
-            (lhs, Ty::Builtin(BuiltinTy::Margin)) => {
+            (lhs, Ty::Lit(LitTy::Margin)) => {
                 if lhs.is_dict() {
                     self.constrain(lhs, &FLOW_MARGIN_DICT_TYPE);
                 }
             }
-            (Ty::Builtin(BuiltinTy::Margin), rhs) => {
+            (Ty::Lit(LitTy::Margin), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_MARGIN_DICT_TYPE, rhs);
                 }
             }
-            (lhs, Ty::Builtin(BuiltinTy::Inset)) => {
+            (lhs, Ty::Lit(LitTy::Inset)) => {
                 if lhs.is_dict() {
                     self.constrain(lhs, &FLOW_INSET_DICT_TYPE);
                 }
             }
-            (Ty::Builtin(BuiltinTy::Inset), rhs) => {
+            (Ty::Lit(LitTy::Inset), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_INSET_DICT_TYPE, rhs);
                 }
             }
-            (lhs, Ty::Builtin(BuiltinTy::Outset)) => {
+            (lhs, Ty::Lit(LitTy::Outset)) => {
                 if lhs.is_dict() {
                     self.constrain(lhs, &FLOW_OUTSET_DICT_TYPE);
                 }
             }
-            (Ty::Builtin(BuiltinTy::Outset), rhs) => {
+            (Ty::Lit(LitTy::Outset), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_OUTSET_DICT_TYPE, rhs);
                 }
             }
-            (lhs, Ty::Builtin(BuiltinTy::Radius)) => {
+            (lhs, Ty::Lit(LitTy::Radius)) => {
                 if lhs.is_dict() {
                     self.constrain(lhs, &FLOW_RADIUS_DICT_TYPE);
                 }
             }
-            (Ty::Builtin(BuiltinTy::Radius), rhs) => {
+            (Ty::Lit(LitTy::Radius), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_RADIUS_DICT_TYPE, rhs);
                 }
@@ -387,7 +387,7 @@ impl TypeChecker<'_> {
             (lhs, Ty::Unary(rhs)) if rhs.op == UnaryOp::TypeOf && is_ty(lhs) => {
                 crate::log_debug_ct!(
                     "constrain type of {lhs:?} ⪯ {rhs:?} {:?}",
-                    matches!(lhs, Ty::Builtin(..)),
+                    matches!(lhs, Ty::Lit(..)),
                 );
                 self.constrain(lhs, &rhs.lhs);
             }
@@ -441,7 +441,7 @@ impl TypeChecker<'_> {
     fn possible_ever_be(&mut self, lhs: &Ty, rhs: &Ty) {
         // todo: instantiataion
         match rhs {
-            Ty::Builtin(..) | Ty::Value(..) | Ty::Boolean(..) => {
+            Ty::Lit(..) | Ty::Value(..) | Ty::Boolean(..) => {
                 self.constrain(rhs, lhs);
             }
             _ => {}
@@ -454,7 +454,7 @@ impl TypeChecker<'_> {
                 let w = self.info.vars.get_mut(&v.def).unwrap();
                 w.weaken();
             }
-            Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
+            Ty::Any | Ty::Boolean(_) | Ty::Lit(_) | Ty::Value(_) => {}
             Ty::Param(v) => {
                 self.weaken(&v.ty);
             }
@@ -520,7 +520,7 @@ impl TypeChecker<'_> {
         }
 
         if let Ty::Value(ins_ty) = term {
-            return BuiltinTy::from_value(&ins_ty.val);
+            return LitTy::from_value(&ins_ty.val);
         }
 
         term.clone()
@@ -558,49 +558,47 @@ impl Joiner {
         }
 
         match (child, &self.definite) {
-            (Ty::Builtin(BuiltinTy::Space | BuiltinTy::None), _) => {}
-            (Ty::Builtin(BuiltinTy::Clause | BuiltinTy::FlowNone), _) => {}
+            (Ty::Lit(LitTy::Space | LitTy::None), _) => {}
+            (Ty::Lit(LitTy::Clause | LitTy::FlowNone), _) => {}
             (Ty::Any, _) | (_, Ty::Any) => {}
             (Ty::Var(var), _) => self.possibles.push(Ty::Var(var)),
             // todo: check possibles
-            (Ty::Array(arr), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Array(arr),
+            (Ty::Array(arr), Ty::Lit(LitTy::None)) => self.definite = Ty::Array(arr),
             (Ty::Array(..), _) => self.definite = Ty::undef(),
-            (Ty::Tuple(elems), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Tuple(elems),
+            (Ty::Tuple(elems), Ty::Lit(LitTy::None)) => self.definite = Ty::Tuple(elems),
             (Ty::Tuple(..), _) => self.definite = Ty::undef(),
             // todo: mystery flow none
             // todo: possible some style (auto)
-            (Ty::Builtin(ty), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Builtin(ty),
-            (Ty::Builtin(..), _) => self.definite = Ty::undef(),
+            (Ty::Lit(ty), Ty::Lit(LitTy::None)) => self.definite = Ty::Lit(ty),
+            (Ty::Lit(..), _) => self.definite = Ty::undef(),
             // todo: value join
-            (Ty::Value(ins_ty), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Value(ins_ty),
+            (Ty::Value(ins_ty), Ty::Lit(LitTy::None)) => self.definite = Ty::Value(ins_ty),
             (Ty::Value(..), _) => self.definite = Ty::undef(),
-            (Ty::Func(func), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Func(func),
+            (Ty::Func(func), Ty::Lit(LitTy::None)) => self.definite = Ty::Func(func),
             (Ty::Func(..), _) => self.definite = Ty::undef(),
-            (Ty::Dict(dict), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Dict(dict),
+            (Ty::Dict(dict), Ty::Lit(LitTy::None)) => self.definite = Ty::Dict(dict),
             (Ty::Dict(..), _) => self.definite = Ty::undef(),
-            (Ty::With(with), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::With(with),
+            (Ty::With(with), Ty::Lit(LitTy::None)) => self.definite = Ty::With(with),
             (Ty::With(..), _) => self.definite = Ty::undef(),
-            (Ty::Args(args), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Args(args),
+            (Ty::Args(args), Ty::Lit(LitTy::None)) => self.definite = Ty::Args(args),
             (Ty::Args(..), _) => self.definite = Ty::undef(),
-            (Ty::Pattern(pat), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Pattern(pat),
+            (Ty::Pattern(pat), Ty::Lit(LitTy::None)) => self.definite = Ty::Pattern(pat),
             (Ty::Pattern(..), _) => self.definite = Ty::undef(),
-            (Ty::Select(sel), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Select(sel),
+            (Ty::Select(sel), Ty::Lit(LitTy::None)) => self.definite = Ty::Select(sel),
             (Ty::Select(..), _) => self.definite = Ty::undef(),
-            (Ty::Unary(unary), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Unary(unary),
+            (Ty::Unary(unary), Ty::Lit(LitTy::None)) => self.definite = Ty::Unary(unary),
             (Ty::Unary(..), _) => self.definite = Ty::undef(),
-            (Ty::Binary(binary), Ty::Builtin(BuiltinTy::None)) => {
-                self.definite = Ty::Binary(binary)
-            }
+            (Ty::Binary(binary), Ty::Lit(LitTy::None)) => self.definite = Ty::Binary(binary),
             (Ty::Binary(..), _) => self.definite = Ty::undef(),
-            (Ty::If(if_ty), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::If(if_ty),
+            (Ty::If(if_ty), Ty::Lit(LitTy::None)) => self.definite = Ty::If(if_ty),
             (Ty::If(..), _) => self.definite = Ty::undef(),
-            (Ty::Union(types), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Union(types),
+            (Ty::Union(types), Ty::Lit(LitTy::None)) => self.definite = Ty::Union(types),
             (Ty::Union(..), _) => self.definite = Ty::undef(),
-            (Ty::Let(bounds), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Let(bounds),
+            (Ty::Let(bounds), Ty::Lit(LitTy::None)) => self.definite = Ty::Let(bounds),
             (Ty::Let(..), _) => self.definite = Ty::undef(),
-            (Ty::Param(param), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Param(param),
+            (Ty::Param(param), Ty::Lit(LitTy::None)) => self.definite = Ty::Param(param),
             (Ty::Param(..), _) => self.definite = Ty::undef(),
-            (Ty::Boolean(b), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Boolean(b),
+            (Ty::Boolean(b), Ty::Lit(LitTy::None)) => self.definite = Ty::Boolean(b),
             (Ty::Boolean(..), _) => self.definite = Ty::undef(),
         }
     }
@@ -609,7 +607,7 @@ impl Default for Joiner {
     fn default() -> Self {
         Self {
             break_or_continue_or_return: false,
-            definite: Ty::Builtin(BuiltinTy::None),
+            definite: Ty::Lit(LitTy::None),
             possibles: Vec::new(),
         }
     }

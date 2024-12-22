@@ -7,7 +7,7 @@ pub trait TyMutator {
     fn mutate_rec(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         use Ty::*;
         match ty {
-            Value(..) | Any | Boolean(..) | Builtin(..) => None,
+            Value(..) | Any | Boolean(..) | Lit(..) => None,
             Union(v) => Some(Union(self.mutate_vec(v, pol)?)),
             Var(..) | Let(..) => None,
             Array(arr) => Some(Array(self.mutate(arr, pol)?.into())),
