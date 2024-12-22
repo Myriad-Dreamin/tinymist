@@ -33,7 +33,7 @@ impl SyntaxRequest for OnEnterRequest {
         position_encoding: PositionEncoding,
     ) -> Option<Self::Response> {
         let root = LinkedNode::new(source.root());
-        let rng = lsp_to_typst::range(self.range, position_encoding, source)?;
+        let rng = to_typst_range(self.range, position_encoding, source)?;
         let cursor = rng.end;
         let leaf = root.leaf_at_compat(cursor)?;
 
@@ -106,7 +106,7 @@ impl OnEnterWorker<'_> {
         // todo: remove_trailing_whitespace
 
         let edit = TextEdit {
-            range: typst_to_lsp::range(rng, self.source, self.position_encoding),
+            range: to_lsp_range(rng, self.source, self.position_encoding),
             new_text: format!("\n{indent}{comment_prefix} $0"),
         };
 
@@ -132,7 +132,7 @@ impl OnEnterWorker<'_> {
 
         let indent = self.indent_of(o.start);
         let edit = TextEdit {
-            range: typst_to_lsp::range(rng, self.source, self.position_encoding),
+            range: to_lsp_range(rng, self.source, self.position_encoding),
             // todo: read indent configuration
             new_text: if !content.contains('\n') {
                 format!("\n{indent}  $0\n{indent}")

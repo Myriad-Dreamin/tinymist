@@ -297,11 +297,7 @@ mod tests {
 
             let request = InlayHintRequest {
                 path: path.clone(),
-                range: typst_to_lsp::range(
-                    0..source.text().len(),
-                    &source,
-                    PositionEncoding::Utf16,
-                ),
+                range: to_lsp_range(0..source.text().len(), &source, PositionEncoding::Utf16),
             };
 
             let result = request.request(ctx);

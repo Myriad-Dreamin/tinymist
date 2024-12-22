@@ -389,7 +389,7 @@ impl Tokenizer {
             range,
         } = token;
 
-        use crate::typst_to_lsp;
+        use crate::lsp_typst_boundary;
         use lsp_types::Position;
         let utf8_start = range.start;
         if self.pos_offset > utf8_start {
@@ -404,7 +404,7 @@ impl Tokenizer {
             return;
         }
 
-        let position = typst_to_lsp::offset_to_position(utf8_start, self.encoding, &self.source);
+        let position = lsp_typst_boundary::to_lsp_position(utf8_start, self.encoding, &self.source);
 
         let delta = self.curr_pos.delta(&position);
 

@@ -37,8 +37,8 @@ use crate::syntax::{
 };
 use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
-    lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
-    LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
+    ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
+    VersionedDocument,
 };
 
 use super::TypeEnv;
@@ -491,26 +491,26 @@ impl SharedContext {
 
     /// Convert a LSP position to a Typst position.
     pub fn to_typst_pos(&self, position: LspPosition, src: &Source) -> Option<usize> {
-        lsp_to_typst::position(position, self.analysis.position_encoding, src)
+        crate::to_typst_position(position, self.analysis.position_encoding, src)
     }
 
     /// Convert a Typst offset to a LSP position.
     pub fn to_lsp_pos(&self, typst_offset: usize, src: &Source) -> LspPosition {
-        typst_to_lsp::offset_to_position(typst_offset, self.analysis.position_encoding, src)
+        crate::to_lsp_position(typst_offset, self.analysis.position_encoding, src)
     }
 
     /// Convert a LSP range to a Typst range.
-    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
-        lsp_to_typst::range(position, self.analysis.position_encoding, src)
+    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<Range<usize>> {
+        crate::to_typst_range(position, self.analysis.position_encoding, src)
     }
 
     /// Convert a Typst range to a LSP range.
-    pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
-        typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    pub fn to_lsp_range(&self, position: Range<usize>, src: &Source) -> LspRange {
+        crate::to_lsp_range(position, src, self.analysis.position_encoding)
     }
 
     /// Convert a Typst range to a LSP range.
-    pub fn to_lsp_range_(&self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
+    pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
             .as_rootless_path()

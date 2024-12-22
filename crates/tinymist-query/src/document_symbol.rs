@@ -45,8 +45,7 @@ fn symbols_in_hierarchy(
     hierarchy
         .iter()
         .map(|hierarchy| {
-            let range =
-                typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);
+            let range = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
                 name: hierarchy.info.name.to_string(),

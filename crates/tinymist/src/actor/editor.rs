@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use log::info;
-use lsp_types::{notification::PublishDiagnostics, PublishDiagnosticsParams, Url};
-use tinymist_query::{DiagnosticsMap, LspDiagnostic};
+use lsp_types::{notification::PublishDiagnostics, Diagnostic, PublishDiagnosticsParams, Url};
+use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
 
 use crate::{tool::word_count::WordsCount, LspClient};
@@ -25,7 +25,7 @@ pub struct EditorActor {
     client: LspClient,
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
-    diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
+    diagnostics: HashMap<Url, HashMap<String, Vec<Diagnostic>>>,
     affect_map: HashMap<String, Vec<Url>>,
     notify_compile_status: bool,
 }
@@ -115,7 +115,7 @@ impl EditorActor {
         }
     }
 
-    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<LspDiagnostic>>) {
+    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<Diagnostic>>) {
         let mut to_publish = Vec::new();
 
         // Get the diagnostics from other groups
