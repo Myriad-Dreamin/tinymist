@@ -4,12 +4,42 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Unreleased
+## v0.12.14 - [2024-12-23]
 
-*We now use [cargo-dist](https://github.com/axodotdev/cargo-dist) to build and release binaries. The registries should prefer to using these binaries over that for VS Code (or VSCodium) extensions.* These following suffixes are used for VS Code (or VSCodium) extensions: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `linux-armhf`, `darwin-x64`, `darwin-arm64`, `alpine-x64`, `alpine-arm64`, and `web`. If you have any problems with changes, please report them to [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues).
+*We now use [cargo-dist](https://github.com/axodotdev/cargo-dist) to build, attest, and release binaries. The package publishers should prefer to use these binaries and validate them along with checksum.*  If you have any problems with changes, please report them to [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues).
+
+These following suffixes are used for VS Code (or VSCodium) extensions: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `linux-armhf`, `darwin-x64`, `darwin-arm64`, `alpine-x64`, `alpine-arm64`, and `web`. The rest are used for other editors (e.g. Neovim).
+
+We also start to release VS Code extension targeting universe platform. The universe target only doesn't bundle the binary. This is suitable for other platforms like RISC-V (riscv64) or LoongArch (loong64). Users of that must install tinymist by themselves. Note it introduces risk to use unaligned version of the extension and the binary, but we can mitigate it in future.
 
 * Bumped typstyle to v0.12.13 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1047
   * This version fixes a bugs that removes comments in math equations in some cases. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01213---2024-12-21
+* Bumped typstfmt to v0.12.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1056
+* Bumped typst-ansi-hl to v0.3.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1057
+
+### Editor
+
+* (Fix) Excluded dollar characters from matched typst language words in https://github.com/Myriad-Dreamin/tinymist/pull/1054
+
+### Code Analysis
+
+* (Fix) Determining `name_started` in sig constructors in https://github.com/Myriad-Dreamin/tinymist/pull/1038
+* Inferring types of show rule transformers in https://github.com/Myriad-Dreamin/tinymist/pull/1045
+
+### Completion
+
+* (Fix) Corrected wrong offset on Neovim for some postfix snippets by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/966
+* (Fix) Improved various cases about completing field accesses in https://github.com/Myriad-Dreamin/tinymist/pull/1019, https://github.com/Myriad-Dreamin/tinymist/pull/1020, https://github.com/Myriad-Dreamin/tinymist/pull/1039, and https://github.com/Myriad-Dreamin/tinymist/pull/1040
+* (Fix) Adjusting offset from start when completing labels in https://github.com/Myriad-Dreamin/tinymist/pull/1051
+* Made and using new field access classifier for completion in https://github.com/Myriad-Dreamin/tinymist/pull/1035
+* Completing fields by type checking in https://github.com/Myriad-Dreamin/tinymist/pull/1041 and https://github.com/Myriad-Dreamin/tinymist/pull/1050
+* Completing tidy-style doc comment by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1029
+
+### Misc
+* Building binaries for riscv64-linux-musl, loongarch64-linux-{musl,gnu} in https://github.com/Myriad-Dreamin/tinymist/pull/1009, https://github.com/Myriad-Dreamin/tinymist/pull/1014, and https://github.com/Myriad-Dreamin/tinymist/pull/1012
+* Building vscode extension targeting universe (other) platforms in https://github.com/Myriad-Dreamin/tinymist/pull/10091059
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.12...v0.12.14
 
 ## v0.12.12 - [2024-12-15]
 
@@ -20,7 +50,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 * Configuring word separator and pattern specific for typst in https://github.com/Myriad-Dreamin/tinymist/pull/990 and https://github.com/Myriad-Dreamin/tinymist/pull/1002
   * Previously `some-ident` is split to `|some-|ident|` from left to right or `|some|-ident|` from right to left. Now VS Code identifies it as a single word.
-* Checking affiliated column for a hidden typst source document by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1003
+* Checking affiliated column for a hidden typst source document in https://github.com/Myriad-Dreamin/tinymist/pull/1003
 
 ### Preview
 
