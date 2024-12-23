@@ -1100,7 +1100,23 @@ mod tests {
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
         assert!(matches!(config.config, FormatterConfig::Disable));
-        // assert_eq!(config.width, 120);
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+    }
+
+    #[test]
+    fn test_typstyle_formatting_config() {
+        let config = Config {
+            formatter_mode: FormatterMode::Typstyle,
+            ..Config::default()
+        };
+        let config = config.formatter();
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+
+        let typstyle_config = match config.config {
+            FormatterConfig::Typstyle(e) => e,
+            _ => panic!("unexpected configuration of formatter"),
+        };
+
+        assert_eq!(typstyle_config.max_width, 120);
     }
 }
