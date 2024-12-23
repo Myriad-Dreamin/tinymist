@@ -10,6 +10,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 These following suffixes are used for VS Code (or VSCodium) extensions: `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `linux-armhf`, `darwin-x64`, `darwin-arm64`, `alpine-x64`, `alpine-arm64`, and `web`. The rest are used for other editors (e.g. Neovim).
 
+We also start to release VS Code extension targeting universe platform. The universe target only doesn't bundle the binary. This is suitable for other platforms like RISC-V (riscv64) or LoongArch (loong64). Users of that must install tinymist by themselves. Note it introduces risk to use unaligned version of the extension and the binary, but we can mitigate it in future.
+
 * Bumped typstyle to v0.12.13 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1047
   * This version fixes a bugs that removes comments in math equations in some cases. For details, see https://enter-tainer.github.io/typstyle/changelog/#v01213---2024-12-21
 * Bumped typstfmt to v0.12.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1056
@@ -35,6 +37,7 @@ These following suffixes are used for VS Code (or VSCodium) extensions: `win32-x
 
 ### Misc
 * Building binaries for riscv64-linux-musl, loongarch64-linux-{musl,gnu} in https://github.com/Myriad-Dreamin/tinymist/pull/1009, https://github.com/Myriad-Dreamin/tinymist/pull/1014, and https://github.com/Myriad-Dreamin/tinymist/pull/1012
+* Building vscode extension targeting universe (other) platforms in https://github.com/Myriad-Dreamin/tinymist/pull/10091059
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.12...v0.12.14
 
