@@ -1119,4 +1119,22 @@ mod tests {
 
         assert_eq!(typstyle_config.max_width, 120);
     }
+
+    #[test]
+    fn test_typstyle_formatting_config_set_width() {
+        let config = Config {
+            formatter_mode: FormatterMode::Typstyle,
+            formatter_print_width: Some(240),
+            ..Config::default()
+        };
+        let config = config.formatter();
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+
+        let typstyle_config = match config.config {
+            FormatterConfig::Typstyle(e) => e,
+            _ => panic!("unexpected configuration of formatter"),
+        };
+
+        assert_eq!(typstyle_config.max_width, 240);
+    }
 }
