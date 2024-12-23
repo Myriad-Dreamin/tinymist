@@ -12,7 +12,7 @@ use super::SyncTaskFactory;
 #[derive(Debug, Clone)]
 pub enum FormatterConfig {
     Typstyle(Box<typstyle_core::PrinterConfig>),
-    Typstfmt(Box<typstfmt_lib::Config>),
+    Typstfmt(Box<typstfmt::Config>),
     Disable,
 }
 
@@ -26,11 +26,7 @@ impl FormatterConfig {
                     && a.chain_width_ratio == b.chain_width_ratio
                     && a.blank_lines_upper_bound == b.blank_lines_upper_bound
             }
-            (Self::Typstfmt(a), Self::Typstfmt(b)) => {
-                let a = serde_json::to_value(a).ok();
-                let b = serde_json::to_value(b).ok();
-                a == b
-            }
+            (Self::Typstfmt(a), Self::Typstfmt(b)) => a == b,
             (Self::Disable, Self::Disable) => true,
             _ => false,
         }
@@ -75,9 +71,7 @@ impl FormatTask {
                         .pretty_print()
                         .ok()
                 }
-                FormatterConfig::Typstfmt(config) => {
-                    Some(typstfmt_lib::format(src.text(), **config))
-                }
+                FormatterConfig::Typstfmt(config) => Some(typstfmt::format(src.text(), **config)),
                 FormatterConfig::Disable => None,
             };
 
