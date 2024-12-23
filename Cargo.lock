@@ -625,14 +625,14 @@ dependencies = [
 
 [[package]]
 name = "confy"
-version = "0.5.1"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e37668cb35145dcfaa1931a5f37fde375eeae8068b4c0d2f289da28a270b2d2c"
+checksum = "45b1f4c00870f07dc34adcac82bb6a72cc5aabca8536ba1797e01df51d2ce9a0"
 dependencies = [
  "directories",
  "serde",
  "thiserror 1.0.69",
- "toml 0.5.11",
+ "toml",
 ]
 
 [[package]]
@@ -858,11 +858,11 @@ dependencies = [
 
 [[package]]
 name = "directories"
-version = "4.0.1"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f51c5d4ddabd36886dd3e1438cb358cdcb0d7c499cb99cb4ac2e38e18b5cb210"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
 dependencies = [
- "dirs-sys 0.3.7",
+ "dirs-sys",
 ]
 
 [[package]]
@@ -871,7 +871,7 @@ version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
 dependencies = [
- "dirs-sys 0.4.1",
+ "dirs-sys",
 ]
 
 [[package]]
@@ -882,17 +882,6 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
-dependencies = [
- "libc",
- "redox_users",
- "winapi",
 ]
 
 [[package]]
@@ -1296,12 +1285,11 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "globmatch"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3755076379cc2b2bbf53855fe718e1eed3093cfb769ebf5d290f617fa9cc09a0"
+checksum = "c5d4150c6e70e3bce79303d8959fbb11533398b883464f71b5d8db8e880a20d8"
 dependencies = [
  "globset",
- "log",
  "walkdir",
 ]
 
@@ -1923,15 +1911,6 @@ name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
-
-[[package]]
-name = "itertools"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -3850,7 +3829,7 @@ dependencies = [
  "hyper",
  "hyper-tungstenite",
  "hyper-util",
- "itertools 0.13.0",
+ "itertools",
  "log",
  "lsp-server",
  "lsp-types",
@@ -3873,7 +3852,7 @@ dependencies = [
  "tinymist-world",
  "tokio",
  "tokio-util",
- "toml 0.8.19",
+ "toml",
  "ttf-parser",
  "typlite",
  "typst",
@@ -3903,7 +3882,7 @@ dependencies = [
  "log",
  "regex",
  "tinymist-world",
- "toml 0.8.19",
+ "toml",
  "typst",
  "typst-svg",
  "typst-syntax 0.12.0",
@@ -3945,7 +3924,7 @@ dependencies = [
  "if_chain",
  "indexmap 2.7.0",
  "insta",
- "itertools 0.13.0",
+ "itertools",
  "log",
  "lsp-types",
  "once_cell",
@@ -3969,7 +3948,7 @@ dependencies = [
  "tinymist-analysis",
  "tinymist-derive",
  "tinymist-world",
- "toml 0.8.19",
+ "toml",
  "triomphe",
  "ttf-parser",
  "typlite",
@@ -4108,27 +4087,6 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd79e69d3b627db300ff956027cc6c3798cef26d22526befdfcd12feeb6d2257"
-dependencies = [
- "serde",
- "serde_spanned",
- "toml_datetime",
- "toml_edit 0.19.15",
-]
-
-[[package]]
-name = "toml"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1ed1f98e3fdc28d6d910e6737ae6ab1a93bf1985935a1193e68f93eeb68d24e"
@@ -4136,7 +4094,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.22.22",
+ "toml_edit",
 ]
 
 [[package]]
@@ -4150,19 +4108,6 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.19.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
-dependencies = [
- "indexmap 2.7.0",
- "serde",
- "serde_spanned",
- "toml_datetime",
- "winnow 0.5.40",
-]
-
-[[package]]
-name = "toml_edit"
 version = "0.22.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ae48d6208a266e853d946088ed816055e556cc6028c5e8e2b84d9fa5dd7c7f5"
@@ -4171,7 +4116,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.6.20",
+ "winnow",
 ]
 
 [[package]]
@@ -4350,7 +4295,7 @@ dependencies = [
  "stacker",
  "syntect",
  "time",
- "toml 0.8.19",
+ "toml",
  "ttf-parser",
  "two-face 0.4.0",
  "typed-arena",
@@ -4519,7 +4464,7 @@ dependencies = [
  "ecow",
  "once_cell",
  "serde",
- "toml 0.8.19",
+ "toml",
  "typst-utils",
  "unicode-ident",
  "unicode-math-class",
@@ -4553,19 +4498,19 @@ dependencies = [
 
 [[package]]
 name = "typstfmt"
-version = "0.12.0"
-source = "git+https://github.com/Myriad-Dreamin/typstfmt?tag=v0.12.0#6def255a6d966dc6055e059225832263e9273f01"
+version = "0.12.1"
+source = "git+https://github.com/Myriad-Dreamin/typstfmt?tag=v0.12.1#c1fd45a4594b916b6e37e3257a69dbcdf25fe339"
 dependencies = [
  "confy",
  "globmatch",
- "itertools 0.10.5",
+ "itertools",
  "lexopt",
  "regex",
  "serde",
- "toml 0.7.8",
+ "toml",
  "tracing",
  "typst-syntax 0.12.0",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -4575,7 +4520,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ab4ca4a1cc62f670b3cf96d37b1d5284ab9137418f476610847d79d5f3a7b8b"
 dependencies = [
  "ecow",
- "itertools 0.13.0",
+ "itertools",
  "pretty",
  "rustc-hash 2.1.0",
  "typst-syntax 0.12.0",
@@ -5182,15 +5127,6 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
-
-[[package]]
-name = "winnow"
-version = "0.5.40"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "winnow"
