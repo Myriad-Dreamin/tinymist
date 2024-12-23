@@ -67,7 +67,7 @@ To build the frontend and copy the output to the `crates/tinymist-assets` folder
 yarn build:preview
 ```
 
-To bundle the assets into tinymist's CLI binary, make sure you build with the feature `typst-preview` enabled, and have uncommented the line in the root `Cargo.toml`:
+To bundle the locally built assets (instead of that from [crates.io](https://crates.io/crates/tinymist-assets)) into tinymist's CLI binary, make sure you build with the feature `typst-preview` enabled, and have uncommented the line in the root `Cargo.toml`:
 
 ```patch
 @@ -207,1 +207,1 @@ # This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
