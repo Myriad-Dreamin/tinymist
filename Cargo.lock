@@ -2784,7 +2784,7 @@ source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095
 dependencies = [
  "cfg-if",
  "typst",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -3885,7 +3885,7 @@ dependencies = [
  "toml",
  "typst",
  "typst-svg",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -4197,17 +4197,6 @@ dependencies = [
 
 [[package]]
 name = "two-face"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37bed2135b2459c7eefba72c906d374697eb15949c205f2f124e3636a46b5eeb"
-dependencies = [
- "once_cell",
- "serde",
- "syntect",
-]
-
-[[package]]
-name = "two-face"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ccd4843ea031c609fe9c16cae00e9657bad8a9f735a3cc2e420955d802b4268"
@@ -4243,7 +4232,7 @@ dependencies = [
  "tinymist-world",
  "typst",
  "typst-svg",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -4297,11 +4286,11 @@ dependencies = [
  "time",
  "toml",
  "ttf-parser",
- "two-face 0.4.0",
+ "two-face",
  "typed-arena",
  "typst-assets",
  "typst-macros",
- "typst-syntax 0.12.0",
+ "typst-syntax",
  "typst-timing",
  "typst-utils",
  "unicode-bidi",
@@ -4316,17 +4305,16 @@ dependencies = [
 
 [[package]]
 name = "typst-ansi-hl"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b457d0812d51dbc28f7a5b8583b8c28cd3c43628e1e7e5a0ae63975fda65351"
+checksum = "b76c8e321c0a4c98817380b977566b16b3281fb2174addd8ee8a6c1bfdfc1d4b"
 dependencies = [
  "ansi_colours",
- "once_cell",
  "syntect",
  "termcolor",
  "thiserror 1.0.69",
- "two-face 0.3.0",
- "typst-syntax 0.11.1",
+ "two-face",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -4419,7 +4407,7 @@ version = "0.12.12"
 dependencies = [
  "cfg-if",
  "typst",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -4437,23 +4425,6 @@ dependencies = [
  "typst-timing",
  "xmlparser",
  "xmlwriter",
-]
-
-[[package]]
-name = "typst-syntax"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3db69f2f41613b1ff6edbec44fd7dc524137f099ee36c46f560cedeaadb40c4"
-dependencies = [
- "comemo",
- "ecow",
- "once_cell",
- "serde",
- "unicode-ident",
- "unicode-math-class",
- "unicode-script",
- "unicode-segmentation",
- "unscanny",
 ]
 
 [[package]]
@@ -4481,7 +4452,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
@@ -4509,7 +4480,7 @@ dependencies = [
  "serde",
  "toml",
  "tracing",
- "typst-syntax 0.12.0",
+ "typst-syntax",
  "unicode-width 0.2.0",
 ]
 
@@ -4523,7 +4494,7 @@ dependencies = [
  "itertools",
  "pretty",
  "rustc-hash 2.1.0",
- "typst-syntax 0.12.0",
+ "typst-syntax",
 ]
 
 [[package]]
