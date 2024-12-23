@@ -8,7 +8,7 @@ Tinymist provides a single integrated language service for Typst. The tinymist p
 
 **The Editor Frontend** – Leveraging the interface of LSP, tinymist provides frontend to each editor, located in the [editor folder](../editors).
 
-**The builtin essential but optional features** – All rest features in tinymist are optional. The significant features are enabled by default, but you can disable them with feature flags. 
+**The builtin essential but optional features** – All rest features in tinymist are optional. The significant features are enabled by default, but you can disable them with feature flags.
 - The syntax highlighting feature powered by [textmate](../syntaxes/textmate/).
 - The document formatting feature powered by [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - The document previewing feature powered by [`typst-preview`](../crates/typst-preview/).
@@ -39,6 +39,14 @@ cargo build --profile=gh-release
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension. The VS Code extension also shows how we build and run the language server and the editor tools.
 
+## Contribute to tinymist-assets or tools/typst-preview-frontend
+
+Make sure you build with the feature `typst-preview` enabled, and modify the code root `Cargo.toml`, and change the line:
+```toml
+# tinymist-assets = { version = "0.12.12" } change into
+tinymist-assets = { path = "./crates/tinymist-assets" }
+```
+
 ## Local Documentation
 
 To serve the documentation locally, run:
@@ -53,7 +61,7 @@ To generate and open crate documentation, run:
 yarn docs:rs --open
 ```
 
-> [!Tip]  
+> [!Tip]
 > Check [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to install the `shiroa` command for documentation generation.
 
 If you find something are not documented, please feel free to open an issue or pull request. There is also a tracking issue to improve the documentation, see [Request for Documentation (RFD)](https://github.com/Myriad-Dreamin/tinymist/issues/931).
@@ -68,7 +76,7 @@ To run analyzer tests for tinymist:
 cargo insta test -p tinymist-query --accept
 ```
 
-> [!Tip]  
+> [!Tip]
 > Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
 
 ## Running Syntax Grammar Tests
