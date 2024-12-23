@@ -403,12 +403,10 @@ impl Config {
                 FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
                     typstyle_core::PrinterConfig::new_with_width(formatter_print_width),
                 )),
-                FormatterMode::Typstfmt => {
-                    FormatterConfig::Typstfmt(Box::new(typstfmt_lib::Config {
-                        max_line_length: formatter_print_width,
-                        ..typstfmt_lib::Config::default()
-                    }))
-                }
+                FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
+                    max_line_length: formatter_print_width,
+                    ..typstfmt::Config::default()
+                })),
                 FormatterMode::Disable => FormatterConfig::Disable,
             },
             position_encoding: self.const_config.position_encoding,

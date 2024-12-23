@@ -54,7 +54,7 @@ typst-timing.workspace = true
 typst-assets.workspace = true
 
 typstyle-core.workspace = true
-typstfmt_lib.workspace = true
+typstfmt.workspace = true
 
 reflexo.workspace = true
 reflexo-typst.workspace = true
