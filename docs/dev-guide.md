@@ -40,14 +40,6 @@ cargo build --profile=gh-release
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension. The VS Code extension also shows how we build and run the language server and the editor tools.
 
-## Contribute to tinymist-assets or tools/typst-preview-frontend
-
-Make sure you build with the feature `typst-preview` enabled, and modify the root `Cargo.toml` uncomment the line:
-
-```toml
-tinymist-assets = { path = "./crates/tinymist-assets/" }
-```
-
 ## Local Documentation
 
 To serve the documentation locally, run:
@@ -66,6 +58,22 @@ yarn docs:rs --open
 > Check [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to install the `shiroa` command for documentation generation.
 
 If you find something are not documented, please feel free to open an issue or pull request. There is also a tracking issue to improve the documentation, see [Request for Documentation (RFD)](https://github.com/Myriad-Dreamin/tinymist/issues/931).
+
+## Contribute to tinymist-assets or tools/typst-preview-frontend
+
+To build the frontend and copy the output to the `crates/tinymist-assets` folder, run:
+
+```bash
+yarn build:preview
+```
+
+To bundle the assets into tinymist's CLI binary, make sure you build with the feature `typst-preview` enabled, and have uncommented the line in the root `Cargo.toml`:
+
+```patch
+@@ -207,1 +207,1 @@ # This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
+-# tinymist-assets = { path = "./crates/tinymist-assets/" }
++tinymist-assets = { path = "./crates/tinymist-assets/" }
+```
 
 ## Running Analyzer Tests
 
