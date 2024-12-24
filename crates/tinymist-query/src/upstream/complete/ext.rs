@@ -770,17 +770,26 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     let Some(field_name) = val.field_name(field_id) else {
                         continue;
                     };
+                    let param_info = val.params().iter().find(|p| p.name == field_name);
+                    let param_docs = param_info.map(|p| p.docs.into());
+                    let ty_from_param = param_info.map(|f| Ty::from_cast_info(&f.input));
 
-                    let sample_value = val.field_from_styles(field_id, styles).ok();
-                    let ty = sample_value.map_or(Ty::Any, |v| Ty::Builtin(BuiltinTy::Type(v.ty())));
+                    let ty_from_style = val
+                        .field_from_styles(field_id, styles)
+                        .ok()
+                        .map(|v| Ty::Builtin(BuiltinTy::Type(v.ty())));
 
-                    self.defines.insert(field_name.into(), ty);
+                    let field_ty = match (ty_from_param, ty_from_style) {
+                        (Some(param), None) => Some(param),
+                        (Some(opt), Some(_)) | (None, Some(opt)) => Some(Ty::from_types(
+                            [opt, Ty::Builtin(BuiltinTy::None)].into_iter(),
+                        )),
+                        (None, None) => None,
+                    };
 
-                    let param_docs = val
-                        .params()
-                        .iter()
-                        .find(|p| p.name == field_name)
-                        .map(|p| p.docs.into());
+                    self.defines
+                        .insert(field_name.into(), field_ty.unwrap_or(Ty::Any));
+
                     if let Some(docs) = param_docs {
                         self.defines.docs.insert(field_name.into(), docs);
                     }
