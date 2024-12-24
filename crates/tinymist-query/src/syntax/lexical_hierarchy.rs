@@ -29,7 +29,7 @@ pub(crate) fn get_lexical_hierarchy(
         },
         eco_vec![],
     ));
-    let res = match worker.get_symbols(root) {
+    let res = match worker.check_node(root) {
         Ok(()) => Some(()),
         Err(err) => {
             log::error!("lexical hierarchy analysis failed: {err:?}");
@@ -38,7 +38,7 @@ pub(crate) fn get_lexical_hierarchy(
     };
 
     while worker.stack.len() > 1 {
-        worker.symbreak();
+        worker.finish_hierarchy();
     }
 
     crate::log_debug_ct!("lexical hierarchy analysis took {:?}", start.elapsed());
@@ -223,14 +223,16 @@ struct LexicalHierarchyWorker {
 }
 
 impl LexicalHierarchyWorker {
-    fn symbreak(&mut self) {
+    /// Finish the current top of the stack.
+    fn finish_hierarchy(&mut self) {
         let (symbol, children) = self.stack.pop().unwrap();
         let current = &mut self.stack.last_mut().unwrap().1;
 
-        current.push(symbreak(symbol, children));
+        current.push(finish_hierarchy(symbol, children));
     }
 
-    fn enter_symbol_context(&mut self, node: &LinkedNode) -> anyhow::Result<IdentContext> {
+    /// Enter a node and setup the context.
+    fn enter_node(&mut self, node: &LinkedNode) -> anyhow::Result<IdentContext> {
         let checkpoint = self.ident_context;
         match node.kind() {
             SyntaxKind::RefMarker => self.ident_context = IdentContext::Ref,
@@ -243,16 +245,17 @@ impl LexicalHierarchyWorker {
         Ok(checkpoint)
     }
 
-    fn exit_symbol_context(&mut self, checkpoint: IdentContext) -> anyhow::Result<()> {
+    /// Exit a node and restore the context.
+    fn exit_node(&mut self, checkpoint: IdentContext) -> anyhow::Result<()> {
         self.ident_context = checkpoint;
         Ok(())
     }
 
-    /// Get all symbols for a node recursively.
-    fn get_symbols(&mut self, node: LinkedNode) -> anyhow::Result<()> {
+    /// Check lexical hierarchy a node recursively.
+    fn check_node(&mut self, node: LinkedNode) -> anyhow::Result<()> {
         let own_symbol = self.get_ident(&node)?;
 
-        let checkpoint = self.enter_symbol_context(&node)?;
+        let checkpoint = self.enter_node(&node)?;
 
         if let Some(symbol) = own_symbol {
             if let LexicalKind::Heading(level) = symbol.kind {
@@ -264,7 +267,7 @@ impl LexicalHierarchyWorker {
                         _ => {}
                     }
 
-                    self.symbreak();
+                    self.finish_hierarchy();
                 }
             }
             let is_heading = matches!(symbol.kind, LexicalKind::Heading(..));
@@ -274,17 +277,17 @@ impl LexicalHierarchyWorker {
 
             if node.kind() != SyntaxKind::ModuleImport {
                 for child in node.children() {
-                    self.get_symbols(child)?;
+                    self.check_node(child)?;
                 }
             }
 
             if is_heading {
                 while stack_height < self.stack.len() {
-                    self.symbreak();
+                    self.finish_hierarchy();
                 }
             } else {
                 while stack_height <= self.stack.len() {
-                    self.symbreak();
+                    self.finish_hierarchy();
                 }
             }
         } else {
@@ -335,15 +338,15 @@ impl LexicalHierarchyWorker {
                         // up.
                         if matches!(pat, ast::Pattern::Normal(ast::Expr::Closure(..))) {
                             let closure = name.clone();
-                            self.get_symbols_with(closure, IdentContext::Ref)?;
+                            self.check_node_with(closure, IdentContext::Ref)?;
                             break 'let_binding;
                         }
                     }
 
                     // reverse order for correct symbol affection
                     let name_offset = pattern.as_ref().map(|node| node.offset());
-                    self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
-                    self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
+                    self.check_opt_node_with(pattern, IdentContext::Var)?;
+                    self.check_first_sub_expr(node.children().rev(), name_offset)?;
                 }
                 SyntaxKind::ForLoop => {
                     let pattern = node.children().find(|child| child.is::<ast::Pattern>());
@@ -353,16 +356,16 @@ impl LexicalHierarchyWorker {
                         .find(|child| child.is::<ast::Expr>());
 
                     let iterable_offset = iterable.as_ref().map(|node| node.offset());
-                    self.get_symbols_in_opt_with(iterable, IdentContext::Ref)?;
-                    self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
-                    self.get_symbols_in_first_expr(node.children().rev(), iterable_offset)?;
+                    self.check_opt_node_with(iterable, IdentContext::Ref)?;
+                    self.check_opt_node_with(pattern, IdentContext::Var)?;
+                    self.check_first_sub_expr(node.children().rev(), iterable_offset)?;
                 }
                 SyntaxKind::Closure => {
                     let first_child = node.children().next();
                     let current = self.stack.last_mut().unwrap().1.len();
                     if let Some(first_child) = first_child {
                         if first_child.kind() == SyntaxKind::Ident {
-                            self.get_symbols_with(first_child, IdentContext::Func)?;
+                            self.check_node_with(first_child, IdentContext::Func)?;
                         }
                     }
                     let body = node
@@ -387,71 +390,75 @@ impl LexicalHierarchyWorker {
                         self.stack.push((symbol, eco_vec![]));
                         let stack_height = self.stack.len();
 
-                        self.get_symbols_with(body, IdentContext::Ref)?;
+                        self.check_node_with(body, IdentContext::Ref)?;
                         while stack_height <= self.stack.len() {
-                            self.symbreak();
+                            self.finish_hierarchy();
                         }
                     }
                 }
                 SyntaxKind::FieldAccess => {
-                    self.get_symbols_in_first_expr(node.children(), None)?;
+                    self.check_first_sub_expr(node.children(), None)?;
                 }
                 SyntaxKind::Named => {
-                    self.get_symbols_in_first_expr(node.children().rev(), None)?;
+                    self.check_first_sub_expr(node.children().rev(), None)?;
 
                     if self.ident_context == IdentContext::Params {
                         let ident = node.children().find(|n| n.kind() == SyntaxKind::Ident);
-                        self.get_symbols_in_opt_with(ident, IdentContext::Var)?;
+                        self.check_opt_node_with(ident, IdentContext::Var)?;
                     }
                 }
                 kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => {}
                 _ => {
                     for child in node.children() {
-                        self.get_symbols(child)?;
+                        self.check_node(child)?;
                     }
                 }
             }
         }
 
-        self.exit_symbol_context(checkpoint)?;
+        self.exit_node(checkpoint)?;
 
         Ok(())
     }
 
+    /// Check a possible node with a specific context.
     #[inline(always)]
-    fn get_symbols_in_opt_with(
+    fn check_opt_node_with(
         &mut self,
         node: Option<LinkedNode>,
         context: IdentContext,
     ) -> anyhow::Result<()> {
         if let Some(node) = node {
-            self.get_symbols_with(node, context)?;
+            self.check_node_with(node, context)?;
         }
 
         Ok(())
     }
 
-    fn get_symbols_in_first_expr<'a>(
+    /// Check the first sub-expression of a node. If an offset is provided, it
+    /// only checks the sub-expression if it starts after the offset.
+    fn check_first_sub_expr<'a>(
         &mut self,
         mut nodes: impl Iterator<Item = LinkedNode<'a>>,
-        iterable_offset: Option<usize>,
+        after_offset: Option<usize>,
     ) -> anyhow::Result<()> {
         let body = nodes.find(|n| n.is::<ast::Expr>());
         if let Some(body) = body {
-            if iterable_offset.is_some_and(|offset| offset >= body.offset()) {
+            if after_offset.is_some_and(|offset| offset >= body.offset()) {
                 return Ok(());
             }
-            self.get_symbols_with(body, IdentContext::Ref)?;
+            self.check_node_with(body, IdentContext::Ref)?;
         }
 
         Ok(())
     }
 
-    fn get_symbols_with(&mut self, node: LinkedNode, context: IdentContext) -> anyhow::Result<()> {
+    /// Check a node with a specific context.
+    fn check_node_with(&mut self, node: LinkedNode, context: IdentContext) -> anyhow::Result<()> {
         let parent_context = self.ident_context;
         self.ident_context = context;
 
-        let res = self.get_symbols(node);
+        let res = self.check_node(node);
 
         self.ident_context = parent_context;
         res
@@ -542,7 +549,7 @@ impl LexicalHierarchyWorker {
     }
 }
 
-fn symbreak(sym: LexicalInfo, curr: EcoVec<LexicalHierarchy>) -> LexicalHierarchy {
+fn finish_hierarchy(sym: LexicalInfo, curr: EcoVec<LexicalHierarchy>) -> LexicalHierarchy {
     LexicalHierarchy {
         info: sym,
         children: if curr.is_empty() {
