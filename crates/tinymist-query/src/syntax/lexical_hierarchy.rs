@@ -1,6 +1,5 @@
 use std::ops::{Deref, Range};
 
-use anyhow::anyhow;
 use ecow::{eco_vec, EcoString, EcoVec};
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
@@ -30,9 +29,9 @@ pub(crate) fn get_lexical_hierarchy(
         eco_vec![],
     ));
     let res = match worker.check_node(root) {
-        Ok(()) => Some(()),
-        Err(err) => {
-            log::error!("lexical hierarchy analysis failed: {err:?}");
+        Some(()) => Some(()),
+        None => {
+            log::error!("lexical hierarchy analysis failed");
             None
         }
     };
@@ -232,7 +231,7 @@ impl LexicalHierarchyWorker {
     }
 
     /// Enter a node and setup the context.
-    fn enter_node(&mut self, node: &LinkedNode) -> anyhow::Result<IdentContext> {
+    fn enter_node(&mut self, node: &LinkedNode) -> Option<IdentContext> {
         let checkpoint = self.ident_context;
         match node.kind() {
             SyntaxKind::RefMarker => self.ident_context = IdentContext::Ref,
@@ -242,17 +241,17 @@ impl LexicalHierarchyWorker {
             _ => {}
         }
 
-        Ok(checkpoint)
+        Some(checkpoint)
     }
 
     /// Exit a node and restore the context.
-    fn exit_node(&mut self, checkpoint: IdentContext) -> anyhow::Result<()> {
+    fn exit_node(&mut self, checkpoint: IdentContext) -> Option<()> {
         self.ident_context = checkpoint;
-        Ok(())
+        Some(())
     }
 
     /// Check lexical hierarchy a node recursively.
-    fn check_node(&mut self, node: LinkedNode) -> anyhow::Result<()> {
+    fn check_node(&mut self, node: LinkedNode) -> Option<()> {
         let own_symbol = self.get_ident(&node)?;
 
         let checkpoint = self.enter_node(&node)?;
@@ -418,7 +417,7 @@ impl LexicalHierarchyWorker {
 
         self.exit_node(checkpoint)?;
 
-        Ok(())
+        Some(())
     }
 
     /// Check a possible node with a specific context.
@@ -427,12 +426,12 @@ impl LexicalHierarchyWorker {
         &mut self,
         node: Option<LinkedNode>,
         context: IdentContext,
-    ) -> anyhow::Result<()> {
+    ) -> Option<()> {
         if let Some(node) = node {
             self.check_node_with(node, context)?;
         }
 
-        Ok(())
+        Some(())
     }
 
     /// Check the first sub-expression of a node. If an offset is provided, it
@@ -441,20 +440,20 @@ impl LexicalHierarchyWorker {
         &mut self,
         mut nodes: impl Iterator<Item = LinkedNode<'a>>,
         after_offset: Option<usize>,
-    ) -> anyhow::Result<()> {
+    ) -> Option<()> {
         let body = nodes.find(|n| n.is::<ast::Expr>());
         if let Some(body) = body {
             if after_offset.is_some_and(|offset| offset >= body.offset()) {
-                return Ok(());
+                return Some(());
             }
             self.check_node_with(body, IdentContext::Ref)?;
         }
 
-        Ok(())
+        Some(())
     }
 
     /// Check a node with a specific context.
-    fn check_node_with(&mut self, node: LinkedNode, context: IdentContext) -> anyhow::Result<()> {
+    fn check_node_with(&mut self, node: LinkedNode, context: IdentContext) -> Option<()> {
         let parent_context = self.ident_context;
         self.ident_context = context;
 
@@ -467,7 +466,7 @@ impl LexicalHierarchyWorker {
     /// Get symbol for a leaf node of a valid type, or `None` if the node is an
     /// invalid type.
     #[allow(deprecated)]
-    fn get_ident(&self, node: &LinkedNode) -> anyhow::Result<Option<LexicalInfo>> {
+    fn get_ident(&self, node: &LinkedNode) -> Option<Option<LexicalInfo>> {
         let (name, kind) = match node.kind() {
             SyntaxKind::Label if self.sk.affect_symbol() => {
                 // filter out label in code context.
@@ -482,24 +481,20 @@ impl LexicalHierarchyWorker {
                             | SyntaxKind::Colon
                     ) || prev_kind.is_keyword()
                 }) {
-                    return Ok(None);
+                    return Some(None);
                 }
-                let ast_node = node
-                    .cast::<ast::Label>()
-                    .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
+                let ast_node = node.cast::<ast::Label>()?;
                 let name = ast_node.get().into();
 
                 (name, LexicalKind::label())
             }
             SyntaxKind::Ident if self.sk.affect_symbol() => {
-                let ast_node = node
-                    .cast::<ast::Ident>()
-                    .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
+                let ast_node = node.cast::<ast::Ident>()?;
                 let name = ast_node.get().clone();
                 let kind = match self.ident_context {
                     IdentContext::Func => LexicalKind::function(),
                     IdentContext::Var | IdentContext::Params => LexicalKind::variable(),
-                    _ => return Ok(None),
+                    _ => return Some(None),
                 };
 
                 (name, kind)
@@ -524,24 +519,24 @@ impl LexicalHierarchyWorker {
             SyntaxKind::Markup => {
                 let name = node.get().to_owned().into_text();
                 if name.is_empty() {
-                    return Ok(None);
+                    return Some(None);
                 }
                 let Some(parent) = node.parent() else {
-                    return Ok(None);
+                    return Some(None);
                 };
                 let kind = match parent.kind() {
                     SyntaxKind::Heading if self.sk.affect_heading() => LexicalKind::Heading(
                         parent.cast::<ast::Heading>().unwrap().depth().get() as i16,
                     ),
-                    _ => return Ok(None),
+                    _ => return Some(None),
                 };
 
                 (name, kind)
             }
-            _ => return Ok(None),
+            _ => return Some(None),
         };
 
-        Ok(Some(LexicalInfo {
+        Some(Some(LexicalInfo {
             name,
             kind,
             range: node.range(),
