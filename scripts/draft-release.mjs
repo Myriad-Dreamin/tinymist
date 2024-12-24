@@ -17,6 +17,83 @@ const run = (command) => {
     });
 };
 
+const generateExtensionInstall = (version) => {
+    
+    /**
+     * @typedef {{ file: string; displayName: string; }} PlatformAsset
+     * @typedef {{ name: string; displayName: string; assets: PlatformAsset[]; }} Platform
+     */
+
+    /**
+     * @param {string} name 
+     * @returns {string}
+     */
+    const binExt = (name) => {
+        return (name.includes('win32') ? '.exe' : '');
+    }
+
+    /**
+     * @param {string} name 
+     * @returns {string}
+     */
+    const debugExt = (name) => {
+        return (name.includes('darwin') ? '.dwarf' : (name.includes('win32') ? '.pdb' : '.debug'));
+    }
+
+    /**
+     * @param {string} name
+     * @param {string} displayName
+     * @returns {Platform}
+     */
+    const platform = (name, displayName) => ({
+        name,
+        displayName,
+        assets: [
+            { file: `tinymist-${name}${binExt(name)}`, displayName: 'Binary' },
+            { file: `tinymist-${name}${debugExt(name)}`, displayName: 'Debug Symbols' }
+        ]
+    })
+
+    /**
+     * @type {Platform[]}
+     */
+    const platforms = [
+        platform('win32-x64', 'x64 Windows'),
+        platform('win32-arm64', 'ARM64 Windows'),
+        platform('linux-x64', 'x64 Linux'),
+        platform('linux-arm64', 'ARM64 Linux'),
+        platform('linux-armhf', 'ARMv7 Linux'),
+        platform('darwin-x64', 'Intel macOS'),
+        platform('darwin-arm64', 'Apple Silicon macOS'),
+        platform('alpine-x64', 'x64 Alpine Linux'),
+        platform('alpine-arm64', 'ARM64 Alpine Linux'),
+        {
+            name: 'universe',
+            displayName: 'Other Platforms (Universe)',
+            assets: []
+        }
+    ];
+
+    const urlBase = `https://github.com/Myriad-Dreamin/tinymist/releases/download/v${version}`;
+
+    const rows = platforms.map(platform => {
+        const file = `[tinymist-${platform.name}.vsix](${urlBase}/tinymist-${platform.name}.vsix)`;
+        const assets = platform.assets.map(asset => {
+            return `[${asset.displayName}](${urlBase}/${asset.file})`;
+        }).join(', ');
+        return `| ${file} | ${platform.displayName} | ${assets} |`;
+    });
+
+    const table = rows.join('\n');
+
+
+    return `## Download tinymist VS Code Extension ${version}
+|  File  | Platform | Assets |
+|--------|----------|--------|
+${table}
+`;
+}
+
 const main = async () => {
     if (!versionToUpload) {
         console.error("Please provide the version to upload");
@@ -68,9 +145,9 @@ const main = async () => {
 
     fs.writeFileSync('target/announcement-changelog.md', changelogPlain);
 
-
+    const extensionInstallText = generateExtensionInstall(versionToUpload);
     // concat and generate final announcement
-    const announcement = `${changelogPlain}\n\n${body}`;
+    const announcement = [changelogPlain, body, extensionInstallText].join('\n\n');
     fs.writeFileSync('target/announcement.gen.md', announcement);
 
     console.log("Please check the generated announcement in target/announcement.gen.md");
