@@ -94,6 +94,17 @@ ${table}
 `;
 }
 
+
+const collapsed = (content, summary) => {
+    return `<details>
+
+<summary><strong>${summary}</strong></summary>
+
+${content}
+
+</details>`;
+}
+
 const main = async () => {
     if (!versionToUpload) {
         console.error("Please provide the version to upload");
@@ -119,9 +130,9 @@ const main = async () => {
 
     const distManifest = await run(DIST_CMD + ' host --steps=upload --steps=release --output-format=json');
     const distData = JSON.parse(distManifest);
-    const body = distData.announcement_github_body;
+    const binInstallText = distData.announcement_github_body;
     // write to file
-    fs.writeFileSync('target/announcement-dist.md', body);
+    fs.writeFileSync('target/announcement-dist.md', binInstallText);
 
     // parse-changelog .\editors\vscode\CHANGELOG.md
     const changelogPlainRaw = await run('parse-changelog ./editors/vscode/CHANGELOG.md');
@@ -147,7 +158,9 @@ const main = async () => {
 
     const extensionInstallText = generateExtensionInstall(versionToUpload);
     // concat and generate final announcement
-    const announcement = [changelogPlain, body, extensionInstallText].join('\n\n');
+    const binInstallSection = collapsed(binInstallText, `Download Binary`);
+    const extensionInstallSection = collapsed(extensionInstallText, `Download VS Code Extension`);
+    const announcement = [changelogPlain, binInstallSection, extensionInstallSection].join('\n\n');
     fs.writeFileSync('target/announcement.gen.md', announcement);
 
     console.log("Please check the generated announcement in target/announcement.gen.md");
