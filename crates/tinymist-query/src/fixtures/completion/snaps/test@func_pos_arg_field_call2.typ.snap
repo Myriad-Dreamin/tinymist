@@ -10,10 +10,10 @@ snapshot_kind: text
   "isIncomplete": false,
   "items": [
    {
-    "kind": 6,
+    "kind": 7,
     "label": "text",
     "labelDetails": {
-     "description": "any"
+     "description": "str"
     },
     "textEdit": {
      "newText": "text, ",
