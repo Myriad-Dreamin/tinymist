@@ -8,41 +8,33 @@ snapshot_kind: text
  "false": [
   {
    "collapsedText": "",
-   "endCharacter": 27,
-   "endLine": 1,
-   "startCharacter": 0,
-   "startLine": 0
-  },
-  {
-   "collapsedText": "",
-   "endCharacter": 67,
-   "endLine": 5,
+   "endCharacter": 14,
+   "endLine": 8,
+   "kind": "comment",
    "startCharacter": 2,
    "startLine": 3
   },
   {
    "collapsedText": "",
-   "endCharacter": 70,
-   "endLine": 7,
-   "startCharacter": 4,
-   "startLine": 6
+   "endCharacter": 27,
+   "endLine": 1,
+   "kind": "comment",
+   "startCharacter": 0,
+   "startLine": 0
   }
  ],
  "true": [
   {
    "collapsedText": "",
-   "endLine": 1,
-   "startLine": 0
-  },
-  {
-   "collapsedText": "",
-   "endLine": 5,
+   "endLine": 8,
+   "kind": "comment",
    "startLine": 3
   },
   {
    "collapsedText": "",
-   "endLine": 7,
-   "startLine": 6
+   "endLine": 1,
+   "kind": "comment",
+   "startLine": 0
   }
  ]
 }

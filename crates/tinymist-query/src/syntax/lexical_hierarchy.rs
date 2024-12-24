@@ -9,6 +9,8 @@ use typst::syntax::{
 };
 use typst_shim::utils::LazyHash;
 
+use super::{is_mark, CommentGroupMatcher};
+
 pub(crate) fn get_lexical_hierarchy(
     source: &Source,
     scope_kind: LexicalScopeKind,
@@ -71,8 +73,7 @@ pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
     Block,
-    LineComment,
-    Space,
+    CommentGroup,
 }
 
 impl LexicalKind {
@@ -98,10 +99,7 @@ impl TryFrom<LexicalKind> for SymbolKind {
             LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
             LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
             LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..)
-            | LexicalKind::Block
-            | LexicalKind::LineComment
-            | LexicalKind::Space => Err(()),
+            LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::CommentGroup => Err(()),
         }
     }
 }
@@ -222,6 +220,10 @@ struct LexicalHierarchyWorker {
 }
 
 impl LexicalHierarchyWorker {
+    fn is_plain_token(kind: SyntaxKind) -> bool {
+        kind.is_trivia() || kind.is_keyword() || is_mark(kind) || kind.is_error()
+    }
+
     /// Finish the current top of the stack.
     fn finish_hierarchy(&mut self) {
         let (symbol, children) = self.stack.pop().unwrap();
@@ -250,6 +252,43 @@ impl LexicalHierarchyWorker {
         Some(())
     }
 
+    /// Check nodes in a list recursively.
+    fn check_nodes(&mut self, node: LinkedNode) -> Option<()> {
+        let mut group_matcher = CommentGroupMatcher::default();
+        let mut comment_range: Option<Range<usize>> = None;
+        for child in node.children() {
+            match group_matcher.process(&child) {
+                super::CommentGroupSignal::Space => {}
+                super::CommentGroupSignal::LineComment
+                | super::CommentGroupSignal::BlockComment => {
+                    let child_range = child.range();
+                    match comment_range {
+                        Some(ref mut comment_range) => comment_range.end = child_range.end,
+                        None => comment_range = Some(child_range),
+                    }
+                }
+                super::CommentGroupSignal::Hash | super::CommentGroupSignal::BreakGroup => {
+                    if let Some(comment_range) = comment_range.take() {
+                        self.stack.push((
+                            LexicalInfo {
+                                name: "".into(),
+                                kind: LexicalKind::CommentGroup,
+                                range: comment_range,
+                            },
+                            eco_vec![],
+                        ));
+                    }
+
+                    if !Self::is_plain_token(child.kind()) {
+                        self.check_node(child)?;
+                    }
+                }
+            }
+        }
+
+        Some(())
+    }
+
     /// Check lexical hierarchy a node recursively.
     fn check_node(&mut self, node: LinkedNode) -> Option<()> {
         let own_symbol = self.get_ident(&node)?;
@@ -275,9 +314,7 @@ impl LexicalHierarchyWorker {
             let stack_height = self.stack.len();
 
             if node.kind() != SyntaxKind::ModuleImport {
-                for child in node.children() {
-                    self.check_node(child)?;
-                }
+                self.check_nodes(node)?;
             }
 
             if is_heading {
@@ -292,41 +329,6 @@ impl LexicalHierarchyWorker {
         } else {
             // todo: for loop variable
             match node.kind() {
-                SyntaxKind::LineComment => {
-                    let w = self.stack.last_mut();
-                    let mut rng = node.range();
-                    if let Some((w, _)) = w {
-                        // TODO: not so good either
-                        if w.kind == LexicalKind::Space {
-                            self.stack.pop().unwrap();
-                            let w = self.stack.last_mut();
-                            if let Some((w, _)) = w {
-                                if w.kind == LexicalKind::LineComment {
-                                    rng.start = w.range.start;
-                                    self.stack.pop().unwrap();
-                                }
-                            }
-                        }
-                    }
-                    self.stack.push((
-                        LexicalInfo {
-                            name: "".into(),
-                            kind: LexicalKind::LineComment,
-                            range: rng,
-                        },
-                        eco_vec![],
-                    ));
-                }
-                SyntaxKind::Space => {
-                    self.stack.push((
-                        LexicalInfo {
-                            name: "".into(),
-                            kind: LexicalKind::Space,
-                            range: node.range(),
-                        },
-                        eco_vec![],
-                    ));
-                }
                 SyntaxKind::LetBinding => 'let_binding: {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
@@ -406,11 +408,9 @@ impl LexicalHierarchyWorker {
                         self.check_opt_node_with(ident, IdentContext::Var)?;
                     }
                 }
-                kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => {}
+                kind if Self::is_plain_token(kind) => {}
                 _ => {
-                    for child in node.children() {
-                        self.check_node(child)?;
-                    }
+                    self.check_nodes(node)?;
                 }
             }
         }

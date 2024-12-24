@@ -132,7 +132,7 @@ fn calc_folding_range(
             });
         }
 
-        if matches!(child.info.kind, LexicalKind::LineComment) {
+        if matches!(child.info.kind, LexicalKind::CommentGroup) {
             folding_range.kind = Some(lsp_types::FoldingRangeKind::Comment);
         }
 
