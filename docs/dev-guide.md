@@ -88,6 +88,8 @@ cargo insta test -p tinymist-query --accept
 > [!Tip]
 > Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
 
+To add more tests, please refer to the guide to [test analyzers.](./dev-guide/tinymist-query.md#testing-analyzers)
+
 ## Running Syntax Grammar Tests
 
 This is required if you are going to change the textmate grammar in `syntaxes/textmate`.
