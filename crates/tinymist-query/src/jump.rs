@@ -1,6 +1,4 @@
-//! The [`CompileServerActor`] implementation borrowed from typst.ts.
-//!
-//! Please check `tinymist::actor::typ_client` for architecture details.
+//! Jumping from and to source and the rendered document.
 
 use std::num::NonZeroUsize;
 
