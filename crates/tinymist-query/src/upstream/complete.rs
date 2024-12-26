@@ -172,30 +172,6 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
 fn complete_markup(ctx: &mut CompletionContext) -> bool {
     let parent_raw = node_ancestors(&ctx.leaf).find(|node| matches!(node.kind(), SyntaxKind::Raw));
 
-    // Bail if we aren't even in markup.
-    // if parent_raw.is_none()
-    //     && !matches!(
-    //         ctx.leaf.parent_kind(),
-    //         None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
-    //     )
-    // {
-    //     return false;
-    // }
-
-    // // Start of an interpolated identifier: "#|".
-    // if ctx.leaf.kind() == SyntaxKind::Hash {
-    //     ctx.from = ctx.cursor;
-    //     code_completions(ctx, true);
-    //     return true;
-    // }
-
-    // // An existing identifier: "#pa|".
-    // if ctx.leaf.kind() == SyntaxKind::Ident {
-    //     ctx.from = ctx.leaf.offset();
-    //     code_completions(ctx, true);
-    //     return true;
-    // }
-
     // Behind a half-completed binding: "#let x = |" or `#let f(x) = |`.
     if_chain! {
         if let Some(prev) = ctx.leaf.prev_leaf();
@@ -249,31 +225,6 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
 
 /// Complete in math mode.
 fn complete_math(ctx: &mut CompletionContext) -> bool {
-    // if !matches!(
-    //     ctx.leaf.parent_kind(),
-    //     Some(SyntaxKind::Equation)
-    //         | Some(SyntaxKind::Math)
-    //         | Some(SyntaxKind::MathFrac)
-    //         | Some(SyntaxKind::MathAttach)
-    // ) {
-    //     return false;
-    // }
-
-    // // Start of an interpolated identifier: "#|".
-    // if ctx.leaf.kind() == SyntaxKind::Hash {
-    //     ctx.from = ctx.cursor;
-    //     code_completions(ctx, true);
-
-    //     return true;
-    // }
-
-    // // Start of an interpolated identifier: "#pa|".
-    // if ctx.leaf.kind() == SyntaxKind::Ident {
-    //     ctx.from = ctx.leaf.offset();
-    //     code_completions(ctx, true);
-    //     return true;
-    // }
-
     // Behind existing atom or identifier: "$a|$" or "$abc|$".
     if !is_triggered_by_punc(ctx.trigger_character)
         && matches!(ctx.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
@@ -427,27 +378,6 @@ fn import_item_completions<'a>(
 
 /// Complete in code mode.
 fn complete_code(ctx: &mut CompletionContext) -> bool {
-    // let surrounding_syntax = ctx.surrounding_syntax();
-    // ctx.explicit = true;
-
-    // if matches!(
-    //     (ctx.leaf.parent_kind(), surrounding_syntax),
-    //     (
-    //         None | Some(SyntaxKind::Markup)
-    //             | Some(SyntaxKind::Math)
-    //             | Some(SyntaxKind::MathFrac)
-    //             | Some(SyntaxKind::MathAttach)
-    //             | Some(SyntaxKind::MathRoot),
-    //         SurroundingSyntax::Regular
-    //     )
-    // ) {
-    //     return false;
-    // }
-
-    let is_hash = is_hash_expr(&ctx.leaf);
-
-    println!("is_hash: {is_hash}");
-
     // Start of an interpolated identifier: "#|".
     if ctx.leaf.kind() == SyntaxKind::Hash {
         ctx.from = ctx.cursor;
@@ -459,7 +389,7 @@ fn complete_code(ctx: &mut CompletionContext) -> bool {
     // Start of an interpolated identifier: "#pa|".
     if ctx.leaf.kind() == SyntaxKind::Ident {
         ctx.from = ctx.leaf.offset();
-        code_completions(ctx, is_hash);
+        code_completions(ctx, is_hash_expr(&ctx.leaf));
         return true;
     }
 
