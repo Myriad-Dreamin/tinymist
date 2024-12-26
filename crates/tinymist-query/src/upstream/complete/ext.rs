@@ -27,7 +27,7 @@ use crate::syntax::{
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
 };
-use crate::upstream::complete::complete_code;
+use crate::upstream::complete::{complete_code, complete_comments, complete_imports};
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 /// Tinymist's completion features.
@@ -1482,6 +1482,18 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     use crate::syntax::classify_context;
     use SurroundingSyntax::*;
 
+    if matches!(
+        ctx.leaf.kind(),
+        SyntaxKind::LineComment | SyntaxKind::BlockComment
+    ) {
+        return complete_comments(ctx).then_some(());
+    }
+
+    let scope = ctx.surrounding_syntax();
+    if matches!(scope, ImportList) {
+        return complete_imports(ctx).then_some(());
+    }
+
     let syntax_context = classify_context(ctx.leaf.clone(), Some(ctx.cursor));
     let syntax = classify_syntax(ctx.leaf.clone(), ctx.cursor);
     crate::log_debug_ct!("complete_type: pos {:?} -> {syntax_context:#?}", ctx.leaf);
@@ -1568,10 +1580,9 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
         .post_type_of_node(ctx.leaf.clone())
         .filter(|ty| !matches!(ty, Ty::Any));
 
-    let scope = ctx.surrounding_syntax();
-
     crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
-    if matches!((scope, &ty), (Regular | StringContent, None)) || matches!(scope, ImportList) {
+
+    if matches!((scope, &ty), (Regular | StringContent, None)) {
         return None;
     }
 

@@ -851,7 +851,13 @@ fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
     if leaf.kind().is_trivia() {
         leaf = leaf.prev_sibling()?;
     }
-    if matches!(leaf.kind(), SyntaxKind::ShowRule | SyntaxKind::SetRule) {
+    if matches!(
+        leaf.kind(),
+        SyntaxKind::ShowRule
+            | SyntaxKind::SetRule
+            | SyntaxKind::ModuleImport
+            | SyntaxKind::ModuleInclude
+    ) {
         return check_surrounding_syntax(&leaf.rightmost_leaf()?);
     }
 

@@ -41,14 +41,10 @@ use ext::*;
 pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
-    let _ = complete_comments(&mut ctx)
-        || complete_type_and_syntax(&mut ctx).is_none() && {
-            crate::log_debug_ct!("continue after completing type and syntax");
-            complete_imports(&mut ctx)
-                || complete_markup(&mut ctx)
-                || complete_math(&mut ctx)
-                || complete_code(&mut ctx, false)
-        };
+    let _ = complete_type_and_syntax(&mut ctx).is_none() && {
+        crate::log_debug_ct!("continue after completing type and syntax");
+        complete_markup(&mut ctx) || complete_math(&mut ctx) || complete_code(&mut ctx, false)
+    };
 
     Some((ctx.from, ctx.incomplete, ctx.completions, ctx.completions2))
 }
@@ -116,13 +112,6 @@ pub enum CompletionKind {
 
 /// Complete in comments. Or rather, don't!
 fn complete_comments(ctx: &mut CompletionContext) -> bool {
-    if !matches!(
-        ctx.leaf.kind(),
-        SyntaxKind::LineComment | SyntaxKind::BlockComment
-    ) {
-        return false;
-    }
-
     let text = ctx.leaf.get().text();
     // check if next line defines a function
     if_chain! {
