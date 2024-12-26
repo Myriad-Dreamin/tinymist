@@ -302,7 +302,7 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         CodeBlock | Code => InterpretMode::Code,
         ContentBlock | Markup => InterpretMode::Markup,
         Equation | Math => InterpretMode::Math,
-        Hash => InterpretMode::Comment,
+        Hash => InterpretMode::Code,
         Label | Text | Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak
         | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed
         | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma
