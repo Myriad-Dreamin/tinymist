@@ -194,7 +194,7 @@ withs = "withs"
 
 [workspace.metadata.typos.files]
 ignore-hidden = false
-extend-exclude = ["/.git", "fixtures", "upstream"]
+extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
 

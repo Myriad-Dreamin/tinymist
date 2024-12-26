@@ -6,6 +6,8 @@ use std::path::Path;
 pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
+pub mod completion;
+pub use completion::*;
 pub mod code_action;
 pub use code_action::*;
 pub mod color_expr;
