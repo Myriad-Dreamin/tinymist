@@ -277,6 +277,14 @@ pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
                 break mode;
             }
 
+            if !t.kind().is_trivia() && {
+                // Previous leaf is hash
+                t.prev_leaf()
+                    .map_or(false, |n| n.kind() == SyntaxKind::Hash)
+            } {
+                return InterpretMode::Code;
+            }
+
             leaf = t.parent();
         } else {
             break InterpretMode::Markup;
@@ -294,8 +302,9 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         CodeBlock | Code => InterpretMode::Code,
         ContentBlock | Markup => InterpretMode::Markup,
         Equation | Math => InterpretMode::Math,
+        Hash => InterpretMode::Code,
         Label | Text | Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak
-        | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed | Hash
+        | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed
         | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma
         | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime
         | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq

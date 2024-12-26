@@ -106,13 +106,8 @@ impl CompletionContext<'_> {
             docs: Default::default(),
         };
 
-        let in_math = matches!(
-            self.leaf.parent_kind(),
-            Some(SyntaxKind::Equation)
-                | Some(SyntaxKind::Math)
-                | Some(SyntaxKind::MathFrac)
-                | Some(SyntaxKind::MathAttach)
-        );
+        let mode = interpret_mode_at(Some(&self.leaf));
+        let in_math = matches!(mode, InterpretMode::Math);
 
         let lib = self.world().library();
         let scope = if in_math { &lib.math } else { &lib.global }
