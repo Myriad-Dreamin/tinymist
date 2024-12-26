@@ -208,11 +208,11 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
         return true;
     }
 
-    // Behind a half-completed binding: "#let x = |".
+    // Behind a half-completed binding: "#let x = |" or `#let f(x) = |`.
     if_chain! {
         if let Some(prev) = ctx.leaf.prev_leaf();
-        if prev.kind() == SyntaxKind::Eq;
-        if prev.parent_kind() == Some(SyntaxKind::LetBinding);
+        if matches!(prev.kind(), SyntaxKind::Eq | SyntaxKind::Arrow);
+        if matches!( prev.parent_kind(), Some(SyntaxKind::LetBinding | SyntaxKind::Closure));
         then {
             ctx.from = ctx.cursor;
             code_completions(ctx, false);
