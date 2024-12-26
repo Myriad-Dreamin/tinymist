@@ -1,0 +1,41 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on \n```\n``` (41..49)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/raw_lang.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]
