@@ -8,6 +8,27 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 3,
+    "label": "pagebreak",
+    "labelDetails": {
+     "description": "(to: \"even\" | \"odd\" | none, weak: bool) => pagebreak"
+    },
+    "textEdit": {
+     "newText": "pagebreak()${1:}",
+     "range": {
+      "end": {
+       "character": 5,
+       "line": 2
+      },
+      "start": {
+       "character": 3,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]
