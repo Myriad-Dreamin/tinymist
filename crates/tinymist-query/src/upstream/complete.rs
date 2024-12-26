@@ -21,7 +21,7 @@ use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 use crate::snippet::{
     CompletionCommand, CompletionContextKey, PrefixSnippet, DEFAULT_PREFIX_SNIPPET,
 };
-use crate::syntax::{InterpretMode, SurroundingSyntax};
+use crate::syntax::{node_ancestors, InterpretMode, SurroundingSyntax};
 
 mod ext;
 pub use ext::CompletionFeat;
@@ -179,11 +179,15 @@ fn complete_comments(ctx: &mut CompletionContext) -> bool {
 
 /// Complete in markup mode.
 fn complete_markup(ctx: &mut CompletionContext) -> bool {
+    let parent_raw = node_ancestors(&ctx.leaf).find(|node| matches!(node.kind(), SyntaxKind::Raw));
+
     // Bail if we aren't even in markup.
-    if !matches!(
-        ctx.leaf.parent_kind(),
-        None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
-    ) {
+    if parent_raw.is_none()
+        && !matches!(
+            ctx.leaf.parent_kind(),
+            None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
+        )
+    {
         return false;
     }
 
@@ -232,19 +236,21 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     }
 
     // Directly after a raw block.
-    let mut s = Scanner::new(ctx.text);
-    s.jump(ctx.leaf.offset());
-    if s.eat_if("```") {
-        s.eat_while('`');
-        let start = s.cursor();
-        if s.eat_if(is_id_start) {
-            s.eat_while(is_id_continue);
+    if let Some(parent_raw) = parent_raw {
+        let mut s = Scanner::new(ctx.text);
+        s.jump(parent_raw.offset());
+        if s.eat_if("```") {
+            s.eat_while('`');
+            let start = s.cursor();
+            if s.eat_if(is_id_start) {
+                s.eat_while(is_id_continue);
+            }
+            if s.cursor() == ctx.cursor {
+                ctx.from = start;
+                ctx.raw_completions();
+            }
+            return true;
         }
-        if s.cursor() == ctx.cursor {
-            ctx.from = start;
-            ctx.raw_completions();
-        }
-        return true;
     }
 
     // Anywhere: "|".

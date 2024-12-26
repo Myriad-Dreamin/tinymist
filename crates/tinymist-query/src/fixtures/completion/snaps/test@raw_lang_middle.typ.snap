@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: "Completion on \n (47..48)"
+description: "Completion on \n (50..51)"
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/raw_lang.typ
+input_file: crates/tinymist-query/src/fixtures/completion/raw_lang_middle.typ
 snapshot_kind: text
 ---
 [
@@ -16,7 +16,7 @@ snapshot_kind: text
      "newText": "typ",
      "range": {
       "end": {
-       "character": 3,
+       "character": 6,
        "line": 3
       },
       "start": {
