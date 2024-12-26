@@ -1,5 +1,5 @@
-/// contains: typ
+/// contains: Typst
 
-/* range after 0..8 */
+/* range after 4..5 */
 ```
 ```
