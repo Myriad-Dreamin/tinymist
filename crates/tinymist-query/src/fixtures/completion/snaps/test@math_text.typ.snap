@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (21..22)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/math_text.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "Re",
+    "labelDetails": {
+     "description": "ℜ"
+    },
+    "sortText": "039",
+    "textEdit": {
+     "newText": "Re",
+     "range": {
+      "end": {
+       "character": 3,
+       "line": 2
+      },
+      "start": {
+       "character": 2,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
