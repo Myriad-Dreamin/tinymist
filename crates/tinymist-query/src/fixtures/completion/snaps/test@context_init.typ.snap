@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (34..35)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/context_init.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "pagebreak",
+    "labelDetails": {
+     "description": "(to: \"even\" | \"odd\" | none, weak: bool) => pagebreak"
+    },
+    "textEdit": {
+     "newText": "pagebreak()${1:}",
+     "range": {
+      "end": {
+       "character": 9,
+       "line": 2
+      },
+      "start": {
+       "character": 9,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
