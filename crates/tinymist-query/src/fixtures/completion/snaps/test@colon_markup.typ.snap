@@ -15,8 +15,9 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, b: content | none, bl: content | none, br: content | none, t: content | none, tl: content | none, tr: content | none) => attach"
     },
+    "sortText": "075",
     "textEdit": {
-     "newText": "attach(${1:})",
+     "newText": " attach(${1:})",
      "range": {
       "end": {
        "character": 2,

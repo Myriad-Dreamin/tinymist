@@ -27,7 +27,9 @@ use crate::syntax::{
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
 };
-use crate::upstream::complete::{complete_code, complete_comments, complete_imports};
+use crate::upstream::complete::{
+    complete_code, complete_comments, complete_imports, complete_markup, complete_math,
+};
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 /// Tinymist's completion features.
@@ -1490,6 +1492,7 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     }
 
     let scope = ctx.surrounding_syntax();
+    let mode = interpret_mode_at(Some(&ctx.leaf));
     if matches!(scope, ImportList) {
         return complete_imports(ctx).then_some(());
     }
@@ -1564,6 +1567,12 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
         {
             args_node = node.parent().map(|s| s.get().clone());
         }
+        // todo: complete reference by type
+        Some(SyntaxContext::Normal(node)) if (matches!(node.kind(), SyntaxKind::Ref)) => {
+            ctx.from = ctx.leaf.offset() + 1;
+            ctx.ref_completions();
+            return Some(());
+        }
         Some(
             SyntaxContext::VarAccess(VarClass::Ident { .. })
             | SyntaxContext::Paren { .. }
@@ -1582,9 +1591,9 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
 
     crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
 
-    if matches!((scope, &ty), (Regular | StringContent, None)) {
-        return None;
-    }
+    // if matches!((scope, &ty), (Regular | StringContent, None)) {
+    //     return None;
+    // }
 
     // adjust the completion position
     // todo: syntax class seems not being considering `is_ident_like`
@@ -1613,13 +1622,30 @@ pub(crate) fn complete_type_and_syntax(ctx: &mut CompletionContext) -> Option<()
     }
 
     let mut completions = std::mem::take(&mut ctx.completions);
-    let explicit = ctx.explicit;
-    ctx.explicit = true;
     let ty = Some(Ty::from_types(ctx.seen_types.iter().cloned()));
     let from_ty = std::mem::replace(&mut ctx.from_ty, ty);
-    complete_code(ctx, true);
+    match mode {
+        InterpretMode::Code => {
+            complete_code(ctx);
+        }
+        InterpretMode::Math => {
+            complete_math(ctx);
+        }
+        InterpretMode::Raw => {
+            complete_markup(ctx);
+        }
+        InterpretMode::Markup => match scope {
+            Regular => {
+                complete_markup(ctx);
+            }
+            Selector | ShowTransform | SetRule => {
+                complete_code(ctx);
+            }
+            StringContent | ImportList => {}
+        },
+        InterpretMode::Comment | InterpretMode::String => {}
+    };
     ctx.from_ty = from_ty;
-    ctx.explicit = explicit;
 
     match scope {
         Regular | StringContent | ImportList | SetRule => {}
