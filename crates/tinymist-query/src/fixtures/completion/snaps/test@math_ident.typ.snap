@@ -8,28 +8,6 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 5,
-    "label": "Re",
-    "labelDetails": {
-     "description": "ℜ"
-    },
-    "sortText": "039",
-    "textEdit": {
-     "newText": "Re",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 2
-      },
-      "start": {
-       "character": 2,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]
