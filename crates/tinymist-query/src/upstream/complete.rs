@@ -445,6 +445,17 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
         return false;
     }
 
+    // Behind a half-completed context block: "context |".
+    if_chain! {
+        if let Some(prev) = ctx.leaf.prev_leaf();
+        if prev.kind() == SyntaxKind::Context;
+        then {
+            ctx.from = ctx.cursor;
+            code_completions(ctx, false);
+            return true;
+        }
+    }
+
     // An existing identifier: "{ pa| }".
     if ctx.leaf.kind() == SyntaxKind::Ident
         && !matches!(ctx.leaf.parent_kind(), Some(SyntaxKind::FieldAccess))
