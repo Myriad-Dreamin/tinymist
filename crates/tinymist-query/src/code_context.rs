@@ -28,7 +28,7 @@ pub enum InteractCodeContextQuery {
 }
 
 /// A response to a `InteractCodeContextQuery`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum InteractCodeContextResponse {
     /// Get the mode at a specific position in a text document.

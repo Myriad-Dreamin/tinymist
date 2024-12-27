@@ -257,15 +257,13 @@ impl LspClient {
     /// Schedules a query from the client.
     pub fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
         let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: AnySchedulableResponse = Ok(match fut {
-            MaybeDone::Done(res) => MaybeDone::Done(
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string())),
-            ),
+        let fut: SchedulableResponse<CompilerQueryResponse> = Ok(match fut {
+            MaybeDone::Done(res) => {
+                MaybeDone::Done(res.map_err(|err| internal_error(err.to_string())))
+            }
             MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
                 let res = fut.await;
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string()))
+                res.map_err(|err| internal_error(err.to_string()))
             })),
             MaybeDone::Gone => MaybeDone::Gone,
         });

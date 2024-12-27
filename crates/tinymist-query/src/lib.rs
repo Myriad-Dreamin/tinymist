@@ -371,7 +371,8 @@ mod polymorphic {
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(untagged)]
     pub enum CompilerQueryResponse {
         OnExport(Option<PathBuf>),
         Hover(Option<Hover>),
@@ -404,42 +405,6 @@ mod polymorphic {
 
         DocumentMetrics(Option<DocumentMetricsResponse>),
         ServerInfo(Option<HashMap<String, ServerInfoResponse>>),
-    }
-
-    impl CompilerQueryResponse {
-        pub fn to_untyped(self) -> serde_json::Result<JsonValue> {
-            match self {
-                Self::OnExport(res) => serde_json::to_value(res),
-                Self::Hover(res) => serde_json::to_value(res),
-                Self::GotoDefinition(res) => serde_json::to_value(res),
-                Self::GotoDeclaration(res) => serde_json::to_value(res),
-                Self::References(res) => serde_json::to_value(res),
-                Self::InlayHint(res) => serde_json::to_value(res),
-                Self::DocumentColor(res) => serde_json::to_value(res),
-                Self::DocumentLink(res) => serde_json::to_value(res),
-                Self::DocumentHighlight(res) => serde_json::to_value(res),
-                Self::ColorPresentation(res) => serde_json::to_value(res),
-                Self::CodeAction(res) => serde_json::to_value(res),
-                Self::CodeLens(res) => serde_json::to_value(res),
-                Self::Completion(res) => serde_json::to_value(res),
-                Self::SignatureHelp(res) => serde_json::to_value(res),
-                Self::PrepareRename(res) => serde_json::to_value(res),
-                Self::Rename(res) => serde_json::to_value(res),
-                Self::WillRenameFiles(res) => serde_json::to_value(res),
-                Self::DocumentSymbol(res) => serde_json::to_value(res),
-                Self::Symbol(res) => serde_json::to_value(res),
-                Self::WorkspaceLabel(res) => serde_json::to_value(res),
-                Self::SemanticTokensFull(res) => serde_json::to_value(res),
-                Self::SemanticTokensDelta(res) => serde_json::to_value(res),
-                Self::Formatting(res) => serde_json::to_value(res),
-                Self::FoldingRange(res) => serde_json::to_value(res),
-                Self::SelectionRange(res) => serde_json::to_value(res),
-                Self::InteractCodeContext(res) => serde_json::to_value(res),
-                Self::OnEnter(res) => serde_json::to_value(res),
-                Self::DocumentMetrics(res) => serde_json::to_value(res),
-                Self::ServerInfo(res) => serde_json::to_value(res),
-            }
-        }
     }
 }
 
