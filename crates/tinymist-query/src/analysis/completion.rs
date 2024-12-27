@@ -363,9 +363,6 @@ impl<'a> CompletionWorker<'a> {
         };
 
         let _ = self.complete_root();
-        let worker_incomplete = self.incomplete;
-        let mut raw_completions = self.raw_completions;
-        let mut completions_rest = self.completions;
 
         // Filter and determine range to replace
         let mut from_ident = None;
@@ -383,7 +380,7 @@ impl<'a> CompletionWorker<'a> {
             let mut rng = from_ident.range();
             let ident_prefix = self.source.text()[rng.start..self.cursor].to_string();
 
-            raw_completions.retain(|item| {
+            self.raw_completions.retain(|item| {
                 let mut prefix_matcher = item.label.chars();
                 'ident_matching: for ch in ident_prefix.chars() {
                     for item in prefix_matcher.by_ref() {
@@ -401,7 +398,7 @@ impl<'a> CompletionWorker<'a> {
             // if modifying some arguments, we need to truncate and add a comma
             if !is_callee && self.cursor != rng.end && is_arg_like_context(&from_ident) {
                 // extend comma
-                for item in raw_completions.iter_mut() {
+                for item in self.raw_completions.iter_mut() {
                     let apply = match &mut item.apply {
                         Some(w) => w,
                         None => {
@@ -424,7 +421,7 @@ impl<'a> CompletionWorker<'a> {
             self.ctx.to_lsp_range(self.from..self.cursor, &self.source)
         };
 
-        let completions = raw_completions.iter().map(|typst_completion| {
+        let completions = self.raw_completions.iter().map(|typst_completion| {
             let typst_snippet = typst_completion
                 .apply
                 .as_ref()
@@ -459,9 +456,9 @@ impl<'a> CompletionWorker<'a> {
             }
         });
         let mut items = completions.collect_vec();
-        items.append(&mut completions_rest);
+        items.append(&mut self.completions);
 
-        Some((worker_incomplete, items))
+        Some((self.incomplete, items))
     }
 
     pub(crate) fn complete_root(&mut self) -> Option<()> {
@@ -525,16 +522,10 @@ impl<'a> CompletionWorker<'a> {
                     self.package_completions(all_versions);
                     return Some(());
                 } else {
-                    let source = self.source.clone();
-                    let paths = self.complete_path(
-                        Some(path),
-                        &source,
-                        self.cursor,
-                        &crate::analysis::PathPreference::Source {
-                            allow_package: true,
-                        },
-                    );
-                    // todo: remove completions2
+                    let paths = self.complete_path(&crate::analysis::PathPreference::Source {
+                        allow_package: true,
+                    });
+                    // todo: remove ctx.completions
                     self.completions.extend(paths.unwrap_or_default());
                 }
 
@@ -685,7 +676,7 @@ impl<'a> CompletionWorker<'a> {
         // The messy code will finally gone, but to help us go over the mess stage, I
         // drop some comment here.
         //
-        // currently, there are only path completions in ctx.completions2
+        // currently, there are only path completions in ctx.completions
         // and type/named param/positional param completions in completions
         // and all rest less relevant completions inctx.completions
         for (idx, compl) in self.completions.iter_mut().enumerate() {
@@ -1078,15 +1069,8 @@ impl<'a> CompletionWorker<'a> {
         }
     }
 
-    fn complete_path(
-        &mut self,
-        node: Option<LinkedNode>,
-        source: &Source,
-        cursor: usize,
-        preference: &PathPreference,
-    ) -> Option<Vec<CompletionItem>> {
-        let ctx = &mut self.ctx;
-        let id = source.id();
+    fn complete_path(&mut self, preference: &PathPreference) -> Option<Vec<CompletionItem>> {
+        let id = self.source.id();
         if id.package().is_some() {
             return None;
         }
@@ -1094,30 +1078,25 @@ impl<'a> CompletionWorker<'a> {
         let is_in_text;
         let text;
         let rng;
-        let node = node.filter(|v| v.kind() == SyntaxKind::Str);
-        if let Some(str_node) = node {
-            // todo: the non-str case
-            str_node.cast::<ast::Str>()?;
-
-            let vr = str_node.range();
+        // todo: the non-str case
+        if self.leaf.is::<ast::Str>() {
+            let vr = self.leaf.range();
             rng = vr.start + 1..vr.end - 1;
-            crate::log_debug_ct!("path_of: {rng:?} {cursor}");
-            if rng.start > rng.end || (cursor != rng.end && !rng.contains(&cursor)) {
+            if rng.start > rng.end || (self.cursor != rng.end && !rng.contains(&self.cursor)) {
                 return None;
             }
 
             let mut w = EcoString::new();
             w.push('"');
-            w.push_str(&source.text()[rng.start..cursor]);
+            w.push_str(&self.source.text()[rng.start..self.cursor]);
             w.push('"');
             let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
-            crate::log_debug_ct!("path_of: {rng:?} {partial_str:?}");
 
             text = partial_str.cast::<ast::Str>()?.get();
             is_in_text = true;
         } else {
             text = EcoString::default();
-            rng = cursor..cursor;
+            rng = self.cursor..self.cursor;
             is_in_text = false;
         }
         crate::log_debug_ct!("complete_path: is_in_text: {is_in_text:?}");
@@ -1144,7 +1123,7 @@ impl<'a> CompletionWorker<'a> {
         let folder_completions = vec![];
         let mut module_completions = vec![];
         // todo: test it correctly
-        for path in ctx.completion_files(preference) {
+        for path in self.ctx.completion_files(preference) {
             crate::log_debug_ct!("compl_check_path: {path:?}");
 
             // Skip self smartly
@@ -1175,7 +1154,7 @@ impl<'a> CompletionWorker<'a> {
             // }
         }
 
-        let replace_range = ctx.to_lsp_range(rng, source);
+        let replace_range = self.ctx.to_lsp_range(rng, &self.source);
 
         fn is_dot_or_slash(ch: &char) -> bool {
             matches!(*ch, '.' | '/')
@@ -1219,7 +1198,7 @@ impl<'a> CompletionWorker<'a> {
                     sorter += 1;
 
                     // todo: no all clients support label details
-                    let res = LspCompletion {
+                    LspCompletion {
                         label: typst_completion.0.to_string(),
                         kind: Some(typst_completion.1.into()),
                         detail: None,
@@ -1229,11 +1208,7 @@ impl<'a> CompletionWorker<'a> {
                         filter_text: Some("".to_owned()),
                         insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
-                    };
-
-                    crate::log_debug_ct!("compl_res: {res:?}");
-
-                    res
+                    }
                 })
                 .collect_vec(),
         )
@@ -2239,14 +2214,7 @@ impl TypeCompletionWorker<'_, '_> {
             BuiltinTy::Module(..) => return None,
 
             BuiltinTy::Path(preference) => {
-                let source = self.base.source.clone();
-
-                let items = self.base.complete_path(
-                    Some(self.base.leaf.clone()),
-                    &source,
-                    self.base.cursor,
-                    preference,
-                );
+                let items = self.base.complete_path(preference);
                 self.base.completions.extend(items.into_iter().flatten());
             }
             BuiltinTy::Args => return None,
