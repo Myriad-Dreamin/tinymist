@@ -1,10 +1,6 @@
 use lsp_types::CompletionList;
-use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{analysis::CompletionWorker, prelude::*, syntax::SyntaxClass, StatefulRequest};
-
-pub(crate) type LspCompletion = lsp_types::CompletionItem;
-pub(crate) type LspCompletionKind = lsp_types::CompletionItemKind;
+use crate::{analysis::CompletionWorker, prelude::*, StatefulRequest};
 
 pub(crate) mod snippet;
 
@@ -57,52 +53,6 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
-        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
-        let source = ctx.source_by_path(&self.path).ok()?;
-        let (cursor, syntax) = ctx.classify_pos_(&source, self.position, 0)?;
-
-        // Skip if is the let binding item *directly*
-        if let Some(SyntaxClass::VarAccess(var)) = &syntax {
-            let node = var.node();
-            match node.parent_kind() {
-                // complete the init part of the let binding
-                Some(SyntaxKind::LetBinding) => {
-                    let parent = node.parent()?;
-                    let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
-                    let parent_init = parent.find(parent_init.span())?;
-                    parent_init.find(node.span())?;
-                }
-                Some(SyntaxKind::Closure) => {
-                    let parent = node.parent()?;
-                    let parent_body = parent.cast::<ast::Closure>()?.body();
-                    let parent_body = parent.find(parent_body.span())?;
-                    parent_body.find(node.span())?;
-                }
-                _ => {}
-            }
-        }
-
-        // Skip if an error node starts with number (e.g. `1pt`)
-        if matches!(
-            syntax,
-            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) {
-            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if node.erroneous() {
-                let mut chars = node.text().chars();
-
-                match chars.next() {
-                    Some(ch) if ch.is_numeric() => return None,
-                    Some('.') => {
-                        if matches!(chars.next(), Some(ch) if ch.is_numeric()) {
-                            return None;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
         // FIXME: correctly identify a completion which is triggered
@@ -117,6 +67,10 @@ impl StatefulRequest for CompletionRequest {
         // Hence, we cannot distinguish between the two cases. Conservatively, we
         // assume that the completion is not explicit.
         let explicit = false;
+
+        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
 
         let worker =
             CompletionWorker::new(ctx, doc, &source, cursor, explicit, self.trigger_character)?;

@@ -489,27 +489,38 @@ impl SharedContext {
         self.analysis.position_encoding
     }
 
-    /// Convert a LSP position to a Typst position.
+    /// Convert an LSP position to a Typst position.
     pub fn to_typst_pos(&self, position: LspPosition, src: &Source) -> Option<usize> {
         crate::to_typst_position(position, self.analysis.position_encoding, src)
     }
 
-    /// Convert a Typst offset to a LSP position.
+    /// Converts an LSP position with some offset.
+    pub fn to_typst_pos_offset(
+        &self,
+        source: &Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<usize> {
+        let offset = self.to_typst_pos(position, source)?;
+        Some(ceil_char_boundary(source.text(), offset + shift))
+    }
+
+    /// Convert a Typst offset to an LSP position.
     pub fn to_lsp_pos(&self, typst_offset: usize, src: &Source) -> LspPosition {
         crate::to_lsp_position(typst_offset, self.analysis.position_encoding, src)
     }
 
-    /// Convert a LSP range to a Typst range.
+    /// Convert an LSP range to a Typst range.
     pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<Range<usize>> {
         crate::to_typst_range(position, self.analysis.position_encoding, src)
     }
 
-    /// Convert a Typst range to a LSP range.
+    /// Convert a Typst range to an LSP range.
     pub fn to_lsp_range(&self, position: Range<usize>, src: &Source) -> LspRange {
         crate::to_lsp_range(position, src, self.analysis.position_encoding)
     }
 
-    /// Convert a Typst range to a LSP range.
+    /// Convert a Typst range to an LSP range.
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
@@ -578,23 +589,9 @@ impl SharedContext {
         position: LspPosition,
         shift: usize,
     ) -> Option<SyntaxClass<'s>> {
-        let (_, syntax) = self.classify_pos_(source, position, shift)?;
-        syntax
-    }
-
-    /// Classifies the syntax under position that can be operated on by IDE
-    /// functionality.
-    pub fn classify_pos_<'s>(
-        &self,
-        source: &'s Source,
-        position: LspPosition,
-        shift: usize,
-    ) -> Option<(usize, Option<SyntaxClass<'s>>)> {
-        let offset = self.to_typst_pos(position, source)?;
-        let cursor = ceil_char_boundary(source.text(), offset + shift);
-
+        let cursor = self.to_typst_pos_offset(source, position, shift)?;
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        Some((cursor, classify_syntax(node, cursor)))
+        classify_syntax(node, cursor)
     }
 
     /// Get the real definition of a compilation.
