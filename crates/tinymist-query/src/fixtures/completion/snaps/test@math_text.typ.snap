@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "ℜ"
     },
+    "sortText": "039",
     "textEdit": {
      "newText": "Re",
      "range": {
