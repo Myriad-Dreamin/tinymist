@@ -33,6 +33,7 @@ use crate::adt::interner::Interned;
 use crate::analysis::{
     analyze_labels, func_signature, BuiltinTy, DynLabel, LocalContext, PathPreference, Ty,
 };
+use crate::prelude::*;
 use crate::snippet::{
     CompletionCommand, CompletionContextKey, ParsedSnippet, PostfixSnippet, PostfixSnippetScope,
     PrefixSnippet, DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
@@ -46,7 +47,9 @@ use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
 };
 use crate::upstream::{plain_docs_sentence, summarize_font_family};
-use crate::{prelude::*, LspCompletion, LspCompletionKind};
+
+type LspCompletion = lsp_types::CompletionItem;
+type LspCompletionKind = lsp_types::CompletionItemKind;
 
 /// Tinymist's completion features.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -205,10 +208,12 @@ pub struct CompletionWorker<'a> {
     pub before: &'a str,
     /// The text after the cursor.
     pub after: &'a str,
-    /// The root node of the source.
-    pub root: LinkedNode<'a>,
     /// The leaf node at the cursor.
     pub leaf: LinkedNode<'a>,
+    /// The syntax class at the cursor.
+    pub syntax: Option<SyntaxClass<'a>>,
+    /// The syntax context at the cursor.
+    pub syntax_context: Option<SyntaxContext<'a>>,
     /// The cursor position.
     pub cursor: usize,
     /// Whether the completion was explicitly requested.
@@ -217,8 +222,6 @@ pub struct CompletionWorker<'a> {
     pub trigger_character: Option<char>,
     /// The position from which the completions apply.
     pub from: usize,
-    /// The type of the expression before the cursor.
-    pub from_ty: Option<Ty>,
     /// The completions.
     pub raw_completions: Vec<Completion>,
     /// The (lsp_types) completions.
@@ -247,6 +250,10 @@ impl<'a> CompletionWorker<'a> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
         let leaf = root.leaf_at_compat(cursor)?;
+        let syntax = classify_syntax(leaf.clone(), cursor);
+        let syntax_context = classify_context(leaf.clone(), Some(cursor));
+
+        crate::log_debug_ct!("CompletionWorker: context {leaf:?} -> {syntax_context:#?}");
         Some(Self {
             ctx,
             document,
@@ -254,13 +261,13 @@ impl<'a> CompletionWorker<'a> {
             text,
             before: &text[..cursor],
             after: &text[cursor..],
-            root,
             leaf,
+            syntax,
+            syntax_context,
             cursor,
             trigger_character,
             explicit,
             from: cursor,
-            from_ty: None,
             incomplete: true,
             raw_completions: vec![],
             completions: vec![],
@@ -305,6 +312,45 @@ impl<'a> CompletionWorker<'a> {
 
     /// Starts the completion process.
     pub(crate) fn work(mut self) -> Option<(bool, Vec<LspCompletion>)> {
+        // Skip if is the let binding item *directly*
+        if let Some(SyntaxClass::VarAccess(var)) = &self.syntax {
+            let node = var.node();
+            match node.parent_kind() {
+                // complete the init part of the let binding
+                Some(SyntaxKind::LetBinding) => {
+                    let parent = node.parent()?;
+                    let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
+                    let parent_init = parent.find(parent_init.span())?;
+                    parent_init.find(node.span())?;
+                }
+                Some(SyntaxKind::Closure) => {
+                    let parent = node.parent()?;
+                    let parent_body = parent.cast::<ast::Closure>()?.body();
+                    let parent_body = parent.find(parent_body.span())?;
+                    parent_body.find(node.span())?;
+                }
+                _ => {}
+            }
+        }
+
+        // Skip if an error node starts with number (e.g. `1pt`)
+        if matches!(
+            self.syntax,
+            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
+        ) && self.leaf.erroneous()
+        {
+            let mut chars = self.leaf.text().chars();
+            match chars.next() {
+                Some(ch) if ch.is_numeric() => return None,
+                Some('.') => {
+                    if matches!(chars.next(), Some(ch) if ch.is_numeric()) {
+                        return None;
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Exclude it self from auto completion
         // e.g. `#let x = (1.);`
         let self_ty = self.leaf.cast::<ast::Expr>().and_then(|leaf| {
@@ -317,32 +363,25 @@ impl<'a> CompletionWorker<'a> {
         };
 
         let _ = self.complete_root();
-        let ctx = self.ctx;
-        let offset = self.from;
         let worker_incomplete = self.incomplete;
         let mut raw_completions = self.raw_completions;
         let mut completions_rest = self.completions;
 
-        // Todo: remove these repeatedly identified information
-        let source = self.source.clone();
-        let syntax = classify_syntax(self.leaf.clone(), self.cursor);
-        let cursor = self.cursor;
-
         // Filter and determine range to replace
         let mut from_ident = None;
-        let is_callee = matches!(syntax, Some(SyntaxClass::Callee(..)));
+        let is_callee = matches!(self.syntax, Some(SyntaxClass::Callee(..)));
         if matches!(
-            syntax,
+            self.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
         ) {
-            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if is_ident_like(&node) && node.offset() == offset {
+            let node = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
+            if is_ident_like(&node) && node.offset() == self.from {
                 from_ident = Some(node);
             }
         }
         let replace_range = if let Some(from_ident) = from_ident {
             let mut rng = from_ident.range();
-            let ident_prefix = source.text()[rng.start..cursor].to_string();
+            let ident_prefix = self.source.text()[rng.start..self.cursor].to_string();
 
             raw_completions.retain(|item| {
                 let mut prefix_matcher = item.label.chars();
@@ -360,7 +399,7 @@ impl<'a> CompletionWorker<'a> {
             });
 
             // if modifying some arguments, we need to truncate and add a comma
-            if !is_callee && cursor != rng.end && is_arg_like_context(&from_ident) {
+            if !is_callee && self.cursor != rng.end && is_arg_like_context(&from_ident) {
                 // extend comma
                 for item in raw_completions.iter_mut() {
                     let apply = match &mut item.apply {
@@ -377,12 +416,12 @@ impl<'a> CompletionWorker<'a> {
                 }
 
                 // Truncate
-                rng.end = cursor;
+                rng.end = self.cursor;
             }
 
-            ctx.to_lsp_range(rng, &source)
+            self.ctx.to_lsp_range(rng, &self.source)
         } else {
-            ctx.to_lsp_range(offset..cursor, &source)
+            self.ctx.to_lsp_range(self.from..self.cursor, &self.source)
         };
 
         let completions = raw_completions.iter().map(|typst_completion| {
@@ -441,12 +480,9 @@ impl<'a> CompletionWorker<'a> {
             return self.complete_imports().then_some(());
         }
 
-        let syntax_context = classify_context(self.leaf.clone(), Some(self.cursor));
-        let syntax = classify_syntax(self.leaf.clone(), self.cursor);
-        crate::log_debug_ct!("complete_type: pos {:?} -> {syntax_context:#?}", self.leaf);
         let mut args_node = None;
 
-        match syntax_context {
+        match self.syntax_context.clone() {
             Some(SyntaxContext::Element { container, .. }) => {
                 if let Some(container) = container.cast::<ast::Dict>() {
                     for named in container.items() {
@@ -525,8 +561,6 @@ impl<'a> CompletionWorker<'a> {
             | None => {}
         }
 
-        crate::log_debug_ct!("ctx.leaf {:?}", self.leaf);
-
         let ty = self
             .ctx
             .post_type_of_node(self.leaf.clone())
@@ -534,16 +568,12 @@ impl<'a> CompletionWorker<'a> {
 
         crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", self.leaf);
 
-        // if matches!((scope, &ty), (Regular | StringContent, None)) {
-        //     return None;
-        // }
-
         // adjust the completion position
         // todo: syntax class seems not being considering `is_ident_like`
         // todo: merge ident_content_offset and label_content_offset
         if is_ident_like(&self.leaf) {
             self.from = self.leaf.offset();
-        } else if let Some(offset) = syntax.as_ref().and_then(SyntaxClass::complete_offset) {
+        } else if let Some(offset) = self.syntax.as_ref().and_then(SyntaxClass::complete_offset) {
             self.from = offset;
         }
 
@@ -567,8 +597,6 @@ impl<'a> CompletionWorker<'a> {
         }
 
         let mut completions = std::mem::take(&mut self.raw_completions);
-        let ty = Some(Ty::from_types(self.seen_types.iter().cloned()));
-        let from_ty = std::mem::replace(&mut self.from_ty, ty);
         match mode {
             InterpretMode::Code => {
                 self.complete_code();
@@ -590,7 +618,6 @@ impl<'a> CompletionWorker<'a> {
             },
             InterpretMode::Comment | InterpretMode::String => {}
         };
-        self.from_ty = from_ty;
 
         match scope {
             Regular | StringContent | ImportList | SetRule => {}
