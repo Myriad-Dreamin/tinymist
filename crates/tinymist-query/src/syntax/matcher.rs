@@ -1224,7 +1224,7 @@ mod tests {
         })
     }
 
-    fn map_cursor(source: &str) -> String {
+    fn map_context(source: &str) -> String {
         map_node(source, |root, cursor| {
             let node = root.leaf_at_compat(cursor);
             let kind = node.and_then(|node| classify_context(node, Some(cursor)));
@@ -1243,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_deref_target() {
+    fn test_get_syntax() {
         assert_snapshot!(map_syntax(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
@@ -1273,8 +1273,8 @@ Text
     }
 
     #[test]
-    fn test_get_check_target() {
-        assert_snapshot!(map_cursor(r#"#let x = 1  
+    fn test_get_context() {
+        assert_snapshot!(map_context(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r"
@@ -1286,31 +1286,31 @@ Text
                    nnnnvvnnn   
         == Heading
         ");
-        assert_snapshot!(map_cursor(r#"#let f(x);"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#let f(x);"#).trim(), @r"
         #let f(x);
          nnnnv v
         ");
-        assert_snapshot!(map_cursor(r#"#f(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#f(1, 2)   Test"#).trim(), @r"
         #f(1, 2)   Test
          vpppppp
         ");
-        assert_snapshot!(map_cursor(r#"#()   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#()   Test"#).trim(), @r"
         #()   Test
          ee
         ");
-        assert_snapshot!(map_cursor(r#"#(1)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(1)   Test"#).trim(), @r"
         #(1)   Test
          PPP
         ");
-        assert_snapshot!(map_cursor(r#"#(a: 1)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(a: 1)   Test"#).trim(), @r"
         #(a: 1)   Test
          eeeeee
         ");
-        assert_snapshot!(map_cursor(r#"#(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(1, 2)   Test"#).trim(), @r"
         #(1, 2)   Test
          eeeeee
         ");
-        assert_snapshot!(map_cursor(r#"#(1, 2)  
+        assert_snapshot!(map_context(r#"#(1, 2)  
   Test"#).trim(), @r"
         #(1, 2)  
          eeeeee  
