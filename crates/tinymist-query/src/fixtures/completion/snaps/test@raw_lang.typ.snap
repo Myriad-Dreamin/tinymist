@@ -12,6 +12,7 @@ snapshot_kind: text
    {
     "kind": 21,
     "label": "Typst",
+    "sortText": "142",
     "textEdit": {
      "newText": "typ",
      "range": {

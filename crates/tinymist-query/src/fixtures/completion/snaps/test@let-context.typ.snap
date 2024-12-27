@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "1"
     },
+    "sortText": "000",
     "textEdit": {
      "newText": "a",
      "range": {

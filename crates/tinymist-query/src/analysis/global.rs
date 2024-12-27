@@ -26,7 +26,7 @@ use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, R
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
+    AllocStats, AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
     SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
     TypeInfo,
 };
@@ -35,7 +35,7 @@ use crate::syntax::{
     classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
     DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
 };
-use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
+use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
     VersionedDocument,

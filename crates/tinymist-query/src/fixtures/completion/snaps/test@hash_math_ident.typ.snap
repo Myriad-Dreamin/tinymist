@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(to: \"even\" | \"odd\" | none, weak: bool) => pagebreak"
     },
+    "sortText": "126",
     "textEdit": {
      "newText": "pagebreak()${1:}",
      "range": {

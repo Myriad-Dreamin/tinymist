@@ -7,16 +7,14 @@ use regex::{Captures, Regex};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{InsTy, Ty},
+    analysis::{complete_type_and_syntax, CompletionWorker, InsTy, Ty},
     prelude::*,
     syntax::{is_ident_like, SyntaxClass},
-    upstream::{autocomplete, CompletionContext},
     StatefulRequest,
 };
 
 pub(crate) type LspCompletion = lsp_types::CompletionItem;
 pub(crate) type LspCompletionKind = lsp_types::CompletionItemKind;
-pub(crate) type TypstCompletionKind = crate::upstream::CompletionKind;
 
 pub(crate) mod snippet;
 
@@ -130,11 +128,10 @@ impl StatefulRequest for CompletionRequest {
             }
         }
 
-        let mut completion_items_rest = None;
         let is_incomplete = false;
 
         let mut cc_ctx =
-            CompletionContext::new(ctx, doc, &source, cursor, explicit, self.trigger_character)?;
+            CompletionWorker::new(ctx, doc, &source, cursor, explicit, self.trigger_character)?;
 
         // Exclude it self from auto completion
         // e.g. `#let x = (1.);`
@@ -147,10 +144,15 @@ impl StatefulRequest for CompletionRequest {
             cc_ctx.seen_types.insert(self_ty);
         };
 
-        let (offset, ic, mut completions, completions_items2) = autocomplete(cc_ctx)?;
-        if !completions_items2.is_empty() {
-            completion_items_rest = Some(completions_items2);
-        }
+        let _ = complete_type_and_syntax(&mut cc_ctx);
+        let CompletionWorker {
+            from: offset,
+            incomplete: ic,
+            mut completions,
+            mut completion_items_rest,
+            ..
+        } = cc_ctx;
+
         // todo: define it well, we were needing it because we wanted to do interactive
         // path completion, but now we've scanned all the paths at the same time.
         // is_incomplete = ic;
@@ -223,7 +225,7 @@ impl StatefulRequest for CompletionRequest {
 
             LspCompletion {
                 label: typst_completion.label.to_string(),
-                kind: Some(completion_kind(typst_completion.kind.clone())),
+                kind: Some(typst_completion.kind.into()),
                 detail: typst_completion.detail.as_ref().map(String::from),
                 sort_text: typst_completion.sort_text.as_ref().map(String::from),
                 filter_text: typst_completion.filter_text.as_ref().map(String::from),
@@ -248,10 +250,7 @@ impl StatefulRequest for CompletionRequest {
             }
         });
         let mut items = completions.collect_vec();
-
-        if let Some(items_rest) = completion_items_rest.as_mut() {
-            items.append(items_rest);
-        }
+        items.append(&mut completion_items_rest);
 
         // To response completions in fine-grained manner, we need to mark result as
         // incomplete. This follows what rust-analyzer does.
@@ -260,23 +259,6 @@ impl StatefulRequest for CompletionRequest {
             is_incomplete,
             items,
         }))
-    }
-}
-
-pub(crate) fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
-    match typst_completion_kind {
-        TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
-        TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
-        TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
-        TypstCompletionKind::Field => LspCompletionKind::FIELD,
-        TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
-        TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
-        TypstCompletionKind::Reference => LspCompletionKind::REFERENCE,
-        TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
-        TypstCompletionKind::Type => LspCompletionKind::CLASS,
-        TypstCompletionKind::Module => LspCompletionKind::MODULE,
-        TypstCompletionKind::File => LspCompletionKind::FILE,
-        TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
     }
 }
 

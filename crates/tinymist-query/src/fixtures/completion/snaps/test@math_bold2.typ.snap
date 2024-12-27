@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content) => content"
     },
+    "sortText": "086",
     "textEdit": {
      "newText": "bold(${1:})",
      "range": {
