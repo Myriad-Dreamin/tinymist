@@ -8,6 +8,27 @@ snapshot_kind: text
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 7,
+    "label": "text",
+    "labelDetails": {
+     "description": "str"
+    },
+    "textEdit": {
+     "newText": "text",
+     "range": {
+      "end": {
+       "character": 69,
+       "line": 2
+      },
+      "start": {
+       "character": 69,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]

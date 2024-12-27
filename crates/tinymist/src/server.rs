@@ -21,9 +21,9 @@ use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
+use task::{CacheTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask};
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
+    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     PositionEncoding, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
@@ -101,12 +101,7 @@ impl LanguageState {
         config: Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
-        let const_config = &config.const_config;
-        let formatter = FormatTask::new(FormatUserConfig {
-            mode: config.formatter_mode,
-            width: config.formatter_print_width.unwrap_or(120),
-            position_encoding: const_config.position_encoding,
-        });
+        let formatter = FormatTask::new(config.formatter());
 
         Self {
             client: client.clone(),
@@ -566,9 +561,9 @@ impl LanguageState {
         }
 
         let new_formatter_config = self.config.formatter();
-        if config.formatter() != new_formatter_config {
-            let err =
-                self.enable_formatter_caps(new_formatter_config.mode != FormatterMode::Disable);
+        if !config.formatter().eq(&new_formatter_config) {
+            let enabled = !matches!(new_formatter_config.config, FormatterConfig::Disable);
+            let err = self.enable_formatter_caps(enabled);
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
@@ -977,7 +972,7 @@ impl LanguageState {
             let replacement = change.text;
             match change.range {
                 Some(lsp_range) => {
-                    let range = lsp_to_typst::range(lsp_range, position_encoding, &meta.content)
+                    let range = to_typst_range(lsp_range, position_encoding, &meta.content)
                         .expect("invalid range");
                     meta.content.edit(range, &replacement);
                 }

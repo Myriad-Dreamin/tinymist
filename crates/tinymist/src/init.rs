@@ -13,7 +13,7 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::FormatUserConfig;
+use task::{FormatUserConfig, FormatterConfig};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, EntryResolver, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -396,9 +396,19 @@ impl Config {
 
     /// Get the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
+        let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
+
         FormatUserConfig {
-            mode: self.formatter_mode,
-            width: self.formatter_print_width.unwrap_or(120),
+            config: match self.formatter_mode {
+                FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
+                    typstyle_core::PrinterConfig::new_with_width(formatter_print_width),
+                )),
+                FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
+                    max_line_length: formatter_print_width,
+                    ..typstfmt::Config::default()
+                })),
+                FormatterMode::Disable => FormatterConfig::Disable,
+            },
             position_encoding: self.const_config.position_encoding,
         }
     }
@@ -1087,8 +1097,42 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert_eq!(config.mode, FormatterMode::Disable);
-        assert_eq!(config.width, 120);
+        assert!(matches!(config.config, FormatterConfig::Disable));
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+    }
+
+    #[test]
+    fn test_typstyle_formatting_config() {
+        let config = Config {
+            formatter_mode: FormatterMode::Typstyle,
+            ..Config::default()
+        };
+        let config = config.formatter();
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+
+        let typstyle_config = match config.config {
+            FormatterConfig::Typstyle(e) => e,
+            _ => panic!("unexpected configuration of formatter"),
+        };
+
+        assert_eq!(typstyle_config.max_width, 120);
+    }
+
+    #[test]
+    fn test_typstyle_formatting_config_set_width() {
+        let config = Config {
+            formatter_mode: FormatterMode::Typstyle,
+            formatter_print_width: Some(240),
+            ..Config::default()
+        };
+        let config = config.formatter();
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+
+        let typstyle_config = match config.config {
+            FormatterConfig::Typstyle(e) => e,
+            _ => panic!("unexpected configuration of formatter"),
+        };
+
+        assert_eq!(typstyle_config.max_width, 240);
     }
 }

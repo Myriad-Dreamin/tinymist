@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box"
     },
+    "sortText": "015",
     "textEdit": {
      "newText": "box(${1:})",
      "range": {
@@ -35,6 +36,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box"
     },
+    "sortText": "016",
     "textEdit": {
      "newText": "box[${1:}]",
      "range": {

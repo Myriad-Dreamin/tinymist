@@ -15,9 +15,9 @@ pub mod syntax;
 pub mod ty;
 mod upstream;
 
-pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
+pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use snippet::PostfixSnippet;
-pub use upstream::{with_vm, CompletionFeat};
+pub use upstream::with_vm;
 
 mod entry;
 pub use entry::*;

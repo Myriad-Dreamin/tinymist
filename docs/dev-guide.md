@@ -8,7 +8,8 @@ Tinymist provides a single integrated language service for Typst. The tinymist p
 
 **The Editor Frontend** – Leveraging the interface of LSP, tinymist provides frontend to each editor, located in the [editor folder](../editors).
 
-**The builtin essential but optional features** – All rest features in tinymist are optional. The significant features are enabled by default, but you can disable them with feature flags. 
+**The builtin essential but optional features** – All rest features in tinymist are optional. The significant features are enabled by default, but you can disable them with feature flags.
+
 - The syntax highlighting feature powered by [textmate](../syntaxes/textmate/).
 - The document formatting feature powered by [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - The document previewing feature powered by [`typst-preview`](../crates/typst-preview/).
@@ -53,10 +54,26 @@ To generate and open crate documentation, run:
 yarn docs:rs --open
 ```
 
-> [!Tip]  
+> [!Tip]
 > Check [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to install the `shiroa` command for documentation generation.
 
 If you find something are not documented, please feel free to open an issue or pull request. There is also a tracking issue to improve the documentation, see [Request for Documentation (RFD)](https://github.com/Myriad-Dreamin/tinymist/issues/931).
+
+## Contribute to tinymist-assets or tools/typst-preview-frontend
+
+To build the frontend and copy the output to the `crates/tinymist-assets` folder, run:
+
+```bash
+yarn build:preview
+```
+
+To bundle the locally built assets (instead of that from [crates.io](https://crates.io/crates/tinymist-assets)) into tinymist's CLI binary, make sure you build with the feature `typst-preview` enabled, and have uncommented the line in the root [`Cargo.toml`](../Cargo.toml):
+
+```patch
+@@ -207,1 +207,1 @@ # This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
+-# tinymist-assets = { path = "./crates/tinymist-assets/" }
++tinymist-assets = { path = "./crates/tinymist-assets/" }
+```
 
 ## Running Analyzer Tests
 
@@ -68,8 +85,10 @@ To run analyzer tests for tinymist:
 cargo insta test -p tinymist-query --accept
 ```
 
-> [!Tip]  
+> [!Tip]
 > Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
+
+To add more tests, please refer to the guide to [test analyzers.](./dev-guide/tinymist-query.md#testing-analyzers)
 
 ## Running Syntax Grammar Tests
 
@@ -97,3 +116,4 @@ To run e2e tests for tinymist on Windows:
 ```bash
 ./scripts/e2e.ps1
 ```
+

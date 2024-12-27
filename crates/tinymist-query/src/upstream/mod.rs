@@ -16,8 +16,6 @@ use typst::{
 
 mod tooltip;
 pub use tooltip::*;
-mod complete;
-pub use complete::*;
 
 /// Extract the first sentence of plain text of a piece of documentation.
 ///
@@ -369,7 +367,7 @@ pub fn route_of_value(val: &Value) -> Option<&'static String> {
 }
 
 /// Create a short description of a font family.
-fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -> EcoString {
+pub fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -> EcoString {
     let mut infos: Vec<_> = variants.collect();
     infos.sort_by_key(|info: &&FontInfo| info.variant);
 

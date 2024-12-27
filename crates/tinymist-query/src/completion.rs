@@ -1,22 +1,7 @@
-use lsp_types::{
-    Command, CompletionItemLabelDetails, CompletionList, CompletionTextEdit, InsertTextFormat,
-    TextEdit,
-};
-use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
-use typst_shim::syntax::LinkedNodeExt;
+use lsp_types::CompletionList;
 
-use crate::{
-    analysis::{InsTy, Ty},
-    prelude::*,
-    syntax::{is_ident_like, SyntaxClass},
-    upstream::{autocomplete, CompletionContext},
-    StatefulRequest,
-};
-
-pub(crate) type LspCompletion = lsp_types::CompletionItem;
-pub(crate) type LspCompletionKind = lsp_types::CompletionItemKind;
-pub(crate) type TypstCompletionKind = crate::upstream::CompletionKind;
+use crate::analysis::{CompletionCursor, CompletionWorker};
+use crate::prelude::*;
 
 pub(crate) mod snippet;
 
@@ -69,10 +54,6 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
-        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
-        let source = ctx.source_by_path(&self.path).ok()?;
-        let (cursor, syntax) = ctx.classify_pos_(&source, self.position, 0)?;
-
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
         // FIXME: correctly identify a completion which is triggered
@@ -88,228 +69,28 @@ impl StatefulRequest for CompletionRequest {
         // assume that the completion is not explicit.
         let explicit = false;
 
-        // Skip if is the let binding item *directly*
-        if let Some(SyntaxClass::VarAccess(var)) = &syntax {
-            let node = var.node();
-            match node.parent_kind() {
-                // complete the init part of the let binding
-                Some(SyntaxKind::LetBinding) => {
-                    let parent = node.parent()?;
-                    let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
-                    let parent_init = parent.find(parent_init.span())?;
-                    parent_init.find(node.span())?;
-                }
-                Some(SyntaxKind::Closure) => {
-                    let parent = node.parent()?;
-                    let parent_body = parent.cast::<ast::Closure>()?.body();
-                    let parent_body = parent.find(parent_body.span())?;
-                    parent_body.find(node.span())?;
-                }
-                _ => {}
-            }
-        }
+        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
+        let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
-        // Skip if an error node starts with number (e.g. `1pt`)
-        if matches!(
-            syntax,
-            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) {
-            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if node.erroneous() {
-                let mut chars = node.text().chars();
+        let worker = CompletionWorker::new(ctx, doc, explicit, self.trigger_character)?;
 
-                match chars.next() {
-                    Some(ch) if ch.is_numeric() => return None,
-                    Some('.') => {
-                        if matches!(chars.next(), Some(ch) if ch.is_numeric()) {
-                            return None;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let (worker_incomplete, items) = worker.work(&mut cursor)?;
 
-        let mut completion_items_rest = None;
-        let is_incomplete = false;
-
-        let mut cc_ctx =
-            CompletionContext::new(ctx, doc, &source, cursor, explicit, self.trigger_character)?;
-
-        // Exclude it self from auto completion
-        // e.g. `#let x = (1.);`
-        let self_ty = cc_ctx.leaf.cast::<ast::Expr>().and_then(|leaf| {
-            let v = cc_ctx.ctx.mini_eval(leaf)?;
-            Some(Ty::Value(InsTy::new(v)))
-        });
-
-        if let Some(self_ty) = self_ty {
-            cc_ctx.seen_types.insert(self_ty);
-        };
-
-        let (offset, ic, mut completions, completions_items2) = autocomplete(cc_ctx)?;
-        if !completions_items2.is_empty() {
-            completion_items_rest = Some(completions_items2);
-        }
         // todo: define it well, we were needing it because we wanted to do interactive
         // path completion, but now we've scanned all the paths at the same time.
         // is_incomplete = ic;
-        let _ = ic;
-
-        // Filter and determine range to replace
-        let mut from_ident = None;
-        let is_callee = matches!(syntax, Some(SyntaxClass::Callee(..)));
-        if matches!(
-            syntax,
-            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
-        ) {
-            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if is_ident_like(&node) && node.offset() == offset {
-                from_ident = Some(node);
-            }
-        }
-        let replace_range = if let Some(from_ident) = from_ident {
-            let mut rng = from_ident.range();
-            let ident_prefix = source.text()[rng.start..cursor].to_string();
-
-            completions.retain(|item| {
-                let mut prefix_matcher = item.label.chars();
-                'ident_matching: for ch in ident_prefix.chars() {
-                    for item in prefix_matcher.by_ref() {
-                        if item == ch {
-                            continue 'ident_matching;
-                        }
-                    }
-
-                    return false;
-                }
-
-                true
-            });
-
-            // if modifying some arguments, we need to truncate and add a comma
-            if !is_callee && cursor != rng.end && is_arg_like_context(&from_ident) {
-                // extend comma
-                for item in completions.iter_mut() {
-                    let apply = match &mut item.apply {
-                        Some(w) => w,
-                        None => {
-                            item.apply = Some(item.label.clone());
-                            item.apply.as_mut().unwrap()
-                        }
-                    };
-                    if apply.trim_end().ends_with(',') {
-                        continue;
-                    }
-                    apply.push_str(", ");
-                }
-
-                // Truncate
-                rng.end = cursor;
-            }
-
-            ctx.to_lsp_range(rng, &source)
-        } else {
-            ctx.to_lsp_range(offset..cursor, &source)
-        };
-
-        let completions = completions.iter().map(|typst_completion| {
-            let typst_snippet = typst_completion
-                .apply
-                .as_ref()
-                .unwrap_or(&typst_completion.label);
-            let lsp_snippet = to_lsp_snippet(typst_snippet);
-            let text_edit = CompletionTextEdit::Edit(TextEdit::new(replace_range, lsp_snippet));
-
-            LspCompletion {
-                label: typst_completion.label.to_string(),
-                kind: Some(completion_kind(typst_completion.kind.clone())),
-                detail: typst_completion.detail.as_ref().map(String::from),
-                sort_text: typst_completion.sort_text.as_ref().map(String::from),
-                filter_text: typst_completion.filter_text.as_ref().map(String::from),
-                label_details: typst_completion.label_detail.as_ref().map(|desc| {
-                    CompletionItemLabelDetails {
-                        detail: None,
-                        description: Some(desc.to_string()),
-                    }
-                }),
-                text_edit: Some(text_edit),
-                additional_text_edits: typst_completion.additional_text_edits.clone(),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                commit_characters: typst_completion
-                    .commit_char
-                    .as_ref()
-                    .map(|v| vec![v.to_string()]),
-                command: typst_completion.command.as_ref().map(|cmd| Command {
-                    command: cmd.to_string(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }
-        });
-        let mut items = completions.collect_vec();
-
-        if let Some(items_rest) = completion_items_rest.as_mut() {
-            items.append(items_rest);
-        }
+        let _ = worker_incomplete;
 
         // To response completions in fine-grained manner, we need to mark result as
         // incomplete. This follows what rust-analyzer does.
         // https://github.com/rust-lang/rust-analyzer/blob/f5a9250147f6569d8d89334dc9cca79c0322729f/crates/rust-analyzer/src/handlers/request.rs#L940C55-L940C75
         Some(CompletionResponse::List(CompletionList {
-            is_incomplete,
+            is_incomplete: false,
             items,
         }))
     }
-}
-
-pub(crate) fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
-    match typst_completion_kind {
-        TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
-        TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
-        TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
-        TypstCompletionKind::Field => LspCompletionKind::FIELD,
-        TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
-        TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
-        TypstCompletionKind::Reference => LspCompletionKind::REFERENCE,
-        TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
-        TypstCompletionKind::Type => LspCompletionKind::CLASS,
-        TypstCompletionKind::Module => LspCompletionKind::MODULE,
-        TypstCompletionKind::File => LspCompletionKind::FILE,
-        TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
-    }
-}
-
-static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
-
-/// Adds numbering to placeholders in snippets
-fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
-    let mut counter = 1;
-    let result =
-        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
-            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
-            counter += 1;
-            substitution
-        });
-
-    result.to_string()
-}
-
-fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
-    while let Some(parent) = matching.parent() {
-        use SyntaxKind::*;
-
-        // todo: contextual
-        match parent.kind() {
-            ContentBlock | Equation | CodeBlock | Markup | Math | Code => return false,
-            Args | Params | Destructuring | Array | Dict => return true,
-            _ => {}
-        }
-
-        matching = parent;
-    }
-    false
 }
 
 #[cfg(test)]

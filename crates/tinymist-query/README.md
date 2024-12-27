@@ -14,4 +14,4 @@ Also see [Developer Guide: Tinymist Query](https://myriad-dreamin.github.io/tiny
 
 ## Contributing
 
-See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md) and [Guide to develop `tinymist-query`](https://github.com/Myriad-Dreamin/tinymist/blob/main/docs/dev-guide/tinymist-query.md).

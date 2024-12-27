@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 description: "Check on \")\" (82)"
-expression: literal_type
+expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_stroke.typ
 snapshot_kind: text
 ---

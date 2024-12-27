@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(any, any, any) => none"
     },
+    "sortText": "000",
     "textEdit": {
      "newText": "aa(${1:})",
      "range": {
@@ -35,6 +36,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "any"
     },
+    "sortText": "001",
     "textEdit": {
      "newText": "aab",
      "range": {
@@ -55,6 +57,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "any"
     },
+    "sortText": "002",
     "textEdit": {
      "newText": "aabc",
      "range": {
@@ -75,6 +78,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "any"
     },
+    "sortText": "003",
     "textEdit": {
      "newText": "aac",
      "range": {
@@ -100,6 +104,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "any"
     },
+    "sortText": "002",
     "textEdit": {
      "newText": "aabc",
      "range": {
@@ -120,6 +125,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "any"
     },
+    "sortText": "003",
     "textEdit": {
      "newText": "aac",
      "range": {

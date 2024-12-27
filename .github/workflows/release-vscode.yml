@@ -114,6 +114,7 @@ jobs:
       isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
       isTest: ${{ matrix.rust-target == 'x86_64-unknown-linux-gnu' || matrix.rust-target == 'x86_64-pc-windows-msvc' }}
+      isUniversal: ${{ matrix.rust-target == 'x86_64-unknown-linux-gnu' }}
     steps:
       - name: "Print Env"
         run: |
@@ -121,6 +122,8 @@ jobs:
           echo "Target: ${{ env.target }}"
           echo "Is Release: ${{ fromJson(env.isRelease) }}"
           echo "Is Nightly: ${{ fromJson(env.isNightly) }}"
+          echo "Is Test: ${{ fromJson(env.isTest) }}"
+          echo "Is Universal (No Server): ${{ fromJson(env.isUniversal) }}"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -263,6 +266,27 @@ jobs:
         with:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
+
+      # The universal target doesn't bundle the binary. Users of that must install
+      # tinymist by themselves.
+      - name: Remove server binary
+        if: fromJson(env.isUniversal)
+        run: rm "editors/vscode/out/tinymist"
+      - name: Package extension (Universal)
+        if: fromJson(env.isRelease) && fromJson(env.isUniversal)
+        run: yarn run package -- -o tinymist-universal.vsix
+        working-directory: ./editors/vscode
+      - name: Package extension (Universal, Nightly)
+        if: fromJson(env.isNightly) && fromJson(env.isUniversal)
+        run: yarn run package -- -o tinymist-universal.vsix --pre-release
+        working-directory: ./editors/vscode
+      - name: Upload tinymist VSIX artifact (Universal)
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isUniversal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-universal.vsix
+          path: editors/vscode/tinymist-universal.vsix
+
       - name: Upload Tinymist E2E Test Snapshot 
         if: always()
         uses: actions/upload-artifact@v4

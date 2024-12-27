@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "module(base)"
     },
+    "sortText": "008",
     "textEdit": {
      "newText": "baz",
      "range": {

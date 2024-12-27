@@ -5,7 +5,7 @@ use crate::{
     adt::interner::Interned,
     prelude::*,
     syntax::{classify_context, classify_syntax, ArgClass, SyntaxContext},
-    LspParamInfo, SemanticRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/signatureHelp`] request is sent from the client to the
@@ -89,7 +89,7 @@ impl SemanticRequest for SignatureHelpRequest {
                     .unwrap_or("any")
             ));
 
-            params.push(LspParamInfo {
+            params.push(ParameterInformation {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
                 documentation: param.docs.as_ref().map(|docs| {
                     Documentation::MarkupContent(MarkupContent {

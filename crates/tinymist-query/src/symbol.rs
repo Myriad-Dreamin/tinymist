@@ -82,7 +82,7 @@ fn filter_document_symbols(
                 return None;
             }
 
-            let rng = typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);
+            let rng = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             Some(SymbolInformation {
                 name: hierarchy.info.name.to_string(),

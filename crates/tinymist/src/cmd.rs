@@ -187,7 +187,7 @@ impl LanguageState {
         let range = opts
             .range
             .map(|r| {
-                tinymist_query::lsp_to_typst::range(r, self.const_config().position_encoding, &s)
+                tinymist_query::to_typst_range(r, self.const_config().position_encoding, &s)
                     .ok_or_else(|| internal_error("cannoet convert range"))
             })
             .transpose()?;

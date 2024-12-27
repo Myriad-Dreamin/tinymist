@@ -26,7 +26,7 @@ use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, R
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
+    AllocStats, AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
     SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
     TypeInfo,
 };
@@ -35,10 +35,10 @@ use crate::syntax::{
     classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
     DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
 };
-use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
+use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
-    LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
+    ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
+    VersionedDocument,
 };
 
 use super::TypeEnv;
@@ -489,28 +489,39 @@ impl SharedContext {
         self.analysis.position_encoding
     }
 
-    /// Convert a LSP position to a Typst position.
+    /// Convert an LSP position to a Typst position.
     pub fn to_typst_pos(&self, position: LspPosition, src: &Source) -> Option<usize> {
-        lsp_to_typst::position(position, self.analysis.position_encoding, src)
+        crate::to_typst_position(position, self.analysis.position_encoding, src)
     }
 
-    /// Convert a Typst offset to a LSP position.
+    /// Converts an LSP position with some offset.
+    pub fn to_typst_pos_offset(
+        &self,
+        source: &Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<usize> {
+        let offset = self.to_typst_pos(position, source)?;
+        Some(ceil_char_boundary(source.text(), offset + shift))
+    }
+
+    /// Convert a Typst offset to an LSP position.
     pub fn to_lsp_pos(&self, typst_offset: usize, src: &Source) -> LspPosition {
-        typst_to_lsp::offset_to_position(typst_offset, self.analysis.position_encoding, src)
+        crate::to_lsp_position(typst_offset, self.analysis.position_encoding, src)
     }
 
-    /// Convert a LSP range to a Typst range.
-    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
-        lsp_to_typst::range(position, self.analysis.position_encoding, src)
+    /// Convert an LSP range to a Typst range.
+    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<Range<usize>> {
+        crate::to_typst_range(position, self.analysis.position_encoding, src)
     }
 
-    /// Convert a Typst range to a LSP range.
-    pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
-        typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    /// Convert a Typst range to an LSP range.
+    pub fn to_lsp_range(&self, position: Range<usize>, src: &Source) -> LspRange {
+        crate::to_lsp_range(position, src, self.analysis.position_encoding)
     }
 
-    /// Convert a Typst range to a LSP range.
-    pub fn to_lsp_range_(&self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
+    /// Convert a Typst range to an LSP range.
+    pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
             .as_rootless_path()
@@ -578,23 +589,9 @@ impl SharedContext {
         position: LspPosition,
         shift: usize,
     ) -> Option<SyntaxClass<'s>> {
-        let (_, syntax) = self.classify_pos_(source, position, shift)?;
-        syntax
-    }
-
-    /// Classifies the syntax under position that can be operated on by IDE
-    /// functionality.
-    pub fn classify_pos_<'s>(
-        &self,
-        source: &'s Source,
-        position: LspPosition,
-        shift: usize,
-    ) -> Option<(usize, Option<SyntaxClass<'s>>)> {
-        let offset = self.to_typst_pos(position, source)?;
-        let cursor = ceil_char_boundary(source.text(), offset + shift);
-
+        let cursor = self.to_typst_pos_offset(source, position, shift)?;
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        Some((cursor, classify_syntax(node, cursor)))
+        classify_syntax(node, cursor)
     }
 
     /// Get the real definition of a compilation.

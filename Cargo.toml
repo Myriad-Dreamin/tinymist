@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.12.12"
+version = "0.12.14"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -111,8 +111,9 @@ typst-render = "0.12.0"
 typst-pdf = "0.12.0"
 typst-syntax = "0.12.0"
 typst-assets = "0.12.0"
-typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle-core = { version = "=0.12.12", default-features = false }
+typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
+typst-ansi-hl = "0.3.0"
+typstyle-core = { version = "=0.12.13", default-features = false }
 typlite = { path = "./crates/typlite" }
 typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
@@ -145,7 +146,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview" }
-tinymist-assets = { version = "0.12.12" }
+tinymist-assets = { version = "0.12.14" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
@@ -193,11 +194,11 @@ withs = "withs"
 
 [workspace.metadata.typos.files]
 ignore-hidden = false
-extend-exclude = ["/.git", "fixtures", "upstream"]
+extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
 
-# This patch is used to bundle a locally built HTML (frontend) of `typst-preview`.
+# This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
 # The shortcoming is that you cannot install tinymist from git source then, i.e. `cargo install --git ..`, with this patch.
 # However, it is not suggested to install it in that way. The suggested ways are: 
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation

@@ -533,8 +533,8 @@ pub static DEFAULT_PREFIX_SNIPPET: LazyLock<Vec<Interned<PrefixSnippet>>> = Lazy
     snippets.chain(snippets2).collect()
 });
 
-pub static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(|| {
-    vec![
+pub static DEFAULT_POSTFIX_SNIPPET: LazyLock<EcoVec<PostfixSnippet>> = LazyLock::new(|| {
+    eco_vec![
         PostfixSnippet {
             scope: PostfixSnippetScope::Content,
             mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],

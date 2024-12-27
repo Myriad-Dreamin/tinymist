@@ -4,17 +4,46 @@ use std::iter::zip;
 
 use lsp_types::TextEdit;
 use sync_lsp::{just_future, SchedulableResponse};
-use tinymist_query::{typst_to_lsp, PositionEncoding};
+use tinymist_query::{to_lsp_range, PositionEncoding};
 use typst::syntax::Source;
 
 use super::SyncTaskFactory;
-use crate::FormatterMode;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
+pub enum FormatterConfig {
+    Typstyle(Box<typstyle_core::PrinterConfig>),
+    Typstfmt(Box<typstfmt::Config>),
+    Disable,
+}
+
+impl FormatterConfig {
+    /// The configuration structs doesn't implement `PartialEq`, so bad.
+    pub fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Typstyle(a), Self::Typstyle(b)) => {
+                a.tab_spaces == b.tab_spaces
+                    && a.max_width == b.max_width
+                    && a.chain_width_ratio == b.chain_width_ratio
+                    && a.blank_lines_upper_bound == b.blank_lines_upper_bound
+            }
+            (Self::Typstfmt(a), Self::Typstfmt(b)) => a == b,
+            (Self::Disable, Self::Disable) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct FormatUserConfig {
-    pub mode: FormatterMode,
-    pub width: u32,
+    pub config: FormatterConfig,
     pub position_encoding: PositionEncoding,
+}
+
+impl FormatUserConfig {
+    /// The configuration structs doesn't implement `PartialEq`, so bad.
+    pub fn eq(&self, other: &Self) -> bool {
+        self.config.eq(&other.config) && self.position_encoding == other.position_encoding
+    }
 }
 
 #[derive(Clone)]
@@ -36,22 +65,17 @@ impl FormatTask {
     pub fn run(&self, src: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
         let c = self.factory.task();
         just_future(async move {
-            match c.mode {
-                FormatterMode::Typstyle => {
-                    let cw = c.width as usize;
-                    let res = typstyle_core::Typstyle::new_with_src(src.clone(), cw).pretty_print();
-                    Ok(calc_diff(src, res, c.position_encoding))
+            let formatted = match &c.config {
+                FormatterConfig::Typstyle(config) => {
+                    typstyle_core::Typstyle::new_with_src(src.clone(), config.as_ref().clone())
+                        .pretty_print()
+                        .ok()
                 }
-                FormatterMode::Typstfmt => {
-                    let config = typstfmt_lib::Config {
-                        max_line_length: c.width as usize,
-                        ..typstfmt_lib::Config::default()
-                    };
-                    let res = typstfmt_lib::format(src.text(), config);
-                    Ok(calc_diff(src, res, c.position_encoding))
-                }
-                FormatterMode::Disable => Ok(None),
-            }
+                FormatterConfig::Typstfmt(config) => Some(typstfmt::format(src.text(), **config)),
+                FormatterConfig::Disable => None,
+            };
+
+            Ok(formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding)))
         })
     }
 }
@@ -85,7 +109,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
     let replace = prefix..old.len() - suffix;
     let with = &new[prefix..new.len() - suffix];
 
-    let range = typst_to_lsp::range(replace, &prev, encoding);
+    let range = to_lsp_range(replace, &prev, encoding);
 
     Some(vec![TextEdit {
         new_text: with.to_owned(),

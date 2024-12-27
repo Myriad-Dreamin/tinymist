@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on \n (50..51)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/raw_lang_middle.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 21,
+    "label": "Typst",
+    "sortText": "142",
+    "textEdit": {
+     "newText": "typ",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 3
+      },
+      "start": {
+       "character": 3,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

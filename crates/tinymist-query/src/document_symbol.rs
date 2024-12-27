@@ -48,8 +48,7 @@ fn symbols_in_hierarchy(
         .iter()
         .filter(|hierarchy| TryInto::<SymbolKind>::try_into(hierarchy.info.kind.clone()).is_ok())
         .map(|hierarchy| {
-            let range =
-                typst_to_lsp::range(hierarchy.info.range.clone(), source, position_encoding);
+            let range = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
                 name: hierarchy.info.name.to_string(),

@@ -27,10 +27,9 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::syntax::find_module_level_docs;
 use crate::{
-    analysis::Analysis, prelude::LocalContext, typst_to_lsp, LspPosition, PositionEncoding,
-    VersionedDocument,
+    analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding, VersionedDocument,
 };
-use crate::{CompletionFeat, LspWorldExt};
+use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
 
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
@@ -330,7 +329,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         break;
     }
 
-    typst_to_lsp::offset_to_position(n.offset() + offset, PositionEncoding::Utf16, s)
+    to_lsp_position(n.offset() + offset, PositionEncoding::Utf16, s)
 }
 
 // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||

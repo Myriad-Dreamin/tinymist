@@ -15,6 +15,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
+    "sortText": "180",
     "textEdit": {
      "newText": "strong(${1:})",
      "range": {
@@ -35,6 +36,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
+    "sortText": "181",
     "textEdit": {
      "newText": "strong[${1:}]",
      "range": {
