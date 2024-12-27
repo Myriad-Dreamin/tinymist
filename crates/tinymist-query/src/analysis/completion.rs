@@ -6,10 +6,7 @@ use std::ops::Range;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
-use lsp_types::{
-    Command, CompletionItem, CompletionItemLabelDetails, CompletionTextEdit, InsertReplaceEdit,
-    InsertTextFormat, TextEdit,
-};
+use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
 use regex::{Captures, Regex};
@@ -33,11 +30,12 @@ use crate::adt::interner::Interned;
 use crate::analysis::{
     analyze_labels, func_signature, BuiltinTy, DynLabel, LocalContext, PathPreference, Ty,
 };
-use crate::prelude::*;
-use crate::snippet::{
-    CompletionCommand, CompletionContextKey, ParsedSnippet, PostfixSnippet, PostfixSnippetScope,
-    PrefixSnippet, DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
+use crate::completion::{
+    Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
+    EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,
+    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
 };
+use crate::prelude::*;
 use crate::syntax::{
     classify_context, interpret_mode_at, is_ident_like, node_ancestors, previous_decls,
     surrounding_syntax, InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext,
@@ -50,8 +48,7 @@ use crate::upstream::{plain_docs_sentence, summarize_font_family};
 
 use super::SharedContext;
 
-type LspCompletion = lsp_types::CompletionItem;
-type LspCompletionKind = lsp_types::CompletionItemKind;
+type LspCompletion = CompletionItem;
 
 /// Tinymist's completion features.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -105,86 +102,6 @@ impl CompletionFeat {
             .as_ref()
             .unwrap_or(&DEFAULT_POSTFIX_SNIPPET)
     }
-}
-
-/// A kind of item that can be completed.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum CompletionKind {
-    /// A syntactical structure.
-    Syntax,
-    /// A function.
-    Func,
-    /// A type.
-    Type,
-    /// A function parameter.
-    Param,
-    /// A field.
-    Field,
-    /// A constant.
-    #[default]
-    Constant,
-    /// A reference.
-    Reference,
-    /// A symbol.
-    Symbol(char),
-    /// A variable.
-    Variable,
-    /// A module.
-    Module,
-    /// A file.
-    File,
-    /// A folder.
-    Folder,
-}
-
-impl From<CompletionKind> for LspCompletionKind {
-    fn from(value: CompletionKind) -> Self {
-        match value {
-            CompletionKind::Syntax => Self::SNIPPET,
-            CompletionKind::Func => Self::FUNCTION,
-            CompletionKind::Param => Self::VARIABLE,
-            CompletionKind::Field => Self::FIELD,
-            CompletionKind::Variable => Self::VARIABLE,
-            CompletionKind::Constant => Self::CONSTANT,
-            CompletionKind::Reference => Self::REFERENCE,
-            CompletionKind::Symbol(_) => Self::FIELD,
-            CompletionKind::Type => Self::CLASS,
-            CompletionKind::Module => Self::MODULE,
-            CompletionKind::File => Self::FILE,
-            CompletionKind::Folder => Self::FOLDER,
-        }
-    }
-}
-
-/// An autocompletion option.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Completion {
-    /// The kind of item this completes to.
-    pub kind: CompletionKind,
-    /// The label the completion is shown with.
-    pub label: EcoString,
-    /// The label the completion is shown with.
-    pub label_detail: Option<EcoString>,
-    /// The label the completion is shown with.
-    pub sort_text: Option<EcoString>,
-    /// The composed text used for filtering.
-    pub filter_text: Option<EcoString>,
-    /// The character that should be committed when selecting this completion.
-    pub commit_char: Option<char>,
-    /// The completed version of the input, possibly described with snippet
-    /// syntax like `${lhs} + ${rhs}`.
-    ///
-    /// Should default to the `label` if `None`.
-    pub apply: Option<EcoString>,
-    /// An optional short description, at most one sentence.
-    pub detail: Option<EcoString>,
-    /// An optional array of additional text edits that are applied when
-    /// selecting this completion. Edits must not overlap with the main edit
-    /// nor with themselves.
-    pub additional_text_edits: Option<Vec<TextEdit>>,
-    /// An optional command to run when the completion is selected.
-    pub command: Option<&'static str>,
 }
 
 /// The struct describing how a completion worker views the editor's cursor.
@@ -318,7 +235,7 @@ impl<'a> CompletionCursor<'a> {
         })
     }
 
-    fn lsp_item_of(&mut self, item: &Completion) -> CompletionItem {
+    fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
         let replace_range = if let Some(from_ident) = self.ident_cursor() {
@@ -340,29 +257,19 @@ impl<'a> CompletionCursor<'a> {
             self.lsp_range_of(self.from..self.cursor)
         };
 
-        let text_edit = CompletionTextEdit::Edit(TextEdit::new(replace_range, snippet.into()));
+        let text_edit = EcoTextEdit::new(replace_range, snippet);
 
         LspCompletion {
-            label: item.label.to_string(),
-            kind: Some(item.kind.into()),
-            detail: item.detail.as_ref().map(String::from),
-            sort_text: item.sort_text.as_ref().map(String::from),
-            filter_text: item.filter_text.as_ref().map(String::from),
-            label_details: item
-                .label_detail
-                .as_ref()
-                .map(|desc| CompletionItemLabelDetails {
-                    detail: None,
-                    description: Some(desc.to_string()),
-                }),
+            label: item.label.clone(),
+            kind: item.kind,
+            detail: item.detail.clone(),
+            sort_text: item.sort_text.clone(),
+            filter_text: item.filter_text.clone(),
+            label_details: item.label_details.clone().map(From::from),
             text_edit: Some(text_edit),
             additional_text_edits: item.additional_text_edits.clone(),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
-            commit_characters: item.commit_char.as_ref().map(|v| vec![v.to_string()]),
-            command: item.command.as_ref().map(|cmd| Command {
-                command: cmd.to_string(),
-                ..Default::default()
-            }),
+            command: item.command.clone(),
             ..Default::default()
         }
     }
@@ -436,11 +343,11 @@ impl<'a> CompletionWorker<'a> {
     fn enrich(&mut self, prefix: &str, suffix: &str) {
         for LspCompletion { text_edit, .. } in &mut self.completions {
             let apply = match text_edit {
-                Some(CompletionTextEdit::Edit(TextEdit { new_text, .. })) => new_text,
+                Some(EcoTextEdit { new_text, .. }) => new_text,
                 _ => continue,
             };
 
-            *apply = format!("{prefix}{apply}{suffix}");
+            *apply = eco_format!("{prefix}{apply}{suffix}");
         }
     }
 
@@ -527,19 +434,11 @@ impl<'a> CompletionWorker<'a> {
         }
 
         for item in &mut self.completions {
-            match item.text_edit {
-                Some(CompletionTextEdit::Edit(TextEdit {
-                    ref mut new_text, ..
-                })) => {
-                    *new_text = to_lsp_snippet(new_text);
-                }
-                Some(CompletionTextEdit::InsertAndReplace(InsertReplaceEdit {
-                    ref mut new_text,
-                    ..
-                })) => {
-                    *new_text = to_lsp_snippet(new_text);
-                }
-                None => {}
+            if let Some(EcoTextEdit {
+                ref mut new_text, ..
+            }) = item.text_edit
+            {
+                *new_text = to_lsp_snippet(new_text);
             }
         }
 
@@ -770,7 +669,7 @@ impl CompletionPair<'_, '_, '_> {
             .chain(self.worker.completions.iter_mut())
             .enumerate()
         {
-            compl.sort_text = Some(format!("{idx:03}"));
+            compl.sort_text = Some(eco_format!("{idx:03}"));
         }
 
         self.worker.completions.append(&mut type_completions);
@@ -1221,9 +1120,9 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            let label = if has_root {
+            let label: EcoString = if has_root {
                 // diff with root
-                unix_slash(path.vpath().as_rooted_path())
+                unix_slash(path.vpath().as_rooted_path()).into()
             } else {
                 let base = base
                     .vpath()
@@ -1232,7 +1131,7 @@ impl CompletionPair<'_, '_, '_> {
                     .unwrap_or(Path::new("/"));
                 let path = path.vpath().as_rooted_path();
                 let w = pathdiff::diff_paths(path, base)?;
-                unix_slash(&w)
+                unix_slash(&w).into()
             };
             crate::log_debug_ct!("compl_label: {label:?}");
 
@@ -1275,27 +1174,27 @@ impl CompletionPair<'_, '_, '_> {
             completions
                 .map(|typst_completion| {
                     let lsp_snippet = &typst_completion.0;
-                    let text_edit = CompletionTextEdit::Edit(TextEdit::new(
+                    let text_edit = EcoTextEdit::new(
                         replace_range,
                         if is_in_text {
-                            lsp_snippet.to_string()
+                            lsp_snippet.clone()
                         } else {
-                            format!(r#""{lsp_snippet}""#)
+                            eco_format!(r#""{lsp_snippet}""#)
                         },
-                    ));
+                    );
 
-                    let sort_text = format!("{sorter:0>digits$}");
+                    let sort_text = eco_format!("{sorter:0>digits$}");
                     sorter += 1;
 
                     // todo: no all clients support label details
                     LspCompletion {
-                        label: typst_completion.0.to_string(),
-                        kind: Some(typst_completion.1.into()),
+                        label: typst_completion.0,
+                        kind: typst_completion.1,
                         detail: None,
                         text_edit: Some(text_edit),
                         // don't sort me
                         sort_text: Some(sort_text),
-                        filter_text: Some("".to_owned()),
+                        filter_text: Some("".into()),
                         insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
                     }
@@ -1337,7 +1236,7 @@ impl CompletionPair<'_, '_, '_> {
                 label: snippet.label.as_ref().into(),
                 apply: Some(snippet.snippet.as_ref().into()),
                 detail: Some(snippet.description.as_ref().into()),
-                command,
+                command: command.map(From::from),
                 ..Completion::default()
             });
         }
@@ -1354,7 +1253,8 @@ impl CompletionPair<'_, '_, '_> {
                 .worker
                 .ctx
                 .analysis
-                .trigger_on_snippet(snippet.contains("${")),
+                .trigger_on_snippet(snippet.contains("${"))
+                .map(From::from),
             ..Completion::default()
         });
     }
@@ -1479,7 +1379,7 @@ impl CompletionPair<'_, '_, '_> {
                     if close { ">" } else { "" }
                 )),
                 label: label.clone(),
-                label_detail: label_desc.clone(),
+                label_details: label_desc.clone(),
                 filter_text: Some(label.clone()),
                 detail: detail.clone(),
                 ..Completion::default()
@@ -1491,7 +1391,7 @@ impl CompletionPair<'_, '_, '_> {
                 self.push_completion(Completion {
                     kind: CompletionKind::Constant,
                     label: bib_title.clone(),
-                    label_detail: Some(label),
+                    label_details: Some(label),
                     filter_text: Some(bib_title),
                     detail,
                     ..completion.clone()
@@ -1528,7 +1428,7 @@ impl CompletionPair<'_, '_, '_> {
         label: Option<EcoString>,
         value: &Value,
         parens: bool,
-        label_detail: Option<EcoString>,
+        label_details: Option<EcoString>,
         docs: Option<&str>,
     ) {
         // Prevent duplicate completions from appearing.
@@ -1589,8 +1489,8 @@ impl CompletionPair<'_, '_, '_> {
             label,
             apply,
             detail,
-            label_detail,
-            command,
+            label_details,
+            command: command.map(From::from),
             ..Completion::default()
         });
     }
@@ -1725,16 +1625,16 @@ impl CompletionPair<'_, '_, '_> {
                 kind: CompletionKind::Syntax,
                 apply: Some("".into()),
                 label: snippet.label.clone(),
-                label_detail: snippet.label_detail.clone(),
+                label_details: snippet.label_detail.clone(),
                 detail: Some(snippet.description.clone()),
                 // range: Some(range),
                 ..Default::default()
             };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
                 let node_content = node.get().clone().into_text();
-                let before = TextEdit {
+                let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
-                    new_text: String::new(),
+                    new_text: EcoString::new(),
                 };
 
                 self.push_completion(Completion {
@@ -1745,11 +1645,11 @@ impl CompletionPair<'_, '_, '_> {
                     ..base
                 });
             } else {
-                let before = TextEdit {
+                let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..rng.start),
-                    new_text: node_before.as_ref().into(),
+                    new_text: node_before.clone(),
                 };
-                let after = TextEdit {
+                let after = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.end..self.cursor.from),
                     new_text: "".into(),
                 };
@@ -1808,17 +1708,18 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            let label_detail = ty.describe().map(From::from).or_else(|| Some("any".into()));
+            let label_details = ty.describe().map(From::from).or_else(|| Some("any".into()));
             let base = Completion {
                 kind: CompletionKind::Func,
-                label_detail,
+                label_details,
                 apply: Some("".into()),
                 // range: Some(range),
                 command: self
                     .worker
                     .ctx
                     .analysis
-                    .trigger_on_snippet_with_param_hint(true),
+                    .trigger_on_snippet_with_param_hint(true)
+                    .map(From::from),
                 ..Default::default()
             };
             let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
@@ -1830,11 +1731,11 @@ impl CompletionPair<'_, '_, '_> {
             }
             crate::log_debug_ct!("checked ufcs: {ty:?}");
             if self.worker.ctx.analysis.completion_feat.ufcs() && fn_feat.min_pos() == 1 {
-                let before = TextEdit {
+                let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..rng.start),
-                    new_text: format!("{name}{lb}"),
+                    new_text: eco_format!("{name}{lb}"),
                 };
-                let after = TextEdit {
+                let after = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.end..self.cursor.from),
                     new_text: rb.into(),
                 };
@@ -1848,9 +1749,9 @@ impl CompletionPair<'_, '_, '_> {
             let more_args = fn_feat.min_pos() > 1 || fn_feat.min_named() > 0;
             if self.worker.ctx.analysis.completion_feat.ufcs_left() && more_args {
                 let node_content = node.get().clone().into_text();
-                let before = TextEdit {
+                let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
-                    new_text: format!("{name}{lb}"),
+                    new_text: eco_format!("{name}{lb}"),
                 };
                 self.push_completion(Completion {
                     apply: if is_content_block {
@@ -1864,11 +1765,11 @@ impl CompletionPair<'_, '_, '_> {
                 });
             }
             if self.worker.ctx.analysis.completion_feat.ufcs_right() && more_args {
-                let before = TextEdit {
+                let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..rng.start),
-                    new_text: format!("{name}("),
+                    new_text: eco_format!("{name}("),
                 };
-                let after = TextEdit {
+                let after = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.end..self.cursor.from),
                     new_text: "".into(),
                 };
@@ -1950,7 +1851,7 @@ impl CompletionPair<'_, '_, '_> {
                 self.push_completion(Completion {
                     kind,
                     label: name,
-                    label_detail: Some(symbol_label_detail(ch)),
+                    label_details: Some(symbol_label_detail(ch)),
                     detail: Some(symbol_detail(ch)),
                     ..Completion::default()
                 });
@@ -1967,13 +1868,14 @@ impl CompletionPair<'_, '_, '_> {
             if !kind_checker.functions.is_empty() {
                 let base = Completion {
                     kind: CompletionKind::Func,
-                    label_detail,
+                    label_details: label_detail,
                     detail,
                     command: self
                         .worker
                         .ctx
                         .analysis
-                        .trigger_on_snippet_with_param_hint(true),
+                        .trigger_on_snippet_with_param_hint(true)
+                        .map(From::from),
                     ..Default::default()
                 };
 
@@ -2048,7 +1950,7 @@ impl CompletionPair<'_, '_, '_> {
             self.push_completion(Completion {
                 kind,
                 label: name,
-                label_detail: label_detail.clone(),
+                label_details: label_detail.clone(),
                 detail,
                 ..Completion::default()
             });
@@ -2122,7 +2024,7 @@ impl CompletionPair<'_, '_, '_> {
                         self.push_completion(Completion {
                             kind: CompletionKind::Symbol(modified.get()),
                             label: modifier.into(),
-                            label_detail: Some(symbol_label_detail(modified.get())),
+                            label_details: Some(symbol_label_detail(modified.get())),
                             ..Completion::default()
                         });
                     }
@@ -2294,14 +2196,15 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                     kind: CompletionKind::Field,
                     label: field.into(),
                     apply: Some(eco_format!("{}: ${{}}", field)),
-                    label_detail: param.ty.describe(),
+                    label_details: param.ty.describe(),
                     detail: docs.map(Into::into),
                     command: self
                         .base
                         .worker
                         .ctx
                         .analysis
-                        .trigger_on_snippet_with_param_hint(true),
+                        .trigger_on_snippet_with_param_hint(true)
+                        .map(From::from),
                     ..Completion::default()
                 });
             }
@@ -2388,7 +2291,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
-                        label_detail: Some(desc.name.into()),
+                        label_details: Some(desc.name.into()),
                         ..Completion::default()
                     });
                 }
@@ -2401,7 +2304,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
-                        label_detail: Some(desc.name.into()),
+                        label_details: Some(desc.name.into()),
                         ..Completion::default()
                     });
                 }
@@ -3016,7 +2919,7 @@ static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
 
 /// Adds numbering to placeholders in snippets
-fn to_lsp_snippet(typst_snippet: &str) -> String {
+fn to_lsp_snippet(typst_snippet: &str) -> EcoString {
     let mut counter = 1;
     let result = TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet, |cap: &Captures| {
         let substitution = format!("${{{}:{}}}", counter, &cap[1]);
@@ -3024,7 +2927,7 @@ fn to_lsp_snippet(typst_snippet: &str) -> String {
         substitution
     });
 
-    result.to_string()
+    result.into()
 }
 
 fn is_hash_expr(leaf: &LinkedNode<'_>) -> bool {

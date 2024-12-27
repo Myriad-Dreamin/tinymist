@@ -16,7 +16,7 @@ pub mod ty;
 mod upstream;
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
-pub use snippet::PostfixSnippet;
+pub use completion::PostfixSnippet;
 pub use upstream::with_vm;
 
 mod entry;
@@ -30,7 +30,7 @@ pub use code_context::*;
 mod code_lens;
 pub use code_lens::*;
 mod completion;
-pub use completion::*;
+pub use completion::CompletionRequest;
 mod color_presentation;
 pub use color_presentation::*;
 mod document_color;
@@ -154,6 +154,7 @@ macro_rules! log_debug_ct {
 
 #[allow(missing_docs)]
 mod polymorphic {
+    use completion::CompletionList;
     use lsp_types::TextEdit;
     use serde::{Deserialize, Serialize};
     use typst::foundations::Dict;
@@ -384,7 +385,7 @@ mod polymorphic {
         ColorPresentation(Option<Vec<ColorPresentation>>),
         CodeAction(Option<Vec<CodeActionOrCommand>>),
         CodeLens(Option<Vec<CodeLens>>),
-        Completion(Option<CompletionResponse>),
+        Completion(Option<CompletionList>),
         SignatureHelp(Option<SignatureHelp>),
         PrepareRename(Option<PrepareRenameResponse>),
         Rename(Option<WorkspaceEdit>),

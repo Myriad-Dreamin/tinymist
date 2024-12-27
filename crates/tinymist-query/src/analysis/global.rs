@@ -43,6 +43,12 @@ use crate::{
 
 use super::TypeEnv;
 
+macro_rules! interned_str {
+    ($name:ident, $value:expr) => {
+        static $name: LazyLock<Interned<str>> = LazyLock::new(|| $value.into());
+    };
+}
+
 /// The analysis data holds globally.
 #[derive(Default, Clone)]
 pub struct Analysis {
@@ -146,14 +152,16 @@ impl Analysis {
     }
 
     /// Get configured trigger suggest command.
-    pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
-        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    pub fn trigger_suggest(&self, context: bool) -> Option<Interned<str>> {
+        interned_str!(INTERNED, "editor.action.triggerSuggest");
+
+        (self.completion_feat.trigger_suggest && context).then(|| INTERNED.clone())
     }
 
     /// Get configured trigger parameter hints command.
-    pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
-        (self.completion_feat.trigger_parameter_hints && context)
-            .then_some("editor.action.triggerParameterHints")
+    pub fn trigger_parameter_hints(&self, context: bool) -> Option<Interned<str>> {
+        interned_str!(INTERNED, "editor.action.triggerParameterHints");
+        (self.completion_feat.trigger_parameter_hints && context).then(|| INTERNED.clone())
     }
 
     /// Get configured trigger suggest after snippet command.
@@ -162,7 +170,7 @@ impl Analysis {
     /// > typing (word starts or trigger characters). However, you can use
     /// > editor.action.triggerSuggest as command on a suggestion to "manually"
     /// > retrigger suggest after inserting one
-    pub fn trigger_on_snippet(&self, context: bool) -> Option<&'static str> {
+    pub fn trigger_on_snippet(&self, context: bool) -> Option<Interned<str>> {
         if !self.completion_feat.trigger_on_snippet_placeholders {
             return None;
         }
@@ -171,13 +179,14 @@ impl Analysis {
     }
 
     /// Get configured trigger on positional parameter hints command.
-    pub fn trigger_on_snippet_with_param_hint(&self, context: bool) -> Option<&'static str> {
+    pub fn trigger_on_snippet_with_param_hint(&self, context: bool) -> Option<Interned<str>> {
+        interned_str!(INTERNED, "tinymist.triggerSuggestAndParameterHints");
         if !self.completion_feat.trigger_on_snippet_placeholders {
             return self.trigger_parameter_hints(context);
         }
 
         (self.completion_feat.trigger_suggest_and_parameter_hints && context)
-            .then_some("tinymist.triggerSuggestAndParameterHints")
+            .then(|| INTERNED.clone())
     }
 }
 
