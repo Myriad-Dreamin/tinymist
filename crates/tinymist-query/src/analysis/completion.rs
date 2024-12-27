@@ -38,8 +38,9 @@ use crate::snippet::{
     PrefixSnippet, DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
 };
 use crate::syntax::{
-    interpret_mode_at, is_ident_like, node_ancestors, previous_decls, surrounding_syntax,
-    InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext, VarClass,
+    classify_context, interpret_mode_at, is_ident_like, node_ancestors, previous_decls,
+    surrounding_syntax, InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext,
+    VarClass,
 };
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
@@ -425,7 +426,6 @@ impl<'a> CompletionWorker<'a> {
     }
 
     pub(crate) fn complete_root(&mut self) -> Option<()> {
-        use crate::syntax::classify_context;
         use SurroundingSyntax::*;
 
         if matches!(
