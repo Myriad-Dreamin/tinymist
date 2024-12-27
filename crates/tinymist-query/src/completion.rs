@@ -1,6 +1,7 @@
 use lsp_types::CompletionList;
 
-use crate::{analysis::CompletionWorker, prelude::*, StatefulRequest};
+use crate::analysis::{CompletionCursor, CompletionWorker};
+use crate::prelude::*;
 
 pub(crate) mod snippet;
 
@@ -71,11 +72,11 @@ impl StatefulRequest for CompletionRequest {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
+        let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
-        let worker =
-            CompletionWorker::new(ctx, doc, &source, cursor, explicit, self.trigger_character)?;
+        let worker = CompletionWorker::new(ctx, doc, explicit, self.trigger_character)?;
 
-        let (worker_incomplete, items) = worker.work()?;
+        let (worker_incomplete, items) = worker.work(&mut cursor)?;
 
         // todo: define it well, we were needing it because we wanted to do interactive
         // path completion, but now we've scanned all the paths at the same time.

@@ -2,13 +2,13 @@
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashSet};
-use std::ops::{Deref, Range};
+use std::ops::Range;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::{
-    Command, CompletionItem, CompletionItemLabelDetails, CompletionTextEdit, InsertTextFormat,
-    TextEdit,
+    Command, CompletionItem, CompletionItemLabelDetails, CompletionTextEdit, InsertReplaceEdit,
+    InsertTextFormat, TextEdit,
 };
 use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
@@ -47,6 +47,8 @@ use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
 };
 use crate::upstream::{plain_docs_sentence, summarize_font_family};
+
+use super::SharedContext;
 
 type LspCompletion = lsp_types::CompletionItem;
 type LspCompletionKind = lsp_types::CompletionItemKind;
@@ -98,10 +100,10 @@ impl CompletionFeat {
         self.postfix() && self.postfix_ufcs_right.unwrap_or(true)
     }
 
-    pub(crate) fn postfix_snippets(&self) -> &[PostfixSnippet] {
+    pub(crate) fn postfix_snippets(&self) -> &EcoVec<PostfixSnippet> {
         self.postfix_snippets
             .as_ref()
-            .map_or(DEFAULT_POSTFIX_SNIPPET.deref(), |v| v.as_slice())
+            .unwrap_or(&DEFAULT_POSTFIX_SNIPPET)
     }
 }
 
@@ -184,6 +186,190 @@ pub struct Completion {
     /// An optional command to run when the completion is selected.
     pub command: Option<&'static str>,
 }
+
+/// The struct describing how a completion worker views the editor's cursor.
+pub struct CompletionCursor<'a> {
+    /// The shared context
+    ctx: Arc<SharedContext>,
+    /// The position from which the completions apply.
+    from: usize,
+    /// The cursor position.
+    cursor: usize,
+    /// The parsed source.
+    source: Source,
+    /// The source text.
+    text: &'a str,
+    /// The text before the cursor.
+    before: &'a str,
+    /// The text after the cursor.
+    after: &'a str,
+    /// The leaf node at the cursor.
+    leaf: LinkedNode<'a>,
+    /// The syntax class at the cursor.
+    syntax: Option<SyntaxClass<'a>>,
+    /// The syntax context at the cursor.
+    syntax_context: Option<SyntaxContext<'a>>,
+    /// The surrounding syntax at the cursor
+    surrounding_syntax: SurroundingSyntax,
+
+    /// Cache for the last lsp range conversion.
+    last_lsp_range_pair: Option<(Range<usize>, LspRange)>,
+    /// Cache for the ident cursor.
+    ident_cursor: OnceLock<Option<LinkedNode<'a>>>,
+    /// Cache for the arg cursor.
+    arg_cursor: OnceLock<Option<SyntaxNode>>,
+}
+
+impl<'a> CompletionCursor<'a> {
+    /// Creates a completion cursor.
+    pub fn new(ctx: Arc<SharedContext>, source: &'a Source, cursor: usize) -> Option<Self> {
+        let text = source.text();
+        let root = LinkedNode::new(source.root());
+        let leaf = root.leaf_at_compat(cursor)?;
+        // todo: cache
+        let syntax = classify_syntax(leaf.clone(), cursor);
+        let syntax_context = classify_context(leaf.clone(), Some(cursor));
+        let surrounding_syntax = surrounding_syntax(&leaf);
+
+        crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
+        Some(Self {
+            ctx,
+            text,
+            source: source.clone(),
+            before: &text[..cursor],
+            after: &text[cursor..],
+            leaf,
+            syntax,
+            syntax_context,
+            surrounding_syntax,
+            cursor,
+            from: cursor,
+            last_lsp_range_pair: None,
+            ident_cursor: OnceLock::new(),
+            arg_cursor: OnceLock::new(),
+        })
+    }
+
+    /// A small window of context before the cursor.
+    fn before_window(&self, size: usize) -> &str {
+        slice_at(
+            self.before,
+            self.cursor.saturating_sub(size)..self.before.len(),
+        )
+    }
+
+    fn is_callee(&self) -> bool {
+        matches!(self.syntax, Some(SyntaxClass::Callee(..)))
+    }
+
+    /// Gets Identifier under cursor.
+    fn ident_cursor(&self) -> &Option<LinkedNode> {
+        self.ident_cursor.get_or_init(|| {
+            let is_from_ident = matches!(
+                self.syntax,
+                Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
+            ) && is_ident_like(&self.leaf)
+                && self.leaf.offset() == self.from;
+
+            is_from_ident.then(|| self.leaf.clone())
+        })
+    }
+
+    fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
+        // self.ctx.to_lsp_range(rng, &self.source)
+        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
+            if *last_rng == rng {
+                return *last_lsp_rng;
+            }
+        }
+
+        let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
+        self.last_lsp_range_pair = Some((rng, lsp_rng));
+        lsp_rng
+    }
+
+    fn arg_cursor(&self) -> &Option<SyntaxNode> {
+        self.arg_cursor.get_or_init(|| {
+            let mut args_node = None;
+
+            match self.syntax_context.clone() {
+                Some(SyntaxContext::Arg { args, .. }) => {
+                    args_node = Some(args.cast::<ast::Args>()?.to_untyped().clone());
+                }
+                Some(SyntaxContext::Normal(node))
+                    if (matches!(node.kind(), SyntaxKind::ContentBlock)
+                        && matches!(self.leaf.kind(), SyntaxKind::LeftBracket)) =>
+                {
+                    args_node = node.parent().map(|s| s.get().clone());
+                }
+                Some(
+                    SyntaxContext::Element { .. }
+                    | SyntaxContext::ImportPath(..)
+                    | SyntaxContext::IncludePath(..)
+                    | SyntaxContext::VarAccess(..)
+                    | SyntaxContext::Paren { .. }
+                    | SyntaxContext::Label { .. }
+                    | SyntaxContext::Normal(..),
+                )
+                | None => {}
+            }
+
+            args_node
+        })
+    }
+
+    fn lsp_item_of(&mut self, item: &Completion) -> CompletionItem {
+        // Determine range to replace
+        let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
+        let replace_range = if let Some(from_ident) = self.ident_cursor() {
+            let mut rng = from_ident.range();
+
+            // if modifying some arguments, we need to truncate and add a comma
+            if !self.is_callee() && self.cursor != rng.end && is_arg_like_context(from_ident) {
+                // extend comma
+                if !snippet.trim_end().ends_with(',') {
+                    snippet.push_str(", ");
+                }
+
+                // Truncate
+                rng.end = self.cursor;
+            }
+
+            self.lsp_range_of(rng)
+        } else {
+            self.lsp_range_of(self.from..self.cursor)
+        };
+
+        let text_edit = CompletionTextEdit::Edit(TextEdit::new(replace_range, snippet.into()));
+
+        LspCompletion {
+            label: item.label.to_string(),
+            kind: Some(item.kind.into()),
+            detail: item.detail.as_ref().map(String::from),
+            sort_text: item.sort_text.as_ref().map(String::from),
+            filter_text: item.filter_text.as_ref().map(String::from),
+            label_details: item
+                .label_detail
+                .as_ref()
+                .map(|desc| CompletionItemLabelDetails {
+                    detail: None,
+                    description: Some(desc.to_string()),
+                }),
+            text_edit: Some(text_edit),
+            additional_text_edits: item.additional_text_edits.clone(),
+            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            commit_characters: item.commit_char.as_ref().map(|v| vec![v.to_string()]),
+            command: item.command.as_ref().map(|cmd| Command {
+                command: cmd.to_string(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+}
+
+type Cursor<'a> = CompletionCursor<'a>;
+
 /// Autocomplete a cursor position in a source file.
 ///
 /// Returns the position from which the completions apply and a list of
@@ -200,32 +386,12 @@ pub struct CompletionWorker<'a> {
     pub ctx: &'a mut LocalContext,
     /// The compiled document.
     pub document: Option<&'a Document>,
-    /// The parsed source.
-    pub source: Source,
-    /// The source text.
-    pub text: &'a str,
-    /// The text before the cursor.
-    pub before: &'a str,
-    /// The text after the cursor.
-    pub after: &'a str,
-    /// The leaf node at the cursor.
-    pub leaf: LinkedNode<'a>,
-    /// The syntax class at the cursor.
-    pub syntax: Option<SyntaxClass<'a>>,
-    /// The syntax context at the cursor.
-    pub syntax_context: Option<SyntaxContext<'a>>,
-    /// The cursor position.
-    pub cursor: usize,
     /// Whether the completion was explicitly requested.
     pub explicit: bool,
     /// The trigger character.
     pub trigger_character: Option<char>,
-    /// The position from which the completions apply.
-    pub from: usize,
     /// The completions.
-    pub raw_completions: Vec<Completion>,
-    /// The (lsp_types) completions.
-    pub completions: Vec<lsp_types::CompletionItem>,
+    pub completions: Vec<LspCompletion>,
     /// Whether the completion is incomplete.
     pub incomplete: bool,
     /// The set of cast completions seen so far.
@@ -237,39 +403,19 @@ pub struct CompletionWorker<'a> {
 }
 
 impl<'a> CompletionWorker<'a> {
-    /// Create a new autocompletion context.
-    #[allow(clippy::too_many_arguments)]
+    /// Create a completion worker.
     pub fn new(
         ctx: &'a mut LocalContext,
         document: Option<&'a Document>,
-        source: &'a Source,
-        cursor: usize,
         explicit: bool,
         trigger_character: Option<char>,
     ) -> Option<Self> {
-        let text = source.text();
-        let root = LinkedNode::new(source.root());
-        let leaf = root.leaf_at_compat(cursor)?;
-        let syntax = classify_syntax(leaf.clone(), cursor);
-        let syntax_context = classify_context(leaf.clone(), Some(cursor));
-
-        crate::log_debug_ct!("CompletionWorker: context {leaf:?} -> {syntax_context:#?}");
         Some(Self {
             ctx,
             document,
-            source: source.clone(),
-            text,
-            before: &text[..cursor],
-            after: &text[cursor..],
-            leaf,
-            syntax,
-            syntax_context,
-            cursor,
             trigger_character,
             explicit,
-            from: cursor,
             incomplete: true,
-            raw_completions: vec![],
             completions: vec![],
             seen_casts: HashSet::new(),
             seen_types: HashSet::new(),
@@ -286,23 +432,15 @@ impl<'a> CompletionWorker<'a> {
         !self.seen_fields.insert(field)
     }
 
-    pub(crate) fn surrounding_syntax(&mut self) -> SurroundingSyntax {
-        surrounding_syntax(&self.leaf)
-    }
-
-    /// A small window of context before the cursor.
-    fn before_window(&self, size: usize) -> &str {
-        slice_at(
-            self.before,
-            self.cursor.saturating_sub(size)..self.before.len(),
-        )
-    }
-
     /// Adds a prefix and suffix to all applications.
     fn enrich(&mut self, prefix: &str, suffix: &str) {
-        for Completion { label, apply, .. } in &mut self.raw_completions {
-            let current = apply.as_ref().unwrap_or(label);
-            *apply = Some(eco_format!("{prefix}{current}{suffix}"));
+        for LspCompletion { text_edit, .. } in &mut self.completions {
+            let apply = match text_edit {
+                Some(CompletionTextEdit::Edit(TextEdit { new_text, .. })) => new_text,
+                _ => continue,
+            };
+
+            *apply = format!("{prefix}{apply}{suffix}");
         }
     }
 
@@ -311,9 +449,9 @@ impl<'a> CompletionWorker<'a> {
     // }
 
     /// Starts the completion process.
-    pub(crate) fn work(mut self) -> Option<(bool, Vec<LspCompletion>)> {
+    pub(crate) fn work(mut self, cursor: &mut Cursor) -> Option<(bool, Vec<LspCompletion>)> {
         // Skip if is the let binding item *directly*
-        if let Some(SyntaxClass::VarAccess(var)) = &self.syntax {
+        if let Some(SyntaxClass::VarAccess(var)) = &cursor.syntax {
             let node = var.node();
             match node.parent_kind() {
                 // complete the init part of the let binding
@@ -335,11 +473,11 @@ impl<'a> CompletionWorker<'a> {
 
         // Skip if an error node starts with number (e.g. `1pt`)
         if matches!(
-            self.syntax,
+            cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) && self.leaf.erroneous()
+        ) && cursor.leaf.erroneous()
         {
-            let mut chars = self.leaf.text().chars();
+            let mut chars = cursor.leaf.text().chars();
             match chars.next() {
                 Some(ch) if ch.is_numeric() => return None,
                 Some('.') => {
@@ -353,7 +491,7 @@ impl<'a> CompletionWorker<'a> {
 
         // Exclude it self from auto completion
         // e.g. `#let x = (1.);`
-        let self_ty = self.leaf.cast::<ast::Expr>().and_then(|leaf| {
+        let self_ty = cursor.leaf.cast::<ast::Expr>().and_then(|leaf| {
             let v = self.ctx.mini_eval(leaf)?;
             Some(Ty::Value(InsTy::new(v)))
         });
@@ -362,28 +500,13 @@ impl<'a> CompletionWorker<'a> {
             self.seen_types.insert(self_ty);
         };
 
-        let _ = self.complete_root();
-        let worker_incomplete = self.incomplete;
-        let mut raw_completions = self.raw_completions;
-        let mut completions_rest = self.completions;
+        let _ = self.complete_root(cursor);
 
-        // Filter and determine range to replace
-        let mut from_ident = None;
-        let is_callee = matches!(self.syntax, Some(SyntaxClass::Callee(..)));
-        if matches!(
-            self.syntax,
-            Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
-        ) {
-            let node = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
-            if is_ident_like(&node) && node.offset() == self.from {
-                from_ident = Some(node);
-            }
-        }
-        let replace_range = if let Some(from_ident) = from_ident {
-            let mut rng = from_ident.range();
-            let ident_prefix = self.source.text()[rng.start..self.cursor].to_string();
+        // Filter
+        if let Some(from_ident) = cursor.ident_cursor() {
+            let ident_prefix = cursor.text[from_ident.offset()..cursor.cursor].to_string();
 
-            raw_completions.retain(|item| {
+            self.completions.retain(|item| {
                 let mut prefix_matcher = item.label.chars();
                 'ident_matching: for ch in ident_prefix.chars() {
                     for item in prefix_matcher.by_ref() {
@@ -397,92 +520,45 @@ impl<'a> CompletionWorker<'a> {
 
                 true
             });
+        }
 
-            // if modifying some arguments, we need to truncate and add a comma
-            if !is_callee && self.cursor != rng.end && is_arg_like_context(&from_ident) {
-                // extend comma
-                for item in raw_completions.iter_mut() {
-                    let apply = match &mut item.apply {
-                        Some(w) => w,
-                        None => {
-                            item.apply = Some(item.label.clone());
-                            item.apply.as_mut().unwrap()
-                        }
-                    };
-                    if apply.trim_end().ends_with(',') {
-                        continue;
-                    }
-                    apply.push_str(", ");
+        for item in &mut self.completions {
+            match item.text_edit {
+                Some(CompletionTextEdit::Edit(TextEdit {
+                    ref mut new_text, ..
+                })) => {
+                    *new_text = to_lsp_snippet(new_text);
                 }
-
-                // Truncate
-                rng.end = self.cursor;
+                Some(CompletionTextEdit::InsertAndReplace(InsertReplaceEdit {
+                    ref mut new_text,
+                    ..
+                })) => {
+                    *new_text = to_lsp_snippet(new_text);
+                }
+                None => {}
             }
+        }
 
-            self.ctx.to_lsp_range(rng, &self.source)
-        } else {
-            self.ctx.to_lsp_range(self.from..self.cursor, &self.source)
-        };
-
-        let completions = raw_completions.iter().map(|typst_completion| {
-            let typst_snippet = typst_completion
-                .apply
-                .as_ref()
-                .unwrap_or(&typst_completion.label);
-            let lsp_snippet = to_lsp_snippet(typst_snippet);
-            let text_edit = CompletionTextEdit::Edit(TextEdit::new(replace_range, lsp_snippet));
-
-            LspCompletion {
-                label: typst_completion.label.to_string(),
-                kind: Some(typst_completion.kind.into()),
-                detail: typst_completion.detail.as_ref().map(String::from),
-                sort_text: typst_completion.sort_text.as_ref().map(String::from),
-                filter_text: typst_completion.filter_text.as_ref().map(String::from),
-                label_details: typst_completion.label_detail.as_ref().map(|desc| {
-                    CompletionItemLabelDetails {
-                        detail: None,
-                        description: Some(desc.to_string()),
-                    }
-                }),
-                text_edit: Some(text_edit),
-                additional_text_edits: typst_completion.additional_text_edits.clone(),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                commit_characters: typst_completion
-                    .commit_char
-                    .as_ref()
-                    .map(|v| vec![v.to_string()]),
-                command: typst_completion.command.as_ref().map(|cmd| Command {
-                    command: cmd.to_string(),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }
-        });
-        let mut items = completions.collect_vec();
-        items.append(&mut completions_rest);
-
-        Some((worker_incomplete, items))
+        Some((self.incomplete, self.completions))
     }
 
-    pub(crate) fn complete_root(&mut self) -> Option<()> {
+    pub(crate) fn complete_root(&mut self, cursor: &mut Cursor) -> Option<()> {
         use SurroundingSyntax::*;
 
         if matches!(
-            self.leaf.kind(),
+            cursor.leaf.kind(),
             SyntaxKind::LineComment | SyntaxKind::BlockComment
         ) {
-            return self.complete_comments().then_some(());
+            return self.complete_comments(cursor).then_some(());
         }
 
-        let scope = self.surrounding_syntax();
-        let mode = interpret_mode_at(Some(&self.leaf));
+        let scope = cursor.surrounding_syntax;
+        let mode = interpret_mode_at(Some(&cursor.leaf));
         if matches!(scope, ImportList) {
-            return self.complete_imports().then_some(());
+            return self.complete_imports(cursor).then_some(());
         }
 
-        let mut args_node = None;
-
-        match self.syntax_context.clone() {
+        match cursor.syntax_context.clone() {
             Some(SyntaxContext::Element { container, .. }) => {
                 if let Some(container) = container.cast::<ast::Dict>() {
                     for named in container.items() {
@@ -499,7 +575,6 @@ impl<'a> CompletionWorker<'a> {
                         self.seen_field(named.name().into());
                     }
                 }
-                args_node = Some(args.to_untyped().clone());
             }
             // todo: complete field by types
             Some(SyntaxContext::VarAccess(
@@ -508,48 +583,38 @@ impl<'a> CompletionWorker<'a> {
                 let target = var.accessed_node()?;
                 let field = var.accessing_field()?;
 
-                let offset = field.offset(&self.ctx.source_by_id(target.span().id()?).ok()?)?;
-                self.from = offset;
+                cursor.from = field.offset(&cursor.source)?;
 
-                self.field_access_completions(&target);
+                self.field_access_completions(cursor, &target);
                 return Some(());
             }
             Some(SyntaxContext::ImportPath(path) | SyntaxContext::IncludePath(path)) => {
                 let Some(ast::Expr::Str(str)) = path.cast() else {
                     return None;
                 };
-                self.from = path.offset();
+                cursor.from = path.offset();
                 let value = str.get();
                 if value.starts_with('@') {
                     let all_versions = value.contains(':');
-                    self.package_completions(all_versions);
+                    self.package_completions(cursor, all_versions);
                     return Some(());
                 } else {
-                    let source = self.source.clone();
                     let paths = self.complete_path(
-                        Some(path),
-                        &source,
-                        self.cursor,
+                        cursor,
                         &crate::analysis::PathPreference::Source {
                             allow_package: true,
                         },
                     );
-                    // todo: remove completions2
+                    // todo: remove ctx.completions
                     self.completions.extend(paths.unwrap_or_default());
                 }
 
                 return Some(());
             }
-            Some(SyntaxContext::Normal(node))
-                if (matches!(node.kind(), SyntaxKind::ContentBlock)
-                    && matches!(self.leaf.kind(), SyntaxKind::LeftBracket)) =>
-            {
-                args_node = node.parent().map(|s| s.get().clone());
-            }
             // todo: complete reference by type
             Some(SyntaxContext::Normal(node)) if (matches!(node.kind(), SyntaxKind::Ref)) => {
-                self.from = self.leaf.offset() + 1;
-                self.ref_completions();
+                cursor.from = cursor.leaf.offset() + 1;
+                self.ref_completions(cursor);
                 return Some(());
             }
             Some(
@@ -563,18 +628,22 @@ impl<'a> CompletionWorker<'a> {
 
         let ty = self
             .ctx
-            .post_type_of_node(self.leaf.clone())
+            .post_type_of_node(cursor.leaf.clone())
             .filter(|ty| !matches!(ty, Ty::Any));
 
-        crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", self.leaf);
+        crate::log_debug_ct!("complete_type: {:?} -> ({scope:?}, {ty:#?})", cursor.leaf);
 
         // adjust the completion position
         // todo: syntax class seems not being considering `is_ident_like`
         // todo: merge ident_content_offset and label_content_offset
-        if is_ident_like(&self.leaf) {
-            self.from = self.leaf.offset();
-        } else if let Some(offset) = self.syntax.as_ref().and_then(SyntaxClass::complete_offset) {
-            self.from = offset;
+        if is_ident_like(&cursor.leaf) {
+            cursor.from = cursor.leaf.offset();
+        } else if let Some(offset) = cursor
+            .syntax
+            .as_ref()
+            .and_then(SyntaxClass::complete_offset)
+        {
+            cursor.from = offset;
         }
 
         if let Some(ty) = ty {
@@ -593,26 +662,26 @@ impl<'a> CompletionWorker<'a> {
                 base: self,
                 filter: &filter,
             };
-            ctx.type_completion(&ty, None);
+            ctx.type_completion(cursor, &ty, None);
         }
 
-        let mut completions = std::mem::take(&mut self.raw_completions);
+        let mut type_completions = std::mem::take(&mut self.completions);
         match mode {
             InterpretMode::Code => {
-                self.complete_code();
+                self.complete_code(cursor);
             }
             InterpretMode::Math => {
-                self.complete_math();
+                self.complete_math(cursor);
             }
             InterpretMode::Raw => {
-                self.complete_markup();
+                self.complete_markup(cursor);
             }
             InterpretMode::Markup => match scope {
                 Regular => {
-                    self.complete_markup();
+                    self.complete_markup(cursor);
                 }
                 Selector | ShowTransform | SetRule => {
-                    self.complete_code();
+                    self.complete_code(cursor);
                 }
                 StringContent | ImportList => {}
             },
@@ -623,12 +692,14 @@ impl<'a> CompletionWorker<'a> {
             Regular | StringContent | ImportList | SetRule => {}
             Selector => {
                 self.snippet_completion(
+                    cursor,
                     "text selector",
                     "\"${text}\"",
                     "Replace occurrences of specific text.",
                 );
 
                 self.snippet_completion(
+                    cursor,
                     "regex selector",
                     "regex(\"${regex}\")",
                     "Replace matches of a regular expression.",
@@ -636,18 +707,21 @@ impl<'a> CompletionWorker<'a> {
             }
             ShowTransform => {
                 self.snippet_completion(
+                    cursor,
                     "replacement",
                     "[${content}]",
                     "Replace the selected element with content.",
                 );
 
                 self.snippet_completion(
+                    cursor,
                     "replacement (string)",
                     "\"${text}\"",
                     "Replace the selected element with a string of text.",
                 );
 
                 self.snippet_completion(
+                    cursor,
                     "transformation",
                     "element => [${content}]",
                     "Transform the element with a function.",
@@ -664,50 +738,36 @@ impl<'a> CompletionWorker<'a> {
         // ctx.strict_scope_completions(false, |value| value.ty() == ty);
 
         crate::log_debug_ct!(
-            "sort_and_explicit_code_completion: {completions:#?} {:#?}",
-            self.raw_completions
+            "sort completions: {type_completions:#?} {:#?}",
+            self.completions
         );
 
-        completions.sort_by(|a, b| {
+        type_completions.sort_by(|a, b| {
             a.sort_text
                 .as_ref()
                 .cmp(&b.sort_text.as_ref())
                 .then_with(|| a.label.cmp(&b.label))
         });
-        self.raw_completions.sort_by(|a, b| {
+        self.completions.sort_by(|a, b| {
             a.sort_text
                 .as_ref()
                 .cmp(&b.sort_text.as_ref())
                 .then_with(|| a.label.cmp(&b.label))
         });
 
-        // todo: this is a bit messy, we can refactor for improving maintainability
-        // The messy code will finally gone, but to help us go over the mess stage, I
-        // drop some comment here.
-        //
-        // currently, there are only path completions in ctx.completions2
-        // and type/named param/positional param completions in completions
-        // and all rest less relevant completions inctx.completions
-        for (idx, compl) in self.completions.iter_mut().enumerate() {
+        for (idx, compl) in type_completions
+            .iter_mut()
+            .chain(self.completions.iter_mut())
+            .enumerate()
+        {
             compl.sort_text = Some(format!("{idx:03}"));
         }
-        let sort_base = self.completions.len();
-        for (idx, compl) in (completions
-            .iter_mut()
-            .chain(self.raw_completions.iter_mut()))
-        .enumerate()
-        {
-            compl.sort_text = Some(eco_format!("{:03}", idx + sort_base));
-        }
 
-        crate::log_debug_ct!(
-            "sort_and_explicit_code_completion after: {completions:#?} {:#?}",
-            self.raw_completions
-        );
+        self.completions.append(&mut type_completions);
 
-        self.raw_completions.append(&mut completions);
+        crate::log_debug_ct!("sort completions after: {:#?}", self.completions);
 
-        if let Some(node) = args_node {
+        if let Some(node) = cursor.arg_cursor() {
             crate::log_debug_ct!("content block compl: args {node:?}");
             let is_unclosed = matches!(node.kind(), SyntaxKind::Args)
                 && node.children().fold(0i32, |acc, node| match node.kind() {
@@ -722,7 +782,7 @@ impl<'a> CompletionWorker<'a> {
             }
         }
 
-        if self.before.ends_with(',') || self.before.ends_with(':') {
+        if cursor.before.ends_with(',') || cursor.before.ends_with(':') {
             self.enrich(" ", "");
         }
         match scope {
@@ -732,22 +792,19 @@ impl<'a> CompletionWorker<'a> {
             }
         }
 
-        crate::log_debug_ct!(
-            "sort_and_explicit_code_completion: {:?}",
-            self.raw_completions
-        );
+        crate::log_debug_ct!("enrich completions: {:?}", self.completions);
 
         Some(())
     }
 
     /// Complete in comments. Or rather, don't!
-    fn complete_comments(&mut self) -> bool {
-        let text = self.leaf.get().text();
+    fn complete_comments(&mut self, cursor: &mut Cursor) -> bool {
+        let text = cursor.leaf.get().text();
         // check if next line defines a function
         if_chain! {
             if text == "///" || text == "/// ";
             // hash node
-            if let Some(next) = self.leaf.next_leaf();
+            if let Some(next) = cursor.leaf.next_leaf();
             // let node
             if let Some(next_next) = next.next_leaf();
             if let Some(next_next) = next_next.next_leaf();
@@ -785,7 +842,7 @@ impl<'a> CompletionWorker<'a> {
                     i += 2;
                 }
                 doc_snippet += &format!("\n/// -> ${}", i + 1);
-                self.raw_completions.push(Completion {
+                self.push_completion(cursor, Completion {
                     label: "Document function".into(),
                     apply: Some(doc_snippet.into()),
                     ..Completion::default()
@@ -796,37 +853,41 @@ impl<'a> CompletionWorker<'a> {
         true
     }
 
+    fn push_completion(&mut self, cursor: &mut Cursor, completion: Completion) {
+        self.completions.push(cursor.lsp_item_of(&completion));
+    }
+
     /// Complete in markup mode.
-    fn complete_markup(&mut self) -> bool {
+    fn complete_markup(&mut self, cursor: &mut Cursor) -> bool {
         let parent_raw =
-            node_ancestors(&self.leaf).find(|node| matches!(node.kind(), SyntaxKind::Raw));
+            node_ancestors(&cursor.leaf).find(|node| matches!(node.kind(), SyntaxKind::Raw));
 
         // Behind a half-completed binding: "#let x = |" or `#let f(x) = |`.
         if_chain! {
-            if let Some(prev) = self.leaf.prev_leaf();
+            if let Some(prev) = cursor.leaf.prev_leaf();
             if matches!(prev.kind(), SyntaxKind::Eq | SyntaxKind::Arrow);
             if matches!( prev.parent_kind(), Some(SyntaxKind::LetBinding | SyntaxKind::Closure));
             then {
-                self.from = self.cursor;
-                self.code_completions( false);
+                cursor.from = cursor.cursor;
+                self.code_completions(cursor, false);
                 return true;
             }
         }
 
         // Behind a half-completed context block: "#context |".
         if_chain! {
-            if let Some(prev) = self.leaf.prev_leaf();
+            if let Some(prev) = cursor.leaf.prev_leaf();
             if prev.kind() == SyntaxKind::Context;
             then {
-                self.from = self.cursor;
-                self.code_completions( false);
+                cursor.from = cursor.cursor;
+                self.code_completions(cursor, false);
                 return true;
             }
         }
 
         // Directly after a raw block.
         if let Some(parent_raw) = parent_raw {
-            let mut s = Scanner::new(self.text);
+            let mut s = Scanner::new(cursor.text);
             s.jump(parent_raw.offset());
             if s.eat_if("```") {
                 s.eat_while('`');
@@ -834,9 +895,9 @@ impl<'a> CompletionWorker<'a> {
                 if s.eat_if(is_id_start) {
                     s.eat_while(is_id_continue);
                 }
-                if s.cursor() == self.cursor {
-                    self.from = start;
-                    self.raw_completions();
+                if s.cursor() == cursor.cursor {
+                    cursor.from = start;
+                    self.raw_completions(cursor);
                 }
                 return true;
             }
@@ -844,8 +905,8 @@ impl<'a> CompletionWorker<'a> {
 
         // Anywhere: "|".
         if !is_triggered_by_punc(self.trigger_character) && self.explicit {
-            self.from = self.cursor;
-            self.snippet_completions(Some(InterpretMode::Markup), None);
+            cursor.from = cursor.cursor;
+            self.snippet_completions(cursor, Some(InterpretMode::Markup), None);
             return true;
         }
 
@@ -853,22 +914,22 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Complete in math mode.
-    fn complete_math(&mut self) -> bool {
+    fn complete_math(&mut self, cursor: &mut Cursor) -> bool {
         // Behind existing atom or identifier: "$a|$" or "$abc|$".
         if !is_triggered_by_punc(self.trigger_character)
-            && matches!(self.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
+            && matches!(cursor.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
         {
-            self.from = self.leaf.offset();
-            self.scope_completions(true);
-            self.snippet_completions(Some(InterpretMode::Math), None);
+            cursor.from = cursor.leaf.offset();
+            self.scope_completions(cursor, true);
+            self.snippet_completions(cursor, Some(InterpretMode::Math), None);
             return true;
         }
 
         // Anywhere: "$|$".
         if !is_triggered_by_punc(self.trigger_character) && self.explicit {
-            self.from = self.cursor;
-            self.scope_completions(true);
-            self.snippet_completions(Some(InterpretMode::Math), None);
+            cursor.from = cursor.cursor;
+            self.scope_completions(cursor, true);
+            self.snippet_completions(cursor, Some(InterpretMode::Math), None);
             return true;
         }
 
@@ -876,54 +937,54 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Complete in code mode.
-    fn complete_code(&mut self) -> bool {
+    fn complete_code(&mut self, cursor: &mut Cursor) -> bool {
         // Start of an interpolated identifier: "#|".
-        if self.leaf.kind() == SyntaxKind::Hash {
-            self.from = self.cursor;
-            self.code_completions(true);
+        if cursor.leaf.kind() == SyntaxKind::Hash {
+            cursor.from = cursor.cursor;
+            self.code_completions(cursor, true);
 
             return true;
         }
 
         // Start of an interpolated identifier: "#pa|".
-        if self.leaf.kind() == SyntaxKind::Ident {
-            self.from = self.leaf.offset();
-            self.code_completions(is_hash_expr(&self.leaf));
+        if cursor.leaf.kind() == SyntaxKind::Ident {
+            cursor.from = cursor.leaf.offset();
+            self.code_completions(cursor, is_hash_expr(&cursor.leaf));
             return true;
         }
 
         // Behind a half-completed context block: "context |".
         if_chain! {
-            if let Some(prev) = self.leaf.prev_leaf();
+            if let Some(prev) = cursor.leaf.prev_leaf();
             if prev.kind() == SyntaxKind::Context;
             then {
-                self.from = self.cursor;
-                self.code_completions( false);
+                cursor.from = cursor.cursor;
+                self.code_completions(cursor, false);
                 return true;
             }
         }
 
         // An existing identifier: "{ pa| }".
-        if self.leaf.kind() == SyntaxKind::Ident
-            && !matches!(self.leaf.parent_kind(), Some(SyntaxKind::FieldAccess))
+        if cursor.leaf.kind() == SyntaxKind::Ident
+            && !matches!(cursor.leaf.parent_kind(), Some(SyntaxKind::FieldAccess))
         {
-            self.from = self.leaf.offset();
-            self.code_completions(false);
+            cursor.from = cursor.leaf.offset();
+            self.code_completions(cursor, false);
             return true;
         }
 
         // Anywhere: "{ | }".
         // But not within or after an expression.
         // ctx.explicit &&
-        if self.leaf.kind().is_trivia()
+        if cursor.leaf.kind().is_trivia()
             || (matches!(
-                self.leaf.kind(),
+                cursor.leaf.kind(),
                 SyntaxKind::LeftParen | SyntaxKind::LeftBrace
-            ) || (matches!(self.leaf.kind(), SyntaxKind::Colon)
-                && self.leaf.parent_kind() == Some(SyntaxKind::ShowRule)))
+            ) || (matches!(cursor.leaf.kind(), SyntaxKind::Colon)
+                && cursor.leaf.parent_kind() == Some(SyntaxKind::ShowRule)))
         {
-            self.from = self.cursor;
-            self.code_completions(false);
+            cursor.from = cursor.cursor;
+            self.code_completions(cursor, false);
             return true;
         }
 
@@ -931,30 +992,31 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Add completions for expression snippets.
-#[rustfmt::skip]
-    fn code_completions(&mut self, hash: bool) {
-    // todo: filter code completions
-    // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
-    self.scope_completions(true);
+    fn code_completions(&mut self, cursor: &mut Cursor, hash: bool) {
+        // todo: filter code completions
+        // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) |
+        // Value::Module(_))
+        self.scope_completions(cursor, true);
 
-    self.snippet_completions(Some(InterpretMode::Code), None);
+        self.snippet_completions(cursor, Some(InterpretMode::Code), None);
 
-    if !hash {
-        self.snippet_completion(
-            "function",
-            "(${params}) => ${output}",
-            "Creates an unnamed function.",
-        );
+        if !hash {
+            self.snippet_completion(
+                cursor,
+                "function",
+                "(${params}) => ${output}",
+                "Creates an unnamed function.",
+            );
+        }
     }
-}
 
     /// Complete imports.
-    fn complete_imports(&mut self) -> bool {
+    fn complete_imports(&mut self, cursor: &mut Cursor) -> bool {
         // On the colon marker of an import list:
         // "#import "path.typ":|"
         if_chain! {
-            if matches!(self.leaf.kind(), SyntaxKind::Colon);
-            if let Some(parent) = self.leaf.clone().parent();
+            if matches!(cursor.leaf.kind(), SyntaxKind::Colon);
+            if let Some(parent) = cursor.leaf.clone().parent();
             if let Some(ast::Expr::Import(import)) = parent.get().cast();
             if !matches!(import.imports(), Some(ast::Imports::Wildcard));
             if let Some(source) = parent.children().find(|child| child.is::<ast::Expr>());
@@ -964,9 +1026,9 @@ impl<'a> CompletionWorker<'a> {
                     _ => Default::default(),
                 };
 
-                self.from = self.cursor;
+                cursor.from = cursor.cursor;
 
-                self.import_item_completions( items, vec![], &source);
+                self.import_item_completions(cursor, items, vec![], &source);
                 if items.iter().next().is_some() {
                     self.enrich("", ", ");
                 }
@@ -978,14 +1040,14 @@ impl<'a> CompletionWorker<'a> {
         // "#import "path.typ": |",
         // "#import "path.typ": a, b, |".
         if_chain! {
-            if let Some(prev) = self.leaf.prev_sibling();
+            if let Some(prev) = cursor.leaf.prev_sibling();
             if let Some(ast::Expr::Import(import)) = prev.get().cast();
-            if !self.text[prev.offset()..self.cursor].contains('\n');
+            if !cursor.text[prev.offset()..cursor.cursor].contains('\n');
             if let Some(ast::Imports::Items(items)) = import.imports();
             if let Some(source) = prev.children().find(|child| child.is::<ast::Expr>());
             then {
-                self.from = self.cursor;
-                self.import_item_completions( items, vec![], &source);
+                cursor.from = cursor.cursor;
+                self.import_item_completions( cursor,items, vec![], &source);
                 return true;
             }
         }
@@ -993,15 +1055,15 @@ impl<'a> CompletionWorker<'a> {
         // Behind a comma in an import list:
         // "#import "path.typ": this,|".
         if_chain! {
-            if matches!(self.leaf.kind(), SyntaxKind::Comma);
-            if let Some(parent) = self.leaf.clone().parent();
+            if matches!(cursor.leaf.kind(), SyntaxKind::Comma);
+            if let Some(parent) = cursor.leaf.clone().parent();
             if parent.kind() == SyntaxKind::ImportItems;
             if let Some(grand) = parent.parent();
             if let Some(ast::Expr::Import(import)) = grand.get().cast();
             if let Some(ast::Imports::Items(items)) = import.imports();
             if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
             then {
-                self.import_item_completions( items, vec![], &source);
+                self.import_item_completions(cursor, items, vec![], &source);
                 self.enrich(" ", "");
                 return true;
             }
@@ -1010,8 +1072,8 @@ impl<'a> CompletionWorker<'a> {
         // Behind a half-started identifier in an import list:
         // "#import "path.typ": th|".
         if_chain! {
-            if matches!(self.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
-            if let Some(path_ctx) = self.leaf.clone().parent();
+            if matches!(cursor.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
+            if let Some(path_ctx) = cursor.leaf.clone().parent();
             if path_ctx.kind() == SyntaxKind::ImportItemPath;
             if let Some(parent) = path_ctx.parent();
             if parent.kind() == SyntaxKind::ImportItems;
@@ -1020,11 +1082,11 @@ impl<'a> CompletionWorker<'a> {
             if let Some(ast::Imports::Items(items)) = import.imports();
             if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
             then {
-                if self.leaf.kind() == SyntaxKind::Ident {
-                    self.from = self.leaf.offset();
+                if cursor.leaf.kind() == SyntaxKind::Ident {
+                    cursor.from = cursor.leaf.offset();
                 }
-                let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| path.iter().take_while(|ident| ident.span() != self.leaf.span()).collect());
-                self.import_item_completions( items, path.unwrap_or_default(), &source);
+                let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| path.iter().take_while(|ident| ident.span() != cursor.leaf.span()).collect());
+                self.import_item_completions(cursor, items, path.unwrap_or_default(), &source);
                 return true;
             }
         }
@@ -1033,9 +1095,10 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Add completions for all exports of a module.
-    fn import_item_completions(
+    fn import_item_completions<'b>(
         &mut self,
-        existing: ast::ImportItems<'a>,
+        cursor: &mut Cursor<'b>,
+        existing: ast::ImportItems<'b>,
         comps: Vec<ast::Ident>,
         source: &LinkedNode,
     ) {
@@ -1068,25 +1131,22 @@ impl<'a> CompletionWorker<'a> {
             .collect::<Vec<_>>();
 
         if existing.iter().next().is_none() {
-            self.snippet_completion("*", "*", "Import everything.");
+            self.snippet_completion(cursor, "*", "*", "Import everything.");
         }
 
         for (name, value, _) in scope.iter() {
             if seen.iter().all(|item| item.as_str() != name) {
-                self.value_completion(Some(name.clone()), value, false, None);
+                self.value_completion(cursor, Some(name.clone()), value, false, None);
             }
         }
     }
 
     fn complete_path(
         &mut self,
-        node: Option<LinkedNode>,
-        source: &Source,
-        cursor: usize,
+        cursor: &mut Cursor,
         preference: &PathPreference,
     ) -> Option<Vec<CompletionItem>> {
-        let ctx = &mut self.ctx;
-        let id = source.id();
+        let id = cursor.source.id();
         if id.package().is_some() {
             return None;
         }
@@ -1094,30 +1154,25 @@ impl<'a> CompletionWorker<'a> {
         let is_in_text;
         let text;
         let rng;
-        let node = node.filter(|v| v.kind() == SyntaxKind::Str);
-        if let Some(str_node) = node {
-            // todo: the non-str case
-            str_node.cast::<ast::Str>()?;
-
-            let vr = str_node.range();
+        // todo: the non-str case
+        if cursor.leaf.is::<ast::Str>() {
+            let vr = cursor.leaf.range();
             rng = vr.start + 1..vr.end - 1;
-            crate::log_debug_ct!("path_of: {rng:?} {cursor}");
-            if rng.start > rng.end || (cursor != rng.end && !rng.contains(&cursor)) {
+            if rng.start > rng.end || (cursor.cursor != rng.end && !rng.contains(&cursor.cursor)) {
                 return None;
             }
 
             let mut w = EcoString::new();
             w.push('"');
-            w.push_str(&source.text()[rng.start..cursor]);
+            w.push_str(&cursor.text[rng.start..cursor.cursor]);
             w.push('"');
             let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
-            crate::log_debug_ct!("path_of: {rng:?} {partial_str:?}");
 
             text = partial_str.cast::<ast::Str>()?.get();
             is_in_text = true;
         } else {
             text = EcoString::default();
-            rng = cursor..cursor;
+            rng = cursor.cursor..cursor.cursor;
             is_in_text = false;
         }
         crate::log_debug_ct!("complete_path: is_in_text: {is_in_text:?}");
@@ -1144,7 +1199,7 @@ impl<'a> CompletionWorker<'a> {
         let folder_completions = vec![];
         let mut module_completions = vec![];
         // todo: test it correctly
-        for path in ctx.completion_files(preference) {
+        for path in self.ctx.completion_files(preference) {
             crate::log_debug_ct!("compl_check_path: {path:?}");
 
             // Skip self smartly
@@ -1175,7 +1230,7 @@ impl<'a> CompletionWorker<'a> {
             // }
         }
 
-        let replace_range = ctx.to_lsp_range(rng, source);
+        let replace_range = cursor.lsp_range_of(rng);
 
         fn is_dot_or_slash(ch: &char) -> bool {
             matches!(*ch, '.' | '/')
@@ -1219,7 +1274,7 @@ impl<'a> CompletionWorker<'a> {
                     sorter += 1;
 
                     // todo: no all clients support label details
-                    let res = LspCompletion {
+                    LspCompletion {
                         label: typst_completion.0.to_string(),
                         kind: Some(typst_completion.1.into()),
                         detail: None,
@@ -1229,11 +1284,7 @@ impl<'a> CompletionWorker<'a> {
                         filter_text: Some("".to_owned()),
                         insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                         ..Default::default()
-                    };
-
-                    crate::log_debug_ct!("compl_res: {res:?}");
-
-                    res
+                    }
                 })
                 .collect_vec(),
         )
@@ -1241,6 +1292,7 @@ impl<'a> CompletionWorker<'a> {
 
     fn snippet_completions(
         &mut self,
+        cursor: &mut Cursor,
         mode: Option<InterpretMode>,
         surrounding_syntax: Option<SurroundingSyntax>,
     ) {
@@ -1267,36 +1319,43 @@ impl<'a> CompletionWorker<'a> {
                 None => analysis.trigger_on_snippet(snippet.snippet.contains("${")),
             };
 
-            self.raw_completions.push(Completion {
-                kind: CompletionKind::Syntax,
-                label: snippet.label.as_ref().into(),
-                apply: Some(snippet.snippet.as_ref().into()),
-                detail: Some(snippet.description.as_ref().into()),
-                command,
-                ..Completion::default()
-            });
+            self.push_completion(
+                cursor,
+                Completion {
+                    kind: CompletionKind::Syntax,
+                    label: snippet.label.as_ref().into(),
+                    apply: Some(snippet.snippet.as_ref().into()),
+                    detail: Some(snippet.description.as_ref().into()),
+                    command,
+                    ..Completion::default()
+                },
+            );
         }
     }
 
     /// Add a snippet completion.
-    fn snippet_completion(&mut self, label: &str, snippet: &str, docs: &str) {
-        self.raw_completions.push(Completion {
-            kind: CompletionKind::Syntax,
-            label: label.into(),
-            apply: Some(snippet.into()),
-            detail: Some(docs.into()),
-            command: self.ctx.analysis.trigger_on_snippet(snippet.contains("${")),
-            ..Completion::default()
-        });
+    fn snippet_completion(&mut self, cursor: &mut Cursor, label: &str, snippet: &str, docs: &str) {
+        self.push_completion(
+            cursor,
+            Completion {
+                kind: CompletionKind::Syntax,
+                label: label.into(),
+                apply: Some(snippet.into()),
+                detail: Some(docs.into()),
+                command: self.ctx.analysis.trigger_on_snippet(snippet.contains("${")),
+                ..Completion::default()
+            },
+        );
     }
 
     /// Add completions for all font families.
-    fn font_completions(&mut self) {
-        let equation = self.before_window(25).contains("equation");
+    fn font_completions(&mut self, cursor: &mut Cursor) {
+        let equation = cursor.before_window(25).contains("equation");
         for (family, iter) in self.world().clone().book().families() {
             let detail = summarize_font_family(iter);
             if !equation || family.contains("Math") {
                 self.value_completion(
+                    cursor,
                     None,
                     &Value::Str(family.into()),
                     false,
@@ -1307,7 +1366,7 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Add completions for all available packages.
-    fn package_completions(&mut self, all_versions: bool) {
+    fn package_completions(&mut self, cursor: &mut Cursor, all_versions: bool) {
         let w = self.world().clone();
         let mut packages: Vec<_> = w
             .packages()
@@ -1328,6 +1387,7 @@ impl<'a> CompletionWorker<'a> {
         }
         for (package, description) in packages {
             self.value_completion(
+                cursor,
                 None,
                 &Value::Str(format_str!("{package}")),
                 false,
@@ -1337,7 +1397,7 @@ impl<'a> CompletionWorker<'a> {
     }
 
     /// Add completions for raw block tags.
-    fn raw_completions(&mut self) {
+    fn raw_completions(&mut self, cursor: &mut Cursor) {
         for (name, mut tags) in RawElem::languages() {
             let lower = name.to_lowercase();
             if !tags.contains(&lower.as_str()) {
@@ -1349,37 +1409,40 @@ impl<'a> CompletionWorker<'a> {
                 continue;
             }
 
-            self.raw_completions.push(Completion {
-                kind: CompletionKind::Constant,
-                label: name.into(),
-                apply: Some(tags[0].into()),
-                detail: Some(repr::separated_list(&tags, " or ").into()),
-                ..Completion::default()
-            });
+            self.push_completion(
+                cursor,
+                Completion {
+                    kind: CompletionKind::Constant,
+                    label: name.into(),
+                    apply: Some(tags[0].into()),
+                    detail: Some(repr::separated_list(&tags, " or ").into()),
+                    ..Completion::default()
+                },
+            );
         }
     }
 
     /// Add completions for labels and references.
-    fn ref_completions(&mut self) {
-        self.label_completions_(false, true);
+    fn ref_completions(&mut self, cursor: &mut Cursor) {
+        self.label_completions_(cursor, false, true);
     }
 
     /// Add completions for labels and references.
-    fn label_completions(&mut self, only_citation: bool) {
-        self.label_completions_(only_citation, false);
+    fn label_completions(&mut self, cursor: &mut Cursor, only_citation: bool) {
+        self.label_completions_(cursor, only_citation, false);
     }
 
     /// Add completions for labels and references.
-    fn label_completions_(&mut self, only_citation: bool, ref_label: bool) {
+    fn label_completions_(&mut self, cursor: &mut Cursor, only_citation: bool, ref_label: bool) {
         let Some(document) = self.document else {
             return;
         };
         let (labels, split) = analyze_labels(document);
 
-        let head = &self.text[..self.from];
+        let head = &cursor.text[..cursor.from];
         let at = head.ends_with('@');
         let open = !at && !head.ends_with('<');
-        let close = !at && !self.after.starts_with('>');
+        let close = !at && !cursor.after.starts_with('>');
         let citation = !at && only_citation;
 
         let (skip, take) = if at || ref_label {
@@ -1419,29 +1482,34 @@ impl<'a> CompletionWorker<'a> {
             if let Some(bib_title) = bib_title {
                 // Note that this completion re-uses the above `apply` field to
                 // alter the `bib_title` to the corresponding label.
-                self.raw_completions.push(Completion {
-                    kind: CompletionKind::Constant,
-                    label: bib_title.clone(),
-                    label_detail: Some(label),
-                    filter_text: Some(bib_title),
-                    detail,
-                    ..completion.clone()
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        kind: CompletionKind::Constant,
+                        label: bib_title.clone(),
+                        label_detail: Some(label),
+                        filter_text: Some(bib_title),
+                        detail,
+                        ..completion.clone()
+                    },
+                );
             }
 
-            self.raw_completions.push(completion);
+            self.push_completion(cursor, completion);
         }
     }
 
     /// Add a completion for a specific value.
     fn value_completion(
         &mut self,
+        cursor: &mut Cursor,
         label: Option<EcoString>,
         value: &Value,
         parens: bool,
         docs: Option<&str>,
     ) {
         self.value_completion_(
+            cursor,
             label,
             value,
             parens,
@@ -1456,6 +1524,7 @@ impl<'a> CompletionWorker<'a> {
     /// Add a completion for a specific value.
     fn value_completion_(
         &mut self,
+        cursor: &mut Cursor,
         label: Option<EcoString>,
         value: &Value,
         parens: bool,
@@ -1498,12 +1567,12 @@ impl<'a> CompletionWorker<'a> {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
             let apply_label = &mut label.as_str();
-            if apply_label.ends_with('"') && self.after.starts_with('"') {
+            if apply_label.ends_with('"') && cursor.after.starts_with('"') {
                 if let Some(trimmed) = apply_label.strip_suffix('"') {
                     *apply_label = trimmed;
                 }
             }
-            let from_before = slice_at(self.text, 0..self.from);
+            let from_before = slice_at(cursor.text, 0..cursor.from);
             if apply_label.starts_with('"') && from_before.ends_with('"') {
                 if let Some(trimmed) = apply_label.strip_prefix('"') {
                     *apply_label = trimmed;
@@ -1515,27 +1584,28 @@ impl<'a> CompletionWorker<'a> {
             }
         }
 
-        self.raw_completions.push(Completion {
-            kind: value_to_completion_kind(value),
-            label,
-            apply,
-            detail,
-            label_detail,
-            command,
-            ..Completion::default()
-        });
+        self.push_completion(
+            cursor,
+            Completion {
+                kind: value_to_completion_kind(value),
+                label,
+                apply,
+                detail,
+                label_detail,
+                command,
+                ..Completion::default()
+            },
+        );
     }
 
-    fn scope_defs(&mut self) -> Option<(Source, Defines)> {
-        let src = self.source.clone();
-
+    fn scope_defs(&mut self, cursor: &mut Cursor) -> Option<Defines> {
         let mut defines = Defines {
-            types: self.ctx.type_check(&src),
+            types: self.ctx.type_check(&cursor.source),
             defines: Default::default(),
             docs: Default::default(),
         };
 
-        let mode = interpret_mode_at(Some(&self.leaf));
+        let mode = interpret_mode_at(Some(&cursor.leaf));
         let in_math = matches!(mode, InterpretMode::Math);
 
         let lib = self.world().library();
@@ -1544,7 +1614,7 @@ impl<'a> CompletionWorker<'a> {
             .clone();
         defines.insert_scope(&scope);
 
-        previous_decls(self.leaf.clone(), |node| -> Option<()> {
+        previous_decls(cursor.leaf.clone(), |node| -> Option<()> {
             match node {
                 PreviousDecl::Ident(ident) => {
                     let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
@@ -1571,19 +1641,22 @@ impl<'a> CompletionWorker<'a> {
             None
         });
 
-        Some((src, defines))
+        Some(defines)
     }
 
-    fn postfix_completions(&mut self, node: &LinkedNode, ty: Ty) -> Option<()> {
+    fn postfix_completions(
+        &mut self,
+        cursor: &mut Cursor,
+        node: &LinkedNode,
+        ty: Ty,
+    ) -> Option<()> {
         if !self.ctx.analysis.completion_feat.postfix() {
             return None;
         }
-        let src = self.source.clone();
 
         let _ = node;
 
-        let surrounding_syntax = self.surrounding_syntax();
-        if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+        if !matches!(cursor.surrounding_syntax, SurroundingSyntax::Regular) {
             return None;
         }
 
@@ -1592,7 +1665,7 @@ impl<'a> CompletionWorker<'a> {
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
         let rng = node.range();
-        for snippet in self.ctx.analysis.completion_feat.postfix_snippets() {
+        for snippet in self.ctx.analysis.completion_feat.postfix_snippets().clone() {
             if !snippet.mode.contains(&cursor_mode) {
                 continue;
             }
@@ -1657,31 +1730,37 @@ impl<'a> CompletionWorker<'a> {
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.start..self.from, &src),
+                    range: cursor.lsp_range_of(rng.start..cursor.from),
                     new_text: String::new(),
                 };
 
-                self.raw_completions.push(Completion {
-                    apply: Some(eco_format!(
-                        "{node_before_before_cursor}{node_before}{node_content}{node_after}"
-                    )),
-                    additional_text_edits: Some(vec![before]),
-                    ..base
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        apply: Some(eco_format!(
+                            "{node_before_before_cursor}{node_before}{node_content}{node_after}"
+                        )),
+                        additional_text_edits: Some(vec![before]),
+                        ..base
+                    },
+                );
             } else {
                 let before = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    range: cursor.lsp_range_of(rng.start..rng.start),
                     new_text: node_before.as_ref().into(),
                 };
                 let after = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    range: cursor.lsp_range_of(rng.end..cursor.from),
                     new_text: "".into(),
                 };
-                self.raw_completions.push(Completion {
-                    apply: Some(node_after.clone()),
-                    additional_text_edits: Some(vec![before, after]),
-                    ..base
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        apply: Some(node_after.clone()),
+                        additional_text_edits: Some(vec![before, after]),
+                        ..base
+                    },
+                );
             }
         }
 
@@ -1690,17 +1769,16 @@ impl<'a> CompletionWorker<'a> {
 
     /// Make ufcs-style completions. Note: you must check that node is a content
     /// before calling this. Todo: ufcs completions for other types.
-    pub fn ufcs_completions(&mut self, node: &LinkedNode) {
+    pub fn ufcs_completions(&mut self, cursor: &mut Cursor, node: &LinkedNode) {
         if !self.ctx.analysis.completion_feat.any_ufcs() {
             return;
         }
 
-        let surrounding_syntax = self.surrounding_syntax();
-        if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+        if !matches!(cursor.surrounding_syntax, SurroundingSyntax::Regular) {
             return;
         }
 
-        let Some((src, defines)) = self.scope_defs() else {
+        let Some(defines) = self.scope_defs(cursor) else {
             return;
         };
 
@@ -1752,73 +1830,82 @@ impl<'a> CompletionWorker<'a> {
             crate::log_debug_ct!("checked ufcs: {ty:?}");
             if self.ctx.analysis.completion_feat.ufcs() && fn_feat.min_pos() == 1 {
                 let before = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    range: cursor.lsp_range_of(rng.start..rng.start),
                     new_text: format!("{name}{lb}"),
                 };
                 let after = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    range: cursor.lsp_range_of(rng.end..cursor.from),
                     new_text: rb.into(),
                 };
 
-                self.raw_completions.push(Completion {
-                    label: name.clone(),
-                    additional_text_edits: Some(vec![before, after]),
-                    ..base.clone()
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        label: name.clone(),
+                        additional_text_edits: Some(vec![before, after]),
+                        ..base.clone()
+                    },
+                );
             }
             let more_args = fn_feat.min_pos() > 1 || fn_feat.min_named() > 0;
             if self.ctx.analysis.completion_feat.ufcs_left() && more_args {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.start..self.from, &src),
+                    range: cursor.lsp_range_of(rng.start..cursor.from),
                     new_text: format!("{name}{lb}"),
                 };
-                self.raw_completions.push(Completion {
-                    apply: if is_content_block {
-                        Some(eco_format!("(${{}}){node_content}"))
-                    } else {
-                        Some(eco_format!("${{}}, {node_content})"))
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        apply: if is_content_block {
+                            Some(eco_format!("(${{}}){node_content}"))
+                        } else {
+                            Some(eco_format!("${{}}, {node_content})"))
+                        },
+                        label: eco_format!("{name}("),
+                        additional_text_edits: Some(vec![before]),
+                        ..base.clone()
                     },
-                    label: eco_format!("{name}("),
-                    additional_text_edits: Some(vec![before]),
-                    ..base.clone()
-                });
+                );
             }
             if self.ctx.analysis.completion_feat.ufcs_right() && more_args {
                 let before = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    range: cursor.lsp_range_of(rng.start..rng.start),
                     new_text: format!("{name}("),
                 };
                 let after = TextEdit {
-                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    range: cursor.lsp_range_of(rng.end..cursor.from),
                     new_text: "".into(),
                 };
-                self.raw_completions.push(Completion {
-                    apply: Some(eco_format!("${{}})")),
-                    label: eco_format!("{name})"),
-                    additional_text_edits: Some(vec![before, after]),
-                    ..base
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        apply: Some(eco_format!("${{}})")),
+                        label: eco_format!("{name})"),
+                        additional_text_edits: Some(vec![before, after]),
+                        ..base
+                    },
+                );
             }
         }
     }
 
     /// Add completions for definitions that are available at the cursor.
-    pub fn scope_completions(&mut self, parens: bool) {
-        let Some((_, defines)) = self.scope_defs() else {
+    pub fn scope_completions(&mut self, cursor: &mut Cursor, parens: bool) {
+        let Some(defines) = self.scope_defs(cursor) else {
             return;
         };
 
-        self.def_completions(defines, parens);
+        self.def_completions(cursor, defines, parens);
     }
 
     /// Add completions for definitions.
-    fn def_completions(&mut self, defines: Defines, parens: bool) {
+    fn def_completions(&mut self, cursor: &mut Cursor, defines: Defines, parens: bool) {
         let default_docs = defines.docs;
         let defines = defines.defines;
 
-        let surrounding_syntax = self.surrounding_syntax();
-        let mode = interpret_mode_at(Some(&self.leaf));
+        let mode = interpret_mode_at(Some(&cursor.leaf));
+        let surrounding_syntax = cursor.surrounding_syntax;
 
         let mut kind_checker = CompletionKindChecker {
             symbols: HashSet::default(),
@@ -1868,13 +1955,16 @@ impl<'a> CompletionWorker<'a> {
             if let Some(ch) = kind_checker.symbols.iter().min().copied() {
                 // todo: describe all chars
                 let kind = CompletionKind::Symbol(ch);
-                self.raw_completions.push(Completion {
-                    kind,
-                    label: name,
-                    label_detail: Some(symbol_label_detail(ch)),
-                    detail: Some(symbol_detail(ch)),
-                    ..Completion::default()
-                });
+                self.push_completion(
+                    cursor,
+                    Completion {
+                        kind,
+                        label: name,
+                        label_detail: Some(symbol_label_detail(ch)),
+                        detail: Some(symbol_detail(ch)),
+                        ..Completion::default()
+                    },
+                );
                 continue;
             }
 
@@ -1898,57 +1988,77 @@ impl<'a> CompletionWorker<'a> {
 
                 crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
 
-                if matches!(surrounding_syntax, SurroundingSyntax::ShowTransform)
+                if matches!(cursor.surrounding_syntax, SurroundingSyntax::ShowTransform)
                     && (fn_feat.min_pos() > 0 || fn_feat.min_named() > 0)
                 {
-                    self.raw_completions.push(Completion {
-                        label: eco_format!("{}.with", name),
-                        apply: Some(eco_format!("{}.with(${{}})", name)),
-                        ..base.clone()
-                    });
+                    self.push_completion(
+                        cursor,
+                        Completion {
+                            label: eco_format!("{}.with", name),
+                            apply: Some(eco_format!("{}.with(${{}})", name)),
+                            ..base.clone()
+                        },
+                    );
                 }
-                if fn_feat.is_element && matches!(surrounding_syntax, SurroundingSyntax::Selector) {
-                    self.raw_completions.push(Completion {
-                        label: eco_format!("{}.where", name),
-                        apply: Some(eco_format!("{}.where(${{}})", name)),
-                        ..base.clone()
-                    });
+                if fn_feat.is_element
+                    && matches!(cursor.surrounding_syntax, SurroundingSyntax::Selector)
+                {
+                    self.push_completion(
+                        cursor,
+                        Completion {
+                            label: eco_format!("{}.where", name),
+                            apply: Some(eco_format!("{}.where(${{}})", name)),
+                            ..base.clone()
+                        },
+                    );
                 }
 
                 let bad_instantiate = matches!(
-                    surrounding_syntax,
+                    cursor.surrounding_syntax,
                     SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                 ) && !fn_feat.is_element;
                 if !bad_instantiate {
-                    if !parens || matches!(surrounding_syntax, SurroundingSyntax::Selector) {
-                        self.raw_completions.push(Completion {
-                            label: name,
-                            ..base
-                        });
+                    if !parens || matches!(cursor.surrounding_syntax, SurroundingSyntax::Selector) {
+                        self.push_completion(
+                            cursor,
+                            Completion {
+                                label: name,
+                                ..base
+                            },
+                        );
                     } else if fn_feat.min_pos() < 1 && !fn_feat.has_rest {
-                        self.raw_completions.push(Completion {
-                            apply: Some(eco_format!("{}()${{}}", name)),
-                            label: name,
-                            ..base
-                        });
+                        self.push_completion(
+                            cursor,
+                            Completion {
+                                apply: Some(eco_format!("{}()${{}}", name)),
+                                label: name,
+                                ..base
+                            },
+                        );
                     } else {
                         let accept_content_arg = fn_feat.next_arg_is_content && !fn_feat.has_rest;
                         let scope_reject_content = matches!(mode, InterpretMode::Math)
                             || matches!(
-                                surrounding_syntax,
+                                cursor.surrounding_syntax,
                                 SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                             );
-                        self.raw_completions.push(Completion {
-                            apply: Some(eco_format!("{name}(${{}})")),
-                            label: name.clone(),
-                            ..base.clone()
-                        });
+                        self.push_completion(
+                            cursor,
+                            Completion {
+                                apply: Some(eco_format!("{name}(${{}})")),
+                                label: name.clone(),
+                                ..base.clone()
+                            },
+                        );
                         if !scope_reject_content && accept_content_arg {
-                            self.raw_completions.push(Completion {
-                                apply: Some(eco_format!("{name}[${{}}]")),
-                                label: eco_format!("{name}.bracket"),
-                                ..base
-                            });
+                            self.push_completion(
+                                cursor,
+                                Completion {
+                                    apply: Some(eco_format!("{name}[${{}}]")),
+                                    label: eco_format!("{name}.bracket"),
+                                    ..base
+                                },
+                            );
                         };
                     }
                 }
@@ -1956,32 +2066,37 @@ impl<'a> CompletionWorker<'a> {
             }
 
             let kind = ty_to_completion_kind(&ty);
-            self.raw_completions.push(Completion {
-                kind,
-                label: name,
-                label_detail: label_detail.clone(),
-                detail,
-                ..Completion::default()
-            });
+            self.push_completion(
+                cursor,
+                Completion {
+                    kind,
+                    label: name,
+                    label_detail: label_detail.clone(),
+                    detail,
+                    ..Completion::default()
+                },
+            );
         }
     }
     /// Add completions for all fields on a node.
-    fn field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
-        self.value_field_access_completions(target)
-            .or_else(|| self.type_field_access_completions(target))
+    fn field_access_completions(&mut self, cursor: &mut Cursor, target: &LinkedNode) -> Option<()> {
+        self.value_field_access_completions(cursor, target)
+            .or_else(|| self.type_field_access_completions(cursor, target))
     }
 
     /// Add completions for all fields on a type.
-    fn type_field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
+    fn type_field_access_completions(
+        &mut self,
+        cursor: &mut Cursor,
+        target: &LinkedNode,
+    ) -> Option<()> {
         let ty = self
             .ctx
             .post_type_of_node(target.clone())
             .filter(|ty| !matches!(ty, Ty::Any));
         crate::log_debug_ct!("type_field_access_completions_on: {target:?} -> {ty:?}");
-
-        let src = self.source.clone();
         let mut defines = Defines {
-            types: self.ctx.type_check(&src),
+            types: self.ctx.type_check(&cursor.source),
             defines: Default::default(),
             docs: Default::default(),
         };
@@ -1994,20 +2109,24 @@ impl<'a> CompletionWorker<'a> {
             },
         );
 
-        self.def_completions(defines, true);
+        self.def_completions(cursor, defines, true);
         Some(())
     }
 
     /// Add completions for all fields on a value.
-    fn value_field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
+    fn value_field_access_completions(
+        &mut self,
+        cursor: &mut Cursor,
+        target: &LinkedNode,
+    ) -> Option<()> {
         let (value, styles) = self.ctx.analyze_expr(target).into_iter().next()?;
         for (name, value, _) in value.ty().scope().iter() {
-            self.value_completion(Some(name.clone()), value, true, None);
+            self.value_completion(cursor, Some(name.clone()), value, true, None);
         }
 
         if let Some(scope) = value.scope() {
             for (name, value, _) in scope.iter() {
-                self.value_completion(Some(name.clone()), value, true, None);
+                self.value_completion(cursor, Some(name.clone()), value, true, None);
             }
         }
 
@@ -2018,6 +2137,7 @@ impl<'a> CompletionWorker<'a> {
             // 2. We can unwrap the field's value since it's a field belonging to
             // this value's type, so accessing it should not fail.
             self.value_completion(
+                cursor,
                 Some(field.into()),
                 &value.field(field).unwrap(),
                 false,
@@ -2025,33 +2145,36 @@ impl<'a> CompletionWorker<'a> {
             );
         }
 
-        self.postfix_completions(target, Ty::Value(InsTy::new(value.clone())));
+        self.postfix_completions(cursor, target, Ty::Value(InsTy::new(value.clone())));
 
         match value {
             Value::Symbol(symbol) => {
                 for modifier in symbol.modifiers() {
                     if let Ok(modified) = symbol.clone().modified(modifier) {
-                        self.raw_completions.push(Completion {
-                            kind: CompletionKind::Symbol(modified.get()),
-                            label: modifier.into(),
-                            label_detail: Some(symbol_label_detail(modified.get())),
-                            ..Completion::default()
-                        });
+                        self.push_completion(
+                            cursor,
+                            Completion {
+                                kind: CompletionKind::Symbol(modified.get()),
+                                label: modifier.into(),
+                                label_detail: Some(symbol_label_detail(modified.get())),
+                                ..Completion::default()
+                            },
+                        );
                     }
                 }
 
-                self.ufcs_completions(target);
+                self.ufcs_completions(cursor, target);
             }
             Value::Content(content) => {
                 for (name, value) in content.fields() {
-                    self.value_completion(Some(name.into()), &value, false, None);
+                    self.value_completion(cursor, Some(name.into()), &value, false, None);
                 }
 
-                self.ufcs_completions(target);
+                self.ufcs_completions(cursor, target);
             }
             Value::Dict(dict) => {
                 for (name, value) in dict.iter() {
-                    self.value_completion(Some(name.clone().into()), value, false, None);
+                    self.value_completion(cursor, Some(name.clone().into()), value, false, None);
                 }
             }
             Value::Func(func) => {
@@ -2063,6 +2186,7 @@ impl<'a> CompletionWorker<'a> {
                             .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
                         {
                             self.value_completion(
+                                cursor,
                                 Some(param.name.into()),
                                 &value.unwrap(),
                                 false,
@@ -2074,11 +2198,14 @@ impl<'a> CompletionWorker<'a> {
             }
             Value::Plugin(plugin) => {
                 for name in plugin.iter() {
-                    self.raw_completions.push(Completion {
-                        kind: CompletionKind::Func,
-                        label: name.clone(),
-                        ..Completion::default()
-                    })
+                    self.push_completion(
+                        cursor,
+                        Completion {
+                            kind: CompletionKind::Func,
+                            label: name.clone(),
+                            ..Completion::default()
+                        },
+                    )
                 }
             }
             _ => {}
@@ -2094,15 +2221,20 @@ struct TypeCompletionWorker<'a, 'b> {
 }
 
 impl TypeCompletionWorker<'_, '_> {
-    fn snippet_completion(&mut self, label: &str, apply: &str, detail: &str) {
+    fn snippet_completion(&mut self, cursor: &mut Cursor, label: &str, apply: &str, detail: &str) {
         if !(self.filter)(&Ty::Any) {
             return;
         }
 
-        self.base.snippet_completion(label, apply, detail);
+        self.base.snippet_completion(cursor, label, apply, detail);
     }
 
-    fn type_completion(&mut self, infer_type: &Ty, docs: Option<&str>) -> Option<()> {
+    fn type_completion(
+        &mut self,
+        cursor: &mut Cursor,
+        infer_type: &Ty,
+        docs: Option<&str>,
+    ) -> Option<()> {
         // Prevent duplicate completions from appearing.
         if !self.base.seen_types.insert(infer_type.clone()) {
             return Some(());
@@ -2123,41 +2255,41 @@ impl TypeCompletionWorker<'_, '_> {
             Ty::If(_) => return None,
             Ty::Union(u) => {
                 for info in u.as_ref() {
-                    self.type_completion(info, docs);
+                    self.type_completion(cursor, info, docs);
                 }
             }
             Ty::Let(bounds) => {
                 for ut in bounds.ubs.iter() {
-                    self.type_completion(ut, docs);
+                    self.type_completion(cursor, ut, docs);
                 }
                 for lt in bounds.lbs.iter() {
-                    self.type_completion(lt, docs);
+                    self.type_completion(cursor, lt, docs);
                 }
             }
             Ty::Tuple(..) | Ty::Array(..) => {
                 if !(self.filter)(infer_type) {
                     return None;
                 }
-                self.snippet_completion("()", "(${})", "An array.");
+                self.snippet_completion(cursor, "()", "(${})", "An array.");
             }
             Ty::Dict(..) => {
                 if !(self.filter)(infer_type) {
                     return None;
                 }
-                self.snippet_completion("()", "(${})", "A dictionary.");
+                self.snippet_completion(cursor, "()", "(${})", "A dictionary.");
             }
             Ty::Boolean(_b) => {
                 if !(self.filter)(infer_type) {
                     return None;
                 }
-                self.snippet_completion("false", "false", "No / Disabled.");
-                self.snippet_completion("true", "true", "Yes / Enabled.");
+                self.snippet_completion(cursor, "false", "false", "No / Disabled.");
+                self.snippet_completion(cursor, "true", "true", "Yes / Enabled.");
             }
             Ty::Builtin(v) => {
                 if !(self.filter)(infer_type) {
                     return None;
                 }
-                self.builtin_type_completion(v, docs);
+                self.builtin_type_completion(cursor, v, docs);
             }
             Ty::Value(v) => {
                 if !(self.filter)(infer_type) {
@@ -2166,13 +2298,13 @@ impl TypeCompletionWorker<'_, '_> {
                 let docs = v.syntax.as_ref().map(|s| s.doc.as_ref()).or(docs);
 
                 if let Value::Type(ty) = &v.val {
-                    self.type_completion(&Ty::Builtin(BuiltinTy::Type(*ty)), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Type(*ty)), docs);
                 } else if v.val.ty() == Type::of::<NoneValue>() {
-                    self.type_completion(&Ty::Builtin(BuiltinTy::None), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::None), docs);
                 } else if v.val.ty() == Type::of::<AutoValue>() {
-                    self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Auto), docs);
                 } else {
-                    self.base.value_completion(None, &v.val, true, docs);
+                    self.base.value_completion(cursor, None, &v.val, true, docs);
                 }
             }
             Ty::Param(param) => {
@@ -2180,7 +2312,7 @@ impl TypeCompletionWorker<'_, '_> {
 
                 let docs = docs.or_else(|| param.docs.as_deref());
                 if param.attrs.positional {
-                    self.type_completion(&param.ty, docs);
+                    self.type_completion(cursor, &param.ty, docs);
                 }
                 if !param.attrs.named {
                     return Some(());
@@ -2194,7 +2326,7 @@ impl TypeCompletionWorker<'_, '_> {
                     return None;
                 }
 
-                let mut rev_stream = self.base.before.chars().rev();
+                let mut rev_stream = cursor.before.chars().rev();
                 let ch = rev_stream.find(|ch| !typst::syntax::is_id_continue(*ch));
                 // skip label/ref completion.
                 // todo: more elegant way
@@ -2202,30 +2334,38 @@ impl TypeCompletionWorker<'_, '_> {
                     return Some(());
                 }
 
-                self.base.raw_completions.push(Completion {
-                    kind: CompletionKind::Field,
-                    label: field.into(),
-                    apply: Some(eco_format!("{}: ${{}}", field)),
-                    label_detail: param.ty.describe(),
-                    detail: docs.map(Into::into),
-                    command: self
-                        .base
-                        .ctx
-                        .analysis
-                        .trigger_on_snippet_with_param_hint(true),
-                    ..Completion::default()
-                });
+                self.base.push_completion(
+                    cursor,
+                    Completion {
+                        kind: CompletionKind::Field,
+                        label: field.into(),
+                        apply: Some(eco_format!("{}: ${{}}", field)),
+                        label_detail: param.ty.describe(),
+                        detail: docs.map(Into::into),
+                        command: self
+                            .base
+                            .ctx
+                            .analysis
+                            .trigger_on_snippet_with_param_hint(true),
+                        ..Completion::default()
+                    },
+                );
             }
         };
 
         Some(())
     }
 
-    fn builtin_type_completion(&mut self, v: &BuiltinTy, docs: Option<&str>) -> Option<()> {
+    fn builtin_type_completion(
+        &mut self,
+        cursor: &mut Cursor,
+        v: &BuiltinTy,
+        docs: Option<&str>,
+    ) -> Option<()> {
         match v {
-            BuiltinTy::None => self.snippet_completion("none", "none", "Nothing."),
+            BuiltinTy::None => self.snippet_completion(cursor, "none", "none", "Nothing."),
             BuiltinTy::Auto => {
-                self.snippet_completion("auto", "auto", "A smart default.");
+                self.snippet_completion(cursor, "auto", "auto", "A smart default.");
             }
             BuiltinTy::Clause => return None,
             BuiltinTy::Undef => return None,
@@ -2239,56 +2379,61 @@ impl TypeCompletionWorker<'_, '_> {
             BuiltinTy::Module(..) => return None,
 
             BuiltinTy::Path(preference) => {
-                let source = self.base.source.clone();
-
-                let items = self.base.complete_path(
-                    Some(self.base.leaf.clone()),
-                    &source,
-                    self.base.cursor,
-                    preference,
-                );
+                let items = self.base.complete_path(cursor, preference);
                 self.base.completions.extend(items.into_iter().flatten());
             }
             BuiltinTy::Args => return None,
             BuiltinTy::Stroke => {
-                self.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
-                self.snippet_completion("()", "(${})", "Stroke dictionary.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Color), docs);
-                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion(cursor, "stroke()", "stroke(${})", "Stroke type.");
+                self.snippet_completion(cursor, "()", "(${})", "Stroke dictionary.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Color), docs);
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Color => {
-                self.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
                 self.snippet_completion(
+                    cursor,
+                    "luma()",
+                    "luma(${v})",
+                    "A custom grayscale color.",
+                );
+                self.snippet_completion(
+                    cursor,
                     "rgb()",
                     "rgb(${r}, ${g}, ${b}, ${a})",
                     "A custom RGBA color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "cmyk()",
                     "cmyk(${c}, ${m}, ${y}, ${k})",
                     "A custom CMYK color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "oklab()",
                     "oklab(${l}, ${a}, ${b}, ${alpha})",
                     "A custom Oklab color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "oklch()",
                     "oklch(${l}, ${chroma}, ${hue}, ${alpha})",
                     "A custom Oklch color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "color.linear-rgb()",
                     "color.linear-rgb(${r}, ${g}, ${b}, ${a})",
                     "A custom linear RGBA color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "color.hsv()",
                     "color.hsv(${h}, ${s}, ${v}, ${a})",
                     "A custom HSVA color.",
                 );
                 self.snippet_completion(
+                    cursor,
                     "color.hsl()",
                     "color.hsl(${h}, ${s}, ${l}, ${a})",
                     "A custom HSLA color.",
@@ -2298,105 +2443,117 @@ impl TypeCompletionWorker<'_, '_> {
             BuiltinTy::TextLang => {
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
                     let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
-                    self.base.raw_completions.push(Completion {
-                        kind: CompletionKind::Syntax,
-                        label: key.to_lowercase().into(),
-                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
-                        detail: Some(detail),
-                        label_detail: Some(desc.name.into()),
-                        ..Completion::default()
-                    });
+                    self.base.push_completion(
+                        cursor,
+                        Completion {
+                            kind: CompletionKind::Syntax,
+                            label: key.to_lowercase().into(),
+                            apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                            detail: Some(detail),
+                            label_detail: Some(desc.name.into()),
+                            ..Completion::default()
+                        },
+                    );
                 }
             }
             BuiltinTy::TextRegion => {
                 for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
                     let detail = eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.name);
-                    self.base.raw_completions.push(Completion {
-                        kind: CompletionKind::Syntax,
-                        label: key.to_lowercase().into(),
-                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
-                        detail: Some(detail),
-                        label_detail: Some(desc.name.into()),
-                        ..Completion::default()
-                    });
+                    self.base.push_completion(
+                        cursor,
+                        Completion {
+                            kind: CompletionKind::Syntax,
+                            label: key.to_lowercase().into(),
+                            apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                            detail: Some(detail),
+                            label_detail: Some(desc.name.into()),
+                            ..Completion::default()
+                        },
+                    );
                 }
             }
             BuiltinTy::Dir => {}
             BuiltinTy::TextFont => {
-                self.base.font_completions();
+                self.base.font_completions(cursor);
             }
             BuiltinTy::Margin => {
-                self.snippet_completion("()", "(${})", "Margin dictionary.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion(cursor, "()", "(${})", "Margin dictionary.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Inset => {
-                self.snippet_completion("()", "(${})", "Inset dictionary.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion(cursor, "()", "(${})", "Inset dictionary.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Outset => {
-                self.snippet_completion("()", "(${})", "Outset dictionary.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion(cursor, "()", "(${})", "Outset dictionary.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Radius => {
-                self.snippet_completion("()", "(${})", "Radius dictionary.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
+                self.snippet_completion(cursor, "()", "(${})", "Radius dictionary.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Length => {
-                self.snippet_completion("pt", "${1}pt", "Point length unit.");
-                self.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
-                self.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
-                self.snippet_completion("in", "${1}in", "Inch length unit.");
-                self.snippet_completion("em", "${1}em", "Em length unit.");
-                self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
+                self.snippet_completion(cursor, "pt", "${1}pt", "Point length unit.");
+                self.snippet_completion(cursor, "mm", "${1}mm", "Millimeter length unit.");
+                self.snippet_completion(cursor, "cm", "${1}cm", "Centimeter length unit.");
+                self.snippet_completion(cursor, "in", "${1}in", "Inch length unit.");
+                self.snippet_completion(cursor, "em", "${1}em", "Em length unit.");
+                self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Auto), docs);
             }
             BuiltinTy::Float => {
                 self.snippet_completion(
+                    cursor,
                     "exponential notation",
                     "${1}e${0}",
                     "Exponential notation",
                 );
             }
             BuiltinTy::Label => {
-                self.base.label_completions(false);
+                self.base.label_completions(cursor, false);
             }
             BuiltinTy::CiteLabel => {
-                self.base.label_completions(true);
+                self.base.label_completions(cursor, true);
             }
             BuiltinTy::RefLabel => {
-                self.base.ref_completions();
+                self.base.ref_completions(cursor);
             }
             BuiltinTy::TypeType(ty) | BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
                     let docs = docs.or(Some("Nothing."));
-                    self.type_completion(&Ty::Builtin(BuiltinTy::None), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
                     let docs = docs.or(Some("A smart default."));
-                    self.type_completion(&Ty::Builtin(BuiltinTy::Auto), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
-                    self.snippet_completion("false", "false", "No / Disabled.");
-                    self.snippet_completion("true", "true", "Yes / Enabled.");
+                    self.snippet_completion(cursor, "false", "false", "No / Disabled.");
+                    self.snippet_completion(cursor, "true", "true", "Yes / Enabled.");
                 } else if *ty == Type::of::<Color>() {
-                    self.type_completion(&Ty::Builtin(BuiltinTy::Color), docs);
+                    self.type_completion(cursor, &Ty::Builtin(BuiltinTy::Color), docs);
                 } else if *ty == Type::of::<Label>() {
-                    self.base.label_completions(false)
+                    self.base.label_completions(cursor, false)
                 } else if *ty == Type::of::<Func>() {
                     self.snippet_completion(
+                        cursor,
                         "function",
                         "(${params}) => ${output}",
                         "A custom function.",
                     );
                 } else {
-                    self.base.raw_completions.push(Completion {
-                        kind: CompletionKind::Syntax,
-                        label: ty.short_name().into(),
-                        apply: Some(eco_format!("${{{ty}}}")),
-                        detail: Some(eco_format!("A value of type {ty}.")),
-                        ..Completion::default()
-                    });
+                    self.base.push_completion(
+                        cursor,
+                        Completion {
+                            kind: CompletionKind::Syntax,
+                            label: ty.short_name().into(),
+                            apply: Some(eco_format!("${{{ty}}}")),
+                            detail: Some(eco_format!("A value of type {ty}.")),
+                            ..Completion::default()
+                        },
+                    );
                 }
             }
             BuiltinTy::Element(elem) => {
                 self.base.value_completion(
+                    cursor,
                     Some(elem.name().into()),
                     &Value::Func((*elem).into()),
                     true,
@@ -2931,14 +3088,13 @@ static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
 
 /// Adds numbering to placeholders in snippets
-fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+fn to_lsp_snippet(typst_snippet: &str) -> String {
     let mut counter = 1;
-    let result =
-        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
-            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
-            counter += 1;
-            substitution
-        });
+    let result = TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet, |cap: &Captures| {
+        let substitution = format!("${{{}:{}}}", counter, &cap[1]);
+        counter += 1;
+        substitution
+    });
 
     result.to_string()
 }
