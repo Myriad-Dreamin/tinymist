@@ -212,7 +212,9 @@ impl RenameFileWorker<'_> {
         let root = LinkedNode::new(ref_src.root());
         let edits = edits.entry(uri).or_default();
         for obj in &link_info.objects {
-            if !matches!(obj.target, LinkTarget::Path(..)) {
+            if !matches!(&obj.target,
+                LinkTarget::Path(file_id, _) if *file_id == self.def_fid
+            ) {
                 continue;
             }
             if let Some(edit) = self.rename_resource_path(obj, &root, &ref_src) {
