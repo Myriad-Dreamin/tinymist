@@ -374,7 +374,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:7ed80ba766d7520604d29b113cda11a");
+        insta::assert_snapshot!(hash, @"siphash128_13:a46fdba2828c3e0b2fa431509c12d45e");
     }
 
     {
