@@ -8,14 +8,13 @@ pub use ecow::{eco_vec, EcoVec};
 pub use itertools::{Format, Itertools};
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
-    ColorInformation, ColorPresentation, CompletionResponse, Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentLink,
-    DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
-    Hover, HoverContents, InlayHint, LanguageString, Location as LspLocation, LocationLink,
-    MarkedString, MarkupContent, MarkupKind, ParameterInformation, Position as LspPosition,
-    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
-    SymbolInformation, TextEdit, Url, WorkspaceEdit,
+    ColorInformation, ColorPresentation, Diagnostic, DiagnosticRelatedInformation,
+    DiagnosticSeverity, DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
+    Documentation, FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
+    LanguageString, Location as LspLocation, LocationLink, MarkedString, MarkupContent, MarkupKind,
+    ParameterInformation, Position as LspPosition, PrepareRenameResponse, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
+    SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;

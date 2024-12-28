@@ -1,9 +1,10 @@
-use lsp_types::CompletionList;
-
 use crate::analysis::{CompletionCursor, CompletionWorker};
 use crate::prelude::*;
 
+pub(crate) mod proto;
+pub use proto::*;
 pub(crate) mod snippet;
+pub use snippet::*;
 
 /// The [`textDocument/completion`] request is sent from the client to the
 /// server to compute completion items at a given cursor position.
@@ -38,7 +39,7 @@ pub struct CompletionRequest {
 }
 
 impl StatefulRequest for CompletionRequest {
-    type Response = CompletionResponse;
+    type Response = CompletionList;
 
     fn request(
         self,
@@ -86,10 +87,10 @@ impl StatefulRequest for CompletionRequest {
         // To response completions in fine-grained manner, we need to mark result as
         // incomplete. This follows what rust-analyzer does.
         // https://github.com/rust-lang/rust-analyzer/blob/f5a9250147f6569d8d89334dc9cca79c0322729f/crates/rust-analyzer/src/handlers/request.rs#L940C55-L940C75
-        Some(CompletionResponse::List(CompletionList {
+        Some(CompletionList {
             is_incomplete: false,
             items,
-        }))
+        })
     }
 }
 
@@ -98,10 +99,9 @@ mod tests {
     use std::collections::HashSet;
 
     use insta::with_settings;
-    use lsp_types::CompletionItem;
 
     use super::*;
-    use crate::{syntax::find_module_level_docs, tests::*};
+    use crate::{completion::proto::CompletionItem, syntax::find_module_level_docs, tests::*};
 
     struct TestConfig {
         pkg_mode: bool,
@@ -175,13 +175,13 @@ mod tests {
                     explicit: false,
                     trigger_character,
                 };
-                results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
-                    CompletionResponse::List(list) => CompletionResponse::List(CompletionList {
+                let result = request
+                    .request(ctx, doc.clone())
+                    .map(|list| CompletionList {
                         is_incomplete: list.is_incomplete,
                         items: get_items(list.items),
-                    }),
-                    CompletionResponse::Array(items) => CompletionResponse::Array(get_items(items)),
-                }));
+                    });
+                results.push(result);
             }
             with_settings!({
                 description => format!("Completion on {text} ({rng:?})"),
