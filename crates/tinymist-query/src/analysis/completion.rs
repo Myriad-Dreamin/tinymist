@@ -95,22 +95,32 @@ pub struct CompletionFeat {
 }
 
 impl CompletionFeat {
-    pub(crate) fn any_ufcs(&self) -> bool {
-        self.ufcs() || self.ufcs_left() || self.ufcs_right()
-    }
+    /// Whether to enable any postfix completion.
     pub(crate) fn postfix(&self) -> bool {
         self.postfix.unwrap_or(true)
     }
+
+    /// Whether to enable any ufcs completion.
+    pub(crate) fn any_ufcs(&self) -> bool {
+        self.ufcs() || self.ufcs_left() || self.ufcs_right()
+    }
+
+    /// Whether to enable ufcs completion.
     pub(crate) fn ufcs(&self) -> bool {
         self.postfix() && self.postfix_ufcs.unwrap_or(true)
     }
+
+    /// Whether to enable ufcs completion (left variant).
     pub(crate) fn ufcs_left(&self) -> bool {
         self.postfix() && self.postfix_ufcs_left.unwrap_or(true)
     }
+
+    /// Whether to enable ufcs completion (right variant).
     pub(crate) fn ufcs_right(&self) -> bool {
         self.postfix() && self.postfix_ufcs_right.unwrap_or(true)
     }
 
+    /// Gets the postfix snippets.
     pub(crate) fn postfix_snippets(&self) -> &EcoVec<PostfixSnippet> {
         self.postfix_snippets
             .as_ref()
@@ -189,6 +199,7 @@ impl<'a> CompletionCursor<'a> {
         )
     }
 
+    /// Whether the cursor is related to a callee item.
     fn is_callee(&self) -> bool {
         matches!(self.syntax, Some(SyntaxClass::Callee(..)))
     }
@@ -206,19 +217,7 @@ impl<'a> CompletionCursor<'a> {
         })
     }
 
-    fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
-        // self.ctx.to_lsp_range(rng, &self.source)
-        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
-            if *last_rng == rng {
-                return *last_lsp_rng;
-            }
-        }
-
-        let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
-        self.last_lsp_range_pair = Some((rng, lsp_rng));
-        lsp_rng
-    }
-
+    /// Gets the argument cursor.
     fn arg_cursor(&self) -> &Option<SyntaxNode> {
         self.arg_cursor.get_or_init(|| {
             let mut args_node = None;
@@ -249,6 +248,21 @@ impl<'a> CompletionCursor<'a> {
         })
     }
 
+    /// Gets the LSP range of a given range with caching.
+    fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
+        // self.ctx.to_lsp_range(rng, &self.source)
+        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
+            if *last_rng == rng {
+                return *last_lsp_rng;
+            }
+        }
+
+        let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
+        self.last_lsp_range_pair = Some((rng, lsp_rng));
+        lsp_rng
+    }
+
+    /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
@@ -289,6 +303,7 @@ impl<'a> CompletionCursor<'a> {
     }
 }
 
+/// Alias for a completion cursor, [`CompletionCursor`].
 type Cursor<'a> = CompletionCursor<'a>;
 
 /// Autocomplete a cursor position in a source file.
@@ -426,7 +441,7 @@ impl<'a> CompletionWorker<'a> {
             worker: self,
             cursor,
         };
-        let _ = pair.complete_root();
+        let _ = pair.complete_cursor();
 
         // Filter
         if let Some(from_ident) = cursor.ident_cursor() {
@@ -469,9 +484,11 @@ struct CompletionPair<'a, 'b, 'c> {
 type Pair<'a, 'b, 'c> = CompletionPair<'a, 'b, 'c>;
 
 impl CompletionPair<'_, '_, '_> {
-    pub(crate) fn complete_root(&mut self) -> Option<()> {
+    /// Starts the completion on a cursor.
+    pub(crate) fn complete_cursor(&mut self) -> Option<()> {
         use SurroundingSyntax::*;
 
+        // Special completions, we should remove them finally
         if matches!(
             self.cursor.leaf.kind(),
             SyntaxKind::LineComment | SyntaxKind::BlockComment
@@ -479,14 +496,18 @@ impl CompletionPair<'_, '_, '_> {
             return self.complete_comments().then_some(());
         }
 
-        let scope = self.cursor.surrounding_syntax;
+        let surrounding_syntax = self.cursor.surrounding_syntax;
         let mode = interpret_mode_at(Some(&self.cursor.leaf));
-        if matches!(scope, ImportList) {
+
+        // Special completions 2, we should remove them finally
+        if matches!(surrounding_syntax, ImportList) {
             return self.complete_imports().then_some(());
         }
 
+        // Checks and completes `self.cursor.syntax_context`
         match self.cursor.syntax_context.clone() {
             Some(SyntaxContext::Element { container, .. }) => {
+                // The existing dictionary fields are not interesting
                 if let Some(container) = container.cast::<ast::Dict>() {
                     for named in container.items() {
                         if let ast::DictItem::Named(named) = named {
@@ -496,6 +517,7 @@ impl CompletionPair<'_, '_, '_> {
                 };
             }
             Some(SyntaxContext::Arg { args, .. }) => {
+                // The existing arguments are not interesting
                 let args = args.cast::<ast::Args>()?;
                 for arg in args.items() {
                     if let ast::Arg::Named(named) = arg {
@@ -550,6 +572,7 @@ impl CompletionPair<'_, '_, '_> {
             | None => {}
         }
 
+        // Triggers a complete type checking.
         let ty = self
             .worker
             .ctx
@@ -557,11 +580,11 @@ impl CompletionPair<'_, '_, '_> {
             .filter(|ty| !matches!(ty, Ty::Any));
 
         crate::log_debug_ct!(
-            "complete_type: {:?} -> ({scope:?}, {ty:#?})",
+            "complete_type: {:?} -> ({surrounding_syntax:?}, {ty:#?})",
             self.cursor.leaf
         );
 
-        // adjust the completion position
+        // Adjusts the completion position
         // todo: syntax class seems not being considering `is_ident_like`
         // todo: merge ident_content_offset and label_content_offset
         if is_ident_like(&self.cursor.leaf) {
@@ -575,8 +598,9 @@ impl CompletionPair<'_, '_, '_> {
             self.cursor.from = offset;
         }
 
+        // Completion by types.
         if let Some(ty) = ty {
-            let filter = |ty: &Ty| match scope {
+            let filter = |ty: &Ty| match surrounding_syntax {
                 SurroundingSyntax::StringContent => match ty {
                     Ty::Builtin(BuiltinTy::Path(..) | BuiltinTy::TextFont) => true,
                     Ty::Value(val) => matches!(val.val, Value::Str(..)),
@@ -593,8 +617,9 @@ impl CompletionPair<'_, '_, '_> {
             };
             ctx.type_completion(&ty, None);
         }
-
         let mut type_completions = std::mem::take(&mut self.worker.completions);
+
+        // Completion by [`crate::syntax::InterpretMode`].
         match mode {
             InterpretMode::Code => {
                 self.complete_code();
@@ -605,7 +630,7 @@ impl CompletionPair<'_, '_, '_> {
             InterpretMode::Raw => {
                 self.complete_markup();
             }
-            InterpretMode::Markup => match scope {
+            InterpretMode::Markup => match surrounding_syntax {
                 Regular => {
                     self.complete_markup();
                 }
@@ -617,7 +642,8 @@ impl CompletionPair<'_, '_, '_> {
             InterpretMode::Comment | InterpretMode::String => {}
         };
 
-        match scope {
+        // Snippet completions associated by surrounding_syntax.
+        match surrounding_syntax {
             Regular | StringContent | ImportList | SetRule => {}
             Selector => {
                 self.snippet_completion(
@@ -653,6 +679,7 @@ impl CompletionPair<'_, '_, '_> {
             }
         }
 
+        // todo: filter completions by type
         // ctx.strict_scope_completions(false, |value| value.ty() == *ty);
         // let length_ty = Type::of::<Length>();
         // ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
@@ -666,6 +693,7 @@ impl CompletionPair<'_, '_, '_> {
             self.worker.completions
         );
 
+        // Sorts completions
         type_completions.sort_by(|a, b| {
             a.sort_text
                 .as_ref()
@@ -709,7 +737,7 @@ impl CompletionPair<'_, '_, '_> {
         if self.cursor.before.ends_with(',') || self.cursor.before.ends_with(':') {
             self.worker.enrich(" ", "");
         }
-        match scope {
+        match surrounding_syntax {
             Regular | ImportList | ShowTransform | SetRule | StringContent => {}
             Selector => {
                 self.worker.enrich("", ": ${}");
@@ -721,6 +749,7 @@ impl CompletionPair<'_, '_, '_> {
         Some(())
     }
 
+    /// Pushes a cursor-insensitive completion item.
     fn push_completion(&mut self, completion: Completion) {
         self.worker
             .completions

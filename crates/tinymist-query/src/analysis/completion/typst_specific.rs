@@ -1,3 +1,6 @@
+//! Completion by typst specific semantics, like `font`, `package`, `label`, or
+//! `typst::foundations::Value`.
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Add completions for all font families.

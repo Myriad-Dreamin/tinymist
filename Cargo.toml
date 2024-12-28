@@ -176,11 +176,13 @@ lto = "thin"
 
 [workspace.lints.rust]
 missing_docs = "warn"
+# missing_crate_level_docs = "warn"
 
 [workspace.lints.clippy]
 uninlined_format_args = "warn"
 # missing_errors_doc = "warn"
 # missing_panics_doc = "warn"
+# missing_docs_in_private_items = "warn"
 missing_safety_doc = "warn"
 undocumented_unsafe_blocks = "warn"
 

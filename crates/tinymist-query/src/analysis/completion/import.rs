@@ -1,3 +1,5 @@
+//! Completion for import items.
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Complete imports.

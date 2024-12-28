@@ -1,3 +1,5 @@
+//! Completion by types.
+
 use super::*;
 
 pub(crate) struct TypeCompletionWorker<'a, 'b, 'c, 'd> {

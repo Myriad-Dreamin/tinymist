@@ -1,3 +1,11 @@
+//! Snippet completions.
+//!
+//! A prefix snippet is a snippet that completes non-existing items. For example
+//! `RR` is completed as `ℝ`.
+//!
+//! A postfix snippet is a snippet that modifies existing items by the dot
+//! accessor syntax. For example `$ RR.abs| $` is completed as `$ abs(RR) $`.
+
 use super::*;
 
 impl CompletionPair<'_, '_, '_> {
