@@ -70,26 +70,25 @@ impl StatefulRequest for CompletionRequest {
         // assume that the completion is not explicit.
         let explicit = false;
 
-        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
+        let document = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
-        let worker = CompletionWorker::new(ctx, doc, explicit, self.trigger_character)?;
-
-        let (worker_incomplete, items) = worker.work(&mut cursor)?;
+        let mut worker = CompletionWorker::new(ctx, document, explicit, self.trigger_character)?;
+        worker.work(&mut cursor)?;
 
         // todo: define it well, we were needing it because we wanted to do interactive
         // path completion, but now we've scanned all the paths at the same time.
         // is_incomplete = ic;
-        let _ = worker_incomplete;
+        let _ = worker.incomplete;
 
         // To response completions in fine-grained manner, we need to mark result as
         // incomplete. This follows what rust-analyzer does.
         // https://github.com/rust-lang/rust-analyzer/blob/f5a9250147f6569d8d89334dc9cca79c0322729f/crates/rust-analyzer/src/handlers/request.rs#L940C55-L940C75
         Some(CompletionList {
             is_incomplete: false,
-            items,
+            items: worker.completions,
         })
     }
 }
