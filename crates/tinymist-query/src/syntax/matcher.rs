@@ -225,7 +225,7 @@ pub fn previous_decls<T>(
 }
 
 /// Whether the node can be recognized as a mark.
-fn is_mark(sk: SyntaxKind) -> bool {
+pub fn is_mark(sk: SyntaxKind) -> bool {
     use SyntaxKind::*;
     #[allow(clippy::match_like_matches_macro)]
     match sk {

@@ -1,0 +1,40 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/comment.typ
+snapshot_kind: text
+---
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 14,
+   "endLine": 8,
+   "kind": "comment",
+   "startCharacter": 2,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 1,
+   "kind": "comment",
+   "startCharacter": 0,
+   "startLine": 0
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 8,
+   "kind": "comment",
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endLine": 1,
+   "kind": "comment",
+   "startLine": 0
+  }
+ ]
+}
