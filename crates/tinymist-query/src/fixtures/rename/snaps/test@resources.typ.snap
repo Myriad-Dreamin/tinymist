@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/resources.typ
+snapshot_kind: text
+---
+{
+ "documentChanges": [
+  {
+   "edits": [
+    {
+     "newText": "\"new_name.typ\"",
+     "range": "1:30:1:39"
+    },
+    {
+     "newText": "\"new_name.typ\" as lib",
+     "range": "0:8:0:17"
+    }
+   ],
+   "textDocument": {
+    "uri": "s2.typ",
+    "version": null
+   }
+  },
+  {
+   "kind": "rename",
+   "newUri": "new_name.typ",
+   "oldUri": "lib.typ"
+  }
+ ]
+}
