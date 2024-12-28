@@ -1,3 +1,5 @@
+//! Completion by [`crate::syntax::InterpretMode`].
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Complete in comments. Or rather, don't!

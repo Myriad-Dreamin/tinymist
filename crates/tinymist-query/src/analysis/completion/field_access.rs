@@ -1,3 +1,5 @@
+//! Completion for field access on nodes.
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Add completions for all fields on a node.

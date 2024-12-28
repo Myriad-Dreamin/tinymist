@@ -1,3 +1,5 @@
+//! Completion of definitions in scope.
+
 use super::*;
 
 #[derive(BindTyCtx)]

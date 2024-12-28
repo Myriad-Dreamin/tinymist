@@ -1,3 +1,5 @@
+//! Completion of paths (string literal).
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     pub fn complete_path(&mut self, preference: &PathPreference) -> Option<Vec<CompletionItem>> {

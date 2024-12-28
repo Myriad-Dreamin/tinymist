@@ -1,3 +1,5 @@
+//! Completion kind analysis.
+
 use super::*;
 
 pub(crate) struct CompletionKindChecker {
@@ -6,11 +8,13 @@ pub(crate) struct CompletionKindChecker {
 }
 
 impl CompletionKindChecker {
+    /// Reset the checker status for a fresh checking.
     fn reset(&mut self) {
         self.symbols.clear();
         self.functions.clear();
     }
 
+    /// Check the completion kind of a type.
     pub fn check(&mut self, ty: &Ty) {
         self.reset();
         match ty {
