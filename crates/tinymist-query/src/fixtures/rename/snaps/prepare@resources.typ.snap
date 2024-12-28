@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/prepare_rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/resources.typ
+snapshot_kind: text
+---
+{
+ "placeholder": "lib.typ",
+ "range": "1:30:1:39"
+}
