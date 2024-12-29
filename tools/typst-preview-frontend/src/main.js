@@ -21,27 +21,19 @@ function main() {
     setupDrag();
 }
 
-/// Placeholders for typst-preview program initializing frontend
-/// arguments.
+/// Typst-preview program initializing frontend arguments.
 function retrieveWsArgs() {
-    /// The string `preview-arg:previewMode:Doc` is a placeholder
-    /// It will be replaced by the actual preview mode.
-    /// ```rs
-    ///   let frontend_html = frontend_html.replace(
-    ///     "preview-arg:previewMode:Doc", ...);
-    /// ```
-    let mode = 'preview-arg:previewMode:Doc';
-    /// Remove the placeholder prefix.
-    mode = mode.replace('preview-arg:previewMode:', '');
+
+    let url = ARGS.get('wsUrl') ?? '/';
+    let secret = ARGS.get('secret');
+    let mode = ARGS.get('previewMode');
     let previewMode = PreviewMode[mode];
 
-    /// The string `ws://127.0.0.1:23625` is a placeholder
-    /// Also, it is the default url to connect to.
     /// Note that we must resolve the url to an absolute url as
     /// the websocket connection requires an absolute url.
     ///
     /// See [WebSocket and relative URLs](https://github.com/whatwg/websockets/issues/20)
-    let urlObject = new URL("ws://127.0.0.1:23625", window.location.href);
+    let urlObject = new URL(url, window.location.href);
     /// Rewrite the protocol to websocket.
     urlObject.protocol = urlObject.protocol.replace('https:', 'wss:').replace('http:', 'ws:');
     if (location.href.startsWith("https://")) {
@@ -49,7 +41,7 @@ function retrieveWsArgs() {
     }
 
     /// Return a `WsArgs` object.
-    return { url: urlObject.href, previewMode, isContentPreview: false };
+    return { url: urlObject.href, previewMode, isContentPreview: false, secret };
 }
 
 /// `buildWs` returns a object, which keeps track of websocket
@@ -114,6 +106,7 @@ function setupVscodeChannel(nextWs) {
                 console.log('reconnect', message);
                 nextWs({
                     url: message.url,
+                    secret: message.secret,
                     previewMode: PreviewMode[message.mode],
                     isContentPreview: message.isContentPreview,
                 });

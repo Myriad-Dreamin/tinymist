@@ -8,7 +8,8 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 // @ts-ignore
 // import { RenderSession as RenderSession2 } from "@myriaddreamin/typst-ts-renderer/pkg/wasm-pack-shim.mjs";
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
-import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
+import { WebSocketSubject } from 'rxjs/webSocket';
+import { getAuthenticatedSocket } from './ws/auth';
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
 export { PreviewMode } from 'typst-dom/typst-doc.mjs';
 
@@ -25,9 +26,10 @@ export interface WsArgs {
     url: string;
     previewMode: PreviewMode;
     isContentPreview: boolean;
+    secret: string;
 }
 
-export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
+export async function wsMain({ url, previewMode, isContentPreview, secret }: WsArgs) {
     if (!url) {
         const hookedElem = document.getElementById("typst-app");
         if (hookedElem) {
@@ -213,32 +215,14 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return svgDoc;
     }
 
-    function setupSocket(svgDoc: TypstDocument): () => void {
+    async function setupSocket(svgDoc: TypstDocument): Promise<() => void> {
         // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
-        $ws = webSocket<ArrayBuffer>({
-            url,
-            binaryType: "arraybuffer",
-            serializer: t => t,
-            deserializer: (event) => event.data,
-            openObserver: {
-                next: (e) => {
-                    const sock = e.target;
-                    console.log('WebSocket connection opened', sock);
-                    window.typstWebsocket = sock as any;
-                    svgDoc.reset();
-                    window.typstWebsocket.send("current");
-                }
-            },
-            closeObserver: {
-                next: (e) => {
-                    console.log('WebSocket connection closed', e);
-                    $ws?.unsubscribe();
-                    if (!disposed) {
-                        setTimeout(() => setupSocket(svgDoc), 1000);
-                    }
-                }
-            }
-        });
+
+        const websocketAndSubject = await getAuthenticatedSocket(url, secret, dec, enc);
+        $ws = websocketAndSubject.websocketSubject;
+        window.typstWebsocket = websocketAndSubject.websocket  as any;
+        svgDoc.reset();
+        window.typstWebsocket.send("current");
 
         const batchMessageChannel = new Subject<ArrayBuffer>();
 
@@ -251,13 +235,27 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             $ws?.complete();
         };
 
-        // window.typstWebsocket = new WebSocket("ws://127.0.0.1:23625");
-
-
         $ws.subscribe({
             next: (data) => batchMessageChannel.next(data), // Called whenever there is a message from the server.
-            error: err => console.log("WebSocket Error: ", err), // Called if at any point WebSocket API signals some kind of error.
-            complete: () => console.log('complete') // Called when connection is closed (for whatever reason).
+            error: async (err) => {
+
+                // Called if at any point WebSocket API signals some kind of error.
+                console.log("WebSocket Error: ", err);
+                if(err.type === "close") {
+                    $ws?.unsubscribe();
+                    if (!disposed) {
+                        setTimeout(async () => await setupSocket(svgDoc), 1000);
+                    }
+                }
+            }, 
+            complete:  async () => {
+                // Called when connection is closed (for whatever reason).
+                console.log('WebSocket connection closed');
+                $ws?.unsubscribe();
+                if (!disposed) {
+                    setTimeout(async () => await setupSocket(svgDoc), 1000);
+                }
+            }
         });
 
         subsribes.push(
@@ -405,7 +403,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             return new Promise(async (kernelDispose) => {
                 console.log("plugin initialized, build info:", await rendererBuildInfo());
 
-                const wsDispose = setupSocket(createSvgDocument(kModule));
+                const wsDispose = await setupSocket(createSvgDocument(kModule));
 
                 // todo: plugin init and setup socket at the same time
                 resolveDispose(() => {

@@ -27,6 +27,8 @@ strum = { version = "0.26.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
+rand = "0.8.5"
+sha2 = "0.10.8"
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
@@ -146,7 +148,9 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview" }
-tinymist-assets = { version = "0.12.16-rc1" }
+# TODO: temporarily for dev
+# tinymist-assets = { version = "0.12.16-rc1" }
+tinymist-assets = { path = "./crates/tinymist-assets" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }

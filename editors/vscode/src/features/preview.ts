@@ -212,6 +212,10 @@ interface OpenPreviewInWebViewArgs {
    */
   dataPlanePort: string | number;
   /**
+   * The secret used for websocket authentication.
+   */
+  secret: string;
+  /**
    * The existing webview panel to reuse.
    */
   webviewPanel?: vscode.WebviewPanel;
@@ -232,6 +236,7 @@ export async function openPreviewInWebView({
   task,
   activeEditor,
   dataPlanePort,
+  secret,
   webviewPanel,
   panelDispose,
 }: OpenPreviewInWebViewArgs) {
@@ -266,19 +271,23 @@ export async function openPreviewInWebView({
   };
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
 
-  // Substitutes arguments in the HTML content.
+  const wsUrl =  translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`)
+  const queryString = (new URLSearchParams({
+    previewMode,
+    wsUrl,
+    secret,
+    state: previewStateEncoded,
+  })).toString();
+
   let html = await getPreviewHtml(context);
   // todo: not needed anymore, but we should test it and remove it later.
   html = html.replace(
     /\/typst-webview-assets/g,
     `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
   );
-  html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
-  html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
-  html = html.replace(
-    "ws://127.0.0.1:23625",
-    translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
-  );
+  // We now put secret information into the html, but that's okay since the webview cannot be accessed
+  // from outside VSCode.
+  html = html.replace('__VSCODE_SECRET_PARAMETERS = undefined', '__VSCODE_SECRET_PARAMETERS = '+JSON.stringify(queryString));
 
   // Sets the HTML content to the webview panel.
   // This will reload the webview panel if it's already opened.
@@ -328,8 +337,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
-
-  const { dataPlanePort, staticServerPort, isPrimary } = await invokeLspCommand();
+  const { dataPlanePort, staticServerPort, secret, isPrimary } = await invokeLspCommand();
   if (!dataPlanePort || !staticServerPort) {
     disposes.dispose();
     throw new Error(`Failed to launch preview ${filePath}`);
@@ -340,9 +348,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
   if (isPrimary) {
     let connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
-    contentPreviewProvider.then((p) => p.postActivate(connectUrl));
+    contentPreviewProvider.then((p) => p.postActivate(connectUrl, secret));
     disposes.add(() => {
-      contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+      contentPreviewProvider.then((p) => p.postDeactivate(connectUrl, secret));
     });
   }
 
@@ -354,6 +362,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         task,
         activeEditor: editor,
         dataPlanePort,
+        secret,
         webviewPanel,
         panelDispose() {
           disposes.dispose();
@@ -363,7 +372,13 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       break;
     }
     case "browser": {
-      vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticServerPort}`));
+      const wsUrl =  translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`)
+      const queryString = (new URLSearchParams({
+        previewMode: task.mode === "doc" ? "Doc" : "Slide",
+        secret,
+        wsUrl,
+      })).toString();
+      vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticServerPort}/#${queryString}`));
       break;
     }
   }
@@ -395,7 +410,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
-    const { dataPlanePort, staticServerPort, isPrimary } = await tinymist.startPreview([
+    const { dataPlanePort, staticServerPort, secret, isPrimary } = await tinymist.startPreview([
       "--task-id",
       taskId,
       "--refresh-style",
@@ -443,7 +458,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       disposes.add(vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500));
     }
 
-    return { staticServerPort, dataPlanePort, isPrimary };
+    return { staticServerPort, dataPlanePort, secret, isPrimary };
   }
 
   async function reportPosition(
@@ -601,20 +616,21 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
   }
 
   current: any = undefined;
-  postActivate(url: string) {
+  postActivate(url: string, secret: string) {
     this.current = {
       type: "reconnect",
       url,
+      secret,
       mode: "Doc",
       isContentPreview: true,
     };
     this.resetHost();
   }
 
-  postDeactivate(url: string) {
-    if (this.current && this.current.url === url) {
+  postDeactivate(url: string, secret: string) {
+    if (this.current && this.current.url === url && this.current.secret === secret) {
       this.currentOutline = undefined;
-      this.postActivate("");
+      this.postActivate("", "");
     }
   }
 

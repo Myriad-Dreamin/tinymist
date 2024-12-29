@@ -15,6 +15,19 @@
     <style id="preview-theme-styles"></style>
     <!-- before all of code to avoid rerender by style replacement -->
     <script>
+
+      /// We're sending this html to un-authenticated clients. So no potentially sensitive data should
+      /// be in the html itself. We pass all needed parameters in the # part of the URL
+      /// However: VSCode webview panels don't support this I think? So provide an escape hatch for VSCode.
+      ///          to set a special variable. This is ok since VSCode webviews cannot be reached by anyone
+      ///          outside VSCode.
+      const __VSCODE_SECRET_PARAMETERS = undefined;
+      const ARGS = new URLSearchParams(
+          __VSCODE_SECRET_PARAMETERS !== undefined ?
+          __VSCODE_SECRET_PARAMETERS :
+          window.location.hash.slice(1)
+      );
+
       if (typeof acquireVsCodeApi !== "undefined") {
         const bytes2utf8 = new TextDecoder("utf-8");
         /**
@@ -26,10 +39,7 @@
           bytes2utf8.decode(
             Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0))
           );
-        /// The string here is a placeholder
-        /// It will be replaced by the actual preview mode.
-        let state = `preview-arg:state:`;
-        state = state.replace("preview-arg:state:", "");
+        let state = ARGS.get('state');
         console.log("state", state);
         if (state !== "") {
           /// Set it later when acquiring the VSCode API

@@ -1,11 +1,13 @@
 //! Document preview tool for Typst
 
+mod auth;
+
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
-use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
+use hyper_tungstenite::{tungstenite::Message, HyperWebsocketStream};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
@@ -22,9 +24,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    frontend_html, CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx,
-    ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
+    CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
+    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
 };
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -263,6 +265,7 @@ pub struct StartPreviewResponse {
     static_server_port: Option<u16>,
     static_server_addr: Option<String>,
     data_plane_port: Option<u16>,
+    secret: String,
     is_primary: bool,
 }
 
@@ -340,10 +343,10 @@ impl PreviewState {
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
-            // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+            let secret = auth::generate_token();
 
-            let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
+            let srv =
+                make_http_server(true, args.data_plane_host, secret.clone(), websocket_tx).await;
             let addr = srv.addr;
             log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
 
@@ -351,6 +354,7 @@ impl PreviewState {
                 static_server_port: Some(addr.port()),
                 static_server_addr: Some(addr.to_string()),
                 data_plane_port: Some(addr.port()),
+                secret,
                 is_primary,
             };
 
@@ -399,21 +403,21 @@ pub struct HttpServer {
 
 /// Create a http server for the previewer.
 pub async fn make_http_server(
-    frontend_html: String,
+    serve_frontend_html: bool,
     static_file_addr: String,
-    websocket_tx: mpsc::UnboundedSender<HyperWebsocket>,
+    secret: String,
+    websocket_tx: mpsc::UnboundedSender<HyperWebsocketStream>,
 ) -> HttpServer {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
-    let frontend_html = hyper::body::Bytes::from(frontend_html);
     let make_service = move || {
-        let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
+        let secret = secret.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
-            let frontend_html = frontend_html.clone();
             let websocket_tx = websocket_tx.clone();
+            let secret = secret.clone();
             async move {
                 // Check if the request is a websocket upgrade request.
                 if hyper_tungstenite::is_upgrade_request(&req) {
@@ -424,7 +428,24 @@ pub async fn make_http_server(
                         })
                         .unwrap();
 
-                    let _ = websocket_tx.send(websocket);
+                    tokio::spawn(async move {
+                        let websocket = websocket.await.unwrap();
+
+                        // Authenticate the client before we talk to it.
+                        // Important even if we run on localhost because
+                        // 1) browsers allow any website to connect to http servers/websockets on localhost
+                        // 2) on multi-user systems another (potentially untrusted) user can connect to localhost.
+                        //
+                        // Note: We use authentication only for the websocket. The static HTML file server (see below)
+                        //       only serves a not secret static template, so we don't bother with authentication there.
+                        if let Ok(websocket) =
+                            auth::try_auth_websocket_client(websocket, &secret).await
+                        {
+                            let _ = websocket_tx.send(websocket);
+                        } else {
+                            log::error!("Websocket client authentication failed");
+                        }
+                    });
 
                     // Return the response so the spawned future can continue.
                     Ok(response)
@@ -432,9 +453,17 @@ pub async fn make_http_server(
                     // log::debug!("Serve frontend: {mode:?}");
                     let res = hyper::Response::builder()
                         .header(hyper::header::CONTENT_TYPE, "text/html")
-                        .body(Full::<Bytes>::from(frontend_html))
+                        // It's important that we serve a static template that only contains information that is public anyway.
+                        // Otherwise, we need authentication here (see comment for websocket case above).
+                        // In particular, the websocket port, the secret etc. must not be in the HTML we serve. These information
+                        // are in the # part of the URL.
+                        .body(Full::<Bytes>::from(if serve_frontend_html {
+                            TYPST_PREVIEW_HTML
+                        } else {
+                            ""
+                        }))
                         .unwrap();
-                    Ok::<_, std::convert::Infallible>(res)
+                    Ok::<_, anyhow::Error>(res)
                 } else {
                     // jump to /
                     let res = hyper::Response::builder()
@@ -575,12 +604,14 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let control_plane_server_handle = tokio::spawn(async move {
         let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
 
-        let srv =
-            make_http_server(String::default(), args.control_plane_host, control_sock_tx).await;
+        // TODO: How to test this control plane thing? Where is it used?
+        let secret = auth::generate_token();
+
+        let srv = make_http_server(false, args.control_plane_host, secret, control_sock_tx).await;
         log::info!("Control panel server listening on: {}", srv.addr);
 
         let control_websocket = control_sock_rx.recv().await.unwrap();
-        let ws = control_websocket.await.unwrap();
+        let ws = control_websocket;
 
         tokio::pin!(ws);
 
@@ -641,24 +672,28 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
-
+    let secret = auth::generate_token();
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
-        let html = frontend_html.clone();
-        Some(make_http_server(html, static_file_host, websocket_tx.clone()).await)
+        Some(make_http_server(true, static_file_host, secret.clone(), websocket_tx.clone()).await)
     } else {
         None
     };
 
-    let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
+    let srv = make_http_server(true, args.data_plane_host, secret.clone(), websocket_tx).await;
     log::info!("Data plane server listening on: {}", srv.addr);
 
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
     log::info!("Static file server listening on: {static_server_addr}");
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
+        if let Err(e) = open::that_detached(format!(
+            "http://{static_server_addr}/#secret={secret}&previewMode={}",
+            match args.preview_mode {
+                PreviewMode::Document => "Doc",
+                PreviewMode::Slide => "Slide",
+            }
+        )) {
             log::error!("failed to open browser: {e}");
         };
     }
@@ -741,29 +776,26 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
-    previewer.start_data_plane(
-        websocket_rx,
-        |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
-            let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
-
-            Ok(conn
-                .sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
-                .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
-                .with(|msg| {
-                    Box::pin(async move {
-                        let msg = match msg {
-                            WsMessage::Text(msg) => Message::Text(msg),
-                            WsMessage::Binary(msg) => Message::Binary(msg),
-                        };
-                        Ok(msg)
-                    })
+fn bind_streams(
+    previewer: &mut Previewer,
+    websocket_rx: mpsc::UnboundedReceiver<HyperWebsocketStream>,
+) {
+    previewer.start_data_plane(websocket_rx, |conn: HyperWebsocketStream| {
+        conn.sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+            .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+            .with(|msg| {
+                Box::pin(async move {
+                    let msg = match msg {
+                        WsMessage::Text(msg) => Message::Text(msg),
+                        WsMessage::Binary(msg) => Message::Binary(msg),
+                    };
+                    Ok(msg)
                 })
-                .map_ok(|msg| match msg {
-                    Message::Text(msg) => WsMessage::Text(msg),
-                    Message::Binary(msg) => WsMessage::Binary(msg),
-                    _ => WsMessage::Text("unsupported message".to_owned()),
-                }))
-        },
-    );
+            })
+            .map_ok(|msg| match msg {
+                Message::Text(msg) => WsMessage::Text(msg),
+                Message::Binary(msg) => WsMessage::Binary(msg),
+                _ => WsMessage::Text("unsupported message".to_owned()),
+            })
+    });
 }
