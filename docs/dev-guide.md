@@ -55,7 +55,7 @@ yarn docs:rs --open
 ```
 
 > [!Tip]
-> You must install [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to build the docs with `yarn`, see the `shiroa` command for more information.
+> Please install [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to build the docs with `yarn`.
 
 If you find missing or incomplete documentation, please feel free to open an issue or pull request. There is also a tracking issue to improve the documentation, see [Request for Documentation (RFD)](https://github.com/Myriad-Dreamin/tinymist/issues/931).
 
