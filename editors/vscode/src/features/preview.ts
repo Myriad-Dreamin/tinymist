@@ -2,7 +2,12 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "../util";
+import {
+  DisposeList,
+  getSensibleTextEditorColumn,
+  getTargetViewColumn,
+  translateExternalURL,
+} from "../util";
 import {
   launchPreviewCompat,
   previewActiveCompat as previewPostActivateCompat,
@@ -770,7 +775,4 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
       isNotPrimary,
     });
   }
-}
-function translateExternalURL(arg0: string): string {
-  throw new Error("Function not implemented.");
 }
