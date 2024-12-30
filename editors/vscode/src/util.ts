@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { ViewColumn } from "vscode";
 import { readFile } from "fs/promises";
+import { isGitpod, translateGitpodURL } from "./gitpod";
 
 export const typstDocumentSelector = [
   { scheme: "file", language: "typst" },
@@ -26,6 +27,14 @@ export const base64Decode = (encoded: string) =>
  */
 export const base64Encode = (utf8Str: string) =>
   btoa(Array.from(utf82bytes.encode(utf8Str), (c) => String.fromCharCode(c)).join(""));
+
+function translateExternalURL(urlStr: string): string {
+  if (isGitpod()) {
+    return translateGitpodURL(urlStr);
+  } else {
+    return urlStr;
+  }
+}
 
 export function activeTypstEditor() {
   const editor = vscode.window.activeTextEditor;

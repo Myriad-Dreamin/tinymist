@@ -9,7 +9,7 @@ import {
   ScrollSyncMode,
   ScrollSyncModeEnum,
   contentPreviewProvider,
-  launchPreviewInWebView,
+  openPreviewInWebView,
   previewProcessOutline,
 } from "./preview";
 import { tinymist } from "../lsp";
@@ -73,7 +73,7 @@ export function previewActiveCompat(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function previewDeactivateCompat() {
+export function previewDeactivate() {
   console.log("killing preview services, count", activeTask.size);
   for (const [_, task] of activeTask) {
     task.panel?.dispose();
@@ -84,6 +84,11 @@ export function previewDeactivateCompat() {
 }
 
 let _previewHtml: string | undefined = undefined;
+/**
+ * Get the preview html content
+ * @param context The extension context
+ * @returns The preview html content containing placeholders to fill.
+ */
 export async function getPreviewHtml(context: vscode.ExtensionContext) {
   if (_previewHtml) {
     return _previewHtml;
@@ -91,8 +96,10 @@ export async function getPreviewHtml(context: vscode.ExtensionContext) {
 
   let html;
   if (isTinymist) {
+    // Gets the HTML resource from the server
     html = await tinymist.getResource("/preview/index.html");
   } else {
+    // In old typst-preview extension, the resources are packed in the extension.
     html = await loadHTMLFile(context, "./out/frontend/index.html");
   }
 
@@ -100,6 +107,13 @@ export async function getPreviewHtml(context: vscode.ExtensionContext) {
     _previewHtml = html;
   }
 
+  // Dispose the `_previewHtml` when the extension is deactivated.
+  //
+  // This is crucial because people may activate another version of the
+  // extension which contains another version of the `_previewHtml`.
+  //
+  // Not disposing the `_previewHtml` will cause inconsistency between the
+  // HTML and language server.
   context.subscriptions.push({
     dispose: () => {
       _previewHtml = undefined;
@@ -309,7 +323,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
   contentPreviewProvider.then((p) => p.postActivate(connectUrl));
   let panel: vscode.WebviewPanel | undefined = undefined;
   if (task.kind == "webview") {
-    panel = await launchPreviewInWebView({
+    panel = await openPreviewInWebView({
       context,
       task,
       activeEditor,
