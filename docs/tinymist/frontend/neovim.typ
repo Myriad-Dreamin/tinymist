@@ -43,7 +43,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
                     -- ...
                 },
             },
-        },
+        }
     }
     ```
 
@@ -71,11 +71,11 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
         }
     }
     ```
-    For a full list of availible settings see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration]. 
+
+    For a full list of available settings see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration]. 
 
 == Formatting
-    Install either `typststyle` or `typstfmt` either via source or via `Mason`. Then specify the formatter in your config
-
+    Either `typststyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
     ```lua 
     formatterMode = "typstyle"
     ```
@@ -85,7 +85,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 == Troubleshooting
 <troubleshooting>
 
-Generally you can find in depth information via the `:mes` command. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`  
+Generally you can find in depth information via the `:mes` command, `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome. 
 
 === tinymist not starting when creating/opening files
 <tinymist-does-not-start-on-creatingopening-files>
