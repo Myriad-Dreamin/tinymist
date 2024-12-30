@@ -429,28 +429,6 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
   }
 }
 
-export interface PreviewResult {
-  staticServerPort?: number;
-  staticServerAddr?: string;
-  dataPlanePort?: number;
-  isPrimary?: boolean;
-}
-
-export async function commandStartPreview(previewArgs: string[]): Promise<PreviewResult> {
-  const res = await tinymist.executeCommand<PreviewResult>(`tinymist.doStartPreview`, [
-    previewArgs,
-  ]);
-  return res || {};
-}
-
-export async function commandKillPreview(taskId: string): Promise<void> {
-  return await tinymist.executeCommand(`tinymist.doKillPreview`, [taskId]);
-}
-
-export async function commandScrollPreview(taskId: string, req: any): Promise<void> {
-  return await tinymist.executeCommand(`tinymist.scrollPreview`, [taskId, req]);
-}
-
 async function commandClearCache(): Promise<void> {
   const activeEditor = window.activeTextEditor;
   if (activeEditor === undefined) {

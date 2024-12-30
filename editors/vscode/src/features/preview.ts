@@ -1,39 +1,58 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+/// This file provides the typst document preview feature for vscode.
+
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "../util";
+import {
+  DisposeList,
+  getSensibleTextEditorColumn,
+  getTargetViewColumn,
+  translateExternalURL,
+} from "../util";
 import {
   launchPreviewCompat,
   previewActiveCompat as previewPostActivateCompat,
-  previewDeactivateCompat,
+  previewDeactivate as previewDeactivateCompat,
   revealDocumentCompat,
   panelSyncScrollCompat,
   LaunchInWebViewTask,
   LaunchInBrowserTask,
-  getPreviewHtml as getPreviewHtmlCompat,
+  getPreviewHtml,
 } from "./preview-compat";
-import { commandKillPreview, commandScrollPreview, commandStartPreview } from "../extension";
-import { isGitpod, translateGitpodURL } from "../gitpod";
-import { registerPreviewTaskDispose } from "../lsp";
+import {
+  PanelScrollOrCursorMoveRequest,
+  registerPreviewTaskDispose,
+  ScrollPreviewRequest,
+  tinymist,
+} from "../lsp";
 
-function translateExternalURL(urlstr: string): string {
-  if (isGitpod()) {
-    return translateGitpodURL(urlstr);
-  } else {
-    return urlstr;
-  }
-}
-
-export function previewPreload(context: vscode.ExtensionContext) {
-  getPreviewHtmlCompat(context);
-}
-
+/**
+ * The launch preview implementation which depends on `isCompat` of previewActivate.
+ */
 let launchImpl: typeof launchPreviewLsp;
+/**
+ * The active editor owning *typst language document* to track.
+ */
 let activeEditor: vscode.TextEditor | undefined;
+
+/**
+ * Preload the preview resources to reduce the latency of the first preview.
+ * @param context The extension context.
+ */
+export function previewPreload(context: vscode.ExtensionContext) {
+  getPreviewHtml(context);
+}
+
+/**
+ * Activate the typst preview feature. This is the "the main entry" of the preview feature.
+ *
+ * @param context The extension context.
+ * @param isCompat Whether the preview feature is activated in the old `mgt19937.typst-preview`
+ * extension.
+ */
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
-  // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
-  getPreviewHtmlCompat(context).then((html) => {
+  // Provides `ContentView` (ContentPreviewProvider) at the sidebar, which is a list of thumbnail
+  // images.
+  getPreviewHtml(context).then((html) => {
     if (!html) {
       vscode.window.showErrorMessage("Failed to load content preview content");
       return;
@@ -47,6 +66,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       ),
     );
   });
+  // Provides `OutlineView` (OutlineProvider) at the sidebar, which provides same content as the
+  // exported PDF outline.
   {
     const outlineProvider = new OutlineProvider(context.extensionUri);
     resolveOutlineProvider(outlineProvider);
@@ -57,6 +78,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       ),
     );
   }
+  // Provides the `typst-preview` webview panel serializer to restore the preview state from last
+  // vscode session.
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer(
       "typst-preview",
@@ -64,6 +87,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     ),
   );
 
+  // Tracks the active editor owning *typst language document*.
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
       const langId = editor?.document.languageId;
@@ -75,12 +99,21 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }),
   );
 
+  // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
     vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
     vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true)),
+    vscode.commands.registerCommand(
+      "typst-preview.revealDocument",
+      isCompat ? revealDocumentCompat : revealDocumentLsp,
+    ),
+    vscode.commands.registerCommand(
+      "typst-preview.sync",
+      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp,
+    ),
     vscode.commands.registerCommand("tinymist.doInspectPreviewState", () => {
       const tasks = Array.from(activeTask.values()).map((t) => {
         return {
@@ -101,24 +134,23 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       }
     }),
   );
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "typst-preview.revealDocument",
-      isCompat ? revealDocumentCompat : revealDocumentLsp,
-    ),
-  );
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "typst-preview.sync",
-      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp,
-    ),
-  );
 
+  // Additional routines for the compat mode.
   if (isCompat) {
     previewPostActivateCompat(context);
   }
 
   launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
+
+  /**
+   * Gets current active editor and launches the preview.
+   *
+   * @param kind Which kind of preview to launch, either in external browser or in builtin vscode
+   * webview.
+   * @param mode The preview mode, either viewing as a document or as a slide.
+   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
+   * to help the `vite dev` server connect the language server via WebSocket.
+   */
   function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
     return async () => {
       activeEditor = activeEditor || vscode.window.activeTextEditor;
@@ -141,7 +173,6 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   }
 }
 
-// This method is called when your extension is deactivated
 export function previewDeactivate() {
   previewDeactivateCompat();
 }
@@ -158,21 +189,52 @@ function getPreviewConfCompat<T>(s: string) {
   return t;
 }
 
-export async function launchPreviewInWebView({
+/**
+ * The arguments for launching the preview in a builtin vscode webview.
+ */
+interface OpenPreviewInWebViewArgs {
+  /**
+   * The extension context.
+   */
+  context: vscode.ExtensionContext;
+  /**
+   * The preview task arguments.
+   */
+  task: LaunchInWebViewTask;
+  /**
+   * The active editor owning *typst language document*.
+   */
+  activeEditor: vscode.TextEditor;
+  /**
+   * The port number of the data plane server.
+   *
+   * The server is already opened by the {@link launchImpl} function.
+   */
+  dataPlanePort: string | number;
+  /**
+   * The existing webview panel to reuse.
+   */
+  webviewPanel?: vscode.WebviewPanel;
+  /**
+   * Additional cleanup routine when the webview panel is disposed.
+   */
+  panelDispose: () => void;
+}
+
+/**
+ * Launches the preview in a builtin vscode webview.
+ *
+ * @param See {@link OpenPreviewInWebViewArgs}.
+ * @returns
+ */
+export async function openPreviewInWebView({
   context,
   task,
   activeEditor,
   dataPlanePort,
   webviewPanel,
   panelDispose,
-}: {
-  context: vscode.ExtensionContext;
-  task: LaunchInWebViewTask;
-  activeEditor: vscode.TextEditor;
-  dataPlanePort: string | number;
-  webviewPanel?: vscode.WebviewPanel;
-  panelDispose: () => void;
-}) {
+}: OpenPreviewInWebViewArgs) {
   const basename = path.basename(activeEditor.document.fileName);
   const fontendPath = path.resolve(context.extensionPath, "out/frontend");
   // Create and show a new WebView
@@ -180,27 +242,22 @@ export async function launchPreviewInWebView({
     webviewPanel !== undefined
       ? webviewPanel
       : vscode.window.createWebviewPanel(
-          "typst-preview", // 标识符
-          `${basename} (Preview)`, // 面板标题
+          "typst-preview",
+          `${basename} (Preview)`,
           getTargetViewColumn(activeEditor.viewColumn),
           {
-            enableScripts: true, // 启用 JS
+            enableScripts: true,
             retainContextWhenHidden: true,
           },
         );
 
-  // todo: bindDocument.onDidDispose, but we did not find a similar way.
+  // todo: bind Document.onDidDispose, but we did not find a similar way.
   panel.onDidDispose(async () => {
     panelDispose();
     console.log("killed preview services");
   });
 
-  // 将已经准备好的 HTML 设置为 Webview 内容
-  let html = await getPreviewHtmlCompat(context);
-  html = html.replace(
-    /\/typst-webview-assets/g,
-    `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
-  );
+  // Determines arguments for the preview HTML.
   const previewMode = task.mode === "doc" ? "Doc" : "Slide";
   const previewState = {
     mode: task.mode,
@@ -208,6 +265,14 @@ export async function launchPreviewInWebView({
     uri: activeEditor.document.uri.toString(),
   };
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
+
+  // Substitutes arguments in the HTML content.
+  let html = await getPreviewHtml(context);
+  // todo: not needed anymore, but we should test it and remove it later.
+  html = html.replace(
+    /\/typst-webview-assets/g,
+    `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
+  );
   html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
   html = html.replace(
@@ -215,8 +280,11 @@ export async function launchPreviewInWebView({
     translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
   );
 
+  // Sets the HTML content to the webview panel.
+  // This will reload the webview panel if it's already opened.
   panel.webview.html = html;
-  // 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
+
+  // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
   // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
   await vscode.env.asExternalUri(
     vscode.Uri.parse(translateExternalURL(`http://127.0.0.1:${dataPlanePort}`)),
@@ -224,6 +292,10 @@ export async function launchPreviewInWebView({
   return panel;
 }
 
+/**
+ * Holds the task control block for each preview task. This is used for editor interactions like
+ * bidirectional jumps between source panels and preview panels.
+ */
 interface TaskControlBlock {
   /// related panel
   panel?: vscode.WebviewPanel;
@@ -234,6 +306,10 @@ const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
   const { kind, context, editor, bindDocument, webviewPanel, isDev, isNotPrimary } = task;
+
+  /**
+   * Can only open one preview for one document.
+   */
   if (activeTask.has(bindDocument)) {
     const { panel } = activeTask.get(bindDocument)!;
     if (panel) {
@@ -249,9 +325,11 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   const scrollSyncMode =
     ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
   const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
+
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
-  const { dataPlanePort, staticServerPort, isPrimary } = await launchCommand();
+
+  const { dataPlanePort, staticServerPort, isPrimary } = await invokeLspCommand();
   if (!dataPlanePort || !staticServerPort) {
     disposes.dispose();
     throw new Error(`Failed to launch preview ${filePath}`);
@@ -271,7 +349,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   let panel: vscode.WebviewPanel | undefined = undefined;
   switch (kind) {
     case "webview": {
-      panel = await launchPreviewInWebView({
+      panel = await openPreviewInWebView({
         context,
         task,
         activeEditor: editor,
@@ -279,7 +357,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         webviewPanel,
         panelDispose() {
           disposes.dispose();
-          commandKillPreview(taskId);
+          tinymist.killPreview(taskId);
         },
       });
       break;
@@ -308,7 +386,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   });
   return { message: "ok", taskId };
 
-  async function launchCommand() {
+  async function invokeLspCommand() {
     console.log(`Preview Command ${filePath}`);
     const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
       ? ["--partial-rendering"]
@@ -317,7 +395,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
-    const { dataPlanePort, staticServerPort, isPrimary } = await commandStartPreview([
+    const { dataPlanePort, staticServerPort, isPrimary } = await tinymist.startPreview([
       "--task-id",
       taskId,
       "--refresh-style",
@@ -372,7 +450,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     editorToReport: vscode.TextEditor,
     event: "changeCursorPosition" | "panelScrollTo",
   ) {
-    const scrollRequest: ScrollRequest = {
+    const scrollRequest: PanelScrollOrCursorMoveRequest = {
       event,
       filepath: editorToReport.document.uri.fsPath,
       line: editorToReport.selection.active.line,
@@ -420,7 +498,7 @@ async function panelSyncScrollLsp(args: any) {
       continue;
     }
 
-    const scrollRequest: ScrollRequest = {
+    const scrollRequest: PanelScrollOrCursorMoveRequest = {
       event: "panelScrollTo",
       filepath: activeEditor.document.uri.fsPath,
       line: activeEditor.selection.active.line,
@@ -430,27 +508,7 @@ async function panelSyncScrollLsp(args: any) {
   }
 }
 
-// That's very unfortunate that sourceScrollBySpan doesn't work well.
-interface SourceScrollBySpanRequest {
-  event: "sourceScrollBySpan";
-  span: string;
-}
-
-interface ScrollByPositionRequest {
-  event: "panelScrollByPosition";
-  position: any;
-}
-
-interface ScrollRequest {
-  event: "panelScrollTo" | "changeCursorPosition";
-  filepath: string;
-  line: any;
-  character: any;
-}
-
-type DocRequests = SourceScrollBySpanRequest | ScrollByPositionRequest | ScrollRequest;
-
-async function scrollPreviewPanel(taskId: string, scrollRequest: DocRequests) {
+async function scrollPreviewPanel(taskId: string, scrollRequest: ScrollPreviewRequest) {
   if ("filepath" in scrollRequest) {
     const filepath = scrollRequest.filepath;
     if (filepath.includes("extension-output")) {
@@ -459,7 +517,7 @@ async function scrollPreviewPanel(taskId: string, scrollRequest: DocRequests) {
     }
   }
 
-  commandScrollPreview(taskId, scrollRequest);
+  tinymist.scrollPreview(taskId, scrollRequest);
 }
 
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};
