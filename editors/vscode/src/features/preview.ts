@@ -41,10 +41,12 @@ export function previewPreload(context: vscode.ExtensionContext) {
  * Activate the typst preview feature. This is the "the main entry" of the preview feature.
  *
  * @param context The extension context.
- * @param isCompat Whether the preview feature is activated in the old `mgt19937.typst-preview` extension.
+ * @param isCompat Whether the preview feature is activated in the old `mgt19937.typst-preview`
+ * extension.
  */
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
-  // Provides `ContentView` (ContentPreviewProvider) at the sidebar, which is a list of thumbnail images.
+  // Provides `ContentView` (ContentPreviewProvider) at the sidebar, which is a list of thumbnail
+  // images.
   getPreviewHtml(context).then((html) => {
     if (!html) {
       vscode.window.showErrorMessage("Failed to load content preview content");
@@ -59,7 +61,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       ),
     );
   });
-  // Provides `OutlineView` (OutlineProvider) at the sidebar, which provides same content as the exported PDF outline.
+  // Provides `OutlineView` (OutlineProvider) at the sidebar, which provides same content as the
+  // exported PDF outline.
   {
     const outlineProvider = new OutlineProvider(context.extensionUri);
     resolveOutlineProvider(outlineProvider);
@@ -70,7 +73,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       ),
     );
   }
-  // Provides the `typst-preview` webview panel serializer to restore the preview state from last vscode session.
+  // Provides the `typst-preview` webview panel serializer to restore the preview state from last
+  // vscode session.
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer(
       "typst-preview",
@@ -136,10 +140,11 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   /**
    * Gets current active editor and launches the preview.
    *
-   * @param kind Which kind of preview to launch, either in external browser or in builtin vscode webview.
+   * @param kind Which kind of preview to launch, either in external browser or in builtin vscode
+   * webview.
    * @param mode The preview mode, either viewing as a document or as a slide.
-   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments to help
-   *             the `vite dev` server connect the language server via WebSocket.
+   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
+   * to help the `vite dev` server connect the language server via WebSocket.
    */
   function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
     return async () => {
@@ -283,8 +288,8 @@ export async function openPreviewInWebView({
 }
 
 /**
- * Holds the task control block for each preview task. This is used for editor interactions like bidirectional jumps
- *  between source panels and preview panels.
+ * Holds the task control block for each preview task. This is used for editor interactions like
+ * bidirectional jumps between source panels and preview panels.
  */
 interface TaskControlBlock {
   /// related panel
