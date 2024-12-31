@@ -9,6 +9,7 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "node:url";
+import { SYNTAX_WITH_BOLD_ITALIC, SYNTAX_WITH_MATH } from "./feature.mjs";
 
 // JS-Snippet to generate pattern
 function generatePattern(maxDepth: number, lb: string, rb: string) {
@@ -66,11 +67,7 @@ const codeBlock: textmate.Pattern = {
       name: "meta.brace.curly.typst",
     },
   },
-  patterns: [
-    {
-      include: "#code",
-    },
-  ],
+  patterns: [{ include: "#code" }],
 };
 
 const contentBlock: textmate.Pattern = {
@@ -87,14 +84,7 @@ const contentBlock: textmate.Pattern = {
       name: "meta.brace.square.typst",
     },
   },
-  patterns: [
-    {
-      include: "#contentBlock",
-    },
-    {
-      include: "#markup",
-    },
-  ],
+  patterns: [{ include: "#contentBlock" }, { include: "#markup" }],
 };
 
 const primitiveColors: textmate.Pattern = {
@@ -115,6 +105,7 @@ const primitiveTypes: textmate.PatternMatch = {
 };
 
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
+const MATH_IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_]*/u;
 
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
@@ -123,7 +114,7 @@ const identifier: textmate.PatternMatch = {
 };
 
 const mathIdentifier: textmate.PatternMatch = {
-  match: /\p{XID_Start}(?:\p{XID_Continue}(?!-))*/u,
+  match: MATH_IDENTIFIER,
   name: "variable.other.readwrite.typst",
 };
 
@@ -156,6 +147,11 @@ const markupBrace: textmate.PatternMatch = {
 const mathBrace: textmate.PatternMatch = {
   name: "markup.content.brace.typst",
   match: /[{}]/,
+};
+
+const mathMoreBrace: textmate.PatternMatch = {
+  name: "markup.content.brace.typst",
+  match: markupBrace.match,
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -206,24 +202,23 @@ const markupMath: textmate.Pattern = {
   ],
 };
 
+const experimentalMathRules: textmate.Pattern[] = [
+  {
+    match: /[_^'\/&√∛∜]/,
+    name: "punctuation.math.operator.typst",
+  },
+  { include: "#strictMathFuncCallOrPropAccess" },
+  { include: "#mathIdentifier" },
+];
+
 const math: textmate.Pattern = {
   patterns: [
-    {
-      include: "#markupEscape",
-    },
-    {
-      include: "#stringLiteral",
-    },
-    // todo: correctly parse math identifier
-    // {
-    //   include: "#mathIdentifier",
-    // },
-    {
-      include: "#markupEnterCode",
-    },
-    {
-      include: "#mathBrace",
-    },
+    { include: "#markupEscape" },
+    { include: "#stringLiteral" },
+    { include: "#markupEnterCode" },
+    ...(SYNTAX_WITH_MATH ? experimentalMathRules : []),
+    // We can mark more braces as text if we enables math syntaxes
+    { include: SYNTAX_WITH_MATH ? "#mathMoreBrace" : "#mathBrace" },
   ],
 };
 
@@ -236,51 +231,27 @@ const markupHeading: textmate.Pattern = {
       name: "punctuation.definition.heading.typst",
     },
   },
-  patterns: [
-    {
-      include: "#markup",
-    },
-  ],
+  patterns: [{ include: "#markup" }],
 };
 
 const common: textmate.Pattern = {
   patterns: [
-    {
-      include: "#strictComments",
-    },
-    {
-      include: "#blockRaw",
-    },
-    {
-      include: "#inlineRaw",
-    },
+    { include: "#strictComments" },
+    { include: "#blockRaw" },
+    { include: "#inlineRaw" },
   ],
 };
 
 // These two markup are buggy
-const ENABLE_BOLD_ITALIC = false;
-const boldItalicMarkup = ENABLE_BOLD_ITALIC
-  ? [
-      {
-        include: "#markupBold",
-      },
-      {
-        include: "#markupItalic",
-      },
-    ]
+const boldItalicMarkup = SYNTAX_WITH_BOLD_ITALIC
+  ? [{ include: "#markupBold" }, { include: "#markupItalic" }]
   : [];
 
 const markup: textmate.Pattern = {
   patterns: [
-    {
-      include: "#common",
-    },
-    {
-      include: "#markupEnterCode",
-    },
-    {
-      include: "#markupEscape",
-    },
+    { include: "#common" },
+    { include: "#markupEnterCode" },
+    { include: "#markupEscape" },
     {
       name: "punctuation.definition.linebreak.typst",
       match: /\\/,
@@ -311,15 +282,9 @@ const markup: textmate.Pattern = {
     //   match: /:([a-zA-Z0-9]+:)+/,
     // },
     ...boldItalicMarkup,
-    {
-      include: "#markupLink",
-    },
-    {
-      include: "#markupMath",
-    },
-    {
-      include: "#markupHeading",
-    },
+    { include: "#markupLink" },
+    { include: "#markupMath" },
+    { include: "#markupHeading" },
     {
       name: "punctuation.definition.list.unnumbered.typst",
       match: /^\s*-\s+/,
@@ -347,15 +312,9 @@ const markup: textmate.Pattern = {
     //     },
     //   },
     // },
-    {
-      include: "#markupLabel",
-    },
-    {
-      include: "#markupReference",
-    },
-    {
-      include: "#markupBrace",
-    },
+    { include: "#markupLabel" },
+    { include: "#markupReference" },
+    { include: "#markupBrace" },
   ],
 };
 
@@ -448,19 +407,13 @@ const markupEnterCode: textmate.Pattern = {
 
 const code: textmate.Pattern = {
   patterns: [
-    {
-      include: "#common",
-    },
-    {
-      include: "#comments",
-    },
+    { include: "#common" },
+    { include: "#comments" },
     {
       name: "punctuation.separator.colon.typst",
       match: /;/,
     },
-    {
-      include: "#expression",
-    },
+    { include: "#expression" },
   ],
 };
 
@@ -527,12 +480,8 @@ const constants: textmate.Pattern = {
       name: "constant.numeric.float.typst",
       match: floatUnit(new RegExp(""), true),
     },
-    {
-      include: "#stringLiteral",
-    },
-    {
-      include: "#markupMath",
-    },
+    { include: "#stringLiteral" },
+    { include: "#markupMath" },
   ],
 };
 
@@ -617,11 +566,7 @@ const expressions = (): textmate.Grammar => {
             name: "keyword.operator.assignment.typst",
           },
         },
-        patterns: [
-          {
-            include: "#expression",
-          },
-        ],
+        patterns: [{ include: "#expression" }],
       },
     ],
   };
@@ -669,11 +614,7 @@ const expressions = (): textmate.Grammar => {
             name: "meta.brace.round.typst",
           },
         },
-        patterns: [
-          {
-            include: "#literalContent",
-          },
-        ],
+        patterns: [{ include: "#literalContent" }],
       },
     ],
   };
@@ -688,9 +629,7 @@ const expressions = (): textmate.Grammar => {
         name: "punctuation.separator.comma.typst",
         match: /,/,
       },
-      {
-        include: "#expression",
-      },
+      { include: "#expression" },
     ],
   };
 
@@ -1397,6 +1336,96 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
   };
 };
 
+const mathCallArgs: textmate.Pattern = {
+  //   name: "meta.call.args.typst",
+  begin: /\(/,
+  end: /\)/,
+  beginCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  patterns: [{ include: "#mathPatternOrArgsBody" }],
+};
+
+const mathPatternOrArgsBody: textmate.Pattern = {
+  patterns: [
+    { include: "#comments" },
+    {
+      match: /,/,
+      name: "punctuation.separator.comma.typst",
+    },
+    { include: "#markupMath" },
+  ],
+};
+
+const mathFuncCallOrPropAccess = (strict: boolean): textmate.Pattern => {
+  return {
+    name: "meta.expr.call.typst",
+    begin: lookAhead(
+      strict
+        ? new RegExp(
+            /(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source
+          )
+        : new RegExp(
+            /(\.\s*)?/.source + MATH_IDENTIFIER.source + /\s*(?=\(|\[)/.source
+          )
+    ),
+    end: strict
+      ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
+      : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
+    patterns: [
+      // todo: comments?
+      //   {
+      //     include: "#comments",
+      //   },
+      {
+        match: /\./,
+        name: "keyword.operator.accessor.typst",
+      },
+      {
+        match: new RegExp(
+          MATH_IDENTIFIER.source +
+            (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
+        ),
+        name: "entity.name.function.typst",
+        patterns: [
+          {
+            include: "#primitiveFunctions",
+          },
+        ],
+      },
+      {
+        include: "#mathIdentifier",
+      },
+      // empty args
+      {
+        // name: "meta.call.args.typst",
+        match: /(\()\s*(\))/,
+        captures: {
+          "1": {
+            name: "meta.brace.round.typst",
+          },
+          "2": {
+            name: "meta.brace.round.typst",
+          },
+        },
+      },
+      {
+        include: "#mathCallArgs",
+      },
+      {
+        include: "#contentBlock",
+      },
+    ],
+  };
+};
+
 // todo: #x => y should be parsed as |#x|=>|y
 // https://github.com/microsoft/vscode-textmate/blob/main/test-cases/themes/syntaxes/TypeScript.tmLanguage.json
 const arrowFunc: textmate.Pattern = {
@@ -1499,6 +1528,7 @@ export const typst: textmate.Grammar = {
     markupHeading,
     markupBrace,
     mathBrace,
+    mathMoreBrace,
 
     ...expressions().repository,
 
@@ -1516,6 +1546,9 @@ export const typst: textmate.Grammar = {
     // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
     patternOrArgsBody,
+    strictMathFuncCallOrPropAccess: mathFuncCallOrPropAccess(true),
+    mathCallArgs,
+    mathPatternOrArgsBody,
     codeBlock,
     contentBlock,
     arrowFunc,

@@ -1,5 +1,6 @@
 import * as textmate from "./textmate.mjs";
 import { languages as rawLanguages } from "./fenced.meta.mjs";
+import { SYNTAX_WITH_LANGS } from "./feature.mjs";
 
 const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 
@@ -84,8 +85,7 @@ const genLang = (
   };
 };
 
-const RENDER_LANGS = true;
-export const blockRawLangs = RENDER_LANGS ? rawLanguages.map(genLang) : [];
+export const blockRawLangs = SYNTAX_WITH_LANGS ? rawLanguages.map(genLang) : [];
 
 export const inlineRaw: textmate.Pattern = {
   name: "markup.raw.inline.typst string.other.raw.typst",
