@@ -11,7 +11,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 We are going to add maintainers to GitHub since 2025-01-07 (in 7 days):
 - @SylvanFranklin want to maintain the "Editor integration" and "Document Previewing" feature in https://github.com/Myriad-Dreamin/tinymist/pull/1091
 
-*Please reply in PRs or DM @Myriad-Dreamin if you have any concerns about adding the maintainers to list.*
+*Please reply in PRs or DM @Myriad-Dreamin if you have any concerns about adding the maintainer to list.*
 
 ### Completion
 
