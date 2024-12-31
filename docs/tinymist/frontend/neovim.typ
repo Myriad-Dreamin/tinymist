@@ -5,10 +5,10 @@
 Run and configure `tinymist` in Neovim with support for all major distros and package managers.
 
 == Feature Integration
-- *LSP* (Completion, Definitions, etc)
-- *Folding Ranges* supported with #link("https://github.com/kevinhwang91/nvim-ufo")[ufo].
-- *Code Formatting* with #link("https://github.com/Enter-tainer/typstyle/")[typestyle] or #link("https://github.com/astrale-sharp/typstfmt")[typstfmt] (depreciated)
-- *Live Web Preview* with #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview]
+- *LSP* (completion, definitions, etc.)
+- *Folding Ranges* supported with #link("https://github.com/kevinhwang91/nvim-ufo")[ufo.]
+- *Code Formatting* with #link("https://github.com/Enter-tainer/typstyle/")[typstyle] or #link("https://github.com/astrale-sharp/typstfmt")[typstfmt (deprecated).]
+- *Live Web Preview* with #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview.]
 
 #note-box[
   Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
@@ -31,7 +31,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   #include "common-finding-executable.typ"
 
 == Configuration
-- With `lspconfig`
+- With `lspconfig`:
   ```lua
   require("lspconfig")["tinymist"].setup {
       settings = {
@@ -47,7 +47,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 
-- Or with `Coc.nvim`
+- Or with `Coc.nvim`:
 
   ```json
   {
@@ -60,7 +60,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
     }
   }
   ```
-- Or finally with the builtin lsp protocol
+- Or finally with the builtin lsp protocol:
 
   ```lua
   vim.lsp.config['tinymist'] = {
@@ -76,7 +76,7 @@ For a full list of available settings see #link("https://github.com/Myriad-Dream
 
 == Formatting
 
-Either `typststyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
+Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
 
 ```lua
 formatterMode = "typstyle"
@@ -89,7 +89,7 @@ There is work in progress to integrate #link("https://github.com/chomosuke/typst
 == Troubleshooting
 <troubleshooting>
 
-Generally you can find in depth information via the `:mes` command, `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
+Generally you can find in depth information via the `:mes` command. `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
 
 === tinymist not starting when creating/opening files
 <tinymist-does-not-start-on-creatingopening-files>
