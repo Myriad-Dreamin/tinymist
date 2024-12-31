@@ -105,7 +105,7 @@ const primitiveTypes: textmate.PatternMatch = {
 };
 
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
-const MATH_IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_]*/u;
+const MATH_IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_]+/u;
 
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
