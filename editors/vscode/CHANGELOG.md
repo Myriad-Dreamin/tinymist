@@ -8,6 +8,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.12.16 - [2024-12-31]
 
+We are going to add maintainers to GitHub since 2025-01-07 (in 7 days):
+- @SylvanFranklin want to maintain the "Editor integration" and "Document Previewing" feature in https://github.com/Myriad-Dreamin/tinymist/pull/1091
+
+*Please reply in PRs or DM @Myriad-Dreamin if you have any concerns about adding these maintainers to list.*
+
 ### Completion
 
 * (Fix) Completing body of let/closure in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/1072
