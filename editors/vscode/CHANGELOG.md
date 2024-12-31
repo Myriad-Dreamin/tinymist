@@ -4,6 +4,33 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
+
+## v0.12.16 - [2024-12-31]
+
+We are going to add maintainers to GitHub since 2025-01-07 (in 7 days):
+- @SylvanFranklin want to maintain the "Editor integration" and "Document Previewing" feature in https://github.com/Myriad-Dreamin/tinymist/pull/1091
+
+*Please reply in PRs or DM @Myriad-Dreamin if you have any concerns about adding the maintainer to list.*
+
+### Completion
+
+* (Fix) Completing body of let/closure in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/1072
+* (Fix) Completing raw language again in https://github.com/Myriad-Dreamin/tinymist/pull/1073
+* (Fix) Completing hash expression in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1071
+* Completing context expression in code mode in https://github.com/Myriad-Dreamin/tinymist/pull/1070
+* Using more efficient completion data structure in https://github.com/Myriad-Dreamin/tinymist/pull/1079
+
+### Rename
+
+* (Fix) Checking to avoid affecting non-related paths when renaming files by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1080
+
+### Folding Range
+
+* Folding continue line comments by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1043
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.14...v0.12.16
+
 ## v0.12.14 - [2024-12-23]
 
 *We now use [cargo-dist](https://github.com/axodotdev/cargo-dist) to build, attest, and release binaries. The package publishers should prefer to use these binaries and validate them along with checksum.*  If you have any problems with changes, please report them to [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues).
