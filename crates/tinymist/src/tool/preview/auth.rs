@@ -80,10 +80,11 @@ pub async fn try_auth_websocket_client(
         .context("auth response 1 missing")??;
     let response: AuthMsgResponseClient = serde_json::from_str(response.to_text()?)?;
 
-    if sha512hex(format!("{}{}{}", secret, challenge, response.cnonce).as_str()) == response.hash {
+    if sha512hex(format!("{}:{}:{}", secret, challenge, response.cnonce).as_str()) == response.hash
+    {
         // ... then we authenticate to the client
         let snonce = generate_token();
-        let hash = sha512hex(format!("{}{}{}", secret, response.challenge, snonce).as_str());
+        let hash = sha512hex(format!("{}:{}:{}", secret, response.challenge, snonce).as_str());
         let json = serde_json::to_string(&AuthMsgResponseServer {
             snonce: &snonce,
             hash: &hash,

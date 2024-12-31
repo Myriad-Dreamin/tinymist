@@ -89,7 +89,7 @@ export function getAuthenticatedSocket(url: string, secret: string, dec: TextDec
                 const cnonce = generateCryptoRandom(32);
                 prews.next(enc.encode(JSON.stringify({
                     'cnonce': cnonce,
-                    'hash': await digestHex(secret + message.challenge + cnonce),
+                    'hash': await digestHex(secret + ":" + message.challenge + ":" + cnonce),
                     'challenge': challengeForServer
                 })));
 
@@ -122,7 +122,7 @@ export function getAuthenticatedSocket(url: string, secret: string, dec: TextDec
                 // Server liked our 'hash'. Now we check if the server is malicious or not
                 if(message.snonce === undefined || message.hash === undefined)
                     throw new Error("Missing snonce or hash.");
-                if(message.hash !== await digestHex(secret + challengeForServer + message.snonce))
+                if(message.hash !== await digestHex(secret + ":" + challengeForServer + ":" + message.snonce))
                     throw new Error("Malicious server detected?!");
 
                 // Authentication succeeded!
