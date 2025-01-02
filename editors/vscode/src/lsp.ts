@@ -48,6 +48,10 @@ export interface PreviewResult {
    */
   dataPlanePort?: number;
   /**
+   * The secret used for websocket authentication
+   */
+  secret: string,
+  /**
    * Whether the preview content is provided by the primary compiler instance. This must be indicate by the CLI argument `--not-primary`
    * when starts a preview task by *LSP Command*.
    *

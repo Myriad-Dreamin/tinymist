@@ -291,6 +291,8 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     task.kind === "browser",
   );
 
+  const secret = '__no_secret_because_typst-preview_doesnt_support_it__';
+
   const addonΠserver = new Addon2Server(
     controlPlanePort,
     enableCursor,
@@ -320,7 +322,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
   });
 
   let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
-  contentPreviewProvider.then((p) => p.postActivate(connectUrl));
+  contentPreviewProvider.then((p) => p.postActivate(connectUrl, secret));
   let panel: vscode.WebviewPanel | undefined = undefined;
   if (task.kind == "webview") {
     panel = await openPreviewInWebView({
@@ -328,11 +330,12 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
       task,
       activeEditor,
       dataPlanePort,
+      secret,
       webviewPanel,
       panelDispose() {
         activeTask.delete(bindDocument);
         serverProcess.kill();
-        contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+        contentPreviewProvider.then((p) => p.postDeactivate(connectUrl, secret));
       },
     });
   }
@@ -413,7 +416,13 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
       `Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`,
     );
     if (openInBrowser) {
-      vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}`));
+      const wsUrl =  `ws://127.0.0.1:${dataPlanePort}`;
+      const queryString = (new URLSearchParams({
+        previewMode: task.mode === "doc" ? "Doc" : "Slide",
+        secret: '__no_secret_because_typst-preview_doesnt_support_it__',
+        wsUrl,
+      })).toString();
+      vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}/#${queryString}`));
     }
     // window.typstWebsocket.send("current");
     return {
@@ -479,6 +488,7 @@ export class Addon2Server {
     bindDocument: vscode.TextDocument,
     activeEditor: vscode.TextEditor,
   ) {
+    // We're talking to the typst-preview server here so no authentication.
     const conn = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
     conn.addEventListener("message", async (message) => {
       const data = JSON.parse(message.data as string);

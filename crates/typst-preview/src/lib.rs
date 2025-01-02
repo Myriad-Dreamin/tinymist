@@ -33,19 +33,6 @@ type Message = WsMessage;
 
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
-/// Get the HTML for the frontend by a given preview mode and server to connect
-pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
-    let mode = match mode {
-        PreviewMode::Document => "Doc",
-        PreviewMode::Slide => "Slide",
-    };
-
-    html.replace("ws://127.0.0.1:23625", to).replace(
-        "preview-arg:previewMode:Doc",
-        format!("preview-arg:previewMode:{mode}").as_str(),
-    )
-}
-
 /// Shortcut to create a previewer.
 pub async fn preview(
     arguments: PreviewArgs,
@@ -82,12 +69,11 @@ impl Previewer {
             + futures::Stream<Item = Result<WsMessage, WsError>>
             + Send
             + 'static,
-        S: 'static,
-        SFut: Future<Output = S> + Send + 'static,
+        S: Send + 'static,
     >(
         &mut self,
-        mut streams: mpsc::UnboundedReceiver<SFut>,
-        caster: impl Fn(S) -> Result<C, Error> + Send + Sync + Copy + 'static,
+        mut streams: mpsc::UnboundedReceiver<S>,
+        caster: impl Fn(S) -> C + Send + Sync + Copy + 'static,
     ) {
         let idle_timeout = reflexo_typst::time::Duration::from_secs(5);
         let (conn_handler, shutdown_tx, mut shutdown_data_plane_rx) =
@@ -98,7 +84,7 @@ impl Previewer {
             let h = conn_handler.clone();
             let alive_tx = alive_tx.clone();
             tokio::spawn(async move {
-                let conn: C = caster(conn.await).unwrap();
+                let conn: C = caster(conn);
                 tokio::pin!(conn);
 
                 if h.enable_partial_rendering {
