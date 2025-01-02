@@ -27,6 +27,6 @@ We are going to add maintainers to GitHub since 2025-01-07 (in 7 days):
 
 ### Folding Range
 
-* Folding continue line comments by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1043
+* Folding continuous comments by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1043
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.14...v0.12.16
