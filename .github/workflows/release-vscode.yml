@@ -424,7 +424,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}-npm
-          path: tinymist-${{ env.target }}.tar.gz
+          path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
       - name: Package extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
