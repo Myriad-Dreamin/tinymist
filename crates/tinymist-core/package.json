@@ -1,0 +1,33 @@
+{
+    "name": "tinymist",
+    "version": "0.12.16",
+    "description": "WASM module for running tinymist analyzers in JavaScript environment.",
+    "author": "Myriad-Dreamin",
+    "license": "Apache-2.0",
+    "keywords": [
+        "TypeScript",
+        "Typst"
+    ],
+    "type": "module",
+    "module": "pkg/tinymist_core.js",
+    "types": "pkg/tinymist_core.d.ts",
+    "files": [
+        "pkg/tinymist_core_bg.wasm",
+        "pkg/tinymist_core_bg.wasm.d.ts",
+        "pkg/tinymist_core_bg.js",
+        "pkg/tinymist_core.js",
+        "pkg/tinymist_core.d.ts"
+    ],
+    "scripts": {
+        "build:dev": "wasm-pack build --target web --dev -- --no-default-features --features web",
+        "build:node": "wasm-pack build --target nodejs -- --no-default-features --features web",
+        "build": "wasm-pack build --target web -- --no-default-features --features web",
+        "publish:dry": "npm publish --dry-run",
+        "publish:lib": "npm publish || exit 0",
+        "test:chrome": "wasm-pack test --chrome --headless --release",
+        "test:firefox": "wasm-pack test --firefox --headless --release"
+    },
+    "devDependencies": {
+        "turbo": "^2.3.3"
+    }
+}

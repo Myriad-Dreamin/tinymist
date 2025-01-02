@@ -15,6 +15,7 @@ rust-version.workspace = true
 
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
+tinymist-core = { workspace = true, default-features = false, features = [] }
 tinymist-world.workspace = true
 tinymist-render.workspace = true
 typlite.workspace = true
