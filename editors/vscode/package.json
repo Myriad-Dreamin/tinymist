@@ -1,5 +1,5 @@
 {
-  "name": "tinymist",
+  "name": "vscode-tinymist",
   "version": "0.12.16",
   "description": "An integrated language service for Typst",
   "keywords": [
