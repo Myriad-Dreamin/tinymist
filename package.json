@@ -1,10 +1,11 @@
 {
-  "name": "tinymist",
+  "name": "tinymist-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "license": "Apache-2.0",
   "workspaces": [
+    "crates/tinymist-core",
     "editors/vscode",
     "contrib/typst-preview/editors/vscode",
     "tools/editor-tools",
