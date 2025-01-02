@@ -27,6 +27,7 @@
     "vscode": "^1.82.0"
   },
   "main": "./out/extension.js",
+  "browser": "./out/extension.web.js",
   "icon": "./icons/ti-white.png",
   "contributes": {
     "viewsContainers": {
@@ -1094,11 +1095,13 @@
   "scripts": {
     "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
     "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
-    "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
+    "build-web-base": "esbuild ./src/extension.web.ts --bundle --outfile=out/extension.web.js --external:vscode --format=cjs --target=es2020,chrome58,edge16,firefox57",
+    "build-system-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "build-base": "yarn run build-web-base && yarn run build-system-base",
     "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
     "package": "vsce package --yarn",
-    "compile": "yarn run build-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
-    "watch": "yarn run build-base -- --sourcemap --watch",
+    "compile": "yarn run build-system-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
+    "watch": "yarn run build-system-base -- --sourcemap --watch",
     "check": "tsc --noEmit",
     "lint": "eslint ./src --ext .ts",
     "lint-fix": "eslint ./src --ext .ts --fix",

@@ -1,5 +1,6 @@
 **
 !out/extension.js
+!out/extension.web.js
 !out/tinymist
 !out/tinymist.exe
 !out/typst.tmLanguage.json
