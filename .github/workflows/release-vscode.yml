@@ -390,19 +390,12 @@ jobs:
   build_web:
     name: build (web)
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    container:
-      image: rust:alpine
-      volumes:
-        - /usr/local/cargo/registry:/usr/local/cargo/registry
     env:
       target: web
       RUST_TARGET: wasm32-unknown-unknown
       isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
     steps:
-      - name: Install dependencies
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
