@@ -599,15 +599,24 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
+    let secret = auth::generate_token();
+    log::info!("Secret for websocket authentication: {secret}");
+
     let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
 
+    let secret_for_control_plane = secret.clone();
     let control_plane_server_handle = tokio::spawn(async move {
         let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
 
         // TODO: How to test this control plane thing? Where is it used?
-        let secret = auth::generate_token();
 
-        let srv = make_http_server(false, args.control_plane_host, secret, control_sock_tx).await;
+        let srv = make_http_server(
+            false,
+            args.control_plane_host,
+            secret_for_control_plane,
+            control_sock_tx,
+        )
+        .await;
         log::info!("Control panel server listening on: {}", srv.addr);
 
         let control_websocket = control_sock_rx.recv().await.unwrap();
@@ -672,7 +681,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let secret = auth::generate_token();
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
         Some(make_http_server(true, static_file_host, secret.clone(), websocket_tx.clone()).await)
