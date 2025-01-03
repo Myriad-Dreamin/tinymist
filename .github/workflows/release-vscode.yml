@@ -409,7 +409,7 @@ jobs:
       - name: Build tinymist vscode extension
         run: |
           yarn
-          yarn run compile
+          yarn run compile:web
         working-directory: ./editors/vscode
       - name: Build tinymist library
         run: yarn build
