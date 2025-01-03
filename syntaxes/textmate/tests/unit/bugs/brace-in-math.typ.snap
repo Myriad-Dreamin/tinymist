@@ -10,16 +10,14 @@
 >$
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >  (
-#^^ source.typst markup.math.typst
-#  ^ source.typst markup.math.typst markup.content.brace.typst
+#^^^^ source.typst markup.math.typst
 >$
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >
 >$
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >  )
-#^^ source.typst markup.math.typst
-#  ^ source.typst markup.math.typst markup.content.brace.typst
+#^^^^ source.typst markup.math.typst
 >$
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >
@@ -56,11 +54,9 @@
 #^^ source.typst meta.expr.let.typst
 #  ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst
 >    lr(})
-#^^^^ source.typst meta.expr.let.typst markup.math.typst
-#    ^^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
-#      ^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
-#       ^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst
-#        ^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#^^^^^^^ source.typst meta.expr.let.typst markup.math.typst
+#       ^ source.typst meta.expr.let.typst markup.math.typst markup.content.brace.typst
+#        ^^ source.typst meta.expr.let.typst markup.math.typst
 >  $
 #^^ source.typst meta.expr.let.typst markup.math.typst
 #  ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst

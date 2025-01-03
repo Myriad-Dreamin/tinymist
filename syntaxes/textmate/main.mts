@@ -239,7 +239,7 @@ const markupMath: textmate.Pattern = {
 
 const experimentalMathRules: textmate.Pattern[] = [
   {
-    begin: replaceGroup(/([_^])({opening})/, "{opening}", MATH_OPENING),
+    begin: replaceGroup(/([_^\/√∛∜])\s*({opening})/, "{opening}", MATH_OPENING),
     end: replaceGroup(/({closing})|(?=\$)|$/, "{closing}", MATH_CLOSING),
     beginCaptures: {
       "1": {
@@ -264,7 +264,7 @@ const experimentalMathRules: textmate.Pattern[] = [
     ],
   },
   {
-    match: /[_^'\/&√∛∜]/,
+    match: /[_^'&\/√∛∜]/,
     name: "punctuation.math.operator.typst",
   },
   { include: "#strictMathFuncCallOrPropAccess" },
