@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import {fs} from 'fs';
+import * as fs from 'fs';
 
 if (!fs.existsSync('./out/extension.web.js')) {
   fs.writeFileSync('./out/extension.web.js', '');
