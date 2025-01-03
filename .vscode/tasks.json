@@ -13,6 +13,13 @@
 			"dependsOrder": "sequence",
 		},
 		{
+			"label": "VS Code Extension Prelaunch [Web]",
+			"dependsOn": [
+				"Compile VS Code Extension [Web]",
+			],
+			"dependsOrder": "sequence",
+		},
+		{
 			"label": "VS Code Extension Prelaunch [Release]",
 			"dependsOn": [
 				"Compile VS Code Extension",
@@ -38,6 +45,13 @@
 			"label": "Compile VS Code Extension",
 			"type": "npm",
 			"script": "compile",
+			"path": "editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Compile VS Code Extension [Web]",
+			"type": "npm",
+			"script": "compile:web",
 			"path": "editors/vscode",
 			"group": "build",
 		},

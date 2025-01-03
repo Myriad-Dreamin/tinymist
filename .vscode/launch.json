@@ -26,7 +26,7 @@
             "outFiles": [
                 "${workspaceFolder}/editors/vscode/out/**/*.js"
             ],
-            "preLaunchTask": "VS Code Extension Prelaunch"
+            "preLaunchTask": "VS Code Extension Prelaunch [Web]"
         },
         {
             "name": "Run Extension [Release]",

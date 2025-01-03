@@ -5,11 +5,12 @@
 import vscode = require("vscode");
 import process = require("process");
 import path = require("path");
+import { extensionState } from "./state";
 
 export function vscodeVariables(
   string: string,
   recursive?: boolean,
-  context = new CodeVariableContext()
+  context = new CodeVariableContext(),
 ): string {
   while (true) {
     string = string.replace(context.regex, (match) => {
@@ -56,8 +57,12 @@ export class CodeVariableContext {
     env: {
       variable: true,
       value: (variable: string) => {
+        if (extensionState.features.web) {
+          return "";
+        }
+
         const e = variable.match(/\${env:(.*?)}/);
-        return (e && process.env[e[1]]) || "";
+        return (e && process.env?.[e[1]]) || "";
       },
     },
     config: {
@@ -162,7 +167,7 @@ export class CodeVariableContext {
     const activeTextEditor = this.activeTextEditor;
     if (activeTextEditor) {
       selectedText = activeTextEditor.document.getText(
-        new vscode.Range(activeTextEditor.selection.start, activeTextEditor.selection.end)
+        new vscode.Range(activeTextEditor.selection.start, activeTextEditor.selection.end),
       );
     }
 

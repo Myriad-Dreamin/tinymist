@@ -408,6 +408,11 @@
   resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.0.tgz#3188bcb273a414b0d215fd22a58540b989b9409a"
   integrity sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ==
 
+"@jspm/core@^2.0.1":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@jspm/core/-/core-2.1.0.tgz#ee21ff64591d68de98b79ca8e4bd6c5249fded53"
+  integrity sha512-3sRl+pkyFY/kLmHl0cgHiFp2xEqErA8N3ECjMs7serSUBmoJ70lBa0PG5t0IM6WJgdZNyyI0R8YFfi5wM8+mzg==
+
 "@myriaddreamin/typst-ts-renderer@0.5.1":
   version "0.5.1"
   resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.5.1.tgz#951bb1df75c93c29b1072b71fe375fb030a8bde2"
@@ -1708,6 +1713,14 @@ es-to-primitive@^1.2.1:
     is-date-object "^1.0.1"
     is-symbol "^1.0.2"
 
+esbuild-plugin-polyfill-node@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.yarnpkg.com/esbuild-plugin-polyfill-node/-/esbuild-plugin-polyfill-node-0.3.0.tgz#e7e3804b8272df51ae4f8ebfb7445a03712504cb"
+  integrity sha512-SHG6CKUfWfYyYXGpW143NEZtcVVn8S/WHcEOxk62LuDXnY4Zpmc+WmxJKN6GMTgTClXJXhEM5KQlxKY6YjbucQ==
+  dependencies:
+    "@jspm/core" "^2.0.1"
+    import-meta-resolve "^3.0.0"
+
 esbuild@^0.18.10:
   version "0.18.20"
   resolved "https://registry.yarnpkg.com/esbuild/-/esbuild-0.18.20.tgz#4709f5a34801b43b799ab7d6d82f7284a9b7a7a6"
@@ -2387,6 +2400,11 @@ import-fresh@^3.2.1:
   dependencies:
     parent-module "^1.0.0"
     resolve-from "^4.0.0"
+
+import-meta-resolve@^3.0.0:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/import-meta-resolve/-/import-meta-resolve-3.1.1.tgz#75d194ae465d17c15736f414734310c87d4c45d7"
+  integrity sha512-qeywsE/KC3w9Fd2ORrRDUw6nS/nLwZpXgfrOc2IILvZYnCaEMd+D56Vfg9k4G29gIeVi3XKql1RQatME8iYsiw==
 
 imurmurhash@^0.1.4:
   version "0.1.4"
@@ -3984,6 +4002,48 @@ tunnel@0.0.6:
   version "0.0.6"
   resolved "https://registry.yarnpkg.com/tunnel/-/tunnel-0.0.6.tgz#72f1314b34a5b192db012324df2cc587ca47f92c"
   integrity sha512-1h/Lnq9yajKY2PEbBadPXj3VxsDDu844OnaAo52UVmIzIvwwtBPIuNvkjuzBlTWpfJyUbG3ez0KSBibQkj4ojg==
+
+turbo-darwin-64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-darwin-64/-/turbo-darwin-64-2.3.3.tgz#875975cddf7abdb52b28e9cab234fc73ca001e80"
+  integrity sha512-bxX82xe6du/3rPmm4aCC5RdEilIN99VUld4HkFQuw+mvFg6darNBuQxyWSHZTtc25XgYjQrjsV05888w1grpaA==
+
+turbo-darwin-arm64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-darwin-arm64/-/turbo-darwin-arm64-2.3.3.tgz#5e85d6dadac6560782bb91081fee56f9cfcd103e"
+  integrity sha512-DYbQwa3NsAuWkCUYVzfOUBbSUBVQzH5HWUFy2Kgi3fGjIWVZOFk86ss+xsWu//rlEAfYwEmopigsPYSmW4X15A==
+
+turbo-linux-64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-linux-64/-/turbo-linux-64-2.3.3.tgz#634f2053cff6ff056bec7f307c2fb4dd9a2bc86f"
+  integrity sha512-eHj9OIB0dFaP6BxB88jSuaCLsOQSYWBgmhy2ErCu6D2GG6xW3b6e2UWHl/1Ho9FsTg4uVgo4DB9wGsKa5erjUA==
+
+turbo-linux-arm64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-linux-arm64/-/turbo-linux-arm64-2.3.3.tgz#284e26825f5d692bffb5b126a9aeccaae6a4533b"
+  integrity sha512-NmDE/NjZoDj1UWBhMtOPmqFLEBKhzGS61KObfrDEbXvU3lekwHeoPvAMfcovzswzch+kN2DrtbNIlz+/rp8OCg==
+
+turbo-windows-64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-windows-64/-/turbo-windows-64-2.3.3.tgz#2900ac2c00d9609bc480d90564a98ca1cc7f4b17"
+  integrity sha512-O2+BS4QqjK3dOERscXqv7N2GXNcqHr9hXumkMxDj/oGx9oCatIwnnwx34UmzodloSnJpgSqjl8iRWiY65SmYoQ==
+
+turbo-windows-arm64@2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo-windows-arm64/-/turbo-windows-arm64-2.3.3.tgz#395508cdf6b351d7dd324fb0b318c1b2cf1d66dd"
+  integrity sha512-dW4ZK1r6XLPNYLIKjC4o87HxYidtRRcBeo/hZ9Wng2XM/MqqYkAyzJXJGgRMsc0MMEN9z4+ZIfnSNBrA0b08ag==
+
+turbo@^2.3.3:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/turbo/-/turbo-2.3.3.tgz#70736263c75f7c0c501278214dee49859e1c7fcd"
+  integrity sha512-DUHWQAcC8BTiUZDRzAYGvpSpGLiaOQPfYXlCieQbwUvmml/LRGIe3raKdrOPOoiX0DYlzxs2nH6BoWJoZrj8hA==
+  optionalDependencies:
+    turbo-darwin-64 "2.3.3"
+    turbo-darwin-arm64 "2.3.3"
+    turbo-linux-64 "2.3.3"
+    turbo-linux-arm64 "2.3.3"
+    turbo-windows-64 "2.3.3"
+    turbo-windows-arm64 "2.3.3"
 
 type-check@^0.4.0, type-check@~0.4.0:
   version "0.4.0"
