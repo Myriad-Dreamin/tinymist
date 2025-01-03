@@ -8,7 +8,7 @@
 #                          ^^^ source.typst keyword.other.logical.typst
 #                             ^^^^^^^^^^^ source.typst
 #                                        ^^^^ source.typst constant.language.boolean.typst
-#                                            ^ source.typst punctuation.separator.colon.typst
+#                                            ^ source.typst punctuation.terminator.statement.typst
 >
 >  if 1 + 2                   == 3 {
 #^^ source.typst

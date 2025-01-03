@@ -5,7 +5,7 @@
 #       ^^^^ source.typst meta.expr.call.typst keyword.other.auto.typst
 #           ^ source.typst meta.expr.call.typst punctuation.separator.comma.typst
 #            ^ source.typst meta.expr.call.typst
-#             ^^^^^ source.typst meta.expr.call.typst entity.name.type.primitive.typst
+#             ^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst
 #                  ^ source.typst meta.expr.call.typst punctuation.separator.colon.typst
 #                   ^ source.typst meta.expr.call.typst
 #                    ^^^^ source.typst meta.expr.call.typst constant.language.boolean.typst
