@@ -25,8 +25,6 @@ interface WebSocketAndSubject {
 function getUnsafeSocketCompat(url: string): Promise<WebSocketAndSubject>
 {
     return new Promise((wsresolve) => {
-        let _sock: WebSocket | undefined = undefined;
-
         let prews = webSocket<ArrayBuffer>({
             url,
             binaryType: "arraybuffer",
@@ -35,7 +33,7 @@ function getUnsafeSocketCompat(url: string): Promise<WebSocketAndSubject>
             openObserver: {
                 next: (e) => {
                     console.log('WebSocket connection opened', e.target);
-                    _sock = e.target as any;
+                    wsresolve({ websocketSubject: prews, websocket: e.target as any});
                 }
             },
         });
@@ -45,13 +43,12 @@ function getUnsafeSocketCompat(url: string): Promise<WebSocketAndSubject>
         }); 
 
         console.log("Authentication skipped (for compat with typst-preview, triggered by special value of `secret`)");
-        wsresolve({ websocketSubject: prews, websocket: _sock });
     });
 }
 
 export function getAuthenticatedSocket(url: string, secret: string, dec: TextDecoder, enc: TextEncoder): Promise<WebSocketAndSubject> {
     // Typst-preview doesn't support authentication. For now, we then skip authentication.
-    // Remove this once we no longer support compatibility with external typst-preview.
+    // FIXME: Remove this once we no longer support compatibility with external typst-preview.
     if('__no_secret_because_typst-preview_doesnt_support_it__' === secret) {
         return getUnsafeSocketCompat(url);
     }

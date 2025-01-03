@@ -287,11 +287,10 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
   const enableCursor =
     vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
   await watchEditorFiles();
-  const { serverProcess, controlPlanePort, dataPlanePort, staticFilePort } = await launchCli(
+  const { serverProcess, controlPlanePort, dataPlanePort, secret, staticFilePort } = await launchCli(
     task.kind === "browser",
   );
 
-  const secret = '__no_secret_because_typst-preview_doesnt_support_it__';
 
   const addonΠserver = new Addon2Server(
     controlPlanePort,
@@ -415,11 +414,12 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     console.log(
       `Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`,
     );
+    const secret = '__no_secret_because_typst-preview_doesnt_support_it__';
     if (openInBrowser) {
       const wsUrl =  `ws://127.0.0.1:${dataPlanePort}`;
       const queryString = (new URLSearchParams({
         previewMode: task.mode === "doc" ? "Doc" : "Slide",
-        secret: '__no_secret_because_typst-preview_doesnt_support_it__',
+        secret,
         wsUrl,
       })).toString();
       vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}/#${queryString}`));
@@ -429,6 +429,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
       serverProcess,
       dataPlanePort,
       controlPlanePort,
+      secret,
       staticFilePort,
     };
   }

@@ -179,6 +179,17 @@ impl EditorServer for CompileHandler {
     }
 }
 
+/// Whether to use websocket authentication. This should ideally always be `Enable`.
+/// `UnsafeDisable` is only temporarily supported to ease the transition for downstream packages.
+// FIXME: Remove `UnsafeDisable` (and the whole enum) in a future version.
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum AuthenticationMode {
+    /// Enable websocket authentication
+    Enable,
+    /// Disable websocket authentication
+    UnsafeDisable,
+}
+
 /// CLI Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
@@ -230,6 +241,12 @@ pub struct PreviewCliArgs {
     /// Don't open the preview in the browser after compilation.
     #[clap(long = "no-open")]
     pub dont_open_in_browser: bool,
+
+    /// Set "unsafe-disable" to disable websocket authentication for the control plane server. Careful: Among other things, this allows any website you visit to use the control plane server.
+    ///
+    /// This option is only meant to ease the transition to authentication for downstream packages. It will be removed in a future version of tinymist.
+    #[clap(long, value_enum, default_value_t=AuthenticationMode::Enable)]
+    pub control_plane_auth_mode: AuthenticationMode,
 }
 
 /// The global state of the preview tool.
@@ -345,8 +362,14 @@ impl PreviewState {
 
             let secret = auth::generate_token();
 
-            let srv =
-                make_http_server(true, args.data_plane_host, secret.clone(), websocket_tx).await;
+            let srv = make_http_server(
+                true,
+                AuthenticationMode::Enable,
+                args.data_plane_host,
+                secret.clone(),
+                websocket_tx,
+            )
+            .await;
             let addr = srv.addr;
             log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
 
@@ -404,6 +427,7 @@ pub struct HttpServer {
 /// Create a http server for the previewer.
 pub async fn make_http_server(
     serve_frontend_html: bool,
+    websocket_auth_mode: AuthenticationMode,
     static_file_addr: String,
     secret: String,
     websocket_tx: mpsc::UnboundedSender<HyperWebsocketStream>,
@@ -414,9 +438,11 @@ pub async fn make_http_server(
 
     let make_service = move || {
         let websocket_tx = websocket_tx.clone();
+        let websocket_auth_mode = websocket_auth_mode.clone();
         let secret = secret.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let websocket_tx = websocket_tx.clone();
+            let websocket_auth_mode = websocket_auth_mode.clone();
             let secret = secret.clone();
             async move {
                 // Check if the request is a websocket upgrade request.
@@ -438,12 +464,22 @@ pub async fn make_http_server(
                         //
                         // Note: We use authentication only for the websocket. The static HTML file server (see below)
                         //       only serves a not secret static template, so we don't bother with authentication there.
-                        if let Ok(websocket) =
-                            auth::try_auth_websocket_client(websocket, &secret).await
-                        {
-                            let _ = websocket_tx.send(websocket);
-                        } else {
-                            log::error!("Websocket client authentication failed");
+                        match websocket_auth_mode {
+                            AuthenticationMode::Enable => {
+                                if let Ok(websocket) =
+                                    auth::try_auth_websocket_client(websocket, &secret).await
+                                {
+                                    let _ = websocket_tx.send(websocket);
+                                } else {
+                                    log::error!("Websocket client authentication failed");
+                                }
+                            }
+                            AuthenticationMode::UnsafeDisable => {
+                                // We optionally allow to skip authentication upon explicit request to ease the transition to
+                                // authentication for downstream packages.
+                                // FIXME: Remove this is in a future version.
+                                let _ = websocket_tx.send(websocket);
+                            }
                         }
                     });
 
@@ -608,10 +644,9 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let control_plane_server_handle = tokio::spawn(async move {
         let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
 
-        // TODO: How to test this control plane thing? Where is it used?
-
         let srv = make_http_server(
             false,
+            args.control_plane_auth_mode,
             args.control_plane_host,
             secret_for_control_plane,
             control_sock_tx,
@@ -683,25 +718,42 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
-        Some(make_http_server(true, static_file_host, secret.clone(), websocket_tx.clone()).await)
+        Some(
+            make_http_server(
+                true,
+                AuthenticationMode::Enable,
+                static_file_host,
+                secret.clone(),
+                websocket_tx.clone(),
+            )
+            .await,
+        )
     } else {
         None
     };
 
-    let srv = make_http_server(true, args.data_plane_host, secret.clone(), websocket_tx).await;
+    let srv = make_http_server(
+        true,
+        AuthenticationMode::Enable,
+        args.data_plane_host,
+        secret.clone(),
+        websocket_tx,
+    )
+    .await;
     log::info!("Data plane server listening on: {}", srv.addr);
 
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
-    log::info!("Static file server listening on: {static_server_addr}");
+    let preview_url = format!(
+        "http://{static_server_addr}/#secret={secret}&previewMode={}",
+        match args.preview_mode {
+            PreviewMode::Document => "Doc",
+            PreviewMode::Slide => "Slide",
+        }
+    );
+    log::info!("Static file server listening on: {preview_url}");
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!(
-            "http://{static_server_addr}/#secret={secret}&previewMode={}",
-            match args.preview_mode {
-                PreviewMode::Document => "Doc",
-                PreviewMode::Slide => "Slide",
-            }
-        )) {
+        if let Err(e) = open::that_detached(preview_url) {
             log::error!("failed to open browser: {e}");
         };
     }
