@@ -26,7 +26,7 @@ function retrieveWsArgs() {
 
     let url = ARGS.get('wsUrl') ?? '/';
     let secret = ARGS.get('secret');
-    let mode = ARGS.get('previewMode');
+    let mode = ARGS.get('previewMode') ?? 'Doc';
     let previewMode = PreviewMode[mode];
 
     /// Note that we must resolve the url to an absolute url as
