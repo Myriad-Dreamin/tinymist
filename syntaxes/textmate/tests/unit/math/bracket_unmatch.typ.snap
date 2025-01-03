@@ -1,0 +1,30 @@
+>$ ||x||_(cal(l)_2() $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^^^^^^^^^^^ source.typst markup.math.typst
+#                    ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_) $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_[ $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_[ $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_⧼ $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_) $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>

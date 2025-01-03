@@ -49,6 +49,10 @@ function oneOf(...patterns: RegExp[]) {
   );
 }
 
+function replaceGroup(pattern: RegExp, group: string, replacement: RegExp) {
+  return new RegExp(pattern.source.replace(group, replacement.source));
+}
+
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const exprEndReg =
   /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\}\]\)\n]|$)/;
@@ -107,6 +111,14 @@ const primitiveTypes: textmate.PatternMatch = {
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 const MATH_IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_]+/u;
 
+// const MATH_OPENING =
+//   /[\[\(\u{5b}\u{7b}\u{2308}\u{230a}\u{231c}\u{231e}\u{2772}\u{27e6}\u{27e8}\u{27ea}\u{27ec}\u{27ee}\u{2983}\u{2985}\u{2987}\u{2989}\u{298b}\u{298d}\u{298f}\u{2991}\u{2993}\u{2995}\u{2997}\u{29d8}\u{29da}\u{29fc}]/u;
+// const MATH_CLOSING =
+//   /[\]\)\u{5d}\u{7d}\u{2309}\u{230b}\u{231d}\u{231f}\u{2773}\u{27e7}\u{27e9}\u{27eb}\u{27ed}\u{27ef}\u{2984}\u{2986}\u{2988}\u{298a}\u{298c}\u{298e}\u{2990}\u{2992}\u{2994}\u{2996}\u{2998}\u{29d9}\u{29db}\u{29fd}]/u;
+
+const MATH_OPENING = /[\[\(\{⌈⌊⌜⌞❲⟦⟨⟪⟬⟮⦃⦅⦇⦉⦋⦍⦏⦑⦓⦕⦗⧘⧚⧼]/;
+const MATH_CLOSING = /[\]\)\}⌉⌋⌝⌟❳⟧⟩⟫⟭⟯⦄⦆⦈⦊⦌⦎⦐⦒⦔⦖⦘⧙⧛⧽]/;
+
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
   match: IDENTIFIER,
@@ -152,6 +164,29 @@ const mathBrace: textmate.PatternMatch = {
 const mathMoreBrace: textmate.PatternMatch = {
   name: "markup.content.brace.typst",
   match: markupBrace.match,
+};
+
+const mathParen: textmate.Pattern = {
+  begin: MATH_OPENING,
+  end: replaceGroup(/({closing})|(?=\$)|$/, "{closing}", MATH_CLOSING),
+  beginCaptures: {
+    "0": {
+      name: "markup.content.brace.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "markup.content.brace.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#mathParen",
+    },
+    {
+      include: "#math",
+    },
+  ],
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -204,7 +239,32 @@ const markupMath: textmate.Pattern = {
 
 const experimentalMathRules: textmate.Pattern[] = [
   {
-    match: /[_^'\/&√∛∜]/,
+    begin: replaceGroup(/([_^\/√∛∜])\s*({opening})/, "{opening}", MATH_OPENING),
+    end: replaceGroup(/({closing})|(?=\$)|$/, "{closing}", MATH_CLOSING),
+    beginCaptures: {
+      "1": {
+        name: "punctuation.math.operator.typst",
+      },
+      "2": {
+        name: "constant.other.symbol.typst",
+      },
+    },
+    endCaptures: {
+      "0": {
+        name: "constant.other.symbol.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#mathParen",
+      },
+      {
+        include: "#math",
+      },
+    ],
+  },
+  {
+    match: /[_^'&\/√∛∜]/,
     name: "punctuation.math.operator.typst",
   },
   { include: "#strictMathFuncCallOrPropAccess" },
@@ -1528,6 +1588,7 @@ export const typst: textmate.Grammar = {
     markupHeading,
     markupBrace,
     mathBrace,
+    mathParen,
     mathMoreBrace,
 
     ...expressions().repository,

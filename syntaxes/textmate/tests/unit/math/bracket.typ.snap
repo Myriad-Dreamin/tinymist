@@ -1,0 +1,36 @@
+>
+>$ ||x||_[] $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^^ source.typst markup.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_[) $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^^ source.typst markup.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ||x||_⧼) $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^^^ source.typst markup.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ 1 / () $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^^ source.typst markup.math.typst
+#         ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ √() $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^ source.typst markup.math.typst
+#      ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ∛() $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^ source.typst markup.math.typst
+#      ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$ ∛∜() $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^ source.typst markup.math.typst
+#       ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
