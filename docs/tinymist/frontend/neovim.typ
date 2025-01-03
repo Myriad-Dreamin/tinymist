@@ -6,8 +6,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 
 == Feature Integration
 - *LSP* (completion, definitions, etc.)
-- *Folding Ranges* supported with #link("https://github.com/kevinhwang91/nvim-ufo")[ufo.]
-- *Code Formatting* with #link("https://github.com/Enter-tainer/typstyle/")[typstyle] or #link("https://github.com/astrale-sharp/typstfmt")[typstfmt (deprecated).]
+- *Code Formatting*
 - *Live Web Preview* with #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview.]
 
 #note-box[
@@ -77,9 +76,42 @@ Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can se
 formatterMode = "typstyle"
 ```
 
-== Preview
+== Live Preview
+<live-preview>
 
-There is work in progress to integrate #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview.nvim] directly into `tinymist`. In the meantime you can find can find installation and configuration instructions on that repo. This should be a shortterm solution.
+Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading (#link("https://pwmt.org/projects/zathura/")[zatuhra] is good).
+
+*Web Preview*
+
+```lua
+-- lazy.nvim
+{
+  'chomosuke/typst-preview.nvim',
+  lazy = false, -- or ft = 'typst'
+  version = '1.*',
+  opts = {}, -- lazy.nvim will implicitly calls `setup {}`
+}
+```
+See #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview] for more installation and configuration options.
+
+*Pdf Preview*
+
+This preview method is slower because of compilation delays, and additional delays in the pdf reader refreshing.
+
+It is often useful to have a command that opens the current file in the reader.
+
+```lua
+vim.api.nvim_create_user_command("OpenPdf", function()
+  local filepath = vim.api.nvim_buf_get_name(0)
+  if filepath:match("%.typ$") then
+    os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
+    -- replace open with your preferred pdf viewer
+    -- os.execute("zathura " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
+  end
+end, {})
+
+```
+Make sure to change `exportPdf` to "onType" or "onSave".
 
 == Troubleshooting
 <troubleshooting>
