@@ -1096,7 +1096,7 @@
     "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
     "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
     "build-web-base": "node esbuild.web.mjs",
-    "build-system-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "build-system-base": "node esbuild.system.mjs",
     "build-base": "yarn run build-web-base && yarn run build-system-base",
     "compile-shared": "yarn run build:syntax && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
     "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
