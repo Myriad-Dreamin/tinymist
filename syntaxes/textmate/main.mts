@@ -154,6 +154,29 @@ const mathMoreBrace: textmate.PatternMatch = {
   match: markupBrace.match,
 };
 
+const mathParen: textmate.Pattern = {
+  begin: /\(/,
+  end: /\)/,
+  beginCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#mathParen",
+    },
+    {
+      include: "#math",
+    },
+  ],
+};
+
 const stringLiteral: textmate.PatternBeginEnd = {
   name: "string.quoted.double.typst",
   begin: /"/,
@@ -203,6 +226,31 @@ const markupMath: textmate.Pattern = {
 };
 
 const experimentalMathRules: textmate.Pattern[] = [
+  {
+    begin: /([_^])(\()/,
+    end: /\)/,
+    beginCaptures: {
+      "1": {
+        name: "punctuation.definition.string.math.typst",
+      },
+      "2": {
+        name: "meta.brace.round.typst",
+      },
+    },
+    endCaptures: {
+      "0": {
+        name: "meta.brace.round.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#mathParen",
+      },
+      {
+        include: "#math",
+      },
+    ],
+  },
   {
     match: /[_^'\/&√∛∜]/,
     name: "punctuation.math.operator.typst",
@@ -1528,6 +1576,7 @@ export const typst: textmate.Grammar = {
     markupHeading,
     markupBrace,
     mathBrace,
+    mathParen,
     mathMoreBrace,
 
     ...expressions().repository,
