@@ -704,6 +704,7 @@
           "markup.raw.inline.typst",
           "string.other.label.typst",
           "string.quoted.double.typst",
+          "constant.other.symbol.typst",
           "constant.character.escape",
           "comment.block.typst",
           "comment.line.double-slash.typst"
@@ -724,6 +725,7 @@
           "markup.raw.inline.typst",
           "string.other.label.typst",
           "string.quoted.double.typst",
+          "constant.other.symbol.typst",
           "constant.character.escape",
           "comment.block.typst",
           "comment.line.double-slash.typst"

@@ -4,7 +4,8 @@
 #  ^^^^^^^^^^ source.typst comment.line.double-slash.typst
 >$ x^"#" = "argmin"_(A x=b) ||x||_(cal(l)_2) $
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
-# ^^^ source.typst markup.math.typst
+# ^^ source.typst markup.math.typst
+#   ^ source.typst markup.math.typst punctuation.math.operator.typst
 #    ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
 #     ^ source.typst markup.math.typst string.quoted.double.typst
 #      ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -12,12 +13,27 @@
 #          ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
 #           ^^^^^^ source.typst markup.math.typst string.quoted.double.typst
 #                 ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
-#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.math.typst
+#                  ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                   ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                    ^^^^^ source.typst markup.math.typst
+#                         ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                          ^^^^^^ source.typst markup.math.typst
+#                                ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                                 ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                                  ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#                                     ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                                      ^ source.typst markup.math.typst meta.expr.call.typst
+#                                       ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                                        ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                                         ^ source.typst markup.math.typst
+#                                          ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                                           ^ source.typst markup.math.typst
 #                                            ^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >
 >$ x^"#" = "argmin"_(A x=b()) ||x||_(cal(l)_2) $
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
-# ^^^ source.typst markup.math.typst
+# ^^ source.typst markup.math.typst
+#   ^ source.typst markup.math.typst punctuation.math.operator.typst
 #    ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
 #     ^ source.typst markup.math.typst string.quoted.double.typst
 #      ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -25,6 +41,22 @@
 #          ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
 #           ^^^^^^ source.typst markup.math.typst string.quoted.double.typst
 #                 ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
-#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.math.typst
+#                  ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                   ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                    ^^^^^ source.typst markup.math.typst
+#                         ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                          ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                           ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                            ^^^^^^ source.typst markup.math.typst
+#                                  ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                                   ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                                    ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#                                       ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                                        ^ source.typst markup.math.typst meta.expr.call.typst
+#                                         ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                                          ^ source.typst markup.math.typst punctuation.math.operator.typst
+#                                           ^ source.typst markup.math.typst
+#                                            ^ source.typst markup.math.typst punctuation.definition.other.typst
+#                                             ^ source.typst markup.math.typst
 #                                              ^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >

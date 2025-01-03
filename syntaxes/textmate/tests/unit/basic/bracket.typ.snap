@@ -1,11 +1,17 @@
 >$((,(#[)],)))$
 #^ source.typst markup.math.typst punctuation.definition.string.math.typst
-# ^^^^ source.typst markup.math.typst
+# ^ source.typst markup.math.typst markup.content.brace.typst
+#  ^ source.typst markup.math.typst markup.content.brace.typst
+#   ^ source.typst markup.math.typst
+#    ^ source.typst markup.math.typst markup.content.brace.typst
 #     ^ source.typst markup.math.typst keyword.control.hash.typst
 #      ^ source.typst markup.math.typst meta.brace.square.typst
 #       ^ source.typst markup.math.typst markup.content.brace.typst
 #        ^ source.typst markup.math.typst meta.brace.square.typst
-#         ^^^^ source.typst markup.math.typst
+#         ^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst markup.content.brace.typst
+#           ^ source.typst markup.math.typst markup.content.brace.typst
+#            ^ source.typst markup.math.typst markup.content.brace.typst
 #             ^ source.typst markup.math.typst punctuation.definition.string.math.typst
 >
 >#for i in range(0) [)]
