@@ -49,7 +49,7 @@ function getUnsafeSocketCompat(url: string): Promise<WebSocketAndSubject>
 export function getAuthenticatedSocket(url: string, secret: string, dec: TextDecoder, enc: TextEncoder): Promise<WebSocketAndSubject> {
     // Typst-preview doesn't support authentication. For now, we then skip authentication.
     // FIXME: Remove this once we no longer support compatibility with external typst-preview.
-    if('__no_secret_because_typst-preview_doesnt_support_it__' === secret) {
+    if('__unsafe-disable__' === secret) {
         return getUnsafeSocketCompat(url);
     }
 

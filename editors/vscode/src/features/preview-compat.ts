@@ -414,7 +414,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     console.log(
       `Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`,
     );
-    const secret = '__no_secret_because_typst-preview_doesnt_support_it__';
+    const secret = '__unsafe-disable__';
     if (openInBrowser) {
       const wsUrl =  `ws://127.0.0.1:${dataPlanePort}`;
       const queryString = (new URLSearchParams({
