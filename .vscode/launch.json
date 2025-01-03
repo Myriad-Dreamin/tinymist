@@ -15,6 +15,20 @@
             "preLaunchTask": "VS Code Extension Prelaunch"
         },
         {
+            "name": "Run Extension [Web]",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentKind=web",
+                "--extensionDevelopmentPath=${workspaceFolder}/editors/vscode"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/editors/vscode/out/**/*.js"
+            ],
+            "preLaunchTask": "VS Code Extension Prelaunch"
+        },
+        {
             "name": "Run Extension [Release]",
             "type": "extensionHost",
             "request": "launch",

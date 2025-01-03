@@ -25,6 +25,7 @@ use sync_lsp::{
     LspBuilder, LspClientRoot, LspResult,
 };
 use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
+use tinymist_core::LONG_VERSION;
 use tinymist_query::{package::PackageInfo, EntryResolver};
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;

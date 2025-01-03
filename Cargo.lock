@@ -3847,6 +3847,7 @@ dependencies = [
  "strum",
  "sync-lsp",
  "tinymist-assets 0.12.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-core",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -3897,6 +3898,16 @@ name = "tinymist-assets"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c151ceddf8f637939ac96a1b1aebd0fdc77427a47e5a13095f56b63498a9c409"
+
+[[package]]
+name = "tinymist-core"
+version = "0.12.16"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "vergen",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "tinymist-derive"
