@@ -3,6 +3,7 @@ import { polyfillNode } from "esbuild-plugin-polyfill-node";
 import * as fs from 'fs';
 
 if (!fs.existsSync('./out/extension.js')) {
+  fs.mkdirSync('./out', { recursive: true });
   fs.writeFileSync('./out/extension.js', '');
 }
 
