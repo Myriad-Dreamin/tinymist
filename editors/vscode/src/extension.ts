@@ -14,24 +14,41 @@ import { loadTinymistConfig } from "./config";
 import { triggerStatusBar } from "./ui-extends";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { activeTypstEditor } from "./util";
-import { tinymist } from "./lsp";
-import { onEnterHandler } from "./lsp.on-enter";
+import { LanguageState, tinymist } from "./lsp";
 import { extensionState } from "./state";
 
 import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool.symbol-view";
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
-import { previewActivate, previewDeactivate, previewPreload } from "./features/preview";
+import { previewActivate, previewDeactivate } from "./features/preview";
 import { taskActivate } from "./features/tasks";
 import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
 import { toolFeatureActivate } from "./features/tool";
 import { dragAndDropActivate } from "./features/drag-and-drop";
+import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
+import { LanguageClient } from "vscode-languageclient/node";
+
+LanguageState.Client = LanguageClient;
+
+const systemActivateTable = (): FeatureEntry[] => [
+  [extensionState.features.label, labelFeatureActivate],
+  [extensionState.features.package, packageFeatureActivate],
+  [extensionState.features.tool, toolFeatureActivate],
+  [extensionState.features.dragAndDrop, dragAndDropActivate],
+  [extensionState.features.task, taskActivate],
+  [extensionState.features.devKit, devKitFeatureActivate],
+  [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],
+  [extensionState.features.language, languageActivate],
+];
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
-    return await doActivate(context);
+    return await tinymistActivate(context, {
+      activateTable: systemActivateTable,
+      config: loadTinymistConfig(),
+    });
   } catch (e) {
     void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
     throw e;
@@ -39,109 +56,32 @@ export async function activate(context: ExtensionContext): Promise<void> {
 }
 
 export async function deactivate(): Promise<void> {
-  // Remove handlers first to avoid sending messages to the server when deactivating
-  previewDeactivate();
-  if (tinymist.context) {
-    for (const disposable of tinymist.context.subscriptions.splice(0)) {
-      disposable.dispose();
-    }
-  }
-  await tinymist.stop();
-  tinymist.context = undefined!;
+  tinymistDeactivate({
+    activateTable: systemActivateTable,
+  });
 }
 
-export async function doActivate(context: ExtensionContext): Promise<void> {
-  tinymist.context = context;
-  const isDevMode = vscode.ExtensionMode.Development == context.extensionMode;
-  // Sets a global context key to indicate that the extension is activated
-  vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
-  context.subscriptions.push({
-    dispose: () => {
-      vscode.commands.executeCommand("setContext", "ext.tinymistActivated", false);
-    },
-  });
-  // Loads configuration
-  const config = loadTinymistConfig();
-  // Inform server that we support named completion callback at the client side
-  config.triggerSuggest = true;
-  config.triggerSuggestAndParameterHints = true;
-  config.triggerParameterHints = true;
-  config.supportHtmlInMarkdown = true;
-  // Sets features
-  extensionState.features.preview = config.previewFeature === "enable";
-  extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";
-  extensionState.features.devKit = isDevMode || config.devKit === "enable";
-  extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
-  extensionState.features.onEnter = !!config.onEnterEvent;
-  extensionState.features.renderDocs = config.renderDocs === "enable";
-
-  // Configures advanced editor settings to affect the host process
-  let configWordSeparators = async () => {
-    const wordSeparators = "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?";
-    const config1 = vscode.workspace.getConfiguration("", { languageId: "typst" });
-    await config1.update("editor.wordSeparators", wordSeparators, true, true);
-    const config2 = vscode.workspace.getConfiguration("", { languageId: "typst-code" });
-    await config2.update("editor.wordSeparators", wordSeparators, true, true);
-  };
-  // Runs configuration asynchronously to avoid blocking the activation
-  if (extensionState.features.wordSeparator) {
-    configWordSeparators().catch((e) =>
-      console.error("cannot change editor.wordSeparators for typst", e),
+function previewActivateInTinymist(context: ExtensionContext) {
+  const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
+  if (typstPreviewExtension) {
+    void vscode.window.showWarningMessage(
+      "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts.",
     );
-  } else {
-    // console.log("skip configuring word separator on startup");
   }
 
-  // Configures advanced language configuration
-  tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("tinymist.typingContinueCommentsOnNewline")) {
-        const config = loadTinymistConfig();
-        // Update language configuration
-        tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
-      }
-    }),
-  );
+  // Tests compat-mode preview extension
+  // previewActivate(context, true);
 
-  // Initializes language client
-  const client = tinymist.initClient(config);
-  // Activates features
-  labelFeatureActivate(context);
-  packageFeatureActivate(context);
-  toolFeatureActivate(context);
-  if (extensionState.features.dragAndDrop) {
-    dragAndDropActivate(context);
-  }
-  if (extensionState.features.task) {
-    taskActivate(context);
-  }
-  if (extensionState.features.devKit) {
-    devKitFeatureActivate(context);
-  }
-  if (extensionState.features.preview) {
-    const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
-    if (typstPreviewExtension) {
-      void vscode.window.showWarningMessage(
-        "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts.",
-      );
-    }
+  // Runs Integrated preview extension
+  previewSetIsTinymist();
+  previewActivate(context, false);
+}
 
-    // Tests compat-mode preview extension
-    // previewActivate(context, true);
-
-    // Runs Integrated preview extension
-    previewSetIsTinymist();
-    previewActivate(context, false);
-  }
-
-  // Starts language client
-  languageActivate(context);
-  await tinymist.startClient();
-
-  // Loads the preview HTML from the binary
-  if (extensionState.features.preview) {
-    previewPreload(context);
+async function languageActivate(context: ExtensionContext) {
+  const client = tinymist.client;
+  if (!client) {
+    console.warn("activating language feature without starting the tinymist language server");
+    return;
   }
 
   // Watch all non typst files.
@@ -209,10 +149,6 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
     });
   }
 
-  return;
-}
-
-async function languageActivate(context: ExtensionContext) {
   context.subscriptions.push(
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
       if (editor?.document.isUntitled) {
@@ -257,7 +193,6 @@ async function languageActivate(context: ExtensionContext) {
 
   // prettier-ignore
   context.subscriptions.push(
-    commands.registerCommand("tinymist.onEnter", onEnterHandler),
     commands.registerCommand("tinymist.openInternal", openInternal),
     commands.registerCommand("tinymist.openExternal", openExternal),
 
@@ -265,12 +200,7 @@ async function languageActivate(context: ExtensionContext) {
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
     commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
     commands.registerCommand("tinymist.clearCache", commandClearCache),
-    commands.registerCommand("tinymist.restartServer", async () => {
-      await deactivate();
-      await doActivate(context);
-    }),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
-    commands.registerCommand("tinymist.showLog", () => tinymist.showLog()),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),

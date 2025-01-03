@@ -3,14 +3,15 @@ import { resolve } from "path";
 
 import * as vscode from "vscode";
 import { ExtensionMode } from "vscode";
-import {
+import type {
   LanguageClient,
   SymbolInformation,
-  type LanguageClientOptions,
-  type ServerOptions,
+  LanguageClientOptions,
+  ServerOptions,
 } from "vscode-languageclient/node";
 
-import { HoverDummyStorage, HoverTmpStorage } from "./features/hover-storage";
+import { HoverDummyStorage } from "./features/hover-storage";
+import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from "./util";
 import { substVscodeVarsInConfig } from "./config";
@@ -86,7 +87,10 @@ interface JumpInfo {
   end: [number, number] | null;
 }
 
-class LanguageState {
+export class LanguageState {
+  static Client: typeof LanguageClient = undefined!;
+  static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
+
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
@@ -180,9 +184,10 @@ class LanguageState {
     const trustedCommands = {
       enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
     };
-    const hoverStorage = extensionState.features.renderDocs
-      ? new HoverTmpStorage(context)
-      : new HoverDummyStorage();
+    const hoverStorage =
+      extensionState.features.renderDocs && LanguageState.HoverTmpStorage
+        ? new LanguageState.HoverTmpStorage(context)
+        : new HoverDummyStorage();
 
     const clientOptions: LanguageClientOptions = {
       documentSelector: typstDocumentSelector,
@@ -230,7 +235,7 @@ class LanguageState {
       },
     };
 
-    const client = (this.client = new LanguageClient(
+    const client = (this.client = new LanguageState.Client(
       "tinymist",
       "Tinymist Typst Language Server",
       serverOptions,

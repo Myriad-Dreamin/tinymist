@@ -4,12 +4,18 @@ export type ExtensionContext = vscode.ExtensionContext;
 
 interface ExtensionState {
   features: {
+    web: boolean;
+    lsp: boolean;
     task: boolean;
     devKit: boolean;
     wordSeparator: boolean;
     dragAndDrop: boolean;
+    label: boolean;
+    package: boolean;
+    tool: boolean;
     onEnter: boolean;
     preview: boolean;
+    language: boolean;
     renderDocs: boolean;
   };
   mut: {
@@ -22,12 +28,18 @@ interface ExtensionState {
 
 export const extensionState: ExtensionState = {
   features: {
+    web: false,
+    lsp: true,
     task: true,
     wordSeparator: true,
+    label: true,
+    package: true,
+    tool: true,
     devKit: false,
     dragAndDrop: false,
     onEnter: false,
     preview: false,
+    language: true,
     renderDocs: false,
   },
   mut: {
