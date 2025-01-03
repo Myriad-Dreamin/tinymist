@@ -35,14 +35,9 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   ```lua
   require("lspconfig")["tinymist"].setup {
       settings = {
-          tinymist = {
-              settings = {
-                  formatterMode = "typstyle",
-                  exportPdf = "onType",
-                  semanticTokens = "disable"
-                  -- ...
-              },
-          },
+          formatterMode = "typstyle",
+          exportPdf = "onType",
+          semanticTokens = "disable"
       }
   }
   ```
