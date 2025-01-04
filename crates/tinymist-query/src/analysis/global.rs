@@ -11,16 +11,14 @@ use reflexo::debug_loc::DataSource;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
-use tinymist_world::LspWorld;
-use tinymist_world::DETACHED_ENTRY;
+use tinymist_world::{LspWorld, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
 use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
-use typst::model::Document;
-use typst::syntax::package::PackageManifest;
-use typst::syntax::{package::PackageSpec, Span, VirtualPath};
+use typst::syntax::package::{PackageManifest, PackageSpec};
+use typst::syntax::{Span, VirtualPath};
 
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
@@ -880,14 +878,9 @@ impl SharedContext {
     /// Passing a `document` (from a previous compilation) is optional, but
     /// enhances the autocompletions. Label completions, for instance, are
     /// only generated when the document is available.
-    pub fn tooltip(
-        &self,
-        document: Option<&Document>,
-        source: &Source,
-        cursor: usize,
-    ) -> Option<Tooltip> {
+    pub fn tooltip(&self, source: &Source, cursor: usize) -> Option<Tooltip> {
         let token = &self.analysis.workers.tooltip;
-        token.enter(|| tooltip_(&self.world, document, source, cursor))
+        token.enter(|| tooltip_(&self.world, source, cursor))
     }
 
     /// Get the manifest of a package by file id.
