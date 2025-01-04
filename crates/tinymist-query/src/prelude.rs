@@ -11,7 +11,7 @@ pub use lsp_types::{
     ColorInformation, ColorPresentation, Diagnostic, DiagnosticRelatedInformation,
     DiagnosticSeverity, DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
-    LanguageString, Location as LspLocation, LocationLink, MarkedString, MarkupContent, MarkupKind,
+    Location as LspLocation, LocationLink, MarkedString, MarkupContent, MarkupKind,
     ParameterInformation, Position as LspPosition, PrepareRenameResponse, SelectionRange,
     SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
     SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
