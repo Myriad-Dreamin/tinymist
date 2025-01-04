@@ -14,9 +14,11 @@ import { setupDrag } from './drag';
 main();
 
 function main() {
-    const wsArgs = retrieveWsArgs();
     const { nextWs } = buildWs();
-    window.onload = () => nextWs(wsArgs);
+    const wsArgs = retrieveWsArgs();
+    // For the vscode `ContentPreviewProvider`, we initially don't have any info where to connect, so don't try.
+    if(wsArgs.secret) 
+        window.onload = () => nextWs(wsArgs);
     setupVscodeChannel(nextWs);
     setupDrag();
 }

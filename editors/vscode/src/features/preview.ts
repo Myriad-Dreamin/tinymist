@@ -573,7 +573,8 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken,
   ) {
     this._view = webviewView; // 将已经准备好的 HTML 设置为 Webview 内容
-
+    
+    // TODO: Can this `typst-webview-assets` thing be removed?
     const fontendPath = path.resolve(this.context.extensionPath, "out/frontend");
     let html = this.htmlContent.replace(
       /\/typst-webview-assets/g,
@@ -581,8 +582,6 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
         .asWebviewUri(vscode.Uri.file(fontendPath))
         .toString()}/typst-webview-assets`,
     );
-
-    html = html.replace("ws://127.0.0.1:23625", ``);
 
     webviewView.webview.options = {
       // Allow scripts in the webview
