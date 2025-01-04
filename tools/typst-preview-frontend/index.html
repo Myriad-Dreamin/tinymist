@@ -23,7 +23,8 @@
       ///          outside VSCode.
       const __VSCODE_SECRET_PARAMETERS = undefined;
       const ARGS = new URLSearchParams(
-          __VSCODE_SECRET_PARAMETERS !== undefined ?
+          // Check for `acquireVsCodeApi` to help avoid accidental misuse of this outside vscode
+          (__VSCODE_SECRET_PARAMETERS !== undefined && typeof acquireVsCodeApi !== "undefined") ?
           __VSCODE_SECRET_PARAMETERS :
           window.location.hash.slice(1)
       );
