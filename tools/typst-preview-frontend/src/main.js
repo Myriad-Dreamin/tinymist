@@ -16,7 +16,7 @@ main();
 function main() {
     const { nextWs } = buildWs();
     const wsArgs = retrieveWsArgs();
-    // For the vscode `ContentPreviewProvider`, we initially don't have any info where to connect, so don't try.
+    // For vscode, we initially don't have any info where to connect, so don't try.
     if(wsArgs.secret) 
         window.onload = () => nextWs(wsArgs);
     setupVscodeChannel(nextWs);
@@ -95,10 +95,6 @@ function setupVscodeChannel(nextWs) {
     if (vscodeAPI?.postMessage) {
         vscodeAPI.postMessage({ type: 'started' });
     }
-    if (vscodeAPI?.setState && window.vscode_state) {
-        vscodeAPI.setState(window.vscode_state);
-    }
-
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
@@ -106,6 +102,12 @@ function setupVscodeChannel(nextWs) {
         switch (message.type) {
             case 'reconnect': {
                 console.log('reconnect', message);
+
+                if(typeof message.state !== "undefined" && vscodeAPI?.setState) {
+                    console.log("vscode_state", message.state);
+                    vscodeAPI.setState(message.state);
+                }
+
                 nextWs({
                     url: message.url,
                     secret: message.secret,

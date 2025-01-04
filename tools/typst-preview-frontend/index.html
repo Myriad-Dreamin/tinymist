@@ -18,36 +18,9 @@
 
       /// We're sending this html to un-authenticated clients. So no potentially sensitive data should
       /// be in the html itself. We pass all needed parameters in the # part of the URL
-      /// However: VSCode webview panels don't support this I think? So provide an escape hatch for VSCode.
-      ///          to set a special variable. This is ok since VSCode webviews cannot be reached by anyone
-      ///          outside VSCode.
-      const __VSCODE_SECRET_PARAMETERS = undefined;
-      const ARGS = new URLSearchParams(
-          // Check for `acquireVsCodeApi` to help avoid accidental misuse of this outside vscode
-          (__VSCODE_SECRET_PARAMETERS !== undefined && typeof acquireVsCodeApi !== "undefined") ?
-          __VSCODE_SECRET_PARAMETERS :
-          window.location.hash.slice(1)
-      );
-
-      if (typeof acquireVsCodeApi !== "undefined") {
-        const bytes2utf8 = new TextDecoder("utf-8");
-        /**
-         * Base64 to UTF-8
-         * @param encoded Base64 encoded string
-         * @returns UTF-8 string
-         */
-        const base64Decode = (encoded) =>
-          bytes2utf8.decode(
-            Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0))
-          );
-        let state = ARGS.get('state');
-        console.log("state", state);
-        if (state !== "") {
-          /// Set it later when acquiring the VSCode API
-          window.vscode_state = JSON.parse(base64Decode(state));
-          console.log("vscode_state", window.vscode_state);
-        }
-      }
+      /// Note: In VSCode, the parameters are _not_ passed in throuh the URL but through a message using
+      ///       `acquireVsCodeApi()`. See `setupVscodeChannel()`
+      const ARGS = new URLSearchParams(window.location.hash.slice(1));
 
       /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
       function deltaE(rgbA, rgbB) {

@@ -263,21 +263,18 @@ export async function openPreviewInWebView({
   });
 
   // Determines arguments for the preview HTML.
-  const previewMode = task.mode === "doc" ? "Doc" : "Slide";
-  const previewState = {
-    mode: task.mode,
-    asPrimary: task.isNotPrimary,
-    uri: activeEditor.document.uri.toString(),
-  };
-  const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
-
-  const wsUrl =  translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`)
-  const queryString = (new URLSearchParams({
-    previewMode,
-    wsUrl,
+  const htmlParams = {
+    type: "reconnect",
+    url: translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
     secret,
-    state: previewStateEncoded,
-  })).toString();
+    mode: task.mode === "doc" ? "Doc" : "Slide",
+    state: { 
+      mode: task.mode,
+      asPrimary: task.isNotPrimary,
+      uri: activeEditor.document.uri.toString(),
+    },
+    isContentPreview: false,
+  };
 
   let html = await getPreviewHtml(context);
   // todo: not needed anymore, but we should test it and remove it later.
@@ -285,13 +282,17 @@ export async function openPreviewInWebView({
     /\/typst-webview-assets/g,
     `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
   );
-  // We now put secret information into the html, but that's okay since the webview cannot be accessed
-  // from outside VSCode.
-  html = html.replace('__VSCODE_SECRET_PARAMETERS = undefined', '__VSCODE_SECRET_PARAMETERS = '+JSON.stringify(queryString));
 
   // Sets the HTML content to the webview panel.
   // This will reload the webview panel if it's already opened.
   panel.webview.html = html;
+
+  // Push the parameters to the html frontend.
+  panel.webview.onDidReceiveMessage((data) => {
+    if(data.type !== "started")
+      return;
+    panel.webview.postMessage(htmlParams);
+  });
 
   // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
   // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
