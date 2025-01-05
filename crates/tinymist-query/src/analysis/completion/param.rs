@@ -18,7 +18,7 @@ impl CompletionPair<'_, '_, '_> {
 
         let closure_node = closure_node.cast::<ast::Closure>()?;
 
-        // The function references itself is common in typst.
+        // It is common for a function to reference itself in typst.
         let name = closure_node.name();
         if let Some(name) = name {
             bindings.insert(name.get().clone());
