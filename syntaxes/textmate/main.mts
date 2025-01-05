@@ -109,7 +109,8 @@ const primitiveTypes: textmate.PatternMatch = {
 };
 
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
-const MATH_IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_]+/u;
+const MATH_IDENTIFIER =
+  /(?:(?<=_)|\b)[\p{XID_Start}](?:(?!_)[\p{XID_Continue}])+/u;
 
 // const MATH_OPENING =
 //   /[\[\(\u{5b}\u{7b}\u{2308}\u{230a}\u{231c}\u{231e}\u{2772}\u{27e6}\u{27e8}\u{27ea}\u{27ec}\u{27ee}\u{2983}\u{2985}\u{2987}\u{2989}\u{298b}\u{298d}\u{298f}\u{2991}\u{2993}\u{2995}\u{2997}\u{29d8}\u{29da}\u{29fc}]/u;
@@ -1417,10 +1418,13 @@ const mathPatternOrArgsBody: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
     {
+      include: "#mathParen",
+    },
+    {
       match: /,/,
       name: "punctuation.separator.comma.typst",
     },
-    { include: "#markupMath" },
+    { include: "#math" },
   ],
 };
 
