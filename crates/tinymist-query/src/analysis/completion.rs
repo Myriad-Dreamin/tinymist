@@ -52,6 +52,7 @@ mod field_access;
 mod import;
 mod kind;
 mod mode;
+mod param;
 mod path;
 mod scope;
 mod snippet;
@@ -504,6 +505,11 @@ impl CompletionPair<'_, '_, '_> {
             return self.complete_imports().then_some(());
         }
 
+        // Special completions 2, we should remove them finally
+        if matches!(surrounding_syntax, ParamList) {
+            return self.complete_params().then_some(());
+        }
+
         // Checks and completes `self.cursor.syntax_context`
         match self.cursor.syntax_context.clone() {
             Some(SyntaxContext::Element { container, .. }) => {
@@ -637,14 +643,14 @@ impl CompletionPair<'_, '_, '_> {
                 Selector | ShowTransform | SetRule => {
                     self.complete_code();
                 }
-                StringContent | ImportList => {}
+                StringContent | ImportList | ParamList => {}
             },
             InterpretMode::Comment | InterpretMode::String => {}
         };
 
         // Snippet completions associated by surrounding_syntax.
         match surrounding_syntax {
-            Regular | StringContent | ImportList | SetRule => {}
+            Regular | StringContent | ImportList | ParamList | SetRule => {}
             Selector => {
                 self.snippet_completion(
                     "text selector",
@@ -738,7 +744,7 @@ impl CompletionPair<'_, '_, '_> {
             self.worker.enrich(" ", "");
         }
         match surrounding_syntax {
-            Regular | ImportList | ShowTransform | SetRule | StringContent => {}
+            Regular | ImportList | ParamList | ShowTransform | SetRule | StringContent => {}
             Selector => {
                 self.worker.enrich("", ": ${}");
             }

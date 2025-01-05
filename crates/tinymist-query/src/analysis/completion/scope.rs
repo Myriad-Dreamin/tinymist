@@ -112,7 +112,8 @@ impl CompletionPair<'_, '_, '_> {
         let filter = |checker: &CompletionKindChecker| {
             match surrounding_syntax {
                 SurroundingSyntax::Regular => true,
-                SurroundingSyntax::StringContent | SurroundingSyntax::ImportList => false,
+                SurroundingSyntax::StringContent => false,
+                SurroundingSyntax::ImportList | SurroundingSyntax::ParamList => false,
                 SurroundingSyntax::Selector => 'selector: {
                     for func in &checker.functions {
                         if func.element().is_some() {
