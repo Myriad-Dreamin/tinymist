@@ -1,0 +1,12 @@
+>$ abs/**/() $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^ source.typst markup.math.typst
+#  ^^^ source.typst markup.math.typst variable.other.readwrite.typst
+#     ^ source.typst markup.math.typst punctuation.math.operator.typst
+#      ^^ source.typst markup.math.typst
+#        ^ source.typst markup.math.typst punctuation.math.operator.typst
+#         ^ source.typst markup.math.typst constant.other.symbol.typst
+#          ^ source.typst markup.math.typst constant.other.symbol.typst
+#           ^ source.typst markup.math.typst
+#            ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>

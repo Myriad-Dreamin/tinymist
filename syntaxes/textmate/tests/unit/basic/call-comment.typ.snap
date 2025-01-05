@@ -1,0 +1,10 @@
+>#math.abs/**/()
+#^ source.typst variable.other.readwrite.hash.typst
+# ^^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst keyword.operator.accessor.typst
+#      ^^^ source.typst variable.other.readwrite.typst
+#         ^^ source.typst comment.block.typst punctuation.definition.comment.typst
+#           ^^ source.typst comment.block.typst
+#             ^ source.typst meta.brace.round.typst
+#              ^ source.typst meta.brace.round.typst
+>
