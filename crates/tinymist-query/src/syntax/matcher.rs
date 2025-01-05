@@ -756,6 +756,7 @@ pub enum SurroundingSyntax {
     ShowTransform,
     ImportList,
     SetRule,
+    ParamList,
 }
 
 pub fn surrounding_syntax(node: &LinkedNode) -> SurroundingSyntax {
@@ -803,7 +804,21 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
                 }
             }
             SyntaxKind::Named => {
-                return Some(Regular);
+                let colon = parent.children().find(|s| s.kind() == SyntaxKind::Colon);
+                let Some(colon) = colon else {
+                    return Some(Regular);
+                };
+
+                return if leaf.offset() >= colon.offset() {
+                    Some(Regular)
+                } else if node_ancestors(leaf).any(|n| n.kind() == SyntaxKind::Params) {
+                    Some(ParamList)
+                } else {
+                    Some(Regular)
+                };
+            }
+            SyntaxKind::Params => {
+                return Some(ParamList);
             }
             SyntaxKind::Args => {
                 met_args = true;
@@ -879,8 +894,8 @@ fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool 
 /// functionality.
 ///
 /// A syntax context is either a [`SyntaxClass`] or other things.
-/// One thing is not ncessary to refer to some exact node. For example, a cursor
-/// moving after some comma in a function call is identified as a
+/// One thing is not necessary to refer to some exact node. For example, a
+/// cursor moving after some comma in a function call is identified as a
 /// [`SyntaxContext::Arg`].
 #[derive(Debug, Clone)]
 pub enum SyntaxContext<'a> {
