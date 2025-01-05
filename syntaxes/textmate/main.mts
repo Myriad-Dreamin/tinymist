@@ -1351,10 +1351,6 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
       ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
       : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
     patterns: [
-      // todo: comments?
-      //   {
-      //     include: "#comments",
-      //   },
       {
         match: /\./,
         name: "keyword.operator.accessor.typst",
@@ -1428,35 +1424,20 @@ const mathPatternOrArgsBody: textmate.Pattern = {
   ],
 };
 
-const mathFuncCallOrPropAccess = (strict: boolean): textmate.Pattern => {
+const mathFuncCallOrPropAccess = (): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
     begin: lookAhead(
-      strict
-        ? new RegExp(
-            /(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source
-          )
-        : new RegExp(
-            /(\.\s*)?/.source + MATH_IDENTIFIER.source + /\s*(?=\(|\[)/.source
-          )
+      new RegExp(/(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source)
     ),
-    end: strict
-      ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
-      : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
+    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/,
     patterns: [
-      // todo: comments?
-      //   {
-      //     include: "#comments",
-      //   },
       {
         match: /\./,
         name: "keyword.operator.accessor.typst",
       },
       {
-        match: new RegExp(
-          MATH_IDENTIFIER.source +
-            (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
-        ),
+        match: new RegExp(MATH_IDENTIFIER.source + /(?=\(|\[)/.source),
         name: "entity.name.function.typst",
         patterns: [
           {
@@ -1611,7 +1592,7 @@ export const typst: textmate.Grammar = {
     // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
     patternOrArgsBody,
-    strictMathFuncCallOrPropAccess: mathFuncCallOrPropAccess(true),
+    strictMathFuncCallOrPropAccess: mathFuncCallOrPropAccess(),
     mathCallArgs,
     mathPatternOrArgsBody,
     codeBlock,
