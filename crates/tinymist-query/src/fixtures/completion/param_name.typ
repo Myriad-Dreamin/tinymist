@@ -1,5 +1,5 @@
-/// contains: content
+/// contains: value
 
 #let f(
-  content, /* range -6..-5 */
-) = content
+  val, /* range -3..-2 */
+) = value
