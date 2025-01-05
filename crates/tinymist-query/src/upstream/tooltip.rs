@@ -6,26 +6,20 @@ use typst::engine::Sink;
 use typst::eval::CapturesVisitor;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
-use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};
 
 use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
-use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
+use crate::analysis::analyze_expr;
 
 /// Describe the item under the cursor.
 ///
 /// Passing a `document` (from a previous compilation) is optional, but enhances
 /// the autocompletions. Label completions, for instance, are only generated
 /// when the document is available.
-pub fn tooltip_(
-    world: &dyn World,
-    document: Option<&Document>,
-    source: &Source,
-    cursor: usize,
-) -> Option<Tooltip> {
+pub fn tooltip_(world: &dyn World, source: &Source, cursor: usize) -> Option<Tooltip> {
     let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     if leaf.kind().is_trivia() {
         return None;
@@ -33,7 +27,8 @@ pub fn tooltip_(
 
     named_param_tooltip(world, &leaf)
         .or_else(|| font_tooltip(world, &leaf))
-        .or_else(|| document.and_then(|doc| label_tooltip(doc, &leaf)))
+        // todo: test that label_tooltip can be removed safely
+        // .or_else(|| document.and_then(|doc| label_tooltip(doc, &leaf)))
         .or_else(|| expr_tooltip(world, &leaf))
         .or_else(|| closure_tooltip(&leaf))
 }
@@ -79,6 +74,8 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
 
     let mut last = None;
     let mut pieces: Vec<EcoString> = vec![];
+    let mut unique_func: Option<Value> = None;
+    let mut unique = true;
     let mut iter = values.iter();
     for (value, _) in (&mut iter).take(Sink::MAX_VALUES - 1) {
         if let Some((prev, count)) = &mut last {
@@ -89,8 +86,30 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
                 write!(pieces.last_mut().unwrap(), " (x{count})").unwrap();
             }
         }
+
+        if matches!(value, Value::Func(..) | Value::Type(..)) {
+            match &unique_func {
+                Some(unique_func) if unique => {
+                    unique = unique_func == value;
+                }
+                Some(_) => {}
+                None => {
+                    unique_func = Some(value.clone());
+                }
+            }
+        } else {
+            unique = false;
+        }
+
         pieces.push(truncated_repr(value));
         last = Some((value, 1));
+    }
+
+    // Don't report the only function reference...
+    // Note we usually expect the `definition` analyzer work in this case, otherwise
+    // please open an issue for this.
+    if unique_func.is_some() && unique {
+        return None;
     }
 
     if let Some((_, count)) = last {
@@ -104,6 +123,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
     }
 
     let tooltip = repr::pretty_comma_list(&pieces, false);
+    // todo: check sensible length, value highlighting
     (!tooltip.is_empty()).then(|| Tooltip::Code(tooltip.into()))
 }
 
@@ -153,29 +173,6 @@ fn length_tooltip(length: Length) -> Option<Tooltip> {
             round_2(length.abs.to_inches())
         ))
     })
-}
-
-/// Tooltip for a hovered reference or label.
-fn label_tooltip(document: &Document, leaf: &LinkedNode) -> Option<Tooltip> {
-    let target = match leaf.kind() {
-        SyntaxKind::RefMarker => leaf.text().trim_start_matches('@'),
-        SyntaxKind::Label => leaf.text().trim_start_matches('<').trim_end_matches('>'),
-        _ => return None,
-    };
-
-    for DynLabel {
-        label,
-        label_desc: _,
-        detail,
-        ..
-    } in analyze_labels(document).0
-    {
-        if label.as_str() == target {
-            return Some(Tooltip::Text(detail?));
-        }
-    }
-
-    None
 }
 
 /// Tooltips for components of a named parameter.

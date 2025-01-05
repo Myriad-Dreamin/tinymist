@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/builtin_var.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\nrgb(\"#ff4136\")\n```",
+ "contents": "### Sampled Values\n```typc\nrgb(\"#ff4136\")\n```",
  "range": "0:20:0:23"
 }

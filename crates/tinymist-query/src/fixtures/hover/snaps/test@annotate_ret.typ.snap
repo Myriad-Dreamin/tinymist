@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/annotate_ret.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\nlet _delayed-wrapper(\n  body: any,\n) = content;\n```\n\n---\n\n\n# Positional Parameters\n\n## body\n\n```typc\ntype: \n```\n\n",
+ "contents": "```typc\nlet _delayed-wrapper(\n  body: any,\n) = content;\n```\n\n---\n\n\n\n# Positional Parameters\n\n## body\n\n```typc\ntype: \n```\n\n",
  "range": "6:20:6:36"
 }

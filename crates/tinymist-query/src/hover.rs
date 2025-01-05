@@ -6,7 +6,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::analysis::get_link_exprs_in;
 use crate::jump_from_cursor;
 use crate::prelude::*;
-use crate::upstream::{expr_tooltip, route_of_value, truncated_repr, Tooltip};
+use crate::upstream::{route_of_value, truncated_repr, Tooltip};
 
 /// The [`textDocument/hover`] request asks the server for hover information at
 /// a given text document position.
@@ -31,8 +31,6 @@ impl StatefulRequest for HoverRequest {
         ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
-        let doc_ref = doc.as_ref().map(|doc| doc.document.as_ref());
-
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
@@ -41,242 +39,245 @@ impl StatefulRequest for HoverRequest {
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         let range = ctx.to_lsp_range(node.range(), &source);
 
-        let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor)
-            .or_else(|| star_tooltip(ctx, &node))
-            .or_else(|| link_tooltip(ctx, &node, cursor))
-            .or_else(|| Some(to_lsp_tooltip(&ctx.tooltip(doc_ref, &source, cursor)?)))?;
-
-        // Neovim shows ugly hover if the hover content is in array, so we join them
-        // manually with divider bars.
-        let mut contents = match contents {
-            HoverContents::Array(contents) => contents
-                .into_iter()
-                .map(|content| match content {
-                    MarkedString::LanguageString(content) => {
-                        format!("```{}\n{}\n```", content.language, content.value)
-                    }
-                    MarkedString::String(content) => content,
-                })
-                .join("\n\n---\n"),
-            HoverContents::Scalar(MarkedString::String(contents)) => contents,
-            HoverContents::Scalar(MarkedString::LanguageString(contents)) => {
-                format!("```{}\n{}\n```", contents.language, contents.value)
-            }
-            lsp_types::HoverContents::Markup(content) => {
-                match content.kind {
-                    MarkupKind::Markdown => content.value,
-                    // todo: escape
-                    MarkupKind::PlainText => content.value,
-                }
-            }
+        let mut worker = HoverWorker {
+            ctx,
+            source,
+            doc,
+            cursor,
+            def: Default::default(),
+            value: Default::default(),
+            preview: Default::default(),
+            docs: Default::default(),
+            actions: Default::default(),
         };
 
-        if let Some(provider) = ctx.analysis.periscope.clone() {
-            if let Some(doc) = doc.clone() {
-                let position = jump_from_cursor(&doc.document, &source, cursor);
-                let position = position.or_else(|| {
-                    for idx in 1..100 {
-                        let next_cursor = cursor + idx;
-                        if next_cursor < source.text().len() {
-                            let position = jump_from_cursor(&doc.document, &source, next_cursor);
-                            if position.is_some() {
-                                return position;
-                            }
-                        }
-                        let prev_cursor = cursor.checked_sub(idx);
-                        if let Some(prev_cursor) = prev_cursor {
-                            let position = jump_from_cursor(&doc.document, &source, prev_cursor);
-                            if position.is_some() {
-                                return position;
-                            }
-                        }
-                    }
+        worker.work();
 
-                    None
-                });
+        let mut contents = vec![];
 
-                log::info!("telescope position: {:?}", position);
-                let content = position.and_then(|pos| provider.periscope_at(ctx, doc, pos));
-                if let Some(preview_content) = content {
-                    contents = format!("{preview_content}\n---\n{contents}");
-                }
-            }
+        contents.append(&mut worker.def);
+        contents.append(&mut worker.value);
+        contents.append(&mut worker.preview);
+        contents.append(&mut worker.docs);
+        if !worker.actions.is_empty() {
+            let content = worker.actions.into_iter().join(" | ");
+            contents.push(content);
+        }
+
+        if contents.is_empty() {
+            return None;
         }
 
         Some(Hover {
-            contents: HoverContents::Scalar(MarkedString::String(contents)),
+            // Neovim shows ugly hover if the hover content is in array, so we join them
+            // manually with divider bars.
+            contents: HoverContents::Scalar(MarkedString::String(contents.join("\n\n---\n\n"))),
             range: Some(range),
         })
     }
 }
 
-fn def_tooltip(
-    ctx: &mut LocalContext,
-    source: &Source,
-    document: Option<&VersionedDocument>,
+struct HoverWorker<'a> {
+    ctx: &'a mut LocalContext,
+    source: Source,
+    doc: Option<VersionedDocument>,
     cursor: usize,
-) -> Option<HoverContents> {
-    let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    let syntax = classify_syntax(leaf.clone(), cursor)?;
-    let def = ctx.def_of_syntax(source, document, syntax.clone())?;
+    def: Vec<String>,
+    value: Vec<String>,
+    preview: Vec<String>,
+    docs: Vec<String>,
+    actions: Vec<CommandLink>,
+}
 
-    let mut results = vec![];
-    let mut actions = vec![];
+impl HoverWorker<'_> {
+    fn work(&mut self) {
+        self.static_analysis();
+        self.preview();
+        self.dynamic_analysis();
+    }
 
-    use Decl::*;
-    match def.decl.as_ref() {
-        Label(..) => {
-            results.push(MarkedString::String(format!("Label: {}\n", def.name())));
-            // todo: type repr
-            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
-                let repr = truncated_repr(&val);
-                results.push(MarkedString::String(format!("{repr}")));
+    /// Static analysis results
+    fn static_analysis(&mut self) -> Option<()> {
+        let source = self.source.clone();
+        let leaf = LinkedNode::new(source.root()).leaf_at_compat(self.cursor)?;
+
+        self.definition()
+            .or_else(|| self.star(&leaf))
+            .or_else(|| self.link(&leaf))
+    }
+
+    /// Dynamic analysis results
+    fn dynamic_analysis(&mut self) -> Option<()> {
+        let typst_tooltip = self.ctx.tooltip(&self.source, self.cursor)?;
+        self.value.push(match typst_tooltip {
+            Tooltip::Text(text) => text.to_string(),
+            Tooltip::Code(code) => format!("### Sampled Values\n```typc\n{code}\n```"),
+        });
+        Some(())
+    }
+
+    /// Definition analysis results
+    fn definition(&mut self) -> Option<()> {
+        let leaf = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
+        let syntax = classify_syntax(leaf.clone(), self.cursor)?;
+        let def = self
+            .ctx
+            .def_of_syntax(&self.source, self.doc.as_ref(), syntax.clone())?;
+
+        use Decl::*;
+        match def.decl.as_ref() {
+            Label(..) => {
+                self.def.push(format!("Label: {}\n", def.name()));
+                // todo: type repr
+                if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                    self.def.push(truncated_repr(&val).into());
+                }
             }
-            Some(HoverContents::Array(results))
-        }
-        BibEntry(..) => {
-            results.push(MarkedString::String(format!(
-                "Bibliography: @{}",
-                def.name()
-            )));
+            BibEntry(..) => {
+                self.def.push(format!("Bibliography: @{}", def.name()));
+            }
+            _ => {
+                let sym_docs = self.ctx.def_docs(&def);
 
-            Some(HoverContents::Array(results))
-        }
-        _ => {
-            let sym_docs = ctx.def_docs(&def);
+                // todo: hover with `with_stack`
 
-            if matches!(def.decl.kind(), DefKind::Variable | DefKind::Constant) {
-                // todo: check sensible length, value highlighting
-                if let Some(values) = expr_tooltip(ctx.world(), syntax.node()) {
-                    match values {
-                        Tooltip::Text(values) => {
-                            results.push(MarkedString::String(values.into()));
+                if matches!(
+                    def.decl.kind(),
+                    DefKind::Function | DefKind::Variable | DefKind::Constant
+                ) && !def.name().is_empty()
+                {
+                    let mut type_doc = String::new();
+                    type_doc.push_str("let ");
+                    type_doc.push_str(def.name());
+
+                    match &sym_docs {
+                        Some(DefDocs::Variable(docs)) => {
+                            push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
                         }
-                        Tooltip::Code(values) => {
-                            results.push(MarkedString::LanguageString(LanguageString {
-                                language: "typc".to_owned(),
-                                value: values.into(),
-                            }));
+                        Some(DefDocs::Function(docs)) => {
+                            let _ = docs.print(&mut type_doc);
+                            push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
                         }
+                        _ => {}
+                    }
+
+                    self.def.push(format!("```typc\n{type_doc};\n```"));
+                }
+
+                if let Some(doc) = sym_docs {
+                    let hover_docs = doc.hover_docs();
+
+                    if !hover_docs.trim().is_empty() {
+                        self.docs.push(hover_docs.into());
+                    }
+                }
+
+                if let Some(link) = ExternalDocLink::get(&def) {
+                    self.actions.push(link);
+                }
+            }
+        }
+
+        Some(())
+    }
+
+    fn star(&mut self, mut node: &LinkedNode) -> Option<()> {
+        if !matches!(node.kind(), SyntaxKind::Star) {
+            return None;
+        }
+
+        while !matches!(node.kind(), SyntaxKind::ModuleImport) {
+            node = node.parent()?;
+        }
+
+        let import_node = node.cast::<ast::ModuleImport>()?;
+        let scope_val = self
+            .ctx
+            .module_by_syntax(import_node.source().to_untyped())?;
+
+        let scope_items = scope_val.scope()?.iter();
+        let mut names = scope_items.map(|item| item.0.as_str()).collect::<Vec<_>>();
+        names.sort();
+
+        let content = format!("This star imports {}", separated_list(&names, "and"));
+        self.def.push(content);
+        Some(())
+    }
+
+    fn link(&mut self, mut node: &LinkedNode) -> Option<()> {
+        while !matches!(node.kind(), SyntaxKind::FuncCall) {
+            node = node.parent()?;
+        }
+
+        let links = get_link_exprs_in(node)?;
+        let links = links
+            .objects
+            .iter()
+            .filter(|link| link.range.contains(&self.cursor))
+            .collect::<Vec<_>>();
+        if links.is_empty() {
+            return None;
+        }
+
+        for obj in links {
+            let Some(target) = obj.target.resolve(self.ctx) else {
+                continue;
+            };
+            // open file in tab or system application
+            self.actions.push(CommandLink {
+                title: Some("Open in Tab".to_string()),
+                command_or_links: vec![CommandOrLink::Command {
+                    id: "tinymist.openInternal".to_string(),
+                    args: vec![JsonValue::String(target.to_string())],
+                }],
+            });
+            self.actions.push(CommandLink {
+                title: Some("Open Externally".to_string()),
+                command_or_links: vec![CommandOrLink::Command {
+                    id: "tinymist.openExternal".to_string(),
+                    args: vec![JsonValue::String(target.to_string())],
+                }],
+            });
+            if let Some(kind) = PathPreference::from_ext(target.path()) {
+                self.def.push(format!("A `{kind:?}` file."));
+            }
+        }
+
+        Some(())
+    }
+
+    fn preview(&mut self) -> Option<()> {
+        // Preview results
+        let provider = self.ctx.analysis.periscope.clone()?;
+        let doc = self.doc.as_ref()?;
+        let position = jump_from_cursor(&doc.document, &self.source, self.cursor);
+        let position = position.or_else(|| {
+            for idx in 1..100 {
+                let next_cursor = self.cursor + idx;
+                if next_cursor < self.source.text().len() {
+                    let position = jump_from_cursor(&doc.document, &self.source, next_cursor);
+                    if position.is_some() {
+                        return position;
+                    }
+                }
+                let prev_cursor = self.cursor.checked_sub(idx);
+                if let Some(prev_cursor) = prev_cursor {
+                    let position = jump_from_cursor(&doc.document, &self.source, prev_cursor);
+                    if position.is_some() {
+                        return position;
                     }
                 }
             }
 
-            // todo: hover with `with_stack`
-
-            if matches!(
-                def.decl.kind(),
-                DefKind::Function | DefKind::Variable | DefKind::Constant
-            ) && !def.name().is_empty()
-            {
-                results.push(MarkedString::LanguageString(LanguageString {
-                    language: "typc".to_owned(),
-                    value: {
-                        let mut type_doc = String::new();
-                        type_doc.push_str("let ");
-                        type_doc.push_str(def.name());
-
-                        match &sym_docs {
-                            Some(DefDocs::Variable(docs)) => {
-                                push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
-                            }
-                            Some(DefDocs::Function(docs)) => {
-                                let _ = docs.print(&mut type_doc);
-                                push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
-                            }
-                            _ => {}
-                        }
-                        type_doc.push(';');
-                        type_doc
-                    },
-                }));
-            }
-
-            if let Some(doc) = sym_docs {
-                results.push(MarkedString::String(doc.hover_docs().into()));
-            }
-
-            if let Some(link) = ExternalDocLink::get(&def) {
-                actions.push(link);
-            }
-
-            render_actions(&mut results, actions);
-            Some(HoverContents::Array(results))
-        }
-    }
-}
-
-fn star_tooltip(ctx: &mut LocalContext, mut node: &LinkedNode) -> Option<HoverContents> {
-    if !matches!(node.kind(), SyntaxKind::Star) {
-        return None;
-    }
-
-    while !matches!(node.kind(), SyntaxKind::ModuleImport) {
-        node = node.parent()?;
-    }
-
-    let import_node = node.cast::<ast::ModuleImport>()?;
-    let scope_val = ctx.module_by_syntax(import_node.source().to_untyped())?;
-
-    let scope_items = scope_val.scope()?.iter();
-    let mut names = scope_items.map(|item| item.0.as_str()).collect::<Vec<_>>();
-    names.sort();
-
-    let content = format!("This star imports {}", separated_list(&names, "and"));
-    Some(HoverContents::Scalar(MarkedString::String(content)))
-}
-
-fn link_tooltip(
-    ctx: &mut LocalContext,
-    mut node: &LinkedNode,
-    cursor: usize,
-) -> Option<HoverContents> {
-    while !matches!(node.kind(), SyntaxKind::FuncCall) {
-        node = node.parent()?;
-    }
-
-    let links = get_link_exprs_in(node)?;
-    let links = links
-        .objects
-        .iter()
-        .filter(|link| link.range.contains(&cursor))
-        .collect::<Vec<_>>();
-    if links.is_empty() {
-        return None;
-    }
-
-    let mut results = vec![];
-    let mut actions = vec![];
-    for obj in links {
-        let Some(target) = obj.target.resolve(ctx) else {
-            continue;
-        };
-        // open file in tab or system application
-        actions.push(CommandLink {
-            title: Some("Open in Tab".to_string()),
-            command_or_links: vec![CommandOrLink::Command {
-                id: "tinymist.openInternal".to_string(),
-                args: vec![JsonValue::String(target.to_string())],
-            }],
+            None
         });
-        actions.push(CommandLink {
-            title: Some("Open Externally".to_string()),
-            command_or_links: vec![CommandOrLink::Command {
-                id: "tinymist.openExternal".to_string(),
-                args: vec![JsonValue::String(target.to_string())],
-            }],
-        });
-        if let Some(kind) = PathPreference::from_ext(target.path()) {
-            let preview = format!("A `{kind:?}` file.");
-            results.push(MarkedString::String(preview));
-        }
-    }
-    render_actions(&mut results, actions);
-    if results.is_empty() {
-        return None;
-    }
 
-    Some(HoverContents::Array(results))
+        log::info!("telescope position: {position:?}");
+
+        let preview_content = provider.periscope_at(self.ctx, doc.clone(), position?)?;
+        self.preview.push(preview_content);
+        Some(())
+    }
 }
 
 fn push_result_ty(
@@ -292,14 +293,6 @@ fn push_result_ty(
     }
 
     let _ = write!(type_doc, " = {short}");
-}
-
-fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
-    if actions.is_empty() {
-        return;
-    }
-
-    results.push(MarkedString::String(actions.into_iter().join(" | ")));
 }
 
 struct ExternalDocLink;
@@ -388,17 +381,6 @@ impl fmt::Display for CommandOrLink {
             }
         }
     }
-}
-
-fn to_lsp_tooltip(typst_tooltip: &Tooltip) -> HoverContents {
-    let lsp_marked_string = match typst_tooltip {
-        Tooltip::Text(text) => MarkedString::String(text.to_string()),
-        Tooltip::Code(code) => MarkedString::LanguageString(LanguageString {
-            language: "typc".to_owned(),
-            value: code.to_string(),
-        }),
-    };
-    HoverContents::Scalar(lsp_marked_string)
 }
 
 #[cfg(test)]

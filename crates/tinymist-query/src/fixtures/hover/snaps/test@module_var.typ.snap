@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/module_var.typ
 snapshot_kind: text
 ---
 {
- "contents": "# The Module",
+ "contents": "### Sampled Values\n```typc\n<module themod>\n```\n\n---\n\n# The Module",
  "range": "2:24:2:30"
 }
