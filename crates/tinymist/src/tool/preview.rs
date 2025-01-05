@@ -179,17 +179,6 @@ impl EditorServer for CompileHandler {
     }
 }
 
-/// Whether to use websocket authentication. This should ideally always be `Enable`.
-/// `UnsafeDisable` is only temporarily supported to ease the transition for downstream packages.
-// FIXME: Remove `UnsafeDisable` (and the whole enum) in a future version.
-#[derive(Clone, Debug, clap::ValueEnum)]
-pub enum AuthenticationMode {
-    /// Enable websocket authentication
-    Enable,
-    /// Disable websocket authentication
-    UnsafeDisable,
-}
-
 /// CLI Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
@@ -242,11 +231,11 @@ pub struct PreviewCliArgs {
     #[clap(long = "no-open")]
     pub dont_open_in_browser: bool,
 
-    /// Set "unsafe-disable" to disable websocket authentication for the control plane server. Careful: Among other things, this allows any website you visit to use the control plane server.
+    /// Use this to disable websocket authentication for the control plane server. Careful: Among other things, this allows any website you visit to use the control plane server.
     ///
     /// This option is only meant to ease the transition to authentication for downstream packages. It will be removed in a future version of tinymist.
-    #[clap(long, value_enum, default_value_t=AuthenticationMode::Enable)]
-    pub control_plane_auth_mode: AuthenticationMode,
+    #[clap(long, default_value = "false")]
+    pub disable_control_plane_auth: bool,
 }
 
 /// The global state of the preview tool.
@@ -364,9 +353,8 @@ impl PreviewState {
 
             let srv = make_http_server(
                 true,
-                AuthenticationMode::Enable,
                 args.data_plane_host,
-                secret.clone(),
+                Some(secret.clone()),
                 websocket_tx,
             )
             .await;
@@ -427,9 +415,8 @@ pub struct HttpServer {
 /// Create a http server for the previewer.
 pub async fn make_http_server(
     serve_frontend_html: bool,
-    websocket_auth_mode: AuthenticationMode,
     static_file_addr: String,
-    secret: String,
+    secret: Option<String>,
     websocket_tx: mpsc::UnboundedSender<HyperWebsocketStream>,
 ) -> HttpServer {
     use http_body_util::Full;
@@ -438,11 +425,9 @@ pub async fn make_http_server(
 
     let make_service = move || {
         let websocket_tx = websocket_tx.clone();
-        let websocket_auth_mode = websocket_auth_mode.clone();
         let secret = secret.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let websocket_tx = websocket_tx.clone();
-            let websocket_auth_mode = websocket_auth_mode.clone();
             let secret = secret.clone();
             async move {
                 // Check if the request is a websocket upgrade request.
@@ -464,8 +449,8 @@ pub async fn make_http_server(
                         //
                         // Note: We use authentication only for the websocket. The static HTML file server (see below)
                         //       only serves a not secret static template, so we don't bother with authentication there.
-                        match websocket_auth_mode {
-                            AuthenticationMode::Enable => {
+                        match secret {
+                            Some(secret) => {
                                 if let Ok(websocket) =
                                     auth::try_auth_websocket_client(websocket, &secret).await
                                 {
@@ -474,7 +459,7 @@ pub async fn make_http_server(
                                     log::error!("Websocket client authentication failed");
                                 }
                             }
-                            AuthenticationMode::UnsafeDisable => {
+                            None => {
                                 // We optionally allow to skip authentication upon explicit request to ease the transition to
                                 // authentication for downstream packages.
                                 // FIXME: Remove this is in a future version.
@@ -640,13 +625,19 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
 
-    let secret_for_control_plane = secret.clone();
+    let secret_for_control_plane = if args.disable_control_plane_auth {
+        log::warn!(
+            "Disabling authentication for the control plane server. This is not recommended."
+        );
+        None
+    } else {
+        Some(secret.clone())
+    };
     let control_plane_server_handle = tokio::spawn(async move {
         let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
 
         let srv = make_http_server(
             false,
-            args.control_plane_auth_mode,
             args.control_plane_host,
             secret_for_control_plane,
             control_sock_tx,
@@ -721,9 +712,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         Some(
             make_http_server(
                 true,
-                AuthenticationMode::Enable,
                 static_file_host,
-                secret.clone(),
+                Some(secret.clone()),
                 websocket_tx.clone(),
             )
             .await,
@@ -734,9 +724,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     let srv = make_http_server(
         true,
-        AuthenticationMode::Enable,
         args.data_plane_host,
-        secret.clone(),
+        Some(secret.clone()),
         websocket_tx,
     )
     .await;
