@@ -42,7 +42,7 @@ function getUnsafeSocketCompat(url: string): Promise<WebSocketAndSubject>
             error: () => {},
         }); 
 
-        console.log("Authentication skipped (for compat with typst-preview, triggered by special value of `secret`)");
+        console.error("Authentication skipped (for compat with typst-preview, triggered by special value of `secret`)");
     });
 }
 
@@ -83,10 +83,10 @@ export function getAuthenticatedSocket(url: string, secret: string, dec: TextDec
                 if(message.challenge === undefined)
                     throw new Error("Missing challenge.");
 
-                const cnonce = generateCryptoRandom(32);
+                const client_nonce = generateCryptoRandom(32);
                 prews.next(enc.encode(JSON.stringify({
-                    'cnonce': cnonce,
-                    'hash': await digestHex(secret + ":" + message.challenge + ":" + cnonce),
+                    'client_nonce': client_nonce,
+                    'hash': await digestHex(secret + ":" + message.challenge + ":" + client_nonce),
                     'challenge': challengeForServer
                 })));
 
@@ -117,10 +117,10 @@ export function getAuthenticatedSocket(url: string, secret: string, dec: TextDec
                 }
 
                 // Server liked our 'hash'. Now we check if the server is malicious or not
-                if(message.snonce === undefined || message.hash === undefined)
-                    throw new Error("Missing snonce or hash.");
-                if(message.hash !== await digestHex(secret + ":" + challengeForServer + ":" + message.snonce))
-                    throw new Error("Malicious server detected?!");
+                if(message.server_nonce === undefined || message.hash === undefined)
+                    throw new Error("Missing server_nonce or hash.");
+                if(message.hash !== await digestHex(secret + ":" + challengeForServer + ":" + message.server_nonce))
+                    throw new Error("Mismatched hash computed by digestHex(secret + \":\" + challengeForServer + \":\" + message.server_nonce)");
 
                 // Authentication succeeded!
                 console.log("Authentication succeeded");

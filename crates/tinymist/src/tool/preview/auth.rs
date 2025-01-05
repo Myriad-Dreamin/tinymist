@@ -26,13 +26,13 @@ struct AuthMsgChallenge<'a> {
 struct AuthMsgResponseClient<'a> {
     hash: &'a str,
     challenge: &'a str,
-    cnonce: &'a str,
+    client_nonce: &'a str,
 }
 
 #[derive(Serialize, Debug)]
 struct AuthMsgResponseServer<'a> {
     hash: &'a str,
-    snonce: &'a str,
+    server_nonce: &'a str,
 }
 
 #[derive(Serialize, Debug)]
@@ -80,13 +80,15 @@ pub async fn try_auth_websocket_client(
         .context("auth response 1 missing")??;
     let response: AuthMsgResponseClient = serde_json::from_str(response.to_text()?)?;
 
-    if sha512hex(format!("{}:{}:{}", secret, challenge, response.cnonce).as_str()) == response.hash
+    if sha512hex(format!("{}:{}:{}", secret, challenge, response.client_nonce).as_str())
+        == response.hash
     {
         // ... then we authenticate to the client
-        let snonce = generate_token();
-        let hash = sha512hex(format!("{}:{}:{}", secret, response.challenge, snonce).as_str());
+        let server_nonce = generate_token();
+        let hash =
+            sha512hex(format!("{}:{}:{}", secret, response.challenge, server_nonce).as_str());
         let json = serde_json::to_string(&AuthMsgResponseServer {
-            snonce: &snonce,
+            server_nonce: &server_nonce,
             hash: &hash,
         })?;
         websocket.send(Message::Binary(json.into())).await?;

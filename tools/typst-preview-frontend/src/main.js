@@ -16,7 +16,8 @@ main();
 function main() {
     const { nextWs } = buildWs();
     const wsArgs = retrieveWsArgs();
-    // For vscode, we initially don't have any info where to connect, so don't try.
+    // If a `wsArgs.secret` is not set, we cannot establish the connection on loading. This usually happens when the preview
+    // is opened inside VS Code. For VS Code, we'll finally establish it in {@link setupVscodeChannel}.
     if(wsArgs.secret) 
         window.onload = () => nextWs(wsArgs);
     setupVscodeChannel(nextWs);
