@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/annotate_dict_param2.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\nlet inherited-scope = dictionary;\n```\n\n---\nDefinitions that are made available to the entire parsed\n         module. This parameter is only used internally.",
+ "contents": "```typc\nlet inherited-scope = dictionary;\n```\n\n---\n\nDefinitions that are made available to the entire parsed\n         module. This parameter is only used internally.",
  "range": "6:21:6:36"
 }

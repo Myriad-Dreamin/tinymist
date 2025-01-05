@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/builtin_var2.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\n<module sys>\n```\n\n---\n```typc\nlet sys;\n```",
+ "contents": "```typc\nlet sys;\n```\n\n---\n\n### Sampled Values\n```typc\n<module sys>\n```",
  "range": "0:20:0:23"
 }

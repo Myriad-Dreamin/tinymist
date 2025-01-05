@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/user.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\nlet f() = int;\n```\n\n---\nTest",
+ "contents": "```typc\nlet f() = int;\n```\n\n---\n\nTest",
  "range": "3:20:3:21"
 }

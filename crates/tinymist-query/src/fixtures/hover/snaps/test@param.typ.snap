@@ -5,6 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/hover/param.typ
 snapshot_kind: text
 ---
 {
- "contents": "```typc\nlet param = int;\n```\n\n---\nThe `parameter`.",
+ "contents": "```typc\nlet param = int;\n```\n\n---\n\nThe `parameter`.",
  "range": "3:25:3:30"
 }
