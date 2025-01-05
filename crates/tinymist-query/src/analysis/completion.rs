@@ -507,7 +507,7 @@ impl CompletionPair<'_, '_, '_> {
 
         // Special completions 3, we should remove them finally
         if matches!(surrounding_syntax, ParamList) {
-            return self.complete_params().then_some(());
+            return self.complete_params();
         }
 
         // Checks and completes `self.cursor.syntax_context`
