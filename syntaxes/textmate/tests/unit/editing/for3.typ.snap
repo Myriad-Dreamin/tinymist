@@ -4,7 +4,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 >
 >test
