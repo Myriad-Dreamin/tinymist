@@ -1,3 +1,7 @@
+>
+>// todo: solve it in future
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst comment.line.double-slash.typst
 >#math.abs/**/()
 #^ source.typst variable.other.readwrite.hash.typst
 # ^^^^ source.typst variable.other.readwrite.typst

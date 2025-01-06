@@ -1430,7 +1430,7 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
     begin: lookAhead(
       new RegExp(/(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source)
     ),
-    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/,
+    end: /(?:(?<=\)|\])(?:(?![\[\(\.\p{XID_Start}])|$))|(?=[\s;,\}\]\)]|$)/u,
     patterns: [
       {
         match: /\./,

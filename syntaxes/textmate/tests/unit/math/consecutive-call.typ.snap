@@ -1,0 +1,13 @@
+>$upright(A)upright(m)$ "Test it."
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^^^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#        ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#         ^ source.typst markup.math.typst meta.expr.call.typst
+#          ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#           ^^^^^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#                  ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                   ^ source.typst markup.math.typst meta.expr.call.typst
+#                    ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                     ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#                      ^^^^^^^^^^^^ source.typst
+>
