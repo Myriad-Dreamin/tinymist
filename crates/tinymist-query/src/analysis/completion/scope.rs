@@ -54,13 +54,6 @@ impl CompletionPair<'_, '_, '_> {
         };
 
         let mode = interpret_mode_at(Some(&self.cursor.leaf));
-        let in_math = matches!(mode, InterpretMode::Math);
-
-        let lib = self.worker.world().library();
-        let scope = if in_math { &lib.math } else { &lib.global }
-            .scope()
-            .clone();
-        defines.insert_scope(&scope);
 
         previous_decls(self.cursor.leaf.clone(), |node| -> Option<()> {
             match node {
@@ -92,6 +85,14 @@ impl CompletionPair<'_, '_, '_> {
             }
             None
         });
+
+        let in_math = matches!(mode, InterpretMode::Math);
+
+        let lib = self.worker.world().library();
+        let scope = if in_math { &lib.math } else { &lib.global }
+            .scope()
+            .clone();
+        defines.insert_scope(&scope);
 
         Some(defines)
     }
