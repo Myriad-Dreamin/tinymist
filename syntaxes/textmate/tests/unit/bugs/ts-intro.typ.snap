@@ -25,7 +25,7 @@
 #                                                    ^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst
 #                                                        ^ source.typst meta.expr.call.typst punctuation.separator.colon.typst
 #                                                         ^ source.typst meta.expr.call.typst
-#                                                          ^^^^ source.typst meta.expr.call.typst support.type.builtin.typst
+#                                                          ^^^^ source.typst meta.expr.call.typst variable.other.constant.builtin.typst
 #                                                              ^ source.typst meta.expr.call.typst punctuation.separator.comma.typst
 #                                                               ^ source.typst meta.expr.call.typst
 #                                                                ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst

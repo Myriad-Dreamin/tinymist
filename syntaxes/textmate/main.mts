@@ -94,7 +94,7 @@ const contentBlock: textmate.Pattern = {
 const primitiveColors: textmate.Pattern = {
   match:
     /\b(red|blue|green|black|white|gray|silver|eastern|navy|aqua|teal|purple|fuchsia|maroon|orange|yellow|olive|lime|ltr|rtl|ttb|btt|start|left|center|right|end|top|horizon|bottom)\b(?!-)/,
-  name: "support.type.builtin.typst",
+  name: "variable.other.constant.builtin.typst",
 };
 
 const primitiveFunctions = {
