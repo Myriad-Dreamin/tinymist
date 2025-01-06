@@ -575,7 +575,7 @@ const expressions = (): textmate.Grammar => {
       },
       {
         match: /\b(in)\b(?!-)/,
-        name: "keyword.operator.range.typst",
+        name: "keyword.other.range.typst",
       },
       {
         match: /\b(and|or|not)\b(?!-)/,
