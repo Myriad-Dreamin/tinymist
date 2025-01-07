@@ -684,7 +684,7 @@ const expressions = (): textmate.Grammar => {
       /// parentheisized expressions: (...)
       {
         begin: /\(/,
-        end: /\)/,
+        end: /\)|(?=[;\}\]])/,
         beginCaptures: {
           "0": {
             name: "meta.brace.round.typst",
@@ -988,7 +988,7 @@ const letStatement = (): textmate.Grammar => {
       },
       {
         begin: /\(/,
-        end: /\)/,
+        end: /\)|(?=[;\}\]])/,
         beginCaptures: {
           "0": {
             name: "meta.brace.round.typst",
@@ -1521,7 +1521,7 @@ const arrowFunc: textmate.Pattern = {
     },
     {
       begin: /=>/,
-      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;]))/,
+      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;\}\]\)]))/,
       beginCaptures: {
         "0": {
           name: "storage.type.function.arrow.typst",

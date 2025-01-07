@@ -16,5 +16,14 @@
 #                      ^^^^ source.typst variable.other.readwrite.typst
 #                          ^ source.typst meta.brace.round.typst
 >
+>#{(}
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.curly.typst
+#  ^ source.typst meta.brace.round.typst
+#   ^ source.typst meta.brace.curly.typst
+>
+>A
+#^^ source.typst
+>
 >---
 #^^^ source.typst punctuation.definition.em-dash.typst
