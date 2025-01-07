@@ -4,7 +4,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -20,7 +20,7 @@
 #      ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #       ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #        ^ source.typst meta.expr.for.typst
-#         ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#         ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #           ^ source.typst meta.expr.for.typst
 #            ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #             ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -37,7 +37,7 @@
 #       ^ source.typst meta.expr.for.typst punctuation.separator.comma.typst
 #        ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#          ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #            ^ source.typst meta.expr.for.typst
 #             ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #              ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -56,7 +56,7 @@
 #         ^^ source.typst meta.expr.for.typst keyword.operator.spread.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #            ^ source.typst meta.expr.for.typst
-#             ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#             ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #               ^ source.typst meta.expr.for.typst
 #                ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -75,7 +75,7 @@
 #          ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #            ^ source.typst meta.expr.for.typst
-#             ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#             ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #               ^ source.typst meta.expr.for.typst
 #                ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -97,7 +97,7 @@
 #            ^^ source.typst meta.expr.for.typst keyword.operator.spread.typst
 #              ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #               ^ source.typst meta.expr.for.typst
-#                ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#                ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #                  ^ source.typst meta.expr.for.typst
 #                   ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                    ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -119,7 +119,7 @@
 #             ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
 #              ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #               ^ source.typst meta.expr.for.typst
-#                ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#                ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #                  ^ source.typst meta.expr.for.typst
 #                   ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                    ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -144,7 +144,7 @@
 #               ^^ source.typst meta.expr.for.typst keyword.operator.spread.typst
 #                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#                   ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #                     ^ source.typst meta.expr.for.typst
 #                      ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                       ^ source.typst meta.expr.for.typst meta.brace.round.typst
@@ -169,7 +169,7 @@
 #                ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#                   ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #                     ^ source.typst meta.expr.for.typst
 #                      ^ source.typst meta.expr.for.typst meta.brace.round.typst
 #                       ^ source.typst meta.expr.for.typst meta.brace.round.typst

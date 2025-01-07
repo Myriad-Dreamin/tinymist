@@ -94,7 +94,7 @@ const contentBlock: textmate.Pattern = {
 const primitiveColors: textmate.Pattern = {
   match:
     /\b(red|blue|green|black|white|gray|silver|eastern|navy|aqua|teal|purple|fuchsia|maroon|orange|yellow|olive|lime|ltr|rtl|ttb|btt|start|left|center|right|end|top|horizon|bottom)\b(?!-)/,
-  name: "support.type.builtin.typst",
+  name: "variable.other.constant.builtin.typst",
 };
 
 const primitiveFunctions = {
@@ -148,12 +148,12 @@ const paramOrArgName: textmate.Pattern = {
 };
 
 const markupLabel: textmate.PatternMatch = {
-  name: "entity.other.label.typst",
+  name: "string.other.label.typst",
   match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.:]*>/u,
 };
 
 const markupReference: textmate.PatternMatch = {
-  name: "entity.other.reference.typst",
+  name: "string.other.reference.typst",
   match:
     /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.:](?!:\s|$|([\.:]*[^\p{XID_Continue}_\-\.:])))*/u,
   captures: {
@@ -239,12 +239,12 @@ const markupMath: textmate.Pattern = {
   end: /\$/,
   beginCaptures: {
     "0": {
-      name: "punctuation.definition.string.math.typst",
+      name: "punctuation.definition.string.begin.math.typst",
     },
   },
   endCaptures: {
     "0": {
-      name: "punctuation.definition.string.math.typst",
+      name: "punctuation.definition.string.end.math.typst",
     },
   },
   patterns: [
@@ -575,7 +575,7 @@ const expressions = (): textmate.Grammar => {
       },
       {
         match: /\b(in)\b(?!-)/,
-        name: "keyword.operator.range.typst",
+        name: "keyword.other.range.typst",
       },
       {
         match: /\b(and|or|not)\b(?!-)/,

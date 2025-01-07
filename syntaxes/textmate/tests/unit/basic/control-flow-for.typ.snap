@@ -9,14 +9,14 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 >#for i in range(1)
 #^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -28,7 +28,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -43,7 +43,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.curly.typst
@@ -53,7 +53,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.curly.typst
@@ -65,7 +65,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -82,7 +82,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -98,7 +98,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -114,7 +114,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -130,7 +130,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -146,7 +146,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -161,7 +161,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
@@ -180,7 +180,7 @@
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.for.typst
-#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst

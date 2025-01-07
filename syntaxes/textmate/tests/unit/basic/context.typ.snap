@@ -53,8 +53,8 @@
 #        ^ source.typst meta.expr.context.typst
 #         ^ source.typst meta.expr.context.typst meta.brace.square.typst
 #          ^^^^^^^^^ source.typst meta.expr.context.typst
-#                   ^ source.typst meta.expr.context.typst entity.other.reference.typst punctuation.definition.reference.typst
-#                    ^^^^^^^^ source.typst meta.expr.context.typst entity.other.reference.typst
+#                   ^ source.typst meta.expr.context.typst string.other.reference.typst punctuation.definition.reference.typst
+#                    ^^^^^^^^ source.typst meta.expr.context.typst string.other.reference.typst
 #                            ^^^^^^^^^ source.typst meta.expr.context.typst
 #                                     ^ source.typst meta.expr.context.typst entity.name.function.hash.typst
 #                                      ^^^^ source.typst meta.expr.context.typst meta.expr.call.typst entity.name.function.typst

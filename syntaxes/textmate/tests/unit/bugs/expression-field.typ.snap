@@ -19,7 +19,7 @@
 #^^ source.typst
 #  ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#       ^^^ source.typst meta.expr.call.typst support.type.builtin.typst
+#       ^^^ source.typst meta.expr.call.typst variable.other.constant.builtin.typst
 #          ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #           ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #            ^ source.typst meta.expr.call.typst meta.brace.square.typst

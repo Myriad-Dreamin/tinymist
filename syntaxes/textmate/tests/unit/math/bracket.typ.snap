@@ -1,66 +1,66 @@
 >
 >$ ||x||_[] $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^^^^^^ source.typst markup.math.typst
 #       ^ source.typst markup.math.typst punctuation.math.operator.typst
 #        ^ source.typst markup.math.typst constant.other.symbol.typst
 #         ^ source.typst markup.math.typst constant.other.symbol.typst
 #          ^ source.typst markup.math.typst
-#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ ||x||_[) $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^^^^^^ source.typst markup.math.typst
 #       ^ source.typst markup.math.typst punctuation.math.operator.typst
 #        ^ source.typst markup.math.typst constant.other.symbol.typst
 #         ^ source.typst markup.math.typst constant.other.symbol.typst
 #          ^ source.typst markup.math.typst
-#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ ||x||_⧼) $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^^^^^^ source.typst markup.math.typst
 #       ^ source.typst markup.math.typst punctuation.math.operator.typst
 #        ^ source.typst markup.math.typst constant.other.symbol.typst
 #         ^ source.typst markup.math.typst constant.other.symbol.typst
 #          ^ source.typst markup.math.typst
-#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ 1 / () $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^^^ source.typst markup.math.typst
 #    ^ source.typst markup.math.typst punctuation.math.operator.typst
 #     ^ source.typst markup.math.typst
 #      ^ source.typst markup.math.typst constant.other.symbol.typst
 #       ^ source.typst markup.math.typst constant.other.symbol.typst
 #        ^ source.typst markup.math.typst
-#         ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#         ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ √() $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^ source.typst markup.math.typst
 #  ^ source.typst markup.math.typst punctuation.math.operator.typst
 #   ^ source.typst markup.math.typst constant.other.symbol.typst
 #    ^ source.typst markup.math.typst constant.other.symbol.typst
 #     ^ source.typst markup.math.typst
-#      ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#      ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ ∛() $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^ source.typst markup.math.typst
 #  ^ source.typst markup.math.typst punctuation.math.operator.typst
 #   ^ source.typst markup.math.typst constant.other.symbol.typst
 #    ^ source.typst markup.math.typst constant.other.symbol.typst
 #     ^ source.typst markup.math.typst
-#      ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#      ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >$ ∛∜() $
-#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
 # ^ source.typst markup.math.typst
 #  ^ source.typst markup.math.typst punctuation.math.operator.typst
 #   ^ source.typst markup.math.typst punctuation.math.operator.typst
 #    ^ source.typst markup.math.typst constant.other.symbol.typst
 #     ^ source.typst markup.math.typst constant.other.symbol.typst
 #      ^ source.typst markup.math.typst
-#       ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+#       ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
