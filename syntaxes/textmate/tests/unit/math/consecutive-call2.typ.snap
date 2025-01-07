@@ -12,7 +12,8 @@
 #                        ^^^^^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst variable.other.readwrite.typst
 #                             ^ source.typst meta.expr.let.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
 #                              ^^^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.typst
-#                                 ^^ source.typst meta.expr.let.typst markup.math.typst
+#                                 ^ source.typst meta.expr.let.typst markup.math.typst keyword.operator.accessor.typst
+#                                  ^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.typst
 #                                   ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.end.math.typst
 >
 >#let curl = $bold(nabla)times$
