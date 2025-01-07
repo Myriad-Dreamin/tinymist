@@ -9,7 +9,12 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "node:url";
-import { SYNTAX_WITH_BOLD_ITALIC, SYNTAX_WITH_MATH } from "./feature.mjs";
+import {
+  FIXED_LENGTH_LOOK_BEHIND,
+  POLYFILL_P_XID,
+  SYNTAX_WITH_BOLD_ITALIC,
+  SYNTAX_WITH_MATH,
+} from "./feature.mjs";
 
 // JS-Snippet to generate pattern
 function generatePattern(maxDepth: number, lb: string, rb: string) {
@@ -57,8 +62,50 @@ function replaceGroup(pattern: RegExp, group: string, replacement: RegExp) {
 }
 
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
-const exprEndReg =
-  /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\}\]\)\n]|$)/;
+const exprEndReg = (() => {
+  const tokens = [
+    // while|if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=
+    /while/,
+    /if/,
+    /and/,
+    /or/,
+    /not/,
+    /in/,
+    /!=/,
+    /==/,
+    /<=/,
+    />=/,
+    /</,
+    />/,
+    /\+/,
+    /-/,
+    /\*/,
+    /\//,
+    /=/,
+    /\+=/,
+    /-=/,
+    /\*=/,
+    /\/=/,
+  ];
+
+  let lookBehind = "";
+
+  if (!FIXED_LENGTH_LOOK_BEHIND) {
+    const tokenSet = tokens.map((t) => t.source).join("|");
+    lookBehind = `(?<!(?:${tokenSet})\\s*)` + /(?=[\[\{\n])/.source;
+  } else {
+    lookBehind =
+      /(?<![ile if and or not in\s]{3}|[=<>\+\-\*\/\s]{3})/.source +
+      /(?=[\[\{\n])/u.source;
+  }
+
+  return {
+    end: lookBehind + "|" + /(?=[;\}\]\)\n]|$)/.source,
+  };
+})();
+const exprEndIfReg = exprEndReg;
+const exprEndWhileReg = exprEndReg;
+const exprEndForReg = exprEndReg;
 
 const codeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
@@ -113,8 +160,9 @@ const primitiveTypes: textmate.PatternMatch = {
 
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 const MATH_IDENTIFIER =
-  /(?:(?<=_)|\b)[\p{XID_Start}](?:(?!_)[\p{XID_Continue}])+/u;
-const MATH_DOT_ACCESS = /(\.)([\p{XID_Start}](?:(?!_)[\p{XID_Continue}])*)/u;
+  /(?:(?<=_)|\b)(?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])+/u;
+const MATH_DOT_ACCESS =
+  /(\.)((?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])*)/u;
 
 // const MATH_OPENING =
 //   /[\[\(\u{5b}\u{7b}\u{2308}\u{230a}\u{231c}\u{231e}\u{2772}\u{27e6}\u{27e8}\u{27ea}\u{27ec}\u{27ee}\u{2983}\u{2985}\u{2987}\u{2989}\u{298b}\u{298d}\u{298f}\u{2991}\u{2993}\u{2995}\u{2997}\u{29d8}\u{29da}\u{29fc}]/u;
@@ -601,6 +649,10 @@ const expressions = (): textmate.Grammar => {
       { include: "#arrayOrDict" },
       { include: "#contentBlock" },
       {
+        match: /\b(else)\b(?!-)/,
+        name: "keyword.control.conditional.typst",
+      },
+      {
         match: /\b(break|continue)\b(?!-)/,
         name: "keyword.control.loop.typst",
       },
@@ -1037,7 +1089,7 @@ const letStatement = (): textmate.Grammar => {
   const letInitClause: textmate.Pattern = {
     // name: "meta.let.init.typst",
     begin: /=\s*/,
-    end: /(?<!\s*=)(?=[;\]})\n])/,
+    end: /(?=[;\]})\n])/,
     beginCaptures: {
       "0": {
         name: "keyword.operator.assignment.typst",
@@ -1082,7 +1134,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /\bif\b(?!-)/,
-    end: exprEndReg,
+    ...exprEndIfReg,
     beginCaptures: {
       "0": {
         name: "keyword.control.conditional.typst",
@@ -1122,7 +1174,7 @@ const forStatement = (): textmate.Grammar => {
   const forClause: textmate.Pattern = {
     // name: "meta.for.clause.bind.typst",
     begin: /(for\b)\s*/,
-    end: exprEndReg,
+    ...exprEndForReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1156,7 +1208,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: exprEndReg,
+    ...exprEndWhileReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1173,10 +1225,18 @@ const whileStatement = (): textmate.Grammar => {
   };
 };
 
+const contextEndReg = () => {
+  if (!FIXED_LENGTH_LOOK_BEHIND) {
+    return /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)\n]|$)/;
+  }
+
+  return /(?<=[\}\]\d])|(?=[;\}\]\)\n]|$)/u;
+};
+
 const contextStatement: textmate.Pattern = {
   name: "meta.expr.context.typst",
   begin: /\bcontext\b(?!-)/,
-  end: /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)\n]|$)/,
+  end: contextEndReg(),
   beginCaptures: {
     "0": {
       name: "keyword.control.other.typst",
@@ -1656,7 +1716,27 @@ function generate() {
 
   const typstPath = path.join(dirname, "../typst.tmLanguage");
 
-  const compiled = textmate.compile(typst);
+  let compiled = textmate.compile(typst);
+
+  if (POLYFILL_P_XID) {
+    // GitHub PCRE does not support \p{XID_Start} and \p{XID_Continue}
+    // todo: what is Other_ID_Start and Other_ID_Continue?
+    // See, https://unicode.org/Public/UCD/latest/ucd/PropList.txt
+
+    // \u{309B}\u{309C}
+    const pXIDStart = /\p{L}\p{Nl}_/u;
+    const pXIDContinue =
+      /\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\\\u{00B7}\\\u{30FB}\\\u{FF65}/u;
+
+    const jsonEncode = (str: string) => {
+      return str.replace(/\\p/g, "\\\\p").replace(/\\u/g, "\\\\u");
+    };
+
+    compiled = compiled
+      .replace(/\\\\p\{XID_Start\}/g, jsonEncode(pXIDStart.source))
+      .replace(/\\\\p\{XID_Continue\}/g, jsonEncode(pXIDContinue.source));
+  }
+
   const repository = JSON.parse(compiled).repository;
 
   // dump to file
