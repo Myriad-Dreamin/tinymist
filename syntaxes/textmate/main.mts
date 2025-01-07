@@ -1355,8 +1355,8 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
           )
     ),
     end: strict
-      ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
-      : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
+      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;\,\}\]\)]|$)/
+      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;\,\}\]\)]|$)/,
     patterns: [
       {
         match: /\./,
@@ -1414,15 +1414,9 @@ const mathCallArgs: textmate.Pattern = {
       name: "meta.brace.round.typst",
     },
   },
-  patterns: [{ include: "#mathPatternOrArgsBody" }],
-};
-
-const mathPatternOrArgsBody: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
-    {
-      include: "#mathParen",
-    },
+    { include: "#mathParen" },
     {
       match: /,/,
       name: "punctuation.separator.comma.typst",
@@ -1437,7 +1431,7 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
     begin: lookAhead(
       new RegExp(/(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source)
     ),
-    end: /(?:(?<=\)|\])(?:(?![\[\(\.\p{XID_Start}])|$))|(?=[\s;,\}\]\)]|$)/u,
+    end: /(?:(?<=[\)\]])(?![\[\(\.\p{XID_Start}]))|(?=[\$\s;,\}\]\)]|$)/u,
     patterns: [
       {
         match: /\./,
@@ -1603,7 +1597,6 @@ export const typst: textmate.Grammar = {
     patternOrArgsBody,
     strictMathFuncCallOrPropAccess: mathFuncCallOrPropAccess(),
     mathCallArgs,
-    mathPatternOrArgsBody,
     codeBlock,
     contentBlock,
     arrowFunc,
