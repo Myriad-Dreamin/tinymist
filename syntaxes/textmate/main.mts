@@ -1181,8 +1181,8 @@ const setStatement = (): textmate.Grammar => {
 
   const setClause: textmate.Pattern = {
     // name: "meta.set.clause.bind.typst",
-    begin: /(set\b)\s*/,
-    end: /(?=if)|(?=[\n;\]}])/,
+    begin: /(set\b)\s+/,
+    end: /(?=if)|(?=[\n;\{\[\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1584,15 +1584,16 @@ export const typst: textmate.Grammar = {
     mathParen,
     mathMoreBrace,
 
+    includeStatement,
+    contextStatement,
+
     ...expressions().repository,
 
-    includeStatement,
     ...importStatement().repository,
     ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,
     ...whileStatement().repository,
-    contextStatement,
     ...setStatement().repository,
     ...showStatement().repository,
     strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
