@@ -9,3 +9,5 @@ node_modules/
 /editors/lapce/out/
 /external/typst-preview
 /dist
+
+.vscode/*.code-workspace
