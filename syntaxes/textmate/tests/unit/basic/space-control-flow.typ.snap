@@ -15,7 +15,7 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -42,7 +42,7 @@
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst
-#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                   ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -89,7 +89,7 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -112,7 +112,7 @@
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst
-#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                   ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -148,7 +148,7 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -172,7 +172,7 @@
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst
-#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                   ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -213,7 +213,7 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.other.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
@@ -234,7 +234,7 @@
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #           ^ source.typst meta.expr.for.typst
-#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#            ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                   ^ source.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst

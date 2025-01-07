@@ -285,7 +285,7 @@
 #^ source.typst entity.name.function.hash.typst
 # ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#        ^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#        ^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.type.primitive.typst
 #           ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
 #            ^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
 #              ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.accessor.typst
@@ -306,7 +306,7 @@
 # ^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #       ^^ source.typst meta.expr.call.typst keyword.operator.spread.typst
-#         ^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#         ^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst support.function.builtin.typst
 #              ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
 #               ^ source.typst meta.expr.call.typst meta.expr.call.typst constant.numeric.integer.typst
 #                ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
