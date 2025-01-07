@@ -131,6 +131,22 @@ const mathIdentifier: textmate.PatternMatch = {
   name: "variable.other.readwrite.typst",
 };
 
+const paramOrArgName: textmate.Pattern = {
+  match: replaceGroup(
+    /(?!(show|import|include)\s*\:)({identifier})\s*(\:)/,
+    "{identifier}",
+    IDENTIFIER
+  ),
+  captures: {
+    "2": {
+      name: "variable.other.readwrite.typst",
+    },
+    "3": {
+      name: "punctuation.separator.colon.typst",
+    },
+  },
+};
+
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
   match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.:]*>/u,
@@ -471,7 +487,7 @@ const code: textmate.Pattern = {
     { include: "#common" },
     { include: "#comments" },
     {
-      name: "punctuation.separator.colon.typst",
+      name: "punctuation.terminator.statement.typst",
       match: /;/,
     },
     { include: "#expression" },
@@ -611,6 +627,10 @@ const expressions = (): textmate.Grammar => {
         name: "keyword.operator.accessor.typst",
       },
       {
+        match: /,/,
+        name: "punctuation.separator.comma.typst",
+      },
+      {
         match:
           /\+|\\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
         name: "keyword.operator.arithmetic.typst",
@@ -681,17 +701,7 @@ const expressions = (): textmate.Grammar => {
   };
 
   const literalContent: textmate.Pattern = {
-    patterns: [
-      {
-        name: "punctuation.separator.colon.typst",
-        match: /:/,
-      },
-      {
-        name: "punctuation.separator.comma.typst",
-        match: /,/,
-      },
-      { include: "#expression" },
-    ],
+    patterns: [{ include: "#paramOrArgName" }, { include: "#expression" }],
   };
 
   return {
@@ -1329,10 +1339,7 @@ const callArgs: textmate.Pattern = {
 const patternOrArgsBody: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
-    {
-      match: /,/,
-      name: "punctuation.separator.comma.typst",
-    },
+    { include: "#paramOrArgName" },
     { include: "#expression" },
   ],
 };
@@ -1547,6 +1554,7 @@ export const typst: textmate.Grammar = {
     primitiveTypes,
     identifier,
     mathIdentifier,
+    paramOrArgName,
     markupLabel,
     markupReference,
     markupEscape,

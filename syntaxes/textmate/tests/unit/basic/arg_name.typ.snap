@@ -1,0 +1,18 @@
+>#place(auto, float: true, []);
+#^ source.typst entity.name.function.hash.typst
+# ^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#       ^^^^ source.typst meta.expr.call.typst keyword.other.auto.typst
+#           ^ source.typst meta.expr.call.typst punctuation.separator.comma.typst
+#            ^ source.typst meta.expr.call.typst
+#             ^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst
+#                  ^ source.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                   ^ source.typst meta.expr.call.typst
+#                    ^^^^ source.typst meta.expr.call.typst constant.language.boolean.typst
+#                        ^ source.typst meta.expr.call.typst punctuation.separator.comma.typst
+#                         ^ source.typst meta.expr.call.typst
+#                          ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                           ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                            ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                             ^ source.typst punctuation.terminator.statement.typst
+>
