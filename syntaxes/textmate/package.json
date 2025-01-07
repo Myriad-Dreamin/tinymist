@@ -5,7 +5,9 @@
   "scripts": {
     "compile": "npx tsc && node ./dist/main.mjs",
     "bundle": "node scripts/install.cjs",
-    "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ"
+    "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ",
+    "test:packages": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/packages/**/*.typ",
+    "test:official": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/official-testing/**/*.typ"
   },
   "devDependencies": {
     "vscode-tmgrammar-test": "^0.1.3"
