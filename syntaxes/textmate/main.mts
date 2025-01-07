@@ -1322,7 +1322,7 @@ const showStatement = (): textmate.Grammar => {
 const callArgs: textmate.Pattern = {
   //   name: "meta.call.args.typst",
   begin: /\(/,
-  end: /\)/,
+  end: /\)|(?=[;\}\]])/,
   beginCaptures: {
     "0": {
       name: "meta.brace.round.typst",
@@ -1403,7 +1403,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
 const mathCallArgs: textmate.Pattern = {
   //   name: "meta.call.args.typst",
   begin: /\(/,
-  end: /\)/,
+  end: /\)|(?=\$)/,
   beginCaptures: {
     "0": {
       name: "meta.brace.round.typst",
