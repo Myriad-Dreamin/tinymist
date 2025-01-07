@@ -1,0 +1,19 @@
+>
+>#text(
+#^ source.typst entity.name.function.hash.typst
+# ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#     ^ source.typst meta.expr.call.typst meta.brace.round.typst
+>  [string is [gissssssss...
+#^^ source.typst meta.expr.call.typst
+#  ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#   ^^^^^^^^^^ source.typst meta.expr.call.typst
+#             ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#              ^^^^^^^^^^ source.typst meta.expr.call.typst
+#                        ^^^ source.typst meta.expr.call.typst punctuation.definition.ellipsis.typst
+>  ],
+#^^ source.typst meta.expr.call.typst
+#  ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#   ^^ source.typst meta.expr.call.typst
+>)
+#^ source.typst meta.expr.call.typst markup.content.brace.typst
+>

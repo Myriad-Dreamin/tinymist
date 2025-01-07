@@ -1456,7 +1456,7 @@ const mathCallArgs: textmate.Pattern = {
   ],
 };
 
-const mathCallStart = new RegExp(MATH_IDENTIFIER.source + /(?=\(|\[)/.source);
+const mathCallStart = new RegExp(MATH_IDENTIFIER.source + /(?=\()/.source);
 
 const mathFuncCallOrPropAccess = (): textmate.Pattern => {
   return {
@@ -1464,11 +1464,11 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
     begin: lookAhead(
       new RegExp(
         `(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` +
-          /(?=\(|\[)/.source
+          /(?=\()/.source
       )
     ),
     end: replaceGroup(
-      /(?:(?<=[\)\]])(?![\[\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
+      /(?:(?<=[\)])(?![\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
       "[CallStart]",
       mathCallStart
     ),
@@ -1504,9 +1504,6 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
       },
       {
         include: "#mathCallArgs",
-      },
-      {
-        include: "#contentBlock",
       },
     ],
   };
