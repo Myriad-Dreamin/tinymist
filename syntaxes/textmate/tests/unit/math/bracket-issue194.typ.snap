@@ -20,7 +20,7 @@
 #                          ^^^^^^ source.typst markup.math.typst
 #                                ^ source.typst markup.math.typst punctuation.math.operator.typst
 #                                 ^ source.typst markup.math.typst constant.other.symbol.typst
-#                                  ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#                                  ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst entity.name.function.typst entity.name.function.typst
 #                                     ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
 #                                      ^ source.typst markup.math.typst meta.expr.call.typst
 #                                       ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
@@ -50,7 +50,7 @@
 #                            ^^^^^^ source.typst markup.math.typst
 #                                  ^ source.typst markup.math.typst punctuation.math.operator.typst
 #                                   ^ source.typst markup.math.typst constant.other.symbol.typst
-#                                    ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#                                    ^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst entity.name.function.typst entity.name.function.typst
 #                                       ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
 #                                        ^ source.typst markup.math.typst meta.expr.call.typst
 #                                         ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst

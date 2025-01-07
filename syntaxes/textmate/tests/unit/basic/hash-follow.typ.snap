@@ -1,0 +1,8 @@
+>#str([])
+#^ source.typst entity.name.type.primitive.hash.typst
+# ^^^ source.typst meta.expr.call.typst entity.name.type.primitive.typst
+#    ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#       ^ source.typst meta.expr.call.typst meta.brace.round.typst
+>

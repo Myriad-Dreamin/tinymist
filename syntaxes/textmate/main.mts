@@ -107,7 +107,7 @@ const primitiveFunctions = {
 
 const primitiveTypes: textmate.PatternMatch = {
   match:
-    /\b(any|str|int|float|bool|length|content|array|dictionary|arguments)\b(?!-)/,
+    /\b(any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-)/,
   name: "entity.name.type.primitive.typst",
 };
 
@@ -492,7 +492,7 @@ const markupEnterCode: textmate.Pattern = {
     ),
     enterExpression(
       "entity.name.type.primitive.hash.typst",
-      /(?=(?:any|str|int|float|bool|length|content|array|dictionary|arguments)\b(?!-))/
+      /(?=(?:any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-))/
     ),
     enterExpression("keyword.other.none.hash.typst", /(?=(?:none)\b(?!-))/),
     enterExpression(
@@ -996,11 +996,7 @@ const letStatement = (): textmate.Grammar => {
         beginCaptures: {
           "1": {
             name: "entity.name.function.typst",
-            patterns: [
-              {
-                include: "#primitiveFunctions",
-              },
-            ],
+            patterns: [{ include: "#primitiveFunctions" }],
           },
           "2": {
             name: "meta.brace.round.typst",
@@ -1398,12 +1394,18 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
           IDENTIFIER.source +
             (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
         ),
-        name: "entity.name.function.typst",
-        patterns: [
-          {
-            include: "#primitiveFunctions",
+        captures: {
+          "0": {
+            patterns: [
+              { include: "#primitiveFunctions" },
+              { include: "#primitiveTypes" },
+              {
+                match: /.*/,
+                name: "entity.name.function.typst",
+              },
+            ],
           },
-        ],
+        },
       },
       {
         include: "#identifier",
@@ -1480,11 +1482,19 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
       {
         match: mathCallStart,
         name: "entity.name.function.typst",
-        patterns: [
-          {
-            include: "#primitiveFunctions",
+        captures: {
+          "0": {
+            name: "entity.name.function.typst",
+            patterns: [
+              { include: "#primitiveFunctions" },
+              { include: "#primitiveTypes" },
+              {
+                match: /.*/,
+                name: "entity.name.function.typst",
+              },
+            ],
           },
-        ],
+        },
       },
       {
         include: "#mathIdentifier",
