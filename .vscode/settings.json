@@ -6,7 +6,4 @@
     "tinymist.fontPaths": [
         "assets/fonts"
     ],
-    "files.watcherExclude": {
-        "**/target": true
-    },
 }
