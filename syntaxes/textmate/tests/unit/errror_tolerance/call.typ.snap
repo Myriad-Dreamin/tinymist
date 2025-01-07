@@ -1,0 +1,22 @@
+>// Error: 7-8 unclosed delimiter
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst comment.line.double-slash.typst
+>#{func(}
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.curly.typst
+#  ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#       ^ source.typst meta.brace.curly.typst
+>
+>#set page(width: 150pt)
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
+#    ^ source.typst meta.expr.set.typst
+#     ^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
+#         ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.set.typst meta.expr.call.typst variable.other.readwrite.typst
+#               ^ source.typst meta.expr.set.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                ^ source.typst meta.expr.set.typst meta.expr.call.typst
+#                 ^^^^^ source.typst meta.expr.set.typst meta.expr.call.typst constant.numeric.length.typst
+#                      ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+>

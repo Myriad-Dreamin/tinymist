@@ -684,7 +684,7 @@ const expressions = (): textmate.Grammar => {
       /// parentheisized expressions: (...)
       {
         begin: /\(/,
-        end: /\)/,
+        end: /\)|(?=[;\}\]])/,
         beginCaptures: {
           "0": {
             name: "meta.brace.round.typst",
@@ -988,7 +988,7 @@ const letStatement = (): textmate.Grammar => {
       },
       {
         begin: /\(/,
-        end: /\)/,
+        end: /\)|(?=[;\}\]])/,
         beginCaptures: {
           "0": {
             name: "meta.brace.round.typst",
@@ -1181,8 +1181,8 @@ const setStatement = (): textmate.Grammar => {
 
   const setClause: textmate.Pattern = {
     // name: "meta.set.clause.bind.typst",
-    begin: /(set\b)\s*/,
-    end: /(?=if)|(?=[\n;\]}])/,
+    begin: /(set\b)\s+/,
+    end: /(?=if)|(?=[\n;\{\[\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1322,7 +1322,7 @@ const showStatement = (): textmate.Grammar => {
 const callArgs: textmate.Pattern = {
   //   name: "meta.call.args.typst",
   begin: /\(/,
-  end: /\)/,
+  end: /\)|(?=[;\}\]])/,
   beginCaptures: {
     "0": {
       name: "meta.brace.round.typst",
@@ -1355,8 +1355,8 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
           )
     ),
     end: strict
-      ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
-      : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
+      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;\,\}\]\)]|$)/
+      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;\,\}\]\)]|$)/,
     patterns: [
       {
         match: /\./,
@@ -1403,7 +1403,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
 const mathCallArgs: textmate.Pattern = {
   //   name: "meta.call.args.typst",
   begin: /\(/,
-  end: /\)/,
+  end: /\)|(?=\$)/,
   beginCaptures: {
     "0": {
       name: "meta.brace.round.typst",
@@ -1414,15 +1414,9 @@ const mathCallArgs: textmate.Pattern = {
       name: "meta.brace.round.typst",
     },
   },
-  patterns: [{ include: "#mathPatternOrArgsBody" }],
-};
-
-const mathPatternOrArgsBody: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
-    {
-      include: "#mathParen",
-    },
+    { include: "#mathParen" },
     {
       match: /,/,
       name: "punctuation.separator.comma.typst",
@@ -1437,7 +1431,7 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
     begin: lookAhead(
       new RegExp(/(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source)
     ),
-    end: /(?:(?<=\)|\])(?:(?![\[\(\.\p{XID_Start}])|$))|(?=[\s;,\}\]\)]|$)/u,
+    end: /(?:(?<=[\)\]])(?![\[\(\.\p{XID_Start}]))|(?=[\$\s;,\}\]\)]|$)/u,
     patterns: [
       {
         match: /\./,
@@ -1521,7 +1515,7 @@ const arrowFunc: textmate.Pattern = {
     },
     {
       begin: /=>/,
-      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;]))/,
+      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;\}\]\)]))/,
       beginCaptures: {
         "0": {
           name: "storage.type.function.arrow.typst",
@@ -1584,15 +1578,16 @@ export const typst: textmate.Grammar = {
     mathParen,
     mathMoreBrace,
 
+    includeStatement,
+    contextStatement,
+
     ...expressions().repository,
 
-    includeStatement,
     ...importStatement().repository,
     ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,
     ...whileStatement().repository,
-    contextStatement,
     ...setStatement().repository,
     ...showStatement().repository,
     strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
@@ -1602,7 +1597,6 @@ export const typst: textmate.Grammar = {
     patternOrArgsBody,
     strictMathFuncCallOrPropAccess: mathFuncCallOrPropAccess(),
     mathCallArgs,
-    mathPatternOrArgsBody,
     codeBlock,
     contentBlock,
     arrowFunc,
