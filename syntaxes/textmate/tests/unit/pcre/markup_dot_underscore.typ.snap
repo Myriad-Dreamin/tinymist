@@ -1,0 +1,44 @@
+>#[_Theorem #number#if name != none [ (#name)]._#h(2pt)#body]
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.square.typst
+#  ^^^^^^^^^ source.typst
+#           ^ source.typst variable.other.readwrite.hash.typst
+#            ^^^^^^ source.typst variable.other.readwrite.typst
+#                  ^ source.typst keyword.control.hash.typst
+#                   ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                     ^ source.typst meta.expr.if.typst
+#                      ^^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#                          ^ source.typst meta.expr.if.typst
+#                           ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#                             ^ source.typst meta.expr.if.typst
+#                              ^^^^ source.typst meta.expr.if.typst keyword.other.none.typst
+#                                  ^ source.typst meta.expr.if.typst
+#                                   ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                                    ^ source.typst meta.expr.if.typst
+#                                     ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#                                      ^ source.typst meta.expr.if.typst variable.other.readwrite.hash.typst
+#                                       ^^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#                                           ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#                                            ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                                             ^^ source.typst
+#                                               ^ source.typst entity.name.function.hash.typst
+#                                                ^ source.typst meta.expr.call.typst entity.name.function.typst
+#                                                 ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                                                  ^^^ source.typst meta.expr.call.typst constant.numeric.length.typst
+#                                                     ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                                                      ^ source.typst variable.other.readwrite.hash.typst
+#                                                       ^^^^ source.typst variable.other.readwrite.typst
+#                                                           ^ source.typst meta.brace.square.typst
+>
+>_#[]._
+#^ source.typst
+# ^ source.typst keyword.control.hash.typst
+#  ^ source.typst meta.brace.square.typst
+#   ^ source.typst meta.brace.square.typst
+#    ^^^ source.typst
+>#[]._
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.square.typst
+#  ^ source.typst meta.brace.square.typst
+#   ^^^ source.typst
+>

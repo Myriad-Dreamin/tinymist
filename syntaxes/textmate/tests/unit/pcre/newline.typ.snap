@@ -1,0 +1,185 @@
+>
+>// Returns list of tuples, where the ith tuple contains:
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst comment.line.double-slash.typst
+>#let _get-code-line-data(
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst entity.name.function.typst
+#                        ^ source.typst meta.expr.let.typst meta.brace.round.typst
+>  styles
+#^^ source.typst meta.expr.let.typst
+#  ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+>) = {
+#^ source.typst meta.expr.let.typst meta.brace.round.typst
+# ^ source.typst meta.expr.let.typst
+#  ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#    ^ source.typst meta.expr.let.typst meta.brace.curly.typst
+>  let line-spacing = 100pt
+#^^ source.typst meta.expr.let.typst
+#  ^^^ source.typst meta.expr.let.typst meta.expr.let.typst storage.type.typst
+#     ^ source.typst meta.expr.let.typst meta.expr.let.typst
+#      ^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.let.typst variable.other.readwrite.typst
+#                  ^ source.typst meta.expr.let.typst meta.expr.let.typst
+#                   ^^ source.typst meta.expr.let.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                     ^^^^^ source.typst meta.expr.let.typst meta.expr.let.typst constant.numeric.length.typst
+>
+>  for i in range(num-lines) {
+#^^ source.typst meta.expr.let.typst
+#  ^^^ source.typst meta.expr.let.typst meta.expr.for.typst keyword.control.loop.typst
+#     ^ source.typst meta.expr.let.typst meta.expr.for.typst
+#      ^ source.typst meta.expr.let.typst meta.expr.for.typst variable.other.readwrite.typst
+#       ^ source.typst meta.expr.let.typst meta.expr.for.typst
+#        ^^ source.typst meta.expr.let.typst meta.expr.for.typst keyword.other.range.typst
+#          ^ source.typst meta.expr.let.typst meta.expr.for.typst
+#           ^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
+#                ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                 ^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst variable.other.readwrite.typst
+#                          ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                           ^ source.typst meta.expr.let.typst meta.expr.for.typst
+#                            ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.brace.curly.typst
+>    let indent-level = indent-levels.at(i)
+#^^^^ source.typst meta.expr.let.typst meta.expr.for.typst
+#    ^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst storage.type.typst
+#       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst
+#        ^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst variable.other.readwrite.typst
+#                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst
+#                     ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                       ^^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst variable.other.readwrite.typst
+#                                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                                     ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst meta.expr.call.typst entity.name.function.typst
+#                                       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+#                                        ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+>
+>    for j in range(calc.max(1, calc.ceil(line-width / real-text-width))) {
+#^^^^ source.typst meta.expr.let.typst meta.expr.for.typst
+#    ^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.control.loop.typst
+#       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#        ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#          ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.other.range.typst
+#            ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#             ^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst support.function.builtin.typst
+#                  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                   ^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst variable.other.readwrite.typst
+#                       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                        ^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#                           ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                            ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst constant.numeric.integer.typst
+#                             ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst punctuation.separator.comma.typst
+#                              ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst
+#                               ^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                   ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                                    ^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#                                        ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                                         ^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                                   ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst
+#                                                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.arithmetic.typst
+#                                                     ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst
+#                                                      ^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                                                     ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                                                                      ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                                                                       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                                                                        ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#                                                                         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.brace.curly.typst
+>      let is-wrapped = j > 0
+#^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#      ^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst storage.type.typst
+#         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#          ^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst variable.other.readwrite.typst
+#                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#                     ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                       ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst variable.other.readwrite.typst
+#                        ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#                         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst keyword.operator.relational.typst
+#                          ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#                           ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst constant.numeric.integer.typst
+>      let real-indent-level = if is-wrapped {0} else {indent-level}
+#^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#      ^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst storage.type.typst
+#         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#          ^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst variable.other.readwrite.typst
+#                           ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst
+#                            ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                              ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst keyword.control.conditional.typst
+#                                ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst
+#                                 ^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst variable.other.readwrite.typst
+#                                           ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst
+#                                            ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst meta.brace.curly.typst
+#                                             ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst constant.numeric.integer.typst
+#                                              ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst meta.brace.curly.typst
+#                                               ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst
+#                                                ^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst keyword.control.conditional.typst
+#                                                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst
+#                                                     ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst meta.brace.curly.typst
+#                                                      ^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst variable.other.readwrite.typst
+#                                                                  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.expr.let.typst meta.expr.if.typst meta.brace.curly.typst
+>
+>      line-count += 1
+#^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#      ^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst variable.other.readwrite.typst
+#                ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#                 ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.operator.arithmetic.typst
+#                  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.operator.assignment.typst
+#                   ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst constant.numeric.integer.typst
+>    }
+#^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
+#    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst meta.brace.curly.typst
+>
+>    line-data.push((line-wrapped-components, indent-level))
+#^^^^ source.typst meta.expr.let.typst meta.expr.for.typst
+#    ^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst keyword.operator.accessor.typst
+#              ^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#                  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                   ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                    ^^^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                           ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst punctuation.separator.comma.typst
+#                                            ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst
+#                                             ^^^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                                         ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                                                          ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+>  }
+#^^ source.typst meta.expr.let.typst meta.expr.for.typst
+#  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.brace.curly.typst
+>
+>  return line-data
+#^^ source.typst meta.expr.let.typst
+#  ^^^^^^ source.typst meta.expr.let.typst keyword.control.flow.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+>}
+#^ source.typst meta.expr.let.typst meta.brace.curly.typst
+>
+>
+>// Create indent guides for a given line of a code element.
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst comment.line.double-slash.typst
+>#let _code-indent-guides(
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst entity.name.function.typst
+#                        ^ source.typst meta.expr.let.typst meta.brace.round.typst
+>) = { style(styles => {
+#^ source.typst meta.expr.let.typst meta.brace.round.typst
+# ^ source.typst meta.expr.let.typst
+#  ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#    ^ source.typst meta.expr.let.typst meta.brace.curly.typst
+#     ^ source.typst meta.expr.let.typst
+#      ^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst entity.name.function.typst
+#           ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+#            ^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst variable.other.readwrite.typst
+#                  ^ source.typst meta.expr.let.typst meta.expr.call.typst
+#                   ^^ source.typst meta.expr.let.typst meta.expr.call.typst storage.type.function.arrow.typst
+#                     ^ source.typst meta.expr.let.typst meta.expr.call.typst
+#                      ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.curly.typst
+>})}
+#^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.curly.typst
+# ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+#  ^ source.typst meta.expr.let.typst meta.brace.curly.typst
+>
+>
