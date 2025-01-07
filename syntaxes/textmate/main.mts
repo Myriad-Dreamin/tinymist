@@ -50,7 +50,10 @@ function oneOf(...patterns: RegExp[]) {
 }
 
 function replaceGroup(pattern: RegExp, group: string, replacement: RegExp) {
-  return new RegExp(pattern.source.replace(group, replacement.source));
+  return new RegExp(
+    pattern.source.replace(group, replacement.source),
+    pattern.flags
+  );
 }
 
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
@@ -111,6 +114,7 @@ const primitiveTypes: textmate.PatternMatch = {
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 const MATH_IDENTIFIER =
   /(?:(?<=_)|\b)[\p{XID_Start}](?:(?!_)[\p{XID_Continue}])+/u;
+const MATH_DOT_ACCESS = /(\.)([\p{XID_Start}](?:(?!_)[\p{XID_Continue}])*)/u;
 
 // const MATH_OPENING =
 //   /[\[\(\u{5b}\u{7b}\u{2308}\u{230a}\u{231c}\u{231e}\u{2772}\u{27e6}\u{27e8}\u{27ea}\u{27ec}\u{27ee}\u{2983}\u{2985}\u{2987}\u{2989}\u{298b}\u{298d}\u{298f}\u{2991}\u{2993}\u{2995}\u{2997}\u{29d8}\u{29da}\u{29fc}]/u;
@@ -254,6 +258,32 @@ const markupMath: textmate.Pattern = {
   ],
 };
 
+const mathPrimary: textmate.Pattern = {
+  begin: MATH_IDENTIFIER,
+  beginCaptures: {
+    "0": {
+      name: mathIdentifier.name!,
+    },
+  },
+  end: /(?!(?:\(|\.[\p{XID_Start}]))|(?=\$)/u,
+  patterns: [
+    { include: "#strictMathFuncCallOrPropAccess" },
+    {
+      match: MATH_DOT_ACCESS,
+      captures: {
+        "1": {
+          name: "keyword.operator.accessor.typst",
+        },
+        "2": {
+          name: mathIdentifier.name!,
+        },
+      },
+    },
+    { include: "#mathCallArgs" },
+    { include: "#mathIdentifier" },
+  ],
+};
+
 const experimentalMathRules: textmate.Pattern[] = [
   {
     begin: replaceGroup(/([_^\/√∛∜])\s*({opening})/, "{opening}", MATH_OPENING),
@@ -284,8 +314,9 @@ const experimentalMathRules: textmate.Pattern[] = [
     match: /[_^'&\/√∛∜]/,
     name: "punctuation.math.operator.typst",
   },
+  // todo: merge me with mathPrimary
   { include: "#strictMathFuncCallOrPropAccess" },
-  { include: "#mathIdentifier" },
+  { include: "#mathPrimary" },
 ];
 
 const math: textmate.Pattern = {
@@ -1425,20 +1456,29 @@ const mathCallArgs: textmate.Pattern = {
   ],
 };
 
+const mathCallStart = new RegExp(MATH_IDENTIFIER.source + /(?=\(|\[)/.source);
+
 const mathFuncCallOrPropAccess = (): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
     begin: lookAhead(
-      new RegExp(/(\.)?/.source + MATH_IDENTIFIER.source + /(?=\(|\[)/.source)
+      new RegExp(
+        `(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` +
+          /(?=\(|\[)/.source
+      )
     ),
-    end: /(?:(?<=[\)\]])(?![\[\(\.\p{XID_Start}]))|(?=[\$\s;,\}\]\)]|$)/u,
+    end: replaceGroup(
+      /(?:(?<=[\)\]])(?![\[\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
+      "[CallStart]",
+      mathCallStart
+    ),
     patterns: [
       {
         match: /\./,
         name: "keyword.operator.accessor.typst",
       },
       {
-        match: new RegExp(MATH_IDENTIFIER.source + /(?=\(|\[)/.source),
+        match: mathCallStart,
         name: "entity.name.function.typst",
         patterns: [
           {
@@ -1576,6 +1616,7 @@ export const typst: textmate.Grammar = {
     markupBrace,
     mathBrace,
     mathParen,
+    mathPrimary,
     mathMoreBrace,
 
     includeStatement,
