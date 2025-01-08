@@ -2,7 +2,7 @@ use std::path::Path;
 
 use sync_lsp::transport::MirrorArgs;
 
-use tinymist::{CompileFontArgs, CompileOnceArgs};
+use tinymist::{tool::project::ProjectCommands, CompileFontArgs, CompileOnceArgs};
 use tinymist_core::LONG_VERSION;
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -15,22 +15,28 @@ pub struct CliArguments {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Commands {
+    /// Probes existence (Nop run)
+    Probe,
+
     /// Generates completion script to stdout
     Completion(ShellCompletionArgs),
     /// Runs language server
     Lsp(LspArgs),
-    /// Runs language query
-    #[clap(hide(true))] // still in development
-    #[clap(subcommand)]
-    Query(QueryCommands),
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(TraceLspArgs),
     /// Runs preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
-    /// Probes existence (Nop run)
-    Probe,
+
+    /// Runs language query
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Query(QueryCommands),
+    /// Runs project
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Project(ProjectCommands),
 }
 
 impl Default for Commands {

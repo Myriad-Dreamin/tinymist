@@ -15,12 +15,14 @@ rust-version.workspace = true
 
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
+tinymist-fs.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
 tinymist-world.workspace = true
 tinymist-render.workspace = true
 typlite.workspace = true
 sync-lsp.workspace = true
 chrono.workspace = true
+pathdiff.workspace = true
 
 once_cell.workspace = true
 anyhow.workspace = true
