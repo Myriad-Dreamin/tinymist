@@ -1,0 +1,72 @@
+>#a => {
+#^ source.typst variable.other.readwrite.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^^^^ source.typst
+#      ^ source.typst markup.content.brace.typst
+>#((a: ")") => { })
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst meta.brace.round.typst
+#   ^ source.typst variable.other.readwrite.typst
+#    ^ source.typst punctuation.separator.colon.typst
+#     ^ source.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^ source.typst string.quoted.double.typst
+#        ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^ source.typst
+#           ^^ source.typst storage.type.function.arrow.typst
+#             ^ source.typst
+#              ^ source.typst meta.brace.curly.typst
+#               ^ source.typst
+#                ^ source.typst meta.brace.curly.typst
+#                 ^ source.typst meta.brace.round.typst
+>#((a: ") => 1") => { })
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst meta.brace.round.typst
+#   ^ source.typst variable.other.readwrite.typst
+#    ^ source.typst punctuation.separator.colon.typst
+#     ^ source.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^^^^^ source.typst string.quoted.double.typst
+#             ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#              ^ source.typst meta.brace.round.typst
+#               ^ source.typst
+#                ^^ source.typst storage.type.function.arrow.typst
+#                  ^ source.typst
+#                   ^ source.typst meta.brace.curly.typst
+#                    ^ source.typst
+#                     ^ source.typst meta.brace.curly.typst
+#                      ^ source.typst meta.brace.round.typst
+>#(a: ") =>") => {
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst punctuation.separator.colon.typst
+#    ^ source.typst
+#     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#      ^^^^ source.typst string.quoted.double.typst
+#          ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#           ^ source.typst meta.brace.round.typst
+#            ^^^^ source.typst
+#                ^ source.typst markup.content.brace.typst
+>#((a: ") =>") => { })
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst meta.brace.round.typst
+#   ^ source.typst variable.other.readwrite.typst
+#    ^ source.typst punctuation.separator.colon.typst
+#     ^ source.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^^^ source.typst string.quoted.double.typst
+#           ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#            ^ source.typst meta.brace.round.typst
+#             ^ source.typst
+#              ^^ source.typst storage.type.function.arrow.typst
+#                ^ source.typst
+#                 ^ source.typst meta.brace.curly.typst
+#                  ^ source.typst
+#                   ^ source.typst meta.brace.curly.typst
+#                    ^ source.typst meta.brace.round.typst
+>

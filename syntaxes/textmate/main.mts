@@ -16,27 +16,8 @@ import {
   SYNTAX_WITH_MATH,
 } from "./feature.mjs";
 
-// JS-Snippet to generate pattern
-function generatePattern(maxDepth: number, lb: string, rb: string) {
-  const NOT_BRACE_PATTERN = `[^${rb}${lb}]`;
-
-  // Unrolled Pattern variants: 0=default, 1=unrolled (more efficient)
-  let p = [`${lb}${NOT_BRACE_PATTERN}*(?:`, `${NOT_BRACE_PATTERN}*)*${rb}`];
-
-  // Generate and display the pattern
-  return (
-    p[0].repeat(maxDepth) +
-    `${lb}${NOT_BRACE_PATTERN}*${rb}` +
-    p[1].repeat(maxDepth)
-  );
-}
-
 function lookAhead(pattern: RegExp) {
   return new RegExp(`(?=(?:${pattern.source}))`);
-}
-
-function braceMatch(pattern: RegExp) {
-  return ("(?x)" + pattern.source) as unknown as RegExp;
 }
 
 function oneOf(...patterns: RegExp[]) {
@@ -61,10 +42,8 @@ function replaceGroup(pattern: RegExp, group: string, replacement: RegExp) {
   );
 }
 
-const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const exprEndReg = (() => {
   const tokens = [
-    // while|if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=
     /while/,
     /if/,
     /and/,
@@ -81,6 +60,7 @@ const exprEndReg = (() => {
     /-/,
     /\*/,
     /\//,
+    /=>/,
     /=/,
     /\+=/,
     /-=/,
@@ -645,7 +625,6 @@ const expressions = (): textmate.Grammar => {
   const expression: textmate.Pattern = {
     patterns: [
       { include: "#comments" },
-      { include: "#arrowFunc" },
       { include: "#arrayOrDict" },
       { include: "#contentBlock" },
       {
@@ -717,6 +696,10 @@ const expressions = (): textmate.Grammar => {
         match:
           /\+|\\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
         name: "keyword.operator.arithmetic.typst",
+      },
+      {
+        match: /=>/,
+        name: "storage.type.function.arrow.typst",
       },
       {
         match: /==|!=|<=|<|>=|>/,
@@ -1579,67 +1562,6 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
   };
 };
 
-// todo: #x => y should be parsed as |#x|=>|y
-// https://github.com/microsoft/vscode-textmate/blob/main/test-cases/themes/syntaxes/TypeScript.tmLanguage.json
-const arrowFunc: textmate.Pattern = {
-  name: "meta.expr.arrow-function.typst",
-  patterns: [
-    {
-      match: new RegExp(`(${IDENTIFIER.source})` + /\s*(?==>)/.source),
-      captures: {
-        "1": {
-          name: "variable.parameter.typst",
-        },
-      },
-    },
-    {
-      begin: braceMatch(lookAhead(new RegExp(PAREN_BLOCK + /\s*=>/.source))),
-      end: /(?==>)/,
-      patterns: [
-        {
-          include: "#comments",
-        },
-        {
-          begin: /\(/,
-          end: /\)/,
-          beginCaptures: {
-            "0": {
-              name: "meta.brace.round.typst",
-            },
-          },
-          endCaptures: {
-            "0": {
-              name: "meta.brace.round.typst",
-            },
-          },
-          patterns: [
-            {
-              include: "#patternOrArgsBody",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      begin: /=>/,
-      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;\}\]\)]))/,
-      beginCaptures: {
-        "0": {
-          name: "storage.type.function.arrow.typst",
-        },
-      },
-      patterns: [
-        {
-          include: "#comments",
-        },
-        {
-          include: "#expression",
-        },
-      ],
-    },
-  ],
-};
-
 export const typst: textmate.Grammar = {
   repository: {
     common,
@@ -1707,14 +1629,11 @@ export const typst: textmate.Grammar = {
     mathCallArgs,
     codeBlock,
     contentBlock,
-    arrowFunc,
   },
 };
 
 function generate() {
   const dirname = fileURLToPath(new URL(".", import.meta.url));
-
-  const typstPath = path.join(dirname, "../typst.tmLanguage");
 
   let compiled = textmate.compile(typst);
 

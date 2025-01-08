@@ -5,7 +5,7 @@
 #     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #        ^ source.typst meta.expr.let.typst
 #         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
-#           ^ source.typst meta.expr.let.typst variable.parameter.typst
+#           ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #            ^ source.typst meta.expr.let.typst
 #             ^^ source.typst meta.expr.let.typst storage.type.function.arrow.typst
 #               ^ source.typst meta.expr.let.typst

@@ -1,7 +1,7 @@
 >#(it => it)
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^ source.typst variable.parameter.typst
+#  ^^ source.typst variable.other.readwrite.typst
 #    ^ source.typst
 #     ^^ source.typst storage.type.function.arrow.typst
 #       ^ source.typst
@@ -149,7 +149,7 @@
 >#(it => {})
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^ source.typst variable.parameter.typst
+#  ^^ source.typst variable.other.readwrite.typst
 #    ^ source.typst
 #     ^^ source.typst storage.type.function.arrow.typst
 #       ^ source.typst

@@ -6,7 +6,7 @@
 #   ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
 #       ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
 #        ^ source.typst meta.expr.show.typst
-#         ^^^^ source.typst meta.expr.show.typst variable.parameter.typst
+#         ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
 #             ^ source.typst meta.expr.show.typst
 #              ^^ source.typst meta.expr.show.typst storage.type.function.arrow.typst
 #                ^ source.typst meta.expr.show.typst
