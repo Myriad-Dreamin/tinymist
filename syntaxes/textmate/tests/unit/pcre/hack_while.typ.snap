@@ -1,0 +1,18 @@
+>#while { false } { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^^^^^ source.typst meta.expr.while.typst constant.language.boolean.typst
+#              ^ source.typst meta.expr.while.typst
+#               ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#                ^ source.typst meta.expr.while.typst
+#                 ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#                  ^ source.typst meta.expr.while.typst
+#                   ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#                    ^ source.typst
+#                     ^ source.typst markup.content.brace.typst
+#                      ^ source.typst
+#                       ^ source.typst markup.content.brace.typst
+>
