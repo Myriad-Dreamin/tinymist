@@ -1,3 +1,5 @@
+import { ANNOTATE_META } from "./feature.mjs";
+
 export interface Grammar {
   patterns?: Pattern[];
   repository?: Repository;
@@ -149,6 +151,58 @@ export type Captures = Partial<Record<NumberStrings, Capture>>;
 export interface Capture {
   name?: string;
   patterns?: Pattern[];
+}
+
+/**
+ * A function to create a look-ahead regular expression.
+ *
+ * @param pattern A regular expression
+ * @returns A regular expression that only looks ahead the pattern without consuming it.
+ */
+export function lookAhead(pattern: RegExp) {
+  return new RegExp(`(?=(?:${pattern.source}))`);
+}
+
+/**
+ * Unions a list of regular expressions into a single regular expression that matches any of the given patterns.
+ *
+ * @param patterns A list of regular expressions
+ * @returns A regular expression that matches any of the patterns.
+ */
+export function oneOf(...patterns: RegExp[]) {
+  return new RegExp(
+    patterns
+      .map((p) => {
+        const src = p.source;
+        if (src.startsWith("(")) {
+          return src;
+        }
+
+        return `(?:${src})`;
+      })
+      .join("|")
+  );
+}
+
+/**
+ * A function to replace a group in a regular expression with another regular expression by simple string substitution.
+ *
+ * @param pat A regular expression
+ * @param group the substring to be replaced
+ * @param replacement A regular expression to replace the group
+ */
+export function replaceGroup(pat: RegExp, group: string, replacement: RegExp) {
+  return new RegExp(pat.source.replace(group, replacement.source), pat.flags);
+}
+
+/**
+ * A wrapper function to annotate the scope name.
+ *
+ * @param name A scope name
+ * @returns return the scope name if we should annotate the scope name, otherwise return undefined
+ */
+export function metaName(name: string) {
+  return ANNOTATE_META ? name : undefined;
 }
 
 export function compile(s: Grammar): string {
