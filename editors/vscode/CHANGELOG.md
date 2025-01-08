@@ -8,6 +8,9 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.12.18 - [2025-01-09]
 
+We have added maintainers to GitHub since 2025-01-09:
+- @SylvanFranklin has become a maintainer of the "Editor integration" and "Document Previewing" feature in https://github.com/Myriad-Dreamin/tinymist/pull/1091
+
 After a super long time of development, we have finished an usable typst grammar for VS Code and GitHub. The grammar can now successfully parse all code, markup and math syntax of source files from [typst/packages (1200k LoCs)](https://github.com/typst/packages) and [typst/typst (17k LoCs)](https://github.com/typst/typst) without failure. A failure means the grammar produces any visible parse error but the official parser doesn't complain. However, it can still only parse a subset of typst syntax correctly:
 - For example, all braces in `#if {}=={}{}{}` (without spaces) are identified as code braces.
 - For example, It hasn't identified the ";" syntax in math calls.
