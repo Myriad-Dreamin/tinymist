@@ -477,7 +477,7 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
       /(?<!#)(?=")/,
       // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
       /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
-      /(?=[\s\}\]\)\#\$]|$)/,
+      /(?=[\s,\}\]\)\#\$]|$)/,
       /(;)/
     ).source,
     beginCaptures: {
@@ -1421,8 +1421,8 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
           )
     ),
     end: strict
-      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;\,\}\]\)\#]|$)/
-      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;\,\}\]\)\#]|$)/,
+      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;,\}\]\)\#]|$)/
+      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;,\}\]\)\#]|$)/,
     patterns: [
       {
         match: /\./,
