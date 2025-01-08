@@ -14,7 +14,12 @@ import {
   POLYFILL_P_XID,
   SYNTAX_WITH_BOLD_ITALIC,
   SYNTAX_WITH_MATH,
+  ANNOTATE_META,
 } from "./feature.mjs";
+
+function metaName(name: string) {
+  return ANNOTATE_META ? name : undefined;
+}
 
 function lookAhead(pattern: RegExp) {
   return new RegExp(`(?=(?:${pattern.source}))`);
@@ -75,12 +80,14 @@ const exprEndReg = (() => {
     lookBehind = `(?<!(?:${tokenSet})\\s*)` + /(?=[\[\{\n])/.source;
   } else {
     lookBehind =
-      /(?<![ile if and or not in\s]{3}|[=<>\+\-\*\/\s]{3})/.source +
-      /(?=[\[\{\n])/u.source;
+      // /(?<=[\}\]\)])(?=[\d])/u.source +
+      // "|" +
+      /(?<!ile|le\s|(?:if|in|or)\s|[\#=<>\+\-\*\/\s](?:if|in|or)|[and not\s]{3}|[\s\S]{2}[=<>\+\-\*\/]|[\s\S][=<>\+\-\*\/][\s]|[=<>\+\-\*\/][\s]{2}|[\s\S][=<>\+\-\*\/]{2}|[=<>\+\-\*\/]{2}\s)/
+        .source + /(?=[\[\{])/u.source;
   }
 
   return {
-    end: lookBehind + "|" + /(?=[;\}\]\)\n]|$)/.source,
+    end: lookBehind + "|" + /(?=[;\}\]\)\#\n]|$)/.source,
   };
 })();
 const exprEndIfReg = exprEndReg;
@@ -462,7 +469,7 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
       /(?<=;)/,
       // Ends unless we are in a call or method call
       new RegExp(
-        /(?<=[\)\]\}])(?![;\(\[\$]|(?:\.method-continue))/.source.replace(
+        /(?<=[\}\]\)])(?![;\(\[\$]|(?:\.method-continue))/.source.replace(
           /method-continue/g,
           IDENTIFIER.source + /(?=[\(\[])/.source
         )
@@ -470,7 +477,7 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
       /(?<!#)(?=")/,
       // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
       /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
-      /(?=[\s\}\]\)\$]|$)/,
+      /(?=[\s,\}\]\)\#\$]|$)/,
       /(;)/
     ).source,
     beginCaptures: {
@@ -707,7 +714,7 @@ const expressions = (): textmate.Grammar => {
       },
       {
         begin: /(\+=|-=|\*=|\/=|=)/,
-        end: /(?=[\n;\)\]\}])/,
+        end: /(?=[\n;\}\]\)])/,
         beginCaptures: {
           "1": {
             name: "keyword.operator.assignment.typst",
@@ -994,7 +1001,7 @@ const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
     begin: lookAhead(/(let\b(?!-))/),
-    end: /(?!\()(?=[\s;\}\]\)])/,
+    end: /(?!\=)(?=[\s;\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1021,13 +1028,11 @@ const letStatement = (): textmate.Grammar => {
       },
     },
     patterns: [
-      {
-        include: "#comments",
-      },
-      /// Matches a func call after the set clause
+      { include: "#comments" },
+      /// Matches a func call after the let identifier
       {
         begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)(\()/u,
-        end: /\)/,
+        end: /\)|(?=[;\}\]])/,
         beginCaptures: {
           "1": {
             name: "entity.name.function.typst",
@@ -1063,29 +1068,20 @@ const letStatement = (): textmate.Grammar => {
         },
         patterns: [{ include: "#patternOrArgsBody" }],
       },
-      {
-        include: "#identifier",
-      },
+      { include: "#identifier" },
     ],
   };
 
   const letInitClause: textmate.Pattern = {
     // name: "meta.let.init.typst",
     begin: /=\s*/,
-    end: /(?=[;\]})\n])/,
+    end: /(?=[\n;\}\]\)])/,
     beginCaptures: {
       "0": {
         name: "keyword.operator.assignment.typst",
       },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-      {
-        include: "#expression",
-      },
-    ],
+    patterns: [{ include: "#comments" }, { include: "#expression" }],
   };
 
   return {
@@ -1102,7 +1098,7 @@ const letStatement = (): textmate.Grammar => {
  */
 const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
-    name: "meta.expr.if.typst",
+    name: metaName("meta.expr.if.typst"),
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
     end: /(?<=\}|\])(?!\s*(else)\b(?!-)|[\[\{])|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[;\}\]\)\n]|$)/,
     patterns: [
@@ -1210,10 +1206,10 @@ const whileStatement = (): textmate.Grammar => {
 
 const contextEndReg = () => {
   if (!FIXED_LENGTH_LOOK_BEHIND) {
-    return /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)\n]|$)/;
+    return /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)#\n]|$)/;
   }
 
-  return /(?<=[\}\]\d])|(?=[;\}\]\)\n]|$)/u;
+  return /(?<=[\}\]\d])|(?=[;\}\]\)#\n]|$)/u;
 };
 
 const contextStatement: textmate.Pattern = {
@@ -1425,8 +1421,8 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
           )
     ),
     end: strict
-      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;\,\}\]\)]|$)/
-      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;\,\}\]\)]|$)/,
+      ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;,\}\]\)\#]|$)/
+      : /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n;,\}\]\)\#]|$)/,
     patterns: [
       {
         match: /\./,
@@ -1644,8 +1640,8 @@ function generate() {
 
     // \u{309B}\u{309C}
     const pXIDStart = /\p{L}\p{Nl}_/u;
-    const pXIDContinue =
-      /\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\\\u{00B7}\\\u{30FB}\\\u{FF65}/u;
+    // \u{00B7} \u{30FB} \u{FF65}
+    const pXIDContinue = /\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}/u;
 
     const jsonEncode = (str: string) => {
       return str.replace(/\\p/g, "\\\\p").replace(/\\u/g, "\\\\u");
