@@ -50,10 +50,10 @@ function replaceGroup(pattern: RegExp, group: string, replacement: RegExp) {
 const exprEndReg = (() => {
   const tokens = [
     /while/,
-    /if/,
     /and/,
-    /or/,
     /not/,
+    /if/,
+    /or/,
     /in/,
     /!=/,
     /==/,
@@ -79,15 +79,34 @@ const exprEndReg = (() => {
     const tokenSet = tokens.map((t) => t.source).join("|");
     lookBehind = `(?<!(?:${tokenSet})\\s*)` + /(?=[\[\{\n])/.source;
   } else {
+    const cases = oneOf(
+      new RegExp(/\b/.source + "while".slice(0)),
+      new RegExp("while".slice(1) + /\s{1}/.source),
+      new RegExp("while".slice(2) + /\s{2}/.source),
+      new RegExp("while".slice(3) + /\s{3}/.source),
+      /[\s\S]{2}(?:\s|[^\p{XID_Continue}])(?:if|in|or)/u,
+      /[\s\S](?:\s|[^\p{XID_Continue}])(?:if|in|or)\s/u,
+      /(?:\s|[^\p{XID_Continue}])(?:if|in|or)\s{2}/u,
+      /(?:if|in|or)\s{3}/u,
+      /[\s\S](?:\s|[^\p{XID_Continue}])(?:and|not)/u,
+      /(?:\s|[^\p{XID_Continue}])(?:and|not)\s/u,
+      /(?:and|not)\s{2}/,
+      // Note that, /=>/, />=/, /<=/, /==/ is a sub-regex of /[=<>\+\-\*\/]{2}/
+      // Also note that, /[=<>\+\-\*\/]{2}/ is a sub-regex of /[\s\S][=<>\+\-\*\/]/
+      /[\s\S]{4}[=<>\+\-\*\/]/,
+      /[\s\S]{3}[=<>\+\-\*\/]\s/,
+      /[\s\S]{2}[=<>\+\-\*\/]\s{2}/,
+      /[\s\S][=<>\+\-\*\/]\s{3}/,
+      /[=<>\+\-\*\/]\s{4}/
+    );
+
     lookBehind =
       // /(?<=[\}\]\)])(?=[\d])/u.source +
-      // "|" +
-      /(?<!ile|le\s|(?:if|in|or)\s|[\#=<>\+\-\*\/\s](?:if|in|or)|[and not\s]{3}|[\s\S]{2}[=<>\+\-\*\/]|[\s\S][=<>\+\-\*\/][\s]|[=<>\+\-\*\/][\s]{2}|[\s\S][=<>\+\-\*\/]{2}|[=<>\+\-\*\/]{2}\s)/
-        .source + /(?=[\[\{])/u.source;
+      `(?<!${cases.source})` + /(?=[\[\{])/u.source;
   }
 
   return {
-    end: lookBehind + "|" + /(?=[;\}\]\)\#\n]|$)/.source,
+    end: lookBehind + "|" + /(?=[;,\}\]\)\#\n]|$)/.source,
   };
 })();
 const exprEndIfReg = exprEndReg;

@@ -1,0 +1,128 @@
+>#if { true } { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#     ^ source.typst meta.expr.if.typst
+#      ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
+#          ^ source.typst meta.expr.if.typst
+#           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#            ^ source.typst meta.expr.if.typst
+#             ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                ^ source.typst
+#                 ^ source.typst markup.content.brace.typst
+#                  ^ source.typst
+#                   ^ source.typst markup.content.brace.typst
+>#if true { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
+#        ^ source.typst meta.expr.if.typst
+#         ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.if.typst
+#           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#            ^ source.typst
+#             ^ source.typst markup.content.brace.typst
+#              ^ source.typst
+#               ^ source.typst markup.content.brace.typst
+>#if false { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#           ^ source.typst meta.expr.if.typst
+#            ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#             ^ source.typst
+#              ^ source.typst markup.content.brace.typst
+#               ^ source.typst
+#                ^ source.typst markup.content.brace.typst
+>#if none == none { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^ source.typst meta.expr.if.typst keyword.other.none.typst
+#        ^ source.typst meta.expr.if.typst
+#         ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#           ^ source.typst meta.expr.if.typst
+#            ^^^^ source.typst meta.expr.if.typst keyword.other.none.typst
+#                ^ source.typst meta.expr.if.typst
+#                 ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                  ^ source.typst meta.expr.if.typst
+#                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                    ^ source.typst
+#                     ^ source.typst markup.content.brace.typst
+#                      ^ source.typst
+#                       ^ source.typst markup.content.brace.typst
+>#if type == type { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#        ^ source.typst meta.expr.if.typst
+#         ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#           ^ source.typst meta.expr.if.typst
+#            ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                ^ source.typst meta.expr.if.typst
+#                 ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                  ^ source.typst meta.expr.if.typst
+#                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                    ^ source.typst
+#                     ^ source.typst markup.content.brace.typst
+#                      ^ source.typst
+#                       ^ source.typst markup.content.brace.typst
+>#let a = 1
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.let.typst
+#       ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#         ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+>#if a == a { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#     ^ source.typst meta.expr.if.typst
+#      ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#        ^ source.typst meta.expr.if.typst
+#         ^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.if.typst
+#           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#            ^ source.typst meta.expr.if.typst
+#             ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#              ^ source.typst
+#               ^ source.typst markup.content.brace.typst
+#                ^ source.typst
+#                 ^ source.typst markup.content.brace.typst
+>#let zzz = 1
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+>#if zzz == zzz { } { }
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#       ^ source.typst meta.expr.if.typst
+#        ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#          ^ source.typst meta.expr.if.typst
+#           ^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                ^ source.typst meta.expr.if.typst
+#                 ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                  ^ source.typst
+#                   ^ source.typst markup.content.brace.typst
+#                    ^ source.typst
+#                     ^ source.typst markup.content.brace.typst
+>
