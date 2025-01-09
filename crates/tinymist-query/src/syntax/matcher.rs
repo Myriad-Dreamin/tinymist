@@ -309,17 +309,18 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         | RightParen | Comma | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus
         | Slash | Hat | Prime | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq
         | HyphEq | StarEq | SlashEq | Dots | Arrow | Root | Not | And | Or | None | Auto | As
-        | Named | Keyed | Error | End => return Option::None,
+        | Named | Keyed | Spread | Error | End => return Option::None,
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
         | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
-        | Import | Include | Spread | Closure | Params | LetBinding | SetRule | ShowRule
-        | Contextual | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport
-        | ImportItems | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue
-        | FuncReturn | Unary | Binary | Parenthesized | Dict | Array | Destructuring
-        | DestructAssignment => InterpretMode::Code,
+        | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
+        | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
+        | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue | FuncReturn
+        | Unary | Binary | Parenthesized | Dict | Array | Destructuring | DestructAssignment => {
+            InterpretMode::Code
+        }
     })
 }
 
