@@ -276,6 +276,19 @@
       "type": "object",
       "title": "Tinymist Typst LSP",
       "properties": {
+        "tinymist.projectResolution": {
+          "type": "string",
+          "default": "singleFile",
+          "markdownDescription": "This configuration sets way to resolved projects.",
+          "enum": [
+            "singleFile",
+            "lockDatabase"
+          ],
+          "enumDescriptions": [
+            "Manage typst documents like what we did in Markdown. Each document is preferred to be put in a single file and no project resolution is needed.",
+            "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the history."
+          ]
+        },
         "tinymist.outputPath": {
           "title": "Output path",
           "description": "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.",
