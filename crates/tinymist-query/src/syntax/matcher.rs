@@ -676,6 +676,13 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         }
     }
 
+    if matches!(node.kind(), SyntaxKind::Text) {
+        let mode = interpret_mode_at(Some(&node));
+        if matches!(mode, InterpretMode::Math) && is_ident_like(&node) {
+            return Some(SyntaxClass::VarAccess(VarClass::Ident(node)));
+        }
+    }
+
     // Move to the first ancestor that is an expression.
     let ancestor = first_ancestor_expr(node)?;
     crate::log_debug_ct!("first_ancestor_expr: {ancestor:?}");
