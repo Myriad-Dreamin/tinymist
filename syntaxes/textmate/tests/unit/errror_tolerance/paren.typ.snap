@@ -12,7 +12,9 @@
 #                ^ source.typst meta.expr.show.typst
 #                 ^ source.typst meta.expr.show.typst constant.numeric.integer.typst
 #                  ^ source.typst meta.brace.round.typst
-#                   ^^^ source.typst
+#                   ^ source.typst
+#                    ^ source.typst keyword.operator.arithmetic.typst
+#                     ^ source.typst
 #                      ^^^^ source.typst variable.other.readwrite.typst
 #                          ^ source.typst meta.brace.round.typst
 >

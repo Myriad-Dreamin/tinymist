@@ -4,3 +4,25 @@
 >#我们
 #^ source.typst variable.other.readwrite.hash.typst
 # ^^ source.typst variable.other.readwrite.typst
+>
+>#align(center)[
+#^ source.typst entity.name.function.hash.typst
+# ^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#       ^^^^^^ source.typst meta.expr.call.typst variable.other.constant.builtin.typst
+#             ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#              ^ source.typst meta.expr.call.typst meta.brace.square.typst
+>  #__g-localization.final(loc).page
+#^^ source.typst meta.expr.call.typst
+#  ^ source.typst meta.expr.call.typst variable.other.readwrite.hash.typst
+#   ^^^^^^^^^^^^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst
+#                   ^ source.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                    ^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#                         ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                          ^^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                             ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                              ^ source.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                               ^^^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+>]
+#^ source.typst meta.expr.call.typst meta.brace.square.typst
+>

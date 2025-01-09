@@ -48,7 +48,7 @@
 #        ^ source.typst entity.name.function.hash.typst
 #         ^ source.typst meta.expr.call.typst entity.name.function.typst
 #          ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#           ^ source.typst meta.expr.call.typst
+#           ^ source.typst meta.expr.call.typst keyword.operator.arithmetic.typst
 #            ^^^ source.typst meta.expr.call.typst constant.numeric.length.typst
 #               ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #                ^ source.typst entity.name.function.hash.typst

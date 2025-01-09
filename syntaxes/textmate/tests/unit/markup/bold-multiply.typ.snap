@@ -1,0 +1,14 @@
+>* #{ 1 * 1 } *
+#^^ source.typst
+#  ^ source.typst keyword.control.hash.typst
+#   ^ source.typst meta.brace.curly.typst
+#    ^ source.typst
+#     ^ source.typst constant.numeric.integer.typst
+#      ^ source.typst
+#       ^ source.typst keyword.operator.arithmetic.typst
+#        ^ source.typst
+#         ^ source.typst constant.numeric.integer.typst
+#          ^ source.typst
+#           ^ source.typst meta.brace.curly.typst
+#            ^^^ source.typst
+>
