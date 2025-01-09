@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (28..29)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/math_ident_in_call2.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "norm",
+    "labelDetails": {
+     "description": "(content, size: auto | relative) => content"
+    },
+    "sortText": "223",
+    "textEdit": {
+     "newText": "norm(${1:})",
+     "range": {
+      "end": {
+       "character": 8,
+       "line": 2
+      },
+      "start": {
+       "character": 6,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
