@@ -405,12 +405,12 @@ impl LockFile {
         id
     }
 
-    fn export(&mut self, id: Id, args: &TaskCompileArgs) -> anyhow::Result<Id> {
+    fn export(&mut self, doc_id: Id, args: &TaskCompileArgs) -> anyhow::Result<Id> {
         let task_id = args
             .task_name
             .as_ref()
             .map(|t| Id(t.clone()))
-            .unwrap_or(id.clone());
+            .unwrap_or(doc_id.clone());
 
         let output_format = if let Some(specified) = args.format {
             specified
@@ -434,10 +434,17 @@ impl LockFile {
 
         let when = args.when.unwrap_or(TaskWhen::Never);
 
+        let mut transforms = vec![];
+
+        if let Some(pages) = &args.pages {
+            transforms.push(ExportTransform::Pages(pages.clone()));
+        }
+
         let export = ExportTask {
-            id,
+            document: doc_id,
+            id: task_id.clone(),
             when,
-            transforms: vec![],
+            transform: transforms,
         };
 
         let task = match output_format {
@@ -458,15 +465,19 @@ impl LockFile {
         Ok(task_id)
     }
 
-    fn preview(&mut self, id: Id, args: &TaskPreviewArgs) -> anyhow::Result<Id> {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> anyhow::Result<Id> {
         let task_id = args
             .name
             .as_ref()
             .map(|t| Id(t.clone()))
-            .unwrap_or(id.clone());
+            .unwrap_or(doc_id.clone());
 
         let when = args.when.unwrap_or(TaskWhen::OnType);
-        let task = ProjectTask::Preview(PreviewTask { id, when });
+        let task = ProjectTask::Preview(PreviewTask {
+            id: task_id.clone(),
+            doc_id,
+            when,
+        });
 
         self.replace_task(task);
 
@@ -495,7 +506,8 @@ impl LockFile {
 
     fn sort(&mut self) {
         self.document.sort_by(|a, b| a.id.cmp(&b.id));
-        self.task.sort_by(|a, b| a.id().cmp(b.id()));
+        self.task
+            .sort_by(|a, b| a.doc_id().cmp(b.doc_id()).then_with(|| a.id().cmp(b.id())));
         // the route's order is important, so we don't sort them.
     }
 }
@@ -553,7 +565,16 @@ fn serialize_resolve(resolve: &LockFile) -> String {
     }
 
     fn emit_output(output: &toml::Value, out: &mut String) {
-        let table = output.as_table().unwrap();
+        let mut table = output.clone();
+        let table = table.as_table_mut().unwrap();
+        // replace transform with task.transforms
+        if let Some(transform) = table.remove("transform") {
+            let mut task_table = toml::Table::new();
+            task_table.insert("transform".to_string(), transform);
+
+            table.insert("task".to_string(), task_table.into());
+        }
+
         out.push_str(&table.to_string());
     }
 
@@ -680,6 +701,17 @@ pub enum ProjectTask {
 
 impl ProjectTask {
     /// Returns the task's ID.
+    pub fn doc_id(&self) -> &Id {
+        match self {
+            ProjectTask::Preview(task) => &task.doc_id,
+            ProjectTask::ExportPdf(task) => &task.export.document,
+            ProjectTask::ExportPng(task) => &task.export.document,
+            ProjectTask::ExportSvg(task) => &task.export.document,
+            // ProjectTask::Other(_) => return None,
+        }
+    }
+
+    /// Returns the task's ID.
     pub fn id(&self) -> &Id {
         match self {
             ProjectTask::Preview(task) => &task.id,
@@ -697,6 +729,8 @@ impl ProjectTask {
 pub struct PreviewTask {
     /// The task's ID.
     pub id: Id,
+    /// The doc's ID.
+    pub doc_id: Id,
     /// When to run the task
     pub when: TaskWhen,
 }
@@ -707,11 +741,13 @@ pub struct PreviewTask {
 pub struct ExportTask {
     /// The task's ID.
     pub id: Id,
+    /// The doc's ID.
+    pub document: Id,
     /// When to run the task
     pub when: TaskWhen,
     /// The task's transforms.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub transforms: Vec<ExportTransform>,
+    pub transform: Vec<ExportTransform>,
 }
 
 /// A project export transform specifier.
@@ -812,13 +848,13 @@ fn update_lock_file(
             Some(Ordering::Equal | Ordering::Less) => {}
             Some(Ordering::Greater) => {
                 bail!(
-                "trying to update lock file having a future version, current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
-            );
+                    "trying to update lock file having a future version, current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+                );
             }
             None => {
                 bail!(
-                "cannot compare version, are version strings in right format? current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
-            );
+                    "cannot compare version, are version strings in right format? current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+                );
             }
         }
 

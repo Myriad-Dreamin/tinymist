@@ -11,11 +11,22 @@ id = "file:docs/tinymist/ebook.typ"
 system-fonts = true
 
 [[task]]
+document = "file:docs/tinymist/book.typ"
 id = "file:docs/tinymist/book.typ"
 type = "export-pdf"
 when = "never"
 
 [[task]]
+document = "file:docs/tinymist/ebook.typ"
+id = "ebook-cover"
+type = "export-svg"
+when = "never"
+
+[[task.transform]]
+pages = ["1-1"]
+
+[[task]]
+document = "file:docs/tinymist/ebook.typ"
 id = "file:docs/tinymist/ebook.typ"
 type = "export-pdf"
 when = "never"
