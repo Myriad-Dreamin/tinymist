@@ -1,0 +1,6 @@
+>_#a_b _
+#^ source.typst
+# ^ source.typst variable.other.readwrite.hash.typst
+#  ^^^ source.typst variable.other.readwrite.typst
+#     ^^^ source.typst
+>
