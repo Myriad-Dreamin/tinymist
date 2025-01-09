@@ -1,0 +1,36 @@
+>#let (a, b) = (1, 1);
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#      ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#       ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                 ^ source.typst meta.expr.let.typst
+#                  ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                   ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#                    ^ source.typst punctuation.terminator.statement.typst
+>#a = 1
+#^ source.typst variable.other.readwrite.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^^^^^ source.typst
+>#(a, b) = (b, a)
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst punctuation.separator.comma.typst
+#    ^ source.typst
+#     ^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+#       ^^^ source.typst
+#          ^ source.typst markup.content.brace.typst
+#           ^^^^ source.typst
+#               ^ source.typst markup.content.brace.typst
+>
