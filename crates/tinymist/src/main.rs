@@ -25,8 +25,8 @@ use sync_lsp::{
     LspBuilder, LspClientRoot, LspResult,
 };
 use tinymist::{
-    tool::project::project_main, CompileConfig, Config, LanguageState, RegularInit, SuperInit,
-    UserActionTask,
+    tool::project::{project_main, task_main},
+    CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask,
 };
 use tinymist_core::LONG_VERSION;
 use tinymist_query::{package::PackageInfo, EntryResolver};
@@ -94,6 +94,7 @@ fn main() -> anyhow::Result<()> {
             RUNTIMES.tokio_runtime.block_on(preview_main(args))
         }
         Commands::Project(args) => project_main(args),
+        Commands::Task(args) => task_main(args),
         Commands::Probe => Ok(()),
     }
 }

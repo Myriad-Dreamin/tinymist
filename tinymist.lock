@@ -2,11 +2,11 @@
 # It is not intended for manual editing.
 version = "0.1.0-beta0"
 
-[[input]]
+[[document]]
 id = "file:docs/tinymist/ebook.typ"
-systemFonts = true
+system-fonts = true
 
-[[output]]
-[exportPdf]
+[[task]]
+[export-pdf]
 id = "file:docs/tinymist/ebook.typ"
 when = "never"
