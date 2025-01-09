@@ -285,8 +285,8 @@
             "lockDatabase"
           ],
           "enumDescriptions": [
-            "Manage typst documents like what we did in Markdown. Each document is preferred to be put in a single file and no project resolution is needed.",
-            "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the history."
+            "Manage typst documents like what we did in Markdown. Each single file is an individual document and no project resolution is needed.",
+            "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file."
           ]
         },
         "tinymist.outputPath": {
