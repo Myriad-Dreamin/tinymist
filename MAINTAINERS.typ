@@ -53,6 +53,13 @@
     - #maintains[
         - #editor-integration
       ]
+  - SylvanFranklin
+    - #github("SylvanFranklin")
+    - #email("sylvanfranklin@icloud.com")
+    - #maintains[
+        - #editor-integration
+        - #document-previewing
+      ]
 ]
 
 == Features
