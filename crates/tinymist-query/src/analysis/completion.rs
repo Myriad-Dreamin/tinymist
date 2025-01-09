@@ -173,7 +173,9 @@ impl<'a> CompletionCursor<'a> {
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
 
+        crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
+        crate::log_debug_ct!("CompletionCursor: surrounding {leaf:?} -> {surrounding_syntax:#?}");
         Some(Self {
             ctx,
             text,
