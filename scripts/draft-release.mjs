@@ -68,6 +68,11 @@ const generateExtensionInstall = (version) => {
         platform('alpine-x64', 'x64 Alpine Linux'),
         platform('alpine-arm64', 'ARM64 Alpine Linux'),
         {
+            name: 'web',
+            displayName: 'Browser (Web)',
+            assets: []
+        },
+        {
             name: 'universal',
             displayName: 'Other Platforms (Universal)',
             assets: []
