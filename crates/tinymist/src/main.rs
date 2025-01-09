@@ -93,7 +93,7 @@ fn main() -> anyhow::Result<()> {
 
             RUNTIMES.tokio_runtime.block_on(preview_main(args))
         }
-        Commands::Project(args) => project_main(args),
+        Commands::Doc(args) => project_main(args),
         Commands::Task(args) => task_main(args),
         Commands::Probe => Ok(()),
     }

@@ -6,61 +6,66 @@ use std::{num::NonZeroUsize, ops::RangeInclusive, path::Path, str::FromStr};
 use anyhow::bail;
 use clap::{ValueEnum, ValueHint};
 use reflexo::path::unix_slash;
+use typst_preview::{PreviewArgs, PreviewMode};
 
 use crate::{CompileFontArgs, CompilePackageArgs};
 
-/// Project commands.
+/// Project document commands.
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "kebab-case")]
-pub enum ProjectCommands {
-    /// Declare a project input.
-    New(ProjectNewArgs),
-    /// Configure project priority in workspace.
-    Configure(ProjectConfigureArgs),
+pub enum DocCommands {
+    /// Declare a document (project input).
+    New(DocNewArgs),
+    /// Configure document priority in workspace.
+    Configure(DocConfigureArgs),
 }
 
-/// Project commands.
+/// Project task commands.
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "kebab-case")]
 pub enum TaskCommands {
-    /// Declare a project task (output).
-    New(TaskNewArgs),
+    /// Declare a compile task (output).
+    Compile(TaskCompileArgs),
+    /// Declare a preview task.
+    Preview(TaskPreviewArgs),
 }
 
-/// Declare a project input.
+/// The id of a document.
+///
+/// If an identifier is not provided, the document's path is used as the id.
 #[derive(Debug, Clone, clap::Parser)]
-pub struct ProjectIdArgs {
-    /// Give an id (name) to project.
+pub struct DocIdArgs {
+    /// Give a name to the document.
     #[clap(long = "name")]
-    pub id: Option<String>,
+    pub name: Option<String>,
     /// Path to input Typst file.
     #[clap(value_hint = ValueHint::FilePath)]
     pub input: String,
 }
 
-/// Declare a project input.
+/// Declare a document (project's input).
 #[derive(Debug, Clone, clap::Parser)]
-pub struct ProjectNewArgs {
+pub struct DocNewArgs {
     /// Argument to identify a project.
     #[clap(flatten)]
-    pub id: ProjectIdArgs,
+    pub id: DocIdArgs,
     /// Configures the project root (for absolute paths).
     #[clap(long = "root", env = "TYPST_ROOT", value_name = "DIR")]
     pub root: Option<String>,
     /// Common font arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
-    /// Common font arguments.
+    /// Common package arguments.
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 }
 
 /// Configure project's priorities.
 #[derive(Debug, Clone, clap::Parser)]
-pub struct ProjectConfigureArgs {
+pub struct DocConfigureArgs {
     /// Argument to identify a project.
     #[clap(flatten)]
-    pub id: ProjectIdArgs,
+    pub id: DocIdArgs,
     /// Set the unsigned priority of these task (lower numbers are higher
     /// priority).
     #[clap(long = "priority", default_value_t = 0)]
@@ -69,14 +74,18 @@ pub struct ProjectConfigureArgs {
 
 /// Declare an export task.
 #[derive(Debug, Clone, clap::Parser)]
-pub struct TaskNewArgs {
+pub struct TaskCompileArgs {
     /// Argument to identify a project.
     #[clap(flatten)]
-    pub declare: ProjectNewArgs,
+    pub declare: DocNewArgs,
 
     /// Name a task.
     #[clap(long = "task")]
-    pub task: Option<String>,
+    pub name: Option<String>,
+
+    /// When to run the task
+    #[arg(long = "when")]
+    pub when: Option<TaskWhen>,
 
     /// Path to output file (PDF, PNG, SVG, or HTML). Use `-` to write output to
     /// stdout.
@@ -114,10 +123,30 @@ pub struct TaskNewArgs {
     /// The PPI (pixels per inch) to use for PNG export.
     #[arg(long = "ppi", default_value_t = 144.0)]
     pub ppi: f32,
+}
+
+/// Declare an lsp task.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct TaskPreviewArgs {
+    /// Argument to identify a project.
+    #[clap(flatten)]
+    pub declare: DocNewArgs,
+
+    /// Name a task.
+    #[clap(long = "task")]
+    pub name: Option<String>,
 
     /// When to run the task
     #[arg(long = "when")]
-    pub when: Option<ExportWhen>,
+    pub when: Option<TaskWhen>,
+
+    /// Preview arguments
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
 }
 
 /// Implements parsing of page ranges (`1-3`, `4`, `5-`, `-2`), used by the
@@ -230,23 +259,23 @@ macro_rules! display_possible_values {
 )]
 #[serde(rename_all = "camelCase")]
 #[clap(rename_all = "camelCase")]
-pub enum ExportWhen {
-    /// Never export.
+pub enum TaskWhen {
+    /// Never watch to run task.
     Never,
-    /// Export on save.
+    /// Run task on save.
     OnSave,
-    /// Export on type.
+    /// Run task on type.
     OnType,
 }
 
-impl ExportWhen {
+impl TaskWhen {
     /// Returns `true` if the task should never be run automatically.
     pub fn is_never(&self) -> bool {
-        matches!(self, ExportWhen::Never)
+        matches!(self, TaskWhen::Never)
     }
 }
 
-display_possible_values!(ExportWhen);
+display_possible_values!(TaskWhen);
 
 /// Which format to use for the generated output file.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
@@ -294,7 +323,7 @@ struct LockFile {
 }
 
 impl LockFile {
-    fn declare(&mut self, args: &ProjectNewArgs) -> Id {
+    fn declare(&mut self, args: &DocNewArgs) -> Id {
         let id: Id = (&args.id).into();
 
         let root = args
@@ -335,9 +364,9 @@ impl LockFile {
         id
     }
 
-    fn export(&mut self, id: Id, args: &TaskNewArgs) -> anyhow::Result<Id> {
+    fn export(&mut self, id: Id, args: &TaskCompileArgs) -> anyhow::Result<Id> {
         let task_id = args
-            .task
+            .name
             .as_ref()
             .map(|t| Id(t.clone()))
             .unwrap_or(id.clone());
@@ -362,7 +391,7 @@ impl LockFile {
             OutputFormat::Pdf
         };
 
-        let when = args.when.unwrap_or(ExportWhen::Never);
+        let when = args.when.unwrap_or(TaskWhen::Never);
 
         let export = ExportTask {
             id,
@@ -382,6 +411,21 @@ impl LockFile {
             OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
             OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
         };
+
+        self.task.push(task);
+
+        Ok(task_id)
+    }
+
+    fn preview(&mut self, id: Id, args: &TaskPreviewArgs) -> anyhow::Result<Id> {
+        let task_id = args
+            .name
+            .as_ref()
+            .map(|t| Id(t.clone()))
+            .unwrap_or(id.clone());
+
+        let when = args.when.unwrap_or(TaskWhen::OnType);
+        let task = ProjectTask::Preview(PreviewTask { id, when });
 
         self.task.push(task);
 
@@ -453,9 +497,9 @@ fn serialize_resolve(resolve: &LockFile) -> String {
 #[serde(rename_all = "kebab-case")]
 pub struct Id(String);
 
-impl From<&ProjectIdArgs> for Id {
-    fn from(args: &ProjectIdArgs) -> Self {
-        if let Some(id) = &args.id {
+impl From<&DocIdArgs> for Id {
+    fn from(args: &DocIdArgs) -> Self {
+        if let Some(id) = &args.name {
             Id(id.clone())
         } else {
             let inp = Path::new(&args.input);
@@ -556,8 +600,8 @@ pub enum ExportTransform {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProjectTask {
-    /// A lsp task.
-    Lsp,
+    /// A preview task.
+    Preview(PreviewTask),
     /// An export PDF task.
     ExportPdf(ExportPdfTask),
     /// An export PNG task.
@@ -578,6 +622,16 @@ pub struct ProjectRoute {
     priority: u32,
 }
 
+/// An lsp task specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct PreviewTask {
+    /// The task's ID.
+    pub id: Id,
+    /// When to run the task
+    pub when: TaskWhen,
+}
+
 /// An export task specifier.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -585,7 +639,7 @@ pub struct ExportTask {
     /// The task's ID.
     pub id: Id,
     /// When to run the task
-    pub when: ExportWhen,
+    pub when: TaskWhen,
     /// The task's transforms.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub transforms: Vec<ExportTransform>,
@@ -624,7 +678,7 @@ pub struct ExportSvgTask {
 }
 
 /// Project commands' main
-pub fn project_main(args: ProjectCommands) -> anyhow::Result<()> {
+pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
     let mut state = LockFile {
         version: LOCK_VERSION.to_string(),
         document: vec![],
@@ -633,10 +687,10 @@ pub fn project_main(args: ProjectCommands) -> anyhow::Result<()> {
     };
 
     match args {
-        ProjectCommands::New(args) => {
+        DocCommands::New(args) => {
             state.declare(&args);
         }
-        ProjectCommands::Configure(args) => {
+        DocCommands::Configure(args) => {
             let id: Id = (&args.id).into();
 
             state.route.push(ProjectRoute {
@@ -662,9 +716,13 @@ pub fn task_main(args: TaskCommands) -> anyhow::Result<()> {
     };
 
     match args {
-        TaskCommands::New(args) => {
+        TaskCommands::Compile(args) => {
             let id = state.declare(&args.declare);
             let _ = state.export(id, &args);
+        }
+        TaskCommands::Preview(args) => {
+            let id = state.declare(&args.declare);
+            let _ = state.preview(id, &args);
         }
     }
 

@@ -3,7 +3,7 @@ use std::path::Path;
 use sync_lsp::transport::MirrorArgs;
 
 use tinymist::{
-    tool::project::{ProjectCommands, TaskCommands},
+    tool::project::{DocCommands, TaskCommands},
     CompileFontArgs, CompileOnceArgs,
 };
 use tinymist_core::LONG_VERSION;
@@ -36,10 +36,10 @@ pub enum Commands {
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
     Query(QueryCommands),
-    /// Runs projects
+    /// Runs documents
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
-    Project(ProjectCommands),
+    Doc(DocCommands),
     /// Runs tasks
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
