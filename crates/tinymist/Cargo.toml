@@ -23,6 +23,7 @@ typlite.workspace = true
 sync-lsp.workspace = true
 chrono.workspace = true
 pathdiff.workspace = true
+semver = "1"
 
 once_cell.workspace = true
 anyhow.workspace = true

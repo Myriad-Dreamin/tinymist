@@ -3,10 +3,19 @@
 version = "0.1.0-beta0"
 
 [[document]]
+id = "file:docs/tinymist/book.typ"
+system-fonts = true
+
+[[document]]
 id = "file:docs/tinymist/ebook.typ"
 system-fonts = true
 
 [[task]]
-[export-pdf]
+id = "file:docs/tinymist/book.typ"
+type = "export-pdf"
+when = "never"
+
+[[task]]
 id = "file:docs/tinymist/ebook.typ"
+type = "export-pdf"
 when = "never"

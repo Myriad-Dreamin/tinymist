@@ -1,9 +1,16 @@
 //! Project management tools.
 
 use core::fmt;
-use std::{num::NonZeroUsize, ops::RangeInclusive, path::Path, str::FromStr};
+use std::{
+    cmp::Ordering,
+    io::{Read, Seek, SeekFrom, Write},
+    num::NonZeroUsize,
+    ops::RangeInclusive,
+    path::Path,
+    str::FromStr,
+};
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use clap::{ValueEnum, ValueHint};
 use reflexo::path::unix_slash;
 use typst_preview::{PreviewArgs, PreviewMode};
@@ -72,7 +79,7 @@ pub struct DocConfigureArgs {
     pub priority: u32,
 }
 
-/// Declare an export task.
+/// Declare an compile task.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct TaskCompileArgs {
     /// Argument to identify a project.
@@ -81,7 +88,7 @@ pub struct TaskCompileArgs {
 
     /// Name a task.
     #[clap(long = "task")]
-    pub name: Option<String>,
+    pub task_name: Option<String>,
 
     /// When to run the task
     #[arg(long = "when")]
@@ -310,15 +317,49 @@ display_possible_values!(PdfStandard);
 
 const LOCK_VERSION: &str = "0.1.0-beta0";
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "version")]
+enum LockFileCompat {
+    #[serde(rename = "0.1.0-beta0")]
+    Version010Beta0(LockFile),
+    #[serde(untagged)]
+    Other(serde_json::Value),
+}
+
+impl LockFileCompat {
+    fn version(&self) -> anyhow::Result<&str> {
+        match self {
+            LockFileCompat::Version010Beta0(..) => Ok(LOCK_VERSION),
+            LockFileCompat::Other(v) => v
+                .get("version")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("missing version field")),
+        }
+    }
+
+    fn migrate(self) -> anyhow::Result<LockFile> {
+        match self {
+            LockFileCompat::Version010Beta0(v) => Ok(v),
+            this @ LockFileCompat::Other(..) => {
+                bail!(
+                    "cannot migrate from version: {}",
+                    this.version().unwrap_or("unknown version")
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct LockFile {
-    /// The lock file version.
-    version: String,
+    // The lock file version.
+    // version: String,
     /// The project's document (input).
     document: Vec<ProjectInput>,
     /// The project's task (output).
     task: Vec<ProjectTask>,
     /// The project's task route.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     route: Vec<ProjectRoute>,
 }
 
@@ -359,14 +400,14 @@ impl LockFile {
             package_cache_path,
         };
 
-        self.document.push(input);
+        self.replace_document(input);
 
         id
     }
 
     fn export(&mut self, id: Id, args: &TaskCompileArgs) -> anyhow::Result<Id> {
         let task_id = args
-            .name
+            .task_name
             .as_ref()
             .map(|t| Id(t.clone()))
             .unwrap_or(id.clone());
@@ -412,7 +453,7 @@ impl LockFile {
             OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
         };
 
-        self.task.push(task);
+        self.replace_task(task);
 
         Ok(task_id)
     }
@@ -427,9 +468,35 @@ impl LockFile {
         let when = args.when.unwrap_or(TaskWhen::OnType);
         let task = ProjectTask::Preview(PreviewTask { id, when });
 
-        self.task.push(task);
+        self.replace_task(task);
 
         Ok(task_id)
+    }
+
+    fn replace_document(&mut self, input: ProjectInput) {
+        let id = input.id.clone();
+        let index = self.document.iter().position(|i| i.id == id);
+        if let Some(index) = index {
+            self.document[index] = input;
+        } else {
+            self.document.push(input);
+        }
+    }
+
+    fn replace_task(&mut self, task: ProjectTask) {
+        let id = task.id().clone();
+        let index = self.task.iter().position(|i| *i.id() == id);
+        if let Some(index) = index {
+            self.task[index] = task;
+        } else {
+            self.task.push(task);
+        }
+    }
+
+    fn sort(&mut self) {
+        self.document.sort_by(|a, b| a.id.cmp(&b.id));
+        self.task.sort_by(|a, b| a.id().cmp(b.id()));
+        // the route's order is important, so we don't sort them.
     }
 }
 
@@ -449,29 +516,33 @@ fn serialize_resolve(resolve: &LockFile) -> String {
     out.push_str(extra_line);
     out.push('\n');
 
-    if let Some(version) = content.get("version") {
-        out.push_str(&format!("version = {version}\n"));
+    out.push_str(&format!("version = {LOCK_VERSION:?}\n"));
+
+    let document = content.get("document");
+    if let Some(document) = document {
+        for document in document.as_array().unwrap() {
+            out.push('\n');
+            out.push_str("[[document]]\n");
+            emit_document(document, &mut out);
+        }
     }
 
-    let document = content["document"].as_array().unwrap();
-    for document in document {
-        out.push('\n');
-        out.push_str("[[document]]\n");
-        emit_document(document, &mut out);
+    let task = content.get("task");
+    if let Some(task) = task {
+        for task in task.as_array().unwrap() {
+            out.push('\n');
+            out.push_str("[[task]]\n");
+            emit_output(task, &mut out);
+        }
     }
 
-    let task = content["task"].as_array().unwrap();
-    for task in task {
-        out.push('\n');
-        out.push_str("[[task]]\n");
-        emit_output(task, &mut out);
-    }
-
-    let route = content["route"].as_array().unwrap();
-    for route in route {
-        out.push('\n');
-        out.push_str("[[route]]\n");
-        emit_route(route, &mut out);
+    let route = content.get("route");
+    if let Some(route) = route {
+        for route in route.as_array().unwrap() {
+            out.push('\n');
+            out.push_str("[[route]]\n");
+            emit_route(route, &mut out);
+        }
     }
 
     return out;
@@ -493,7 +564,9 @@ fn serialize_resolve(resolve: &LockFile) -> String {
 }
 
 /// A project ID.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub struct Id(String);
 
@@ -588,17 +661,9 @@ pub struct ProjectInput {
     pub package_cache_path: Option<ResourcePath>,
 }
 
-/// A project export transform specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportTransform {
-    /// Only pick a subset of pages.
-    Pages(Vec<Pages>),
-}
-
 /// A project task specifier.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", tag = "type")]
 pub enum ProjectTask {
     /// A preview task.
     Preview(PreviewTask),
@@ -608,18 +673,22 @@ pub enum ProjectTask {
     ExportPng(ExportPngTask),
     /// An export SVG task.
     ExportSvg(ExportSvgTask),
-    /// An export task of another type.
-    Other(serde_json::Value),
+    // todo: compatibility
+    // An export task of another type.
+    // Other(serde_json::Value),
 }
 
-/// A project route specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ProjectRoute {
-    /// A project.
-    id: Id,
-    /// The priority of the project.
-    priority: u32,
+impl ProjectTask {
+    /// Returns the task's ID.
+    pub fn id(&self) -> &Id {
+        match self {
+            ProjectTask::Preview(task) => &task.id,
+            ProjectTask::ExportPdf(task) => &task.export.id,
+            ProjectTask::ExportPng(task) => &task.export.id,
+            ProjectTask::ExportSvg(task) => &task.export.id,
+            // ProjectTask::Other(_) => return None,
+        }
+    }
 }
 
 /// An lsp task specifier.
@@ -641,8 +710,16 @@ pub struct ExportTask {
     /// When to run the task
     pub when: TaskWhen,
     /// The task's transforms.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub transforms: Vec<ExportTransform>,
+}
+
+/// A project export transform specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportTransform {
+    /// Only pick a subset of pages.
+    Pages(Vec<Pages>),
 }
 
 /// An export pdf task specifier.
@@ -653,7 +730,7 @@ pub struct ExportPdfTask {
     #[serde(flatten)]
     pub export: ExportTask,
     /// The pdf standards.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pdf_standards: Vec<PdfStandard>,
 }
 
@@ -677,57 +754,133 @@ pub struct ExportSvgTask {
     pub export: ExportTask,
 }
 
-/// Project commands' main
-pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
-    let mut state = LockFile {
-        version: LOCK_VERSION.to_string(),
-        document: vec![],
-        task: vec![],
-        route: vec![],
+/// A project route specifier.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ProjectRoute {
+    /// A project.
+    id: Id,
+    /// The priority of the project.
+    priority: u32,
+}
+
+struct Version<'a>(&'a str);
+
+impl PartialEq for Version<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        semver::Version::parse(self.0)
+            .ok()
+            .and_then(|a| semver::Version::parse(other.0).ok().map(|b| a == b))
+            .unwrap_or(false)
+    }
+}
+
+impl PartialOrd for Version<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let lhs = semver::Version::parse(self.0).ok()?;
+        let rhs = semver::Version::parse(other.0).ok()?;
+        Some(lhs.cmp(&rhs))
+    }
+}
+
+fn update_lock_file(
+    path: &str,
+    f: impl FnOnce(&mut LockFile) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    let cwd = Path::new(".").to_owned();
+    let fs = tinymist_fs::flock::Filesystem::new(cwd);
+
+    let mut lock_file = fs.open_rw_exclusive_create(path, "project commands")?;
+
+    let mut data = vec![];
+    lock_file.read_to_end(&mut data)?;
+
+    let old_data = std::str::from_utf8(&data).context("tinymist.lock file is not valid utf-8")?;
+
+    let mut state = if old_data.trim().is_empty() {
+        LockFile {
+            document: vec![],
+            task: vec![],
+            route: vec![],
+        }
+    } else {
+        let old_state = toml::from_str::<LockFileCompat>(old_data)
+            .context("tinymist.lock file is not a valid TOML file")?;
+
+        let version = old_state.version()?;
+        match Version(version).partial_cmp(&Version(LOCK_VERSION)) {
+            Some(Ordering::Equal | Ordering::Less) => {}
+            Some(Ordering::Greater) => {
+                bail!(
+                "trying to update lock file having a future version, current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+            );
+            }
+            None => {
+                bail!(
+                "cannot compare version, are version strings in right format? current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+            );
+            }
+        }
+
+        old_state.migrate()?
     };
 
-    match args {
-        DocCommands::New(args) => {
-            state.declare(&args);
-        }
-        DocCommands::Configure(args) => {
-            let id: Id = (&args.id).into();
+    f(&mut state)?;
 
-            state.route.push(ProjectRoute {
-                id: id.clone(),
-                priority: args.priority,
-            });
-        }
+    // todo: for read only operations, we don't have to compare it.
+    state.sort();
+    let new_data = serialize_resolve(&state);
+
+    // If the lock file contents haven't changed so don't rewrite it. This is
+    // helpful on read-only filesystems.
+    if old_data == new_data {
+        return Ok(());
     }
 
-    let content = serialize_resolve(&state);
-    std::fs::write("tinymist.lock", content).unwrap();
+    lock_file.file().set_len(0)?;
+    lock_file.seek(SeekFrom::Start(0))?;
+    lock_file.write_all(new_data.as_bytes())?;
 
     Ok(())
 }
 
+const LOCKFILE_PATH: &str = "tinymist.lock";
+
+/// Project document commands' main
+pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
+    update_lock_file(LOCKFILE_PATH, |state| {
+        match args {
+            DocCommands::New(args) => {
+                state.declare(&args);
+            }
+            DocCommands::Configure(args) => {
+                let id: Id = (&args.id).into();
+
+                state.route.push(ProjectRoute {
+                    id: id.clone(),
+                    priority: args.priority,
+                });
+            }
+        }
+
+        Ok(())
+    })
+}
+
 /// Project task commands' main
 pub fn task_main(args: TaskCommands) -> anyhow::Result<()> {
-    let mut state = LockFile {
-        version: LOCK_VERSION.to_string(),
-        document: vec![],
-        task: vec![],
-        route: vec![],
-    };
-
-    match args {
-        TaskCommands::Compile(args) => {
-            let id = state.declare(&args.declare);
-            let _ = state.export(id, &args);
+    update_lock_file(LOCKFILE_PATH, |state| {
+        match args {
+            TaskCommands::Compile(args) => {
+                let id = state.declare(&args.declare);
+                let _ = state.export(id, &args);
+            }
+            TaskCommands::Preview(args) => {
+                let id = state.declare(&args.declare);
+                let _ = state.preview(id, &args);
+            }
         }
-        TaskCommands::Preview(args) => {
-            let id = state.declare(&args.declare);
-            let _ = state.preview(id, &args);
-        }
-    }
 
-    let content = serialize_resolve(&state);
-    std::fs::write("tinymist.lock", content).unwrap();
-
-    Ok(())
+        Ok(())
+    })
 }
