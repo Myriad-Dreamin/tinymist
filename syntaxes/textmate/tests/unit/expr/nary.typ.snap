@@ -47,8 +47,7 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst variable.other.readwrite.typst
 #   ^ source.typst
-#    ^ source.typst keyword.operator.arithmetic.typst
-#     ^ source.typst keyword.operator.assignment.typst
+#    ^^ source.typst keyword.operator.assignment.typst
 #      ^ source.typst
 #       ^^^ source.typst variable.other.constant.builtin.typst
 #          ^ source.typst meta.brace.round.typst

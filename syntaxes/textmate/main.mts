@@ -684,10 +684,11 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
           IDENTIFIER.source + /(?=[\(\[])/.source
         )
       ),
-      /(?<!#)(?=")/,
+      // The hash starts a string or an identifier.
+      /(?<!#)(?=["\_])/,
       // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
       /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
-      /(?=[\s,\}\]\)\#\$]|$)/,
+      /(?=[\s,\}\]\)\#\$\*]|$)/,
       /(;)/
     ).source,
     beginCaptures: {
@@ -891,11 +892,6 @@ const expression: textmate.Pattern = {
       name: "punctuation.separator.comma.typst",
     },
     {
-      match:
-        /\+|\\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
-      name: "keyword.operator.arithmetic.typst",
-    },
-    {
       match: /=>/,
       name: "storage.type.function.arrow.typst",
     },
@@ -910,6 +906,10 @@ const expression: textmate.Pattern = {
         "1": { name: "keyword.operator.assignment.typst" },
       },
       patterns: [{ include: "#expression" }],
+    },
+    {
+      match: /\+|\\|\/|\*|-/,
+      name: "keyword.operator.arithmetic.typst",
     },
   ],
 };

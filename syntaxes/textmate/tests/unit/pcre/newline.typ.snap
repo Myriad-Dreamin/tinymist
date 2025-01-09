@@ -121,8 +121,7 @@
 #^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
 #      ^^^^^^^^^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst variable.other.readwrite.typst
 #                ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
-#                 ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.operator.arithmetic.typst
-#                  ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.operator.assignment.typst
+#                 ^^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst keyword.operator.assignment.typst
 #                   ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst
 #                    ^ source.typst meta.expr.let.typst meta.expr.for.typst meta.expr.for.typst constant.numeric.integer.typst
 >    }

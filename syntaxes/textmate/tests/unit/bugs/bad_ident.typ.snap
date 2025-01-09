@@ -461,14 +461,14 @@
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^^^ source.typst constant.numeric.length.typst
-#     ^ source.typst
+#     ^ source.typst keyword.operator.arithmetic.typst
 #      ^^^ source.typst constant.numeric.length.typst
 #         ^ source.typst meta.brace.round.typst
 >#(1rad-1rad)
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^^^^ source.typst constant.numeric.angle.typst
-#      ^ source.typst
+#      ^ source.typst keyword.operator.arithmetic.typst
 #       ^^^^ source.typst constant.numeric.angle.typst
 #           ^ source.typst meta.brace.round.typst
 >#(true-)
