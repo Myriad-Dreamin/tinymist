@@ -279,7 +279,7 @@
         "tinymist.projectResolution": {
           "type": "string",
           "default": "singleFile",
-          "markdownDescription": "This configuration sets way to resolved projects.",
+          "markdownDescription": "This configuration specifies the way to resolved projects.",
           "enum": [
             "singleFile",
             "lockDatabase"
