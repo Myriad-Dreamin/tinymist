@@ -648,6 +648,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-foundation"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b55271e5c8c478ad3f38ad24ef34923091e0548492a266d19b3c0b4d82574c63"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1055,6 +1065,12 @@ name = "fast-srgb8"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd2e7510819d6fbf51a5545c8f922716ecfb14df168a3242f7d33e0239efe6a1"
+
+[[package]]
+name = "fastrand"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fdeflate"
@@ -3651,6 +3667,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempfile"
+version = "3.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a8a559c81686f576e8cd0290cd2a24a2a9ad80c98b3478856500fcbd7acd704"
+dependencies = [
+ "cfg-if",
+ "fastrand",
+ "getrandom",
+ "once_cell",
+ "rustix",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "term"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3837,10 +3867,12 @@ dependencies = [
  "open",
  "parking_lot",
  "paste",
+ "pathdiff",
  "rayon",
  "reflexo",
  "reflexo-typst",
  "reflexo-vec2svg",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3848,6 +3880,7 @@ dependencies = [
  "sync-lsp",
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
+ "tinymist-fs",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -3915,6 +3948,19 @@ version = "0.12.18"
 dependencies = [
  "quote",
  "syn 2.0.90",
+]
+
+[[package]]
+name = "tinymist-fs"
+version = "0.12.18"
+dependencies = [
+ "anyhow",
+ "core-foundation",
+ "libc",
+ "log",
+ "same-file",
+ "tempfile",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

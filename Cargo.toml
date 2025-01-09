@@ -154,6 +154,7 @@ typst-preview = { path = "./crates/typst-preview" }
 tinymist-assets = { version = "0.12.18" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-core = { path = "./crates/tinymist-core/", default-features = false }
+tinymist-fs = { path = "./crates/tinymist-fs/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
