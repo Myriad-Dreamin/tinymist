@@ -3573,7 +3573,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "anyhow",
  "clap",
@@ -3682,7 +3682,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3805,7 +3805,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3846,7 +3846,7 @@ dependencies = [
  "serde_yaml",
  "strum",
  "sync-lsp",
- "tinymist-assets 0.12.18-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
  "tinymist-query",
  "tinymist-render",
@@ -3874,7 +3874,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "base64",
  "comemo",
@@ -3891,17 +3891,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.18-rc2"
+version = "0.12.18"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.18-rc2"
+version = "0.12.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc1fb0dfaa3c3c112e08d3da204106ed42999c765b36a80f4f9e98b0f1b288b"
+checksum = "ed5eff9dea7cc19f40b914a77f955b291e0f0e4ab6a74468123e6bb6241b6b85"
 
 [[package]]
 name = "tinymist-core"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -3911,7 +3911,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "quote",
  "syn 2.0.90",
@@ -3919,7 +3919,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "anyhow",
  "base64",
@@ -3973,7 +3973,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "base64",
  "log",
@@ -3984,7 +3984,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4000,7 +4000,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-assets 0.12.18-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "typst",
  "typst-assets",
 ]
@@ -4231,7 +4231,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "base64",
  "clap",
@@ -4374,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "clap",
  "comemo",
@@ -4387,7 +4387,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.12.18-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "typst",
  "typst-assets",
@@ -4414,7 +4414,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.12.18-rc2"
+version = "0.12.18"
 dependencies = [
  "cfg-if",
  "typst",
