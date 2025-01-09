@@ -271,7 +271,7 @@ pub enum InterpretMode {
 /// Determine the interpretation mode at the given position (context-sensitive).
 pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
     loop {
-        crate::log_debug_ct!("leaf for context: {leaf:?}");
+        crate::log_debug_ct!("leaf for mode: {leaf:?}");
         if let Some(t) = leaf {
             if let Some(mode) = interpret_mode_at_kind(t.kind()) {
                 break mode;
@@ -303,24 +303,24 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         ContentBlock | Markup => InterpretMode::Markup,
         Equation | Math => InterpretMode::Math,
         Hash => InterpretMode::Code,
-        Label | Text | Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak
-        | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed
-        | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma
-        | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime
-        | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq
-        | Dots | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | End => {
-            return Option::None
-        }
+        Label | Text | Ident | Args | FuncCall | FieldAccess | Bool | Int | Float | Numeric
+        | Space | Linebreak | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim
+        | RawTrimmed | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen
+        | RightParen | Comma | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus
+        | Slash | Hat | Prime | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq
+        | HyphEq | StarEq | SlashEq | Dots | Arrow | Root | Not | And | Or | None | Auto | As
+        | Named | Keyed | Spread | Error | End => return Option::None,
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
         | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
-        | Import | Include | Args | Spread | Closure | Params | LetBinding | SetRule | ShowRule
-        | Contextual | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport
-        | ImportItems | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue
-        | FuncReturn | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
-        | DestructAssignment => InterpretMode::Code,
+        | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
+        | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
+        | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue | FuncReturn
+        | Unary | Binary | Parenthesized | Dict | Array | Destructuring | DestructAssignment => {
+            InterpretMode::Code
+        }
     })
 }
 
@@ -673,6 +673,13 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
             if let Some(dot_target) = dot_target {
                 return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
             }
+        }
+    }
+
+    if matches!(node.kind(), SyntaxKind::Text) {
+        let mode = interpret_mode_at(Some(&node));
+        if matches!(mode, InterpretMode::Math) && is_ident_like(&node) {
+            return Some(SyntaxClass::VarAccess(VarClass::Ident(node)));
         }
     }
 

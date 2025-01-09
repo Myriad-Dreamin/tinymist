@@ -663,7 +663,7 @@ const markupEscape: textmate.PatternMatch = {
 
 const markupHeading: textmate.Pattern = {
   name: "markup.heading.typst",
-  begin: /^\s*(=+)(?:(?=[\r\n]|$)|\s+)/,
+  begin: /^\s*(=+)(?:(?=[\r\n]|$)|[^\S\n]+)/,
   end: /\n|(?=<)/,
   beginCaptures: {
     "1": { name: "punctuation.definition.heading.typst" },
