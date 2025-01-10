@@ -17,11 +17,13 @@ use tinymist_project::{vfs::FsProvider, RevisingUniverse};
 use tokio::sync::{mpsc, oneshot};
 use typst::diag::{SourceDiagnostic, SourceResult};
 
-use crate::task::CacheTask;
 use crate::world::base::{
     // features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     // typst::prelude::EcoVec,
-    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
+    vfs::{
+        notify::{MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
+        FilesystemEvent,
+    },
     CompilerFeat,
     CompilerUniverse,
     CompilerWorld,
@@ -29,7 +31,6 @@ use crate::world::base::{
     TaskInputs,
     WorldDeps,
 };
-
 /// A signal that possibly triggers an export.
 ///
 /// Whether to export depends on the current state of the document and the user
@@ -258,7 +259,6 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat> {
     pub compile_handle: Arc<dyn CompilationHandle<F>>,
     pub feature_set: FeatureSet,
-    pub cache: CacheTask,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
@@ -266,7 +266,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             compile_handle: Arc::new(std::marker::PhantomData),
             feature_set: Default::default(),
-            cache: Default::default(),
         }
     }
 }
@@ -300,8 +299,6 @@ pub struct CompileServerActor<F: CompilerFeat> {
     intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
     /// Channel for receiving interrupts from the compiler actor.
     intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
-    /// Shared cache evict task.
-    cache: CacheTask,
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
@@ -319,7 +316,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileServerOpts {
             compile_handle,
             feature_set,
-            cache: cache_evict,
         }: CompileServerOpts<F>,
     ) -> Self {
         let entry = verse.entry_state();
@@ -342,7 +338,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             intr_tx,
             intr_rx,
-            cache: cache_evict,
 
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
@@ -558,7 +553,17 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        self.cache.evict(world.revision(), world.take_cache());
+        let revision = world.revision();
+        let source_cache = world.take_cache();
+
+        rayon::spawn(move || {
+            // Evict compilation cache.
+            let evict_start = std::time::Instant::now();
+            comemo::evict(30);
+            source_cache.evict(revision, 15);
+            let elapsed = evict_start.elapsed();
+            log::info!("CacheEvictTask: evict cache in {elapsed:?}");
+        });
     }
 
     /// Process some interrupt. Return whether it needs compilation.
