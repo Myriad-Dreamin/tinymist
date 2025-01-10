@@ -4057,6 +4057,7 @@ dependencies = [
  "flate2",
  "log",
  "parking_lot",
+ "rayon",
  "reflexo-typst",
  "reflexo-typst-shim",
  "reqwest",
@@ -4064,6 +4065,7 @@ dependencies = [
  "serde_json",
  "tar",
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio",
  "typst",
  "typst-assets",
 ]

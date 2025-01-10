@@ -4,7 +4,6 @@ pub mod editor;
 #[cfg(feature = "preview")]
 pub mod preview;
 pub mod typ_client;
-pub mod typ_server;
 
 use std::sync::Arc;
 
@@ -22,8 +21,8 @@ use crate::{
     world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
+use tinymist_world::typ_server::{CompileServerActor, CompileServerOpts};
 use typ_client::{CompileClientActor, CompileHandler};
-use typ_server::{CompileServerActor, CompileServerOpts};
 
 impl LanguageState {
     /// Restart the primary server.

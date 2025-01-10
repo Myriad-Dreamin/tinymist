@@ -36,15 +36,13 @@ use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
+use tinymist_world::typ_server::{
+    CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
+};
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
 
-use super::{
-    editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
-    typ_server::{
-        CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
-    },
-};
+use super::editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum};
 use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},

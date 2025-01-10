@@ -6,6 +6,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{bail, Context};
 use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
+use tinymist_world::typ_server::{CompiledArtifact, ExportSignal};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
@@ -18,11 +19,7 @@ use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
-    actor::{
-        editor::EditorRequest,
-        typ_client::WorldSnapFut,
-        typ_server::{CompiledArtifact, ExportSignal},
-    },
+    actor::{editor::EditorRequest, typ_client::WorldSnapFut},
     tool::word_count,
     world::LspCompilerFeat,
     ExportMode, PathPattern,
