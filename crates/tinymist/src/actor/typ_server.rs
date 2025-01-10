@@ -20,8 +20,6 @@ use reflexo_typst::{
 };
 use typst::diag::{SourceDiagnostic, SourceResult};
 
-use crate::task::CacheTask;
-
 /// A signal that possibly triggers an export.
 ///
 /// Whether to export depends on the current state of the document and the user
@@ -250,7 +248,6 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat> {
     pub compile_handle: Arc<dyn CompilationHandle<F>>,
     pub feature_set: FeatureSet,
-    pub cache: CacheTask,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
@@ -258,7 +255,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             compile_handle: Arc::new(std::marker::PhantomData),
             feature_set: Default::default(),
-            cache: Default::default(),
         }
     }
 }
@@ -292,8 +288,6 @@ pub struct CompileServerActor<F: CompilerFeat> {
     intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
     /// Channel for receiving interrupts from the compiler actor.
     intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
-    /// Shared cache evict task.
-    cache: CacheTask,
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
@@ -311,7 +305,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileServerOpts {
             compile_handle,
             feature_set,
-            cache: cache_evict,
         }: CompileServerOpts<F>,
     ) -> Self {
         let entry = verse.entry_state();
@@ -334,7 +327,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             intr_tx,
             intr_rx,
-            cache: cache_evict,
 
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
@@ -546,7 +538,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        self.cache.evict();
+        rayon::spawn(|| {
+            let evict_start = std::time::Instant::now();
+            comemo::evict(30);
+            let elapsed = evict_start.elapsed();
+            log::info!("CacheEvictTask: evict cache in {elapsed:?}");
+        });
     }
 
     /// Process some interrupt. Return whether it needs compilation.
