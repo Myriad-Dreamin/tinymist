@@ -85,7 +85,7 @@ export class TextProvider implements vscode.DocumentDropEditProvider {
         additionalPkgs.push(["@preview/grayness", "0.1.0", "grayscale-image"]);
         codeSnippet = `grayscale-image(read(${strPath}))`;
         break;
-      case ResourceKind.Webp:
+      case ResourceKind.Xlsx:
         additionalPkgs.push(["@preview/rexllent", "0.2.0", "xlsx-parser"]);
         codeSnippet = `xlsx-parser(read(${strPath}, encoding: none)`;
         break;
