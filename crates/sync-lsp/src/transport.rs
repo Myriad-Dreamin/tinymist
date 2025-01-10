@@ -4,7 +4,8 @@ use std::{
 };
 
 use crossbeam_channel::{bounded, Receiver, Sender};
-use lsp_server::{Connection, Message};
+
+use crate::{Connection, ConnectionRx, ConnectionTx, Message};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -43,10 +44,23 @@ pub fn with_stdio_transport(
     };
     let o = || std::io::stdout().lock();
 
+    let (event_sender, event_receiver) = bounded::<crate::Event>(10);
+
     // Create the transport. Includes the stdio (stdin and stdout) versions but this
     // could also be implemented to use sockets or HTTP.
-    let (sender, receiver, io_threads) = io_transport(i, o);
-    let connection = Connection { sender, receiver };
+    let (lsp_sender, lsp_receiver, io_threads) = io_transport(i, o);
+    let connection = Connection {
+        // lsp_sender,
+        // lsp_receiver,
+        sender: ConnectionTx {
+            event: event_sender,
+            lsp: lsp_sender,
+        },
+        receiver: ConnectionRx {
+            event: event_receiver,
+            lsp: lsp_receiver,
+        },
+    };
 
     f(connection)?;
 

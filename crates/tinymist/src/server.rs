@@ -28,6 +28,7 @@ use tinymist_query::{
 };
 use tinymist_query::{EntryResolver, PageSelection};
 use tokio::sync::mpsc;
+use typ_server::Interrupt;
 use typst::{diag::FileResult, syntax::Source};
 
 use super::{init::*, *};
@@ -183,7 +184,7 @@ impl LanguageState {
     }
 
     /// Install handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands>(
+    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = LanguageState;
@@ -199,6 +200,8 @@ impl LanguageState {
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
+            // customized event
+            .with_event(&Interrupt::Compile, State::compile_interrupt::<T>)
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
             .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
@@ -286,6 +289,20 @@ impl LanguageState {
                 })
                 .collect(),
         )
+    }
+
+    fn compile_interrupt<T: Initializer<S = Self>>(
+        mut state: ServiceState<T, T::S>,
+        _params: Interrupt<LspCompilerFeat>,
+    ) -> anyhow::Result<()> {
+        let Some(ready) = state.ready() else {
+            log::info!("interrupted on not ready server");
+            return Ok(());
+        };
+
+        let _ = ready;
+        log::info!("interrupted");
+        Ok(())
     }
 }
 
