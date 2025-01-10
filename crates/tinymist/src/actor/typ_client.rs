@@ -36,9 +36,12 @@ use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
-use tinymist_world::typ_server::{
-    CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, ProjectCompiler,
-    ProjectInterrupt, SucceededArtifact,
+use tinymist_world::{
+    typ_server::{
+        CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, ProjectCompiler,
+        ProjectInterrupt, SucceededArtifact,
+    },
+    LspInterrupt,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -102,6 +105,10 @@ impl LocalCompileHandler {
 
     pub fn add_memory_changes(&mut self, event: MemoryEvent) {
         self.wrapper.process(ProjectInterrupt::Memory(event));
+    }
+
+    pub fn interrupt(&mut self, intr: ProjectInterrupt<LspCompilerFeat>) {
+        self.wrapper.process(intr);
     }
 
     pub fn change_task(&mut self, task: TaskInputs) {
@@ -435,6 +442,10 @@ impl CompileClientActor {
 
     pub fn add_memory_changes(&mut self, event: MemoryEvent) {
         self.handle.add_memory_changes(event);
+    }
+
+    pub fn interrupt(&mut self, intr: LspInterrupt) {
+        self.handle.interrupt(intr);
     }
 
     pub fn change_task(&mut self, task_inputs: TaskInputs) {
