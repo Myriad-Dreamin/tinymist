@@ -1,9 +1,11 @@
 //! World implementation of typst for tinymist.
 
-use font::TinymistFontResolver;
+pub mod font;
+
 pub use reflexo_typst;
 pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
+use reflexo_typst::package::RegistryPathMapper;
 pub use reflexo_typst::world as base;
 pub use reflexo_typst::world::{package, CompilerUniverse, CompilerWorld, Revising, TaskInputs};
 pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
@@ -23,8 +25,7 @@ use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
 use reflexo_typst::{CompilerFeat, ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
-pub mod font;
-pub mod project;
+use crate::font::TinymistFontResolver;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -214,13 +215,28 @@ impl LspUniverseBuilder {
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
     ) -> ZResult<LspUniverse> {
+        let registry = Arc::new(package_registry);
+        let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
+
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
-            Vfs::new(SystemAccessModel {}),
-            package_registry,
+            Vfs::new(resolver, SystemAccessModel {}),
+            registry,
             font_resolver,
         ))
+    }
+
+    /// Resolve fonts from given options.
+    pub fn only_embedded_fonts() -> ZResult<TinymistFontResolver> {
+        let mut searcher = SystemFontSearcher::new();
+        searcher.resolve_opts(CompileFontOpts {
+            font_profile_cache_path: Default::default(),
+            font_paths: vec![],
+            no_system_fonts: true,
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+        })?;
+        Ok(searcher.into())
     }
 
     /// Resolve fonts from given options.

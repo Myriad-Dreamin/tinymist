@@ -20,14 +20,15 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
     let cwd = std::env::current_dir().unwrap();
     let main = Source::detached(s);
     let mut universe = LspUniverseBuilder::build(
-        EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
+        EntryState::new_rooted(cwd.as_path().into(), Some(main.id().vpath().clone())),
         Default::default(),
         FONT_RESOLVER.clone(),
         Default::default(),
     )
     .unwrap();
+    let main_id = universe.main_id().unwrap();
     universe
-        .map_shadow_by_id(main.id(), Bytes::from(main.text().as_bytes().to_owned()))
+        .map_shadow_by_id(main_id, Bytes::from(main.text().as_bytes().to_owned()))
         .unwrap();
     let world = universe.snapshot();
 

@@ -17,6 +17,7 @@ pub use doc_highlight::*;
 pub mod link_expr;
 pub use link_expr::*;
 pub mod stats;
+use reflexo_typst::vfs::WorkspaceResolver;
 pub use stats::*;
 pub mod definition;
 pub use definition::*;
@@ -24,7 +25,7 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-use typst::syntax::{Source, VirtualPath};
+use typst::syntax::Source;
 use typst::World;
 mod post_tyck;
 mod tyck;
@@ -40,11 +41,11 @@ pub use global::*;
 
 use ecow::eco_format;
 use lsp_types::Url;
-use reflexo_typst::{EntryReader, TypstFileId};
+use reflexo_typst::TypstFileId;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 
-use crate::path_to_url;
+use crate::path_res_to_url;
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -75,16 +76,13 @@ pub trait LspWorldExt {
 impl LspWorldExt for tinymist_world::LspWorld {
     fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
-        let root = self.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = path.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {path:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        match self.id_for_path(path) {
+            Some(id) => Ok(id),
+            None => WorkspaceResolver::file_with_parent_root(path).ok_or_else(|| {
+                let reason = eco_format!("invalid path: {path:?}");
+                FileError::Other(Some(reason))
+            }),
+        }
     }
 
     fn source_by_path(&self, path: &Path) -> FileResult<Source> {
@@ -93,10 +91,10 @@ impl LspWorldExt for tinymist_world::LspWorld {
     }
 
     fn uri_for_id(&self, fid: TypstFileId) -> Result<Url, FileError> {
-        self.path_for_id(fid).and_then(|path| {
-            path_to_url(&path)
-                .map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
-        })
+        let res = path_res_to_url(self.path_for_id(fid)?);
+
+        log::info!("uri_for_id: {fid:?} -> {res:?}");
+        res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
     }
 }
 

@@ -100,13 +100,14 @@ fn scaffold_project(
         }
     }
 
-    let package_root = world.path_for_id(toml_id)?;
+    let package_root = world.path_for_id(toml_id)?.as_path().to_owned();
     let package_root = package_root
         .parent()
         .ok_or_else(|| eco_format!("package root is not a directory (at {:?})", toml_id))?;
 
     let template_dir = toml_id.join(tmpl_info.path.as_str());
-    let real_template_dir = world.path_for_id(template_dir)?;
+    // todo: template in memory
+    let real_template_dir = world.path_for_id(template_dir)?.to_err()?;
     if !real_template_dir.exists() {
         bail!(
             "template directory does not exist (at {})",

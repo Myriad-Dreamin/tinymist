@@ -178,7 +178,7 @@ async fn trace_main(
 
     let timings = writer.into_inner().unwrap();
 
-    let handle = &state.primary().handle;
+    let handle = &state.handle;
     let diagnostics =
         tinymist_query::convert_diagnostics(w, diags.iter(), handle.analysis.position_encoding);
 

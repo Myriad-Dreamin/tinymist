@@ -2,9 +2,9 @@
 
 use std::path::Path;
 
+use crate::project::*;
 use anyhow::bail;
 use clap::ValueHint;
-use tinymist_world::project::*;
 use typst_preview::{PreviewArgs, PreviewMode};
 
 use crate::{CompileFontArgs, CompilePackageArgs};

@@ -3,6 +3,10 @@
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
+use crate::project::{
+    update_lock, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
+    ExportPngTask, ExportSignal, ExportTextTask, ProjectTask, TaskWhen,
+};
 use anyhow::{bail, Context};
 use reflexo_typst::{EntryReader, EntryState, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
@@ -19,13 +23,7 @@ use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
-    actor::{
-        editor::EditorRequest,
-        typ_client::WorldSnapFut,
-        typ_server::{CompiledArtifact, ExportSignal},
-    },
-    tool::word_count,
-    world::LspCompilerFeat,
+    actor::editor::EditorRequest, project::WorldSnapFut, tool::word_count, world::LspCompilerFeat,
     ExportMode, PathPattern,
 };
 
@@ -40,18 +38,21 @@ pub struct ExportUserConfig {
     pub mode: ExportMode,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ExportTask {
+    pub handle: tokio::runtime::Handle,
     pub factory: SyncTaskFactory<ExportConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
 
 impl ExportTask {
-    pub fn new(data: ExportConfig) -> Self {
+    pub fn new(handle: tokio::runtime::Handle, data: ExportConfig) -> Self {
         Self {
+            handle,
             factory: SyncTaskFactory::new(data),
-            ..ExportTask::default()
+            export_folder: FutureFolder::default(),
+            count_word_folder: FutureFolder::default(),
         }
     }
 
@@ -80,8 +81,8 @@ impl SyncTaskFactory<ExportConfig> {
                 ..Default::default()
             });
 
-            let artifact = snap.compile().await;
-            export.do_export(&kind, artifact).await
+            let artifact = snap.compile();
+            export.do_export(&kind, artifact, false).await
         }
     }
 }
@@ -127,29 +128,33 @@ impl ExportConfig {
             return None;
         }
 
-        t.export_folder.spawn(artifact.world.revision().get(), || {
+        let fut = t.export_folder.spawn(artifact.world.revision().get(), || {
             let this = self.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(this.do_export(&this.kind, artifact).await);
+                log_err(this.do_export(&this.kind, artifact, true).await);
                 Some(())
             })
-        });
+        })?;
+
+        t.handle.spawn(fut);
 
         Some(())
     }
 
-    fn signal_count_word(&self, artifact: &CompiledArtifact<LspCompilerFeat>, t: &ExportTask) {
+    fn signal_count_word(
+        &self,
+        artifact: &CompiledArtifact<LspCompilerFeat>,
+        t: &ExportTask,
+    ) -> Option<()> {
         if !self.count_words {
-            return;
+            return None;
         }
 
-        let Some(editor_tx) = self.editor_tx.clone() else {
-            return;
-        };
+        let editor_tx = self.editor_tx.clone()?;
         let revision = artifact.world.revision().get();
 
-        t.count_word_folder.spawn(revision, || {
+        let fut = t.count_word_folder.spawn(revision, || {
             let artifact = artifact.clone();
             let group = self.group.clone();
             Box::pin(async move {
@@ -164,13 +169,18 @@ impl ExportConfig {
 
                 Some(())
             })
-        });
+        })?;
+
+        t.handle.spawn(fut);
+
+        Some(())
     }
 
     async fn do_export(
         &self,
         kind: &ExportKind,
         artifact: CompiledArtifact<LspCompilerFeat>,
+        passive: bool,
     ) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use ExportKind::*;
@@ -197,6 +207,70 @@ impl ExportConfig {
                     format!("RenderActor({kind:?}): failed to create directory")
                 })?;
             }
+        }
+
+        if !passive {
+            let updater = update_lock(&snap.world);
+
+            let _ = updater.and_then(|mut updater| {
+                let doc_id = updater.compiled(&snap.world)?;
+                let task_id = doc_id.clone();
+
+                let when = match self.config.mode {
+                    ExportMode::Never => TaskWhen::Never,
+                    ExportMode::OnType => TaskWhen::OnType,
+                    ExportMode::OnSave => TaskWhen::OnSave,
+                    ExportMode::OnDocumentHasTitle => TaskWhen::OnSave,
+                };
+
+                // todo: page transforms
+                let transforms = vec![];
+
+                use tinymist_project::ExportTask as ProjectExportTask;
+
+                let export = ProjectExportTask {
+                    document: doc_id,
+                    id: task_id,
+                    when,
+                    transform: transforms,
+                };
+
+                let task = match kind {
+                    Pdf { creation_timestamp } => {
+                        let _ = creation_timestamp;
+                        ProjectTask::ExportPdf(ExportPdfTask {
+                            export,
+                            pdf_standards: Default::default(),
+                        })
+                    }
+                    Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+                    Markdown {} => ProjectTask::ExportMarkdown(ExportMarkdownTask { export }),
+                    Text {} => ProjectTask::ExportText(ExportTextTask { export }),
+                    Query { .. } => {
+                        // todo: ignoring query task.
+                        return None;
+                    }
+                    Svg { page } => {
+                        // todo: ignoring page selection.
+                        let _ = page;
+                        return None;
+                    }
+                    Png { ppi, fill, page } => {
+                        // todo: ignoring page fill.
+                        let _ = fill;
+                        // todo: ignoring page selection.
+                        let _ = page;
+
+                        let ppi = ppi.unwrap_or(144.) as f32;
+                        ProjectTask::ExportPng(ExportPngTask { export, ppi })
+                    }
+                };
+
+                updater.task(task);
+                updater.commit();
+
+                Some(())
+            });
         }
 
         // Prepare the document.

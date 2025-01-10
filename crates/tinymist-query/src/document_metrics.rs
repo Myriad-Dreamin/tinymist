@@ -215,7 +215,7 @@ impl DocumentMetricsWorker<'_> {
         let column = source.byte_to_column(byte_index)?;
 
         let filepath = self.ctx.path_for_id(file_id).ok()?;
-        let filepath_str = filepath.to_string_lossy().to_string();
+        let filepath_str = filepath.as_path().display().to_string();
 
         Some((filepath_str, line as u32 + 1, column as u32 + 1))
     }

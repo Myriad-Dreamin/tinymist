@@ -4,7 +4,9 @@ use std::{cmp::Ordering, path::Path, str::FromStr};
 
 use anyhow::{bail, Context};
 use clap::ValueHint;
-use reflexo_typst::{path::unix_slash, typst::diag::EcoString};
+use reflexo::path::unix_slash;
+use typst::diag::EcoString;
+use typst::syntax::FileId;
 
 pub use anyhow::Result;
 
@@ -339,7 +341,7 @@ impl ResourcePath {
         ResourcePath("file".into(), rel.to_string())
     }
 
-    pub fn from_file_id(id: reflexo_typst::typst::TypstFileId) -> Self {
+    pub fn from_file_id(id: FileId) -> Self {
         let package = id.package();
         match package {
             Some(package) => ResourcePath(

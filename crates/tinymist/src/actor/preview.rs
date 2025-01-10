@@ -7,8 +7,7 @@ use sync_lsp::{internal_error, LspClient, LspResult};
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
-use super::typ_client::CompileHandler;
-use crate::tool::preview::HttpServer;
+use crate::tool::preview::{HttpServer, PreviewProjectHandler};
 
 pub struct PreviewTab {
     /// Task ID
@@ -20,7 +19,7 @@ pub struct PreviewTab {
     /// Control plane message sender
     pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     /// Compile handler
-    pub compile_handler: Arc<CompileHandler>,
+    pub compile_handler: Arc<PreviewProjectHandler>,
     /// Whether this tab is primary
     pub is_primary: bool,
 }

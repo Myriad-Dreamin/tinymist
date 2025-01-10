@@ -1,3 +1,5 @@
+use reflexo_typst::vfs::WorkspaceResolver;
+
 use crate::{
     analysis::Definition,
     prelude::*,
@@ -65,7 +67,7 @@ pub(crate) fn prepare_renaming(
     let name = def.name().clone();
     let (def_fid, _def_range) = def.location(ctx.shared()).clone()?;
 
-    if def_fid.package().is_some() {
+    if WorkspaceResolver::is_package_file(def_fid) {
         crate::log_debug_ct!(
             "prepare_rename: {name} is in a package {pkg:?}",
             pkg = def_fid.package(),

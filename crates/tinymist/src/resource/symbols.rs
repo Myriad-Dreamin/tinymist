@@ -6,8 +6,9 @@ use reflexo_typst::{
 };
 use sync_lsp::LspResult;
 use tinymist_world::TaskInputs;
+use typst::{syntax::VirtualPath, World};
 
-use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
+use crate::{project::WorldSnapFut, z_internal_error};
 
 use super::prelude::*;
 
@@ -980,16 +981,14 @@ impl LanguageState {
         let font = {
             let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
-            let new_entry = EntryState::new_rootless(entry_path.clone())
-                .ok_or_else(|| error_once!("cannot change entry"))
-                .map_err(z_internal_error)?;
+            let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
 
             let mut forked = snap.world.task(TaskInputs {
                 entry: Some(new_entry),
                 ..Default::default()
             });
             forked
-                .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
+                .map_shadow_by_id(forked.main(), math_shaping_text.into_bytes().into())
                 .map_err(|e| error_once!("cannot map shadow", err: e))
                 .map_err(z_internal_error)?;
 

@@ -1,5 +1,5 @@
 use anyhow::bail;
-use reflexo_typst::{EntryState, ImmutPath, TypstFileId};
+use reflexo_typst::{EntryState, ImmutPath};
 use typst::syntax::VirtualPath;
 
 /// Entry resolver
@@ -59,14 +59,14 @@ impl EntryResolver {
             (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
                 Ok(stripped) => Some(EntryState::new_rooted(
                     root,
-                    Some(TypstFileId::new(None, VirtualPath::new(stripped))),
+                    Some(VirtualPath::new(stripped)),
                 )),
                 Err(err) => {
                     log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
-                    EntryState::new_rootless(entry)
+                    EntryState::new_rooted_by_parent(entry)
                 }
             },
-            (Some(entry), None) => EntryState::new_rootless(entry),
+            (Some(entry), None) => EntryState::new_rooted_by_parent(entry),
             (None, Some(root)) => Some(EntryState::new_workspace(root)),
             (None, None) => None,
         };
@@ -105,6 +105,8 @@ impl EntryResolver {
 #[cfg(test)]
 #[cfg(any(windows, unix, target_os = "macos"))]
 mod entry_tests {
+    use reflexo_typst::TypstFileId;
+
     use super::*;
     use std::path::Path;
 

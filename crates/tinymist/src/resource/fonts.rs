@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
-use crate::actor::typ_client::WorldSnapFut;
+use crate::project::WorldSnapFut;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FontResourceItem {

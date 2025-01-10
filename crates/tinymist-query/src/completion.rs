@@ -169,7 +169,7 @@ mod tests {
             let mut results = vec![];
             for s in rng.clone() {
                 let request = CompletionRequest {
-                    path: ctx.path_for_id(id).unwrap(),
+                    path: ctx.path_for_id(id).unwrap().as_path().to_owned(),
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                     trigger_character,

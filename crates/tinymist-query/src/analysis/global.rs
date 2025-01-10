@@ -9,6 +9,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use reflexo::debug_loc::DataSource;
 use reflexo::hash::{hash128, FxDashMap};
+use reflexo_typst::vfs::{PathResolution, WorkspaceResolver};
 use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
 use tinymist_world::{LspWorld, DETACHED_ENTRY};
@@ -315,9 +316,9 @@ impl LocalContext {
         self.caches
             .completion_files
             .get_or_init(|| {
-                if let Some(root) = self.world.workspace_root() {
+                if let Some(root) = self.world.entry_state().workspace_root() {
                     scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |path| {
-                        TypstFileId::new(None, VirtualPath::new(path))
+                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
                     })
                 } else {
                     vec![]
@@ -357,7 +358,7 @@ impl LocalContext {
     }
 
     /// Get all depended files in the workspace, inclusively.
-    pub fn depended_source_files(&self) -> Vec<TypstFileId> {
+    pub fn depended_source_files(&self) -> EcoVec<TypstFileId> {
         let mut ids = self.depended_files();
         let preference = PathPreference::Source {
             allow_package: false,
@@ -368,24 +369,11 @@ impl LocalContext {
 
     /// Get all depended file ids of a compilation, inclusively.
     /// Note: must be called after compilation.
-    pub fn depended_files(&self) -> Vec<TypstFileId> {
-        let mut ids = vec![];
-        for dep in self.depended_paths() {
-            if let Ok(ref_fid) = self.file_id_by_path(&dep) {
-                ids.push(ref_fid);
-            }
-        }
-        ids
-    }
-
-    /// Get depended paths of a compilation.
-    /// Note: must be called after compilation.
-    pub(crate) fn depended_paths(&self) -> EcoVec<reflexo::ImmutPath> {
+    pub fn depended_files(&self) -> EcoVec<TypstFileId> {
         let mut deps = EcoVec::new();
         self.world.iter_dependencies(&mut |path| {
             deps.push(path);
         });
-
         deps
     }
 
@@ -585,7 +573,7 @@ impl SharedContext {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathBuf, FileError> {
+    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathResolution, FileError> {
         self.world.path_for_id(id)
     }
 

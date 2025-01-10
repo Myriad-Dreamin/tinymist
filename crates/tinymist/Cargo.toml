@@ -60,6 +60,7 @@ sync-lsp.workspace = true
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-fs.workspace = true
+tinymist-project.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
 tinymist-world.workspace = true
 tinymist-render.workspace = true
