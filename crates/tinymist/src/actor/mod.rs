@@ -145,6 +145,7 @@ impl LanguageState {
         // Create the actor
         let server = ProjectCompiler::new_with(
             verse,
+            self.client.clone().to_untyped(),
             // intr_tx,
             // intr_rx,
             CompileServerOpts {

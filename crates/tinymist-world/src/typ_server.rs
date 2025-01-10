@@ -428,11 +428,18 @@ pub struct ProjectCompiler<F: CompilerFeat> {
     pub primary: ProjectState<F>,
     // /// The compiler actors for tasks
     pub dedicates: Vec<ProjectState<F>>,
+
+    /// Channel for sending interrupts to the compiler actor.
+    dep_tx: mpsc::UnboundedSender<NotifyMessage>,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
     /// Create a new compiler actor with options
-    pub fn new_with(verse: CompilerUniverse<F>, opts: CompileServerOpts<F>) -> Self {
+    pub fn new_with(
+        verse: CompilerUniverse<F>,
+        sender: sync_lsp::LspClient,
+        opts: CompileServerOpts<F>,
+    ) -> Self {
         let root = verse.workspace_root();
         if let Some(root) = root {
             let _ = tinymist_project::LockFile::update(&root, |l| {
@@ -440,6 +447,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
                 Ok(())
             });
         }
+
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            sender.send_event(ProjectInterrupt::<F>::Fs(event));
+        }));
 
         let wrapper = CompilerServerWrapper::new_with(verse, opts);
         let primary = ProjectState {
@@ -449,14 +461,16 @@ impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
         Self {
             wrapper,
             primary,
+            dep_tx,
             dedicates: vec![],
         }
     }
 
     pub fn process(&mut self, intr: ProjectInterrupt<F>) {
-        let send = |resp| {
-            let _ = resp;
-            panic!("process task resp");
+        let send = |resp| match resp {
+            CompilerResponse::Notify(msg) => {
+                log_send_error("notify", self.dep_tx.send(msg));
+            }
         };
 
         match intr {
