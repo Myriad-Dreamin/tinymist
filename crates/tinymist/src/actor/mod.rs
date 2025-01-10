@@ -8,7 +8,6 @@ pub mod typ_client;
 use std::sync::Arc;
 
 use reflexo::ImmutPath;
-use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
@@ -23,7 +22,7 @@ use crate::{
     world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
-use tinymist_world::typ_server::{CompileServerOpts, CompilerServerWrapper};
+use tinymist_world::typ_server::{CompileServerOpts, ProjectCompiler};
 use typ_client::{CompileClientActor, CompileHandler, LocalCompileHandler};
 
 impl LanguageState {
@@ -44,7 +43,6 @@ impl LanguageState {
             group.to_owned(),
             self.entry_resolver().resolve(entry),
             self.compile_config().determine_inputs(),
-            self.vfs_snapshot(),
         );
 
         let prev = if group == "primary" {
@@ -73,7 +71,6 @@ impl LanguageState {
         editor_group: String,
         entry: EntryState,
         inputs: ImmutDict,
-        snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
         let _ = intr_rx;
@@ -146,7 +143,7 @@ impl LanguageState {
                 .expect("incorrect options");
 
         // Create the actor
-        let server = CompilerServerWrapper::new_with(
+        let server = ProjectCompiler::new_with(
             verse,
             // intr_tx,
             // intr_rx,
@@ -172,12 +169,13 @@ impl LanguageState {
 
         // Create the client
         let config = self.compile_config().clone();
-        let client = CompileClientActor::new(Arc::new(handle), config, entry);
+
+        // todo: restart loses the memory changes
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.
-        client.add_memory_changes(MemoryEvent::Update(snapshot));
-        client
+        // client.add_memory_changes(MemoryEvent::Update(snapshot));
+        CompileClientActor::new(handle, config, entry)
     }
 }
 
