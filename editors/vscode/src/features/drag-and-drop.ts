@@ -19,6 +19,7 @@ enum ResourceKind {
   Csv,
   Yaml,
   Bib,
+  Xlsx,
 }
 
 const resourceKinds: Record<string, ResourceKind> = {
@@ -42,6 +43,7 @@ const resourceKinds: Record<string, ResourceKind> = {
   ".yaml": ResourceKind.Yaml,
   ".yml": ResourceKind.Yaml,
   ".bib": ResourceKind.Bib,
+  ".xlsx": ResourceKind.Xlsx,
 };
 
 export class TextProvider implements vscode.DocumentDropEditProvider {
@@ -82,6 +84,10 @@ export class TextProvider implements vscode.DocumentDropEditProvider {
       case ResourceKind.Webp:
         additionalPkgs.push(["@preview/grayness", "0.1.0", "grayscale-image"]);
         codeSnippet = `grayscale-image(read(${strPath}))`;
+        break;
+      case ResourceKind.Webp:
+        additionalPkgs.push(["@preview/rexllent", "0.2.0", "xlsx-parser"]);
+        codeSnippet = `xlsx-parser(read(${strPath}, encoding: none)`;
         break;
       case ResourceKind.Source:
         codeSnippet = `include ${strPath}`;
