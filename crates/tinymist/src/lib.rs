@@ -21,6 +21,7 @@
 mod actor;
 mod cmd;
 mod init;
+pub mod project;
 mod resource;
 mod server;
 mod stats;
@@ -33,15 +34,15 @@ mod utils;
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
-pub use tinymist_project as project;
 pub use tinymist_project::world;
 pub use tinymist_query as query;
-pub use world::*;
+pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
 use lsp_server::{RequestId, ResponseError};
 use serde_json::from_value;
 use sync_lsp::*;
 use utils::*;
+use world::*;
 
 use tinymist_query::CompilerQueryResponse;
 

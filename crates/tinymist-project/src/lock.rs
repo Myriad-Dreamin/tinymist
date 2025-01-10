@@ -1,11 +1,12 @@
 use std::{path::Path, sync::Arc};
 
+use crate::LspWorld;
+use ecow::EcoVec;
 use tinymist_std::path::unix_slash;
 use tinymist_world::EntryReader;
 use typst::{diag::EcoString, syntax::FileId};
 
 use super::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask, ResourcePath};
-use crate::LspWorld;
 
 /// Make a new project lock updater.
 pub fn update_lock(world: &LspWorld) -> Option<ProjectLockUpdater> {
@@ -81,7 +82,7 @@ impl ProjectLockUpdater {
         self.updates.push(LockUpdate::Task(task));
     }
 
-    pub fn update_materials(&mut self, doc_id: Id, ids: Vec<FileId>) {
+    pub fn update_materials(&mut self, doc_id: Id, ids: EcoVec<FileId>) {
         let mut files = ids
             .into_iter()
             .map(ResourcePath::from_file_id)

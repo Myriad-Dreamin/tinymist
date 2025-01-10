@@ -1,5 +1,7 @@
 //! Document preview tool for Typst
 
+#![allow(missing_docs)]
+
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
@@ -11,7 +13,7 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::{error::prelude::*, Error, TypstDocument};
+use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
@@ -28,11 +30,13 @@ use typst_preview::{
 };
 use typst_shim::syntax::LinkedNodeExt;
 
+use crate::project::{
+    CompileHandlerImpl, CompileServerOpts, CompiledArtifact, LspInterrupt, ProjectClient,
+    ProjectCompiler,
+};
 use crate::world::LspCompilerFeat;
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
-use actor::typ_client::CompileHandler;
-use actor::typ_server::{CompileServerActor, CompileServerOpts, CompiledArtifact};
 
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
@@ -62,7 +66,10 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(loc) = loc;
 
-        let source_id = world.id_for_path(Path::new(&loc.filepath))?;
+        let filepath = Path::new(&loc.filepath);
+        let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
+
+        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
         let source = world.source(source_id).ok()?;
         let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
 
@@ -88,10 +95,14 @@ impl typst_preview::CompileView for PreviewCompileView {
         let Some(doc) = doc.as_deref() else {
             return vec![];
         };
-        let Some(source_id) = world.id_for_path(Path::new(&src_loc.filepath)) else {
+        let Some(root) = world.workspace_root() else {
+            return vec![];
+        };
+        let Some(relative_path) = path.strip_prefix(root).ok() else {
             return vec![];
         };
 
+        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
         let Some(source) = world.source(source_id).ok() else {
             return vec![];
         };
@@ -130,6 +141,7 @@ impl EditorServer for CompileHandler {
         reset_shadow: bool,
     ) -> Result<(), Error> {
         // todo: is it safe to believe that the path is normalized?
+        let now = std::time::SystemTime::now();
         let files = FileChangeSet::new_inserts(
             files
                 .files
@@ -137,7 +149,7 @@ impl EditorServer for CompileHandler {
                 .map(|(path, content)| {
                     let content = content.as_bytes().into();
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(content).into())
+                    (path.into(), Ok((now, content)).into())
                 })
                 .collect(),
         );
@@ -248,15 +260,85 @@ pub struct StartPreviewResponse {
     is_primary: bool,
 }
 
+pub struct PreviewProjectHandler {
+    client: Box<dyn ProjectClient>,
+    project_id: String,
+}
+
+impl PreviewProjectHandler {
+    pub fn flush_compile(&self) {
+        let _ = self.project_id;
+        self.client.send_event(LspInterrupt::Compile);
+    }
+
+    pub async fn settle(&self) -> Result<(), Error> {
+        // let req = PreviewRequest::Kill(task_id.to_owned(), oneshot::channel().1);
+        // let _ = self.client.send_event(req);
+        // true
+        todo!()
+    }
+
+    pub fn unregister_preview(&self, _task_id: &str) -> bool {
+        // let req = PreviewRequest::Kill(task_id.to_owned(), oneshot::channel().1);
+        // let _ = self.client.send_event(req);
+        // true
+        todo!()
+    }
+}
+
+impl EditorServer for PreviewProjectHandler {
+    async fn update_memory_files(
+        &self,
+        files: MemoryFiles,
+        reset_shadow: bool,
+    ) -> Result<(), Error> {
+        // todo: is it safe to believe that the path is normalized?
+        let files = FileChangeSet::new_inserts(
+            files
+                .files
+                .into_iter()
+                .map(|(path, content)| {
+                    // todo: cloning PathBuf -> Arc<Path>
+                    (path.into(), Ok(content.as_bytes().into()).into())
+                })
+                .collect(),
+        );
+
+        let intr = LspInterrupt::Memory(if reset_shadow {
+            MemoryEvent::Sync(files)
+        } else {
+            MemoryEvent::Update(files)
+        });
+        self.client.send_event(intr);
+
+        Ok(())
+    }
+
+    async fn remove_shadow_files(&self, files: MemoryFilesShort) -> Result<(), Error> {
+        // todo: is it safe to believe that the path is normalized?
+        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
+        self.client
+            .send_event(LspInterrupt::Memory(MemoryEvent::Update(files)));
+
+        Ok(())
+    }
+}
+
 impl PreviewState {
     /// Start a preview on a given compiler.
     pub fn start(
         &self,
         args: PreviewCliArgs,
         previewer: PreviewBuilder,
-        compile_handler: Arc<CompileHandler>,
+        // compile_handler: Arc<CompileHandler>,
+        project_id: String,
         is_primary: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
+        let compile_handler = Arc::new(PreviewProjectHandler {
+            project_id,
+            client: Box::new(self.client.clone().to_untyped()),
+        });
+
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
@@ -502,6 +584,7 @@ pub async fn make_http_server(
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     log::info!("Arguments: {args:#?}");
+    let handle = tokio::runtime::Handle::current();
 
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
@@ -517,37 +600,54 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     });
 
     let verse = args.compile.resolve()?;
+    let previewer = PreviewBuilder::new(args.preview);
 
     let (service, handle) = {
         // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
         let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
-        let (intr_tx, intr_rx) = mpsc::unbounded_channel();
+        let (intr_tx, intr_rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let handle = Arc::new(CompileHandler {
-            inner: Default::default(),
-            diag_group: "main".to_owned(),
-            intr_tx: intr_tx.clone(),
-            // export_tx,
-            export: Default::default(),
-            editor_tx,
-            analysis: Arc::default(),
-            stats: Default::default(),
-            notified_revision: parking_lot::Mutex::new(0),
-        });
+        // todo: unify filesystem watcher
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        let fs_intr_tx = intr_tx.clone();
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            fs_intr_tx.send_event(LspInterrupt::Fs(event));
+        }));
 
         // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
-        let service = CompileServerActor::new_with(
-            verse,
-            intr_tx,
-            intr_rx,
-            CompileServerOpts {
-                compile_handle: handle.clone(),
-                ..Default::default()
-            },
-        )
-        .with_watch(true);
+        // Create the actor
+        let handle = Arc::new(CompileHandlerImpl {
+            #[cfg(feature = "preview")]
+            inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
+            diag_group: "main".to_owned(),
+            export: crate::task::ExportTask::new(handle, Default::default()),
+            editor_tx,
+            client: Box::new(intr_tx.clone()),
+            analysis: Arc::default(),
+
+            notified_revision: parking_lot::Mutex::new(0),
+        });
+
+        let mut server = ProjectCompiler::new_with(verse, dep_tx, CompileServerOpts::default())
+            .with_compile_handle(handle);
+        let registered = server
+            .primary
+            .ext
+            .register_preview(previewer.compile_watcher());
+        assert!(registered, "failed to register preview");
+
+        let service = async move {
+            let mut intr_rx = intr_rx;
+            while let Some(intr) = intr_rx.recv().await {
+                server.process(intr);
+            }
+        };
+        let handle = Arc::new(PreviewProjectHandler {
+            project_id: "primary".to_owned(),
+            client: Box::new(intr_tx),
+        });
 
         (service, handle)
     };
@@ -614,12 +714,9 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         let _ = srv.join.await;
     });
 
-    let previewer = PreviewBuilder::new(args.preview);
-    let registered = handle.register_preview(previewer.compile_watcher());
-    assert!(registered, "failed to register preview");
     let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
     let mut previewer = previewer.build(lsp_tx, handle.clone()).await;
-    tokio::spawn(service.run());
+    tokio::spawn(service);
 
     bind_streams(&mut previewer, websocket_rx);
 

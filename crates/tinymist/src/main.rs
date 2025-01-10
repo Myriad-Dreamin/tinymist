@@ -217,7 +217,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let entry = state.entry_resolver().resolve(Some(input.as_path().into()));
 
-        let snap = state.primary().snapshot().unwrap();
+        let snap = state.snapshot().unwrap();
 
         RUNTIMES.tokio_runtime.block_on(async {
             let snap = snap.receive().await.unwrap();
@@ -266,7 +266,7 @@ pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
 
         let state = service.state_mut().unwrap();
 
-        let snap = state.primary().snapshot().unwrap();
+        let snap = state.snapshot().unwrap();
         let res = RUNTIMES.tokio_runtime.block_on(async move {
             let w = snap.receive().await.map_err(internal_error)?;
             match cmds {

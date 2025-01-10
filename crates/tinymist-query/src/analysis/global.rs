@@ -374,7 +374,6 @@ impl LocalContext {
         self.world.iter_dependencies(&mut |file_id| {
             deps.push(file_id);
         });
-
         deps
     }
 

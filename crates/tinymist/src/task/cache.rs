@@ -36,7 +36,7 @@ impl CacheTask {
             .revision
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let task = self.factory.task();
-        self.cache_evict_folder.spawn(revision, || {
+        let Some(fut) = self.cache_evict_folder.spawn(revision, || {
             Box::pin(async move {
                 let _ = FutureFolder::compute(move |_| {
                     // Evict compilation cache.
@@ -49,6 +49,9 @@ impl CacheTask {
 
                 Some(())
             })
-        });
+        }) else {
+            return;
+        };
+        tokio::spawn(fut);
     }
 }
