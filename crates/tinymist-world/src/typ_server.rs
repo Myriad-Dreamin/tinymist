@@ -2,6 +2,8 @@
 //!
 //! Please check `tinymist::actor::typ_client` for architecture details.
 
+#![allow(missing_docs)]
+
 use std::{
     collections::HashSet,
     path::Path,
@@ -445,7 +447,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     ) -> Option<CompiledArtifact<F>> {
         self.suspended_reason.see(reason);
         let reason = std::mem::take(&mut self.suspended_reason);
-        let start = reflexo::time::now();
+        let start = reflexo_typst::time::now();
 
         let compiling = self.snapshot(is_once, reason);
         self.watch_snap = OnceLock::new();

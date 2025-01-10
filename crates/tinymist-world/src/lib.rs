@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod font;
 pub mod package;
+pub mod typ_server;
 use package::HttpsRegistry;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
