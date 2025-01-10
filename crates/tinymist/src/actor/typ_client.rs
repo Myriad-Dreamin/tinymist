@@ -30,7 +30,7 @@ use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
     CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
 };
-use sync_lsp::{just_future, QueryFuture};
+use sync_lsp::just_future;
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
@@ -49,7 +49,7 @@ use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
-    CompileConfig,
+    CompileConfig, QueryFuture,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
