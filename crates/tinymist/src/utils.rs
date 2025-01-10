@@ -47,7 +47,7 @@ macro_rules! get_arg_or_default {
 }
 pub(crate) use get_arg_or_default;
 
-pub fn z_internal_error(msg: reflexo::Error) -> ResponseError {
+pub fn z_internal_error(msg: tinymist_std::Error) -> ResponseError {
     ResponseError {
         code: ErrorCode::InternalError as i32,
         message: format!("internal: {msg:?}"),

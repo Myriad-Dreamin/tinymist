@@ -3,11 +3,10 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 // use reflexo_typst::font::GlyphId;
 use reflexo_typst::{vector::font::GlyphId, TypstDocument, TypstFont};
 use sync_lsp::LspResult;
-use typst::syntax::VirtualPath;
-use typst::World;
+use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
-use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
+use crate::{project::WorldSnapFut, z_internal_error};
 
 use super::prelude::*;
 

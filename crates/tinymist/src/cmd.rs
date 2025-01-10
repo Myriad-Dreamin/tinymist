@@ -5,13 +5,13 @@ use std::path::PathBuf;
 
 use lsp_server::RequestId;
 use lsp_types::*;
-use reflexo_typst::error::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
+use tinymist_std::error::prelude::*;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use world::TaskInputs;
@@ -211,9 +211,7 @@ impl LanguageState {
     /// Clear all cached resources.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
-        for dead in self.servers_mut() {
-            dead.clear_cache();
-        }
+        self.handle.analysis.clear_cache();
         just_ok(JsonValue::Null)
     }
 
@@ -254,6 +252,7 @@ impl LanguageState {
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
+        use crate::project::ProjectStateExt;
         use crate::tool::preview::PreviewCliArgs;
         use clap::Parser;
 
@@ -286,30 +285,44 @@ impl LanguageState {
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
-        let primary = self.primary().handle.clone();
-        if !cli_args.not_as_primary && primary.register_preview(previewer.compile_watcher()) {
+        let handle = &mut self.handle;
+        let primary = &mut handle.wrapper.primary;
+        let _ = ProjectStateExt::unregister_preview;
+        if !cli_args.not_as_primary && primary.ext.register_preview(previewer.compile_watcher()) {
+            let id = primary.id.clone();
             // todo: recover pin status reliably
             self.pin_entry(Some(entry))
                 .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
 
-            self.preview.start(cli_args, previewer, primary, true)
+            self.preview.start(cli_args, previewer, id, true)
         } else {
-            self.restart_dedicate(&task_id, Some(entry));
-            let Some(dedicate) = self.dedicate(&task_id) else {
-                return Err(invalid_params(
-                    "just restarted compiler instance for the task is not found",
-                ));
-            };
+            // Get the task-dedicated compile server.
+            // pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
+            //     self.dedicates
+            //         .iter()
+            //         .find(|dedicate| dedicate.handle.diag_group == group)
+            // }
 
-            let handle = dedicate.handle.clone();
+            // self.restart_dedicate(&task_id, Some(entry));
+            // let Some(dedicate) = self.dedicate(&task_id) else {
+            //     return Err(invalid_params(
+            //         "just restarted compiler instance for the task is not found",
+            //     ));
+            // };
 
-            if !handle.register_preview(previewer.compile_watcher()) {
-                return Err(invalid_params(
-                    "cannot register preview to the compiler instance",
-                ));
-            }
+            // let _ = dedicate;
 
-            self.preview.start(cli_args, previewer, handle, false)
+            // let handle = dedicate.handle.clone();
+
+            // if !handle.register_preview(previewer.compile_watcher()) {
+            //     return Err(invalid_params(
+            //         "cannot register preview to the compiler instance",
+            //     ));
+            // }
+
+            // self.preview.start(cli_args, previewer, handle, false)
+
+            todo!()
         }
     }
 
@@ -345,7 +358,7 @@ impl LanguageState {
         let from_source = get_arg!(args[0] as String);
         let to_path = get_arg!(args[1] as Option<PathBuf>).map(From::from);
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
@@ -390,7 +403,7 @@ impl LanguageState {
 
         let from_source = get_arg!(args[0] as String);
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
@@ -458,7 +471,7 @@ impl LanguageState {
 
         let entry = self.entry_resolver().resolve(Some(path));
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
         let user_action = self.user_action;
 
         just_future(async move {
@@ -526,13 +539,13 @@ impl LanguageState {
 impl LanguageState {
     /// Get the all valid fonts
     pub fn resource_fonts(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snapshot = self.primary().snapshot().map_err(z_internal_error)?;
+        let snapshot = self.snapshot().map_err(z_internal_error)?;
         just_future(Self::get_font_resources(snapshot))
     }
 
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snapshot = self.primary().snapshot().map_err(z_internal_error)?;
+        let snapshot = self.snapshot().map_err(z_internal_error)?;
         just_future(Self::get_symbol_resources(snapshot))
     }
 
@@ -549,7 +562,7 @@ impl LanguageState {
 
     /// Get directory of packages
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.paths();
@@ -563,7 +576,7 @@ impl LanguageState {
         &mut self,
         _arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.local_path();
@@ -579,7 +592,7 @@ impl LanguageState {
     ) -> AnySchedulableResponse {
         let ns = get_arg!(arguments[1] as EcoString);
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let packages =
@@ -597,7 +610,7 @@ impl LanguageState {
         &mut self,
         mut arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let fut = self.primary().query_snapshot().map_err(internal_error)?;
+        let fut = self.query_snapshot().map_err(internal_error)?;
         let info = get_arg!(arguments[1] as PackageInfo);
 
         just_future(async move {
@@ -657,7 +670,7 @@ impl LanguageState {
         info: PackageInfo,
         f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
-        let fut = self.primary().query_snapshot().map_err(internal_error)?;
+        let fut = self.query_snapshot().map_err(internal_error)?;
 
         Ok(async move {
             let snap = fut.receive().await.map_err(z_internal_error)?;
