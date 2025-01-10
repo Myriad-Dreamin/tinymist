@@ -325,7 +325,7 @@ export function provideSvgDoc<
         this.hookedElem.style.transform = transformAttr;
       }
 
-      // change height of the container back from `installCtrlWheelHandler` hack
+      // change height of the container back from `installRescaleHandler` hack
       if (this.hookedElem.style.height) {
         this.hookedElem.style.removeProperty("height");
       }
