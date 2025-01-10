@@ -1,3 +1,5 @@
+//! Transport layer for LSP messages.
+
 use std::{
     io::{self, BufRead, Read, Write},
     thread,
@@ -7,6 +9,27 @@ use crossbeam_channel::{bounded, Receiver, Sender};
 
 use crate::{Connection, ConnectionRx, ConnectionTx, Message};
 
+/// Convenience cli arguments for setting up a transport with an optional mirror
+/// or replay file.
+///
+/// The `mirror` argument will write the stdin to the file.
+/// The `replay` argument will read the file as input.
+///
+/// # Example
+///
+/// The example below shows the typical usage of the `MirrorArgs` struct.
+/// It records an LSP session and replays it to compare the output.
+///
+/// If the language server has stable output, the replayed output should be the
+/// same.
+///
+/// ```bash
+/// $ my-lsp --mirror /tmp/mirror.log > responses.txt
+/// $ ls /tmp
+/// mirror.log
+/// $ my-lsp --replay /tmp/mirror.log > responses-replayed.txt
+/// $ diff responses.txt responses-replayed.txt
+/// ```
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct MirrorArgs {
