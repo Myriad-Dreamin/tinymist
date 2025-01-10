@@ -6,6 +6,7 @@ pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 pub use reflexo_typst::world as base;
 pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
+use typ_server::Interrupt;
 
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
@@ -201,6 +202,8 @@ pub type LspUniverse = TypstSystemUniverseExtend;
 pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<LazyHash<TypstDict>>;
+/// LSP interrupt.
+pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;
@@ -221,6 +224,18 @@ impl LspUniverseBuilder {
             package_registry,
             font_resolver,
         ))
+    }
+
+    /// Resolve fonts from given options.
+    pub fn only_embedded_fonts() -> ZResult<TinymistFontResolver> {
+        let mut searcher = SystemFontSearcher::new();
+        searcher.resolve_opts(CompileFontOpts {
+            font_profile_cache_path: Default::default(),
+            font_paths: vec![],
+            no_system_fonts: true,
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+        })?;
+        Ok(searcher.into())
     }
 
     /// Resolve fonts from given options.

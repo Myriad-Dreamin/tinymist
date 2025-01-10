@@ -172,6 +172,8 @@ pub enum Interrupt<F: CompilerFeat> {
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
     ChangeTask(TaskInputs),
+    /// Font changes.
+    Font(Arc<F::FontResolver>),
     /// Request compiler to respond a snapshot without needing to wait latest
     /// compilation.
     SnapshotRead(oneshot::Sender<CompileSnapshot<F>>),
@@ -616,6 +618,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompilerServerWrapper<F> {
                 self.verse.increment_revision(|_| {});
 
                 reason_by_entry_change()
+            }
+            Interrupt::Font(font) => {
+                let _ = font;
+                todo!();
             }
             Interrupt::SnapshotRead(task) => {
                 log::debug!("CompileServerActor: take snapshot");

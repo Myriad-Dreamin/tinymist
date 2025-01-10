@@ -13,16 +13,18 @@ use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
+use tinymist_world::LspInterrupt;
 use tokio::sync::mpsc;
 use typst::layout::Position;
 
+use crate::stats::CompilerQueryStats;
 use crate::{
     task::{ExportConfig, ExportTask, ExportUserConfig},
     world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
-use tinymist_world::typ_server::{CompileServerActor, CompileServerOpts};
-use typ_client::{CompileClientActor, CompileHandler};
+use tinymist_world::typ_server::{CompileServerOpts, CompilerServerWrapper};
+use typ_client::{CompileClientActor, CompileHandler, LocalCompileHandler};
 
 impl LanguageState {
     /// Restart the primary server.
@@ -74,6 +76,7 @@ impl LanguageState {
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
+        let _ = intr_rx;
 
         // Run Export actors before preparing cluster to avoid loss of events
         let export = ExportTask::new(ExportConfig {
@@ -134,32 +137,42 @@ impl LanguageState {
         let cert_path = self.compile_config().determine_certification_path();
         let package = self.compile_config().determine_package_opts();
 
+        // todo: never fail?
+        let default_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let package_registry =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let verse =
+            LspUniverseBuilder::build(entry_.clone(), inputs, default_fonts, package_registry)
+                .expect("incorrect options");
+
+        // Create the actor
+        let server = CompilerServerWrapper::new_with(
+            verse,
+            // intr_tx,
+            // intr_rx,
+            CompileServerOpts {
+                compile_handle,
+                ..Default::default()
+            },
+        );
+        let client = self.client.clone();
         self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let package_registry =
-                LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-            let verse =
-                LspUniverseBuilder::build(entry_.clone(), inputs, font_resolver, package_registry)
-                    .expect("incorrect options");
-
-            // Create the actor
-            let server = CompileServerActor::new_with(
-                verse,
-                intr_tx,
-                intr_rx,
-                CompileServerOpts {
-                    compile_handle,
-                    ..Default::default()
-                },
-            )
-            .with_watch(true);
-            tokio::spawn(server.run());
+            client.send_event(LspInterrupt::Font(font_resolver));
         });
+
+        let handle = LocalCompileHandler {
+            diag_group: editor_group,
+            wrapper: server,
+            analysis: handle.analysis.clone(),
+            stats: CompilerQueryStats::default(),
+            export: handle.export.clone(),
+        };
 
         // Create the client
         let config = self.compile_config().clone();
-        let client = CompileClientActor::new(handle, config, entry);
+        let client = CompileClientActor::new(Arc::new(handle), config, entry);
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.

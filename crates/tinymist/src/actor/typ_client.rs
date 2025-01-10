@@ -37,7 +37,8 @@ use tinymist_query::{
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tinymist_world::typ_server::{
-    CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
+    CompilationHandle, CompileSnapshot, CompiledArtifact, CompilerServerWrapper, Interrupt,
+    SucceededArtifact,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -51,6 +52,137 @@ use crate::{
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
+
+pub struct LocalCompileHandler {
+    pub(crate) diag_group: String,
+    pub(crate) wrapper: CompilerServerWrapper<LspCompilerFeat>,
+    pub(crate) analysis: Arc<Analysis>,
+    pub(crate) stats: CompilerQueryStats,
+    pub(crate) export: ExportTask,
+}
+
+impl LocalCompileHandler {
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
+        // let (tx, rx) = oneshot::channel();
+        // self.intr_tx
+        //     .send(Interrupt::SnapshotRead(tx))
+        //     .map_err(map_string_err("failed to send snapshot request"))?;
+
+        // Ok(WorldSnapFut { rx })
+        todo!()
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
+        // let fut = self.snapshot()?;
+        // let analysis = self.analysis.clone();
+        // let rev_lock = analysis.lock_revision(q);
+
+        // Ok(QuerySnapFut {
+        //     fut,
+        //     analysis,
+        //     rev_lock,
+        // })
+        todo!()
+    }
+
+    /// Get latest artifact the compiler thread for tasks
+    pub fn artifact(&self) -> ZResult<ArtifactSnap> {
+        // let (tx, rx) = oneshot::channel();
+        // self.intr_tx
+        //     .send(Interrupt::CurrentRead(tx))
+        //     .map_err(map_string_err("failed to send snapshot request"))?;
+
+        // Ok(ArtifactSnap { rx })
+        todo!()
+    }
+
+    pub fn flush_compile(&self) {
+        // todo: better way to flush compile
+        // let _ = self.intr_tx.send(Interrupt::Compile);
+        todo!()
+    }
+
+    pub fn add_memory_changes(&self, event: MemoryEvent) {
+        // let _ = self.intr_tx.send(Interrupt::Memory(event));
+        todo!()
+    }
+
+    pub fn change_task(&self, task_inputs: TaskInputs) {
+        // let _ = self.intr_tx.send(Interrupt::ChangeTask(task_inputs));
+        todo!()
+    }
+
+    pub async fn settle(&self) -> anyhow::Result<()> {
+        // let (tx, rx) = oneshot::channel();
+        // let _ = self.intr_tx.send(Interrupt::Settle(tx));
+        // rx.await?;
+        // Ok(())
+        todo!()
+    }
+
+    fn push_diagnostics(&self, revision: usize, diagnostics: Option<DiagnosticsMap>) {
+        // let dv = DocVersion {
+        //     group: self.diag_group.clone(),
+        //     revision,
+        // };
+        // let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
+        // if let Err(err) = res {
+        //     error!("failed to send diagnostics: {err:#}");
+        // }
+        todo!()
+    }
+
+    fn notify_diagnostics(
+        &self,
+        world: &LspWorld,
+        errors: EcoVec<SourceDiagnostic>,
+        warnings: EcoVec<SourceDiagnostic>,
+    ) {
+        // let revision = world.revision().get();
+        // trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
+
+        // let diagnostics = tinymist_query::convert_diagnostics(
+        //     world,
+        //     errors.iter().chain(warnings.iter()),
+        //     self.analysis.position_encoding,
+        // );
+
+        // let entry = world.entry_state();
+        // // todo: better way to remove diagnostics
+        // // todo: check all errors in this file
+        // let detached = entry.is_inactive();
+        // let valid = !detached;
+        // self.push_diagnostics(revision, valid.then_some(diagnostics));
+        todo!()
+    }
+
+    // todo: multiple preview support
+    #[cfg(feature = "preview")]
+    #[must_use]
+    pub fn register_preview(&self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        // let mut p = self.inner.write();
+        // if p.as_ref().is_some() {
+        //     return false;
+        // }
+        // *p = Some(handle.clone());
+        // true
+        todo!()
+    }
+
+    #[cfg(feature = "preview")]
+    #[must_use]
+    pub fn unregister_preview(&self, task_id: &str) -> bool {
+        // let mut p = self.inner.write();
+        // if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
+        //     *p = None;
+        //     return true;
+        // }
+        // false
+        todo!()
+    }
+}
 
 pub struct CompileHandler {
     pub(crate) diag_group: String,
@@ -261,7 +393,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 }
 
 pub struct CompileClientActor {
-    pub handle: Arc<CompileHandler>,
+    pub handle: Arc<LocalCompileHandler>,
 
     pub config: CompileConfig,
     entry: EntryState,
@@ -269,7 +401,7 @@ pub struct CompileClientActor {
 
 impl CompileClientActor {
     pub(crate) fn new(
-        handle: Arc<CompileHandler>,
+        handle: Arc<LocalCompileHandler>,
         config: CompileConfig,
         entry: EntryState,
     ) -> Self {
