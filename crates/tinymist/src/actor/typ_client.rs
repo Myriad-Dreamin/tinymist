@@ -63,28 +63,25 @@ pub struct LocalCompileHandler {
 
 impl LocalCompileHandler {
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
-        // let (tx, rx) = oneshot::channel();
-        // self.intr_tx
-        //     .send(Interrupt::SnapshotRead(tx))
-        //     .map_err(map_string_err("failed to send snapshot request"))?;
+    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+        let (tx, rx) = oneshot::channel();
+        let snap = self.wrapper.snapshot();
+        let _ = tx.send(snap);
 
-        // Ok(WorldSnapFut { rx })
-        todo!()
+        Ok(WorldSnapFut { rx })
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
-        // let fut = self.snapshot()?;
-        // let analysis = self.analysis.clone();
-        // let rev_lock = analysis.lock_revision(q);
+    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
+        let fut = self.snapshot()?;
+        let analysis = self.analysis.clone();
+        let rev_lock = analysis.lock_revision(q);
 
-        // Ok(QuerySnapFut {
-        //     fut,
-        //     analysis,
-        //     rev_lock,
-        // })
-        todo!()
+        Ok(QuerySnapFut {
+            fut,
+            analysis,
+            rev_lock,
+        })
     }
 
     /// Get latest artifact the compiler thread for tasks
