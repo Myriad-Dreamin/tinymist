@@ -292,7 +292,8 @@ impl LanguageState {
             self.pin_entry(Some(entry))
                 .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
 
-            self.preview.start(cli_args, previewer, primary, true)
+            // self.preview.start(cli_args, previewer, primary, true)
+            todo!()
         } else {
             self.restart_dedicate(&task_id, Some(entry));
             let Some(dedicate) = self.dedicate(&task_id) else {
@@ -309,7 +310,8 @@ impl LanguageState {
                 ));
             }
 
-            self.preview.start(cli_args, previewer, handle, false)
+            // self.preview.start(cli_args, previewer, handle, false)
+            todo!()
         }
     }
 

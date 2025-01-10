@@ -149,6 +149,19 @@ impl<S: 'static> TypedLspClient<S> {
         self.client
             .send_request_::<R>(params, move |s, resp| handler(caster(s), resp))
     }
+
+    /// Sends a event to the client itself.
+    pub fn send_event<T: std::any::Any + Send + 'static>(&self, event: T) {
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send request: connection closed");
+            return;
+        };
+
+        let Err(res) = sender.event.send(Box::new(event)) else {
+            return;
+        };
+        log::warn!("failed to send event: {res:?}");
+    }
 }
 
 impl<S> Clone for TypedLspClient<S> {
