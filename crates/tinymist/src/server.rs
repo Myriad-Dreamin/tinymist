@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use actor::editor::EditorActor;
+use actor::typ_server::Interrupt;
 use anyhow::anyhow;
 use anyhow::Context;
 use log::{error, info, trace};
