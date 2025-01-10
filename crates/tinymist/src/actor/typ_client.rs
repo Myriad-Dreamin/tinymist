@@ -37,8 +37,8 @@ use tinymist_query::{
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tinymist_world::typ_server::{
-    CompilationHandle, CompileSnapshot, CompiledArtifact, CompilerServerWrapper, Interrupt,
-    SucceededArtifact,
+    CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, ProjectCompiler,
+    ProjectInterrupt, SucceededArtifact,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -55,7 +55,7 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 pub struct LocalCompileHandler {
     pub(crate) diag_group: String,
-    pub(crate) wrapper: CompilerServerWrapper<LspCompilerFeat>,
+    pub(crate) wrapper: ProjectCompiler<LspCompilerFeat>,
     pub(crate) analysis: Arc<Analysis>,
     pub(crate) stats: CompilerQueryStats,
     pub(crate) export: ExportTask,
@@ -98,20 +98,17 @@ impl LocalCompileHandler {
         todo!()
     }
 
-    pub fn flush_compile(&self) {
+    pub fn flush_compile(&mut self) {
         // todo: better way to flush compile
-        // let _ = self.intr_tx.send(Interrupt::Compile);
-        todo!()
+        self.wrapper.process(ProjectInterrupt::Compile);
     }
 
-    pub fn add_memory_changes(&self, event: MemoryEvent) {
-        // let _ = self.intr_tx.send(Interrupt::Memory(event));
-        todo!()
+    pub fn add_memory_changes(&mut self, event: MemoryEvent) {
+        self.wrapper.process(ProjectInterrupt::Memory(event));
     }
 
-    pub fn change_task(&self, task_inputs: TaskInputs) {
-        // let _ = self.intr_tx.send(Interrupt::ChangeTask(task_inputs));
-        todo!()
+    pub fn change_task(&mut self, task: TaskInputs) {
+        self.wrapper.process(ProjectInterrupt::ChangeTask(task));
     }
 
     pub async fn settle(&self) -> anyhow::Result<()> {
@@ -393,7 +390,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 }
 
 pub struct CompileClientActor {
-    pub handle: Arc<LocalCompileHandler>,
+    pub handle: LocalCompileHandler,
 
     pub config: CompileConfig,
     entry: EntryState,
@@ -401,7 +398,7 @@ pub struct CompileClientActor {
 
 impl CompileClientActor {
     pub(crate) fn new(
-        handle: Arc<LocalCompileHandler>,
+        handle: LocalCompileHandler,
         config: CompileConfig,
         entry: EntryState,
     ) -> Self {
@@ -413,8 +410,8 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
-        self.handle.clone().snapshot()
+    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+        self.handle.snapshot()
     }
 
     /// Get the entry resolver.
@@ -423,24 +420,27 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
-        self.handle.clone().query_snapshot(None)
+    pub fn query_snapshot(&mut self) -> ZResult<QuerySnapFut> {
+        self.handle.query_snapshot(None)
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
+    pub fn query_snapshot_with_stat(
+        &mut self,
+        q: &CompilerQueryRequest,
+    ) -> ZResult<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.handle.stats.query_stat(path, name);
-        let fut = self.handle.clone().query_snapshot(Some(q))?;
+        let fut = self.handle.query_snapshot(Some(q))?;
         Ok(QuerySnapWithStat { fut, stat })
     }
 
-    pub fn add_memory_changes(&self, event: MemoryEvent) {
+    pub fn add_memory_changes(&mut self, event: MemoryEvent) {
         self.handle.add_memory_changes(event);
     }
 
-    pub fn change_task(&self, task_inputs: TaskInputs) {
+    pub fn change_task(&mut self, task_inputs: TaskInputs) {
         self.handle.change_task(task_inputs);
     }
 
@@ -452,7 +452,7 @@ impl CompileClientActor {
         self.handle.export.change_config(config);
     }
 
-    pub fn on_export(&self, req: OnExportRequest) -> QueryFuture {
+    pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
@@ -526,7 +526,7 @@ impl CompileClientActor {
         self.handle.analysis.clear_cache();
     }
 
-    pub fn collect_server_info(&self) -> QueryFuture {
+    pub fn collect_server_info(&mut self) -> QueryFuture {
         let dg = self.handle.diag_group.clone();
         let api_stats = self.handle.stats.report();
         let query_stats = self.handle.analysis.report_query_stats();

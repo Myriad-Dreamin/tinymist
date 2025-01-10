@@ -286,7 +286,7 @@ impl LanguageState {
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
-        let primary = self.primary().handle.clone();
+        let primary = &mut self.primary().handle;
         if !cli_args.not_as_primary && primary.register_preview(previewer.compile_watcher()) {
             // todo: recover pin status reliably
             self.pin_entry(Some(entry))
@@ -295,20 +295,29 @@ impl LanguageState {
             // self.preview.start(cli_args, previewer, primary, true)
             todo!()
         } else {
-            self.restart_dedicate(&task_id, Some(entry));
-            let Some(dedicate) = self.dedicate(&task_id) else {
-                return Err(invalid_params(
-                    "just restarted compiler instance for the task is not found",
-                ));
-            };
+            // Get the task-dedicated compile server.
+            // pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
+            //     self.dedicates
+            //         .iter()
+            //         .find(|dedicate| dedicate.handle.diag_group == group)
+            // }
 
-            let handle = dedicate.handle.clone();
+            // self.restart_dedicate(&task_id, Some(entry));
+            // let Some(dedicate) = self.dedicate(&task_id) else {
+            //     return Err(invalid_params(
+            //         "just restarted compiler instance for the task is not found",
+            //     ));
+            // };
 
-            if !handle.register_preview(previewer.compile_watcher()) {
-                return Err(invalid_params(
-                    "cannot register preview to the compiler instance",
-                ));
-            }
+            // let _ = dedicate;
+
+            // let handle = dedicate.handle.clone();
+
+            // if !handle.register_preview(previewer.compile_watcher()) {
+            //     return Err(invalid_params(
+            //         "cannot register preview to the compiler instance",
+            //     ));
+            // }
 
             // self.preview.start(cli_args, previewer, handle, false)
             todo!()

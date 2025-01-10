@@ -277,38 +277,6 @@ pub struct CompileServerActor<F: CompilerFeat> {
     dep_rx: Option<mpsc::UnboundedReceiver<NotifyMessage>>,
 }
 
-/// The compiler actor.
-pub struct CompilerServerWrapper<F: CompilerFeat> {
-    /// The underlying universe.
-    pub verse: CompilerUniverse<F>,
-    /// The compilation handle.
-    pub compile_handle: Arc<dyn CompilationHandle<F>>,
-    /// Whether to enable file system watching.
-    pub enable_watch: bool,
-
-    /// The current logical tick.
-    logical_tick: usize,
-    /// Last logical tick when invalidation is caused by shadow update.
-    dirty_shadow_logical_tick: usize,
-
-    /// Estimated latest set of shadow files.
-    estimated_shadow_files: HashSet<Arc<Path>>,
-    /// The latest compiled document.
-    pub(crate) latest_doc: Option<Arc<TypstDocument>>,
-    /// The latest successly compiled document.
-    latest_success_doc: Option<Arc<TypstDocument>>,
-    /// feature set for compile_once mode.
-    once_feature_set: Arc<FeatureSet>,
-    /// Shared feature set for watch mode.
-    watch_feature_set: Arc<FeatureSet>,
-
-    watch_snap: OnceLock<CompileSnapshot<F>>,
-    suspended: bool,
-    compiling: bool,
-    suspended_reason: CompileReasons,
-    committed_revision: usize,
-}
-
 impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     /// Create a new compiler actor with options
     pub fn new_with(
@@ -432,6 +400,108 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         true
     }
 }
+
+pub enum ProjectInterrupt<F: CompilerFeat> {
+    /// Compile anyway.
+    Compile,
+    /// Compiled from computing thread.
+    Compiled(CompiledArtifact<F>),
+    /// Change the watching entry.
+    ChangeTask(TaskInputs),
+    /// Font changes.
+    Font(Arc<F::FontResolver>),
+    /// Memory file changes.
+    Memory(MemoryEvent),
+    /// File system event.
+    Fs(FilesystemEvent),
+}
+
+pub struct ProjectState<F: CompilerFeat> {
+    /// The forked world.
+    pub world: CompilerWorld<F>,
+}
+
+pub struct ProjectCompiler<F: CompilerFeat> {
+    pub wrapper: CompilerServerWrapper<F>,
+    // /// The primary compiler.
+    pub primary: ProjectState<F>,
+    // /// The compiler actors for tasks
+    pub dedicates: Vec<ProjectState<F>>,
+}
+
+impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
+    /// Create a new compiler actor with options
+    pub fn new_with(verse: CompilerUniverse<F>, opts: CompileServerOpts<F>) -> Self {
+        let wrapper = CompilerServerWrapper::new_with(verse, opts);
+        let primary = ProjectState {
+            world: wrapper.verse.snapshot(),
+        };
+        Self {
+            wrapper,
+            primary,
+            dedicates: vec![],
+        }
+    }
+
+    pub fn process(&mut self, intr: ProjectInterrupt<F>) {
+        let send = |resp| {
+            let _ = resp;
+            panic!("process task resp");
+        };
+
+        match intr {
+            ProjectInterrupt::Compile => todo!(),
+            ProjectInterrupt::Compiled(..) => todo!(),
+            ProjectInterrupt::ChangeTask(task) => {
+                let intr = Interrupt::ChangeTask(task);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Font(..) => todo!(),
+            ProjectInterrupt::Memory(memory_event) => {
+                let intr = Interrupt::Memory(memory_event);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Fs(..) => todo!(),
+        }
+    }
+}
+
+/// The compiler actor.
+pub struct CompilerServerWrapper<F: CompilerFeat> {
+    /// The underlying universe.
+    pub verse: CompilerUniverse<F>,
+    /// The compilation handle.
+    pub compile_handle: Arc<dyn CompilationHandle<F>>,
+    /// Whether to enable file system watching.
+    pub enable_watch: bool,
+
+    /// The current logical tick.
+    logical_tick: usize,
+    /// Last logical tick when invalidation is caused by shadow update.
+    dirty_shadow_logical_tick: usize,
+
+    /// Estimated latest set of shadow files.
+    estimated_shadow_files: HashSet<Arc<Path>>,
+    /// The latest compiled document.
+    pub(crate) latest_doc: Option<Arc<TypstDocument>>,
+    /// The latest successly compiled document.
+    latest_success_doc: Option<Arc<TypstDocument>>,
+    /// feature set for compile_once mode.
+    once_feature_set: Arc<FeatureSet>,
+    /// Shared feature set for watch mode.
+    watch_feature_set: Arc<FeatureSet>,
+
+    watch_snap: OnceLock<CompileSnapshot<F>>,
+    suspended: bool,
+    compiling: bool,
+    suspended_reason: CompileReasons,
+    committed_revision: usize,
+}
+
+// /// The primary compiler actor.
+// pub primary: Option<CompileClientActor>,
+// /// The compiler actors for tasks
+// pub dedicates: Vec<CompileClientActor>,
 
 impl<F: CompilerFeat + Send + Sync + 'static> CompilerServerWrapper<F> {
     /// Create a new compiler actor with options
