@@ -263,11 +263,9 @@ pub struct TaskPreviewArgs {
     pub preview_mode: PreviewMode,
 }
 
-const LOCKFILE_PATH: &str = "tinymist.lock";
-
 /// Project document commands' main
 pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
-    LockFile::update(LOCKFILE_PATH, |state| {
+    LockFile::update(Path::new("."), |state| {
         match args {
             DocCommands::New(args) => {
                 state.declare(&args);
@@ -288,7 +286,7 @@ pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
 
 /// Project task commands' main
 pub fn task_main(args: TaskCommands) -> anyhow::Result<()> {
-    LockFile::update(LOCKFILE_PATH, |state| {
+    LockFile::update(Path::new("."), |state| {
         match args {
             TaskCommands::Compile(args) => {
                 let id = state.declare(&args.declare);
