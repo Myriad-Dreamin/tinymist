@@ -3872,7 +3872,6 @@ dependencies = [
  "reflexo",
  "reflexo-typst",
  "reflexo-vec2svg",
- "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3881,6 +3880,7 @@ dependencies = [
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
  "tinymist-fs",
+ "tinymist-project",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -3961,6 +3961,24 @@ dependencies = [
  "same-file",
  "tempfile",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "tinymist-project"
+version = "0.12.18"
+dependencies = [
+ "anyhow",
+ "clap",
+ "log",
+ "pathdiff",
+ "reflexo",
+ "same-file",
+ "semver",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tinymist-fs",
+ "toml",
 ]
 
 [[package]]
