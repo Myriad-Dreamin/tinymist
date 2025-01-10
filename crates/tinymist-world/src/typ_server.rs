@@ -433,6 +433,14 @@ pub struct ProjectCompiler<F: CompilerFeat> {
 impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
     /// Create a new compiler actor with options
     pub fn new_with(verse: CompilerUniverse<F>, opts: CompileServerOpts<F>) -> Self {
+        let root = verse.workspace_root();
+        if let Some(root) = root {
+            let _ = tinymist_project::LockFile::update(&root, |l| {
+                let _ = l;
+                Ok(())
+            });
+        }
+
         let wrapper = CompilerServerWrapper::new_with(verse, opts);
         let primary = ProjectState {
             id: "primary".to_string(),

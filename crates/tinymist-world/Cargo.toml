@@ -28,6 +28,7 @@ reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
 
 tinymist-assets = { workspace = true }
+tinymist-project.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
 dirs.workspace = true
