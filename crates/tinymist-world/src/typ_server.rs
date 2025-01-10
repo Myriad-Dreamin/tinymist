@@ -464,6 +464,22 @@ impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
             ProjectInterrupt::Fs(..) => todo!(),
         }
     }
+
+    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+        if self
+            .wrapper
+            .watch_snap
+            .get()
+            .is_some_and(|e| e.world.revision() < *self.wrapper.verse.revision.read())
+        {
+            self.wrapper.watch_snap = OnceLock::new();
+        }
+
+        self.wrapper
+            .watch_snap
+            .get_or_init(|| self.wrapper.snapshot(false, no_reason()))
+            .clone()
+    }
 }
 
 /// The compiler actor.
