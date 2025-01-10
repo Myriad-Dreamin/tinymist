@@ -166,24 +166,20 @@ impl LanguageState {
     }
 
     /// Get the primary compile server for those commands without task context.
-    pub fn primary(&self) -> &CompileClientActor {
-        self.primary.as_ref().expect("primary")
-    }
-
-    /// Get the task-dedicated compile server.
-    pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
-        self.dedicates
-            .iter()
-            .find(|dedicate| dedicate.handle.diag_group == group)
+    pub fn primary(&mut self) -> &mut CompileClientActor {
+        self.primary.as_mut().expect("primary")
     }
 
     /// Get all compile servers in current state.
     pub fn servers_mut(&mut self) -> impl Iterator<Item = &mut CompileClientActor> {
-        self.primary.iter_mut().chain(self.dedicates.iter_mut())
+        // self.primary.iter_mut().chain(self.dedicates.iter_mut())
+        todo!();
+
+        [].into_iter()
     }
 
     /// Install handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands>(
+    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = LanguageState;
@@ -199,6 +195,8 @@ impl LanguageState {
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
+            // customized event
+            .with_event(&LspInterrupt::Compile, State::compile_interrupt::<T>)
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
             .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
@@ -267,7 +265,7 @@ impl LanguageState {
         provider.args.add_commands(
             &Some("tinymist.getResources")
                 .iter()
-                .chain(provider.exec_cmds.keys())
+                .chain(provider.command_handlers.keys())
                 .map(ToString::to_string)
                 .collect::<Vec<_>>(),
         );
@@ -275,17 +273,18 @@ impl LanguageState {
         provider
     }
 
-    /// Get all sources in current state.
-    pub fn vfs_snapshot(&self) -> FileChangeSet {
-        FileChangeSet::new_inserts(
-            self.memory_changes
-                .iter()
-                .map(|(path, meta)| {
-                    let content = meta.content.clone().text().as_bytes().into();
-                    (path.clone(), FileResult::Ok((meta.mt, content)).into())
-                })
-                .collect(),
-        )
+    fn compile_interrupt<T: Initializer<S = Self>>(
+        mut state: ServiceState<T, T::S>,
+        params: LspInterrupt,
+    ) -> anyhow::Result<()> {
+        let Some(ready) = state.ready() else {
+            log::info!("interrupted on not ready server");
+            return Ok(());
+        };
+
+        let server = ready.primary();
+        server.interrupt(params);
+        Ok(())
     }
 }
 
@@ -911,9 +910,8 @@ impl LanguageState {
 
 impl LanguageState {
     fn update_source(&mut self, files: FileChangeSet) -> Result<(), Error> {
-        for srv in self.servers_mut() {
-            srv.add_memory_changes(MemoryEvent::Update(files.clone()));
-        }
+        self.primary()
+            .add_memory_changes(MemoryEvent::Update(files.clone()));
 
         Ok(())
     }
@@ -923,6 +921,7 @@ impl LanguageState {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
+        log::info!("create source: {path:?}");
         self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
@@ -932,7 +931,6 @@ impl LanguageState {
         );
 
         let content: Bytes = content.as_bytes().into();
-        log::info!("create source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
@@ -1021,7 +1019,6 @@ impl LanguageState {
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        let primary = || self.primary();
         let is_pinning = self.pinning;
         just_ok(match query {
             FoldingRange(req) => query_source!(self, FoldingRange, req)?,
@@ -1029,14 +1026,14 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
-            OnExport(req) => return primary().on_export(req),
-            ServerInfo(_) => return primary().collect_server_info(),
-            _ => return Self::query_on(primary(), is_pinning, query),
+            OnExport(req) => return self.primary().on_export(req),
+            ServerInfo(_) => return self.primary().collect_server_info(),
+            _ => return Self::query_on(self.primary(), is_pinning, query),
         })
     }
 
     fn query_on(
-        client: &CompileClientActor,
+        client: &mut CompileClientActor,
         is_pinning: bool,
         query: CompilerQueryRequest,
     ) -> QueryFuture {

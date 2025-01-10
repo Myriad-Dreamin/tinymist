@@ -16,6 +16,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_world::typ_server::{CompileServerActor, CompileServerOpts, SucceededArtifact};
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
@@ -32,7 +33,6 @@ use crate::world::{LspCompilerFeat, LspWorld};
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use actor::typ_client::CompileHandler;
-use actor::typ_server::{CompileServerActor, CompileServerOpts, SucceededArtifact};
 
 impl CompileHost for CompileHandler {}
 

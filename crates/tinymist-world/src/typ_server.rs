@@ -2,6 +2,8 @@
 //!
 //! Please check `tinymist::actor::typ_client` for architecture details.
 
+#![allow(missing_docs)]
+
 use std::{
     collections::HashSet,
     path::Path,
@@ -19,8 +21,6 @@ use reflexo_typst::{
     WorldDeps,
 };
 use typst::diag::{SourceDiagnostic, SourceResult};
-
-use crate::task::CacheTask;
 
 /// A signal that possibly triggers an export.
 ///
@@ -69,7 +69,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         self
     }
 
-    pub async fn compile(self) -> CompiledArtifact<F> {
+    pub fn compile(self) -> CompiledArtifact<F> {
         let mut snap = self;
         let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
         let (doc, warnings) = match warned {
@@ -172,6 +172,8 @@ pub enum Interrupt<F: CompilerFeat> {
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
     ChangeTask(TaskInputs),
+    /// Font changes.
+    Font(Arc<F::FontResolver>),
     /// Request compiler to respond a snapshot without needing to wait latest
     /// compilation.
     SnapshotRead(oneshot::Sender<CompileSnapshot<F>>),
@@ -250,7 +252,6 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat> {
     pub compile_handle: Arc<dyn CompilationHandle<F>>,
     pub feature_set: FeatureSet,
-    pub cache: CacheTask,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
@@ -258,13 +259,267 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             compile_handle: Arc::new(std::marker::PhantomData),
             feature_set: Default::default(),
-            cache: Default::default(),
         }
     }
 }
 
 /// The compiler actor.
 pub struct CompileServerActor<F: CompilerFeat> {
+    /// The wrapper
+    pub wrapper: CompilerServerWrapper<F>,
+
+    /// Channel for sending interrupts to the compiler actor.
+    intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
+    /// Channel for receiving interrupts from the compiler actor.
+    intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
+
+    dep_tx: mpsc::UnboundedSender<NotifyMessage>,
+    dep_rx: Option<mpsc::UnboundedReceiver<NotifyMessage>>,
+}
+
+impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
+    /// Create a new compiler actor with options
+    pub fn new_with(
+        verse: CompilerUniverse<F>,
+        intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
+        intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
+        opts: CompileServerOpts<F>,
+    ) -> Self {
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        Self {
+            wrapper: CompilerServerWrapper::new_with(verse, opts),
+
+            intr_tx,
+            intr_rx,
+            dep_tx,
+            dep_rx: Some(dep_rx),
+        }
+    }
+
+    /// Compile the document once.
+    async fn run_compile(
+        &mut self,
+        reason: CompileReasons,
+        curr_reads: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
+        is_once: bool,
+    ) -> Option<CompiledArtifact<F>> {
+        let compile = self.wrapper.run_compile(reason, curr_reads, is_once)?;
+
+        if is_once {
+            Some(compile())
+        } else {
+            let intr_tx = self.intr_tx.clone();
+            tokio::task::spawn(async move {
+                let err = intr_tx.send(Interrupt::Compiled(compile()));
+                log_send_error("compiled", err);
+            });
+
+            None
+        }
+    }
+
+    pub fn with_watch(mut self, watch: bool) -> Self {
+        self.wrapper.enable_watch = watch;
+        self
+    }
+
+    /// Launches the compiler actor.
+    pub fn start(&mut self) -> bool {
+        if !self.wrapper.enable_watch {
+            return self.wrapper.start();
+        }
+
+        // Trigger the first compilation (if active)
+        self.wrapper.start();
+
+        // Spawn file system watcher.
+        let fs_tx = self.intr_tx.clone();
+        let dep_rx = self.dep_rx.take().expect("start only once");
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
+        }));
+
+        true
+    }
+
+    /// Launches the compiler actor.
+    pub async fn run(mut self) -> bool {
+        if !self.wrapper.enable_watch {
+            return self.start();
+        }
+
+        self.start();
+
+        let dep_tx = self.dep_tx.clone();
+        let mut curr_reads = vec![];
+
+        'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
+            let mut comp_reason = no_reason();
+
+            'accumulate: loop {
+                // Warp the logical clock by one.
+                self.wrapper.logical_tick += 1;
+
+                // If settle, stop the actor.
+                if let Interrupt::Settle(e) = event {
+                    log::info!("CompileServerActor: requested stop");
+                    e.send(()).ok();
+                    break 'event_loop;
+                }
+
+                if let Interrupt::CurrentRead(event) = event {
+                    curr_reads.push(event);
+                } else {
+                    comp_reason.see(self.wrapper.process(
+                        event,
+                        |res: CompilerResponse| match res {
+                            CompilerResponse::Notify(msg) => {
+                                log_send_error("compile_deps", dep_tx.send(msg));
+                            }
+                        },
+                    ));
+                }
+
+                // Try to accumulate more events.
+                match self.intr_rx.try_recv() {
+                    Ok(new_event) => event = new_event,
+                    _ => break 'accumulate,
+                }
+            }
+
+            // Either we have a reason to compile or we have events that want to have any
+            // compilation.
+            if comp_reason.any() || !curr_reads.is_empty() {
+                self.run_compile(comp_reason, &mut curr_reads, false).await;
+            }
+        }
+
+        log_send_error("settle_notify", dep_tx.send(NotifyMessage::Settle));
+        log::info!("CompileServerActor: exited");
+        true
+    }
+}
+
+pub enum ProjectInterrupt<F: CompilerFeat> {
+    /// Compile anyway.
+    Compile,
+    /// Compiled from computing thread.
+    Compiled(CompiledArtifact<F>),
+    /// Change the watching entry.
+    ChangeTask(TaskInputs),
+    /// Font changes.
+    Font(Arc<F::FontResolver>),
+    /// Memory file changes.
+    Memory(MemoryEvent),
+    /// File system event.
+    Fs(FilesystemEvent),
+}
+
+pub struct ProjectState<F: CompilerFeat> {
+    pub id: String,
+    /// The forked world.
+    pub world: CompilerWorld<F>,
+}
+
+pub struct ProjectCompiler<F: CompilerFeat> {
+    pub wrapper: CompilerServerWrapper<F>,
+    // /// The primary compiler.
+    pub primary: ProjectState<F>,
+    // /// The compiler actors for tasks
+    pub dedicates: Vec<ProjectState<F>>,
+
+    /// Channel for sending interrupts to the compiler actor.
+    dep_tx: mpsc::UnboundedSender<NotifyMessage>,
+}
+
+impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
+    /// Create a new compiler actor with options
+    pub fn new_with(
+        verse: CompilerUniverse<F>,
+        sender: sync_lsp::LspClient,
+        opts: CompileServerOpts<F>,
+    ) -> Self {
+        let root = verse.workspace_root();
+        if let Some(root) = root {
+            let _ = tinymist_project::LockFile::update(&root, |l| {
+                let _ = l;
+                Ok(())
+            });
+        }
+
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            sender.send_event(ProjectInterrupt::<F>::Fs(event));
+        }));
+
+        let wrapper = CompilerServerWrapper::new_with(verse, opts);
+        let primary = ProjectState {
+            id: "primary".to_string(),
+            world: wrapper.verse.snapshot(),
+        };
+        Self {
+            wrapper,
+            primary,
+            dep_tx,
+            dedicates: vec![],
+        }
+    }
+
+    pub fn process(&mut self, intr: ProjectInterrupt<F>) {
+        let send = |resp| match resp {
+            CompilerResponse::Notify(msg) => {
+                log_send_error("notify", self.dep_tx.send(msg));
+            }
+        };
+
+        match intr {
+            ProjectInterrupt::Compile => {
+                let intr = Interrupt::Compile;
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Compiled(compiled) => {
+                let intr = Interrupt::Compiled(compiled);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::ChangeTask(task) => {
+                let intr = Interrupt::ChangeTask(task);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Font(font) => {
+                let intr = Interrupt::Font(font);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Memory(memory_event) => {
+                let intr = Interrupt::Memory(memory_event);
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Fs(fs_event) => {
+                let intr = Interrupt::Fs(fs_event);
+                self.wrapper.process(intr, send);
+            }
+        }
+    }
+
+    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+        if self
+            .wrapper
+            .watch_snap
+            .get()
+            .is_some_and(|e| e.world.revision() < *self.wrapper.verse.revision.read())
+        {
+            self.wrapper.watch_snap = OnceLock::new();
+        }
+
+        self.wrapper
+            .watch_snap
+            .get_or_init(|| self.wrapper.snapshot(false, no_reason()))
+            .clone()
+    }
+}
+
+/// The compiler actor.
+pub struct CompilerServerWrapper<F: CompilerFeat> {
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
     /// The compilation handle.
@@ -288,13 +543,6 @@ pub struct CompileServerActor<F: CompilerFeat> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    /// Channel for sending interrupts to the compiler actor.
-    intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
-    /// Channel for receiving interrupts from the compiler actor.
-    intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
-    /// Shared cache evict task.
-    cache: CacheTask,
-
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
     compiling: bool,
@@ -302,16 +550,18 @@ pub struct CompileServerActor<F: CompilerFeat> {
     committed_revision: usize,
 }
 
-impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
+// /// The primary compiler actor.
+// pub primary: Option<CompileClientActor>,
+// /// The compiler actors for tasks
+// pub dedicates: Vec<CompileClientActor>,
+
+impl<F: CompilerFeat + Send + Sync + 'static> CompilerServerWrapper<F> {
     /// Create a new compiler actor with options
     pub fn new_with(
         verse: CompilerUniverse<F>,
-        intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
-        intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
         CompileServerOpts {
             compile_handle,
             feature_set,
-            cache: cache_evict,
         }: CompileServerOpts<F>,
     ) -> Self {
         let entry = verse.entry_state();
@@ -332,10 +582,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 feature_set.configure(&WITH_COMPILING_STATUS_FEATURE, true),
             ),
 
-            intr_tx,
-            intr_rx,
-            cache: cache_evict,
-
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
             compiling: false,
@@ -344,77 +590,20 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         }
     }
 
-    pub fn with_watch(mut self, watch: bool) -> Self {
-        self.enable_watch = watch;
-        self
-    }
-
     fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
         CompileEnv::default().configure_shared(feature_set)
     }
 
     /// Launches the compiler actor.
-    pub async fn run(mut self) -> bool {
-        if !self.enable_watch {
-            let artifact = self.compile_once().await;
-            return artifact.doc.is_ok();
-        }
-
-        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
-        let mut curr_reads = vec![];
-
+    pub fn start(&mut self) -> bool {
         log::debug!("CompileServerActor: initialized");
 
         // Trigger the first compilation (if active)
-        self.run_compile(reason_by_entry_change(), &mut curr_reads, false)
-            .await;
-
-        // Spawn file system watcher.
-        let fs_tx = self.intr_tx.clone();
-        tokio::spawn(watch_deps(dep_rx, move |event| {
-            log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
-        }));
-
-        'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
-            let mut comp_reason = no_reason();
-
-            'accumulate: loop {
-                // Warp the logical clock by one.
-                self.logical_tick += 1;
-
-                // If settle, stop the actor.
-                if let Interrupt::Settle(e) = event {
-                    log::info!("CompileServerActor: requested stop");
-                    e.send(()).ok();
-                    break 'event_loop;
-                }
-
-                if let Interrupt::CurrentRead(event) = event {
-                    curr_reads.push(event);
-                } else {
-                    comp_reason.see(self.process(event, |res: CompilerResponse| match res {
-                        CompilerResponse::Notify(msg) => {
-                            log_send_error("compile_deps", dep_tx.send(msg));
-                        }
-                    }));
-                }
-
-                // Try to accumulate more events.
-                match self.intr_rx.try_recv() {
-                    Ok(new_event) => event = new_event,
-                    _ => break 'accumulate,
-                }
-            }
-
-            // Either we have a reason to compile or we have events that want to have any
-            // compilation.
-            if comp_reason.any() || !curr_reads.is_empty() {
-                self.run_compile(comp_reason, &mut curr_reads, false).await;
-            }
+        let compile = self.run_compile(reason_by_entry_change(), &mut vec![], !self.enable_watch);
+        if let Some(compile) = compile {
+            compile();
         }
 
-        log_send_error("settle_notify", dep_tx.send(NotifyMessage::Settle));
-        log::info!("CompileServerActor: exited");
         true
     }
 
@@ -438,22 +627,21 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     }
 
     /// Compile the document once.
-    pub async fn compile_once(&mut self) -> CompiledArtifact<F> {
+    pub fn compile_once(&mut self) -> CompiledArtifact<F> {
         self.run_compile(reason_by_entry_change(), &mut vec![], true)
-            .await
-            .expect("is_once is set")
+            .expect("is_once is set")()
     }
 
     /// Compile the document once.
-    async fn run_compile(
+    fn run_compile(
         &mut self,
         reason: CompileReasons,
         curr_reads: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
         is_once: bool,
-    ) -> Option<CompiledArtifact<F>> {
+    ) -> Option<impl FnOnce() -> CompiledArtifact<F>> {
         self.suspended_reason.see(reason);
         let reason = std::mem::take(&mut self.suspended_reason);
-        let start = reflexo::time::now();
+        let start = reflexo_typst::time::now();
 
         let compiling = self.snapshot(is_once, reason);
         self.watch_snap = OnceLock::new();
@@ -484,8 +672,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         h.status(revision, CompileReport::Stage(id, "compiling", start));
 
-        let compile = move || async move {
-            let compiled = compiling.compile().await;
+        Some(move || {
+            let compiled = compiling.compile();
 
             for reader in curr_reads {
                 let _ = reader.send(SucceededArtifact::Compiled(compiled.clone()));
@@ -506,19 +694,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             h.notify_compile(&compiled, rep);
 
             compiled
-        };
-
-        if is_once {
-            Some(compile().await)
-        } else {
-            let intr_tx = self.intr_tx.clone();
-            tokio::task::spawn(async move {
-                let err = intr_tx.send(Interrupt::Compiled(compile().await));
-                log_send_error("compiled", err);
-            });
-
-            None
-        }
+        })
     }
 
     fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
@@ -546,7 +722,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        self.cache.evict();
+        rayon::spawn(|| {
+            let evict_start = std::time::Instant::now();
+            comemo::evict(30);
+            let elapsed = evict_start.elapsed();
+            log::info!("CacheEvictTask: evict cache in {elapsed:?}");
+        });
     }
 
     /// Process some interrupt. Return whether it needs compilation.
@@ -557,6 +738,13 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             Interrupt::Compile => {
                 // Increment the revision anyway.
                 self.verse.increment_revision(|_| {});
+
+                reason_by_entry_change()
+            }
+            Interrupt::Font(font) => {
+                self.verse.increment_revision(|verse| {
+                    verse.inner.font_resolver = font;
+                });
 
                 reason_by_entry_change()
             }

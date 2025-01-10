@@ -1,11 +1,35 @@
+//! Transport layer for LSP messages.
+
 use std::{
     io::{self, BufRead, Read, Write},
     thread,
 };
 
 use crossbeam_channel::{bounded, Receiver, Sender};
-use lsp_server::{Connection, Message};
 
+use crate::{Connection, ConnectionRx, ConnectionTx, Message};
+
+/// Convenience cli arguments for setting up a transport with an optional mirror
+/// or replay file.
+///
+/// The `mirror` argument will write the stdin to the file.
+/// The `replay` argument will read the file as input.
+///
+/// # Example
+///
+/// The example below shows the typical usage of the `MirrorArgs` struct.
+/// It records an LSP session and replays it to compare the output.
+///
+/// If the language server has stable output, the replayed output should be the
+/// same.
+///
+/// ```bash
+/// $ my-lsp --mirror /tmp/mirror.log > responses.txt
+/// $ ls /tmp
+/// mirror.log
+/// $ my-lsp --replay /tmp/mirror.log > responses-replayed.txt
+/// $ diff responses.txt responses-replayed.txt
+/// ```
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct MirrorArgs {
@@ -43,10 +67,23 @@ pub fn with_stdio_transport(
     };
     let o = || std::io::stdout().lock();
 
+    let (event_sender, event_receiver) = bounded::<crate::Event>(10);
+
     // Create the transport. Includes the stdio (stdin and stdout) versions but this
     // could also be implemented to use sockets or HTTP.
-    let (sender, receiver, io_threads) = io_transport(i, o);
-    let connection = Connection { sender, receiver };
+    let (lsp_sender, lsp_receiver, io_threads) = io_transport(i, o);
+    let connection = Connection {
+        // lsp_sender,
+        // lsp_receiver,
+        sender: ConnectionTx {
+            event: event_sender,
+            lsp: lsp_sender,
+        },
+        receiver: ConnectionRx {
+            event: event_receiver,
+            lsp: lsp_receiver,
+        },
+    };
 
     f(connection)?;
 

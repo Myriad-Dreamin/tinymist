@@ -1,3 +1,5 @@
+//! A synchronous language server implementation.
+
 use core::fmt;
 use std::any::Any;
 use std::path::Path;
@@ -5,17 +7,64 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::{collections::HashMap, path::PathBuf};
 
+use crossbeam_channel::RecvError;
 use futures::future::MaybeDone;
-use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
+use lsp_server::{ErrorCode, Notification, Request, RequestId, Response};
 use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
 use parking_lot::Mutex;
 use reflexo::{time::Instant, ImmutPath};
 use serde::Serialize;
 use serde_json::{from_value, Value as JsonValue};
-use tinymist_query::CompilerQueryResponse;
 
 pub mod req_queue;
 pub mod transport;
+
+type Event = Box<dyn Any + Send>;
+
+/// The sender of the language server.
+#[derive(Debug, Clone)]
+pub struct ConnectionTx {
+    /// The sender of the events.
+    pub event: crossbeam_channel::Sender<Event>,
+    /// The sender of the LSP messages.
+    pub lsp: crossbeam_channel::Sender<Message>,
+}
+
+/// The sender of the language server.
+#[derive(Debug, Clone)]
+pub struct ConnectionRx {
+    /// The receiver of the events.
+    pub event: crossbeam_channel::Receiver<Event>,
+    /// The receiver of the LSP messages.
+    pub lsp: crossbeam_channel::Receiver<Message>,
+}
+
+impl ConnectionRx {
+    /// Receives a message or an event.
+    fn recv(&self) -> Result<EventOrMessage, RecvError> {
+        crossbeam_channel::select_biased! {
+            recv(self.lsp) -> msg => msg.map(EventOrMessage::Msg),
+            recv(self.event) -> event => event.map(EventOrMessage::Evt),
+        }
+    }
+}
+
+/// This is a helper enum to handle both events and messages.
+enum EventOrMessage {
+    Evt(Event),
+    Msg(Message),
+}
+
+/// Connection is just a pair of channels of LSP messages.
+pub struct Connection {
+    /// The senders of the connection.
+    pub sender: ConnectionTx,
+    /// The receivers of the connection.
+    pub receiver: ConnectionRx,
+}
+
+/// The common message type for the language server.
+pub type Message = lsp_server::Message;
 
 /// The common error type for the language server.
 pub use lsp_server::ResponseError;
@@ -35,8 +84,6 @@ pub type AnySchedulableResponse = SchedulableResponse<JsonValue>;
 /// - Returns Ok(None) -> Need to respond none
 /// - Returns Err(..) -> Need to respond error
 pub type ScheduledResult = LspResult<Option<()>>;
-/// The future type for a lsp query.
-pub type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
 
 /// A helper function to create a `LspResponseFuture`
 pub fn just_ok<T, E>(res: T) -> Result<ResponseFuture<Result<T, E>>, E> {
@@ -75,6 +122,7 @@ pub struct TypedLspClient<S> {
 }
 
 impl<S> TypedLspClient<S> {
+    /// Converts the client to an untyped client.
     pub fn to_untyped(self) -> LspClient {
         self.client
     }
@@ -101,6 +149,19 @@ impl<S: 'static> TypedLspClient<S> {
         self.client
             .send_request_::<R>(params, move |s, resp| handler(caster(s), resp))
     }
+
+    /// Sends a event to the client itself.
+    pub fn send_event<T: std::any::Any + Send + 'static>(&self, event: T) {
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send request: connection closed");
+            return;
+        };
+
+        let Err(res) = sender.event.send(Box::new(event)) else {
+            return;
+        };
+        log::warn!("failed to send event: {res:?}");
+    }
 }
 
 impl<S> Clone for TypedLspClient<S> {
@@ -125,12 +186,12 @@ impl<S> std::ops::Deref for TypedLspClient<S> {
 #[derive(Debug, Clone)]
 pub struct LspClientRoot {
     weak: LspClient,
-    _strong: Arc<crossbeam_channel::Sender<Message>>,
+    _strong: Arc<ConnectionTx>,
 }
 
 impl LspClientRoot {
     /// Creates a new language server host.
-    pub fn new(handle: tokio::runtime::Handle, sender: crossbeam_channel::Sender<Message>) -> Self {
+    pub fn new(handle: tokio::runtime::Handle, sender: ConnectionTx) -> Self {
         let _strong = Arc::new(sender);
         let weak = LspClient {
             handle,
@@ -155,7 +216,7 @@ pub struct LspClient {
     /// The tokio handle.
     pub handle: tokio::runtime::Handle,
 
-    sender: Weak<crossbeam_channel::Sender<Message>>,
+    sender: Weak<ConnectionTx>,
     req_queue: Arc<Mutex<ReqQueue>>,
 }
 
@@ -173,8 +234,22 @@ impl LspClient {
         self.req_queue.lock().incoming.has_pending()
     }
 
+    /// Prints states of the request queue and panics.
     pub fn begin_panic(&self) {
         self.req_queue.lock().begin_panic();
+    }
+
+    /// Sends a event to the client itself.
+    pub fn send_event<T: std::any::Any + Send + 'static>(&self, event: T) {
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send request: connection closed");
+            return;
+        };
+
+        let Err(res) = sender.event.send(Box::new(event)) else {
+            return;
+        };
+        log::warn!("failed to send event: {res:?}");
     }
 
     /// Sends a request to the client and registers a handler.
@@ -191,7 +266,7 @@ impl LspClient {
         let request = req_queue
             .outgoing
             .register(R::METHOD.to_owned(), params, Box::new(handler));
-        let Err(res) = sender.send(request.into()) else {
+        let Err(res) = sender.lsp.send(request.into()) else {
             return;
         };
         log::warn!("failed to send request: {res:?}");
@@ -228,7 +303,7 @@ impl LspClient {
 
             let duration = start.elapsed();
             log::info!("handled  {method} - ({}) in {duration:0.2?}", response.id);
-            let Err(res) = sender.send(response.into()) else {
+            let Err(res) = sender.lsp.send(response.into()) else {
                 return;
             };
             log::warn!("failed to send response: {res:?}");
@@ -241,7 +316,7 @@ impl LspClient {
             log::warn!("failed to send notification: connection closed");
             return;
         };
-        let Err(res) = sender.send(notif.into()) else {
+        let Err(res) = sender.lsp.send(notif.into()) else {
             return;
         };
         log::warn!("failed to send notification: {res:?}");
@@ -254,22 +329,6 @@ impl LspClient {
 }
 
 impl LspClient {
-    /// Schedules a query from the client.
-    pub fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: SchedulableResponse<CompilerQueryResponse> = Ok(match fut {
-            MaybeDone::Done(res) => {
-                MaybeDone::Done(res.map_err(|err| internal_error(err.to_string())))
-            }
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
-    }
-
     /// Schedules a request from the client.
     pub fn schedule<T: Serialize + 'static>(
         &self,
@@ -318,97 +377,139 @@ type ExecuteCmdMap<S> = HashMap<&'static str, BoxHandler<S, Vec<JsonValue>>>;
 type RegularCmdMap<S> = HashMap<&'static str, BoxHandler<S, JsonValue>>;
 type NotifyCmdMap<S> = HashMap<&'static str, BoxPureHandler<S, JsonValue>>;
 type ResourceMap<S> = HashMap<ImmutPath, BoxHandler<S, Vec<JsonValue>>>;
+type MayInitBoxHandler<A, S, T> =
+    Box<dyn for<'a> Fn(ServiceState<'a, A, S>, &LspClient, T) -> anyhow::Result<()>>;
+type EventMap<A, S> = HashMap<core::any::TypeId, MayInitBoxHandler<A, S, Event>>;
 
+/// A trait that initializes the language server.
 pub trait Initializer {
+    /// The type of the initialization request.
     type I: for<'de> serde::Deserialize<'de>;
+    /// The type of the service.
     type S;
 
+    /// Handles the initialization request.
+    /// If the behind protocol is the standard LSP, the request is
+    /// `InitializeParams`.
     fn initialize(self, req: Self::I) -> (Self::S, AnySchedulableResponse);
 }
 
+/// The builder pattern for the language server.
 pub struct LspBuilder<Args: Initializer> {
+    /// The extra initialization arguments.
     pub args: Args,
+    /// The client surface for the implementing language server.
     pub client: LspClient,
-    pub exec_cmds: ExecuteCmdMap<Args::S>,
-    pub notify_cmds: NotifyCmdMap<Args::S>,
-    pub regular_cmds: RegularCmdMap<Args::S>,
-    pub resource_routes: ResourceMap<Args::S>,
+    /// The event handlers.
+    pub events: EventMap<Args, Args::S>,
+    /// The command handlers.
+    pub command_handlers: ExecuteCmdMap<Args::S>,
+    /// The notification handlers.
+    pub notif_handlers: NotifyCmdMap<Args::S>,
+    /// The request handlers.
+    pub req_handlers: RegularCmdMap<Args::S>,
+    /// The resource handlers.
+    pub resource_handlers: ResourceMap<Args::S>,
 }
 
 impl<Args: Initializer> LspBuilder<Args>
 where
     Args::S: 'static,
 {
+    /// Creates a new language server builder.
     pub fn new(args: Args, client: LspClient) -> Self {
         Self {
             args,
             client,
-            exec_cmds: ExecuteCmdMap::new(),
-            notify_cmds: NotifyCmdMap::new(),
-            regular_cmds: RegularCmdMap::new(),
-            resource_routes: ResourceMap::new(),
+            events: EventMap::new(),
+            command_handlers: ExecuteCmdMap::new(),
+            notif_handlers: NotifyCmdMap::new(),
+            req_handlers: RegularCmdMap::new(),
+            resource_handlers: ResourceMap::new(),
         }
     }
 
+    /// Registers an event handler.
+    pub fn with_event<T: std::any::Any>(
+        mut self,
+        ins: &T,
+        handler: impl for<'a> Fn(ServiceState<'a, Args, Args::S>, T) -> anyhow::Result<()> + 'static,
+    ) -> Self {
+        self.events.insert(
+            ins.type_id(),
+            Box::new(move |s, _client, req| handler(s, *req.downcast().unwrap())),
+        );
+        self
+    }
+
+    /// Registers an raw event handler.
     pub fn with_command_(
         mut self,
         cmd: &'static str,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.exec_cmds.insert(cmd, raw_to_boxed(handler));
+        self.command_handlers.insert(cmd, raw_to_boxed(handler));
         self
     }
 
+    /// Registers an async command handler.
     pub fn with_command<R: Serialize + 'static>(
         mut self,
         cmd: &'static str,
         handler: AsyncHandler<Args::S, Vec<JsonValue>, R>,
     ) -> Self {
-        self.exec_cmds.insert(
+        self.command_handlers.insert(
             cmd,
             Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
         );
         self
     }
 
+    /// Registers an untyped notification handler.
     pub fn with_notification_<R: Notif>(
         mut self,
         handler: PureHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.notify_cmds.insert(R::METHOD, Box::new(handler));
+        self.notif_handlers.insert(R::METHOD, Box::new(handler));
         self
     }
 
+    /// Registers a typed notification handler.
     pub fn with_notification<R: Notif>(mut self, handler: PureHandler<Args::S, R::Params>) -> Self {
-        self.notify_cmds.insert(
+        self.notif_handlers.insert(
             R::METHOD,
             Box::new(move |s, req| handler(s, from_json(req)?)),
         );
         self
     }
 
+    /// Registers a raw request handler that handlers a kind of untyped lsp
+    /// request.
     pub fn with_raw_request<R: Req>(mut self, handler: RawHandler<Args::S, JsonValue>) -> Self {
-        self.regular_cmds.insert(R::METHOD, raw_to_boxed(handler));
+        self.req_handlers.insert(R::METHOD, raw_to_boxed(handler));
         self
     }
 
     // todo: unsafe typed
+    /// Registers an raw request handler that handlers a kind of typed lsp
+    /// request.
     pub fn with_request_<R: Req>(
         mut self,
         handler: fn(&mut Args::S, RequestId, R::Params) -> ScheduledResult,
     ) -> Self {
-        self.regular_cmds.insert(
+        self.req_handlers.insert(
             R::METHOD,
             Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
         );
         self
     }
 
+    /// Registers a typed request handler.
     pub fn with_request<R: Req>(
         mut self,
         handler: AsyncHandler<Args::S, R::Params, R::Result>,
     ) -> Self {
-        self.regular_cmds.insert(
+        self.req_handlers.insert(
             R::METHOD,
             Box::new(move |s, client, req_id, req| {
                 client.schedule(req_id, handler(s, from_json(req)?))
@@ -417,35 +518,57 @@ where
         self
     }
 
+    /// Registers a raw resource handler.
     pub fn with_resource_(
         mut self,
         path: ImmutPath,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.resource_routes.insert(path, raw_to_boxed(handler));
+        self.resource_handlers.insert(path, raw_to_boxed(handler));
         self
     }
 
+    /// Registers an async resource handler.
     pub fn with_resource(
         mut self,
         path: &'static str,
         handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
     ) -> Self {
-        self.resource_routes.insert(
+        self.resource_handlers.insert(
             Path::new(path).into(),
             Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
         );
         self
     }
 
+    /// Builds the language server driver.
     pub fn build(self) -> LspDriver<Args> {
         LspDriver {
             state: State::Uninitialized(Some(Box::new(self.args))),
+            events: self.events,
             client: self.client,
-            commands: self.exec_cmds,
-            notifications: self.notify_cmds,
-            requests: self.regular_cmds,
-            resources: self.resource_routes,
+            commands: self.command_handlers,
+            notifications: self.notif_handlers,
+            requests: self.req_handlers,
+            resources: self.resource_handlers,
+        }
+    }
+}
+
+/// An enum to represent the state of the language server.
+pub enum ServiceState<'a, A, S> {
+    /// The service is uninitialized.
+    Uninitialized(Option<&'a mut A>),
+    /// The service is initializing.
+    Ready(&'a mut S),
+}
+
+impl<A, S> ServiceState<'_, A, S> {
+    /// Converts the state to an option holding the ready service.
+    pub fn ready(&mut self) -> Option<&mut S> {
+        match self {
+            ServiceState::Ready(s) => Some(s),
+            _ => None,
         }
     }
 }
@@ -474,6 +597,7 @@ impl<Args, S> State<Args, S> {
     }
 }
 
+/// The language server driver.
 pub struct LspDriver<Args: Initializer> {
     /// State to synchronize with the client.
     state: State<Args, Args::S>,
@@ -481,25 +605,30 @@ pub struct LspDriver<Args: Initializer> {
     pub client: LspClient,
 
     // Handle maps
+    /// Events for dispatching.
+    pub events: EventMap<Args, Args::S>,
     /// Extra commands provided with `textDocument/executeCommand`.
     pub commands: ExecuteCmdMap<Args::S>,
     /// Notifications for dispatching.
     pub notifications: NotifyCmdMap<Args::S>,
     /// Requests for dispatching.
     pub requests: RegularCmdMap<Args::S>,
-    /// Resource for dispatching.
+    /// Resources for dispatching.
     pub resources: ResourceMap<Args::S>,
 }
 
 impl<Args: Initializer> LspDriver<Args> {
+    /// Gets the state of the language server.
     pub fn state(&self) -> Option<&Args::S> {
         self.state.opt()
     }
 
+    /// Gets the mutable state of the language server.
     pub fn state_mut(&mut self) -> Option<&mut Args::S> {
         self.state.opt_mut()
     }
 
+    /// Makes the language server ready.
     pub fn ready(&mut self, params: Args::I) -> AnySchedulableResponse {
         let args = match &mut self.state {
             State::Uninitialized(args) => args,
@@ -518,11 +647,14 @@ impl<Args: Initializer> LspDriver<Args>
 where
     Args::S: 'static,
 {
-    pub fn start(
-        &mut self,
-        inbox: crossbeam_channel::Receiver<Message>,
-        is_replay: bool,
-    ) -> anyhow::Result<()> {
+    /// Starts the language server on the given connection.
+    ///
+    /// If `is_replay` is true, the server will wait for all pending requests to
+    /// finish before exiting. This is useful for testing the language server.
+    ///
+    /// See [`transport::MirrorArgs`] for information about the record-replay
+    /// feature.
+    pub fn start(&mut self, inbox: ConnectionRx, is_replay: bool) -> anyhow::Result<()> {
         let res = self.start_(inbox);
 
         if is_replay {
@@ -550,7 +682,9 @@ where
         res
     }
 
-    pub fn start_(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
+    /// Starts the language server on the given connection.
+    pub fn start_(&mut self, inbox: ConnectionRx) -> anyhow::Result<()> {
+        use EventOrMessage::*;
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
         // event (like a condvar), and event fires, priority of the thread is
@@ -575,15 +709,32 @@ where
             const EXIT_METHOD: &str = notification::Exit::METHOD;
             let loop_start = Instant::now();
             match msg {
-                Message::Request(req) => self.on_request(loop_start, req),
-                Message::Notification(not) => {
+                Evt(event) => {
+                    let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
+                        log::warn!("unhandled event: {:?}", event.as_ref().type_id());
+                        continue;
+                    };
+
+                    let s = match &mut self.state {
+                        State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
+                        State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
+                        State::ShuttingDown => {
+                            log::warn!("server is shutting down");
+                            continue;
+                        }
+                    };
+
+                    event_handler(s, &self.client, event)?;
+                }
+                Msg(Message::Request(req)) => self.on_request(loop_start, req),
+                Msg(Message::Notification(not)) => {
                     let is_exit = not.method == EXIT_METHOD;
                     self.on_notification(loop_start, not)?;
                     if is_exit {
                         return Ok(());
                     }
                 }
-                Message::Response(resp) => {
+                Msg(Message::Response(resp)) => {
                     let s = match &mut self.state {
                         State::Ready(s) => s,
                         _ => {
@@ -776,30 +927,33 @@ fn resp_err(code: ErrorCode, msg: impl fmt::Display) -> ResponseError {
     }
 }
 
+/// Creates an invalid params error.
 pub fn invalid_params(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InvalidParams, msg)
 }
 
+/// Creates an internal error.
 pub fn internal_error(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InternalError, msg)
 }
 
+/// Creates a not initialized error.
 pub fn not_initialized() -> ResponseError {
     resp_err(ErrorCode::ServerNotInitialized, "not initialized yet")
 }
 
+/// Creates a method not found error.
 pub fn method_not_found() -> ResponseError {
     resp_err(ErrorCode::MethodNotFound, "method not found")
 }
 
+/// Creates an invalid request error.
 pub fn invalid_request(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InvalidRequest, msg)
 }
 
-pub fn result_to_response<T: Serialize>(
-    id: RequestId,
-    result: Result<T, ResponseError>,
-) -> Response {
+/// Converts an [`LspResult`] to a response.
+pub fn result_to_response<T: Serialize>(id: RequestId, result: LspResult<T>) -> Response {
     match result.and_then(|t| serde_json::to_value(t).map_err(internal_error)) {
         Ok(resp) => Response::new_ok(id, resp),
         Err(e) => Response::new_err(id, e.code, e.message),

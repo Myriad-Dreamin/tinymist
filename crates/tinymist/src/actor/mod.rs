@@ -4,26 +4,26 @@ pub mod editor;
 #[cfg(feature = "preview")]
 pub mod preview;
 pub mod typ_client;
-pub mod typ_server;
 
 use std::sync::Arc;
 
 use reflexo::ImmutPath;
-use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
+use tinymist_world::LspInterrupt;
 use tokio::sync::mpsc;
 use typst::layout::Position;
 
+use crate::stats::CompilerQueryStats;
 use crate::{
     task::{ExportConfig, ExportTask, ExportUserConfig},
     world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
-use typ_client::{CompileClientActor, CompileHandler};
-use typ_server::{CompileServerActor, CompileServerOpts};
+use tinymist_world::typ_server::{CompileServerOpts, ProjectCompiler};
+use typ_client::{CompileClientActor, CompileHandler, LocalCompileHandler};
 
 impl LanguageState {
     /// Restart the primary server.
@@ -43,7 +43,6 @@ impl LanguageState {
             group.to_owned(),
             self.entry_resolver().resolve(entry),
             self.compile_config().determine_inputs(),
-            self.vfs_snapshot(),
         );
 
         let prev = if group == "primary" {
@@ -72,9 +71,9 @@ impl LanguageState {
         editor_group: String,
         entry: EntryState,
         inputs: ImmutDict,
-        snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
+        let _ = intr_rx;
 
         // Run Export actors before preparing cluster to avoid loss of events
         let export = ExportTask::new(ExportConfig {
@@ -132,42 +131,52 @@ impl LanguageState {
         let font_resolver = self.compile_config().determine_fonts();
         let entry_ = entry.clone();
         let compile_handle = handle.clone();
-        let cache = self.cache.clone();
         let cert_path = self.compile_config().determine_certification_path();
         let package = self.compile_config().determine_package_opts();
 
+        // todo: never fail?
+        let default_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let package_registry =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let verse =
+            LspUniverseBuilder::build(entry_.clone(), inputs, default_fonts, package_registry)
+                .expect("incorrect options");
+
+        // Create the actor
+        let server = ProjectCompiler::new_with(
+            verse,
+            self.client.clone().to_untyped(),
+            // intr_tx,
+            // intr_rx,
+            CompileServerOpts {
+                compile_handle,
+                ..Default::default()
+            },
+        );
+        let client = self.client.clone();
         self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let package_registry =
-                LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-            let verse =
-                LspUniverseBuilder::build(entry_.clone(), inputs, font_resolver, package_registry)
-                    .expect("incorrect options");
-
-            // Create the actor
-            let server = CompileServerActor::new_with(
-                verse,
-                intr_tx,
-                intr_rx,
-                CompileServerOpts {
-                    compile_handle,
-                    cache,
-                    ..Default::default()
-                },
-            )
-            .with_watch(true);
-            tokio::spawn(server.run());
+            client.send_event(LspInterrupt::Font(font_resolver));
         });
+
+        let handle = LocalCompileHandler {
+            diag_group: editor_group,
+            wrapper: server,
+            analysis: handle.analysis.clone(),
+            stats: CompilerQueryStats::default(),
+            export: handle.export.clone(),
+        };
 
         // Create the client
         let config = self.compile_config().clone();
-        let client = CompileClientActor::new(handle, config, entry);
+
+        // todo: restart loses the memory changes
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.
-        client.add_memory_changes(MemoryEvent::Update(snapshot));
-        client
+        // client.add_memory_changes(MemoryEvent::Update(snapshot));
+        CompileClientActor::new(handle, config, entry)
     }
 }
 

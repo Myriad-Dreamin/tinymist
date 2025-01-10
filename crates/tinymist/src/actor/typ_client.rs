@@ -30,29 +30,160 @@ use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
     CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
 };
-use sync_lsp::{just_future, QueryFuture};
+use sync_lsp::just_future;
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
     SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
+use tinymist_world::{
+    typ_server::{
+        CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, ProjectCompiler,
+        ProjectInterrupt, SucceededArtifact,
+    },
+    LspInterrupt,
+};
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
 
-use super::{
-    editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
-    typ_server::{
-        CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
-    },
-};
+use super::editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum};
 use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
-    CompileConfig,
+    CompileConfig, QueryFuture,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
+
+pub struct LocalCompileHandler {
+    pub(crate) diag_group: String,
+    pub(crate) wrapper: ProjectCompiler<LspCompilerFeat>,
+    pub(crate) analysis: Arc<Analysis>,
+    pub(crate) stats: CompilerQueryStats,
+    pub(crate) export: ExportTask,
+}
+
+impl LocalCompileHandler {
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+        let (tx, rx) = oneshot::channel();
+        let snap = self.wrapper.snapshot();
+        let _ = tx.send(snap);
+
+        Ok(WorldSnapFut { rx })
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
+        let fut = self.snapshot()?;
+        let analysis = self.analysis.clone();
+        let rev_lock = analysis.lock_revision(q);
+
+        Ok(QuerySnapFut {
+            fut,
+            analysis,
+            rev_lock,
+        })
+    }
+
+    /// Get latest artifact the compiler thread for tasks
+    pub fn artifact(&self) -> ZResult<ArtifactSnap> {
+        // let (tx, rx) = oneshot::channel();
+        // self.intr_tx
+        //     .send(Interrupt::CurrentRead(tx))
+        //     .map_err(map_string_err("failed to send snapshot request"))?;
+
+        // Ok(ArtifactSnap { rx })
+        todo!()
+    }
+
+    pub fn flush_compile(&mut self) {
+        // todo: better way to flush compile
+        self.wrapper.process(ProjectInterrupt::Compile);
+    }
+
+    pub fn add_memory_changes(&mut self, event: MemoryEvent) {
+        self.wrapper.process(ProjectInterrupt::Memory(event));
+    }
+
+    pub fn interrupt(&mut self, intr: ProjectInterrupt<LspCompilerFeat>) {
+        self.wrapper.process(intr);
+    }
+
+    pub fn change_task(&mut self, task: TaskInputs) {
+        self.wrapper.process(ProjectInterrupt::ChangeTask(task));
+    }
+
+    pub async fn settle(&self) -> anyhow::Result<()> {
+        // let (tx, rx) = oneshot::channel();
+        // let _ = self.intr_tx.send(Interrupt::Settle(tx));
+        // rx.await?;
+        // Ok(())
+        todo!()
+    }
+
+    fn push_diagnostics(&self, revision: usize, diagnostics: Option<DiagnosticsMap>) {
+        // let dv = DocVersion {
+        //     group: self.diag_group.clone(),
+        //     revision,
+        // };
+        // let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
+        // if let Err(err) = res {
+        //     error!("failed to send diagnostics: {err:#}");
+        // }
+        todo!()
+    }
+
+    fn notify_diagnostics(
+        &self,
+        world: &LspWorld,
+        errors: EcoVec<SourceDiagnostic>,
+        warnings: EcoVec<SourceDiagnostic>,
+    ) {
+        // let revision = world.revision().get();
+        // trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
+
+        // let diagnostics = tinymist_query::convert_diagnostics(
+        //     world,
+        //     errors.iter().chain(warnings.iter()),
+        //     self.analysis.position_encoding,
+        // );
+
+        // let entry = world.entry_state();
+        // // todo: better way to remove diagnostics
+        // // todo: check all errors in this file
+        // let detached = entry.is_inactive();
+        // let valid = !detached;
+        // self.push_diagnostics(revision, valid.then_some(diagnostics));
+        todo!()
+    }
+
+    // todo: multiple preview support
+    #[cfg(feature = "preview")]
+    #[must_use]
+    pub fn register_preview(&self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        // let mut p = self.inner.write();
+        // if p.as_ref().is_some() {
+        //     return false;
+        // }
+        // *p = Some(handle.clone());
+        // true
+        todo!()
+    }
+
+    #[cfg(feature = "preview")]
+    #[must_use]
+    pub fn unregister_preview(&self, task_id: &str) -> bool {
+        // let mut p = self.inner.write();
+        // if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
+        //     *p = None;
+        //     return true;
+        // }
+        // false
+        todo!()
+    }
+}
 
 pub struct CompileHandler {
     pub(crate) diag_group: String,
@@ -263,7 +394,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 }
 
 pub struct CompileClientActor {
-    pub handle: Arc<CompileHandler>,
+    pub handle: LocalCompileHandler,
 
     pub config: CompileConfig,
     entry: EntryState,
@@ -271,7 +402,7 @@ pub struct CompileClientActor {
 
 impl CompileClientActor {
     pub(crate) fn new(
-        handle: Arc<CompileHandler>,
+        handle: LocalCompileHandler,
         config: CompileConfig,
         entry: EntryState,
     ) -> Self {
@@ -283,8 +414,8 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
-        self.handle.clone().snapshot()
+    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+        self.handle.snapshot()
     }
 
     /// Get the entry resolver.
@@ -293,24 +424,31 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
-        self.handle.clone().query_snapshot(None)
+    pub fn query_snapshot(&mut self) -> ZResult<QuerySnapFut> {
+        self.handle.query_snapshot(None)
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
+    pub fn query_snapshot_with_stat(
+        &mut self,
+        q: &CompilerQueryRequest,
+    ) -> ZResult<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.handle.stats.query_stat(path, name);
-        let fut = self.handle.clone().query_snapshot(Some(q))?;
+        let fut = self.handle.query_snapshot(Some(q))?;
         Ok(QuerySnapWithStat { fut, stat })
     }
 
-    pub fn add_memory_changes(&self, event: MemoryEvent) {
+    pub fn add_memory_changes(&mut self, event: MemoryEvent) {
         self.handle.add_memory_changes(event);
     }
 
-    pub fn change_task(&self, task_inputs: TaskInputs) {
+    pub fn interrupt(&mut self, intr: LspInterrupt) {
+        self.handle.interrupt(intr);
+    }
+
+    pub fn change_task(&mut self, task_inputs: TaskInputs) {
         self.handle.change_task(task_inputs);
     }
 
@@ -322,7 +460,7 @@ impl CompileClientActor {
         self.handle.export.change_config(config);
     }
 
-    pub fn on_export(&self, req: OnExportRequest) -> QueryFuture {
+    pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
@@ -396,7 +534,7 @@ impl CompileClientActor {
         self.handle.analysis.clear_cache();
     }
 
-    pub fn collect_server_info(&self) -> QueryFuture {
+    pub fn collect_server_info(&mut self) -> QueryFuture {
         let dg = self.handle.diag_group.clone();
         let api_stats = self.handle.stats.report();
         let query_stats = self.handle.analysis.report_query_stats();

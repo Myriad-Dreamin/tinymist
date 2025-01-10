@@ -20,12 +20,16 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 log.workspace = true
+tokio.workspace = true
+rayon.workspace = true
+sync-lsp.workspace = true
 
 reflexo-typst.workspace = true
 reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
 
 tinymist-assets = { workspace = true }
+tinymist-project.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
 dirs.workspace = true
