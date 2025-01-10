@@ -417,6 +417,7 @@ pub enum ProjectInterrupt<F: CompilerFeat> {
 }
 
 pub struct ProjectState<F: CompilerFeat> {
+    pub id: String,
     /// The forked world.
     pub world: CompilerWorld<F>,
 }
@@ -434,6 +435,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
     pub fn new_with(verse: CompilerUniverse<F>, opts: CompileServerOpts<F>) -> Self {
         let wrapper = CompilerServerWrapper::new_with(verse, opts);
         let primary = ProjectState {
+            id: "primary".to_string(),
             world: wrapper.verse.snapshot(),
         };
         Self {
@@ -450,18 +452,30 @@ impl<F: CompilerFeat + Send + Sync + 'static> ProjectCompiler<F> {
         };
 
         match intr {
-            ProjectInterrupt::Compile => todo!(),
-            ProjectInterrupt::Compiled(..) => todo!(),
+            ProjectInterrupt::Compile => {
+                let intr = Interrupt::Compile;
+                self.wrapper.process(intr, send);
+            }
+            ProjectInterrupt::Compiled(compiled) => {
+                let intr = Interrupt::Compiled(compiled);
+                self.wrapper.process(intr, send);
+            }
             ProjectInterrupt::ChangeTask(task) => {
                 let intr = Interrupt::ChangeTask(task);
                 self.wrapper.process(intr, send);
             }
-            ProjectInterrupt::Font(..) => todo!(),
+            ProjectInterrupt::Font(font) => {
+                let intr = Interrupt::Font(font);
+                self.wrapper.process(intr, send);
+            }
             ProjectInterrupt::Memory(memory_event) => {
                 let intr = Interrupt::Memory(memory_event);
                 self.wrapper.process(intr, send);
             }
-            ProjectInterrupt::Fs(..) => todo!(),
+            ProjectInterrupt::Fs(fs_event) => {
+                let intr = Interrupt::Fs(fs_event);
+                self.wrapper.process(intr, send);
+            }
         }
     }
 
@@ -706,8 +720,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompilerServerWrapper<F> {
                 reason_by_entry_change()
             }
             Interrupt::Font(font) => {
-                let _ = font;
-                todo!();
+                self.verse.increment_revision(|verse| {
+                    verse.inner.font_resolver = font;
+                });
+
+                reason_by_entry_change()
             }
             Interrupt::SnapshotRead(task) => {
                 log::debug!("CompileServerActor: take snapshot");

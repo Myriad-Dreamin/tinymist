@@ -6,7 +6,7 @@ pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 pub use reflexo_typst::world as base;
 pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
-use typ_server::Interrupt;
+use typ_server::ProjectInterrupt;
 
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
@@ -203,7 +203,7 @@ pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<LazyHash<TypstDict>>;
 /// LSP interrupt.
-pub type LspInterrupt = Interrupt<LspCompilerFeat>;
+pub type LspInterrupt = ProjectInterrupt<LspCompilerFeat>;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;
