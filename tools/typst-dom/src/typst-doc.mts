@@ -262,8 +262,9 @@ export class TypstDocumentContext<O = any> {
     };
 
     // Ctrl+= or Ctrl+- rescaling
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') !== -1;
     const keydownEventHandler = (event: KeyboardEvent) => {
-      if(event.ctrlKey) {
+      if((!isMac && event.ctrlKey) || (isMac && event.metaKey)) {
         if(event.key === "=") {
           event.preventDefault();
           doRescale(-1, undefined, undefined);
