@@ -132,7 +132,6 @@ impl LanguageState {
         let font_resolver = self.compile_config().determine_fonts();
         let entry_ = entry.clone();
         let compile_handle = handle.clone();
-        let cache = self.cache.clone();
         let cert_path = self.compile_config().determine_certification_path();
         let package = self.compile_config().determine_package_opts();
 
@@ -152,7 +151,6 @@ impl LanguageState {
                 intr_rx,
                 CompileServerOpts {
                     compile_handle,
-                    cache,
                     ..Default::default()
                 },
             )
