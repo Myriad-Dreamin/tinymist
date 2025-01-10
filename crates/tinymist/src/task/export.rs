@@ -76,7 +76,7 @@ impl SyncTaskFactory<ExportConfig> {
                 ..Default::default()
             });
 
-            let artifact = snap.compile().await;
+            let artifact = snap.compile();
             export.do_export(&kind, artifact).await
         }
     }
