@@ -654,6 +654,12 @@
     },
     "languages": [
       {
+        "id": "toml",
+        "extensions": [
+          "tinymist.lock"
+        ]
+      },
+      {
         "id": "typst",
         "configuration": "./syntaxes/language-configuration.json",
         "extensions": [
