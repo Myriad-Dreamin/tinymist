@@ -3970,7 +3970,7 @@ dependencies = [
  "clap",
  "log",
  "pathdiff",
- "reflexo",
+ "reflexo-typst",
  "same-file",
  "semver",
  "serde",
