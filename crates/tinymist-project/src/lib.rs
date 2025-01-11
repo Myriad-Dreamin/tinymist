@@ -17,13 +17,15 @@ use std::{
 
 use anyhow::{bail, Context};
 use clap::{ValueEnum, ValueHint};
-use reflexo::path::unix_slash;
+use reflexo_typst::{path::unix_slash, typst::diag::EcoString};
 
 pub use anyhow::Result;
 
 const LOCKFILE_PATH: &str = "tinymist.lock";
 
 const LOCK_VERSION: &str = "0.1.0-beta0";
+
+pub const PROJECT_ROUTE_USER_ACTION_PRIORITY: u32 = 256;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "version")]
@@ -94,6 +96,13 @@ impl LockFile {
         }
     }
 
+    pub fn replace_route(&mut self, route: ProjectRoute) {
+        let id = route.id.clone();
+
+        self.route.retain(|i| i.id != id);
+        self.route.push(route);
+    }
+
     pub fn sort(&mut self) {
         self.document.sort_by(|a, b| a.id.cmp(&b.id));
         self.task
@@ -128,21 +137,21 @@ impl LockFile {
             }
         }
 
-        let task = content.get("task");
-        if let Some(task) = task {
-            for task in task.as_array().unwrap() {
-                out.push('\n');
-                out.push_str("[[task]]\n");
-                emit_output(task, &mut out);
-            }
-        }
-
         let route = content.get("route");
         if let Some(route) = route {
             for route in route.as_array().unwrap() {
                 out.push('\n');
                 out.push_str("[[route]]\n");
                 emit_route(route, &mut out);
+            }
+        }
+
+        let task = content.get("task");
+        if let Some(task) = task {
+            for task in task.as_array().unwrap() {
+                out.push('\n');
+                out.push_str("[[task]]\n");
+                emit_output(task, &mut out);
             }
         }
 
@@ -224,6 +233,11 @@ impl LockFile {
             return Ok(());
         }
 
+        // todo: even if cargo, they don't update the lock file atomically. This
+        // indicates that we may get data corruption if the process is killed
+        // while writing the lock file. This is sensible because `Cargo.lock` is
+        // only a "resolved result" of the `Cargo.toml`. Thus, we should inform
+        // users that don't only persist configuration in the lock file.
         lock_file.file().set_len(0)?;
         lock_file.seek(SeekFrom::Start(0))?;
         lock_file.write_all(new_data.as_bytes())?;
@@ -242,6 +256,12 @@ pub struct Id(String);
 impl Id {
     pub fn new(s: String) -> Self {
         Id(s)
+    }
+}
+
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
@@ -275,8 +295,8 @@ impl From<&DocIdArgs> for Id {
 }
 
 /// A resource path.
-#[derive(Debug, Clone)]
-pub struct ResourcePath(String, String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ResourcePath(EcoString, String);
 
 impl fmt::Display for ResourcePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -294,7 +314,7 @@ impl FromStr for ResourcePath {
         if parts.next().is_some() {
             Err("too many colons")
         } else {
-            Ok(ResourcePath(scheme.to_string(), path.to_string()))
+            Ok(ResourcePath(scheme.into(), path.to_string()))
         }
     }
 }
@@ -327,7 +347,21 @@ impl ResourcePath {
             pathdiff::diff_paths(inp, &cwd).unwrap()
         };
         let rel = unix_slash(&rel);
-        ResourcePath("file".to_string(), rel.to_string())
+        ResourcePath("file".into(), rel.to_string())
+    }
+
+    pub fn from_file_id(id: reflexo_typst::typst::TypstFileId) -> Self {
+        let package = id.package();
+        match package {
+            Some(package) => ResourcePath(
+                "file_id".into(),
+                format!("{package}{}", unix_slash(id.vpath().as_rooted_path())),
+            ),
+            None => ResourcePath(
+                "file_id".into(),
+                format!("$root{}", unix_slash(id.vpath().as_rooted_path())),
+            ),
+        }
     }
 }
 
@@ -502,7 +536,19 @@ pub struct ExportTextTask {
 }
 
 /// A project route specifier.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ProjectMaterial {
+    /// The root of the project that the material belongs to.
+    pub root: EcoString,
+    /// A project.
+    pub id: Id,
+    /// The files.
+    pub files: Vec<ResourcePath>,
+}
+
+/// A project route specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectRoute {
     /// A project.

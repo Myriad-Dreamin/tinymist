@@ -182,7 +182,7 @@ pub struct DocConfigureArgs {
     pub id: DocIdArgs,
     /// Set the unsigned priority of these task (lower numbers are higher
     /// priority).
-    #[clap(long = "priority", default_value_t = 0)]
+    #[clap(long = "priority", default_value_t = PROJECT_ROUTE_USER_ACTION_PRIORITY)]
     pub priority: u32,
 }
 
