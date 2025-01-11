@@ -281,7 +281,7 @@ impl LanguageState {
             self.memory_changes
                 .iter()
                 .map(|(path, meta)| {
-                    let content = meta.content.clone().text().as_bytes().into();
+                    let content = Bytes::from_string(meta.content.clone().text().to_string());
                     (path.clone(), FileResult::Ok((meta.mt, content)).into())
                 })
                 .collect(),
@@ -931,7 +931,7 @@ impl LanguageState {
             },
         );
 
-        let content: Bytes = content.as_bytes().into();
+        let content = Bytes::from_string(content);
         log::info!("create source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
@@ -984,7 +984,8 @@ impl LanguageState {
 
         meta.mt = now;
 
-        let snapshot = FileResult::Ok((now, meta.content.text().as_bytes().into())).into();
+        let snapshot =
+            FileResult::Ok((now, Bytes::new(meta.content.text().as_bytes().to_vec()))).into();
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
 

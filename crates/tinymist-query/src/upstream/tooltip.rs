@@ -3,11 +3,11 @@ use std::fmt::Write;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use typst::engine::Sink;
-use typst::eval::CapturesVisitor;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::World;
+use typst_eval::CapturesVisitor;
 use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};
 

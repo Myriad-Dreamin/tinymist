@@ -254,7 +254,7 @@ impl Ty {
 }
 
 fn is_content_builtin_type(ty: &Type) -> bool {
-    *ty == Type::of::<Content>() || *ty == Type::of::<typst::symbols::Symbol>()
+    *ty == Type::of::<Content>() || *ty == Type::of::<typst::foundations::Symbol>()
 }
 
 /// A function parameter type
@@ -644,6 +644,14 @@ impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // todo: buggy
         self.def.cmp(&other.def)
+    }
+}
+
+impl TypeVar {
+    /// Low-performance comparison but it is free from the concurrency issue.
+    /// This is only used for making stable test snapshots.
+    pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.def.strict_cmp(&other.def)
     }
 }
 

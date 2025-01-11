@@ -2,13 +2,14 @@
 
 use comemo::Track;
 use ecow::*;
+use reflexo_typst::{TypstDocument, TypstPagedDocument};
 use typst::engine::{Engine, Route, Sink, Traced};
-use typst::eval::Vm;
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
 use typst::introspection::Introspector;
-use typst::model::{BibliographyElem, Document};
+use typst::model::BibliographyElem;
 use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
 use typst::World;
+use typst_eval::Vm;
 
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
@@ -42,7 +43,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 }
             }
 
-            return typst::trace(world, node.span());
+            return typst::trace::<TypstPagedDocument>(world, node.span());
         }
     };
 
@@ -63,6 +64,7 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
+        routines: &typst::ROUTINES,
         world: world.track(),
         route: Route::default(),
         introspector: introspector.track(),
@@ -77,9 +79,13 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
-    let module = typst::eval::import(&mut vm, source.clone(), source_span, true)
-        .ok()
-        .map(Value::Module);
+    let module = match source.clone() {
+        Value::Str(path) => typst_eval::import(&mut vm.engine, &path, source_span)
+            .ok()
+            .map(Value::Module),
+        Value::Module(module) => Some(Value::Module(module)),
+        _ => None,
+    };
 
     (Some(source), module)
 }
@@ -103,11 +109,11 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
+pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.
-    for elem in document.introspector.all() {
+    for elem in document.introspector().all() {
         let Some(label) = elem.label() else { continue };
         let (is_derived, details) = {
             let derived = elem
@@ -136,9 +142,9 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
     let split = output.len();
 
     // Bibliography keys.
-    for (key, detail) in BibliographyElem::keys(document.introspector.track()) {
+    for (key, detail) in BibliographyElem::keys(document.introspector().track()) {
         output.push(DynLabel {
-            label: Label::new(key.as_str()),
+            label: Label::from(key),
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,

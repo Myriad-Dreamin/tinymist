@@ -11,6 +11,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
+use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -153,7 +154,7 @@ impl EditorServer for CompileHandler {
                 .files
                 .into_iter()
                 .map(|(path, content)| {
-                    let content = content.as_bytes().into();
+                    let content = Bytes::new(content.as_bytes().to_vec());
                     // todo: cloning PathBuf -> Arc<Path>
                     (path.into(), Ok((now, content)).into())
                 })
@@ -696,19 +697,24 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
     let mut p = Point::default();
 
     let span = node.span();
-    let mut positions: Vec<Position> = vec![];
-    for (i, page) in document.pages.iter().enumerate() {
-        let mut min_dis = u64::MAX;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            if let Some(page) = NonZeroUsize::new(i + 1) {
-                positions.push(Position { page, point: pos });
+    match document {
+        TypstDocument::Paged(paged_doc) => {
+            let mut positions: Vec<Position> = vec![];
+            for (i, page) in paged_doc.pages.iter().enumerate() {
+                let mut min_dis = u64::MAX;
+                if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+                    if let Some(page) = NonZeroUsize::new(i + 1) {
+                        positions.push(Position { page, point: pos });
+                    }
+                }
             }
+
+            log::info!("jump_from_cursor: {positions:#?}");
+
+            positions
         }
+        _ => vec![],
     }
-
-    log::info!("jump_from_cursor: {positions:#?}");
-
-    positions
 }
 
 /// Find the position of a span in a frame.
@@ -727,7 +733,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                     return Some(pos);
                 }
                 if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    let dis = glyph
+                        .span
+                        .0
+                        .into_raw()
+                        .get()
+                        .abs_diff(span.into_raw().get());
                     if dis < *min_dis {
                         *min_dis = dis;
                         *p = pos;

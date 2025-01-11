@@ -5,6 +5,7 @@ use reflexo_typst::{
     vector::font::GlyphId, world::EntryState, ShadowApi, TaskInputs, TypstDocument, TypstFont,
 };
 use sync_lsp::LspResult;
+use typst::foundations::Bytes;
 
 use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
 
@@ -951,10 +952,22 @@ impl LanguageState {
         let snap = snap.receive().await.map_err(z_internal_error)?;
 
         let mut symbols = ResourceSymbolMap::new();
-        use typst::symbols::{emoji, sym};
-        populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
+
+        let std = snap
+            .world
+            .library
+            .std
+            .scope()
+            .ok_or_else(|| internal_error("cannot get std scope"))?;
+        let sym = std
+            .get("sym")
+            .ok_or_else(|| internal_error("cannot get sym"))?;
+
+        if let Some(scope) = sym.scope() {
+            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
+        }
         // todo: disabling emoji module, as there is performant issue on emojis
-        let _ = emoji;
+        // let _ = emoji;
         // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
         const PRELUDE: &str = r#"#show math.equation: set text(font: (
@@ -988,7 +1001,7 @@ impl LanguageState {
                 ..Default::default()
             });
             forked
-                .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
+                .map_shadow(&entry_path, Bytes::from_string(math_shaping_text))
                 .map_err(|e| error_once!("cannot map shadow", err: e))
                 .map_err(z_internal_error)?;
 
@@ -998,7 +1011,10 @@ impl LanguageState {
                 .map_err(z_internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
+            Some(trait_symbol_fonts(
+                &TypstDocument::Paged(sym_doc.output),
+                &symbols_ref,
+            ))
         };
 
         let mut glyph_def = String::new();
@@ -1116,9 +1132,14 @@ fn trait_symbol_fonts(
 
     impl Worker<'_> {
         fn work(&mut self, doc: &TypstDocument) {
-            for (pg, s) in doc.pages.iter().zip(self.symbols.iter()) {
-                self.active = s;
-                self.work_frame(&pg.frame);
+            match doc {
+                TypstDocument::Paged(paged_doc) => {
+                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
+                        self.active = s;
+                        self.work_frame(&pg.frame);
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -1192,7 +1213,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch.char() as u32,
+                unicode: ch as u32,
                 glyphs: vec![],
             },
         );

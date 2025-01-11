@@ -73,7 +73,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         let mut snap = self;
         let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
         let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(doc.output), doc.warnings),
+            Ok(doc) => (Ok(Arc::new(TypstDocument::Paged(doc.output))), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
         CompiledArtifact {

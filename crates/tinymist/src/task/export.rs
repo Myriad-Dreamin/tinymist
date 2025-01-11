@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
-use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
+use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime, TypstDocument};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -14,7 +14,7 @@ use typst::{
     syntax::{ast, SyntaxNode},
     visualize::Color,
 };
-use typst_pdf::PdfOptions;
+use typst_pdf::{PdfOptions, Timestamp};
 
 use crate::tool::text::FullTextDigest;
 use crate::{
@@ -119,7 +119,7 @@ impl ExportConfig {
                 ExportMode::Never => false,
                 ExportMode::OnType => s.by_mem_events,
                 ExportMode::OnSave => s.by_fs_events,
-                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
+                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
             };
 
         if !need_export {
@@ -207,7 +207,12 @@ impl ExportConfig {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let first_page = doc.pages.first().unwrap();
+            let paged_doc = match doc.as_ref() {
+                TypstDocument::Paged(paged_doc) => Some(paged_doc),
+                TypstDocument::Html(_) => None,
+            }
+            .unwrap();
+            let first_page = paged_doc.pages.first().unwrap();
             Ok(match kind2 {
                 Pdf { creation_timestamp } => {
                     let timestamp =
@@ -215,7 +220,7 @@ impl ExportConfig {
                     // todo: Some(pdf_uri.as_str())
                     // todo: timestamp world.now()
                     typst_pdf::pdf(
-                        doc,
+                        paged_doc,
                         &PdfOptions {
                             timestamp,
                             ..Default::default()
@@ -232,8 +237,9 @@ impl ExportConfig {
                     one,
                     pretty,
                 } => {
-                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
-                        .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    let elements =
+                        reflexo_typst::query::retrieve(&snap.world, &selector, paged_doc)
+                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
                     }
@@ -256,7 +262,7 @@ impl ExportConfig {
                     }
                 }
                 Html {} => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(doc).into_bytes()
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc).into_bytes()
                 }
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
@@ -269,7 +275,7 @@ impl ExportConfig {
                 Svg { page: First } => typst_svg::svg(first_page).into_bytes(),
                 Svg {
                     page: Merged { .. },
-                } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
+                } => typst_svg::svg_merged(paged_doc, Abs::zero()).into_bytes(),
                 Png {
                     ppi,
                     fill: _,
@@ -306,7 +312,7 @@ impl ExportConfig {
                         Abs::zero()
                     };
 
-                    typst_render::render_merged(doc, ppi / 72., gap, Some(fill))
+                    typst_render::render_merged(paged_doc, ppi / 72., gap, Some(fill))
                         .encode_png()
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
@@ -379,17 +385,19 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
     }
 }
 
-/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
+/// Convert [`chrono::DateTime`] to [`Timestamp`]
+fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
     use chrono::{Datelike, Timelike};
-    TypstDatetime::from_ymd_hms(
+    let datetime = TypstDatetime::from_ymd_hms(
         date_time.year(),
         date_time.month().try_into().ok()?,
         date_time.day().try_into().ok()?,
         date_time.hour().try_into().ok()?,
         date_time.minute().try_into().ok()?,
         date_time.second().try_into().ok()?,
-    )
+    );
+
+    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 /// Serialize data to the output format.

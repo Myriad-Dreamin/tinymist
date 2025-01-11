@@ -239,8 +239,8 @@ impl DocsChecker<'_> {
                 .chain([
                     Type::of::<typst::visualize::Color>(),
                     Type::of::<typst::visualize::Gradient>(),
-                    Type::of::<typst::visualize::Pattern>(),
-                    Type::of::<typst::symbols::Symbol>(),
+                    Type::of::<typst::visualize::Tiling>(),
+                    Type::of::<typst::foundations::Symbol>(),
                     Type::of::<typst::foundations::Version>(),
                     Type::of::<typst::foundations::Bytes>(),
                     Type::of::<typst::foundations::Label>(),
@@ -289,7 +289,7 @@ impl DocsChecker<'_> {
         crate::log_debug_ct!("check doc type annotation: {name:?}");
         if let Value::Content(raw) = val {
             let annotated = raw.clone().unpack::<typst::text::RawElem>().ok()?;
-            let annotated = annotated.text().clone().into_value().cast::<Str>().ok()?;
+            let annotated = annotated.text.clone().into_value().cast::<Str>().ok()?;
             let code = typst::syntax::parse_code(&annotated.as_str().replace('\'', "θ"));
             let mut exprs = code.cast::<ast::Code>()?.exprs();
             let term = self.check_type_expr(module, exprs.next()?);
