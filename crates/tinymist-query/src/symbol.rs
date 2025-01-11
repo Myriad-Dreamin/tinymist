@@ -36,9 +36,7 @@ impl SemanticRequest for SymbolRequest {
 
         let mut symbols = vec![];
 
-        // todo! need compilation for iter_dependencies
-
-        for path in ctx.dependencies() {
+        for path in ctx.depended_paths() {
             let Ok(source) = ctx.source_by_path(&path) else {
                 continue;
             };

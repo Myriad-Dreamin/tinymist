@@ -82,7 +82,7 @@ impl ReferencesWorker<'_> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 
-        for dep in self.ctx.ctx.dependencies() {
+        for dep in self.ctx.ctx.depended_paths() {
             if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&dep) {
                 ids.push(ref_fid);
             }

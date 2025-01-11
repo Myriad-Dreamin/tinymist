@@ -1,4 +1,5 @@
 use core::fmt;
+use std::path::Path;
 
 use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
@@ -90,9 +91,13 @@ impl PathPreference {
         }
     }
 
+    pub fn is_match(&self, path: &Path) -> bool {
+        let ext = path.extension().and_then(|ext| ext.to_str());
+        ext.map_or(false, |ext| self.ext_matcher().is_match(ext))
+    }
+
     pub fn from_ext(path: &str) -> Option<Self> {
-        let path = std::path::Path::new(path).extension()?.to_str()?;
-        PathPreference::iter().find(|preference| preference.ext_matcher().is_match(path))
+        PathPreference::iter().find(|preference| preference.is_match(std::path::Path::new(path)))
     }
 }
 
