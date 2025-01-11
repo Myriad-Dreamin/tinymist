@@ -255,13 +255,18 @@ pub struct DocIdArgs {
     pub input: String,
 }
 
+impl From<&ResourcePath> for Id {
+    fn from(value: &ResourcePath) -> Self {
+        Id(value.to_string())
+    }
+}
+
 impl From<&DocIdArgs> for Id {
     fn from(args: &DocIdArgs) -> Self {
         if let Some(id) = &args.name {
             Id(id.clone())
         } else {
-            let inp = Path::new(&args.input);
-            Id(ResourcePath::from_user_sys(inp).to_string())
+            (&ResourcePath::from_user_sys(Path::new(&args.input))).into()
         }
     }
 }
