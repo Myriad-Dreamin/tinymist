@@ -3602,7 +3602,6 @@ dependencies = [
  "reflexo",
  "serde",
  "serde_json",
- "tinymist-query",
  "tokio",
  "tokio-util",
 ]
