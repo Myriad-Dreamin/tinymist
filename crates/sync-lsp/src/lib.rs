@@ -12,7 +12,6 @@ use parking_lot::Mutex;
 use reflexo::{time::Instant, ImmutPath};
 use serde::Serialize;
 use serde_json::{from_value, Value as JsonValue};
-use tinymist_query::CompilerQueryResponse;
 
 pub mod req_queue;
 pub mod transport;
@@ -35,8 +34,6 @@ pub type AnySchedulableResponse = SchedulableResponse<JsonValue>;
 /// - Returns Ok(None) -> Need to respond none
 /// - Returns Err(..) -> Need to respond error
 pub type ScheduledResult = LspResult<Option<()>>;
-/// The future type for a lsp query.
-pub type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
 
 /// A helper function to create a `LspResponseFuture`
 pub fn just_ok<T, E>(res: T) -> Result<ResponseFuture<Result<T, E>>, E> {
@@ -254,22 +251,6 @@ impl LspClient {
 }
 
 impl LspClient {
-    /// Schedules a query from the client.
-    pub fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: SchedulableResponse<CompilerQueryResponse> = Ok(match fut {
-            MaybeDone::Done(res) => {
-                MaybeDone::Done(res.map_err(|err| internal_error(err.to_string())))
-            }
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
-    }
-
     /// Schedules a request from the client.
     pub fn schedule<T: Serialize + 'static>(
         &self,
