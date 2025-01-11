@@ -477,7 +477,8 @@ fn set_not_readonly(p: &Path) -> io::Result<bool> {
 
     #[cfg(unix)]
     {
-        perms.set_readonly(false);
+        use std::os::unix::fs::PermissionsExt;
+        perms.set_mode(0o640);
     }
     #[cfg(not(unix))]
     #[allow(clippy::permissions_set_readonly_false)]
