@@ -649,6 +649,7 @@ impl Ord for TypeVar {
 
 impl TypeVar {
     /// Low-performance comparison but it is free from the concurrency issue.
+    /// This is only used for making stable test snapshots.
     pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.def.strict_cmp(&other.def)
     }

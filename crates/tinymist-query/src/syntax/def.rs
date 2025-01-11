@@ -468,6 +468,8 @@ impl Ord for Decl {
 }
 
 trait StrictCmp {
+    /// Low-performance comparison but it is free from the concurrency issue.
+    /// This is only used for making stable test snapshots.
     fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering;
 }
 
