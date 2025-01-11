@@ -2,10 +2,11 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive_use.typ
+snapshot_kind: text
 ---
 "base" = Any
-"f" = () => Any
 "a" = Any
+"f" = () => Any
 =====
 0..0 -> @a
 1..21 -> @base

@@ -2,11 +2,12 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
+snapshot_kind: text
 ---
 "base" = Any
+"bad-instantiate" = Any
 "prefix" = (("title": Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
 "title" = None
-"bad-instantiate" = Any
 =====
 0..0 -> @bad-instantiate
 1..21 -> @base

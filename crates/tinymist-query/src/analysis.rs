@@ -328,7 +328,7 @@ mod type_check_tests {
                 .map(|bounds| (bounds.name(), bounds))
                 .collect::<Vec<_>>();
 
-            vars.sort_by(|x, y| x.1.var.cmp(&y.1.var));
+            vars.sort_by(|x, y| x.1.var.strict_cmp(&y.1.var));
 
             for (name, bounds) in vars {
                 writeln!(f, "{name:?} = {:?}", info.simplify(bounds.as_type(), true))?;
