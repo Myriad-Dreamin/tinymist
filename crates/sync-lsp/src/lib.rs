@@ -5,8 +5,9 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::{collections::HashMap, path::PathBuf};
 
+use crossbeam_channel::RecvError;
 use futures::future::MaybeDone;
-use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
+use lsp_server::{ErrorCode, Notification, Request, RequestId, Response};
 use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
 use parking_lot::Mutex;
 use reflexo::{time::Instant, ImmutPath};
@@ -15,6 +16,42 @@ use serde_json::{from_value, Value as JsonValue};
 
 pub mod req_queue;
 pub mod transport;
+
+type Event = Box<dyn Any + Send>;
+
+#[derive(Debug, Clone)]
+pub struct ConnectionTx {
+    pub event: crossbeam_channel::Sender<Event>,
+    pub lsp: crossbeam_channel::Sender<Message>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectionRx {
+    pub event: crossbeam_channel::Receiver<Event>,
+    pub lsp: crossbeam_channel::Receiver<Message>,
+}
+
+pub enum EventOrMessage {
+    Evt(Event),
+    Msg(Message),
+}
+
+impl ConnectionRx {
+    pub fn recv(&self) -> Result<EventOrMessage, RecvError> {
+        crossbeam_channel::select_biased! {
+            recv(self.lsp) -> msg => msg.map(EventOrMessage::Msg),
+            recv(self.event) -> event => event.map(EventOrMessage::Evt),
+        }
+    }
+}
+
+/// Connection is just a pair of channels of LSP messages.
+pub struct Connection {
+    pub sender: ConnectionTx,
+    pub receiver: ConnectionRx,
+}
+
+pub type Message = lsp_server::Message;
 
 /// The common error type for the language server.
 pub use lsp_server::ResponseError;
@@ -122,12 +159,12 @@ impl<S> std::ops::Deref for TypedLspClient<S> {
 #[derive(Debug, Clone)]
 pub struct LspClientRoot {
     weak: LspClient,
-    _strong: Arc<crossbeam_channel::Sender<Message>>,
+    _strong: Arc<ConnectionTx>,
 }
 
 impl LspClientRoot {
     /// Creates a new language server host.
-    pub fn new(handle: tokio::runtime::Handle, sender: crossbeam_channel::Sender<Message>) -> Self {
+    pub fn new(handle: tokio::runtime::Handle, sender: ConnectionTx) -> Self {
         let _strong = Arc::new(sender);
         let weak = LspClient {
             handle,
@@ -152,7 +189,7 @@ pub struct LspClient {
     /// The tokio handle.
     pub handle: tokio::runtime::Handle,
 
-    sender: Weak<crossbeam_channel::Sender<Message>>,
+    sender: Weak<ConnectionTx>,
     req_queue: Arc<Mutex<ReqQueue>>,
 }
 
@@ -174,6 +211,19 @@ impl LspClient {
         self.req_queue.lock().begin_panic();
     }
 
+    /// Sends a event to the client itself.
+    pub fn send_event<T: std::any::Any + Send + 'static>(&self, event: T) {
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send request: connection closed");
+            return;
+        };
+
+        let Err(res) = sender.event.send(Box::new(event)) else {
+            return;
+        };
+        log::warn!("failed to send event: {res:?}");
+    }
+
     /// Sends a request to the client and registers a handler.
     pub fn send_request_<R: Req>(
         &self,
@@ -188,7 +238,7 @@ impl LspClient {
         let request = req_queue
             .outgoing
             .register(R::METHOD.to_owned(), params, Box::new(handler));
-        let Err(res) = sender.send(request.into()) else {
+        let Err(res) = sender.lsp.send(request.into()) else {
             return;
         };
         log::warn!("failed to send request: {res:?}");
@@ -225,7 +275,7 @@ impl LspClient {
 
             let duration = start.elapsed();
             log::info!("handled  {method} - ({}) in {duration:0.2?}", response.id);
-            let Err(res) = sender.send(response.into()) else {
+            let Err(res) = sender.lsp.send(response.into()) else {
                 return;
             };
             log::warn!("failed to send response: {res:?}");
@@ -238,7 +288,7 @@ impl LspClient {
             log::warn!("failed to send notification: connection closed");
             return;
         };
-        let Err(res) = sender.send(notif.into()) else {
+        let Err(res) = sender.lsp.send(notif.into()) else {
             return;
         };
         log::warn!("failed to send notification: {res:?}");
@@ -299,6 +349,9 @@ type ExecuteCmdMap<S> = HashMap<&'static str, BoxHandler<S, Vec<JsonValue>>>;
 type RegularCmdMap<S> = HashMap<&'static str, BoxHandler<S, JsonValue>>;
 type NotifyCmdMap<S> = HashMap<&'static str, BoxPureHandler<S, JsonValue>>;
 type ResourceMap<S> = HashMap<ImmutPath, BoxHandler<S, Vec<JsonValue>>>;
+type MayInitBoxHandler<A, S, T> =
+    Box<dyn for<'a> Fn(ServiceState<'a, A, S>, &LspClient, T) -> anyhow::Result<()>>;
+type EventMap<A, S> = HashMap<core::any::TypeId, MayInitBoxHandler<A, S, Event>>;
 
 pub trait Initializer {
     type I: for<'de> serde::Deserialize<'de>;
@@ -310,6 +363,7 @@ pub trait Initializer {
 pub struct LspBuilder<Args: Initializer> {
     pub args: Args,
     pub client: LspClient,
+    pub events: EventMap<Args, Args::S>,
     pub exec_cmds: ExecuteCmdMap<Args::S>,
     pub notify_cmds: NotifyCmdMap<Args::S>,
     pub regular_cmds: RegularCmdMap<Args::S>,
@@ -324,11 +378,24 @@ where
         Self {
             args,
             client,
+            events: EventMap::new(),
             exec_cmds: ExecuteCmdMap::new(),
             notify_cmds: NotifyCmdMap::new(),
             regular_cmds: RegularCmdMap::new(),
             resource_routes: ResourceMap::new(),
         }
+    }
+
+    pub fn with_event<T: std::any::Any>(
+        mut self,
+        ins: &T,
+        handler: impl for<'a> Fn(ServiceState<'a, Args, Args::S>, T) -> anyhow::Result<()> + 'static,
+    ) -> Self {
+        self.events.insert(
+            ins.type_id(),
+            Box::new(move |s, _client, req| handler(s, *req.downcast().unwrap())),
+        );
+        self
     }
 
     pub fn with_command_(
@@ -422,11 +489,26 @@ where
     pub fn build(self) -> LspDriver<Args> {
         LspDriver {
             state: State::Uninitialized(Some(Box::new(self.args))),
+            events: self.events,
             client: self.client,
             commands: self.exec_cmds,
             notifications: self.notify_cmds,
             requests: self.regular_cmds,
             resources: self.resource_routes,
+        }
+    }
+}
+
+pub enum ServiceState<'a, A, S> {
+    Uninitialized(Option<&'a mut A>),
+    Ready(&'a mut S),
+}
+
+impl<A, S> ServiceState<'_, A, S> {
+    pub fn ready(&mut self) -> Option<&mut S> {
+        match self {
+            ServiceState::Ready(s) => Some(s),
+            _ => None,
         }
     }
 }
@@ -462,13 +544,15 @@ pub struct LspDriver<Args: Initializer> {
     pub client: LspClient,
 
     // Handle maps
+    /// Events for dispatching.
+    pub events: EventMap<Args, Args::S>,
     /// Extra commands provided with `textDocument/executeCommand`.
     pub commands: ExecuteCmdMap<Args::S>,
     /// Notifications for dispatching.
     pub notifications: NotifyCmdMap<Args::S>,
     /// Requests for dispatching.
     pub requests: RegularCmdMap<Args::S>,
-    /// Resource for dispatching.
+    /// Resources for dispatching.
     pub resources: ResourceMap<Args::S>,
 }
 
@@ -499,11 +583,7 @@ impl<Args: Initializer> LspDriver<Args>
 where
     Args::S: 'static,
 {
-    pub fn start(
-        &mut self,
-        inbox: crossbeam_channel::Receiver<Message>,
-        is_replay: bool,
-    ) -> anyhow::Result<()> {
+    pub fn start(&mut self, inbox: ConnectionRx, is_replay: bool) -> anyhow::Result<()> {
         let res = self.start_(inbox);
 
         if is_replay {
@@ -531,7 +611,8 @@ where
         res
     }
 
-    pub fn start_(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
+    pub fn start_(&mut self, inbox: ConnectionRx) -> anyhow::Result<()> {
+        use EventOrMessage::*;
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
         // event (like a condvar), and event fires, priority of the thread is
@@ -556,15 +637,32 @@ where
             const EXIT_METHOD: &str = notification::Exit::METHOD;
             let loop_start = Instant::now();
             match msg {
-                Message::Request(req) => self.on_request(loop_start, req),
-                Message::Notification(not) => {
+                Evt(event) => {
+                    let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
+                        log::warn!("unhandled event: {:?}", event.as_ref().type_id());
+                        continue;
+                    };
+
+                    let s = match &mut self.state {
+                        State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
+                        State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
+                        State::ShuttingDown => {
+                            log::warn!("server is shutting down");
+                            continue;
+                        }
+                    };
+
+                    event_handler(s, &self.client, event)?;
+                }
+                Msg(Message::Request(req)) => self.on_request(loop_start, req),
+                Msg(Message::Notification(not)) => {
                     let is_exit = not.method == EXIT_METHOD;
                     self.on_notification(loop_start, not)?;
                     if is_exit {
                         return Ok(());
                     }
                 }
-                Message::Response(resp) => {
+                Msg(Message::Response(resp)) => {
                     let s = match &mut self.state {
                         State::Ready(s) => s,
                         _ => {
