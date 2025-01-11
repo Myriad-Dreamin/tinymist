@@ -81,6 +81,19 @@ In VSCode, enable compile status meaning that the extension will show the compil
   - `disable`
 - **Default**: `"enable"`
 
+## `tinymist.statusBarFormat`
+
+Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:
+
+- `{compileStatusIcon}`: Icon indicating the compile status
+- `{wordCount}`: Number of words in the document
+- `{fileName}`: Name of the file being compiled
+
+Note: The status bar will be hidden if the format string is empty.
+
+- **Type**: `string`
+- **Default**: `"{compileStatusIcon} {wordCount} [{fileName}]"`
+
 ## `tinymist.typstExtraArgs`
 
 You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.

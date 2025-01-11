@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { statusBarFormatString } from "./extension";
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -23,6 +24,7 @@ interface WordsCount {
 
 export interface TinymistStatus {
   status: "compiling" | "compileSuccess" | "compileError";
+  path: string;
   wordsCount: WordsCount;
 }
 
@@ -39,11 +41,13 @@ export function wordCountItemProcess(event: TinymistStatus) {
   statusBarItem = statusBarItem || initWordCountItem();
 
   const updateTooltip = () => {
-    statusBarItem.tooltip = `${words} ${plural("Word", words)}
+    statusBarItem.tooltip = `
+Main file: ${event.path}
+${words} ${plural("Word", words)}
 ${chars} ${plural("Character", chars)}
 ${spaces} ${plural("Space", spaces)}
 ${cjkChars} CJK ${plural("Character", cjkChars)}
-[Click to show logs]`;
+[Click to show logs]`.trim();
   };
 
   words = event.wordsCount?.words || 0;
@@ -51,30 +55,24 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
   spaces = event.wordsCount?.spaces || 0;
   cjkChars = event.wordsCount?.cjkChars || 0;
 
-  const style: string = "errorStatus";
+  const fileName = event.path ? event.path.split("/").slice(-1)[0] : "";
+  const fileNameWithoutExt = fileName ? fileName.split(".").slice(0, -1).join(".") : "";
+
+  const formatString = statusBarFormatString()
+    .replace(/\{wordCount\}/g, `${words} ${plural("Word", words)}`)
+    .replace(/\{fileName\}/g, fileNameWithoutExt);
+
   if (statusBarItem) {
     if (event.status === "compiling") {
-      if (style === "compact") {
-        statusBarItem.text = "$(sync~spin)";
-      } else if (style === "errorStatus") {
-        statusBarItem.text = `$(sync~spin) ${words} ${plural("Word", words)}`;
-      }
+      statusBarItem.text = formatString.replace(/\{compileStatusIcon\}/g, "$(sync~spin)");
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
       updateTooltip();
     } else if (event.status === "compileSuccess") {
-      if (style === "compact") {
-        statusBarItem.text = "$(typst-guy)";
-      } else if (style === "errorStatus") {
-        statusBarItem.text = `$(sync) ${words} ${plural("Word", words)}`;
-      }
+      statusBarItem.text = formatString.replace(/\{compileStatusIcon\}/g, "$(sync)");
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.prominentBackground");
       updateTooltip();
     } else if (event.status === "compileError") {
-      if (style === "compact") {
-        statusBarItem.text = "$(typst-guy)";
-      } else if (style === "errorStatus") {
-        statusBarItem.text = `$(sync) ${words} ${plural("Word", words)}`;
-      }
+      statusBarItem.text = formatString.replace(/\{compileStatusIcon\}/g, "$(sync)");
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
       updateTooltip();
     }

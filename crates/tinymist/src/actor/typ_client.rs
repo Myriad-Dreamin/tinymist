@@ -26,6 +26,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use anyhow::bail;
 use log::{error, info, trace};
+use reflexo::path::unix_slash;
 use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
     CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
@@ -40,7 +41,7 @@ use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
 
 use super::{
-    editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
+    editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum},
     typ_server::{
         CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
     },
@@ -182,9 +183,9 @@ impl CompileHandler {
 }
 
 impl CompilationHandle<LspCompilerFeat> for CompileHandler {
-    fn status(&self, revision: usize, _rep: CompileReport) {
+    fn status(&self, revision: usize, rep: CompileReport) {
         // todo: seems to duplicate with CompileStatus
-        let status = match _rep {
+        let status = match rep {
             CompileReport::Suspend => {
                 self.push_diagnostics(revision, None);
                 TinymistCompileStatusEnum::CompileSuccess
@@ -198,14 +199,21 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 
         let this = &self;
         this.editor_tx
-            .send(EditorRequest::Status(this.diag_group.clone(), status))
+            .send(EditorRequest::Status(CompileStatus {
+                group: this.diag_group.clone(),
+                path: rep
+                    .compiling_id()
+                    .map(|s| unix_slash(s.vpath().as_rooted_path()))
+                    .unwrap_or_default(),
+                status,
+            }))
             .unwrap();
 
         #[cfg(feature = "preview")]
         if let Some(inner) = this.inner.read().as_ref() {
             use typst_preview::CompileStatus;
 
-            let status = match _rep {
+            let status = match rep {
                 CompileReport::Suspend => CompileStatus::CompileSuccess,
                 CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
                 CompileReport::CompileSuccess(_, _, _) => CompileStatus::CompileSuccess,
@@ -218,7 +226,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         }
     }
 
-    fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
+    fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, rep: CompileReport) {
         // todo: we need to manage the revision for fn status() as well
         {
             let mut n_rev = self.notified_revision.lock();
@@ -241,14 +249,18 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         self.export.signal(snap, snap.signal);
 
         self.editor_tx
-            .send(EditorRequest::Status(
-                self.diag_group.clone(),
-                if snap.doc.is_ok() {
+            .send(EditorRequest::Status(CompileStatus {
+                group: self.diag_group.clone(),
+                path: rep
+                    .compiling_id()
+                    .map(|s| unix_slash(s.vpath().as_rooted_path()))
+                    .unwrap_or_default(),
+                status: if snap.doc.is_ok() {
                     TinymistCompileStatusEnum::CompileSuccess
                 } else {
                     TinymistCompileStatusEnum::CompileError
                 },
-            ))
+            }))
             .unwrap();
 
         #[cfg(feature = "preview")]

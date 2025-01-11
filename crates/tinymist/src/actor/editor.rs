@@ -15,9 +15,16 @@ pub struct DocVersion {
     pub revision: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct CompileStatus {
+    pub group: String,
+    pub path: String,
+    pub status: TinymistCompileStatusEnum,
+}
+
 pub enum EditorRequest {
     Diag(DocVersion, Option<DiagnosticsMap>),
-    Status(String, TinymistCompileStatusEnum),
+    Status(CompileStatus),
     WordCount(String, WordsCount),
 }
 
@@ -46,7 +53,11 @@ impl EditorActor {
     }
 
     pub async fn run(mut self) {
-        let mut compile_status = TinymistCompileStatusEnum::Compiling;
+        let mut compile_status = CompileStatus {
+            group: "primary".to_owned(),
+            status: TinymistCompileStatusEnum::Compiling,
+            path: "".to_owned(),
+        };
         let mut words_count = None;
         while let Some(req) = self.editor_rx.recv().await {
             match req {
@@ -59,13 +70,14 @@ impl EditorActor {
 
                     self.publish(group, diagnostics).await;
                 }
-                EditorRequest::Status(group, status) => {
-                    log::info!("received status request({group}) {status:?}");
-                    if self.notify_compile_status && group == "primary" {
+                EditorRequest::Status(status) => {
+                    log::info!("received status request({status:?})");
+                    if self.notify_compile_status && status.group == "primary" {
                         compile_status = status;
                         self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
-                                status: compile_status.clone(),
+                                status: compile_status.status.clone(),
+                                path: compile_status.path.clone(),
                                 words_count: words_count.clone(),
                             },
                         );
@@ -77,7 +89,8 @@ impl EditorActor {
                         words_count = Some(wc);
                         self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
-                                status: compile_status.clone(),
+                                status: compile_status.status.clone(),
+                                path: compile_status.path.clone(),
                                 words_count: words_count.clone(),
                             },
                         );
@@ -156,8 +169,9 @@ pub enum TinymistCompileStatusEnum {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TinymistCompileStatus {
+struct TinymistCompileStatus {
     pub status: TinymistCompileStatusEnum,
+    pub path: String,
     pub words_count: Option<WordsCount>,
 }
 

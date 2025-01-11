@@ -516,8 +516,11 @@ async function commandActivateDocPath(
   if (extensionState.mut.focusingDoc?.isClosed) {
     extensionState.mut.focusingDoc = undefined;
   }
+  const formatString = statusBarFormatString();
   // remove the status bar until the last focusing file is closed
-  triggerStatusBar(!!(fsPath || extensionState.mut.focusingDoc?.isClosed === false));
+  triggerStatusBar(
+    !!formatString && !!(fsPath || extensionState.mut.focusingDoc?.isClosed === false),
+  );
   await tinymist.executeCommand("tinymist.focusMain", [fsPath]);
 }
 
@@ -599,4 +602,12 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }
