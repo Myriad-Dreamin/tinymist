@@ -358,6 +358,12 @@ pub enum ProjectTask {
     ExportPng(ExportPngTask),
     /// An export SVG task.
     ExportSvg(ExportSvgTask),
+    /// An export HTML task.
+    ExportHtml(ExportHtmlTask),
+    /// An export Markdown task.
+    ExportMarkdown(ExportMarkdownTask),
+    /// An export Text task.
+    ExportText(ExportTextTask),
     // todo: compatibility
     // An export task of another type.
     // Other(serde_json::Value),
@@ -371,6 +377,9 @@ impl ProjectTask {
             ProjectTask::ExportPdf(task) => &task.export.document,
             ProjectTask::ExportPng(task) => &task.export.document,
             ProjectTask::ExportSvg(task) => &task.export.document,
+            ProjectTask::ExportHtml(task) => &task.export.document,
+            ProjectTask::ExportMarkdown(task) => &task.export.document,
+            ProjectTask::ExportText(task) => &task.export.document,
             // ProjectTask::Other(_) => return None,
         }
     }
@@ -382,6 +391,9 @@ impl ProjectTask {
             ProjectTask::ExportPdf(task) => &task.export.id,
             ProjectTask::ExportPng(task) => &task.export.id,
             ProjectTask::ExportSvg(task) => &task.export.id,
+            ProjectTask::ExportHtml(task) => &task.export.id,
+            ProjectTask::ExportMarkdown(task) => &task.export.id,
+            ProjectTask::ExportText(task) => &task.export.id,
             // ProjectTask::Other(_) => return None,
         }
     }
@@ -445,10 +457,37 @@ pub struct ExportPngTask {
     pub ppi: f32,
 }
 
-/// An export png task specifier.
+/// An export svg task specifier.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportSvgTask {
+    /// The shared export arguments
+    #[serde(flatten)]
+    pub export: ExportTask,
+}
+
+/// An export html task specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportHtmlTask {
+    /// The shared export arguments
+    #[serde(flatten)]
+    pub export: ExportTask,
+}
+
+/// An export markdown task specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportMarkdownTask {
+    /// The shared export arguments
+    #[serde(flatten)]
+    pub export: ExportTask,
+}
+
+/// An export text task specifier.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportTextTask {
     /// The shared export arguments
     #[serde(flatten)]
     pub export: ExportTask,
