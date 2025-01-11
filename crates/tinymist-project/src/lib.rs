@@ -61,8 +61,10 @@ pub struct LockFile {
     // The lock file version.
     // version: String,
     /// The project's document (input).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub document: Vec<ProjectInput>,
     /// The project's task (output).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub task: Vec<ProjectTask>,
     /// The project's task route.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
