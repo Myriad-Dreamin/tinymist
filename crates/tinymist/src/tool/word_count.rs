@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
+use reflexo_typst::TypstDocument;
 use reflexo_typst::{debug_loc::SourceSpanOffset, exporter_utils::map_err};
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;

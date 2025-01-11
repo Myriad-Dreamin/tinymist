@@ -14,6 +14,7 @@ use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
+use typst::engine::{Route, Sink, Traced};
 use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::package::{PackageManifest, PackageSpec};

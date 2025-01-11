@@ -132,9 +132,12 @@ log = "0.4"
 reflexo = { version = "=0.5.4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.5.4", default-features = false }
+reflexo-world = { version = "=0.5.4", features = ["system"] }
+reflexo-typst = { version = "=0.5.4", features = [
+    "system",
+], default-features = false }
 reflexo-vec2svg = { version = "=0.5.4" }
-
+reflexo-typst-shim = { version = "=0.5.4", features = ["nightly"] }
 
 typst = "0.13.0"
 typst-html = "0.13.0"
@@ -145,6 +148,8 @@ typst-pdf = "0.13.0"
 typst-syntax = "0.13.0"
 typst-eval = "0.13.0"
 typst-assets = "0.12.0"
+
+
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.14", default-features = false }
@@ -257,14 +262,14 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
 typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9", features = [
     "fonts",
 ] }
@@ -280,19 +285,18 @@ typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9",
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
-# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
-# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
+reflexo-world = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
+reflexo-typst2vec = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
+reflexo-typst-shim = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "369f66dfab645d7a24d8307b9051b9839cfed72d" }
 
 # These patches use local `reflexo` for development.
-reflexo = { path = "../typst.ts/crates/reflexo/" }
-reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.19-rc2" }
-
-[patch."https://github.com/Myriad-Dreamin/tinymist.git"]
-typst-shim = { path = "crates/typst-shim" }
-tinymist-analysis = { path = "crates/tinymist-analysis" }
-tinymist-std = { path = "crates/tinymist-std" }
-tinymist-world = { path = "crates/tinymist-world" }
-tinymist-project = { path = "crates/tinymist-project" }
+# reflexo = { path = "../typst.ts/crates/reflexo/" }
+# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
+# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+# reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
+# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+# reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
+# typstyle = { path = "../typstyle" }

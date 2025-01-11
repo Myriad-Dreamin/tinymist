@@ -17,6 +17,7 @@ mod upstream;
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use completion::PostfixSnippet;
+use reflexo_typst::TypstDocument;
 pub use upstream::with_vm;
 
 mod diagnostics;

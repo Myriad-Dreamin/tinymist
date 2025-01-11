@@ -8,6 +8,7 @@ use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
+use reflexo::path::unix_slash;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;

@@ -8,6 +8,7 @@
 use core::fmt;
 
 use base64::Engine;
+use reflexo_typst::TypstDocument;
 use reflexo_vec2svg::{ExportFeature, SvgExporter, SvgText};
 use tinymist_query::{FramePosition, LocalContext, VersionedDocument};
 use tinymist_std::typst::TypstDocument;
