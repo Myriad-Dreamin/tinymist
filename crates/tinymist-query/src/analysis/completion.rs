@@ -9,6 +9,7 @@ use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use reflexo::path::unix_slash;
+use reflexo_typst::TypstDocument;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
@@ -17,7 +18,6 @@ use typst::foundations::{
     fields_on, format_str, repr, AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type,
     Value,
 };
-use typst::model::Document;
 use typst::syntax::ast::{self, AstNode, Param};
 use typst::syntax::{is_id_continue, is_id_start, is_ident};
 use typst::text::RawElem;
@@ -329,7 +329,7 @@ pub struct CompletionWorker<'a> {
     /// The analysis local context.
     ctx: &'a mut LocalContext,
     /// The compiled document.
-    document: Option<&'a Document>,
+    document: Option<&'a TypstDocument>,
     /// Whether the completion was explicitly requested.
     explicit: bool,
     /// The trigger character.
@@ -346,7 +346,7 @@ impl<'a> CompletionWorker<'a> {
     /// Create a completion worker.
     pub fn new(
         ctx: &'a mut LocalContext,
-        document: Option<&'a Document>,
+        document: Option<&'a TypstDocument>,
         explicit: bool,
         trigger_character: Option<char>,
     ) -> Option<Self> {

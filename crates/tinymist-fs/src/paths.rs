@@ -477,7 +477,6 @@ fn set_not_readonly(p: &Path) -> io::Result<bool> {
 
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
         perms.set_readonly(false);
     }
     #[cfg(not(unix))]

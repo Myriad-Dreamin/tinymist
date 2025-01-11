@@ -44,6 +44,7 @@ rpds.workspace = true
 rayon.workspace = true
 
 typst.workspace = true
+typst-eval.workspace = true
 
 reflexo.workspace = true
 typst-shim.workspace = true

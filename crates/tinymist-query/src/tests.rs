@@ -11,7 +11,10 @@ use std::{
 use once_cell::sync::Lazy;
 use reflexo_typst::package::PackageSpec;
 use reflexo_typst::world::EntryState;
-use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, TaskInputs};
+use reflexo_typst::{
+    CompileDriverImpl, EntryManager, EntryReader, ShadowApi, TaskInputs, TypstDocument,
+    TypstPagedDocument,
+};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
 use typst::foundations::Bytes;
@@ -134,10 +137,10 @@ pub fn compile_doc_for_test(
         }));
     }
 
-    let doc = typst::compile(world.as_ref()).output.unwrap();
+    let doc: TypstPagedDocument = typst::compile(world.as_ref()).output.unwrap();
     Some(VersionedDocument {
         version: 0,
-        document: Arc::new(doc),
+        document: Arc::new(TypstDocument::Paged(doc.into())),
     })
 }
 
@@ -182,7 +185,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
 
         let pw = root.join(Path::new(&path));
         world
-            .map_shadow(&pw, Bytes::from(source.as_bytes()))
+            .map_shadow(&pw, Bytes::new(source.as_bytes().to_owned()))
             .unwrap();
         last_pw = Some(pw);
     }

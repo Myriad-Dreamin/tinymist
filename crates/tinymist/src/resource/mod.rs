@@ -13,8 +13,7 @@ mod prelude {
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::Value as JsonValue;
     pub use sync_lsp::*;
-    pub use typst::foundations::{Scope, Value};
-    pub use typst::symbols::Symbol;
+    pub use typst::foundations::{Scope, Symbol, Value};
 
     pub use crate::LanguageState;
 

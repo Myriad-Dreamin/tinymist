@@ -560,7 +560,7 @@ mod call_info_tests {
             };
 
             let mut w = ci.arg_mapping.iter().collect::<Vec<_>>();
-            w.sort_by(|x, y| x.0.span().number().cmp(&y.0.span().number()));
+            w.sort_by(|x, y| x.0.span().into_raw().cmp(&y.0.span().into_raw()));
 
             for (arg, arg_call_info) in w {
                 writeln!(f, "{} -> {:?}", arg.clone().into_text(), arg_call_info)?;

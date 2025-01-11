@@ -254,7 +254,7 @@ impl Ty {
 }
 
 fn is_content_builtin_type(ty: &Type) -> bool {
-    *ty == Type::of::<Content>() || *ty == Type::of::<typst::symbols::Symbol>()
+    *ty == Type::of::<Content>() || *ty == Type::of::<typst::foundations::Symbol>()
 }
 
 /// A function parameter type

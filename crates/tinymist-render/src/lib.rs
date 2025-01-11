@@ -8,6 +8,7 @@
 use core::fmt;
 
 use base64::Engine;
+use reflexo_typst::TypstDocument;
 use reflexo_vec2svg::{ExportFeature, SvgExporter, SvgText};
 use tinymist_query::{FramePosition, LocalContext, VersionedDocument};
 
@@ -97,32 +98,37 @@ impl PeriscopeRenderer {
         doc: VersionedDocument,
         pos: FramePosition,
     ) -> Option<(String, f32, f32)> {
-        // todo: svg viewer compatibility
-        type UsingExporter = SvgExporter<PeriscopeExportFeature>;
-        let mut doc = UsingExporter::svg_doc(&doc.document);
-        doc.module.prepare_glyphs();
-        let page0 = doc.pages.get(pos.page.get() - 1)?.clone();
-        let mut svg_text = UsingExporter::render(&doc.module, &[page0.clone()], None);
+        match doc.document.as_ref() {
+            TypstDocument::Paged(paged_doc) => {
+                // todo: svg viewer compatibility
+                type UsingExporter = SvgExporter<PeriscopeExportFeature>;
+                let mut doc = UsingExporter::svg_doc(&paged_doc);
+                doc.module.prepare_glyphs();
+                let page0 = doc.pages.get(pos.page.get() - 1)?.clone();
+                let mut svg_text = UsingExporter::render(&doc.module, &[page0.clone()], None);
 
-        // todo: let typst.ts expose it
-        let svg_header = svg_text.get_mut(0)?;
+                // todo: let typst.ts expose it
+                let svg_header = svg_text.get_mut(0)?;
 
-        let y_center = pos.point.y.to_pt() as f32;
-        let y_lo = y_center - self.p.y_above;
-        let y_hi = y_center + self.p.y_below;
+                let y_center = pos.point.y.to_pt() as f32;
+                let y_lo = y_center - self.p.y_above;
+                let y_hi = y_center + self.p.y_below;
 
-        let width = page0.size.x.0;
-        let height = y_hi - y_lo;
+                let width = page0.size.x.0;
+                let height = y_hi - y_lo;
 
-        *svg_header = SvgText::Plain(header_inner(
-            page0.size.x.0,
-            y_lo,
-            y_hi,
-            self.p.scale,
-            self.p.invert_color == "always",
-        ));
+                *svg_header = SvgText::Plain(header_inner(
+                    page0.size.x.0,
+                    y_lo,
+                    y_hi,
+                    self.p.scale,
+                    self.p.invert_color == "always",
+                ));
 
-        Some((SvgText::join(svg_text), width, height))
+                Some((SvgText::join(svg_text), width, height))
+            }
+            _ => None,
+        }
     }
 }
 
