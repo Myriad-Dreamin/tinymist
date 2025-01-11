@@ -1,3 +1,5 @@
+//! A synchronous language server implementation.
+
 use core::fmt;
 use std::any::Any;
 use std::path::Path;
@@ -19,25 +21,27 @@ pub mod transport;
 
 type Event = Box<dyn Any + Send>;
 
+/// The sender of the language server.
 #[derive(Debug, Clone)]
 pub struct ConnectionTx {
+    /// The sender of the events.
     pub event: crossbeam_channel::Sender<Event>,
+    /// The sender of the LSP messages.
     pub lsp: crossbeam_channel::Sender<Message>,
 }
 
+/// The sender of the language server.
 #[derive(Debug, Clone)]
 pub struct ConnectionRx {
+    /// The receiver of the events.
     pub event: crossbeam_channel::Receiver<Event>,
+    /// The receiver of the LSP messages.
     pub lsp: crossbeam_channel::Receiver<Message>,
 }
 
-pub enum EventOrMessage {
-    Evt(Event),
-    Msg(Message),
-}
-
 impl ConnectionRx {
-    pub fn recv(&self) -> Result<EventOrMessage, RecvError> {
+    /// Receives a message or an event.
+    fn recv(&self) -> Result<EventOrMessage, RecvError> {
         crossbeam_channel::select_biased! {
             recv(self.lsp) -> msg => msg.map(EventOrMessage::Msg),
             recv(self.event) -> event => event.map(EventOrMessage::Evt),
@@ -45,12 +49,21 @@ impl ConnectionRx {
     }
 }
 
+/// This is a helper enum to handle both events and messages.
+enum EventOrMessage {
+    Evt(Event),
+    Msg(Message),
+}
+
 /// Connection is just a pair of channels of LSP messages.
 pub struct Connection {
+    /// The senders of the connection.
     pub sender: ConnectionTx,
+    /// The receivers of the connection.
     pub receiver: ConnectionRx,
 }
 
+/// The common message type for the language server.
 pub type Message = lsp_server::Message;
 
 /// The common error type for the language server.
@@ -109,6 +122,7 @@ pub struct TypedLspClient<S> {
 }
 
 impl<S> TypedLspClient<S> {
+    /// Converts the client to an untyped client.
     pub fn to_untyped(self) -> LspClient {
         self.client
     }
@@ -207,6 +221,7 @@ impl LspClient {
         self.req_queue.lock().incoming.has_pending()
     }
 
+    /// Prints states of the request queue and panics.
     pub fn begin_panic(&self) {
         self.req_queue.lock().begin_panic();
     }
@@ -353,39 +368,55 @@ type MayInitBoxHandler<A, S, T> =
     Box<dyn for<'a> Fn(ServiceState<'a, A, S>, &LspClient, T) -> anyhow::Result<()>>;
 type EventMap<A, S> = HashMap<core::any::TypeId, MayInitBoxHandler<A, S, Event>>;
 
+/// A trait that initializes the language server.
 pub trait Initializer {
+    /// The type of the initialization request.
     type I: for<'de> serde::Deserialize<'de>;
+    /// The type of the service.
     type S;
 
+    /// Handles the initialization request.
+    /// If the behind protocol is the standard LSP, the request is
+    /// `InitializeParams`.
     fn initialize(self, req: Self::I) -> (Self::S, AnySchedulableResponse);
 }
 
+/// The builder pattern for the language server.
 pub struct LspBuilder<Args: Initializer> {
+    /// The extra initialization arguments.
     pub args: Args,
+    /// The client surface for the implementing language server.
     pub client: LspClient,
+    /// The event handlers.
     pub events: EventMap<Args, Args::S>,
-    pub exec_cmds: ExecuteCmdMap<Args::S>,
-    pub notify_cmds: NotifyCmdMap<Args::S>,
-    pub regular_cmds: RegularCmdMap<Args::S>,
-    pub resource_routes: ResourceMap<Args::S>,
+    /// The command handlers.
+    pub command_handlers: ExecuteCmdMap<Args::S>,
+    /// The notification handlers.
+    pub notif_handlers: NotifyCmdMap<Args::S>,
+    /// The request handlers.
+    pub req_handlers: RegularCmdMap<Args::S>,
+    /// The resource handlers.
+    pub resource_handlers: ResourceMap<Args::S>,
 }
 
 impl<Args: Initializer> LspBuilder<Args>
 where
     Args::S: 'static,
 {
+    /// Creates a new language server builder.
     pub fn new(args: Args, client: LspClient) -> Self {
         Self {
             args,
             client,
             events: EventMap::new(),
-            exec_cmds: ExecuteCmdMap::new(),
-            notify_cmds: NotifyCmdMap::new(),
-            regular_cmds: RegularCmdMap::new(),
-            resource_routes: ResourceMap::new(),
+            command_handlers: ExecuteCmdMap::new(),
+            notif_handlers: NotifyCmdMap::new(),
+            req_handlers: RegularCmdMap::new(),
+            resource_handlers: ResourceMap::new(),
         }
     }
 
+    /// Registers an event handler.
     pub fn with_event<T: std::any::Any>(
         mut self,
         ins: &T,
@@ -398,65 +429,74 @@ where
         self
     }
 
+    /// Registers an raw event handler.
     pub fn with_command_(
         mut self,
         cmd: &'static str,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.exec_cmds.insert(cmd, raw_to_boxed(handler));
+        self.command_handlers.insert(cmd, raw_to_boxed(handler));
         self
     }
 
+    /// Registers an async command handler.
     pub fn with_command<R: Serialize + 'static>(
         mut self,
         cmd: &'static str,
         handler: AsyncHandler<Args::S, Vec<JsonValue>, R>,
     ) -> Self {
-        self.exec_cmds.insert(
+        self.command_handlers.insert(
             cmd,
             Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
         );
         self
     }
 
+    /// Registers an untyped notification handler.
     pub fn with_notification_<R: Notif>(
         mut self,
         handler: PureHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.notify_cmds.insert(R::METHOD, Box::new(handler));
+        self.notif_handlers.insert(R::METHOD, Box::new(handler));
         self
     }
 
+    /// Registers a typed notification handler.
     pub fn with_notification<R: Notif>(mut self, handler: PureHandler<Args::S, R::Params>) -> Self {
-        self.notify_cmds.insert(
+        self.notif_handlers.insert(
             R::METHOD,
             Box::new(move |s, req| handler(s, from_json(req)?)),
         );
         self
     }
 
+    /// Registers a raw request handler that handlers a kind of untyped lsp
+    /// request.
     pub fn with_raw_request<R: Req>(mut self, handler: RawHandler<Args::S, JsonValue>) -> Self {
-        self.regular_cmds.insert(R::METHOD, raw_to_boxed(handler));
+        self.req_handlers.insert(R::METHOD, raw_to_boxed(handler));
         self
     }
 
     // todo: unsafe typed
+    /// Registers an raw request handler that handlers a kind of typed lsp
+    /// request.
     pub fn with_request_<R: Req>(
         mut self,
         handler: fn(&mut Args::S, RequestId, R::Params) -> ScheduledResult,
     ) -> Self {
-        self.regular_cmds.insert(
+        self.req_handlers.insert(
             R::METHOD,
             Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
         );
         self
     }
 
+    /// Registers a typed request handler.
     pub fn with_request<R: Req>(
         mut self,
         handler: AsyncHandler<Args::S, R::Params, R::Result>,
     ) -> Self {
-        self.regular_cmds.insert(
+        self.req_handlers.insert(
             R::METHOD,
             Box::new(move |s, client, req_id, req| {
                 client.schedule(req_id, handler(s, from_json(req)?))
@@ -465,46 +505,53 @@ where
         self
     }
 
+    /// Registers a raw resource handler.
     pub fn with_resource_(
         mut self,
         path: ImmutPath,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.resource_routes.insert(path, raw_to_boxed(handler));
+        self.resource_handlers.insert(path, raw_to_boxed(handler));
         self
     }
 
+    /// Registers an async resource handler.
     pub fn with_resource(
         mut self,
         path: &'static str,
         handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
     ) -> Self {
-        self.resource_routes.insert(
+        self.resource_handlers.insert(
             Path::new(path).into(),
             Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
         );
         self
     }
 
+    /// Builds the language server driver.
     pub fn build(self) -> LspDriver<Args> {
         LspDriver {
             state: State::Uninitialized(Some(Box::new(self.args))),
             events: self.events,
             client: self.client,
-            commands: self.exec_cmds,
-            notifications: self.notify_cmds,
-            requests: self.regular_cmds,
-            resources: self.resource_routes,
+            commands: self.command_handlers,
+            notifications: self.notif_handlers,
+            requests: self.req_handlers,
+            resources: self.resource_handlers,
         }
     }
 }
 
+/// An enum to represent the state of the language server.
 pub enum ServiceState<'a, A, S> {
+    /// The service is uninitialized.
     Uninitialized(Option<&'a mut A>),
+    /// The service is initializing.
     Ready(&'a mut S),
 }
 
 impl<A, S> ServiceState<'_, A, S> {
+    /// Converts the state to an option holding the ready service.
     pub fn ready(&mut self) -> Option<&mut S> {
         match self {
             ServiceState::Ready(s) => Some(s),
@@ -537,6 +584,7 @@ impl<Args, S> State<Args, S> {
     }
 }
 
+/// The language server driver.
 pub struct LspDriver<Args: Initializer> {
     /// State to synchronize with the client.
     state: State<Args, Args::S>,
@@ -557,14 +605,17 @@ pub struct LspDriver<Args: Initializer> {
 }
 
 impl<Args: Initializer> LspDriver<Args> {
+    /// Gets the state of the language server.
     pub fn state(&self) -> Option<&Args::S> {
         self.state.opt()
     }
 
+    /// Gets the mutable state of the language server.
     pub fn state_mut(&mut self) -> Option<&mut Args::S> {
         self.state.opt_mut()
     }
 
+    /// Makes the language server ready.
     pub fn ready(&mut self, params: Args::I) -> AnySchedulableResponse {
         let args = match &mut self.state {
             State::Uninitialized(args) => args,
@@ -583,6 +634,13 @@ impl<Args: Initializer> LspDriver<Args>
 where
     Args::S: 'static,
 {
+    /// Starts the language server on the given connection.
+    ///
+    /// If `is_replay` is true, the server will wait for all pending requests to
+    /// finish before exiting. This is useful for testing the language server.
+    ///
+    /// See [`transport::MirrorArgs`] for information about the record-replay
+    /// feature.
     pub fn start(&mut self, inbox: ConnectionRx, is_replay: bool) -> anyhow::Result<()> {
         let res = self.start_(inbox);
 
@@ -611,6 +669,7 @@ where
         res
     }
 
+    /// Starts the language server on the given connection.
     pub fn start_(&mut self, inbox: ConnectionRx) -> anyhow::Result<()> {
         use EventOrMessage::*;
         // todo: follow what rust analyzer does
@@ -855,30 +914,33 @@ fn resp_err(code: ErrorCode, msg: impl fmt::Display) -> ResponseError {
     }
 }
 
+/// Creates an invalid params error.
 pub fn invalid_params(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InvalidParams, msg)
 }
 
+/// Creates an internal error.
 pub fn internal_error(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InternalError, msg)
 }
 
+/// Creates a not initialized error.
 pub fn not_initialized() -> ResponseError {
     resp_err(ErrorCode::ServerNotInitialized, "not initialized yet")
 }
 
+/// Creates a method not found error.
 pub fn method_not_found() -> ResponseError {
     resp_err(ErrorCode::MethodNotFound, "method not found")
 }
 
+/// Creates an invalid request error.
 pub fn invalid_request(msg: impl fmt::Display) -> ResponseError {
     resp_err(ErrorCode::InvalidRequest, msg)
 }
 
-pub fn result_to_response<T: Serialize>(
-    id: RequestId,
-    result: Result<T, ResponseError>,
-) -> Response {
+/// Converts an [`LspResult`] to a response.
+pub fn result_to_response<T: Serialize>(id: RequestId, result: LspResult<T>) -> Response {
     match result.and_then(|t| serde_json::to_value(t).map_err(internal_error)) {
         Ok(resp) => Response::new_ok(id, resp),
         Err(e) => Response::new_err(id, e.code, e.message),

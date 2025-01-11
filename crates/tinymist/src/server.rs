@@ -267,7 +267,7 @@ impl LanguageState {
         provider.args.add_commands(
             &Some("tinymist.getResources")
                 .iter()
-                .chain(provider.exec_cmds.keys())
+                .chain(provider.command_handlers.keys())
                 .map(ToString::to_string)
                 .collect::<Vec<_>>(),
         );

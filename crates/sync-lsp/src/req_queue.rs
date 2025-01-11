@@ -1,3 +1,7 @@
+//! The request-response queue for the LSP server.
+//!
+//! This is stolen from the lsp-server crate for customization.
+
 use core::fmt;
 use std::collections::HashMap;
 
@@ -7,7 +11,9 @@ use lsp_server::{ErrorCode, Request, RequestId, Response, ResponseError};
 
 /// Manages the set of pending requests, both incoming and outgoing.
 pub struct ReqQueue<I, O> {
+    /// The incoming requests.
     pub incoming: Incoming<I>,
+    /// The outgoing requests.
     pub outgoing: Outgoing<O>,
 }
 
@@ -32,6 +38,7 @@ impl<I, O> fmt::Debug for ReqQueue<I, O> {
 }
 
 impl<I, O> ReqQueue<I, O> {
+    /// Prints states of the request queue and panics.
     pub fn begin_panic(&self) {
         let keys = self.incoming.pending.keys().cloned().collect::<Vec<_>>();
         log::error!("incoming pending: {keys:?}");
@@ -42,11 +49,15 @@ impl<I, O> ReqQueue<I, O> {
     }
 }
 
+/// The incoming request queue.
 #[derive(Debug)]
 pub struct Incoming<I> {
     pending: HashMap<RequestId, I>,
 }
 
+/// The outgoing request queue.
+///
+/// It holds the next request ID and the pending requests.
 #[derive(Debug)]
 pub struct Outgoing<O> {
     next_id: i32,
@@ -54,14 +65,24 @@ pub struct Outgoing<O> {
 }
 
 impl<I> Incoming<I> {
+    /// Registers a request with the given ID and data.
     pub fn register(&mut self, id: RequestId, data: I) {
         self.pending.insert(id, data);
     }
 
+    /// Checks if there are *any* pending requests.
+    ///
+    /// This is useful for testing language server.
     pub fn has_pending(&self) -> bool {
         !self.pending.is_empty()
     }
 
+    /// Checks if a request with the given ID is completed.
+    pub fn is_completed(&self, id: &RequestId) -> bool {
+        !self.pending.contains_key(id)
+    }
+
+    /// Cancels a request with the given ID.
     pub fn cancel(&mut self, id: RequestId) -> Option<Response> {
         let _data = self.complete(id.clone())?;
         let error = ResponseError {
@@ -76,16 +97,14 @@ impl<I> Incoming<I> {
         })
     }
 
+    /// Completes a request with the given ID.
     pub fn complete(&mut self, id: RequestId) -> Option<I> {
         self.pending.remove(&id)
-    }
-
-    pub fn is_completed(&self, id: &RequestId) -> bool {
-        !self.pending.contains_key(id)
     }
 }
 
 impl<O> Outgoing<O> {
+    /// Registers a request with the given method, params, and data.
     pub fn register<P: Serialize>(&mut self, method: String, params: P, data: O) -> Request {
         let id = RequestId::from(self.next_id);
         self.pending.insert(id.clone(), data);
@@ -93,6 +112,7 @@ impl<O> Outgoing<O> {
         Request::new(id, method, params)
     }
 
+    /// Completes a request with the given ID.
     pub fn complete(&mut self, id: RequestId) -> Option<O> {
         self.pending.remove(&id)
     }
