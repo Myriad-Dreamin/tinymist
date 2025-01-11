@@ -365,7 +365,7 @@
           "default": null
         },
         "tinymist.compileStatus": {
-          "title": "Show/Report compilation status",
+          "title": "Show/Report Compile Status",
           "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label.",
           "type": "string",
           "default": "enable",
@@ -373,6 +373,12 @@
             "enable",
             "disable"
           ]
+        },
+        "tinymist.statusBarFormat": {
+          "title": "Format of the Server Status in the Status Bar",
+          "markdownDescription": "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty.",
+          "type": "string",
+          "default": "{compileStatusIcon} {wordCount} [{fileName}]"
         },
         "tinymist.typstExtraArgs": {
           "title": "Specifies the arguments for Typst as same as typst-cli",
