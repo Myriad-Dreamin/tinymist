@@ -355,6 +355,39 @@ impl LocalContext {
         }
     }
 
+    /// Get all depended files in the workspace, inclusively.
+    pub fn depended_source_files(&self) -> Vec<TypstFileId> {
+        let mut ids = self.depended_files();
+        let preference = PathPreference::Source {
+            allow_package: false,
+        };
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids
+    }
+
+    /// Get all depended file ids of a compilation, inclusively.
+    /// Note: must be called after compilation.
+    pub fn depended_files(&self) -> Vec<TypstFileId> {
+        let mut ids = vec![];
+        for dep in self.depended_paths() {
+            if let Ok(ref_fid) = self.file_id_by_path(&dep) {
+                ids.push(ref_fid);
+            }
+        }
+        ids
+    }
+
+    /// Get depended paths of a compilation.
+    /// Note: must be called after compilation.
+    pub(crate) fn depended_paths(&self) -> EcoVec<reflexo::ImmutPath> {
+        let mut deps = EcoVec::new();
+        self.world.iter_dependencies(&mut |path| {
+            deps.push(path);
+        });
+
+        deps
+    }
+
     /// Get the world surface for Typst compiler.
     pub fn world(&self) -> &LspWorld {
         &self.shared.world
@@ -599,17 +632,6 @@ impl SharedContext {
         let cursor = self.to_typst_pos_offset(source, position, shift)?;
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         classify_syntax(node, cursor)
-    }
-
-    /// Get the real definition of a compilation.
-    /// Note: must be called after compilation.
-    pub(crate) fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
-        let mut deps = EcoVec::new();
-        self.world.iter_dependencies(&mut |path| {
-            deps.push(path);
-        });
-
-        deps
     }
 
     /// Resolve extra font information.
