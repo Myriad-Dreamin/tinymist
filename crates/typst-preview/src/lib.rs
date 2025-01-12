@@ -30,8 +30,6 @@ type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 type WsError = Error;
 type Message = WsMessage;
 
-pub trait CompileHost: EditorServer {}
-
 /// Get the HTML for the frontend by a given preview mode and server to connect
 pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
     let mode = match mode {
@@ -49,7 +47,7 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
 pub async fn preview(
     arguments: PreviewArgs,
     conn: ControlPlaneTx,
-    client: Arc<impl CompileHost + Send + Sync + 'static>,
+    client: Arc<impl EditorServer>,
 ) -> Previewer {
     PreviewBuilder::new(arguments).build(conn, client).await
 }
@@ -230,10 +228,7 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn build<T>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer
-    where
-        T: CompileHost + Send + Sync + 'static,
-    {
+    pub async fn build<T: EditorServer>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer {
         let PreviewBuilder {
             arguments,
             shutdown_tx,
@@ -299,7 +294,7 @@ pub enum Location {
     Src(SourceLocation),
 }
 
-pub trait EditorServer {
+pub trait EditorServer: Send + Sync + 'static {
     fn update_memory_files(
         &self,
         _files: MemoryFiles,

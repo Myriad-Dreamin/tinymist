@@ -22,9 +22,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    frontend_html, CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx,
-    ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    frontend_html, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
+    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    PreviewBuilder, PreviewMode, Previewer, WsMessage,
 };
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -130,8 +130,6 @@ impl typst_preview::CompileView for PreviewCompileView {
         })
     }
 }
-
-impl CompileHost for CompileHandler {}
 
 impl EditorServer for CompileHandler {
     async fn update_memory_files(
