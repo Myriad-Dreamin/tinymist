@@ -424,11 +424,15 @@ pub async fn make_http_server(
                     // Any website a user visits in a browser can connect to our websocket server on
                     // 127.0.0.1 because CORS does not work for websockets. Thus, check the `Origin`
                     // header ourselves. See the comment on CORS below for more details.
-                    if req
-                        .headers()
-                        .get("Origin")
-                        .map_or(false, |h| *h == expected_origin)
-                    {
+                    //
+                    // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
+                    // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any `Origin`
+                    // starting with `vscode-webview://` as well. I think that's okay from a security point
+                    // of view, because I think malicious websites can't trick browsers into sending
+                    // `vscode-webview://...` as `Origin`.
+                    if req.headers().get("Origin").map_or(false, |h| {
+                        *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://")
+                    }) {
                         let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
                             .map_err(|e| {
                                 log::error!("Error in websocket upgrade: {e}");
