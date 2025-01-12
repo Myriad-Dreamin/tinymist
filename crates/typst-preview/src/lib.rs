@@ -193,7 +193,7 @@ pub struct PreviewBuilder {
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
     webview_conn: BroadcastChannel<WebviewActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
 
     compile_watcher: OnceCell<Arc<CompileWatcher>>,
 }
@@ -206,7 +206,7 @@ impl PreviewBuilder {
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
             webview_conn: broadcast::channel(32),
-            doc_sender: Arc::new(std::sync::RwLock::new(None)),
+            doc_sender: Arc::new(parking_lot::RwLock::new(None)),
             compile_watcher: OnceCell::new(),
         }
     }
@@ -383,7 +383,7 @@ pub trait CompileView: Send + Sync {
 pub struct CompileWatcher {
     task_id: String,
     refresh_style: RefreshStyle,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -410,7 +410,7 @@ impl CompileWatcher {
         match status {
             CompileStatus::CompileSuccess => {
                 // it is ok to ignore the error here
-                *self.doc_sender.write().unwrap() = Some(view);
+                *self.doc_sender.write() = Some(view);
 
                 // todo: is it right that ignore zero broadcast receiver?
                 let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
@@ -435,5 +435,5 @@ struct DataPlane {
     enable_partial_rendering: bool,
     invert_colors: String,
     renderer_tx: broadcast::Sender<RenderActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
 }

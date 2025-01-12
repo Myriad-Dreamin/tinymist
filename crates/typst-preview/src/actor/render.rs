@@ -40,7 +40,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+    view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     renderer: IncrSvgDocServer,
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -50,14 +50,14 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+        view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
         editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
         let mut res = Self {
             mailbox,
-            document,
+            view,
             renderer: IncrSvgDocServer::default(),
             editor_conn_sender,
             svg_sender,
@@ -134,13 +134,7 @@ impl RenderActor {
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
             log::debug!("RenderActor: has_full_render: {has_full_render}");
-            let Some(document) = self
-                .document
-                .read()
-                .unwrap()
-                .as_ref()
-                .and_then(|view| view.doc())
-            else {
+            let Some(document) = self.view.read().as_ref().and_then(|view| view.doc()) else {
                 log::info!("RenderActor: document is not ready");
                 continue;
             };
@@ -162,7 +156,7 @@ impl RenderActor {
     }
 
     fn view(&self) -> Option<Arc<dyn CompileView>> {
-        self.document.read().ok()?.clone()
+        self.view.read().clone()
     }
 
     fn resolve_span_range(
@@ -298,7 +292,7 @@ impl RenderActor {
 
 pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+    document: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 
     span_interner: SpanInterner,
@@ -307,7 +301,7 @@ pub struct OutlineRenderActor {
 impl OutlineRenderActor {
     pub fn new(
         signal: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<dyn CompileView>>>>,
+        document: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {
@@ -338,13 +332,7 @@ impl OutlineRenderActor {
             while self.signal.try_recv().is_ok() {}
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
-            let Some(document) = self
-                .document
-                .read()
-                .unwrap()
-                .as_ref()
-                .and_then(|view| view.doc())
-            else {
+            let Some(document) = self.document.read().as_ref().and_then(|view| view.doc()) else {
                 log::info!("OutlineRenderActor: document is not ready");
                 continue;
             };
