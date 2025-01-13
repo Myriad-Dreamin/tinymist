@@ -245,14 +245,25 @@ pub async fn make_http_server(
             let timings = timings.clone();
             let _ = alive_tx.send(());
             async move {
+                // Make sure VSCode can connect to this http server but no malicious website a user
+                // might open in a browser. We recognize VSCode by an `Origin` header that starts
+                // with `vscode-webview://`. Malicious websites can (hopefully) not trick browsers
+                // into sending an `Origin` header that starts with `vscode-webview://`
+                //
+                // See comment in `make_http_server` in `crates/tinymist/src/tool/preview.rs` for more
+                // details. In particular, note that this does _not_ protect against malicious users
+                // that share the same computer as us.
+                let Some(allowed_origin) = req
+                    .headers()
+                    .get("Origin")
+                    .filter(|h| h.as_bytes().starts_with(b"vscode-webview://"))
+                else {
+                    anyhow::bail!("Origin must start with vscode-webview://");
+                };
+
+                let b = hyper::Response::builder()
+                    .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, allowed_origin);
                 if req.uri().path() == "/" {
-                    let b = hyper::Response::builder()
-                        .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
-                        .header(hyper::header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD")
-                        .header(
-                            hyper::header::ACCESS_CONTROL_ALLOW_HEADERS,
-                            "Origin, X-Requested-With, Content-Type, Accept",
-                        );
                     let res = if req.method() == hyper::Method::HEAD {
                         b.body(Full::<Bytes>::default()).unwrap()
                     } else {
@@ -261,10 +272,10 @@ pub async fn make_http_server(
                             .unwrap()
                     };
 
-                    Ok::<_, std::convert::Infallible>(res)
+                    Ok::<_, anyhow::Error>(res)
                 } else {
                     // jump to /
-                    let res = hyper::Response::builder()
+                    let res = b
                         .status(hyper::StatusCode::FOUND)
                         .header(hyper::header::LOCATION, "/")
                         .body(Full::<Bytes>::default())
