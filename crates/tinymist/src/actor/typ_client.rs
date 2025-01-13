@@ -265,11 +265,8 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.inner.read().as_ref() {
-            let res = snap
-                .doc
-                .clone()
-                .map_err(|_| typst_preview::CompileStatus::CompileError);
-            inner.notify_compile(res, snap.signal.by_fs_events, snap.signal.by_entry_update);
+            let snap = snap.clone();
+            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
         }
     }
 }

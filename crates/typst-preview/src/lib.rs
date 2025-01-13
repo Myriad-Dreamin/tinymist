@@ -22,7 +22,6 @@ use typst::{layout::Position, syntax::Span};
 
 use actor::editor::{EditorActor, EditorActorRequest};
 use actor::render::RenderActorRequest;
-use actor::typst::{TypstActor, TypstActorRequest};
 use actor::webview::WebviewActorRequest;
 use debug_loc::SpanInterner;
 
@@ -30,8 +29,6 @@ type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
 type WsError = Error;
 type Message = WsMessage;
-
-pub trait CompileHost: SourceFileServer + EditorServer {}
 
 /// Get the HTML for the frontend by a given preview mode and server to connect
 pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
@@ -50,7 +47,7 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
 pub async fn preview(
     arguments: PreviewArgs,
     conn: ControlPlaneTx,
-    client: Arc<impl CompileHost + Send + Sync + 'static>,
+    client: Arc<impl EditorServer>,
 ) -> Previewer {
     PreviewBuilder::new(arguments).build(conn, client).await
 }
@@ -126,7 +123,7 @@ impl Previewer {
                 let render_actor = actor::render::RenderActor::new(
                     h.renderer_tx.subscribe(),
                     h.doc_sender.clone(),
-                    h.typst_tx,
+                    h.editor_tx.clone(),
                     svg.0,
                     h.webview_tx,
                 );
@@ -193,11 +190,10 @@ type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 pub struct PreviewBuilder {
     arguments: PreviewArgs,
     shutdown_tx: Option<mpsc::Sender<()>>,
-    typst_mailbox: MpScChannel<TypstActorRequest>,
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
     webview_conn: BroadcastChannel<WebviewActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
 
     compile_watcher: OnceCell<Arc<CompileWatcher>>,
 }
@@ -207,11 +203,10 @@ impl PreviewBuilder {
         Self {
             arguments,
             shutdown_tx: None,
-            typst_mailbox: mpsc::unbounded_channel(),
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
             webview_conn: broadcast::channel(32),
-            doc_sender: Arc::new(std::sync::RwLock::new(None)),
+            doc_sender: Arc::new(parking_lot::RwLock::new(None)),
             compile_watcher: OnceCell::new(),
         }
     }
@@ -233,14 +228,10 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn build<T>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer
-    where
-        T: CompileHost + Send + Sync + 'static,
-    {
+    pub async fn build<T: EditorServer>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer {
         let PreviewBuilder {
             arguments,
             shutdown_tx,
-            typst_mailbox,
             renderer_mailbox,
             editor_conn: (editor_tx, editor_rx),
             webview_conn: (webview_tx, _),
@@ -252,22 +243,12 @@ impl PreviewBuilder {
         let span_interner = SpanInterner::new();
         let (shutdown_data_plane_tx, shutdown_data_plane_rx) = mpsc::channel(1);
 
-        // Spawns the typst actor
-        let typst_actor = TypstActor::new(
-            client,
-            typst_mailbox.1,
-            renderer_mailbox.0.clone(),
-            editor_tx.clone(),
-            webview_tx.clone(),
-        );
-        tokio::spawn(typst_actor.run());
-        log::info!("Previewer: typst actor spawned");
-
         // Spawns the editor actor
         let editor_actor = EditorActor::new(
+            client,
             editor_rx,
             conn,
-            typst_mailbox.0.clone(),
+            renderer_mailbox.0.clone(),
             webview_tx.clone(),
             span_interner.clone(),
         );
@@ -278,7 +259,6 @@ impl PreviewBuilder {
         let data_plane = DataPlane {
             span_interner: span_interner.clone(),
             webview_tx: webview_tx.clone(),
-            typst_tx: typst_mailbox.0.clone(),
             editor_tx: editor_tx.clone(),
             invert_colors: arguments.invert_colors.clone(),
             renderer_tx: renderer_mailbox.0.clone(),
@@ -314,31 +294,7 @@ pub enum Location {
     Src(SourceLocation),
 }
 
-pub trait SourceFileServer {
-    fn resolve_source_span(
-        &self,
-        _by: Location,
-    ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
-        async { Ok(None) }
-    }
-
-    fn resolve_document_position(
-        &self,
-        _by: Location,
-    ) -> impl Future<Output = Result<Vec<Position>, Error>> + Send {
-        async { Ok(vec![]) }
-    }
-
-    fn resolve_source_location(
-        &self,
-        _s: Span,
-        _offset: Option<usize>,
-    ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
-        async { Ok(None) }
-    }
-}
-
-pub trait EditorServer {
+pub trait EditorServer: Send + Sync + 'static {
     fn update_memory_files(
         &self,
         _files: MemoryFiles,
@@ -371,7 +327,7 @@ pub struct ChangeCursorPositionRequest {
     character: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SrcToDocJumpRequest {
     filepath: PathBuf,
     line: usize,
@@ -397,10 +353,37 @@ pub struct MemoryFilesShort {
     // mtime: Option<u64>,
 }
 
+pub trait CompileView: Send + Sync {
+    /// Get the compiled document.
+    fn doc(&self) -> Option<Arc<Document>>;
+    /// Get the compile status.
+    fn status(&self) -> CompileStatus;
+
+    /// Check if the view is by OnSaved event.
+    fn is_on_saved(&self) -> bool;
+    /// Check if the view is by entry update.
+    fn is_by_entry_update(&self) -> bool;
+
+    /// Resolve the source span offset.
+    fn resolve_source_span(&self, _by: Location) -> Option<SourceSpanOffset> {
+        None
+    }
+
+    /// Resolve the document position.
+    fn resolve_document_position(&self, _by: Location) -> Vec<Position> {
+        vec![]
+    }
+
+    /// Resolve the span with an optional offset.
+    fn resolve_span(&self, _s: Span, _offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
+        None
+    }
+}
+
 pub struct CompileWatcher {
     task_id: String,
     refresh_style: RefreshStyle,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -416,20 +399,18 @@ impl CompileWatcher {
             .send(EditorActorRequest::CompileStatus(status));
     }
 
-    pub fn notify_compile(
-        &self,
-        res: Result<Arc<Document>, CompileStatus>,
-        is_on_saved: bool,
-        is_by_entry_update: bool,
-    ) {
-        if !is_by_entry_update && (self.refresh_style == RefreshStyle::OnSave && !is_on_saved) {
+    pub fn notify_compile(&self, view: Arc<dyn CompileView>) {
+        if !view.is_by_entry_update()
+            && (self.refresh_style == RefreshStyle::OnSave && !view.is_on_saved())
+        {
             return;
         }
 
-        match res {
-            Ok(doc) => {
+        let status = view.status();
+        match status {
+            CompileStatus::CompileSuccess => {
                 // it is ok to ignore the error here
-                *self.doc_sender.write().unwrap() = Some(doc);
+                *self.doc_sender.write() = Some(view);
 
                 // todo: is it right that ignore zero broadcast receiver?
                 let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
@@ -437,7 +418,7 @@ impl CompileWatcher {
                     CompileStatus::CompileSuccess,
                 ));
             }
-            Err(status) => {
+            CompileStatus::Compiling | CompileStatus::CompileError => {
                 let _ = self
                     .editor_tx
                     .send(EditorActorRequest::CompileStatus(status));
@@ -450,10 +431,9 @@ impl CompileWatcher {
 struct DataPlane {
     span_interner: SpanInterner,
     webview_tx: broadcast::Sender<WebviewActorRequest>,
-    typst_tx: mpsc::UnboundedSender<TypstActorRequest>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     enable_partial_rendering: bool,
     invert_colors: String,
     renderer_tx: broadcast::Sender<RenderActorRequest>,
-    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
+    doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
 }

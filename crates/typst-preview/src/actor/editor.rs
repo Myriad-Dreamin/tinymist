@@ -1,14 +1,17 @@
+use std::sync::Arc;
+
 use log::{debug, info, trace, warn};
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
+use crate::actor::render::RenderActorRequest;
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
-    actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
-    MemoryFilesShort, SrcToDocJumpRequest,
+    ChangeCursorPositionRequest, DocToSrcJumpInfo, EditorServer, MemoryFiles, MemoryFilesShort,
+    SrcToDocJumpRequest,
 };
 
 use super::webview::WebviewActorRequest;
@@ -102,11 +105,12 @@ impl ControlPlaneTx {
     }
 }
 
-pub struct EditorActor {
+pub struct EditorActor<T> {
+    client: Arc<T>,
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
     editor_conn: ControlPlaneTx,
 
-    world_sender: mpsc::UnboundedSender<TypstActorRequest>,
+    renderer_sender: broadcast::Sender<RenderActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
 
     span_interner: SpanInterner,
@@ -144,18 +148,20 @@ pub enum ControlPlaneResponse {
     Outline(Outline),
 }
 
-impl EditorActor {
+impl<T: EditorServer> EditorActor<T> {
     pub fn new(
+        client: Arc<T>,
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
         editor_websocket_conn: ControlPlaneTx,
-        world_sender: mpsc::UnboundedSender<TypstActorRequest>,
+        renderer_sender: broadcast::Sender<RenderActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {
         Self {
+            client,
             mailbox,
             editor_conn: editor_websocket_conn,
-            world_sender,
+            renderer_sender,
             webview_sender,
 
             span_interner,
@@ -201,11 +207,11 @@ impl EditorActor {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);
-                            self.world_sender.send(TypstActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
+                            self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
                         }
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.world_sender.send(TypstActorRequest::SrcToDocJumpResolve(jump_info)).unwrap();
+                            self.renderer_sender.send(RenderActorRequest::SrcToDocJumpResolve(jump_info)).unwrap();
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
@@ -217,17 +223,32 @@ impl EditorActor {
                             self.source_scroll_by_span(jump_info.span)
                                 .await;
                         }
-                        ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
-                            debug!("EditorActor: received message from editor: SyncMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
-                            self.world_sender.send(TypstActorRequest::SyncMemoryFiles(memory_files)).unwrap();
+                        ControlPlaneMessage::SyncMemoryFiles(req) => {
+                            debug!(
+                                "EditorActor: processing SYNC memory files: {:?}",
+                                req.files.keys().collect::<Vec<_>>()
+                            );
+                            handle_error(
+                                "SyncMemoryFiles",
+                                self.client.update_memory_files(req, true).await,
+                            );
                         }
-                        ControlPlaneMessage::UpdateMemoryFiles(memory_files) => {
-                            debug!("EditorActor: received message from editor: UpdateMemoryFiles {:?}", memory_files.files.keys().collect::<Vec<_>>());
-                            self.world_sender.send(TypstActorRequest::UpdateMemoryFiles(memory_files)).unwrap();
+                        ControlPlaneMessage::UpdateMemoryFiles(req) => {
+                            debug!(
+                                "EditorActor: processing UPDATE memory files: {:?}",
+                                req.files.keys().collect::<Vec<_>>()
+                            );
+                            handle_error(
+                                "UpdateMemoryFiles",
+                                self.client.update_memory_files(req, false).await,
+                            );
                         }
-                        ControlPlaneMessage::RemoveMemoryFiles(memory_files) => {
-                            debug!("EditorActor: received message from editor: RemoveMemoryFiles {:?}", &memory_files.files);
-                            self.world_sender.send(TypstActorRequest::RemoveMemoryFiles(memory_files)).unwrap();
+                        ControlPlaneMessage::RemoveMemoryFiles(req) => {
+                            debug!("EditorActor: processing REMOVE memory files: {:?}", req.files);
+                            handle_error(
+                                "RemoveMemoryFiles",
+                                self.client.remove_shadow_files(req).await,
+                            );
                         }
                     };
                 }
@@ -254,12 +275,20 @@ impl EditorActor {
         };
         if let Some(span) = jump_info {
             let span_and_offset = span.into();
-            self.world_sender
-                .send(TypstActorRequest::DocToSrcJumpResolve((
+            self.renderer_sender
+                .send(RenderActorRequest::DocToSrcJumpResolve((
                     span_and_offset,
                     span_and_offset,
                 )))
                 .unwrap();
         };
     }
+}
+
+fn handle_error<T>(loc: &'static str, m: Result<T, reflexo_typst::Error>) -> Option<T> {
+    if let Err(err) = &m {
+        log::error!("EditorActor: failed to {loc}: {err:#}");
+    }
+
+    m.ok()
 }

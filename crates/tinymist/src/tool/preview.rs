@@ -22,22 +22,44 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    frontend_html, CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx,
-    ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
+    frontend_html, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
+    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    PreviewBuilder, PreviewMode, Previewer, WsMessage,
 };
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::world::{LspCompilerFeat, LspWorld};
+use crate::world::LspCompilerFeat;
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use actor::typ_client::CompileHandler;
-use actor::typ_server::{CompileServerActor, CompileServerOpts, SucceededArtifact};
+use actor::typ_server::{CompileServerActor, CompileServerOpts, CompiledArtifact};
 
-impl CompileHost for CompileHandler {}
+/// The preview's view of the compiled artifact.
+pub struct PreviewCompileView {
+    /// The artifact and snap.
+    pub snap: CompiledArtifact<LspCompilerFeat>,
+}
 
-impl CompileHandler {
-    fn resolve_source_span(world: &LspWorld, loc: Location) -> Option<SourceSpanOffset> {
+impl typst_preview::CompileView for PreviewCompileView {
+    fn doc(&self) -> Option<Arc<TypstDocument>> {
+        self.snap.doc.clone().ok()
+    }
+    fn status(&self) -> typst_preview::CompileStatus {
+        match self.snap.doc {
+            Ok(_) => typst_preview::CompileStatus::CompileSuccess,
+            Err(_) => typst_preview::CompileStatus::CompileError,
+        }
+    }
+
+    fn is_on_saved(&self) -> bool {
+        self.snap.signal.by_fs_events
+    }
+    fn is_by_entry_update(&self) -> bool {
+        self.snap.signal.by_entry_update
+    }
+
+    fn resolve_source_span(&self, loc: Location) -> Option<SourceSpanOffset> {
+        let world = &self.snap.world;
         let Location::Src(loc) = loc;
 
         let filepath = Path::new(&loc.filepath);
@@ -58,21 +80,18 @@ impl CompileHandler {
         Some(SourceSpanOffset { span, offset })
     }
 
-    async fn resolve_document_position(
-        snap: SucceededArtifact<LspCompilerFeat>,
-        loc: Location,
-    ) -> Vec<Position> {
+    fn resolve_document_position(&self, loc: Location) -> Vec<Position> {
+        let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
         let path = Path::new(&src_loc.filepath).to_owned();
         let line = src_loc.pos.line;
         let column = src_loc.pos.column;
 
-        let doc = snap.success_doc();
+        let doc = self.snap.success_doc();
         let Some(doc) = doc.as_deref() else {
             return vec![];
         };
-        let world = snap.world();
         let Some(root) = world.workspace_root() else {
             return vec![];
         };
@@ -91,11 +110,8 @@ impl CompileHandler {
         jump_from_cursor(doc, &source, cursor)
     }
 
-    fn resolve_source_location(
-        world: &LspWorld,
-        span: Span,
-        offset: Option<usize>,
-    ) -> Option<DocToSrcJumpInfo> {
+    fn resolve_span(&self, span: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
+        let world = &self.snap.world;
         let resolve_off =
             |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
 
@@ -112,31 +128,6 @@ impl CompileHandler {
             start: resolve_off(&source, range.start),
             end: resolve_off(&source, range.end),
         })
-    }
-}
-
-impl SourceFileServer for CompileHandler {
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    async fn resolve_source_span(&self, loc: Location) -> Result<Option<SourceSpanOffset>, Error> {
-        let snap = self.snapshot()?.receive().await?;
-        Ok(Self::resolve_source_span(&snap.world, loc))
-    }
-
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    async fn resolve_document_position(&self, loc: Location) -> Result<Vec<Position>, Error> {
-        let snap = self.artifact()?.receive().await?;
-        Ok(Self::resolve_document_position(snap, loc).await)
-    }
-
-    async fn resolve_source_location(
-        &self,
-        span: Span,
-        offset: Option<usize>,
-    ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-        let snap = self.snapshot()?.receive().await?;
-        Ok(Self::resolve_source_location(&snap.world, span, offset))
     }
 }
 
