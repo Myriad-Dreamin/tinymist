@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::sync::Arc;
 
 use reflexo_typst::debug_loc::{
@@ -10,7 +11,7 @@ use tokio::sync::{broadcast, mpsc};
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 use crate::debug_loc::SpanInterner;
 use crate::outline::Outline;
-use crate::{ChangeCursorPositionRequest, CompileView, DocToSrcJumpInfo, SrcToDocJumpRequest};
+use crate::{ChangeCursorPositionRequest, CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
 
 #[derive(Debug, Clone)]
 pub struct ResolveSpanRequest(pub Vec<ElementPoint>);
@@ -19,9 +20,9 @@ pub struct ResolveSpanRequest(pub Vec<ElementPoint>);
 pub enum RenderActorRequest {
     RenderFullLatest,
     RenderIncremental,
-    DocToSrcJumpResolve((SourceSpanOffset, SourceSpanOffset)),
-    SrcToDocJumpResolve(SrcToDocJumpRequest),
-    ResolveSpan(ResolveSpanRequest),
+    EditorResolveSpanRange(Range<SourceSpanOffset>),
+    WebviewResolveSpan(ResolveSpanRequest),
+    ResolveSourceLoc(ResolveSourceLocRequest),
     ChangeCursorPosition(ChangeCursorPositionRequest),
 }
 
@@ -30,9 +31,9 @@ impl RenderActorRequest {
         match self {
             Self::RenderFullLatest => true,
             Self::RenderIncremental => false,
-            Self::ResolveSpan(_) => false,
-            Self::DocToSrcJumpResolve(_) => false,
-            Self::SrcToDocJumpResolve(_) => false,
+            Self::EditorResolveSpanRange(_) => false,
+            Self::WebviewResolveSpan(_) => false,
+            Self::ResolveSourceLoc(_) => false,
             Self::ChangeCursorPosition(_) => false,
         }
     }
@@ -68,28 +69,17 @@ impl RenderActor {
     }
 
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
-        log::trace!("RenderActor: received message: {:?}", msg);
+        log::trace!("RenderActor: received message: {msg:?}");
 
         let res = msg.is_full_render();
-
         match msg {
-            RenderActorRequest::DocToSrcJumpResolve(span_range) => {
-                log::debug!("RenderActor: processing doc2src: {span_range:?}");
+            RenderActorRequest::EditorResolveSpanRange(span_range) => {
+                log::debug!("RenderActor: resolving EditorResolveSpanRange: {span_range:?}");
 
-                self.doc_to_src_jump_resolve(span_range);
+                self.editor_resolve_span_range(span_range);
             }
-            RenderActorRequest::ChangeCursorPosition(req) => {
-                log::debug!("RenderActor: processing src2doc: {:?}", req);
-
-                self.change_cursor_position(req);
-            }
-            RenderActorRequest::SrcToDocJumpResolve(req) => {
-                log::debug!("RenderActor: processing src2doc: {:?}", req);
-
-                self.src_to_doc_jump_resolve(req);
-            }
-            RenderActorRequest::ResolveSpan(ResolveSpanRequest(element_path)) => {
-                log::info!("RenderActor: resolving span: {:?}", element_path);
+            RenderActorRequest::WebviewResolveSpan(ResolveSpanRequest(element_path)) => {
+                log::debug!("RenderActor: resolving WebviewResolveSpan: {element_path:?}");
                 let spans = match self.renderer.resolve_span_by_element_path(&element_path) {
                     Ok(spans) => spans,
                     Err(err) => {
@@ -98,11 +88,21 @@ impl RenderActor {
                     }
                 };
 
-                log::info!("RenderActor: resolved span: {spans:?}");
+                log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
                 // end position is used
                 if let Some(spans) = spans {
-                    self.doc_to_src_jump_resolve(spans);
+                    self.resolve_span_range(spans.0..spans.1);
                 }
+            }
+            RenderActorRequest::ResolveSourceLoc(req) => {
+                log::debug!("RenderActor: resolving ResolveSourceLoc: {req:?}");
+
+                self.resolve_source_loc(req);
+            }
+            RenderActorRequest::ChangeCursorPosition(req) => {
+                log::debug!("RenderActor: processing ChangeCursorPosition: {req:?}");
+
+                self.change_cursor_position(req);
             }
             RenderActorRequest::RenderFullLatest | RenderActorRequest::RenderIncremental => {}
         }
@@ -159,15 +159,19 @@ impl RenderActor {
         self.view.read().clone()
     }
 
-    fn resolve_span_range(
-        &self,
-        span_range: (SourceSpanOffset, SourceSpanOffset),
-    ) -> Option<DocToSrcJumpInfo> {
+    fn editor_resolve_span_range(&self, span_range: Range<SourceSpanOffset>) -> Option<()> {
+        let req = EditorActorRequest::DocToSrcJump(self.resolve_span_range(span_range)?);
+        let _ = self.editor_conn_sender.send(req);
+
+        Some(())
+    }
+
+    fn resolve_span_range(&self, range: Range<SourceSpanOffset>) -> Option<DocToSrcJumpInfo> {
         let view = self.view()?;
         // Resolves FileLoC of start, end, and the element wide
-        let st_res = view.resolve_span(span_range.0.span, Some(span_range.0.offset));
-        let ed_res = view.resolve_span(span_range.1.span, Some(span_range.1.offset));
-        let elem_res = view.resolve_span(span_range.1.span, None);
+        let st_res = view.resolve_span(range.start.span, Some(range.start.offset));
+        let ed_res = view.resolve_span(range.end.span, Some(range.end.offset));
+        let elem_res = view.resolve_span(range.end.span, None);
 
         // Combines the result of start and end
         let range_res = match (st_res, ed_res) {
@@ -229,16 +233,6 @@ impl RenderActor {
         }
     }
 
-    fn doc_to_src_jump_resolve(
-        &self,
-        span_range: (SourceSpanOffset, SourceSpanOffset),
-    ) -> Option<()> {
-        let req = EditorActorRequest::DocToSrcJump(self.resolve_span_range(span_range)?);
-        let _ = self.editor_conn_sender.send(req);
-
-        Some(())
-    }
-
     fn change_cursor_position(&mut self, req: ChangeCursorPositionRequest) -> Option<()> {
         let span = self
             .view()?
@@ -260,7 +254,7 @@ impl RenderActor {
         Some(())
     }
 
-    fn src_to_doc_jump_resolve(&self, req: SrcToDocJumpRequest) -> Option<()> {
+    fn resolve_source_loc(&self, req: ResolveSourceLocRequest) -> Option<()> {
         // todo: change name to resolve resolve src position
         let info = self
             .view()?

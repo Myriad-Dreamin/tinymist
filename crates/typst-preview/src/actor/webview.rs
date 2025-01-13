@@ -155,7 +155,7 @@ impl<
                         if let Ok(path) = path {
                             let path: Vec<(u32, u32, String)> = path;
                             let path = path.into_iter().map(ElementPoint::from).collect::<Vec<_>>();
-                            self.render_sender.send(RenderActorRequest::ResolveSpan(ResolveSpanRequest(path))).unwrap();
+                            self.render_sender.send(RenderActorRequest::WebviewResolveSpan(ResolveSpanRequest(path))).unwrap();
                         };
                     } else {
                         let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await;
