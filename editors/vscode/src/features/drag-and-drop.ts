@@ -87,7 +87,7 @@ export class TextProvider implements vscode.DocumentDropEditProvider {
         break;
       case ResourceKind.Xlsx:
         additionalPkgs.push(["@preview/rexllent", "0.2.1", "xlsx-parser"]);
-        codeSnippet = `xlsx-parser(read(${strPath}, encoding: none)`;
+        codeSnippet = `xlsx-parser(read(${strPath}, encoding: none))`;
         break;
       case ResourceKind.Source:
         codeSnippet = `include ${strPath}`;
