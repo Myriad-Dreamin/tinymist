@@ -5,7 +5,7 @@
 Run and configure `tinymist` in Neovim with support for all major distros and package managers.
 
 == Feature Integration
-- *LSP* (completion, definitions, etc.)
+- *Language service* (completion, definitions, etc.)
 - *Code Formatting*
 - *Live Web Preview* with #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview.]
 
@@ -112,6 +112,31 @@ end, {})
 
 ```
 Make sure to change `exportPdf` to "onType" or "onSave".
+
+=== Working with Multiple-Files Projects
+<working-with-multiple-file-projects>
+
+Tinymist currently cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the typicial unknown label error in a project like that:
+
+```typ
+// in file: /sub.typ
+// Error: unknown label 'label-in-main'
+@label-in-main
+// in file: /main.typ
+#include "sub.typ"
+= Heading <label-in-main>
+```
+
+The solution is a bit internal, which should get further improvement, but you can pin a main file by command.
+
+```lua
+-- pin the main file
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.api.nvim_buf_get_name(0) } })
+-- unpin the main file
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
+```
+
+It also doesn't remember the main file across sessions, so you may need to run the command again after restarting neovim.
 
 == Troubleshooting
 <troubleshooting>
