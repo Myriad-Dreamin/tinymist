@@ -116,7 +116,7 @@ Make sure to change `exportPdf` to "onType" or "onSave".
 === Working with Multiple-Files Projects
 <working-with-multiple-file-projects>
 
-Tinymist currently cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the typicial unknown label error in a project like that:
+Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
 ```typ
 // in file: /sub.typ
@@ -136,7 +136,9 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
 ```
 
-It also doesn't remember the main file across sessions, so you may need to run the command again after restarting neovim.
+It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting neovim.
+
+This could be improved in the future.
 
 == Troubleshooting
 <troubleshooting>
