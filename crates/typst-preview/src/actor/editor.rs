@@ -11,7 +11,7 @@ use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
     ChangeCursorPositionRequest, DocToSrcJumpInfo, EditorServer, MemoryFiles, MemoryFilesShort,
-    SrcToDocJumpRequest,
+    ResolveSourceLocRequest,
 };
 
 use super::webview::WebviewActorRequest;
@@ -122,7 +122,7 @@ pub enum ControlPlaneMessage {
     #[serde(rename = "changeCursorPosition")]
     ChangeCursorPosition(ChangeCursorPositionRequest),
     #[serde(rename = "panelScrollTo")]
-    SrcToDocJump(SrcToDocJumpRequest),
+    ResolveSourceLoc(ResolveSourceLocRequest),
     #[serde(rename = "panelScrollByPosition")]
     PanelScrollByPosition(PanelScrollByPositionRequest),
     #[serde(rename = "sourceScrollBySpan")]
@@ -209,9 +209,9 @@ impl<T: EditorServer> EditorActor<T> {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);
                             self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
                         }
-                        ControlPlaneMessage::SrcToDocJump(jump_info) => {
+                        ControlPlaneMessage::ResolveSourceLoc(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.renderer_sender.send(RenderActorRequest::SrcToDocJumpResolve(jump_info)).unwrap();
+                            self.renderer_sender.send(RenderActorRequest::ResolveSourceLoc(jump_info)).unwrap();
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
@@ -276,10 +276,9 @@ impl<T: EditorServer> EditorActor<T> {
         if let Some(span) = jump_info {
             let span_and_offset = span.into();
             self.renderer_sender
-                .send(RenderActorRequest::DocToSrcJumpResolve((
-                    span_and_offset,
-                    span_and_offset,
-                )))
+                .send(RenderActorRequest::EditorResolveSpanRange(
+                    span_and_offset..span_and_offset,
+                ))
                 .unwrap();
         };
     }
