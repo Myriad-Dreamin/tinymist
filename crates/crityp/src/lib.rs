@@ -1,31 +1,22 @@
+use anyhow::Context as ContextTrait;
 use clap::Parser;
+use comemo::Track;
 use criterion::Criterion;
-use tinymist_world::CompileOnceArgs;
-use typst::{
-    engine::{Engine, Route, Sink, Traced},
-    foundations::{Context, Value},
-    introspection::Introspector,
-    World,
-};
-use typst_syntax::{FileId, VirtualPath};
+use ecow::{eco_format, EcoString};
+use tinymist_world::reflexo_typst::path::unix_slash;
+use tinymist_world::{CompileOnceArgs, LspWorld};
+use typst::engine::{Engine, Route, Sink, Traced};
+use typst::foundations::{Context, Func, Value};
+use typst::introspection::Introspector;
+use typst::World;
 
-fn fibonacci(n: u64) -> u64 {
-    match n {
-        0 => 1,
-        1 => 1,
-        n => fibonacci(n - 1) + fibonacci(n - 2),
-    }
-}
+fn crityp_bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
+    let main_source = world.source(world.main())?;
+    let main_path = unix_slash(world.main().vpath().as_rooted_path());
 
-fn criterion_benchmark(c: &mut Criterion, world: &mut tinymist_world::LspWorld) {
-    use comemo::Track;
-
-    let id = FileId::new(None, VirtualPath::new("target/test-bench.typ"));
-
-    let source = world.source(id).unwrap();
     let route = Route::default();
-    let traced = Traced::default();
     let mut sink = Sink::default();
+    let traced = Traced::default();
     let introspector = Introspector::default();
 
     let module = typst::eval::eval(
@@ -33,67 +24,82 @@ fn criterion_benchmark(c: &mut Criterion, world: &mut tinymist_world::LspWorld) 
         traced.track(),
         sink.track_mut(),
         route.track(),
-        &source,
+        &main_source,
     );
+    let module = module
+        .map_err(|e| anyhow::anyhow!("{e:?}"))
+        .context("evaluation error")?;
 
-    let engine = &mut Engine {
-        world: ((world) as &dyn World).track(),
-        introspector: introspector.track(),
-        traced: traced.track(),
-        sink: sink.track_mut(),
-        route,
-    };
+    let mut goals: Vec<(EcoString, &Func)> = vec![];
+    for (name, value, _) in module.scope().iter() {
+        if !name.starts_with("bench") {
+            continue;
+        }
 
-    let module = module.unwrap();
+        if let Value::Func(func) = value {
+            goals.push((eco_format!("{main_path}@{name}"), func));
+        }
+    }
 
-    let fib_func = module.scope().get("fib-bench").unwrap();
-    let fib_func = match fib_func {
-        Value::Func(f) => f,
-        _ => panic!("Expected function"),
-    };
+    for (name, func) in goals {
+        let route = Route::default();
+        let mut sink = Sink::default();
+        let engine = &mut Engine {
+            world: ((world) as &dyn World).track(),
+            introspector: introspector.track(),
+            traced: traced.track(),
+            sink: sink.track_mut(),
+            route,
+        };
 
-    let mut call_typst_func_trampoline = || {
-        let context = Context::default();
-        let values = Vec::<Value>::default();
-        let _result = fib_func.call(engine, context.track(), values).unwrap();
-    };
+        let mut call_once = move || {
+            let context = Context::default();
+            let values = Vec::<Value>::default();
+            func.call(engine, context.track(), values)
+        };
 
-    c.bench_function("fib typst", |b| {
-        b.iter(|| {
-            comemo::evict(0);
-            call_typst_func_trampoline();
-        })
-    });
-    c.bench_function("fib rust", |b| {
-        b.iter(|| fibonacci(std::hint::black_box(20)))
-    });
+        if let Err(err) = call_once() {
+            eprintln!("call error in {name}: {err:?}");
+            continue;
+        }
+
+        c.bench_function(&name, move |b| {
+            b.iter(|| {
+                comemo::evict(0);
+                let _result = call_once();
+            })
+        });
+    }
+
+    Ok(())
 }
 
-/// Common arguments of compile, watch, and query.
+/// Common arguments of crityp benchmark.
 #[derive(Debug, Clone, Parser, Default)]
-pub struct CompileArgs {
+pub struct BenchArgs {
+    /// Arguments for compiling the document once, compatible with `typst-cli
+    /// compile`.
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
-    /// Path to output file
-    #[clap(value_name = "OUTPUT")]
-    pub output: Option<String>,
+    /// Path to output file for benchmarks
+    #[clap(long, default_value = "target/crityp")]
+    pub bench_output: String,
 }
 
 pub fn run() -> anyhow::Result<()> {
-    let crityp_path = std::env::current_dir().unwrap().join("target/crityp");
-
     // Parse command line arguments
-    let mut args = CompileArgs::parse();
-
-    args.compile.input = Some("target/test-bench.typ".to_string());
+    let args = BenchArgs::parse();
 
     let universe = args.compile.resolve()?;
     let mut world = universe.snapshot();
 
-    let mut crit = criterion::Criterion::default().output_directory(&crityp_path);
+    let out_dir = std::env::current_dir()
+        .context("cannot get current working directory")?
+        .join(args.bench_output);
+    let mut crit = criterion::Criterion::default().output_directory(&out_dir);
 
-    criterion_benchmark(&mut crit, &mut world);
+    crityp_bench(&mut crit, &mut world)?;
 
     crit.final_summary();
 
