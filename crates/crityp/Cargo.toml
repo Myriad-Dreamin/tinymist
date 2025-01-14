@@ -1,0 +1,45 @@
+[package]
+name = "crityp"
+description = "Benchmark support for typst."
+categories = ["compilers", "command-line-utilities"]
+keywords = ["language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "crityp"
+path = "src/main.rs"
+required-features = ["cli"]
+test = false
+doctest = false
+bench = false
+doc = false
+
+[dependencies]
+base64.workspace = true
+clap = { workspace = true, optional = true }
+comemo.workspace = true
+ecow.workspace = true
+anyhow.workspace = true
+
+typst.workspace = true
+typst-syntax.workspace = true
+tinymist-world.workspace = true
+criterion = "0.5.1"
+# criterion = { path = "../../target/criterion.rs" }
+
+[dev-dependencies]
+insta.workspace = true
+regex.workspace = true
+
+[features]
+default = ["cli"]
+cli = ["clap"]
+
+[lints]
+workspace = true
