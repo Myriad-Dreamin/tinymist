@@ -33,7 +33,7 @@ jobs:
           node-version: 22
       - name: Install deps
         run: yarn install
-      - id: Generate Announcement
+      - name: "Generate announcement"
         run: |
           yarn draft-release ${{ inputs.tag }}
           echo "draft-release ran successfully"
