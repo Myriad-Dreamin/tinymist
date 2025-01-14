@@ -4,7 +4,7 @@ Benchmark support for typst.
 
 ## Usage
 
-Use `crityp` to benchmark a typst file. The CLI arguments is compatible with `typst-cli compile`.
+Use `crityp` to benchmark functions whose name starts with "bench" a typst file. The CLI arguments is compatible with `typst-cli compile`.
 
 ```shell
 crityp test-bench.typ
@@ -20,4 +20,13 @@ Found 7 outliers among 100 measurements (7.00%)
   2 (2.00%) low mild
   4 (4.00%) high mild
   1 (1.00%) high severe
+Benchmarking /test-bench.typ@bench-fib2 ...
+```
+
+The example typst file is as follows:
+
+```typ
+#let fib(n) = if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
+#let bench-fib() = fib(20)
+#let bench-fib2() = fib(20)
 ```
