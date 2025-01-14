@@ -1,16 +1,15 @@
 use anyhow::Context as ContextTrait;
-use clap::Parser;
 use comemo::Track;
 use criterion::Criterion;
 use ecow::{eco_format, EcoString};
 use tinymist_world::reflexo_typst::path::unix_slash;
-use tinymist_world::{CompileOnceArgs, LspWorld};
+use tinymist_world::LspWorld;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Value};
 use typst::introspection::Introspector;
 use typst::World;
 
-fn crityp_bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
+pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
     let main_source = world.source(world.main())?;
     let main_path = unix_slash(world.main().vpath().as_rooted_path());
 
@@ -70,38 +69,6 @@ fn crityp_bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
             })
         });
     }
-
-    Ok(())
-}
-
-/// Common arguments of crityp benchmark.
-#[derive(Debug, Clone, Parser, Default)]
-pub struct BenchArgs {
-    /// Arguments for compiling the document once, compatible with `typst-cli
-    /// compile`.
-    #[clap(flatten)]
-    pub compile: CompileOnceArgs,
-
-    /// Path to output file for benchmarks
-    #[clap(long, default_value = "target/crityp")]
-    pub bench_output: String,
-}
-
-pub fn run() -> anyhow::Result<()> {
-    // Parse command line arguments
-    let args = BenchArgs::parse();
-
-    let universe = args.compile.resolve()?;
-    let mut world = universe.snapshot();
-
-    let out_dir = std::env::current_dir()
-        .context("cannot get current working directory")?
-        .join(args.bench_output);
-    let mut crit = criterion::Criterion::default().output_directory(&out_dir);
-
-    crityp_bench(&mut crit, &mut world)?;
-
-    crit.final_summary();
 
     Ok(())
 }
