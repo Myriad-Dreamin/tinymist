@@ -27,6 +27,8 @@ strum = { version = "0.26.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
+# Fixes psm compile error. See issue.
+cc = "=1.2.9"
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
