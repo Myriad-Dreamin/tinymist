@@ -2,6 +2,10 @@
 
 #show: book-page.with(title: "Release Instructions")
 
+Normally, you should always create release candidates to avoid failures in the release process. For example, if you are releasing version `0.12.19`, you should create a release candidate `0.12.19-rc1` first. This is because once you tag a version, you cannot delete it, otherwise the people in downstream that already pull the tag will have to force update their repository. The release candidates are canaries to test any potential poison in the release process. Two things to note:
+- At most 9 release candidates can be created for a version. This is because semver compares the version number as a string, and `rc9` is greater than `rc10` in sense of string comparison.
+- You must publish the release soon after a good release candidate is created, otherwise CI may fail tomorrow.
+
 #set heading(numbering: numbly(none, "Step {2:1}~"))
 
 == Updating Version String to Release
