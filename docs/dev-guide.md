@@ -117,3 +117,7 @@ To run e2e tests for tinymist on Windows:
 ./scripts/e2e.ps1
 ```
 
+## Release on GitHub
+
+The code owners and maintainers of the release channels can check the [Release Guide](/dev-guide/release-instruction.md) to learn how to check and release the new version of tinymist.
+
