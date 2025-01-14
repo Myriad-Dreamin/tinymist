@@ -1,5 +1,5 @@
 # stolen from https://github.com/nvarner/tinymist/blob/master/.github/workflows/release.yml
-name: CI
+name: tinymist::ci
 on:
   push:
     branches:
