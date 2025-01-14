@@ -27,7 +27,8 @@ strum = { version = "0.26.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
-# Fixes psm compile error. See issue.
+# Fixes psm compile error. See [issue](https://github.com/rust-cross/cargo-zigbuild/issues/305).
+# Remove once rust-lang/stacker bumped cc.
 cc = "=1.2.9"
 
 # Asynchoronous and Multi-threading
