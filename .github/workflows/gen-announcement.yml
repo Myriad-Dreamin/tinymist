@@ -1,5 +1,3 @@
-#  yarn draft-release 0.12.19
-# stolen from https://github.com/nvarner/tinymist/blob/master/.github/workflows/release.yml
 name: tinymist::announce
 on:
   workflow_dispatch:
