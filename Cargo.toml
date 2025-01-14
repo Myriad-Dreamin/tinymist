@@ -12,7 +12,7 @@ rust-version = "1.82"
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "tests"]
+members = ["crates/*", "tests", "target/criterion.rs"]
 
 [workspace.dependencies]
 
