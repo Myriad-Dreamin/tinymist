@@ -1,3 +1,5 @@
+//! Crityp is a standalone benchmark tool for typst.
+
 use anyhow::Context;
 use clap::Parser;
 use tinymist_world::CompileOnceArgs;
@@ -15,7 +17,7 @@ pub struct BenchArgs {
     pub bench_output: String,
 }
 
-pub fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     // Parse command line arguments
     let args = BenchArgs::parse();
 

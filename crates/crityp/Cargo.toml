@@ -41,5 +41,5 @@ regex.workspace = true
 default = ["cli"]
 cli = ["clap"]
 
-# [lints]
-# workspace = true
+[lints]
+workspace = true
