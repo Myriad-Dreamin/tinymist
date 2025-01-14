@@ -70,6 +70,13 @@ const main = async () => {
     convert("docs/tinymist/introduction.typ", "README.md", {
       before: "# Tinymist\n\n",
     }),
+    convert(
+      "docs/tinymist/release-instruction.typ",
+      "docs/release-instruction.md",
+      {
+        before: "# Release Instructions\n\n",
+      }
+    ),
     convert("docs/tinymist/frontend/emacs.typ", "editors/emacs/README.md", {
       before: "# Tinymist Emacs Support for Typst\n\n",
     }),
