@@ -12,68 +12,23 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-
-tinymist-assets = { workspace = true }
-tinymist-query.workspace = true
-tinymist-fs.workspace = true
-tinymist-core = { workspace = true, default-features = false, features = [] }
-tinymist-world.workspace = true
-tinymist-render.workspace = true
-tinymist-project.workspace = true
-typlite.workspace = true
-sync-lsp.workspace = true
-chrono.workspace = true
-pathdiff.workspace = true
-
-once_cell.workspace = true
 anyhow.workspace = true
-comemo.workspace = true
-tokio.workspace = true
-tokio-util.workspace = true
-futures.workspace = true
-itertools.workspace = true
 async-trait.workspace = true
-env_logger.workspace = true
-log.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
-parking_lot.workspace = true
-paste.workspace = true
-strum.workspace = true
-ttf-parser.workspace = true
-
+base64.workspace = true
+chrono.workspace = true
 clap.workspace = true
 clap_builder.workspace = true
 clap_complete.workspace = true
 clap_complete_fig.workspace = true
 clap_complete_nushell.workspace = true
 clap_mangen.workspace = true
-
-typst.workspace = true
-typst-svg.workspace = true
-typst-pdf.workspace = true
-typst-render.workspace = true
-typst-timing.workspace = true
-typst-assets.workspace = true
-
-typstyle-core.workspace = true
-typstfmt.workspace = true
-typst-ansi-hl.workspace = true
-
-reflexo.workspace = true
-reflexo-typst.workspace = true
-reflexo-vec2svg.workspace = true
-typst-shim.workspace = true
-codespan-reporting.workspace = true
-toml.workspace = true
-walkdir.workspace = true
-typst-preview = { workspace = true, optional = true }
-lsp-server.workspace = true
 crossbeam-channel.workspace = true
-lsp-types.workspace = true
+codespan-reporting.workspace = true
+comemo.workspace = true
 dhat = { workspace = true, optional = true }
-unicode-script.workspace = true
+dirs.workspace = true
+env_logger.workspace = true
+futures.workspace = true
 hyper = { workspace = true, optional = true }
 hyper-util = { workspace = true, optional = true, features = [
     "server",
@@ -84,10 +39,48 @@ hyper-util = { workspace = true, optional = true, features = [
 ] }
 http-body-util = { version = "0.1.2", optional = true }
 hyper-tungstenite = { workspace = true, optional = true }
+itertools.workspace = true
+lsp-server.workspace = true
+lsp-types.workspace = true
+log.workspace = true
+once_cell.workspace = true
 open = { workspace = true, optional = true }
-dirs.workspace = true
-base64.workspace = true
+pathdiff.workspace = true
+parking_lot.workspace = true
+paste.workspace = true
 rayon.workspace = true
+reflexo.workspace = true
+reflexo-typst.workspace = true
+reflexo-vec2svg.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+strum.workspace = true
+sync-lsp.workspace = true
+tinymist-assets = { workspace = true }
+tinymist-query.workspace = true
+tinymist-fs.workspace = true
+tinymist-core = { workspace = true, default-features = false, features = [] }
+tinymist-world.workspace = true
+tinymist-render.workspace = true
+tinymist-project.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+toml.workspace = true
+ttf-parser.workspace = true
+typlite.workspace = true
+typst.workspace = true
+typst-svg.workspace = true
+typst-pdf.workspace = true
+typst-render.workspace = true
+typst-timing.workspace = true
+typst-shim.workspace = true
+typst-preview = { workspace = true, optional = true }
+typst-ansi-hl.workspace = true
+typstfmt.workspace = true
+typstyle-core.workspace = true
+unicode-script.workspace = true
+walkdir.workspace = true
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]
@@ -102,11 +95,12 @@ dhat-heap = ["dhat"]
 # - code (Deja Vu Sans Mono)
 # and additionally New Computer Modern for text
 # into the binary.
-embed-fonts = ["typst-assets/fonts"]
+embed-fonts = ["tinymist-world/fonts"]
 
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = [
+    "tinymist-world/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",
 ]
@@ -124,8 +118,8 @@ preview = [
 
 [build-dependencies]
 anyhow.workspace = true
-vergen.workspace = true
 cargo_metadata = "0.18.0"
+vergen.workspace = true
 
 [lints]
 workspace = true
