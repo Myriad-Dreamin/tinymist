@@ -19,8 +19,5 @@ typst-syntax.workspace = true
 typst.workspace = true
 cfg-if.workspace = true
 
-[build-dependencies]
-cc.workspace = true
-
 [lints]
 workspace = true

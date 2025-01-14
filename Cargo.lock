@@ -4656,7 +4656,6 @@ dependencies = [
 name = "typst-shim"
 version = "0.12.18"
 dependencies = [
- "cc",
  "cfg-if",
  "typst",
  "typst-syntax",
