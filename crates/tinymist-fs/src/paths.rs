@@ -782,9 +782,8 @@ mod tests {
     fn write_atomic_permissions() {
         use std::os::unix::fs::PermissionsExt;
 
-        let original_perms = std::fs::Permissions::from_mode(u32::from(
-            libc::S_IRWXU | libc::S_IRGRP | libc::S_IWGRP | libc::S_IROTH,
-        ));
+        let perms: u32 = libc::S_IRWXU | libc::S_IRGRP | libc::S_IWGRP | libc::S_IROTH;
+        let original_perms = std::fs::Permissions::from_mode(perms);
 
         let tmp = tempfile::Builder::new().tempfile().unwrap();
 
@@ -800,7 +799,7 @@ mod tests {
 
         let new_perms = std::fs::metadata(tmp.path()).unwrap().permissions();
 
-        let mask = u32::from(libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO);
+        let mask: u32 = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
         assert_eq!(original_perms.mode(), new_perms.mode() & mask);
     }
 
