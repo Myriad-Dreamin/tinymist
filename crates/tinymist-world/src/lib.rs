@@ -5,6 +5,7 @@ pub use reflexo_typst;
 pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 pub use reflexo_typst::world as base;
+pub use reflexo_typst::world::{package, CompilerUniverse, CompilerWorld, Revising, TaskInputs};
 pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
 
 use std::path::Path;
@@ -17,13 +18,12 @@ use clap::{builder::ValueParser, ArgAction, Parser};
 use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
+use reflexo_typst::package::http::HttpRegistry;
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, ImmutPath, TypstDict};
+use reflexo_typst::{CompilerFeat, ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
 pub mod font;
-pub mod package;
-use package::HttpsRegistry;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -38,7 +38,7 @@ impl CompilerFeat for SystemCompilerFeatExtend {
     /// It accesses a physical file system.
     type AccessModel = SystemAccessModel;
     /// It performs native HTTP requests for fetching package data.
-    type Registry = HttpsRegistry;
+    type Registry = HttpRegistry;
 }
 
 /// The compiler universe in system environment.
@@ -211,7 +211,7 @@ impl LspUniverseBuilder {
         entry: EntryState,
         inputs: ImmutDict,
         font_resolver: Arc<TinymistFontResolver>,
-        package_registry: HttpsRegistry,
+        package_registry: HttpRegistry,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
             entry,
@@ -238,8 +238,12 @@ impl LspUniverseBuilder {
     pub fn resolve_package(
         cert_path: Option<ImmutPath>,
         args: Option<&CompilePackageArgs>,
-    ) -> HttpsRegistry {
-        HttpsRegistry::new(cert_path, args)
+    ) -> HttpRegistry {
+        HttpRegistry::new(
+            cert_path,
+            args.and_then(|args| Some(args.package_path.clone()?.into())),
+            args.and_then(|args| Some(args.package_cache_path.clone()?.into())),
+        )
     }
 }
 

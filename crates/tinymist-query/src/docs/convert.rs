@@ -2,7 +2,8 @@ use std::sync::{Arc, LazyLock};
 
 use ecow::{eco_format, EcoString};
 use parking_lot::Mutex;
-use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
+use tinymist_world::base::{EntryState, ShadowApi};
+use tinymist_world::TaskInputs;
 use typlite::scopes::Scopes;
 use typlite::value::Value;
 use typlite::TypliteFeat;

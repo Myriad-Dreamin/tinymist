@@ -17,7 +17,7 @@ use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
-use reflexo_typst::{package::PackageSpec, TaskInputs, TypstDict};
+use reflexo_typst::{package::PackageSpec, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{
     internal_error,
@@ -30,6 +30,7 @@ use tinymist::{
 };
 use tinymist_core::LONG_VERSION;
 use tinymist_query::{package::PackageInfo, EntryResolver};
+use tinymist_world::TaskInputs;
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
 

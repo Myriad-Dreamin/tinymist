@@ -99,15 +99,15 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.5.1", default-features = false, features = [
+reflexo = { version = "=0.5.4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "=0.5.1", features = ["system"] }
-reflexo-typst = { version = "=0.5.1", features = [
+reflexo-world = { version = "=0.5.4", features = ["system"] }
+reflexo-typst = { version = "=0.5.4", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { version = "=0.5.1" }
-reflexo-typst-shim = { version = "=0.5.1", features = ["nightly"] }
+reflexo-vec2svg = { version = "=0.5.4" }
+reflexo-typst-shim = { version = "=0.5.4", features = ["nightly"] }
 
 
 typst = "0.12.0"

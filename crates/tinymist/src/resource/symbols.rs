@@ -2,9 +2,10 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 // use reflexo_typst::font::GlyphId;
 use reflexo_typst::{
-    vector::font::GlyphId, world::EntryState, ShadowApi, TaskInputs, TypstDocument, TypstFont,
+    vector::font::GlyphId, world::EntryState, ShadowApi, TypstDocument, TypstFont,
 };
 use sync_lsp::LspResult;
+use tinymist_world::TaskInputs;
 
 use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
 
