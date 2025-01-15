@@ -6,7 +6,6 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{bail, Context};
 use reflexo_typst::{EntryReader, EntryState, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
-use tinymist_world::typ_server::{CompiledArtifact, ExportSignal};
 use tinymist_world::TaskInputs;
 use tokio::sync::mpsc;
 use typlite::Typlite;
