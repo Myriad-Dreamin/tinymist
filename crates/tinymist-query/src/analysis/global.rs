@@ -30,8 +30,9 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    classify_syntax, construct_module_dependencies, resolve_id_by_path, scan_workspace_files, Decl,
-    DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
+    classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
+    scan_workspace_files, Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency,
+    SyntaxClass,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
@@ -622,15 +623,27 @@ impl SharedContext {
     }
 
     /// Classifies the syntax under position that can be operated on by IDE
-    /// functionality.
-    pub fn classify_pos<'s>(
+    /// functionality. It is preferred to select a decl if it is at the starts
+    /// of some mark.
+    pub fn classify_for_decl<'s>(
         &self,
         source: &'s Source,
         position: LspPosition,
-        shift: usize,
     ) -> Option<SyntaxClass<'s>> {
-        let cursor = self.to_typst_pos_offset(source, position, shift)?;
-        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+        let cursor = self.to_typst_pos_offset(source, position, 1)?;
+        let mut node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+
+        // In the case that the cursor is at the end of an identifier.
+        // e.g. `f(x|)`, we will select the `x`
+        if cursor == node.offset() + 1 && is_mark(node.kind()) {
+            let prev_leaf = node.prev_leaf();
+            if let Some(prev_leaf) = prev_leaf {
+                if prev_leaf.range().end == node.offset() {
+                    node = prev_leaf;
+                }
+            }
+        }
+
         classify_syntax(node, cursor)
     }
 
