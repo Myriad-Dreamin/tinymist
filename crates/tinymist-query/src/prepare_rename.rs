@@ -38,7 +38,7 @@ impl StatefulRequest for PrepareRenameRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let syntax = ctx.classify_pos(&source, self.position, 1)?;
+        let syntax = ctx.classify_for_decl(&source, self.position)?;
         if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
             // todo: rename field access
             log::info!("prepare_rename: field access is not a definition site");

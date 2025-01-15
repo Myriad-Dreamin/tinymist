@@ -31,7 +31,7 @@ impl StatefulRequest for ReferencesRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let syntax = ctx.classify_pos(&source, self.position, 1)?;
+        let syntax = ctx.classify_for_decl(&source, self.position)?;
 
         let locations = find_references(ctx, &source, doc.as_ref(), syntax)?;
 
