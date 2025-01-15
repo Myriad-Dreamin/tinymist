@@ -86,7 +86,7 @@ display_possible_values!(PdfStandard);
 /// `CompileCommand.pages` argument, through the `FromStr` trait instead of a
 /// value parser, in order to generate better errors.
 ///
-/// See also: https://github.com/clap-rs/clap/issues/5065
+/// See also: <https://github.com/clap-rs/clap/issues/5065>
 #[derive(Debug, Clone)]
 pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
