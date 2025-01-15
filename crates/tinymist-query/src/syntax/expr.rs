@@ -188,7 +188,7 @@ impl ExprInfo {
         let of = Expr::Decl(decl.clone());
         self.exports
             .get(decl.name())
-            .map_or(false, |export| match export {
+            .is_some_and(|export| match export {
                 Expr::Ref(ref_expr) => ref_expr.root == Some(of),
                 exprt => *exprt == of,
             })

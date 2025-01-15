@@ -205,7 +205,7 @@ impl FnCompletionFeat {
         let pos_size = sig.positional_params().len();
         self.has_rest = self.has_rest || sig.rest_param().is_some();
         self.next_arg_is_content =
-            self.next_arg_is_content || sig.pos(idx).map_or(false, |ty| ty.is_content(&()));
+            self.next_arg_is_content || sig.pos(idx).is_some_and(|ty| ty.is_content(&()));
         let name_size = sig.named_params().len();
         let left_pos = pos_size.saturating_sub(idx);
         self.min_pos = self

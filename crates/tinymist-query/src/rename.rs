@@ -238,7 +238,7 @@ impl RenameFileWorker<'_> {
     fn rename_module_path(&mut self, span: Span, r: &RefExpr, src: &Source) -> Option<TextEdit> {
         let importing = r.root.as_ref()?.file_id();
 
-        if importing.map_or(true, |fid| fid != self.def_fid) {
+        if importing != Some(self.def_fid) {
             return None;
         }
         crate::log_debug_ct!("import: {span:?} -> {importing:?} v.s. {:?}", self.def_fid);

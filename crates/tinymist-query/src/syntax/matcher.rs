@@ -279,8 +279,7 @@ pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
 
             if !t.kind().is_trivia() && {
                 // Previous leaf is hash
-                t.prev_leaf()
-                    .map_or(false, |n| n.kind() == SyntaxKind::Hash)
+                t.prev_leaf().is_some_and(|n| n.kind() == SyntaxKind::Hash)
             } {
                 return InterpretMode::Code;
             }
