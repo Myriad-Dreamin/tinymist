@@ -199,7 +199,7 @@ impl Filesystem {
     /// This function will create a file at `path` if it doesn't already exist
     /// (including intermediate directories), and then it will acquire an
     /// exclusive lock on `path`. If the process must block waiting for the
-    /// lock, the `msg` is printed to [`GlobalContext`].
+    /// lock, the `msg` is printed to stderr.
     ///
     /// The returned file can be accessed to look at the path and also has
     /// read/write access to the underlying file.
@@ -239,7 +239,7 @@ impl Filesystem {
     ///
     /// This function will fail if `path` doesn't already exist, but if it does
     /// then it will acquire a shared lock on `path`. If the process must block
-    /// waiting for the lock, the `msg` is printed to [`GlobalContext`].
+    /// waiting for the lock, the `msg` is printed to stderr.
     ///
     /// The returned file can be accessed to look at the path and also has read
     /// access to the underlying file. Any writes to the file will return an
@@ -429,7 +429,7 @@ mod sys {
     }
 
     pub(super) fn error_contended(err: &Error) -> bool {
-        err.raw_os_error().map_or(false, |x| x == libc::EWOULDBLOCK)
+        err.raw_os_error() == Some(libc::EWOULDBLOCK)
     }
 
     pub(super) fn error_unsupported(err: &Error) -> bool {
@@ -445,6 +445,7 @@ mod sys {
 
     #[cfg(not(target_os = "solaris"))]
     fn flock(file: &File, flag: libc::c_int) -> Result<()> {
+        // SAFETY: this is implemented by the cargo
         let ret = unsafe { libc::flock(file.as_raw_fd(), flag) };
         if ret < 0 {
             Err(Error::last_os_error())

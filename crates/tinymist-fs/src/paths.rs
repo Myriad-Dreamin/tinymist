@@ -195,7 +195,7 @@ pub fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Res
         use std::os::unix::fs::PermissionsExt;
 
         // these constants are u16 on macOS
-        let mask = u32::from(libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO);
+        let mask: u32 = libc::S_IRWXU | libc::S_IRWXG | libc::S_IRWXO;
         let mode = meta.permissions().mode() & mask;
 
         std::fs::Permissions::from_mode(mode)

@@ -35,7 +35,7 @@ pub enum TaskWhen {
     OnSave,
     /// Run task on type.
     OnType,
-    /// [DEPRECATED] Run task when a document has a title and on saved, which is
+    /// *DEPRECATED* Run task when a document has a title and on saved, which is
     /// useful to filter out template files.
     ///
     /// Note: this is deprecating.
