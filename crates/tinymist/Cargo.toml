@@ -63,7 +63,6 @@ tinymist-fs.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
 tinymist-world.workspace = true
 tinymist-render.workspace = true
-tinymist-project.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 toml.workspace = true

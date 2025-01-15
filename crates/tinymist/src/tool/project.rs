@@ -4,7 +4,7 @@ use std::path::Path;
 
 use anyhow::bail;
 use clap::ValueHint;
-use tinymist_project::*;
+use tinymist_world::project::*;
 use typst_preview::{PreviewArgs, PreviewMode};
 
 use crate::{CompileFontArgs, CompilePackageArgs};
