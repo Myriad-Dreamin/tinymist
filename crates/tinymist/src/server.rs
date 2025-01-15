@@ -29,7 +29,6 @@ use tinymist_query::{
 use tinymist_query::{EntryResolver, PageSelection};
 use tinymist_world::TaskInputs;
 use tokio::sync::mpsc;
-use typ_server::Interrupt;
 use typst::{diag::FileResult, syntax::Source};
 
 use super::{init::*, *};
