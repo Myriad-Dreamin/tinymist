@@ -389,6 +389,7 @@ fn is_on_nfs_mount(path: &Path) -> bool {
         return false;
     };
 
+    // SAFETY: this is implemented by the cargo
     unsafe {
         let mut buf: libc::statfs = mem::zeroed();
         let r = libc::statfs(path.as_ptr(), &mut buf);
