@@ -617,7 +617,7 @@ fn token_from_ident(ei: &ExprInfo, ident: &LinkedNode, modifier: &mut ModifierSe
     let next = ident.next_leaf();
     let next_is_adjacent = next
         .as_ref()
-        .map_or(false, |n| n.range().start == ident.range().end);
+        .is_some_and(|n| n.range().start == ident.range().end);
     let next_parent = next.as_ref().and_then(|n| n.parent_kind());
     let next_kind = next.map(|n| n.kind());
     let lexical_function_call = next_is_adjacent
@@ -699,7 +699,7 @@ fn ns(modifier: &mut ModifierSet) -> TokenType {
 fn get_expr_following_hashtag<'a>(hashtag: &LinkedNode<'a>) -> Option<LinkedNode<'a>> {
     hashtag
         .next_sibling()
-        .filter(|next| next.cast::<ast::Expr>().map_or(false, |expr| expr.hash()))
+        .filter(|next| next.cast::<ast::Expr>().is_some_and(|expr| expr.hash()))
         .and_then(|node| node.leftmost_leaf())
 }
 

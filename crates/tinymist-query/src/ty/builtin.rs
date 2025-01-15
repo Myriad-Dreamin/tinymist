@@ -93,7 +93,7 @@ impl PathPreference {
 
     pub fn is_match(&self, path: &Path) -> bool {
         let ext = path.extension().and_then(|ext| ext.to_str());
-        ext.map_or(false, |ext| self.ext_matcher().is_match(ext))
+        ext.is_some_and(|ext| self.ext_matcher().is_match(ext))
     }
 
     pub fn from_ext(path: &str) -> Option<Self> {

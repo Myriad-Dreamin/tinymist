@@ -1,7 +1,7 @@
 use core::fmt;
 use std::borrow::Cow;
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock};
 use std::{
     collections::{HashMap, HashSet},
     ops::Range,
@@ -397,6 +397,8 @@ fn pos(v: &Value) -> String {
 
 impl Redact for RedactFields {
     fn redact(&self, json_val: Value) -> Value {
+        static REG: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
         match json_val {
             Value::Object(mut map) => {
                 for (_, val) in map.iter_mut() {
@@ -432,11 +434,7 @@ impl Redact for RedactFields {
                         }
                         "contents" => {
                             let res = t.as_str().unwrap();
-                            static REG: OnceLock<regex::Regex> = OnceLock::new();
-                            let reg = REG.get_or_init(|| {
-                                regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap()
-                            });
-                            let res = reg.replace_all(res, |_captures: &regex::Captures| {
+                            let res = REG.replace_all(res, |_captures: &regex::Captures| {
                                 "data:image-hash/svg+xml;base64,redacted"
                             });
 
