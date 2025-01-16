@@ -188,7 +188,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
 
     verse.mutate_entry(EntryState::new_detached()).unwrap();
     let world = verse.snapshot();
-    std::marker::PhantomData.ensure_main(&world).unwrap();
     let _ = std::marker::PhantomData.compile(&world, &mut Default::default());
 
     let pw = last_pw.unwrap();
