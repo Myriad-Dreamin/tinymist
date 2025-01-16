@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use reflexo_typst::typst::prelude::*;
 use reflexo_typst::{package::PackageSpec, TypstFileId};
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::HttpsRegistry;
+use tinymist_world::package::http::HttpRegistry;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::VirtualPath;
@@ -78,7 +78,7 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
-    registry: &HttpsRegistry,
+    registry: &HttpRegistry,
     ns: EcoString,
 ) -> EcoVec<(PathBuf, PackageSpec)> {
     // search packages locally. We only search in the data

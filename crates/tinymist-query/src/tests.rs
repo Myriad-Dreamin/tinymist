@@ -11,9 +11,10 @@ use std::{
 use once_cell::sync::Lazy;
 use reflexo_typst::package::PackageSpec;
 use reflexo_typst::world::EntryState;
-use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, TaskInputs};
+use reflexo_typst::{Compiler, EntryManager, EntryReader, ShadowApi};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
+use tinymist_world::TaskInputs;
 use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
@@ -30,8 +31,6 @@ use crate::{
     analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding, VersionedDocument,
 };
 use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
-
-type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     let name = if name.is_empty() { "playground" } else { name };
@@ -147,7 +146,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     } else {
         PathBuf::from("/")
     };
-    let mut world = LspUniverseBuilder::build(
+    let mut verse = LspUniverseBuilder::build(
         EntryState::new_rooted(root.as_path().into(), None),
         Default::default(),
         Arc::new(
@@ -181,19 +180,18 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         let path = path.unwrap_or_else(|| format!("/s{idx}.typ"));
 
         let pw = root.join(Path::new(&path));
-        world
+        verse
             .map_shadow(&pw, Bytes::from(source.as_bytes()))
             .unwrap();
         last_pw = Some(pw);
     }
 
-    world.mutate_entry(EntryState::new_detached()).unwrap();
-    let mut driver = CompileDriver::new(std::marker::PhantomData, world);
-    let _ = driver.compile(&mut Default::default());
+    verse.mutate_entry(EntryState::new_detached()).unwrap();
+    let world = verse.snapshot();
+    let _ = std::marker::PhantomData.compile(&world, &mut Default::default());
 
     let pw = last_pw.unwrap();
-    driver
-        .universe_mut()
+    verse
         .mutate_entry(EntryState::new_rooted(
             root.as_path().into(),
             Some(TypstFileId::new(
@@ -202,7 +200,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
             )),
         ))
         .unwrap();
-    f(driver.universe_mut(), pw)
+    f(&mut verse, pw)
 }
 
 pub fn find_test_range(s: &Source) -> Range<usize> {

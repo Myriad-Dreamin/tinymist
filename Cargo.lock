@@ -1942,15 +1942,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "instant"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "ipnet"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2849,8 +2840,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b13fc37349d5c5bbf5d2ad365a55f2439d59deb78acb5578575b1d88cb8e66"
 dependencies = [
  "base64",
  "bitvec",
@@ -2858,7 +2850,6 @@ dependencies = [
  "dashmap",
  "ecow",
  "fxhash",
- "instant",
  "parking_lot",
  "path-clean",
  "reflexo-typst-shim",
@@ -2870,12 +2861,14 @@ dependencies = [
  "serde_with",
  "siphasher 1.0.1",
  "tiny-skia-path",
+ "web-time",
 ]
 
 [[package]]
 name = "reflexo-typst"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94fe8e18c1d82e428e598c4099af771e7b1b3cc56e58ae5cd450867d595f95f1"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2902,8 +2895,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo-typst-shim"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41e26fc8d9096f2ab25dabca6407544961172f1bd6b255668e5d3e91f2ded2c1"
 dependencies = [
  "cfg-if",
  "typst",
@@ -2912,8 +2906,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo-typst2vec"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5f0f3aa5ce66a27c72a9baddeb0f46281d8e9ef6296bfd51cf7aec002c48e07"
 dependencies = [
  "bitvec",
  "comemo",
@@ -2937,8 +2932,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo-vec2svg"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7dce08258ec590d103b4eb839a1ad7297274135b6d4d5cb36d178de9ef73ad8"
 dependencies = [
  "base64",
  "comemo",
@@ -2950,8 +2946,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo-vfs"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5513a7f75fc88d8cc4e151832f0596b0e925fa74aaf374351977df06c6ef6eb0"
 dependencies = [
  "indexmap 2.7.0",
  "log",
@@ -2964,8 +2961,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo-world"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e30d61064c8821db1ace4da82b6129f19560f203430f20159f4e42ae025c19"
 dependencies = [
  "chrono",
  "codespan-reporting",
@@ -5490,3 +5488,33 @@ checksum = "16099418600b4d8f028622f73ff6e3deaabdff330fb9a2a131dea781ee8b0768"
 dependencies = [
  "zune-core",
 ]
+
+[[patch.unused]]
+name = "reflexo"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+
+[[patch.unused]]
+name = "reflexo-typst"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+
+[[patch.unused]]
+name = "reflexo-typst-shim"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+
+[[patch.unused]]
+name = "reflexo-typst2vec"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+
+[[patch.unused]]
+name = "reflexo-vec2svg"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
+
+[[patch.unused]]
+name = "reflexo-world"
+version = "0.5.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"

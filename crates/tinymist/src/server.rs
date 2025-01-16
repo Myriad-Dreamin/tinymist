@@ -15,7 +15,7 @@ use once_cell::sync::OnceCell;
 use reflexo_typst::{
     error::prelude::*,
     vfs::notify::{FileChangeSet, MemoryEvent},
-    Bytes, Error, ImmutPath, TaskInputs, Time,
+    Bytes, Error, ImmutPath, Time,
 };
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,7 @@ use tinymist_query::{
     PositionEncoding, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
+use tinymist_world::TaskInputs;
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
 

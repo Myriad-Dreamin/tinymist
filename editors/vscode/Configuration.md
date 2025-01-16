@@ -1,5 +1,15 @@
 # Tinymist Server Configuration
 
+## `tinymist.projectResolution`
+
+This configuration specifies the way to resolved projects.
+
+- **Type**: `string`
+- **Enum**:
+  - `singleFile`: Manage typst documents like what we did in Markdown. Each single file is an individual document and no project resolution is needed.
+  - `lockDatabase`: Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file.
+- **Default**: `"singleFile"`
+
 ## `tinymist.outputPath`
 
 The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.

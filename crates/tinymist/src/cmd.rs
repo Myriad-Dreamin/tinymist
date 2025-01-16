@@ -3,7 +3,6 @@
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use base::TaskInputs;
 use lsp_server::RequestId;
 use lsp_types::*;
 use reflexo_typst::error::prelude::*;
@@ -15,6 +14,7 @@ use tinymist_query::package::PackageInfo;
 use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use world::TaskInputs;
 
 use super::server::*;
 use super::*;
