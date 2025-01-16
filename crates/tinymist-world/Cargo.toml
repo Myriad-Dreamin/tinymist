@@ -17,7 +17,6 @@ chrono.workspace = true
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
-flate2 = "1"
 log.workspace = true
 parking_lot.workspace = true
 pathdiff.workspace = true
@@ -25,20 +24,13 @@ tokio.workspace = true
 rayon.workspace = true
 reflexo-typst.workspace = true
 reflexo-typst-shim = { workspace = true, features = ["nightly"] }
-reqwest = { version = "^0.12", default-features = false, features = [
-    "rustls-tls",
-    "blocking",
-    "multipart",
-] }
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tar = "0.4"
-tinymist-assets = { workspace = true }
 tinymist-fs.workspace = true
 typst.workspace = true
 toml.workspace = true
-typst-assets = { workspace = true }
+typst-assets.workspace = true
 
 
 [features]
