@@ -166,14 +166,17 @@ export class LanguageState {
     const context = this.context;
     const isProdMode = context.extensionMode === ExtensionMode.Production;
 
+    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
+    const RUST_BACKTRACE = isProdMode ? "1" : "full";
+
     const run = {
       command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
       args: [
         "lsp",
         /// The `--mirror` flag is only used in development/test mode for testing
-        ...(isProdMode ? [] : ["--mirror", "tinymist-lsp.log"]),
+        ...mirrorFlag,
       ],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
+      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
     };
     // console.log("use arguments", run);
     const serverOptions: ServerOptions = {
