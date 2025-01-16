@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use log::info;
 use lsp_types::{notification::PublishDiagnostics, Diagnostic, PublishDiagnosticsParams, Url};
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
@@ -63,7 +62,7 @@ impl EditorActor {
             match req {
                 EditorRequest::Diag(dv, diagnostics) => {
                     let DocVersion { group, revision } = dv;
-                    info!(
+                    log::debug!(
                         "received diagnostics from {group}:{revision}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
                     );
@@ -71,7 +70,7 @@ impl EditorActor {
                     self.publish(group, diagnostics).await;
                 }
                 EditorRequest::Status(status) => {
-                    log::info!("received status request({status:?})");
+                    log::debug!("received status request({status:?})");
                     if self.notify_compile_status && status.group == "primary" {
                         compile_status = status;
                         self.client.send_notification::<TinymistCompileStatus>(
@@ -98,7 +97,7 @@ impl EditorActor {
                 }
             }
         }
-        info!("compile cluster actor is stopped");
+        log::info!("editor actor is stopped");
     }
 
     pub async fn publish(&mut self, group: String, next_diag: Option<DiagnosticsMap>) {
