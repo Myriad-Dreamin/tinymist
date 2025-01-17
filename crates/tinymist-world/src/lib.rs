@@ -24,6 +24,7 @@ use reflexo_typst::{CompilerFeat, ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
 pub mod font;
+pub mod project;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
