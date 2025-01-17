@@ -48,13 +48,13 @@ use crate::stats::{CompilerQueryStats, QueryStatGuard};
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 #[derive(Default)]
-pub struct ProjectExt {
+pub struct ProjectStateExt {
     #[cfg(feature = "preview")]
     pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
 }
 
 #[cfg(feature = "preview")]
-impl ProjectExt {
+impl ProjectStateExt {
     // todo: multiple preview support
     #[must_use]
     pub fn register_preview(&self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
@@ -78,7 +78,7 @@ impl ProjectExt {
 }
 
 /// LSP project compiler.
-pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectExt>;
+pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectStateExt>;
 
 pub struct Project {
     pub diag_group: String,
@@ -109,11 +109,6 @@ impl Project {
             analysis,
             rev_lock,
         })
-    }
-
-    pub fn flush_compile(&mut self) {
-        // todo: better way to flush compile
-        self.wrapper.process(Interrupt::Compile);
     }
 
     pub fn add_memory_changes(&mut self, event: MemoryEvent) {
@@ -205,7 +200,7 @@ impl CompileHandlerImpl {
     }
 }
 
-impl CompileHandler<LspCompilerFeat, ProjectExt> for CompileHandlerImpl {
+impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
         let instances = std::iter::once(&c.primary).chain(c.dedicates.iter());
         for s in instances {
@@ -213,9 +208,9 @@ impl CompileHandler<LspCompilerFeat, ProjectExt> for CompileHandlerImpl {
                 continue;
             }
 
-            let snap = c.project_snapshot(s, false);
+            let snap = s.snapshot(false);
 
-            let compile_fn = ProjectCompiler::run_compile_static(c.compile_handle.clone(), snap);
+            let compile_fn = ProjectCompiler::run_compile_static(c.handler.clone(), snap);
             rayon::spawn(|| {
                 compile_fn();
             });

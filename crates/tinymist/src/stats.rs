@@ -69,7 +69,7 @@ pub struct CompilerQueryStats {
 
 impl CompilerQueryStats {
     /// Record a query.
-    pub fn query_stat(&self, path: Option<&Path>, name: &'static str) -> QueryStatGuard {
+    pub(crate) fn query_stat(&self, path: Option<&Path>, name: &'static str) -> QueryStatGuard {
         let stats = &self.query_stats;
         // let refs = stats.entry(path.clone()).or_default();
         let refs = stats

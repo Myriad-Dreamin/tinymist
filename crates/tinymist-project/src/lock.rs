@@ -2,12 +2,11 @@ use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
 use reflexo::path::unix_slash;
-use tinymist_world::EntryReader;
-use tinymist_world::LspWorld;
+use tinymist_world::{EntryReader, LspWorld};
 use typst::diag::EcoString;
 use typst::syntax::FileId;
 
-use super::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask, ResourcePath};
+use crate::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask, ResourcePath};
 
 /// Make a new project lock updater.
 pub fn update_lock(world: &LspWorld) -> Option<ProjectLockUpdater> {
