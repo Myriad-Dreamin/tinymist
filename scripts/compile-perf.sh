@@ -1,0 +1,5 @@
+echo "Compiling performance test"
+echo "Bench on Small Project..."
+hyperfine -N "target/release/tinymist compile target/test.typ" "typst compile target/test.typ"
+echo "Bench on Large Project..."
+hyperfine -N "target/release/tinymist compile ../../typst/tutorial/src/ebook.typ --root ../../typst/tutorial --font-path ../../typst/tutorial/assets/typst-fonts/ --font-path ../../typst/tutorial/assets/fonts/" "typst compile ../../typst/tutorial/src/ebook.typ --root ../../typst/tutorial --font-path ../../typst/tutorial/assets/typst-fonts/ --font-path ../../typst/tutorial/assets/fonts/"

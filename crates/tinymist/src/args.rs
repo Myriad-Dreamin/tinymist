@@ -32,6 +32,9 @@ pub enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
 
+    /// Runs compile commands
+    #[clap(hide(true))] // still in development
+    Compile(CompileArgs),
     /// Runs language query
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
@@ -141,6 +144,17 @@ pub struct TraceLspArgs {
     pub mirror: MirrorArgs,
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
+}
+
+/// Common arguments of compile, watch, and query.
+#[derive(Debug, Clone, Default, clap::Parser)]
+pub struct CompileArgs {
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// Path to output file
+    #[clap(value_name = "OUTPUT")]
+    pub output: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, clap::Parser)]
