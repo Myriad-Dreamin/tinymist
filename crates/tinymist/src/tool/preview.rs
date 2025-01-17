@@ -18,6 +18,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_project::ProjectInsId;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
@@ -262,13 +263,14 @@ pub struct StartPreviewResponse {
 
 pub struct PreviewProjectHandler {
     client: Box<dyn ProjectClient>,
-    project_id: String,
+    project_id: ProjectInsId,
 }
 
 impl PreviewProjectHandler {
     pub fn flush_compile(&self) {
         let _ = self.project_id;
-        self.client.send_event(LspInterrupt::Compile);
+        self.client
+            .send_event(LspInterrupt::Compile(self.project_id.clone()));
     }
 
     pub async fn settle(&self) -> Result<(), Error> {
@@ -331,7 +333,7 @@ impl PreviewState {
         args: PreviewCliArgs,
         previewer: PreviewBuilder,
         // compile_handler: Arc<CompileHandler>,
-        project_id: String,
+        project_id: ProjectInsId,
         is_primary: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let compile_handler = Arc::new(PreviewProjectHandler {
@@ -618,7 +620,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         // Create the actor
-        let handle = Arc::new(CompileHandlerImpl {
+        let compile_handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
             diag_group: "main".to_owned(),
@@ -630,13 +632,25 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             notified_revision: parking_lot::Mutex::new(0),
         });
 
-        let mut server = ProjectCompiler::new_with(verse, dep_tx, CompileServerOpts::default())
-            .with_compile_handle(handle);
+        let mut server = ProjectCompiler::new(
+            verse,
+            dep_tx,
+            CompileServerOpts {
+                handler: compile_handle,
+                enable_watch: true,
+                ..Default::default()
+            },
+        );
         let registered = server
             .primary
             .ext
             .register_preview(previewer.compile_watcher());
         assert!(registered, "failed to register preview");
+
+        let handle = Arc::new(PreviewProjectHandler {
+            project_id: server.primary.id.clone(),
+            client: Box::new(intr_tx),
+        });
 
         let service = async move {
             let mut intr_rx = intr_rx;
@@ -644,10 +658,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
                 server.process(intr);
             }
         };
-        let handle = Arc::new(PreviewProjectHandler {
-            project_id: "primary".to_owned(),
-            client: Box::new(intr_tx),
-        });
 
         (service, handle)
     };

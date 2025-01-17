@@ -12,7 +12,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 use reflexo_typst::{
     features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     CompileEnv, CompileReport, Compiler, TypstDocument,
@@ -22,9 +22,17 @@ use tinymist_world::{
     CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, TaskInputs, WorldDeps,
 };
 use tokio::sync::mpsc;
+use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::{vfs::FsProvider, RevisingUniverse};
+use tinymist_world::{CompilerUniverse, CompilerWorld, LspCompilerFeat, TaskInputs};
+/// LSP interrupt.
+pub type LspInterrupt = Interrupt<LspCompilerFeat>;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct ProjectInsId(EcoString);
+
 /// A signal that possibly triggers an export.
 ///
 /// Whether to export depends on the current state of the document and the user
@@ -40,6 +48,8 @@ pub struct ExportSignal {
 }
 
 pub struct CompileSnapshot<F: CompilerFeat> {
+    /// The project id.
+    pub id: ProjectInsId,
     /// The export signal for the document.
     pub signal: ExportSignal,
     /// Using env
@@ -92,6 +102,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
 impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
     fn clone(&self) -> Self {
         Self {
+            id: self.id.clone(),
             signal: self.signal,
             env: self.env.clone(),
             world: self.world.clone(),
@@ -156,7 +167,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
 
 pub enum Interrupt<F: CompilerFeat> {
     /// Compile anyway.
-    Compile,
+    Compile(ProjectInsId),
     /// Compiled from computing thread.
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
@@ -227,15 +238,17 @@ struct TaggedMemoryEvent {
 }
 
 pub struct CompileServerOpts<F: CompilerFeat, Ext> {
-    pub compile_handle: Arc<dyn CompileHandler<F, Ext>>,
+    pub handler: Arc<dyn CompileHandler<F, Ext>>,
     pub feature_set: FeatureSet,
+    pub enable_watch: bool,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileServerOpts<F, Ext> {
     fn default() -> Self {
         Self {
-            compile_handle: Arc::new(std::marker::PhantomData),
+            handler: Arc::new(std::marker::PhantomData),
             feature_set: Default::default(),
+            enable_watch: false,
         }
     }
 }
@@ -245,7 +258,7 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
     /// The compilation handle.
-    pub compile_handle: Arc<dyn CompileHandler<F, Ext>>,
+    pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// Channel for sending interrupts to the compiler actor.
     dep_tx: mpsc::UnboundedSender<NotifyMessage>,
     /// Whether to enable file system watching.
@@ -258,11 +271,6 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     /// Estimated latest set of shadow files.
     estimated_shadow_files: HashSet<Arc<Path>>,
 
-    /// feature set for compile_once mode.
-    once_feature_set: Arc<FeatureSet>,
-    /// Shared feature set for watch mode.
-    watch_feature_set: Arc<FeatureSet>,
-
     /// The primary state.
     pub primary: ProjectState<F, Ext>,
     /// The states for dedicate tasks
@@ -271,22 +279,48 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCompiler<F, Ext> {
     /// Create a compiler with options
-    pub fn new_with(
+    pub fn new(
         verse: CompilerUniverse<F>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         CompileServerOpts {
-            compile_handle,
+            handler,
             feature_set,
+            enable_watch,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
+        let primary =
+            Self::create_project(&verse, handler.clone(), dep_tx.clone(), feature_set.clone());
+        Self {
+            verse,
+            handler,
+            dep_tx,
+            enable_watch,
+
+            logical_tick: 1,
+            dirty_shadow_logical_tick: 0,
+
+            estimated_shadow_files: Default::default(),
+
+            primary,
+            dedicates: vec![],
+        }
+    }
+
+    fn create_project(
+        verse: &CompilerUniverse<F>,
+        handler: Arc<dyn CompileHandler<F, Ext>>,
+        dep_tx: mpsc::UnboundedSender<NotifyMessage>,
+        feature_set: FeatureSet,
+    ) -> ProjectState<F, Ext> {
         let entry = verse.entry_state();
-        let primary = ProjectState {
-            id: "primary".to_string(),
+        ProjectState {
+            id: ProjectInsId("primary".into()),
             ext: Default::default(),
             world: verse.snapshot(),
             reason: no_reason(),
-            compile_handle: compile_handle.clone(),
-            dep_tx: dep_tx.clone(),
+            snapshot: OnceLock::new(),
+            handler,
+            dep_tx,
             compilation: OnceLock::default(),
             latest_doc: None,
             latest_success_doc: None,
@@ -296,36 +330,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     .clone()
                     .configure(&WITH_COMPILING_STATUS_FEATURE, true),
             ),
-            watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
             compiling: false,
             suspended_reason: no_reason(),
             committed_revision: 0,
-        };
-        Self {
-            verse,
-
-            logical_tick: 1,
-            compile_handle,
-            enable_watch: false,
-            dirty_shadow_logical_tick: 0,
-
-            estimated_shadow_files: Default::default(),
-            once_feature_set: Arc::new(feature_set.clone()),
-            watch_feature_set: Arc::new(
-                feature_set.configure(&WITH_COMPILING_STATUS_FEATURE, true),
-            ),
-
-            primary,
-            dep_tx,
-            dedicates: vec![],
         }
-    }
-
-    // todo: options
-    pub fn with_compile_handle(mut self, handle: Arc<dyn CompileHandler<F, Ext>>) -> Self {
-        self.compile_handle = handle;
-        self
     }
 
     pub fn process(&mut self, intr: Interrupt<F>) {
@@ -335,12 +344,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
         let revision = self.verse.revision.get();
         if revision != previous_revision {
-            self.primary.world = self.verse.snapshot();
-            self.primary.world.set_is_compiling(false);
+            let snap = self.verse.snapshot();
             for dedicate in &mut self.dedicates {
-                dedicate.world = self.verse.snapshot();
-                dedicate.world.set_is_compiling(false);
+                dedicate.reset(snap.clone());
             }
+            self.primary.reset(snap);
         }
 
         self.primary.reason.see(reason);
@@ -349,39 +357,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
 
         // Customized Project Compilation Handler
-        self.compile_handle.clone().on_any_compile_reason(self);
+        self.handler.clone().on_any_compile_reason(self);
     }
 
     pub fn snapshot(&mut self) -> CompileSnapshot<F> {
         self.primary.watch_snapshot()
-    }
-
-    /// Compile the document once.
-    pub fn project_snapshot(
-        &self,
-        project: &ProjectState<F, Ext>,
-        is_once: bool,
-    ) -> CompileSnapshot<F> {
-        let world = self.verse.snapshot();
-        let env = self.make_env(if is_once {
-            self.once_feature_set.clone()
-        } else {
-            self.watch_feature_set.clone()
-        });
-        CompileSnapshot {
-            world,
-            env: env.clone(),
-            signal: ExportSignal {
-                by_entry_update: project.reason.by_entry_update,
-                by_mem_events: project.reason.by_memory_events,
-                by_fs_events: project.reason.by_fs_events,
-            },
-            success_doc: project.latest_success_doc.clone(),
-        }
-    }
-
-    fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
-        CompileEnv::default().configure_shared(feature_set)
     }
 
     /// Launches the compiler actor.
@@ -655,7 +635,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
     fn process_inner(&mut self, intr: Interrupt<F>) -> CompileReasons {
         match intr {
-            Interrupt::Compile => {
+            Interrupt::Compile(id) => {
+                let _ = id;
                 // Increment the revision anyway.
                 self.verse.increment_revision(|_| {});
 
@@ -680,7 +661,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     self.primary.suspended = entry.is_inactive();
                     if self.primary.suspended {
                         log::info!("ProjectCompiler: removing diag");
-                        self.compile_handle
+                        self.handler
                             .status(self.verse.revision.get(), CompileReport::Suspend);
                     }
 
@@ -770,17 +751,19 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 }
 
 pub struct ProjectState<F: CompilerFeat, Ext> {
-    pub id: String,
+    pub id: ProjectInsId,
     /// The extension
     pub ext: Ext,
     /// The forked world.
     pub world: CompilerWorld<F>,
     /// The reason to compile.
     pub reason: CompileReasons,
+    /// The latest snapshot.
+    pub snapshot: OnceLock<CompileSnapshot<F>>,
     /// The latest compilation.
     pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
-    pub compile_handle: Arc<dyn CompileHandler<F, Ext>>,
+    pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// Channel for sending interrupts to the compiler actor.
     dep_tx: mpsc::UnboundedSender<NotifyMessage>,
 
@@ -793,7 +776,6 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
     compiling: bool,
     suspended_reason: CompileReasons,
@@ -805,7 +787,7 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
         CompileEnv::default().configure_shared(feature_set)
     }
 
-    pub fn snapshot(&self, is_once: bool, reason: CompileReasons) -> CompileSnapshot<F> {
+    pub fn snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
         let world = self.world.clone();
         let env = self.make_env(if is_once {
             self.once_feature_set.clone()
@@ -813,12 +795,13 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
             self.watch_feature_set.clone()
         });
         CompileSnapshot {
+            id: self.id.clone(),
             world,
             env: env.clone(),
             signal: ExportSignal {
-                by_entry_update: reason.by_entry_update,
-                by_mem_events: reason.by_memory_events,
-                by_fs_events: reason.by_fs_events,
+                by_entry_update: self.reason.by_entry_update,
+                by_mem_events: self.reason.by_memory_events,
+                by_fs_events: self.reason.by_fs_events,
             },
             success_doc: self.latest_success_doc.clone(),
         }
@@ -833,9 +816,7 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
         //     self.watch_snap = OnceLock::new();
         // }
 
-        self.watch_snap
-            .get_or_init(|| self.snapshot(false, no_reason()))
-            .clone()
+        self.snapshot.get_or_init(|| self.snapshot(false)).clone()
     }
 
     /// Compile the document once.
@@ -848,9 +829,10 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
         let reason = std::mem::take(&mut self.suspended_reason);
         let start = tinymist_std::time::now();
 
-        let compiling = self.snapshot(is_once, reason);
-        self.watch_snap = OnceLock::new();
-        self.watch_snap.get_or_init(|| compiling.clone());
+        let compiling = self.snapshot(is_once);
+        self.reason = no_reason();
+        self.snapshot = OnceLock::new();
+        self.snapshot.get_or_init(|| compiling.clone());
 
         if self.suspended {
             self.suspended_reason.see(reason);
@@ -864,7 +846,7 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
 
         self.compiling = true;
 
-        let h = self.compile_handle.clone();
+        let h = self.handler.clone();
 
         // todo unwrap main id
         let id = compiling.world.main_id().unwrap();
@@ -930,6 +912,14 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
     fn process_lagged_compile(&mut self) -> CompileReasons {
         // The reason which is kept but not used.
         std::mem::take(&mut self.suspended_reason)
+    }
+
+    fn reset(&mut self, world: CompilerWorld<F>) {
+        self.world = world;
+        self.world.set_is_compiling(false);
+
+        self.snapshot = OnceLock::new();
+        self.compilation = OnceLock::default();
     }
 }
 

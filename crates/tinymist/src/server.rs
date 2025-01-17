@@ -27,6 +27,7 @@ use task::{
     CacheTask, ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig,
     UserActionTask,
 };
+use tinymist_project::ProjectInsId;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
     to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
@@ -201,7 +202,10 @@ impl LanguageState {
         let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
             // customized event
-            .with_event(&LspInterrupt::Compile, State::compile_interrupt::<T>)
+            .with_event(
+                &LspInterrupt::Compile(ProjectInsId::default()),
+                State::compile_interrupt::<T>,
+            )
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
             .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
@@ -1193,11 +1197,12 @@ impl LanguageState {
         }));
 
         // Create the actor
-        let server = ProjectCompiler::new_with(
+        let server = ProjectCompiler::new(
             verse,
             dep_tx,
             CompileServerOpts {
-                compile_handle,
+                handler: compile_handle,
+                enable_watch: true,
                 ..Default::default()
             },
         );

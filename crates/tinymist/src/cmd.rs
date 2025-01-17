@@ -252,7 +252,7 @@ impl LanguageState {
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
-        use crate::project::ProjectExt;
+        use crate::project::ProjectStateExt;
         use crate::tool::preview::PreviewCliArgs;
         use clap::Parser;
 
@@ -287,7 +287,7 @@ impl LanguageState {
 
         let handle = &mut self.handle;
         let primary = &mut handle.wrapper.primary;
-        let _ = ProjectExt::unregister_preview;
+        let _ = ProjectStateExt::unregister_preview;
         if !cli_args.not_as_primary && primary.ext.register_preview(previewer.compile_watcher()) {
             let id = primary.id.clone();
             // todo: recover pin status reliably
