@@ -369,16 +369,16 @@ impl LspClient {
 
 impl LspClient {
     fn start_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
-        log::debug!("handling {method} - ({req_id}) at {received_at:0.2?}");
+        log::info!("handling {method} - ({req_id}) at {received_at:0.2?}");
     }
 
     fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
         let duration = received_at.elapsed();
-        log::debug!("handled  {method} - ({req_id}) in {duration:0.2?}");
+        log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
     }
 
     fn start_notification(&self, method: &str, received_at: Instant) {
-        log::debug!("notifying {method} at {received_at:0.2?}");
+        log::info!("notifying {method} at {received_at:0.2?}");
     }
 
     fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>) {
@@ -386,7 +386,7 @@ impl LspClient {
         if let Err(err) = result {
             log::error!("notifying {method} failed in {request_duration:0.2?}: {err:?}");
         } else {
-            log::debug!("notifying {method} succeeded in {request_duration:0.2?}");
+            log::info!("notifying {method} succeeded in {request_duration:0.2?}");
         }
     }
 }
