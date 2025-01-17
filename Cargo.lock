@@ -3984,7 +3984,6 @@ dependencies = [
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
  "tinymist-fs",
- "tinymist-project",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -4067,24 +4066,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymist-project"
-version = "0.12.18"
-dependencies = [
- "anyhow",
- "clap",
- "log",
- "pathdiff",
- "reflexo-typst",
- "same-file",
- "semver",
- "serde",
- "serde_json",
- "tempfile",
- "tinymist-fs",
- "toml",
-]
-
-[[package]]
 name = "tinymist-query"
 version = "0.12.18"
 dependencies = [
@@ -4161,13 +4142,19 @@ dependencies = [
  "flate2",
  "log",
  "parking_lot",
+ "pathdiff",
+ "rayon",
  "reflexo-typst",
  "reflexo-typst-shim",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "tar",
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-fs",
+ "tokio",
+ "toml",
  "typst",
  "typst-assets",
 ]
