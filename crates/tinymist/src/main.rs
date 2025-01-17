@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
@@ -17,7 +17,7 @@ use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
-use reflexo_typst::{package::PackageSpec, TypstDict};
+use reflexo_typst::{package::PackageSpec, Compiler, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{
     internal_error,
@@ -84,6 +84,7 @@ fn main() -> anyhow::Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Compile(args) => compile(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
@@ -108,6 +109,41 @@ pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
 
     let mut cmd = CliArguments::command();
     generate(shell, &mut cmd, "tinymist", &mut io::stdout());
+
+    Ok(())
+}
+
+/// Runs compilation
+pub fn compile(args: CompileArgs) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    let input = args
+        .compile
+        .input
+        .as_ref()
+        .context("Missing required argument: INPUT")?;
+    let output = match args.output {
+        Some(stdout_path) if stdout_path == "-" => None,
+        Some(output_path) => Some(PathBuf::from(output_path)),
+        None => Some(Path::new(input).with_extension("pdf")),
+    };
+
+    let universe = args.compile.resolve()?;
+    let world = universe.snapshot();
+
+    let converter = std::marker::PhantomData.compile(&world, &mut Default::default());
+    let pdf = typst_pdf::pdf(&converter.unwrap().output, &Default::default());
+
+    match (pdf, output) {
+        (Ok(pdf), None) => {
+            std::io::stdout().write_all(&pdf).unwrap();
+        }
+        (Ok(pdf), Some(output)) => std::fs::write(output, pdf).unwrap(),
+        (Err(err), ..) => {
+            eprintln!("{err:?}");
+            std::process::exit(1);
+        }
+    }
 
     Ok(())
 }
