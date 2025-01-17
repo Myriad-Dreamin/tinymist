@@ -246,10 +246,9 @@ impl LspClient {
             return;
         };
 
-        let Err(res) = sender.event.send(Box::new(event)) else {
-            return;
-        };
-        log::warn!("failed to send event: {res:?}");
+        if let Err(res) = sender.event.send(Box::new(event)) {
+            log::warn!("failed to send event: {res:?}");
+        }
     }
 
     /// Sends a request to the client and registers a handler.
@@ -259,17 +258,17 @@ impl LspClient {
         handler: impl FnOnce(&mut dyn Any, lsp_server::Response) + Send + Sync + 'static,
     ) {
         let mut req_queue = self.req_queue.lock();
+        let request = req_queue
+            .outgoing
+            .register(R::METHOD.to_owned(), params, Box::new(handler));
+
         let Some(sender) = self.sender.upgrade() else {
             log::warn!("failed to send request: connection closed");
             return;
         };
-        let request = req_queue
-            .outgoing
-            .register(R::METHOD.to_owned(), params, Box::new(handler));
-        let Err(res) = sender.lsp.send(request.into()) else {
-            return;
-        };
-        log::warn!("failed to send request: {res:?}");
+        if let Err(res) = sender.lsp.send(request.into()) {
+            log::warn!("failed to send request: {res:?}");
+        }
     }
 
     /// Completes an server2client request in the request queue.
@@ -288,43 +287,43 @@ impl LspClient {
         let mut req_queue = self.req_queue.lock();
         let method = request.method.clone();
         let req_id = request.id.clone();
-        log::info!("handling {method} - ({req_id}) at {received_at:0.2?}");
+        self.start_request(&req_id, &method, received_at);
         req_queue.incoming.register(req_id, (method, received_at));
     }
 
     /// Completes an client2server request in the request queue.
     pub fn respond(&self, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
-        if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
-            let Some(sender) = self.sender.upgrade() else {
-                log::warn!("failed to send request: connection closed");
-                return;
-            };
+        let Some((method, received_at)) = req_queue.incoming.complete(response.id.clone()) else {
+            return;
+        };
 
-            let duration = start.elapsed();
-            log::info!("handled  {method} - ({}) in {duration:0.2?}", response.id);
-            let Err(res) = sender.lsp.send(response.into()) else {
-                return;
-            };
-            log::warn!("failed to send response: {res:?}");
-        }
-    }
+        self.stop_request(&response.id, &method, received_at);
 
-    /// Sends an untyped notification to the client.
-    pub fn send_notification_(&self, notif: lsp_server::Notification) {
         let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send notification: connection closed");
+            log::warn!("failed to send response ({method}): connection closed");
             return;
         };
-        let Err(res) = sender.lsp.send(notif.into()) else {
-            return;
-        };
-        log::warn!("failed to send notification: {res:?}");
+        if let Err(res) = sender.lsp.send(response.into()) {
+            log::warn!("failed to send response ({method}): {res:?}");
+        }
     }
 
     /// Sends a typed notification to the client.
     pub fn send_notification<N: Notif>(&self, params: N::Params) {
         self.send_notification_(lsp_server::Notification::new(N::METHOD.to_owned(), params));
+    }
+
+    /// Sends an untyped notification to the client.
+    pub fn send_notification_(&self, notif: lsp_server::Notification) {
+        let method = &notif.method;
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send notification ({method}): connection closed");
+            return;
+        };
+        if let Err(res) = sender.lsp.send(notif.into()) {
+            log::warn!("failed to send notification: {res:?}");
+        }
     }
 }
 
@@ -364,6 +363,30 @@ impl LspClient {
             Ok(Some(())) => {}
             // The requests that doesn't start.
             _ => self.respond(result_to_response(req_id, resp)),
+        }
+    }
+}
+
+impl LspClient {
+    fn start_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
+        log::info!("handling {method} - ({req_id}) at {received_at:0.2?}");
+    }
+
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
+        let duration = received_at.elapsed();
+        log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
+    }
+
+    fn start_notification(&self, method: &str, received_at: Instant) {
+        log::info!("notifying {method} at {received_at:0.2?}");
+    }
+
+    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>) {
+        let request_duration = received_at.elapsed();
+        if let Err(err) = result {
+            log::error!("notifying {method} failed in {request_duration:0.2?}: {err:?}");
+        } else {
+            log::info!("notifying {method} succeeded in {request_duration:0.2?}");
         }
     }
 }
@@ -850,27 +873,16 @@ where
     }
 
     /// Handles an incoming notification.
-    fn on_notification(
-        &mut self,
-        request_received: Instant,
-        not: Notification,
-    ) -> anyhow::Result<()> {
-        log::info!("notifying {} - at {:0.2?}", not.method, request_received);
-        let handle = |s, not: Notification| {
-            let Some(handler) = self.notifications.get(not.method.as_str()) else {
-                log::warn!("unhandled notification: {}", not.method);
+    fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
+        self.client.start_notification(&not.method, received_at);
+        let handle = |s, Notification { method, params }: Notification| {
+            let Some(handler) = self.notifications.get(method.as_str()) else {
+                log::warn!("unhandled notification: {method}");
                 return Ok(());
             };
 
-            let result = handler(s, not.params);
-
-            let request_duration = request_received.elapsed();
-            let method = &not.method;
-            if let Err(err) = result {
-                log::error!("notifing {method} failed in {request_duration:0.2?}: {err:?}");
-            } else {
-                log::info!("notifing {method} succeeded in {request_duration:0.2?}");
-            }
+            let result = handler(s, params);
+            self.client.stop_notification(&method, received_at, result);
 
             Ok(())
         };
