@@ -166,14 +166,19 @@ export class LanguageState {
     const context = this.context;
     const isProdMode = context.extensionMode === ExtensionMode.Production;
 
+    /// The `--mirror` flag is only used in development/test mode for testing
+    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
+    /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
+    /// production mode because we don't put the debug information in the binary.
+    ///
+    /// Note: Developers can still download the debug information from the GitHub Releases and enable the backtrace
+    /// manually by themselves.
+    const RUST_BACKTRACE = isProdMode ? "1" : "full";
+
     const run = {
       command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
-      args: [
-        "lsp",
-        /// The `--mirror` flag is only used in development/test mode for testing
-        ...(isProdMode ? [] : ["--mirror", "tinymist-lsp.log"]),
-      ],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
+      args: ["lsp", ...mirrorFlag],
+      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
     };
     // console.log("use arguments", run);
     const serverOptions: ServerOptions = {

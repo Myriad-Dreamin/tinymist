@@ -7,6 +7,7 @@
 				"Compile VS Code Extension",
 				"Build Debug LSP Binary",
 				"Copy Debug LSP Binary to VS Code Extension",
+				"Copy Debug LSP Debug Info to VS Code Extension",
 				"Compile Typst Preview Extension",
 				"Copy Debug LSP Binary to Typst Preview Extension"
 			],
@@ -126,6 +127,25 @@
 					"${workspaceFolder}/target/debug/tinymist",
 					"${workspaceFolder}/editors/vscode/out/"
 				]
+			}
+		},
+		{
+			"label": "Copy Debug LSP Debug Info to VS Code Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\debug\\tinymist.pdb",
+					"${workspaceFolder}\\editors\\vscode\\out\\"
+				]
+			},
+			"linux": {
+				"command": "true",
+				"args": []
+			},
+			"osx": {
+				"command": "true",
+				"args": []
 			}
 		},
 		{
