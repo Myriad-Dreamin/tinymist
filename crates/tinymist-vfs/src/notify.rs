@@ -6,31 +6,18 @@ use typst::diag::{FileError, FileResult};
 
 use crate::{Bytes, ImmutPath, PathAccessModel};
 
-/// internal representation of [`NotifyFile`]
-#[derive(Debug, Clone)]
-struct NotifyFileRepr {
-    mtime: crate::Time,
-    content: Bytes,
-}
-
 /// A file snapshot that is notified by some external source
 ///
 /// Note: The error is boxed to avoid large stack size
 #[derive(Clone)]
-pub struct FileSnapshot(Result<NotifyFileRepr, Box<FileError>>);
+pub struct FileSnapshot(Result<Bytes, Box<FileError>>);
 
 impl fmt::Debug for FileSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.as_ref() {
             Ok(v) => f
                 .debug_struct("FileSnapshot")
-                .field("mtime", &v.mtime)
-                .field(
-                    "content",
-                    &FileContent {
-                        len: v.content.len(),
-                    },
-                )
+                .field("content", &FileContent { len: v.len() })
                 .finish(),
             Err(e) => f.debug_struct("FileSnapshot").field("error", &e).finish(),
         }
@@ -38,37 +25,25 @@ impl fmt::Debug for FileSnapshot {
 }
 
 impl FileSnapshot {
-    /// Access the internal data of the file snapshot
+    /// content of the file
     #[inline]
     #[track_caller]
-    fn retrieve<'a, T>(&'a self, f: impl FnOnce(&'a NotifyFileRepr) -> T) -> FileResult<T> {
-        self.0.as_ref().map(f).map_err(|e| *e.clone())
-    }
-
-    /// mtime of the file
-    pub fn mtime(&self) -> FileResult<&crate::Time> {
-        self.retrieve(|e| &e.mtime)
-    }
-
-    /// content of the file
     pub fn content(&self) -> FileResult<&Bytes> {
-        self.retrieve(|e| &e.content)
+        self.0.as_ref().map_err(|e| *e.clone())
     }
 
     /// Whether the related file is a file
+    #[inline]
+    #[track_caller]
     pub fn is_file(&self) -> FileResult<bool> {
-        self.retrieve(|_| true)
+        self.content().map(|_| true)
     }
 }
 
 /// Convenient function to create a [`FileSnapshot`] from tuple
-impl From<FileResult<(crate::Time, Bytes)>> for FileSnapshot {
-    fn from(result: FileResult<(crate::Time, Bytes)>) -> Self {
-        Self(
-            result
-                .map(|(mtime, content)| NotifyFileRepr { mtime, content })
-                .map_err(Box::new),
-        )
+impl From<FileResult<Bytes>> for FileSnapshot {
+    fn from(result: FileResult<Bytes>) -> Self {
+        Self(result.map_err(Box::new))
     }
 }
 
