@@ -40,6 +40,20 @@ impl FileSnapshot {
     }
 }
 
+impl std::ops::Deref for FileSnapshot {
+    type Target = Result<Bytes, Box<FileError>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for FileSnapshot {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Convenient function to create a [`FileSnapshot`] from tuple
 impl From<FileResult<Bytes>> for FileSnapshot {
     fn from(result: FileResult<Bytes>) -> Self {
