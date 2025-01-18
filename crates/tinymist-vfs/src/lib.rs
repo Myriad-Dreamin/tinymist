@@ -64,9 +64,6 @@ pub trait PathAccessModel {
     /// more information.
     fn clear(&mut self) {}
 
-    /// Return whether a path is corresponding to a file.
-    fn is_file(&self, src: &Path) -> FileResult<bool>;
-
     /// Return the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
 }
@@ -81,9 +78,6 @@ pub trait AccessModel {
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
     fn clear(&mut self) {}
-
-    /// Return whether a path is corresponding to a file.
-    fn is_file(&self, src: TypstFileId) -> FileResult<bool>;
 
     /// Return the content of a file entry.
     fn content(&self, src: TypstFileId) -> FileResult<Bytes>;
@@ -110,10 +104,6 @@ where
         self.inner.write().clear();
     }
 
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        self.inner.read().is_file(src)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         self.inner.read().content(src)
     }
@@ -129,8 +119,6 @@ pub trait FsProvider {
     fn file_path(&self, id: TypstFileId) -> FileResult<PathResolution>;
 
     fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
-
-    fn is_file(&self, id: TypstFileId) -> FileResult<bool>;
 }
 /// Create a new `Vfs` harnessing over the given `access_model` specific for
 /// `reflexo_world::CompilerWorld`. With vfs, we can minimize the
@@ -259,16 +247,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
 
     /// Read a file.
     pub fn read(&self, path: TypstFileId) -> FileResult<Bytes> {
-        if self.access_model.is_file(path)? {
-            self.access_model.content(path)
-        } else {
-            Err(FileError::IsDirectory)
-        }
-    }
-
-    /// Whether the given path is a file.
-    pub fn is_file(&self, path: TypstFileId) -> FileResult<bool> {
-        self.access_model.is_file(path)
+        self.access_model.content(path)
     }
 }
 

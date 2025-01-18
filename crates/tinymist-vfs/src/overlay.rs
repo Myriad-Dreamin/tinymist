@@ -69,14 +69,6 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
 }
 
 impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        if self.files.get(src).is_some() {
-            return Ok(true);
-        }
-
-        self.inner.is_file(src)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(content) = self.files.get(src) {
             return Ok(content.clone());
@@ -87,14 +79,6 @@ impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
 }
 
 impl<M: AccessModel> AccessModel for OverlayAccessModel<TypstFileId, M> {
-    fn is_file(&self, src: TypstFileId) -> FileResult<bool> {
-        if self.files.get(&src).is_some() {
-            return Ok(true);
-        }
-
-        self.inner.is_file(src)
-    }
-
     fn content(&self, src: TypstFileId) -> FileResult<Bytes> {
         if let Some(content) = self.files.get(&src) {
             return Ok(content.clone());

@@ -476,10 +476,6 @@ impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
     fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
         self.vfs.read(fid)
     }
-
-    fn is_file(&self, fid: TypstFileId) -> FileResult<bool> {
-        self.vfs.is_file(fid)
-    }
 }
 
 impl<F: CompilerFeat> World for CompilerWorld<F> {
