@@ -11,7 +11,7 @@ pub trait EntryReader {
     fn entry_state(&self) -> EntryState;
 
     fn workspace_root(&self) -> Option<Arc<Path>> {
-        self.entry_state().root().clone()
+        self.entry_state().workspace_root().clone()
     }
 
     fn main_id(&self) -> Option<FileId> {
@@ -56,6 +56,19 @@ impl EntryState {
         Self::new_rooted(root, None)
     }
 
+    /// Create an entry state without permission to access the file system.
+    pub fn new_rootless(main: VirtualPath) -> Self {
+        Self {
+            root: None,
+            main: Some(FileId::new(None, main)),
+        }
+    }
+
+    /// Create an entry state with a workspace root and an main file.
+    pub fn new_rooted_by_id(root: ImmutPath, main: FileId) -> Self {
+        Self::new_rooted(root, Some(main.vpath().clone()))
+    }
+
     /// Create an entry state with a workspace root and an optional main file.
     pub fn new_rooted(root: ImmutPath, main: Option<VirtualPath>) -> Self {
         let main = main.map(|main| WorkspaceResolver::workspace_file(Some(&root), main));
@@ -87,9 +100,9 @@ impl EntryState {
 
     pub fn workspace_root(&self) -> Option<ImmutPath> {
         if let Some(main) = self.main {
-            let pkg = WorkspaceResolver::resolve(main).ok()?;
-            match pkg {
+            match WorkspaceResolver::resolve(main).ok()? {
                 WorkspaceResolution::Workspace(id) => Some(id.path().clone()),
+                WorkspaceResolution::Rootless => None,
                 WorkspaceResolution::Package => self.root.clone(),
             }
         } else {

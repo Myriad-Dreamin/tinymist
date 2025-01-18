@@ -66,6 +66,7 @@ static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
 
 pub enum WorkspaceResolution {
     Workspace(WorkspaceId),
+    Rootless,
     Package,
 }
 
@@ -84,6 +85,11 @@ impl WorkspaceResolver {
     pub fn is_workspace_file(fid: TypstFileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
+    }
+
+    pub fn is_package_file(fid: TypstFileId) -> bool {
+        fid.package()
+            .is_some_and(|p| p.namespace != WorkspaceResolver::WORKSPACE_NS)
     }
 
     /// Id of the given path if it exists in the `Vfs` and is not deleted.
@@ -125,11 +131,9 @@ impl WorkspaceResolver {
 
     /// File path corresponding to the given `fid`.
     pub fn resolve(fid: TypstFileId) -> FileResult<WorkspaceResolution> {
-        let package = fid.package().ok_or_else(|| {
-            FileError::Other(Some(eco_format!(
-                "cannot map file id without package spec: {fid:?}"
-            )))
-        })?;
+        let Some(package) = fid.package() else {
+            return Ok(WorkspaceResolution::Rootless);
+        };
 
         match package.namespace.as_str() {
             "ws" => {
@@ -161,7 +165,7 @@ impl fmt::Debug for Resolving {
 
         let path = match WorkspaceResolver::resolve(id) {
             Ok(WorkspaceResolution::Workspace(workspace)) => id.vpath().resolve(&workspace.path()),
-            Ok(WorkspaceResolution::Package) | Err(_) => None,
+            Ok(WorkspaceResolution::Rootless | WorkspaceResolution::Package) | Err(_) => None,
         };
 
         if let Some(path) = path {

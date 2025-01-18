@@ -54,6 +54,7 @@ impl<T: PackageRegistry> tinymist_vfs::PathMapper for RegistryPathMapper<T> {
         // will be resolved.
         let root = match WorkspaceResolver::resolve(id)? {
             WorkspaceResolution::Workspace(id) => id.path().clone(),
+            WorkspaceResolution::Rootless => return Err(FileError::AccessDenied),
             WorkspaceResolution::Package => self.registry.resolve(id.package().unwrap())?,
         };
 
