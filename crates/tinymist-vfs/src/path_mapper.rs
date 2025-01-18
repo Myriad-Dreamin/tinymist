@@ -49,23 +49,30 @@ impl PathResolution {
 
 pub trait RootResolver {
     fn path_for_id(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
-        let root = self.resolve_root(file_id)?;
+        use WorkspaceResolution::*;
+        let root = match WorkspaceResolver::resolve(file_id)? {
+            Workspace(id) => id.path().clone(),
+            Package => {
+                self.resolve_package_root(file_id.package().expect("not a file in package"))?
+            }
+            UntitledRooted(..) | Rootless => {
+                return Ok(PathResolution::Rootless(Cow::Borrowed(file_id.vpath())))
+            }
+        };
 
-        match root {
-            Some(root) => file_id
-                .vpath()
-                .resolve(&root)
-                .map(PathResolution::Resolved)
-                .ok_or_else(|| FileError::AccessDenied),
-            None => Ok(PathResolution::Rootless(Cow::Borrowed(file_id.vpath()))),
-        }
+        file_id
+            .vpath()
+            .resolve(&root)
+            .map(PathResolution::Resolved)
+            .ok_or_else(|| FileError::AccessDenied)
     }
 
     fn resolve_root(&self, file_id: TypstFileId) -> FileResult<Option<ImmutPath>> {
+        use WorkspaceResolution::*;
         match WorkspaceResolver::resolve(file_id)? {
-            WorkspaceResolution::Workspace(id) => Ok(Some(id.path().clone())),
-            WorkspaceResolution::Rootless => Ok(None),
-            WorkspaceResolution::Package => self
+            Workspace(id) | UntitledRooted(id) => Ok(Some(id.path().clone())),
+            Rootless => Ok(None),
+            Package => self
                 .resolve_package_root(file_id.package().expect("not a file in package"))
                 .map(Some),
         }
@@ -83,12 +90,26 @@ const NO_VERSION: PackageVersion = PackageVersion {
     patch: 0,
 };
 
+const UNTITLED_ROOT: PackageVersion = PackageVersion {
+    major: 0,
+    minor: 0,
+    patch: 1,
+};
+
 impl WorkspaceId {
     fn package(&self) -> PackageSpec {
         PackageSpec {
             namespace: WorkspaceResolver::WORKSPACE_NS.clone(),
             name: eco_format!("p{}", self.0),
             version: NO_VERSION,
+        }
+    }
+
+    fn untitled_root(&self) -> PackageSpec {
+        PackageSpec {
+            namespace: WorkspaceResolver::WORKSPACE_NS.clone(),
+            name: eco_format!("p{}", self.0),
+            version: UNTITLED_ROOT,
         }
     }
 
@@ -121,6 +142,7 @@ static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
 
 pub enum WorkspaceResolution {
     Workspace(WorkspaceId),
+    UntitledRooted(WorkspaceId),
     Rootless,
     Package,
 }
@@ -195,6 +217,14 @@ impl WorkspaceResolver {
         TypstFileId::new(workspace.as_ref().map(WorkspaceId::package), path)
     }
 
+    /// Mounts an untiled file to some workspace. The `root` is the
+    /// root directory of the workspace. If `root` is `None`, the source
+    /// code at the `path` will not be able to access physical files.
+    pub fn rooted_untitled(root: Option<&ImmutPath>, path: VirtualPath) -> TypstFileId {
+        let workspace = root.map(Self::workspace_id);
+        TypstFileId::new(workspace.as_ref().map(WorkspaceId::untitled_root), path)
+    }
+
     /// File path corresponding to the given `fid`.
     pub fn resolve(fid: TypstFileId) -> FileResult<WorkspaceResolution> {
         let Some(package) = fid.package() else {
@@ -207,7 +237,11 @@ impl WorkspaceResolver {
                     FileError::Other(Some(eco_format!("bad workspace id: {fid:?}")))
                 })?;
 
-                Ok(WorkspaceResolution::Workspace(id))
+                Ok(if package.version == UNTITLED_ROOT {
+                    WorkspaceResolution::UntitledRooted(id)
+                } else {
+                    WorkspaceResolution::Workspace(id)
+                })
             }
             _ => Ok(WorkspaceResolution::Package),
         }
@@ -225,13 +259,15 @@ pub struct Resolving {
 
 impl fmt::Debug for Resolving {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use WorkspaceResolution::*;
         let Some(id) = self.id else {
             return write!(f, "None");
         };
 
         let path = match WorkspaceResolver::resolve(id) {
-            Ok(WorkspaceResolution::Workspace(workspace)) => id.vpath().resolve(&workspace.path()),
-            Ok(WorkspaceResolution::Rootless | WorkspaceResolution::Package) | Err(_) => None,
+            Ok(Workspace(workspace)) => id.vpath().resolve(&workspace.path()),
+            Ok(UntitledRooted(..)) => Some(id.vpath().as_rootless_path().to_owned()),
+            Ok(Rootless | Package) | Err(_) => None,
         };
 
         if let Some(path) = path {

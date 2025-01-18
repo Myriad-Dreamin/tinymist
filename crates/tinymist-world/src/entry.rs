@@ -97,7 +97,9 @@ impl EntryState {
     pub fn workspace_root(&self) -> Option<ImmutPath> {
         if let Some(main) = self.main {
             match WorkspaceResolver::resolve(main).ok()? {
-                WorkspaceResolution::Workspace(id) => Some(id.path().clone()),
+                WorkspaceResolution::Workspace(id) | WorkspaceResolution::UntitledRooted(id) => {
+                    Some(id.path().clone())
+                }
                 WorkspaceResolution::Rootless => None,
                 WorkspaceResolution::Package => self.root.clone(),
             }
