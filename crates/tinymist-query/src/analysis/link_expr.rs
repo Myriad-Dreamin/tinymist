@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use lsp_types::Url;
-use reflexo_typst::package::PackageSpec;
+use tinymist_world::package::PackageSpec;
 
 use super::prelude::*;
 

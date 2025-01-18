@@ -1,6 +1,8 @@
 //! upstream of following files <https://github.com/rust-lang/rust-analyzer/tree/master/crates/vfs>
 //!   ::path_interner.rs -> path_interner.rs
 
+#![allow(missing_docs)]
+
 /// Provides ProxyAccessModel that makes access to JavaScript objects for
 /// browser compilation.
 #[cfg(feature = "browser")]
@@ -32,8 +34,8 @@ mod path_interner;
 pub use typst::foundations::Bytes;
 pub use typst::syntax::FileId as TypstFileId;
 
-pub use reflexo::time::Time;
-pub use reflexo::ImmutPath;
+pub use tinymist_std::time::Time;
+pub use tinymist_std::ImmutPath;
 
 pub(crate) use path_interner::PathInterner;
 
@@ -49,7 +51,7 @@ use std::{
 };
 
 use parking_lot::{Mutex, RwLock};
-use reflexo::path::PathClean;
+use tinymist_std::path::PathClean;
 use typst::diag::{FileError, FileResult};
 
 use self::{

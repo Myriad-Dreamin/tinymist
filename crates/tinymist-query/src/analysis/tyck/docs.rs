@@ -1,4 +1,4 @@
-use reflexo::TakeAs;
+use tinymist_std::TakeAs;
 
 use super::*;
 use crate::syntax::DocString;

@@ -6,6 +6,7 @@ use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::CastInfo;
+use typst::syntax::FileId;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
@@ -185,10 +186,10 @@ impl fmt::Debug for PackageId {
     }
 }
 
-impl TryFrom<TypstFileId> for PackageId {
+impl TryFrom<FileId> for PackageId {
     type Error = ();
 
-    fn try_from(value: TypstFileId) -> Result<Self, Self::Error> {
+    fn try_from(value: FileId) -> Result<Self, Self::Error> {
         let Some(spec) = value.package() else {
             return Err(());
         };

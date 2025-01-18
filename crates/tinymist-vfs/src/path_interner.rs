@@ -4,7 +4,7 @@
 use std::hash::{BuildHasherDefault, Hash};
 
 use indexmap::IndexMap;
-use reflexo::hash::FxHasher;
+use tinymist_std::hash::FxHasher;
 
 use super::FileId;
 

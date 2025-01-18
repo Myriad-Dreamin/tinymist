@@ -6,7 +6,7 @@ mod module;
 mod package;
 mod tidy;
 
-use reflexo::path::unix_slash;
+use tinymist_std::path::unix_slash;
 use typst::syntax::FileId;
 
 pub(crate) use convert::convert_docs;

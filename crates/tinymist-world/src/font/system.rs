@@ -7,10 +7,10 @@ use std::{
 };
 
 use fontdb::Database;
-use reflexo::debug_loc::{DataSource, MemoryDataSource};
-use reflexo::error::prelude::*;
-use reflexo_vfs::system::LazyFile;
 use sha2::{Digest, Sha256};
+use tinymist_std::debug_loc::{DataSource, MemoryDataSource};
+use tinymist_std::error::prelude::*;
+use tinymist_vfs::system::LazyFile;
 use typst::{
     diag::{FileError, FileResult},
     foundations::Bytes,
@@ -271,7 +271,7 @@ impl SystemFontSearcher {
     #[cfg(not(feature = "lazy-fontdb"))]
     pub fn flush(&mut self) {
         use fontdb::Source;
-        use reflexo::debug_loc::FsDataSource;
+        use tinymist_std::debug_loc::FsDataSource;
 
         for face in self.db.faces() {
             let path = match &face.source {

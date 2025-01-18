@@ -1,8 +1,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use reflexo::ImmutPath;
 use rpds::RedBlackTreeMapSync;
+use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes, Time};
@@ -56,7 +56,7 @@ impl<M: AccessModel> OverlayAccessModel<M> {
         // we change mt every time, since content almost changes every time
         // Note: we can still benefit from cache, since we incrementally parse source
 
-        let mt = reflexo::time::now();
+        let mt = tinymist_std::time::now();
         let meta = OverlayFileMeta { mt, content };
 
         match self.files.get_mut(&path) {

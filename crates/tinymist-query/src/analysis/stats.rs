@@ -6,8 +6,8 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use reflexo::hash::FxDashMap;
-use reflexo_typst::TypstFileId;
+use tinymist_std::hash::FxDashMap;
+use typst::syntax::FileId;
 
 use super::Analysis;
 
@@ -64,7 +64,7 @@ impl QueryStatGuard {
 /// Statistics about the analyzers
 #[derive(Default)]
 pub struct AnalysisStats {
-    pub(crate) query_stats: FxDashMap<TypstFileId, FxDashMap<&'static str, QueryStatBucket>>,
+    pub(crate) query_stats: FxDashMap<FileId, FxDashMap<&'static str, QueryStatBucket>>,
 }
 
 impl AnalysisStats {

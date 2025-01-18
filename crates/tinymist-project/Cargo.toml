@@ -1,6 +1,6 @@
 [package]
-name = "tinymist-world"
-description = "World implementation of typst for tinymist."
+name = "tinymist-project"
+description = "Project model of typst for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 authors.workspace = true
@@ -17,25 +17,27 @@ chrono.workspace = true
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
+ecow.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 pathdiff.workspace = true
 tokio.workspace = true
 rayon.workspace = true
-reflexo-typst.workspace = true
-reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tinymist-world = { workspace = true, features = ["system"] }
 tinymist-fs.workspace = true
-typst.workspace = true
+tinymist-std.workspace = true
 toml.workspace = true
+typst.workspace = true
 typst-assets.workspace = true
-
+notify.workspace = true
 
 [features]
 fonts = ["typst-assets/fonts"]
-no-content-hint = ["reflexo-typst/no-content-hint"]
+# "reflexo-typst/no-content-hint"
+no-content-hint = []
 
 [lints]
 workspace = true

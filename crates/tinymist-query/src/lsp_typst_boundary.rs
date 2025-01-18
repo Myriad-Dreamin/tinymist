@@ -2,7 +2,7 @@
 
 use std::cmp::Ordering;
 
-use reflexo::path::PathClean;
+use tinymist_std::path::PathClean;
 use typst::syntax::Source;
 
 use crate::prelude::*;

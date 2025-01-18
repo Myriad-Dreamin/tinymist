@@ -7,6 +7,7 @@ use std::{
 
 use clap::Parser;
 use ecow::{eco_format, EcoString};
+use tinymist_project::WorldProvider;
 use typlite::value::*;
 use typlite::{CompileOnceArgs, Typlite};
 

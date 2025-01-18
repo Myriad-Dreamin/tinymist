@@ -1,6 +1,6 @@
 use std::{path::Path, sync::atomic::AtomicU64};
 
-use reflexo::ImmutPath;
+use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes};
@@ -31,7 +31,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
     }
 
     fn mtime(&self, src: &Path) -> FileResult<crate::Time> {
-        let instant = reflexo::time::Instant::now();
+        let instant = tinymist_std::time::Instant::now();
         let res = self.inner.mtime(src);
         let elapsed = instant.elapsed();
         // self.trace[0] += elapsed.as_nanos() as u64;
@@ -44,7 +44,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
     }
 
     fn is_file(&self, src: &Path) -> FileResult<bool> {
-        let instant = reflexo::time::Instant::now();
+        let instant = tinymist_std::time::Instant::now();
         let res = self.inner.is_file(src);
         let elapsed = instant.elapsed();
         self.trace[1].fetch_add(
@@ -56,7 +56,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
     }
 
     fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        let instant = reflexo::time::Instant::now();
+        let instant = tinymist_std::time::Instant::now();
         let res = self.inner.real_path(src);
         let elapsed = instant.elapsed();
         self.trace[2].fetch_add(
@@ -68,7 +68,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {
-        let instant = reflexo::time::Instant::now();
+        let instant = tinymist_std::time::Instant::now();
         let res = self.inner.content(src);
         let elapsed = instant.elapsed();
         self.trace[3].fetch_add(

@@ -2,8 +2,8 @@ use lsp_types::{
     DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
     RenameFile, TextDocumentEdit,
 };
-use reflexo::path::{unix_slash, PathClean};
 use rustc_hash::FxHashSet;
+use tinymist_std::path::{unix_slash, PathClean};
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,

@@ -348,7 +348,7 @@ fn remove_list_annotations(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use reflexo_typst::package::{PackageRegistry, PackageSpec};
+    use tinymist_world::package::{PackageRegistry, PackageSpec};
 
     use super::{package_docs, PackageInfo};
     use crate::tests::*;

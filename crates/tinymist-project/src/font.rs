@@ -7,14 +7,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use system::SystemFontSearcher;
+use tinymist_world::font::system::SystemFontSearcher;
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
-use reflexo_typst::debug_loc::DataSource;
-use reflexo_typst::Bytes;
+use crate::world::vfs::Bytes;
+use tinymist_std::debug_loc::DataSource;
 
-pub use reflexo_typst::font::*;
+pub use crate::world::base::font::*;
 
 #[derive(Debug)]
 /// The default FontResolver implementation.

@@ -1,4 +1,4 @@
-use reflexo::debug_loc::{DataSource, MemoryDataSource};
+use tinymist_std::debug_loc::{DataSource, MemoryDataSource};
 use typst::foundations::Bytes;
 use typst::text::{FontBook, FontInfo};
 

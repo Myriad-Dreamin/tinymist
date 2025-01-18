@@ -1,3 +1,9 @@
+//! World implementation of typst for tinymist.
+
+#![allow(missing_docs)]
+
+pub mod args;
+
 pub mod source;
 
 pub mod config;
@@ -11,6 +17,8 @@ pub use world::*;
 pub mod font;
 pub mod package;
 pub mod parser;
+
+pub use tinymist_vfs as vfs;
 
 /// Run the compiler in the system environment.
 #[cfg(feature = "system")]
@@ -30,8 +38,8 @@ use std::{
 };
 
 use ecow::EcoVec;
-use reflexo::ImmutPath;
-use reflexo_vfs::AccessModel as VfsAccessModel;
+use tinymist_std::ImmutPath;
+use tinymist_vfs::AccessModel as VfsAccessModel;
 use typst::{
     diag::{At, FileResult, SourceResult},
     foundations::Bytes,

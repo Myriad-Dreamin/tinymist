@@ -1,14 +1,14 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::project::font::TinymistFontResolver;
+use crate::world::EntryState;
 use anyhow::bail;
 use clap::Parser;
-use font::TinymistFontResolver;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 use reflexo::path::PathClean;
-use reflexo_typst::world::EntryState;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};

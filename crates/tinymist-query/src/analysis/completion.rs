@@ -8,11 +8,11 @@ use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
-use reflexo::path::unix_slash;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
-use tinymist_world::LspWorld;
+use tinymist_project::LspWorld;
+use tinymist_std::path::unix_slash;
 use typst::foundations::{
     fields_on, format_str, repr, AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type,
     Value,

@@ -11,7 +11,7 @@ use reflexo_typst::{CompileEnv, Compiler, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
-use tinymist_world::LspWorld;
+use tinymist_project::LspWorld;
 use typst::{syntax::Span, World};
 
 use crate::{internal_error, LanguageState};

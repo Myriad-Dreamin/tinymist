@@ -16,8 +16,8 @@ pub use lsp_types::{
     SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
     SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
-pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
+pub use tinymist_std::DefId;
 pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;
 pub use typst::syntax::ast::{self, AstNode};

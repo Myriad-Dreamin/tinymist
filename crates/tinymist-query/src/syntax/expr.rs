@@ -1,16 +1,16 @@
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
-use reflexo::hash::hash128;
-use reflexo_typst::LazyHash;
 use rpds::RedBlackTreeMapSync;
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use tinymist_analysis::import::resolve_id_by_path;
+use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
     syntax::{Span, SyntaxNode},
+    utils::LazyHash,
 };
 
 use crate::{

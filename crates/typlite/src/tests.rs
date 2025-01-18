@@ -4,7 +4,9 @@ mod rendering;
 use std::sync::{LazyLock, OnceLock};
 
 use regex::Regex;
-use tinymist_world::{font::TinymistFontResolver, CompileFontArgs, EntryState, LspUniverseBuilder};
+use tinymist_project::{
+    font::TinymistFontResolver, CompileFontArgs, EntryState, LspUniverseBuilder,
+};
 use typst_syntax::Source;
 
 use super::*;

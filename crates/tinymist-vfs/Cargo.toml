@@ -1,6 +1,6 @@
 [package]
-name = "reflexo-vfs"
-description = "Vfs for reflexo."
+name = "tinymist-vfs"
+description = "Vfs for tinymist."
 authors.workspace = true
 version.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ repository.workspace = true
 [dependencies]
 
 typst.workspace = true
-reflexo.workspace = true
+tinymist-std = { workspace = true, features = ["typst"] }
 parking_lot.workspace = true
 nohash-hasher.workspace = true
 indexmap.workspace = true
@@ -24,9 +24,9 @@ js-sys = { workspace = true, optional = true }
 
 [features]
 
-web = ["wasm-bindgen", "web-sys", "js-sys", "reflexo/web"]
+web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
 browser = ["web"]
-system = ["reflexo/system"]
+system = ["tinymist-std/system"]
 
 [lints]
 workspace = true

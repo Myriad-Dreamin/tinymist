@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use reflexo::error::prelude::*;
-use reflexo_vfs::{system::SystemAccessModel, Vfs};
+use tinymist_std::error::prelude::*;
+use tinymist_vfs::{system::SystemAccessModel, Vfs};
 use typst::utils::LazyHash;
 
 use crate::{

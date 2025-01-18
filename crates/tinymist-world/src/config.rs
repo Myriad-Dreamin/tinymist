@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::path::PathBuf;
 
-use reflexo::AsCowBytes;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use tinymist_std::AsCowBytes;
 use typst::foundations::Dict;
 
 use crate::EntryOpts;

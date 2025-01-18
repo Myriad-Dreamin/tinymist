@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use reflexo::debug_loc::DataSource;
+use tinymist_std::debug_loc::DataSource;
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 

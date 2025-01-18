@@ -4,9 +4,9 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
-use reflexo::ImmutPath;
 use reqwest::blocking::Response;
 use reqwest::Certificate;
+use tinymist_std::ImmutPath;
 use typst::diag::{eco_format, EcoString, PackageResult, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 

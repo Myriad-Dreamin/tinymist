@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
-use reflexo::{error::prelude::*, ImmutPath};
 use serde::{Deserialize, Serialize};
+use tinymist_std::{error::prelude::*, ImmutPath};
 use typst::diag::SourceResult;
 use typst::syntax::{FileId, VirtualPath};
 
@@ -179,7 +179,7 @@ impl EntryOpts {
 }
 
 impl TryFrom<EntryOpts> for EntryState {
-    type Error = reflexo::Error;
+    type Error = tinymist_std::Error;
 
     fn try_from(value: EntryOpts) -> Result<Self, Self::Error> {
         match value {

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use reflexo::ImmutPath;
+use tinymist_std::ImmutPath;
 use typst::diag::{FileError, FileResult};
 
 use super::AccessModel;

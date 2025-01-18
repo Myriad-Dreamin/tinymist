@@ -1,8 +1,8 @@
 use core::fmt;
 use std::sync::Arc;
 
-use reflexo::debug_loc::DataSource;
-use reflexo::QueryRef;
+use tinymist_std::debug_loc::DataSource;
+use tinymist_std::QueryRef;
 use typst::text::Font;
 
 use crate::font::FontLoader;

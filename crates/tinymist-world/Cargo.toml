@@ -1,56 +1,89 @@
 [package]
-name = "reflexo-world"
-description = "Typst's World implementation for reflexo."
+name = "tinymist-world"
+description = "Typst's World implementation for tinymist."
+categories = ["compilers"]
+keywords = ["language", "typst"]
 authors.workspace = true
 version.workspace = true
 license.workspace = true
 edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 
-typst.workspace = true
-reflexo.workspace = true
-reflexo-vfs.workspace = true
-reflexo-typst-shim.workspace = true
-parking_lot.workspace = true
-ecow.workspace = true
-log.workspace = true
+anyhow.workspace = true
 chrono.workspace = true
-serde.workspace = true
-comemo.workspace = true
+clap.workspace = true
 codespan-reporting.workspace = true
+comemo.workspace = true
+dirs = { workspace = true, optional = true }
+ecow.workspace = true
 flate2.workspace = true
-tar.workspace = true
-serde_json.workspace = true
-sha2.workspace = true
+fontdb = { workspace = true, optional = true }
 hex.workspace = true
-strum.workspace = true
+js-sys = { workspace = true, optional = true }
+log.workspace = true
+parking_lot.workspace = true
+pathdiff.workspace = true
+tokio.workspace = true
+rayon.workspace = true
+reflexo-typst.workspace = true
+reflexo-typst-shim = { workspace = true, features = ["nightly"] }
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 serde_with.workspace = true
-
+serde-wasm-bindgen = { workspace = true, optional = true }
+sha2.workspace = true
+strum.workspace = true
+tar.workspace = true
+tinymist-fs.workspace = true
+tinymist-std.workspace = true
+tinymist-vfs.workspace = true
+typst.workspace = true
+toml.workspace = true
+typst-assets.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
-js-sys = { workspace = true, optional = true }
-serde-wasm-bindgen = { workspace = true, optional = true }
-
-dirs = { workspace = true, optional = true }
-fontdb = { workspace = true, optional = true }
-
-reqwest = { version = "^0.12", default-features = false, features = [
-    "rustls-tls",
-    "blocking",
-    "multipart",
-] }
+reqwest.workspace = true
 
 [features]
 
 default = []
 lazy-fontdb = []
 browser-embedded-fonts = []
-web = ["wasm-bindgen", "web-sys", "js-sys", "serde-wasm-bindgen", "reflexo/web"]
+web = [
+    "wasm-bindgen",
+    "web-sys",
+    "js-sys",
+    "serde-wasm-bindgen",
+    "tinymist-std/web",
+]
 browser = ["web"]
-system = ["dep:dirs", "dep:fontdb", "reflexo/system"]
+system = [
+    "dep:dirs",
+    "dep:fontdb",
+    "tinymist-std/system",
+    "tinymist-vfs/system",
+]
+
+# todo: remove me
+fonts = []
+no-content-hint = []
 
 [lints]
 workspace = true
+
+# ====
+
+# [dependencies]
+
+
+# [features]
+# fonts = ["typst-assets/fonts"]
+# no-content-hint = ["reflexo-typst/no-content-hint"]
+
+# [lints]
+# workspace = true

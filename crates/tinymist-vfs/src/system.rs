@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use typst::diag::{FileError, FileResult};
 
 use crate::{AccessModel, Bytes, Time};
-use reflexo::{ImmutPath, ReadAllOnce};
+use tinymist_std::{ImmutPath, ReadAllOnce};
 
 /// Provides SystemAccessModel that makes access to the local file system for
 /// system compilation.
