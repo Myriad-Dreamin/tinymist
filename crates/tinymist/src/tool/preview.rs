@@ -12,7 +12,7 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
+use reflexo_typst::vfs::{notify::MemoryEvent, FileChangeSet};
 use reflexo_typst::watch_deps;
 use reflexo_typst::{error::prelude::*, Error, TypstDocument};
 use serde::Serialize;

@@ -7,7 +7,9 @@ pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 use reflexo_typst::package::RegistryPathMapper;
 pub use reflexo_typst::world as base;
-pub use reflexo_typst::world::{package, CompilerUniverse, CompilerWorld, Revising, TaskInputs};
+pub use reflexo_typst::world::{
+    package, CompilerUniverse, CompilerWorld, RevisingUniverse, TaskInputs,
+};
 pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
 
 use std::path::Path;

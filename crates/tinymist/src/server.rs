@@ -18,9 +18,7 @@ use reflexo_typst::watch_deps;
 use reflexo_typst::world::EntryState;
 use reflexo_typst::Compiler;
 use reflexo_typst::{
-    error::prelude::*,
-    vfs::notify::{FileChangeSet, MemoryEvent},
-    Bytes, Error, ImmutPath,
+    error::prelude::*, vfs::notify::MemoryEvent, vfs::FileChangeSet, Bytes, Error, ImmutPath,
 };
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
@@ -1015,7 +1013,7 @@ impl LanguageState {
 
             // todo: Introducing additional compilation here, but we must get accurate
             // dependencies by compiling it again.
-            snap.snap.world.source_db.take_state();
+            snap.snap.world.take_state();
             let err = std::marker::PhantomData.compile(&snap.world, &mut Default::default());
             if err.is_err() {
                 return ZResult::Ok(());
