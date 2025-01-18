@@ -19,9 +19,16 @@ pub mod system;
 /// [`Vfs`] will make a overlay access model over the provided dummy access
 /// model.
 pub mod dummy;
+
+/// Provides snapshot models
+pub mod snapshot;
+pub use snapshot::*;
+use tinymist_std::hash::FxHashMap;
+
 /// Provides notify access model which retrieves file system events and changes
 /// from some notify backend.
 pub mod notify;
+pub use notify::{FilesystemEvent, MemoryEvent};
 /// Provides overlay access model which allows to shadow the underlying access
 /// model with memory contents.
 pub mod overlay;
@@ -32,23 +39,27 @@ pub mod trace;
 mod utils;
 
 mod path_mapper;
-use notify::{FilesystemEvent, NotifyAccessModel};
 pub use path_mapper::{PathResolution, RootResolver, WorkspaceResolution, WorkspaceResolver};
 
-use resolve::ResolveAccessModel;
+use rpds::RedBlackTreeMapSync;
 pub use typst::foundations::Bytes;
 pub use typst::syntax::FileId as TypstFileId;
 
 pub use tinymist_std::time::Time;
 pub use tinymist_std::ImmutPath;
+use typst::syntax::Source;
 
 use core::fmt;
+use std::num::NonZeroUsize;
+use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use typst::diag::{FileError, FileResult};
 
-use self::overlay::OverlayAccessModel;
+use crate::notify::NotifyAccessModel;
+use crate::overlay::OverlayAccessModel;
+use crate::resolve::ResolveAccessModel;
 
 /// Handle to a file in [`Vfs`]
 pub type FileId = TypstFileId;
@@ -62,7 +73,7 @@ pub trait PathAccessModel {
     ///
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
-    fn clear(&mut self) {}
+    fn reset(&mut self) {}
 
     /// Return the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
@@ -77,10 +88,10 @@ pub trait AccessModel {
     ///
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
-    fn clear(&mut self) {}
+    fn reset(&mut self) {}
 
     /// Return the content of a file entry.
-    fn content(&self, src: TypstFileId) -> FileResult<Bytes>;
+    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>);
 }
 
 #[derive(Clone)]
@@ -100,8 +111,9 @@ impl<M> PathAccessModel for SharedAccessModel<M>
 where
     M: PathAccessModel,
 {
-    fn clear(&mut self) {
-        self.inner.write().clear();
+    #[inline]
+    fn reset(&mut self) {
+        self.inner.write().reset();
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {
@@ -120,10 +132,14 @@ pub trait FsProvider {
 
     fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
 }
+
 /// Create a new `Vfs` harnessing over the given `access_model` specific for
 /// `reflexo_world::CompilerWorld`. With vfs, we can minimize the
 /// implementation overhead for [`AccessModel`] trait.
 pub struct Vfs<M: PathAccessModel + Sized> {
+    managed: Arc<Mutex<EntryMap>>,
+    paths: Arc<Mutex<PathMap>>,
+    revision: NonZeroUsize,
     // access_model: TraceAccessModel<VfsAccessModel<M>>,
     /// The wrapped access model.
     access_model: VfsAccessModel<M>,
@@ -136,8 +152,15 @@ impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
 }
 
 impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
+    pub fn revision(&self) -> NonZeroUsize {
+        self.revision
+    }
+
     pub fn snapshot(&self) -> Self {
         Self {
+            managed: self.managed.clone(),
+            paths: self.paths.clone(),
+            revision: self.revision,
             access_model: self.access_model.clone(),
         }
     }
@@ -169,18 +192,40 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         // If you want to trace the access model, uncomment the following line
         // let access_model = TraceAccessModel::new(access_model);
 
-        Self { access_model }
+        Self {
+            managed: Arc::default(),
+            paths: Arc::default(),
+            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
+            access_model,
+        }
     }
 
-    /// Reset the source file and path references.
-    ///
-    /// It performs a rolling reset, with discard some cache file entry when it
-    /// is unused in recent 30 lifecycles.
-    ///
-    /// Note: The lifetime counter is incremented every time this function is
-    /// called.
-    pub fn reset(&mut self) {
-        self.access_model.clear();
+    /// Reset all state.
+    pub fn reset_all(&mut self) {
+        self.reset_access_model();
+        self.reset_cache();
+    }
+
+    /// Reset access model.
+    pub fn reset_access_model(&mut self) {
+        self.access_model.reset();
+    }
+
+    /// Reset all possible caches.
+    pub fn reset_cache(&mut self) {
+        self.revise().reset_cache();
+    }
+
+    /// Clear the cache that is not touched for a long time.
+    pub fn evict(&mut self, threshold: usize) {
+        let mut m = self.managed.lock();
+        let rev = self.revision.get();
+        for (id, entry) in m.entries.clone().iter() {
+            let entry_rev = entry.bytes.get().map(|e| e.1).unwrap_or_default();
+            if entry_rev + threshold < rev {
+                m.entries.remove_mut(id);
+            }
+        }
     }
 
     /// Resolve the real path for a file id.
@@ -188,56 +233,17 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         self.access_model.inner.resolver.path_for_id(id)
     }
 
-    /// Reset the shadowing files in [`OverlayAccessModel`].
-    ///
-    /// Note: This function is independent from [`Vfs::reset`].
-    pub fn reset_shadow(&mut self) {
-        self.access_model.clear_shadow();
-        self.access_model.inner.inner.clear_shadow();
-    }
-
-    /// Get paths to all the shadowing files in [`OverlayAccessModel`].
+    /// Get paths to all the shadowing paths in [`OverlayAccessModel`].
     pub fn shadow_paths(&self) -> Vec<ImmutPath> {
         self.access_model.inner.inner.file_paths()
     }
 
-    /// Get paths to all the shadowing files in [`OverlayAccessModel`].
+    /// Get paths to all the shadowing file ids in [`OverlayAccessModel`].
+    ///
+    /// The in memory untitled files can have no path so
+    /// they only have file ids.
     pub fn shadow_ids(&self) -> Vec<TypstFileId> {
         self.access_model.file_paths()
-    }
-
-    /// Add a shadowing file to the [`OverlayAccessModel`].
-    pub fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()> {
-        self.access_model
-            .inner
-            .inner
-            .add_file(path, content, |c| c.into());
-
-        Ok(())
-    }
-
-    /// Remove a shadowing file from the [`OverlayAccessModel`].
-    pub fn remove_shadow(&mut self, path: &Path) {
-        self.access_model.inner.inner.remove_file(path);
-    }
-
-    /// Add a shadowing file to the [`OverlayAccessModel`] by file id.
-    pub fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
-        self.access_model.add_file(&file_id, content, |c| *c);
-
-        Ok(())
-    }
-
-    /// Remove a shadowing file from the [`OverlayAccessModel`] by file id.
-    pub fn remove_shadow_by_id(&mut self, file_id: TypstFileId) {
-        self.access_model.remove_file(&file_id);
-    }
-
-    /// Let the vfs notify the access model with a filesystem event.
-    ///
-    /// See [`NotifyAccessModel`] for more information.
-    pub fn notify_fs_event(&mut self, event: FilesystemEvent) {
-        self.access_model.inner.inner.inner.notify(event);
     }
 
     /// Returns the overall memory usage for the stored files.
@@ -245,9 +251,222 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         0
     }
 
-    /// Read a file.
-    pub fn read(&self, path: TypstFileId) -> FileResult<Bytes> {
-        self.access_model.content(path)
+    pub fn revise(&mut self) -> RevisingVfs<M> {
+        let managed = self.managed.lock().clone();
+        let paths = self.paths.lock().clone();
+
+        RevisingVfs {
+            managed,
+            paths,
+            inner: self,
+            view_changed: false,
+        }
+    }
+
+    /// Reads a file.
+    pub fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
+        let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
+
+        self.read_content(&bytes, fid).clone()
+    }
+
+    /// Reads a source.
+    pub fn source(&self, fid: TypstFileId) -> FileResult<Source> {
+        let (bytes, source) = self
+            .managed
+            .lock()
+            .slot(fid, |entry| (entry.bytes.clone(), entry.source.clone()));
+
+        let source = source.get_or_init(|| {
+            let content = self
+                .read_content(&bytes, fid)
+                .as_ref()
+                .map_err(Clone::clone)?;
+
+            let content = std::str::from_utf8(content).map_err(|_| FileError::InvalidUtf8)?;
+
+            Ok(Source::new(fid, content.into()))
+        });
+
+        source.clone()
+    }
+
+    /// Reads and caches content of a file.
+    fn read_content<'a>(&self, bytes: &'a BytesQuery, fid: TypstFileId) -> &'a FileResult<Bytes> {
+        &bytes
+            .get_or_init(|| {
+                let (path, content) = self.access_model.content(fid);
+                if let Some(path) = path.as_ref() {
+                    self.paths.lock().insert(path, fid);
+                }
+
+                (path, self.revision.get(), content)
+            })
+            .2
+    }
+}
+
+pub struct RevisingVfs<'a, M: PathAccessModel + Sized> {
+    inner: &'a mut Vfs<M>,
+    managed: EntryMap,
+    paths: PathMap,
+    view_changed: bool,
+}
+
+impl<M: PathAccessModel + Sized> Drop for RevisingVfs<'_, M> {
+    fn drop(&mut self) {
+        if self.view_changed {
+            self.inner.managed = Arc::new(Mutex::new(std::mem::take(&mut self.managed)));
+            self.inner.paths = Arc::new(Mutex::new(std::mem::take(&mut self.paths)));
+            let revision = &mut self.inner.revision;
+            *revision = revision.checked_add(1).expect("revision overflowed");
+        }
+    }
+}
+
+impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
+    pub fn vfs(&mut self) -> &mut Vfs<M> {
+        self.inner
+    }
+
+    fn am(&mut self) -> &mut VfsAccessModel<M> {
+        &mut self.inner.access_model
+    }
+
+    fn invalidate_path(&mut self, path: &Path) {
+        if let Some(fids) = self.paths.remove(path) {
+            self.view_changed = true;
+            for fid in fids {
+                self.invalidate_file_id(fid);
+            }
+        }
+    }
+
+    fn invalidate_file_id(&mut self, file_id: TypstFileId) {
+        self.view_changed = true;
+        self.managed.slot(file_id, |e| {
+            e.bytes = Arc::default();
+            e.source = Arc::default();
+        });
+    }
+
+    /// Reset the shadowing files in [`OverlayAccessModel`].
+    ///
+    /// Note: This function is independent from [`Vfs::reset`].
+    pub fn reset_shadow(&mut self) {
+        for path in self.am().inner.inner.file_paths() {
+            self.invalidate_path(&path);
+        }
+        for fid in self.am().file_paths() {
+            self.invalidate_file_id(fid);
+        }
+
+        self.am().clear_shadow();
+        self.am().inner.inner.clear_shadow();
+    }
+
+    /// Reset all caches. This can happen when:
+    /// - package paths are reconfigured.
+    /// - The root of the workspace is switched.
+    pub fn reset_cache(&mut self) {
+        self.view_changed = true;
+        self.managed = EntryMap::default();
+        self.paths = PathMap::default();
+    }
+
+    /// Add a shadowing file to the [`OverlayAccessModel`].
+    pub fn map_shadow(&mut self, path: &Path, snap: FileSnapshot) -> FileResult<()> {
+        self.view_changed = true;
+        self.invalidate_path(path);
+        self.am().inner.inner.add_file(path, snap, |c| c.into());
+
+        Ok(())
+    }
+
+    /// Remove a shadowing file from the [`OverlayAccessModel`].
+    pub fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
+        self.view_changed = true;
+        self.invalidate_path(path);
+        self.am().inner.inner.remove_file(path);
+
+        Ok(())
+    }
+
+    /// Add a shadowing file to the [`OverlayAccessModel`] by file id.
+    pub fn map_shadow_by_id(&mut self, file_id: TypstFileId, snap: FileSnapshot) -> FileResult<()> {
+        self.view_changed = true;
+        self.invalidate_file_id(file_id);
+        self.am().add_file(&file_id, snap, |c| *c);
+
+        Ok(())
+    }
+
+    /// Remove a shadowing file from the [`OverlayAccessModel`] by file id.
+    pub fn remove_shadow_by_id(&mut self, file_id: TypstFileId) {
+        self.view_changed = true;
+        self.invalidate_file_id(file_id);
+        self.am().remove_file(&file_id);
+    }
+
+    /// Let the vfs notify the access model with a filesystem event.
+    ///
+    /// See [`NotifyAccessModel`] for more information.
+    pub fn notify_fs_event(&mut self, event: FilesystemEvent) {
+        self.notify_fs_changes(event.split().0);
+    }
+    /// Let the vfs notify the access model with a filesystem changes.
+    ///
+    /// See [`NotifyAccessModel`] for more information.
+    pub fn notify_fs_changes(&mut self, event: FileChangeSet) {
+        self.view_changed = true;
+        self.am().inner.inner.inner.notify(event);
+    }
+}
+
+type BytesQuery = Arc<OnceLock<(Option<ImmutPath>, usize, FileResult<Bytes>)>>;
+
+#[derive(Debug, Clone, Default)]
+struct VfsEntry {
+    bytes: BytesQuery,
+    source: Arc<OnceLock<FileResult<Source>>>,
+}
+
+#[derive(Clone, Default)]
+struct EntryMap {
+    entries: RedBlackTreeMapSync<TypstFileId, VfsEntry>,
+}
+
+impl EntryMap {
+    /// Read a slot.
+    #[inline(always)]
+    fn slot<T>(&mut self, path: TypstFileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
+        if let Some(entry) = self.entries.get_mut(&path) {
+            f(entry)
+        } else {
+            let mut entry = VfsEntry::default();
+            let res = f(&mut entry);
+            self.entries.insert_mut(path, entry);
+            res
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+struct PathMap {
+    paths: FxHashMap<ImmutPath, Vec<TypstFileId>>,
+}
+
+impl PathMap {
+    fn insert(&mut self, path: &ImmutPath, fid: TypstFileId) {
+        if let Some(fids) = self.paths.get_mut(path) {
+            fids.push(fid);
+        } else {
+            self.paths.insert(path.clone(), vec![fid]);
+        }
+    }
+
+    fn remove(&mut self, path: &Path) -> Option<Vec<TypstFileId>> {
+        self.paths.remove(path)
     }
 }
 

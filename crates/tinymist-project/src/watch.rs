@@ -17,9 +17,9 @@ use tokio::sync::mpsc;
 use typst::diag::FileError;
 
 use crate::vfs::{
-    notify::{FileChangeSet, FileSnapshot, FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
+    notify::{FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
-    PathAccessModel,
+    FileChangeSet, FileSnapshot, PathAccessModel,
 };
 
 type WatcherPair = (RecommendedWatcher, mpsc::UnboundedReceiver<NotifyEvent>);

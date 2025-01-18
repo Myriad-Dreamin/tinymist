@@ -16,10 +16,6 @@ pub trait EntryReader {
 }
 
 pub trait EntryManager: EntryReader {
-    fn reset(&mut self) -> SourceResult<()> {
-        Ok(())
-    }
-
     fn mutate_entry(&mut self, state: EntryState) -> SourceResult<EntryState>;
 }
 

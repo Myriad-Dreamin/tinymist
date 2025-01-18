@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use actor::editor::EditorActor;
 use anyhow::anyhow;
 use anyhow::Context;

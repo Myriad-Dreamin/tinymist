@@ -4,13 +4,13 @@ use rpds::RedBlackTreeMapSync;
 use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
+use crate::{AccessModel, Bytes, FileSnapshot, PathAccessModel, TypstFileId};
 
 /// Provides overlay access model which allows to shadow the underlying access
 /// model with memory contents.
 #[derive(Default, Debug, Clone)]
 pub struct OverlayAccessModel<K: Ord, M> {
-    files: RedBlackTreeMapSync<K, Bytes>,
+    files: RedBlackTreeMapSync<K, FileSnapshot>,
     /// The underlying access model
     pub inner: M,
 }
@@ -45,16 +45,20 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
     }
 
     /// Add a shadow file to the [`OverlayAccessModel`]
-    pub fn add_file<Q: Ord + ?Sized>(&mut self, path: &Q, content: Bytes, cast: impl Fn(&Q) -> K)
-    where
+    pub fn add_file<Q: Ord + ?Sized>(
+        &mut self,
+        path: &Q,
+        snap: FileSnapshot,
+        cast: impl Fn(&Q) -> K,
+    ) where
         K: Borrow<Q>,
     {
         match self.files.get_mut(path) {
             Some(e) => {
-                *e = content;
+                *e = snap;
             }
             None => {
-                self.files.insert_mut(cast(path), content);
+                self.files.insert_mut(cast(path), snap);
             }
         }
     }
@@ -71,7 +75,7 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
 impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(content) = self.files.get(src) {
-            return Ok(content.clone());
+            return content.content().cloned();
         }
 
         self.inner.content(src)
@@ -79,9 +83,13 @@ impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
 }
 
 impl<M: AccessModel> AccessModel for OverlayAccessModel<TypstFileId, M> {
-    fn content(&self, src: TypstFileId) -> FileResult<Bytes> {
+    fn reset(&mut self) {
+        self.inner.reset();
+    }
+
+    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
         if let Some(content) = self.files.get(&src) {
-            return Ok(content.clone());
+            return (None, content.content().cloned());
         }
 
         self.inner.content(src)
