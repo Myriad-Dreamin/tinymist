@@ -59,9 +59,7 @@ impl ProxyContext {
             let size = header.size().map_err(|e| format!("{e:?}"))?;
             buf.clear();
             buf.reserve(size as usize);
-            entry
-                .read_to_end(&mut buf)
-                .map_err(|e| format!("{e:?}"))?;
+            entry.read_to_end(&mut buf).map_err(|e| format!("{e:?}"))?;
 
             cb(path, &buf, mtime)?
         }
