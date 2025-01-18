@@ -17,16 +17,16 @@ use reflexo_typst::{
     features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     CompileEnv, CompileReport, Compiler, TypstDocument,
 };
-use tinymist_world::{
-    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, TaskInputs, WorldDeps,
-};
-use tokio::sync::mpsc;
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult};
 
-use crate::{vfs::FsProvider, RevisingUniverse};
-use tinymist_world::{CompilerUniverse, CompilerWorld, LspCompilerFeat, TaskInputs};
+use crate::LspCompilerFeat;
+use tinymist_world::{
+    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
+    vfs::{FsProvider, RevisingVfs},
+    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, TaskInputs, WorldDeps,
+};
+
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 
@@ -150,6 +150,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 
 pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
     fn on_any_compile_reason(&self, state: &mut ProjectCompiler<F, Ext>);
+    // todo: notify project specific compile
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
     fn status(&self, revision: usize, rep: CompileReport);
 }
@@ -171,7 +172,7 @@ pub enum Interrupt<F: CompilerFeat> {
     /// Compiled from computing thread.
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
-    ChangeTask(TaskInputs),
+    ChangeTask(ProjectInsId, TaskInputs),
     /// Font changes.
     Font(Arc<F::FontResolver>),
     /// Memory file changes.
@@ -255,8 +256,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
 
 /// The synchronous compiler that runs on one project or multiple projects.
 pub struct ProjectCompiler<F: CompilerFeat, Ext> {
-    /// The underlying universe.
-    pub verse: CompilerUniverse<F>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// Channel for sending interrupts to the compiler actor.
@@ -289,9 +288,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
         let primary =
-            Self::create_project(&verse, handler.clone(), dep_tx.clone(), feature_set.clone());
+            Self::create_project(verse, handler.clone(), dep_tx.clone(), feature_set.clone());
         Self {
-            verse,
             handler,
             dep_tx,
             enable_watch,
@@ -307,7 +305,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     fn create_project(
-        verse: &CompilerUniverse<F>,
+        verse: CompilerUniverse<F>,
         handler: Arc<dyn CompileHandler<F, Ext>>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         feature_set: FeatureSet,
@@ -316,9 +314,9 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         ProjectState {
             id: ProjectInsId("primary".into()),
             ext: Default::default(),
-            world: verse.snapshot(),
+            verse,
             reason: no_reason(),
-            snapshot: OnceLock::new(),
+            snapshot: None,
             handler,
             dep_tx,
             compilation: OnceLock::default(),
@@ -338,82 +336,20 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     pub fn process(&mut self, intr: Interrupt<F>) {
-        let previous_revision = self.verse.revision.get();
-
-        let reason = self.process_inner(intr);
-
-        let revision = self.verse.revision.get();
-        if revision != previous_revision {
-            let snap = self.verse.snapshot();
-            for dedicate in &mut self.dedicates {
-                dedicate.reset(snap.clone());
-            }
-            self.primary.reset(snap);
-        }
-
-        self.primary.reason.see(reason);
-        for dedicate in &mut self.dedicates {
-            dedicate.reason.see(reason);
-        }
-
+        // todo: evcit cache
+        self.process_inner(intr);
         // Customized Project Compilation Handler
         self.handler.clone().on_any_compile_reason(self);
     }
 
     pub fn snapshot(&mut self) -> CompileSnapshot<F> {
-        self.primary.watch_snapshot()
-    }
-
-    /// Launches the compiler actor.
-    pub fn start(&mut self) -> bool {
-        log::debug!("ProjectCompiler: initialized");
-
-        // Trigger the first compilation (if active)
-        let compile = self
-            .primary
-            .run_compile_shared(reason_by_entry_change(), !self.enable_watch);
-        if let Some(compile) = compile {
-            compile();
-        }
-
-        true
+        self.primary.snapshot()
     }
 
     /// Compile the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
-        self.primary
-            .run_compile_shared(reason_by_entry_change(), true)
-            .expect("is_once is set")()
-    }
-
-    /// Compile the document once.
-    pub fn run_compile_static(
-        h: Arc<dyn CompileHandler<F, Ext>>,
-        snap: CompileSnapshot<F>,
-    ) -> impl FnOnce() -> CompiledArtifact<F> {
-        let start = tinymist_std::time::now();
-
-        // todo unwrap main id
-        let id = snap.world.main_id().unwrap();
-        let revision = snap.world.revision().get();
-
-        h.status(revision, CompileReport::Stage(id, "compiling", start));
-
-        move || {
-            let compiled = snap.compile();
-
-            let elapsed = start.elapsed().unwrap_or_default();
-            let rep = match &compiled.doc {
-                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.clone(), elapsed),
-                Err(err) => CompileReport::CompileError(id, err.clone(), elapsed),
-            };
-
-            // todo: we need to check revision for really concurrent compilation
-            log_compile_report(&compiled.env, &rep);
-            h.notify_compile(&compiled, rep);
-
-            compiled
-        }
+        let snap = self.primary.make_snapshot(true);
+        ProjectState::run_compile(self.handler.clone(), snap)()
     }
 
     // fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl
@@ -592,32 +528,30 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
     /// Apply delayed memory changes to underlying compiler.
     fn apply_delayed_memory_changes(
-        verse: &mut RevisingUniverse<F>,
+        verse: &mut RevisingVfs<'_, F::AccessModel>,
         dirty_shadow_logical_tick: &mut usize,
-        event: &mut FilesystemEvent,
+        event: &Option<UpstreamUpdateEvent>,
     ) -> Option<()> {
         // Handle delayed upstream update event before applying file system changes
-        if let FilesystemEvent::UpstreamUpdate { upstream_event, .. } = event {
-            let event = upstream_event.take()?.opaque;
+        if let Some(event) = event {
             let TaggedMemoryEvent {
                 logical_tick,
                 event,
-            } = *event.downcast().ok()?;
+            } = event.opaque.as_ref().downcast_ref()?;
 
             // Recovery from dirty shadow state.
-            if logical_tick == *dirty_shadow_logical_tick {
+            if logical_tick == dirty_shadow_logical_tick {
                 *dirty_shadow_logical_tick = 0;
             }
 
-            Self::apply_memory_changes(verse, event);
+            Self::apply_memory_changes(verse, event.clone());
         }
 
         Some(())
     }
 
     /// Apply memory changes to underlying compiler.
-    fn apply_memory_changes(verse: &mut RevisingUniverse<F>, event: MemoryEvent) {
-        let mut vfs = verse.vfs();
+    fn apply_memory_changes(vfs: &mut RevisingVfs<'_, F::AccessModel>, event: MemoryEvent) {
         if matches!(event, MemoryEvent::Sync(..)) {
             vfs.reset_shadow();
         }
@@ -633,18 +567,44 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
     }
 
-    fn process_inner(&mut self, intr: Interrupt<F>) -> CompileReasons {
+    fn find_project<'a>(
+        primary: &'a mut ProjectState<F, Ext>,
+        dedicates: &'a mut [ProjectState<F, Ext>],
+        id: &ProjectInsId,
+    ) -> &'a mut ProjectState<F, Ext> {
+        if id == &primary.id {
+            return primary;
+        }
+
+        dedicates.iter_mut().find(|e| e.id == *id).unwrap()
+    }
+
+    fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
+        std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut())
+    }
+
+    fn process_inner(&mut self, intr: Interrupt<F>) {
         match intr {
             Interrupt::Compile(id) => {
-                let _ = id;
+                let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &id);
                 // Increment the revision anyway.
-                self.verse.increment_revision(|_| {});
+                proj.verse.increment_revision(|verse| {
+                    verse.flush();
+                });
 
-                reason_by_entry_change()
+                proj.reason.see(reason_by_entry_change());
             }
-            Interrupt::ChangeTask(change) => {
-                self.verse.increment_revision(|verse| {
-                    if let Some(inputs) = change.inputs {
+            Interrupt::Compiled(artifact) => {
+                let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &artifact.id);
+
+                proj.process_compile(artifact);
+                let reason = proj.process_lagged_compile();
+                proj.reason.see(reason);
+            }
+            Interrupt::ChangeTask(id, change) => {
+                let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &id);
+                proj.verse.increment_revision(|verse| {
+                    if let Some(inputs) = change.inputs.clone() {
                         verse.set_inputs(inputs);
                     }
 
@@ -658,32 +618,34 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
                 // After incrementing the revision
                 if let Some(entry) = change.entry {
-                    self.primary.suspended = entry.is_inactive();
-                    if self.primary.suspended {
+                    proj.suspended = entry.is_inactive();
+                    // todo: dedicate suspended
+                    if proj.suspended {
                         log::info!("ProjectCompiler: removing diag");
                         self.handler
-                            .status(self.verse.revision.get(), CompileReport::Suspend);
+                            .status(proj.verse.revision.get(), CompileReport::Suspend);
                     }
 
                     // Reset the watch state and document state.
-                    self.primary.latest_doc = None;
-                    self.primary.latest_success_doc = None;
-                    self.primary.suspended_reason = no_reason();
+                    proj.latest_doc = None;
+                    proj.latest_success_doc = None;
+                    proj.suspended_reason = no_reason();
                 }
 
-                reason_by_entry_change()
-            }
-            Interrupt::Compiled(artifact) => {
-                self.primary.process_compile(artifact);
-                self.primary.process_lagged_compile()
+                proj.reason.see(reason_by_entry_change());
             }
 
-            Interrupt::Font(font) => {
-                self.verse.increment_revision(|verse| {
-                    verse.inner.font_resolver = font;
+            Interrupt::Font(fonts) => {
+                self.projects().for_each(|proj| {
+                    let font_changed = proj.verse.increment_revision(|verse| {
+                        verse.set_fonts(fonts.clone());
+                        verse.font_changed()
+                    });
+                    if font_changed {
+                        // todo: reason_by_font_change
+                        proj.reason.see(reason_by_entry_change());
+                    }
                 });
-
-                reason_by_entry_change()
             }
             Interrupt::Memory(event) => {
                 log::debug!("ProjectCompiler: memory event incoming");
@@ -706,9 +668,17 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
                 // If there is no invalidation happening, apply memory changes directly.
                 if files.is_empty() && self.dirty_shadow_logical_tick == 0 {
-                    self.verse
-                        .increment_revision(|verse| Self::apply_memory_changes(verse, event));
-                    return reason_by_mem();
+                    let changes = std::iter::repeat_n(event, 1 + self.dedicates.len());
+                    for (proj, event) in std::iter::once(&mut self.primary).zip(changes) {
+                        let vfs_changed = proj.verse.increment_revision(|verse| {
+                            Self::apply_memory_changes(&mut verse.vfs(), event.clone());
+                            verse.vfs_changed()
+                        });
+                        if vfs_changed {
+                            proj.reason.see(reason_by_mem());
+                        }
+                    }
+                    return;
                 }
 
                 // Otherwise, send upstream update event.
@@ -723,28 +693,40 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 });
                 let err = self.dep_tx.send(event);
                 log_send_error("dep_tx", err);
-
-                no_reason()
             }
-            Interrupt::Fs(mut event) => {
-                log::debug!("CompileServerActor: fs event incoming {event:?}");
-
-                let mut reason = reason_by_fs();
+            Interrupt::Fs(event) => {
+                log::debug!("ProjectCompiler: fs event incoming {event:?}");
 
                 // Apply file system changes.
                 let dirty_tick = &mut self.dirty_shadow_logical_tick;
-                self.verse.increment_revision(|verse| {
-                    // Handle delayed upstream update event before applying file system changes
-                    if Self::apply_delayed_memory_changes(verse, dirty_tick, &mut event).is_none() {
-                        log::warn!("CompileServerActor: unknown upstream update event");
+                let (changes, event) = event.split();
+                let changes = std::iter::repeat_n(changes, 1 + self.dedicates.len());
+                let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
 
-                        // Actual a delayed memory event.
-                        reason = reason_by_mem();
+                for (proj, changes) in proj.zip(changes) {
+                    let vfs_changed = proj.verse.increment_revision(|verse| {
+                        {
+                            let mut vfs = verse.vfs();
+
+                            // Handle delayed upstream update event before applying file system
+                            // changes
+                            if Self::apply_delayed_memory_changes(&mut vfs, dirty_tick, &event)
+                                .is_none()
+                            {
+                                log::warn!("ProjectCompiler: unknown upstream update event");
+
+                                // Actual a delayed memory event.
+                                proj.reason.see(reason_by_mem());
+                            }
+                            vfs.notify_fs_changes(changes);
+                        }
+                        verse.vfs_changed()
+                    });
+
+                    if vfs_changed {
+                        proj.reason.see(reason_by_fs());
                     }
-                    verse.vfs().notify_fs_event(event)
-                });
-
-                reason
+                }
             }
         }
     }
@@ -754,12 +736,12 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
     pub id: ProjectInsId,
     /// The extension
     pub ext: Ext,
-    /// The forked world.
-    pub world: CompilerWorld<F>,
+    /// The underlying universe.
+    pub verse: CompilerUniverse<F>,
     /// The reason to compile.
     pub reason: CompileReasons,
     /// The latest snapshot.
-    pub snapshot: OnceLock<CompileSnapshot<F>>,
+    snapshot: Option<CompileSnapshot<F>>,
     /// The latest compilation.
     pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
@@ -782,13 +764,24 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
     committed_revision: usize,
 }
 
-impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
+impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
     pub fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
         CompileEnv::default().configure_shared(feature_set)
     }
 
-    pub fn snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
-        let world = self.world.clone();
+    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+        match self.snapshot.as_ref() {
+            Some(snap) if snap.world.revision() == self.verse.revision => snap.clone(),
+            _ => {
+                let snap = self.make_snapshot(false);
+                self.snapshot = Some(snap.clone());
+                snap
+            }
+        }
+    }
+
+    fn make_snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
+        let world = self.verse.snapshot();
         let env = self.make_env(if is_once {
             self.once_feature_set.clone()
         } else {
@@ -805,70 +798,6 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
             },
             success_doc: self.latest_success_doc.clone(),
         }
-    }
-
-    pub fn watch_snapshot(&mut self) -> CompileSnapshot<F> {
-        // if self
-        //     .watch_snap
-        //     .get()
-        //     .is_some_and(|e| e.world.revision() < *self.verse.revision.read())
-        // {
-        //     self.watch_snap = OnceLock::new();
-        // }
-
-        self.snapshot.get_or_init(|| self.snapshot(false)).clone()
-    }
-
-    /// Compile the document once.
-    fn run_compile_shared(
-        &mut self,
-        reason: CompileReasons,
-        is_once: bool,
-    ) -> Option<impl FnOnce() -> CompiledArtifact<F>> {
-        self.suspended_reason.see(reason);
-        let reason = std::mem::take(&mut self.suspended_reason);
-        let start = tinymist_std::time::now();
-
-        let compiling = self.snapshot(is_once);
-        self.reason = no_reason();
-        self.snapshot = OnceLock::new();
-        self.snapshot.get_or_init(|| compiling.clone());
-
-        if self.suspended {
-            self.suspended_reason.see(reason);
-            return None;
-        }
-
-        if self.compiling {
-            self.suspended_reason.see(reason);
-            return None;
-        }
-
-        self.compiling = true;
-
-        let h = self.handler.clone();
-
-        // todo unwrap main id
-        let id = compiling.world.main_id().unwrap();
-        let revision = compiling.world.revision().get();
-
-        h.status(revision, CompileReport::Stage(id, "compiling", start));
-
-        Some(move || {
-            let compiled = compiling.compile();
-
-            let elapsed = start.elapsed().unwrap_or_default();
-            let rep = match &compiled.doc {
-                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.clone(), elapsed),
-                Err(err) => CompileReport::CompileError(id, err.clone(), elapsed),
-            };
-
-            // todo: we need to check revision for really concurrent compilation
-            log_compile_report(&compiled.env, &rep);
-            h.notify_compile(&compiled, rep);
-
-            compiled
-        })
     }
 
     fn process_compile(&mut self, artifact: CompiledArtifact<F>) {
@@ -914,12 +843,49 @@ impl<F: CompilerFeat + 'static, Ext: 'static> ProjectState<F, Ext> {
         std::mem::take(&mut self.suspended_reason)
     }
 
-    fn reset(&mut self, world: CompilerWorld<F>) {
-        self.world = world;
-        self.world.set_is_compiling(false);
+    #[must_use]
+    pub fn may_compile(
+        &mut self,
+        handler: &Arc<dyn CompileHandler<F, Ext>>,
+    ) -> Option<impl FnOnce() -> CompiledArtifact<F>> {
+        if !self.reason.any() || self.verse.entry_state().is_inactive() {
+            return None;
+        }
 
-        self.snapshot = OnceLock::new();
-        self.compilation = OnceLock::default();
+        let snap = self.snapshot();
+        self.reason = Default::default();
+
+        Some(Self::run_compile(handler.clone(), snap))
+    }
+
+    /// Compile the document once.
+    fn run_compile(
+        h: Arc<dyn CompileHandler<F, Ext>>,
+        snap: CompileSnapshot<F>,
+    ) -> impl FnOnce() -> CompiledArtifact<F> {
+        let start = tinymist_std::time::now();
+
+        // todo unwrap main id
+        let id = snap.world.main_id().unwrap();
+        let revision = snap.world.revision().get();
+
+        h.status(revision, CompileReport::Stage(id, "compiling", start));
+
+        move || {
+            let compiled = snap.compile();
+
+            let elapsed = start.elapsed().unwrap_or_default();
+            let rep = match &compiled.doc {
+                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.clone(), elapsed),
+                Err(err) => CompileReport::CompileError(id, err.clone(), elapsed),
+            };
+
+            // todo: we need to check revision for really concurrent compilation
+            log_compile_report(&compiled.env, &rep);
+            h.notify_compile(&compiled, rep);
+
+            compiled
+        }
     }
 }
 

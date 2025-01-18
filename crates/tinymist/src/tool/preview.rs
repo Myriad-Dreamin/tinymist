@@ -5,7 +5,6 @@
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
@@ -14,8 +13,6 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
-use serde::Serialize;
-use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::ProjectInsId;
@@ -38,6 +35,8 @@ use crate::project::{
 use crate::world::LspCompilerFeat;
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
+use project::watch_deps;
+use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
 
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {

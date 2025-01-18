@@ -15,6 +15,3 @@ pub use lock::*;
 pub use model::*;
 pub use watch::*;
 pub use world::*;
-
-/// LsP interrupt.
-pub type LspInterrupt = Interrupt<LspCompilerFeat>;

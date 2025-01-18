@@ -116,7 +116,8 @@ impl Project {
     }
 
     pub fn change_task(&mut self, task: TaskInputs) {
-        self.wrapper.process(Interrupt::ChangeTask(task));
+        self.wrapper
+            .process(Interrupt::ChangeTask(self.wrapper.primary.id.clone(), task));
     }
 
     pub async fn settle(&self) -> anyhow::Result<()> {
@@ -198,23 +199,12 @@ impl CompileHandlerImpl {
 
 impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
-        let instances = std::iter::once(&c.primary).chain(c.dedicates.iter());
-        for s in instances {
-            if !s.reason.any() || s.world.entry_state().is_inactive() {
-                continue;
-            }
-
-            let snap = s.snapshot(false);
-
-            let compile_fn = ProjectCompiler::run_compile_static(c.handler.clone(), snap);
-            rayon::spawn(|| {
-                compile_fn();
-            });
-        }
-
         let instances_mut = std::iter::once(&mut c.primary).chain(c.dedicates.iter_mut());
         for s in instances_mut {
-            s.reason = Default::default();
+            let compile_fn = s.may_compile(&c.handler);
+            if let Some(compile_fn) = compile_fn {
+                compile_fn();
+            }
         }
     }
 
