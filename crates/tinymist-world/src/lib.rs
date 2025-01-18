@@ -32,27 +32,21 @@ pub(crate) mod browser;
 #[cfg(feature = "browser")]
 pub use browser::{BrowserCompilerFeat, TypstBrowserUniverse, TypstBrowserWorld};
 
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
 use tinymist_std::ImmutPath;
 use tinymist_vfs::AccessModel as VfsAccessModel;
-use typst::{
-    diag::{At, FileResult, SourceResult},
-    foundations::Bytes,
-    syntax::FileId,
-    syntax::Span,
-};
+use typst::diag::{At, FileResult, SourceResult};
+use typst::foundations::Bytes;
+use typst::syntax::{FileId, Span};
 
 use font::FontResolver;
 use package::PackageRegistry;
 
 /// Latest version of the shadow api, which is in beta.
 pub trait ShadowApi {
-    fn _shadow_map_id(&self, _file_id: FileId) -> FileResult<PathBuf> {
+    fn _shadow_map_id(&self, _file_id: FileId) -> FileResult<ImmutPath> {
         unimplemented!()
     }
 
@@ -141,7 +135,7 @@ impl<C: ShadowApi> ShadowApiExt for C {
 
 /// Latest version of the world dependencies api, which is in beta.
 pub trait WorldDeps {
-    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath));
+    fn iter_dependencies(&self, f: &mut dyn FnMut(FileId));
 }
 
 /// type trait interface of [`CompilerWorld`].

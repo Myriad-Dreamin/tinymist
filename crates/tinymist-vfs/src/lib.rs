@@ -29,7 +29,8 @@ pub mod overlay;
 pub mod trace;
 mod utils;
 
-mod path_interner;
+mod path_mapper;
+pub use path_mapper::{PathMapper, PathResolution};
 
 pub use typst::foundations::Bytes;
 pub use typst::syntax::FileId as TypstFileId;
@@ -37,13 +38,10 @@ pub use typst::syntax::FileId as TypstFileId;
 pub use tinymist_std::time::Time;
 pub use tinymist_std::ImmutPath;
 
-pub(crate) use path_interner::PathInterner;
-
 use core::fmt;
-use std::{collections::HashMap, hash::Hash, path::Path, sync::Arc};
+use std::{hash::Hash, path::Path, sync::Arc};
 
-use parking_lot::{Mutex, RwLock};
-use tinymist_std::path::PathClean;
+use parking_lot::RwLock;
 use typst::diag::{FileError, FileResult};
 
 use self::{
@@ -55,7 +53,7 @@ use self::{
 ///
 /// Most functions in typst-ts use this when they need to refer to a file.
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct FileId(pub u32);
+pub struct FileId(pub TypstFileId);
 
 /// safe because `FileId` is a new type of `u32`
 impl nohash_hasher::IsEnabled for FileId {}
@@ -133,61 +131,21 @@ type VfsAccessModel<M> = OverlayAccessModel<NotifyAccessModel<SharedAccessModel<
 
 pub trait FsProvider {
     /// Arbitrary one of file path corresponding to the given `id`.
-    fn file_path(&self, id: FileId) -> ImmutPath;
+    fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath>;
 
-    fn mtime(&self, id: FileId) -> FileResult<Time>;
+    fn mtime(&self, id: TypstFileId) -> FileResult<Time>;
 
-    fn read(&self, id: FileId) -> FileResult<Bytes>;
+    fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
 
-    fn is_file(&self, id: FileId) -> FileResult<bool>;
+    fn is_file(&self, id: TypstFileId) -> FileResult<bool>;
 }
-
-#[derive(Default)]
-struct PathMapper {
-    /// Map from path to slot index.
-    ///
-    /// Note: we use a owned [`FileId`] here, which is resultant from
-    /// [`PathInterner`]
-    id_cache: RwLock<HashMap<ImmutPath, FileId>>,
-    /// The path interner for canonical paths.
-    intern: Mutex<PathInterner<ImmutPath, ()>>,
-}
-
-impl PathMapper {
-    /// Id of the given path if it exists in the `Vfs` and is not deleted.
-    pub fn file_id(&self, path: &Path) -> FileId {
-        let quick_id = self.id_cache.read().get(path).copied();
-        if let Some(id) = quick_id {
-            return id;
-        }
-
-        let path: ImmutPath = path.clean().as_path().into();
-
-        let mut path_interner = self.intern.lock();
-        let id = path_interner.intern(path.clone(), ()).0;
-
-        let mut path2slot = self.id_cache.write();
-        path2slot.insert(path.clone(), id);
-
-        id
-    }
-
-    /// File path corresponding to the given `file_id`.
-    pub fn file_path(&self, file_id: FileId) -> ImmutPath {
-        let path_interner = self.intern.lock();
-        path_interner.lookup(file_id).clone()
-    }
-}
-
 /// Create a new `Vfs` harnessing over the given `access_model` specific for
 /// `reflexo_world::CompilerWorld`. With vfs, we can minimize the
 /// implementation overhead for [`AccessModel`] trait.
 pub struct Vfs<M: AccessModel + Sized> {
-    paths: Arc<PathMapper>,
-
     // access_model: TraceAccessModel<VfsAccessModel<M>>,
     /// The wrapped access model.
-    access_model: VfsAccessModel<M>,
+    pub access_model: VfsAccessModel<M>,
 }
 
 impl<M: AccessModel + Sized> fmt::Debug for Vfs<M> {
@@ -199,7 +157,6 @@ impl<M: AccessModel + Sized> fmt::Debug for Vfs<M> {
 impl<M: AccessModel + Clone + Sized> Vfs<M> {
     pub fn snapshot(&self) -> Self {
         Self {
-            paths: self.paths.clone(),
             access_model: self.access_model.clone(),
         }
     }
@@ -226,10 +183,7 @@ impl<M: AccessModel + Sized> Vfs<M> {
         // If you want to trace the access model, uncomment the following line
         // let access_model = TraceAccessModel::new(access_model);
 
-        Self {
-            paths: Default::default(),
-            access_model,
-        }
+        Self { access_model }
     }
 
     /// Reset the source file and path references.
@@ -279,11 +233,6 @@ impl<M: AccessModel + Sized> Vfs<M> {
         0
     }
 
-    /// Id of the given path if it exists in the `Vfs` and is not deleted.
-    pub fn file_id(&self, path: &Path) -> FileId {
-        self.paths.file_id(path)
-    }
-
     /// Read a file.
     pub fn read(&self, path: &Path) -> FileResult<Bytes> {
         if self.access_model.is_file(path)? {
@@ -291,24 +240,6 @@ impl<M: AccessModel + Sized> Vfs<M> {
         } else {
             Err(FileError::IsDirectory)
         }
-    }
-}
-
-impl<M: AccessModel> FsProvider for Vfs<M> {
-    fn file_path(&self, id: FileId) -> ImmutPath {
-        self.paths.file_path(id)
-    }
-
-    fn mtime(&self, src: FileId) -> FileResult<Time> {
-        self.access_model.mtime(&self.file_path(src))
-    }
-
-    fn read(&self, src: FileId) -> FileResult<Bytes> {
-        self.access_model.content(&self.file_path(src))
-    }
-
-    fn is_file(&self, src: FileId) -> FileResult<bool> {
-        self.access_model.is_file(&self.file_path(src))
     }
 }
 

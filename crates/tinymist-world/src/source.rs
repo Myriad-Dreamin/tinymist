@@ -5,8 +5,8 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
 use tinymist_std::hash::FxHashMap;
-use tinymist_std::{ImmutPath, QueryRef};
-use tinymist_vfs::{Bytes, FileId, FsProvider, TypstFileId};
+use tinymist_std::QueryRef;
+use tinymist_vfs::{Bytes, FsProvider, TypstFileId};
 use typst::{
     diag::{FileError, FileResult},
     syntax::Source,
@@ -56,7 +56,7 @@ impl<T: Revised> SharedState<T> {
 
 pub struct SourceCache {
     last_accessed_rev: NonZeroUsize,
-    fid: FileId,
+    fid: TypstFileId,
     source: IncrFileQuery<Source>,
     buffer: FileQuery<Bytes>,
 }
@@ -151,27 +151,23 @@ impl SourceDb {
     ///
     /// When you don't reset the vfs for each compilation, this function will
     /// still return remaining files from the previous compilation.
-    pub fn iter_dependencies_dyn<'a>(
-        &'a self,
-        p: &'a impl FsProvider,
-        f: &mut dyn FnMut(ImmutPath),
-    ) {
+    pub fn iter_dependencies_dyn(&self, f: &mut dyn FnMut(TypstFileId)) {
         for slot in self.slots.lock().iter() {
-            f(p.file_path(slot.1.fid));
+            f(slot.1.fid);
         }
     }
 
     /// Get file content by path.
-    pub fn file(&self, id: TypstFileId, fid: FileId, p: &impl FsProvider) -> FileResult<Bytes> {
-        self.slot(id, fid, |slot| slot.buffer.compute(|| p.read(fid)).cloned())
+    pub fn file(&self, fid: TypstFileId, p: &impl FsProvider) -> FileResult<Bytes> {
+        self.slot(fid, |slot| slot.buffer.compute(|| p.read(fid)).cloned())
     }
 
     /// Get source content by path and assign the source with a given typst
     /// global file id.
     ///
     /// See `Vfs::resolve_with_f` for more information.
-    pub fn source(&self, id: TypstFileId, fid: FileId, p: &impl FsProvider) -> FileResult<Source> {
-        self.slot(id, fid, |slot| {
+    pub fn source(&self, fid: TypstFileId, p: &impl FsProvider) -> FileResult<Source> {
+        self.slot(fid, |slot| {
             slot.source
                 .compute_with_context(|prev| {
                     let content = p.read(fid)?;
@@ -184,7 +180,7 @@ impl SourceDb {
                             Ok(source)
                         }
                         // Return a new source if we don't have a reparse feature or no prev
-                        _ => Ok(Source::new(id, next)),
+                        _ => Ok(Source::new(fid, next)),
                     }
                 })
                 .cloned()
@@ -192,11 +188,11 @@ impl SourceDb {
     }
 
     /// Insert a new slot into the vfs.
-    fn slot<T>(&self, id: TypstFileId, fid: FileId, f: impl FnOnce(&SourceCache) -> T) -> T {
+    fn slot<T>(&self, fid: TypstFileId, f: impl FnOnce(&SourceCache) -> T) -> T {
         let mut slots = self.slots.lock();
-        f(slots.entry(id).or_insert_with(|| {
+        f(slots.entry(fid).or_insert_with(|| {
             let state = self.shared.read();
-            let cache_entry = state.cache_entries.get(&id);
+            let cache_entry = state.cache_entries.get(&fid);
 
             cache_entry
                 .map(|e| SourceCache {

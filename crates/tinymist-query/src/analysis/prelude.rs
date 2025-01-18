@@ -2,7 +2,7 @@ pub use core::fmt;
 pub use std::collections::{BTreeMap, HashMap};
 pub use std::hash::{Hash, Hasher};
 pub use std::ops::Range;
-pub use std::path::{Path, PathBuf};
+pub use std::path::Path;
 pub use std::sync::{Arc, LazyLock};
 
 pub use comemo::Track;

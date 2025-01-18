@@ -12,6 +12,7 @@ use reflexo_typst::{
     features::WITH_COMPILING_STATUS_FEATURE, typst::prelude::EcoVec, CompileEnv, CompileReport,
     Compiler, ConsoleDiagReporter, FeatureSet, GenericExporter, TypstDocument,
 };
+use tinymist_project::vfs::FsProvider;
 use tinymist_project::watch_deps;
 use tokio::sync::{mpsc, oneshot};
 use typst::diag::{SourceDiagnostic, SourceResult};
@@ -548,7 +549,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         // Notify the new file dependencies.
         let mut deps = vec![];
-        world.iter_dependencies(&mut |dep| deps.push(dep.clone()));
+        world.iter_dependencies(&mut |dep| {
+            if let Ok(x) = world.file_path(dep) {
+                deps.push(x)
+            }
+        });
         send(CompilerResponse::Notify(NotifyMessage::SyncDependency(
             deps,
         )));

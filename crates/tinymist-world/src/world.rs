@@ -8,8 +8,10 @@ use std::{
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
 use tinymist_std::error::prelude::*;
+use tinymist_std::time::Time;
 use tinymist_std::ImmutPath;
-use tinymist_vfs::{notify::FilesystemEvent, Vfs};
+use tinymist_vfs::{notify::FilesystemEvent, AccessModel, PathMapper, PathResolution, Vfs};
+use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
@@ -221,24 +223,22 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<PathBuf, FileError> {
+    pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
         if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().to_owned());
+            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().into());
         }
 
         // Determine the root path relative to which the file path
         // will be resolved.
-        let root = match id.package() {
-            Some(spec) => self.registry.resolve(spec)?,
-            None => self.entry.root().ok_or(FileError::Other(Some(eco_format!(
-                "cannot access directory without root: state: {:?}",
-                self.entry
-            ))))?,
+        let root = match PathMapper::resolve(id)? {
+            PathResolution::Workspace(id) | PathResolution::Untitled(id) => id.path().clone(),
+            PathResolution::Package => self.registry.resolve(id.package().unwrap())?,
         };
 
         // Join the path to the root. If it tries to escape, deny
         // access. Note: It can still escape via symlinks.
-        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+        let path = id.vpath().resolve(&root).map(From::from);
+        path.ok_or(FileError::AccessDenied)
     }
 
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
@@ -275,7 +275,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<PathBuf> {
+    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<ImmutPath> {
         self.path_for_id(file_id)
     }
 
@@ -388,24 +388,22 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<PathBuf, FileError> {
+    pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
         if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().to_owned());
+            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().into());
         }
 
         // Determine the root path relative to which the file path
         // will be resolved.
-        let root = match id.package() {
-            Some(spec) => self.registry.resolve(spec)?,
-            None => self.entry.root().ok_or(FileError::Other(Some(eco_format!(
-                "cannot access directory without root: state: {:?}",
-                self.entry
-            ))))?,
+        let root = match PathMapper::resolve(id)? {
+            PathResolution::Workspace(id) | PathResolution::Untitled(id) => id.path().clone(),
+            PathResolution::Package => self.registry.resolve(id.package().unwrap())?,
         };
 
         // Join the path to the root. If it tries to escape, deny
         // access. Note: It can still escape via symlinks.
-        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+        let path = id.vpath().resolve(&root).map(From::from);
+        path.ok_or(FileError::AccessDenied)
     }
     /// Lookup a source file by id.
     #[track_caller]
@@ -433,7 +431,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<PathBuf> {
+    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<ImmutPath> {
         self.path_for_id(file_id)
     }
 
@@ -456,6 +454,24 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
         self.vfs.remove_shadow(path);
         Ok(())
+    }
+}
+
+impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
+    fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath> {
+        self.path_for_id(id)
+    }
+
+    fn mtime(&self, src: TypstFileId) -> FileResult<Time> {
+        self.vfs.access_model.mtime(&self.file_path(src)?)
+    }
+
+    fn read(&self, src: TypstFileId) -> FileResult<Bytes> {
+        self.vfs.access_model.content(&self.file_path(src)?)
+    }
+
+    fn is_file(&self, src: TypstFileId) -> FileResult<bool> {
+        self.vfs.access_model.is_file(&self.file_path(src)?)
     }
 }
 
@@ -494,14 +510,12 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             return Ok(DETACH_SOURCE.clone());
         }
 
-        let fid = self.vfs.file_id(&self.path_for_id(id)?);
-        self.source_db.source(id, fid, &self.vfs)
+        self.source_db.source(id, self)
     }
 
     /// Try to access the specified file.
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        let fid = self.vfs.file_id(&self.path_for_id(id)?);
-        self.source_db.file(id, fid, &self.vfs)
+        self.source_db.file(id, self)
     }
 
     /// Get the current date.
@@ -545,8 +559,8 @@ impl<F: CompilerFeat> EntryReader for CompilerWorld<F> {
 
 impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     #[inline]
-    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath)) {
-        self.source_db.iter_dependencies_dyn(&self.vfs, f)
+    fn iter_dependencies(&self, f: &mut dyn FnMut(TypstFileId)) {
+        self.source_db.iter_dependencies_dyn(f)
     }
 }
 
