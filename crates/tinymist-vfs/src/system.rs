@@ -13,8 +13,10 @@ pub struct SystemAccessModel;
 impl SystemAccessModel {
     fn stat(&self, src: &Path) -> std::io::Result<SystemFileMeta> {
         let meta = std::fs::metadata(src)?;
+        let file_type = meta.file_type();
         Ok(SystemFileMeta {
-            is_file: meta.is_file(),
+            is_file: file_type.is_file(),
+            is_dir: file_type.is_dir(),
         })
     }
 }
@@ -28,6 +30,15 @@ impl PathAccessModel for SystemAccessModel {
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         let f = |e| FileError::from_io(e, src);
         let mut buf = Vec::<u8>::new();
+
+        let meta = self.stat(src).map_err(f)?;
+
+        if meta.is_dir {
+            return Err(FileError::IsDirectory);
+        } else if !meta.is_file {
+            return Err(FileError::AccessDenied);
+        }
+
         std::fs::File::open(src)
             .map_err(f)?
             .read_to_end(&mut buf)
@@ -69,4 +80,5 @@ impl ReadAllOnce for LazyFile {
 #[derive(Debug, Clone, Copy)]
 pub struct SystemFileMeta {
     is_file: bool,
+    is_dir: bool,
 }

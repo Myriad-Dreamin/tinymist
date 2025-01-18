@@ -9,7 +9,7 @@ use crate::{Bytes, ImmutPath, PathAccessModel};
 /// A file snapshot that is notified by some external source
 ///
 /// Note: The error is boxed to avoid large stack size
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FileSnapshot(Result<Bytes, Box<FileError>>);
 
 impl fmt::Debug for FileSnapshot {
