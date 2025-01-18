@@ -266,11 +266,11 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

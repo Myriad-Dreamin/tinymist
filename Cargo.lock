@@ -5571,28 +5571,3 @@ checksum = "16099418600b4d8f028622f73ff6e3deaabdff330fb9a2a131dea781ee8b0768"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "reflexo"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
-
-[[patch.unused]]
-name = "reflexo-typst"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
-
-[[patch.unused]]
-name = "reflexo-typst-shim"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
-
-[[patch.unused]]
-name = "reflexo-typst2vec"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
-
-[[patch.unused]]
-name = "reflexo-vec2svg"
-version = "0.5.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9#1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9"
