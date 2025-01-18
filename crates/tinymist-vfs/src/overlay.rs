@@ -4,19 +4,13 @@ use rpds::RedBlackTreeMapSync;
 use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes, PathAccessModel, Time, TypstFileId};
-
-#[derive(Debug, Clone)]
-struct OverlayFileMeta {
-    mt: Time,
-    content: Bytes,
-}
+use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
 
 /// Provides overlay access model which allows to shadow the underlying access
 /// model with memory contents.
 #[derive(Default, Debug, Clone)]
 pub struct OverlayAccessModel<K: Ord, M> {
-    files: RedBlackTreeMapSync<K, OverlayFileMeta>,
+    files: RedBlackTreeMapSync<K, Bytes>,
     /// The underlying access model
     pub inner: M,
 }
@@ -55,29 +49,12 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
     where
         K: Borrow<Q>,
     {
-        // we change mt every time, since content almost changes every time
-        // Note: we can still benefit from cache, since we incrementally parse source
-
-        let mt = tinymist_std::time::now();
-        let meta = OverlayFileMeta { mt, content };
-
         match self.files.get_mut(path) {
             Some(e) => {
-                if e.mt == meta.mt && e.content != meta.content {
-                    e.mt = meta
-                        .mt
-                        // [`crate::Time`] has a minimum resolution of 1ms
-                        // we negate the time by 1ms so that the time is always
-                        // invalidated
-                        .checked_sub(std::time::Duration::from_millis(1))
-                        .unwrap();
-                    e.content = meta.content.clone();
-                } else {
-                    *e = meta.clone();
-                }
+                *e = content;
             }
             None => {
-                self.files.insert_mut(cast(path), meta);
+                self.files.insert_mut(cast(path), content);
             }
         }
     }
@@ -101,8 +78,8 @@ impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {
-        if let Some(meta) = self.files.get(src) {
-            return Ok(meta.content.clone());
+        if let Some(content) = self.files.get(src) {
+            return Ok(content.clone());
         }
 
         self.inner.content(src)
@@ -119,8 +96,8 @@ impl<M: AccessModel> AccessModel for OverlayAccessModel<TypstFileId, M> {
     }
 
     fn content(&self, src: TypstFileId) -> FileResult<Bytes> {
-        if let Some(meta) = self.files.get(&src) {
-            return Ok(meta.content.clone());
+        if let Some(content) = self.files.get(&src) {
+            return Ok(content.clone());
         }
 
         self.inner.content(src)
