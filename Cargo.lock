@@ -4053,7 +4053,6 @@ version = "0.12.18"
 dependencies = [
  "anyhow",
  "cargo_metadata",
- "tinymist-world",
  "vergen",
  "wasm-bindgen",
 ]
