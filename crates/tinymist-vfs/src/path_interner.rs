@@ -23,18 +23,6 @@ impl<P, Ext> Default for PathInterner<P, Ext> {
 }
 
 impl<P: Hash + Eq, Ext> PathInterner<P, Ext> {
-    /// Scan through each value in the set and keep those where the
-    /// closure `keep` returns `true`.
-    ///
-    /// The elements are visited in order, and remaining elements keep their
-    /// order.
-    ///
-    /// Computes in **O(n)** time (average).
-    #[allow(dead_code)]
-    pub fn retain(&mut self, keep: impl FnMut(&P, &mut Ext) -> bool) {
-        self.map.retain(keep)
-    }
-
     /// Insert `path` in `self`.
     ///
     /// - If `path` already exists in `self`, returns its associated id;
