@@ -1,0 +1,41 @@
+[package]
+name = "tinymist-world"
+description = "World implementation of typst for tinymist."
+categories = ["compilers"]
+keywords = ["language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+comemo.workspace = true
+dirs.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+pathdiff.workspace = true
+tokio.workspace = true
+rayon.workspace = true
+reflexo-typst.workspace = true
+reflexo-typst-shim = { workspace = true, features = ["nightly"] }
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tinymist-fs.workspace = true
+typst.workspace = true
+toml.workspace = true
+typst-assets.workspace = true
+
+
+[features]
+fonts = ["typst-assets/fonts"]
+no-content-hint = ["reflexo-typst/no-content-hint"]
+
+[lints]
+workspace = true
