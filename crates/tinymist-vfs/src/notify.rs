@@ -132,7 +132,7 @@ pub enum MemoryEvent {
     /// this:
     ///
     /// ```
-    /// use crate::notify::{MemoryEvent, FileChangeSet};
+    /// use tinymist_vfs::notify::{MemoryEvent, FileChangeSet};
     /// let event = MemoryEvent::Sync(FileChangeSet::default());
     /// ```
     Sync(FileChangeSet),
