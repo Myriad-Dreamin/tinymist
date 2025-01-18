@@ -77,12 +77,6 @@ pub trait AccessModel {
     /// Return whether a path is corresponding to a file.
     fn is_file(&self, src: &Path) -> FileResult<bool>;
 
-    /// Return the real path before creating a vfs file entry.
-    ///
-    /// Note: vfs will fetch the file entry once if multiple paths shares a same
-    /// real path.
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath>;
-
     /// Return the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
 }
@@ -114,10 +108,6 @@ where
 
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         self.inner.read().is_file(src)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        self.inner.read().real_path(src)
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {

@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use typst::diag::{FileError, FileResult};
 
 use crate::{AccessModel, Bytes, Time};
-use tinymist_std::{ImmutPath, ReadAllOnce};
+use tinymist_std::ReadAllOnce;
 
 /// Provides SystemAccessModel that makes access to the local file system for
 /// system compilation.
@@ -29,10 +29,6 @@ impl AccessModel for SystemAccessModel {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         let f = |e| FileError::from_io(e, src);
         Ok(self.stat(src).map_err(f)?.is_file)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        Ok(src.into())
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {

@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rpds::RedBlackTreeMapSync;
-use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes, Time};
@@ -101,14 +100,6 @@ impl<M: AccessModel> AccessModel for OverlayAccessModel<M> {
         }
 
         self.inner.is_file(src)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        if self.files.get(src).is_some() {
-            return Ok(src.into());
-        }
-
-        self.inner.real_path(src)
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {

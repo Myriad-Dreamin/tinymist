@@ -255,14 +255,6 @@ impl<M: AccessModel> AccessModel for NotifyAccessModel<M> {
         self.inner.is_file(src)
     }
 
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        if self.files.contains_key(src) {
-            return Ok(src.into());
-        }
-
-        self.inner.real_path(src)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(entry) = self.files.get(src) {
             return entry.content().cloned();

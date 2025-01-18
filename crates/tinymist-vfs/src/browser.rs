@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use tinymist_std::ImmutPath;
 use typst::diag::{FileError, FileResult};
 use wasm_bindgen::prelude::*;
 
@@ -48,20 +47,6 @@ impl AccessModel for ProxyAccessModel {
             .map_err(|e| {
                 web_sys::console::error_3(
                     &"typst_ts::compiler::ProxyAccessModel::is_file failure".into(),
-                    &src.to_string_lossy().as_ref().into(),
-                    &e,
-                );
-                FileError::AccessDenied
-            })
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        self.real_path_fn
-            .call1(&self.context, &src.to_string_lossy().as_ref().into())
-            .map(|v| Path::new(&v.as_string().unwrap()).into())
-            .map_err(|e| {
-                web_sys::console::error_3(
-                    &"typst_ts::compiler::ProxyAccessModel::real_path failure".into(),
                     &src.to_string_lossy().as_ref().into(),
                     &e,
                 );

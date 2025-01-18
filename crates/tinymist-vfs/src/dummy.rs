@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use tinymist_std::ImmutPath;
 use typst::diag::{FileError, FileResult};
 
 use super::AccessModel;
@@ -21,10 +20,6 @@ impl AccessModel for DummyAccessModel {
 
     fn is_file(&self, _src: &Path) -> FileResult<bool> {
         Ok(true)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        Ok(src.into())
     }
 
     fn content(&self, _src: &Path) -> FileResult<Bytes> {

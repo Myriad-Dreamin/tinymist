@@ -1,6 +1,5 @@
 use std::{path::Path, sync::atomic::AtomicU64};
 
-use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes};
@@ -52,18 +51,6 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
             std::sync::atomic::Ordering::Relaxed,
         );
         crate::utils::console_log!("is_file: {:?} {:?}", src, elapsed);
-        res
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        let instant = tinymist_std::time::Instant::now();
-        let res = self.inner.real_path(src);
-        let elapsed = instant.elapsed();
-        self.trace[2].fetch_add(
-            elapsed.as_nanos() as u64,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-        crate::utils::console_log!("real_path: {:?} {:?}", src, elapsed);
         res
     }
 
