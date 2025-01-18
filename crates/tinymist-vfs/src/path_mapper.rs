@@ -3,7 +3,9 @@
 //! not too big.
 
 use core::fmt;
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use parking_lot::RwLock;
@@ -15,8 +17,61 @@ use typst::syntax::VirtualPath;
 
 use super::TypstFileId;
 
-pub trait PathMapper {
-    fn path_for_id(&self, file_id: TypstFileId) -> FileResult<ImmutPath>;
+pub enum PathResolution {
+    Resolved(PathBuf),
+    Rootless(Cow<'static, VirtualPath>),
+}
+
+impl PathResolution {
+    pub fn to_err(self) -> FileResult<PathBuf> {
+        match self {
+            PathResolution::Resolved(path) => Ok(path),
+            PathResolution::Rootless(_) => Err(FileError::AccessDenied),
+        }
+    }
+
+    pub fn as_path(&self) -> &Path {
+        match self {
+            PathResolution::Resolved(path) => path.as_path(),
+            PathResolution::Rootless(path) => path.as_rooted_path(),
+        }
+    }
+
+    pub fn join(&self, path: &str) -> FileResult<PathResolution> {
+        match self {
+            PathResolution::Resolved(path) => Ok(PathResolution::Resolved(path.join(path))),
+            PathResolution::Rootless(root) => {
+                Ok(PathResolution::Rootless(Cow::Owned(root.join(path))))
+            }
+        }
+    }
+}
+
+pub trait RootResolver {
+    fn path_for_id(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+        let root = self.resolve_root(file_id)?;
+
+        match root {
+            Some(root) => file_id
+                .vpath()
+                .resolve(&root)
+                .map(PathResolution::Resolved)
+                .ok_or_else(|| FileError::AccessDenied),
+            None => Ok(PathResolution::Rootless(Cow::Borrowed(file_id.vpath()))),
+        }
+    }
+
+    fn resolve_root(&self, file_id: TypstFileId) -> FileResult<Option<ImmutPath>> {
+        match WorkspaceResolver::resolve(file_id)? {
+            WorkspaceResolution::Workspace(id) => Ok(Some(id.path().clone())),
+            WorkspaceResolution::Rootless => Ok(None),
+            WorkspaceResolution::Package => self
+                .resolve_package_root(file_id.package().expect("not a file in package"))
+                .map(Some),
+        }
+    }
+
+    fn resolve_package_root(&self, pkg: &PackageSpec) -> FileResult<ImmutPath>;
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -119,6 +174,17 @@ impl WorkspaceResolver {
     /// Creates a file id for a rootless file.
     pub fn rootless_file(path: VirtualPath) -> TypstFileId {
         TypstFileId::new(None, path)
+    }
+
+    /// Creates a file id for a rootless file.
+    pub fn file_with_parent_root(path: &Path) -> Option<TypstFileId> {
+        if !path.is_absolute() {
+            return None;
+        }
+        let parent = path.parent()?;
+        let parent = ImmutPath::from(parent);
+        let path = VirtualPath::new(path.file_name()?);
+        Some(Self::workspace_file(Some(&parent), path))
     }
 
     /// Creates a file id for a file in some workspace. The `root` is the root

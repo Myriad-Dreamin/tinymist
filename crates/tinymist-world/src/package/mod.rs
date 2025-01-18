@@ -4,11 +4,9 @@ use std::{path::Path, sync::Arc};
 use ecow::EcoString;
 use tinymist_std::ImmutPath;
 use tinymist_vfs::{TypstFileId, WorkspaceResolution, WorkspaceResolver};
+use typst::diag::FileResult;
 pub use typst::diag::PackageError;
-use typst::diag::{FileError, FileResult};
 pub use typst::syntax::package::PackageSpec;
-
-use crate::DETACHED_ENTRY;
 
 pub mod dummy;
 
@@ -44,24 +42,9 @@ impl<T> RegistryPathMapper<T> {
     }
 }
 
-impl<T: PackageRegistry> tinymist_vfs::PathMapper for RegistryPathMapper<T> {
-    fn path_for_id(&self, id: TypstFileId) -> FileResult<ImmutPath> {
-        if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().into());
-        }
-
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match WorkspaceResolver::resolve(id)? {
-            WorkspaceResolution::Workspace(id) => id.path().clone(),
-            WorkspaceResolution::Rootless => return Err(FileError::AccessDenied),
-            WorkspaceResolution::Package => self.registry.resolve(id.package().unwrap())?,
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        let path = id.vpath().resolve(&root).map(From::from);
-        path.ok_or(FileError::AccessDenied)
+impl<T: PackageRegistry> tinymist_vfs::RootResolver for RegistryPathMapper<T> {
+    fn resolve_package_root(&self, pkg: &PackageSpec) -> FileResult<ImmutPath> {
+        Ok(self.registry.resolve(pkg)?)
     }
 }
 

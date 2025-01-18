@@ -12,12 +12,13 @@ use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::CompileFontArgs;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::EntryState;
 use tinymist_world::TaskInputs;
 use tinymist_world::{EntryManager, EntryReader, ShadowApi};
 use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
@@ -56,11 +57,16 @@ pub fn run_with_ctx<T>(
     path: PathBuf,
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
-    let root = verse.workspace_root().unwrap();
+    let root = verse.entry_state().workspace_root().unwrap();
     let paths = verse
         .shadow_paths()
         .into_iter()
-        .map(|path| TypstFileId::new(None, VirtualPath::new(path.strip_prefix(&root).unwrap())))
+        .map(|path| {
+            WorkspaceResolver::workspace_file(
+                Some(&root),
+                VirtualPath::new(path.strip_prefix(&root).unwrap()),
+            )
+        })
         .collect::<Vec<_>>();
 
     let world = verse.snapshot();

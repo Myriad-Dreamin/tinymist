@@ -550,8 +550,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         // Notify the new file dependencies.
         let mut deps = vec![];
         world.iter_dependencies(&mut |dep| {
-            if let Ok(x) = world.file_path(dep) {
-                deps.push(x)
+            if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
+                deps.push(x.into())
             }
         });
         send(CompilerResponse::Notify(NotifyMessage::SyncDependency(

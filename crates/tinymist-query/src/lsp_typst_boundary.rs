@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 
 use tinymist_std::path::PathClean;
+use tinymist_world::vfs::PathResolution;
 use typst::syntax::Source;
 
 use crate::prelude::*;
@@ -43,6 +44,11 @@ const UNTITLED_ROOT: &str = "/untitled";
 static EMPTY_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("file://").unwrap());
 
 /// Convert a path to a URL.
+pub fn untitled_url(path: &Path) -> anyhow::Result<Url> {
+    Ok(Url::parse(&format!("untitled:{}", path.display()))?)
+}
+
+/// Convert a path to a URL.
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
         // rust-url will panic on converting an empty path.
@@ -50,7 +56,7 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
             return Ok(EMPTY_URL.clone());
         }
 
-        return Ok(Url::parse(&format!("untitled:{}", untitled.display()))?);
+        return untitled_url(untitled);
     }
 
     Url::from_file_path(path).or_else(|never| {
@@ -58,6 +64,14 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
 
         anyhow::bail!("could not convert path to URI: path: {path:?}",)
     })
+}
+
+/// Convert a path resolution to a URL.
+pub fn path_res_to_url(path: PathResolution) -> anyhow::Result<Url> {
+    match path {
+        PathResolution::Rootless(path) => untitled_url(path.as_rooted_path()),
+        PathResolution::Resolved(path) => path_to_url(&path),
+    }
 }
 
 /// Convert a URL to a path.

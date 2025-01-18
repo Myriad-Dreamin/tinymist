@@ -9,7 +9,7 @@ use crate::LspWorld;
 
 /// Make a new project lock updater.
 pub fn update_lock(world: &LspWorld) -> Option<ProjectLockUpdater> {
-    let root = world.workspace_root()?;
+    let root = world.entry_state().workspace_root()?;
     Some(ProjectLockUpdater {
         root,
         updates: vec![],

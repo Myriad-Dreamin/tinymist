@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 use tinymist_project::LspWorld;
 use tinymist_std::debug_loc::DataSource;
 use tinymist_std::hash::{hash128, FxDashMap};
-use tinymist_std::ImmutPath;
+use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, WorldDeps, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
@@ -316,9 +316,9 @@ impl LocalContext {
         self.caches
             .completion_files
             .get_or_init(|| {
-                if let Some(root) = self.world.workspace_root() {
+                if let Some(root) = self.world.entry_state().workspace_root() {
                     scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |path| {
-                        TypstFileId::new(None, VirtualPath::new(path))
+                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
                     })
                 } else {
                     vec![]
@@ -574,7 +574,7 @@ impl SharedContext {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: TypstFileId) -> Result<ImmutPath, FileError> {
+    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathResolution, FileError> {
         self.world.path_for_id(id)
     }
 

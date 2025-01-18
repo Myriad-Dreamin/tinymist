@@ -665,7 +665,7 @@ impl LanguageState {
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
                 let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = world.path_for_id(toml_id)?;
+                let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
                 let pkg_root = toml_path.parent().ok_or_else(|| {
                     eco_format!("cannot get package root (parent of {toml_path:?})")
                 })?;

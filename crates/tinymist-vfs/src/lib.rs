@@ -33,7 +33,7 @@ mod utils;
 
 mod path_mapper;
 use notify::{FilesystemEvent, NotifyAccessModel};
-pub use path_mapper::{PathMapper, WorkspaceResolution, WorkspaceResolver};
+pub use path_mapper::{PathResolution, RootResolver, WorkspaceResolution, WorkspaceResolver};
 
 use resolve::ResolveAccessModel;
 pub use typst::foundations::Bytes;
@@ -126,7 +126,7 @@ type VfsAccessModel<M> = OverlayAccessModel<TypstFileId, ResolveAccessModel<VfsP
 
 pub trait FsProvider {
     /// Arbitrary one of file path corresponding to the given `id`.
-    fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath>;
+    fn file_path(&self, id: TypstFileId) -> FileResult<PathResolution>;
 
     fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
 
@@ -168,7 +168,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     ///   the vfs is watching the file system.
     ///
     /// See [`AccessModel`] for more information.
-    pub fn new(resolver: Arc<dyn PathMapper + Send + Sync>, access_model: M) -> Self {
+    pub fn new(resolver: Arc<dyn RootResolver + Send + Sync>, access_model: M) -> Self {
         let access_model = SharedAccessModel::new(access_model);
         let access_model = NotifyAccessModel::new(access_model);
         let access_model = OverlayAccessModel::new(access_model);
@@ -196,7 +196,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn file_path(&self, id: TypstFileId) -> Result<ImmutPath, FileError> {
+    pub fn file_path(&self, id: TypstFileId) -> Result<PathResolution, FileError> {
         self.access_model.inner.resolver.path_for_id(id)
     }
 

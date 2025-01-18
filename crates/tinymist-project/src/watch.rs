@@ -25,10 +25,7 @@ use tinymist_std::ImmutPath;
 type WatcherPair = (RecommendedWatcher, mpsc::UnboundedReceiver<NotifyEvent>);
 type NotifyEvent = notify::Result<notify::Event>;
 type FileEntry = (/* key */ ImmutPath, /* value */ FileSnapshot);
-type NotifyFilePair = FileResult<(
-    /* mtime */ tinymist_std::time::Time,
-    /* content */ Bytes,
-)>;
+type NotifyFilePair = FileResult</* content */ Bytes>;
 
 /// The state of a watched file.
 ///
@@ -290,10 +287,7 @@ impl NotifyActor {
 
                 changeset.may_insert(self.notify_entry_update(path.clone(), Some(meta)));
             } else {
-                let watched = meta.and_then(|meta| {
-                    let content = self.inner.content(path)?;
-                    Ok((meta.modified().unwrap(), content))
-                });
+                let watched = self.inner.content(path);
                 changeset.inserts.push((path.clone(), watched.into()));
             }
         }
@@ -409,12 +403,8 @@ impl NotifyActor {
             return None;
         }
 
-        // Check meta, path, and content
-
-        // Get meta, real path and ignore errors
-        let mtime = meta.modified().ok()?;
-
-        let mut file = self.inner.content(&path).map(|it| (mtime, it));
+        // Check path and content
+        let mut file = self.inner.content(&path);
 
         // Check state in fast path: compare state, return None on not sending
         // the file change
@@ -456,7 +446,7 @@ impl NotifyActor {
                 }
             },
             // Compare content for transitional the state
-            (Some(Ok((prev_tick, prev_content))), Ok((next_tick, next_content))) => {
+            (Some(Ok(prev_content)), Ok(next_content)) => {
                 // So far it is accurately no change for the file, skip it
                 if prev_content == next_content {
                     return None;
@@ -488,27 +478,6 @@ impl NotifyActor {
                     // Otherwise, we push the diff to the consumer.
                     WatchState::EmptyOrRemoval { .. } => {}
                 }
-
-                // We have found a change, however, we need to check whether the
-                // mtime is changed. Generally, the mtime should be changed.
-                // However, It is common that editor (VSCode) to change the
-                // mtime after writing
-                //
-                // this condition should be never happen, but we still check it
-                //
-                // There will be cases that user change content of a file and
-                // then also modify the mtime of the file, so we need to check
-                // `next_tick == prev_tick`: Whether mtime is changed.
-                // `matches!(entry.state, WatchState::Fresh)`: Whether the file
-                //   is fresh. We have not submit the file to the compiler, so
-                //   that is ok.
-                if next_tick == prev_tick && matches!(entry.state, WatchState::Stable) {
-                    // this is necessary to invalidate our mtime-based cache
-                    *next_tick = prev_tick
-                        .checked_add(std::time::Duration::from_micros(1))
-                        .unwrap();
-                    log::warn!("same content but mtime is different...: {:?} content: prev:{:?} v.s. curr:{:?}", path, prev_content, next_content);
-                };
             }
         };
 

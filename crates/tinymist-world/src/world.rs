@@ -7,13 +7,13 @@ use std::{
 
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
-use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{notify::FilesystemEvent, Vfs};
+use tinymist_std::error::prelude::*;
+use tinymist_vfs::{notify::FilesystemEvent, PathResolution, Vfs, WorkspaceResolver};
 use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
-    syntax::{FileId, Source, Span},
+    syntax::{FileId, Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
     Library, World,
@@ -221,8 +221,17 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
+    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.vfs.file_path(id)
+    }
+
+    /// Resolve the root of the workspace.
+    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        let root = self.entry.workspace_root()?;
+        Some(WorkspaceResolver::workspace_file(
+            Some(&root),
+            VirtualPath::new(path.strip_prefix(&root).ok()?),
+        ))
     }
 
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
@@ -383,9 +392,19 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
+    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.vfs.file_path(id)
     }
+
+    /// Resolve the root of the workspace.
+    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        let root = self.entry.workspace_root()?;
+        Some(WorkspaceResolver::workspace_file(
+            Some(&root),
+            VirtualPath::new(path.strip_prefix(&root).ok()?),
+        ))
+    }
+
     /// Lookup a source file by id.
     #[track_caller]
     fn lookup(&self, id: FileId) -> Source {
@@ -450,7 +469,7 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, fid: TypstFileId) -> FileResult<ImmutPath> {
+    fn file_path(&self, fid: TypstFileId) -> FileResult<PathResolution> {
         self.vfs.file_path(fid)
     }
 
@@ -566,7 +585,7 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
         Ok(match self.path_for_id(id) {
-            Ok(path) => path.display().to_string(),
+            Ok(path) => path.as_path().display().to_string(),
             Err(_) => format!("{id:?}"),
         })
     }
