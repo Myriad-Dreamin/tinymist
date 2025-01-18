@@ -565,24 +565,9 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
-        let vpath = id.vpath();
-        Ok(if let Some(package) = id.package() {
-            format!("{package}{}", vpath.as_rooted_path().display())
-        } else {
-            match self.entry.root() {
-                Some(root) => {
-                    // Try to express the path relative to the working directory.
-                    vpath
-                        .resolve(&root)
-                        // differ from typst
-                        // .and_then(|abs| pathdiff::diff_paths(&abs, self.workdir()))
-                        .as_deref()
-                        .unwrap_or_else(|| vpath.as_rootless_path())
-                        .to_string_lossy()
-                        .into()
-                }
-                None => vpath.as_rooted_path().display().to_string(),
-            }
+        Ok(match self.path_for_id(id) {
+            Ok(path) => path.display().to_string(),
+            Err(_) => format!("{id:?}"),
         })
     }
 

@@ -2,6 +2,7 @@
 //! no longer exist -- the assumption is total size of paths we ever look at is
 //! not too big.
 
+use core::fmt;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -139,6 +140,34 @@ impl WorkspaceResolver {
                 Ok(WorkspaceResolution::Workspace(id))
             }
             _ => Ok(WorkspaceResolution::Package),
+        }
+    }
+
+    /// File path corresponding to the given `fid`.
+    pub fn display(id: Option<TypstFileId>) -> Resolving {
+        Resolving { id }
+    }
+}
+
+pub struct Resolving {
+    id: Option<TypstFileId>,
+}
+
+impl fmt::Debug for Resolving {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Some(id) = self.id else {
+            return write!(f, "None");
+        };
+
+        let path = match WorkspaceResolver::resolve(id) {
+            Ok(WorkspaceResolution::Workspace(workspace)) => id.vpath().resolve(&workspace.path()),
+            Ok(WorkspaceResolution::Package) | Err(_) => None,
+        };
+
+        if let Some(path) = path {
+            write!(f, "{}", path.display())
+        } else {
+            write!(f, "{:?}", self.id)
         }
     }
 }
