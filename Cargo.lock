@@ -2851,6 +2851,7 @@ dependencies = [
  "dashmap",
  "ecow",
  "fxhash",
+ "js-sys",
  "parking_lot",
  "path-clean",
  "reflexo-typst-shim",
@@ -2862,6 +2863,7 @@ dependencies = [
  "serde_with",
  "siphasher 1.0.1",
  "tiny-skia-path",
+ "wasm-bindgen",
  "web-time",
 ]
 
@@ -2877,6 +2879,7 @@ dependencies = [
  "futures",
  "fxhash",
  "indexmap 2.7.0",
+ "js-sys",
  "log",
  "nohash-hasher",
  "notify",
@@ -2892,6 +2895,7 @@ dependencies = [
  "tar",
  "tokio",
  "typst",
+ "web-sys",
 ]
 
 [[package]]
@@ -2952,12 +2956,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5513a7f75fc88d8cc4e151832f0596b0e925fa74aaf374351977df06c6ef6eb0"
 dependencies = [
  "indexmap 2.7.0",
+ "js-sys",
  "log",
  "nohash-hasher",
  "parking_lot",
  "reflexo",
  "rpds",
  "typst",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -2974,6 +2981,7 @@ dependencies = [
  "flate2",
  "fontdb",
  "hex",
+ "js-sys",
  "log",
  "parking_lot",
  "reflexo",
@@ -2981,12 +2989,15 @@ dependencies = [
  "reflexo-vfs",
  "reqwest",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
  "serde_with",
  "sha2",
  "strum",
  "tar",
  "typst",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -4053,6 +4064,7 @@ version = "0.12.18"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "tinymist-world",
  "vergen",
  "wasm-bindgen",
 ]
@@ -4231,9 +4243,7 @@ dependencies = [
  "log",
  "parking_lot",
  "pathdiff",
- "rayon",
  "reflexo-typst",
- "reflexo-typst-shim",
  "reqwest",
  "semver",
  "serde",
@@ -4243,10 +4253,8 @@ dependencies = [
  "sha2",
  "strum",
  "tar",
- "tinymist-fs",
  "tinymist-std",
  "tinymist-vfs",
- "tokio",
  "toml",
  "typst",
  "typst-assets",

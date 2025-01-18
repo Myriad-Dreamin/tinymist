@@ -27,10 +27,9 @@ js-sys = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
 pathdiff.workspace = true
-tokio.workspace = true
-rayon.workspace = true
-reflexo-typst.workspace = true
-reflexo-typst-shim = { workspace = true, features = ["nightly"] }
+# tokio.workspace = true
+# rayon.workspace = true
+reflexo-typst = { workspace = true, default-features = false }
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -39,7 +38,7 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 sha2.workspace = true
 strum.workspace = true
 tar.workspace = true
-tinymist-fs.workspace = true
+# tinymist-fs.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
 typst.workspace = true
@@ -47,13 +46,13 @@ toml.workspace = true
 typst-assets.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
-reqwest.workspace = true
+reqwest = { workspace = true, optional = true }
 
 [features]
 
 default = []
-lazy-fontdb = []
 browser-embedded-fonts = ["fonts"]
+http-registry = ["dep:reqwest"]
 web = [
     "wasm-bindgen",
     "web-sys",
@@ -61,18 +60,21 @@ web = [
     "serde-wasm-bindgen",
     "tinymist-std/web",
     "tinymist-vfs/web",
+    "reflexo-typst/web",
 ]
 browser = ["web"]
 system = [
     "dep:dirs",
     "dep:fontdb",
+    "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",
+    "reflexo-typst/web",
 ]
 
 # todo: remove me
 fonts = []
-no-content-hint = []
+no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]
 workspace = true
