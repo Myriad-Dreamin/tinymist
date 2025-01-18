@@ -40,15 +40,7 @@ pub use tinymist_std::ImmutPath;
 pub(crate) use path_interner::PathInterner;
 
 use core::fmt;
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    path::Path,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::{collections::HashMap, hash::Hash, path::Path, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
 use tinymist_std::path::PathClean;
@@ -152,38 +144,16 @@ pub trait FsProvider {
 
 #[derive(Default)]
 struct PathMapper {
-    /// The number of lifecycles since the creation of the `Vfs`.
-    ///
-    /// Note: The lifetime counter is incremented on resetting vfs.
-    clock: AtomicU64,
     /// Map from path to slot index.
     ///
     /// Note: we use a owned [`FileId`] here, which is resultant from
     /// [`PathInterner`]
     id_cache: RwLock<HashMap<ImmutPath, FileId>>,
     /// The path interner for canonical paths.
-    intern: Mutex<PathInterner<ImmutPath, u64>>,
+    intern: Mutex<PathInterner<ImmutPath, ()>>,
 }
 
 impl PathMapper {
-    /// Reset the path references.
-    ///
-    /// It performs a rolling reset, with discard some cache file entry when it
-    /// is unused in recent 30 lifecycles.
-    ///
-    /// Note: The lifetime counter is incremented every time this function is
-    /// called.
-    pub fn reset(&self) {
-        self.clock.fetch_add(1, Ordering::SeqCst);
-
-        // todo: clean path interner.
-        // let new_lifetime_cnt = self.lifetime_cnt;
-        // self.path2slot.get_mut().clear();
-        // self.path_interner
-        //     .get_mut()
-        //     .retain(|_, lifetime| new_lifetime_cnt - *lifetime <= 30);
-    }
-
     /// Id of the given path if it exists in the `Vfs` and is not deleted.
     pub fn file_id(&self, path: &Path) -> FileId {
         let quick_id = self.id_cache.read().get(path).copied();
@@ -194,8 +164,7 @@ impl PathMapper {
         let path: ImmutPath = path.clean().as_path().into();
 
         let mut path_interner = self.intern.lock();
-        let lifetime_cnt = self.clock.load(Ordering::SeqCst);
-        let id = path_interner.intern(path.clone(), lifetime_cnt).0;
+        let id = path_interner.intern(path.clone(), ()).0;
 
         let mut path2slot = self.id_cache.write();
         path2slot.insert(path.clone(), id);
@@ -271,7 +240,6 @@ impl<M: AccessModel + Sized> Vfs<M> {
     /// Note: The lifetime counter is incremented every time this function is
     /// called.
     pub fn reset(&mut self) {
-        self.paths.reset();
         self.access_model.clear();
     }
 
