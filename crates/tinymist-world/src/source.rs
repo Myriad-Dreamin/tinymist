@@ -105,9 +105,6 @@ pub struct SourceDb {
     pub shared: Arc<RwLock<SharedState<SourceCache>>>,
     /// The slots for all the files during a single lifecycle.
     pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
-    /// Whether to reparse the file when it is changed.
-    /// Default to `true`.
-    pub do_reparse: bool,
 }
 
 impl fmt::Debug for SourceDb {
@@ -122,16 +119,6 @@ impl SourceDb {
             revision: self.revision,
             slots: std::mem::take(&mut self.slots),
         }
-    }
-
-    /// Set the `do_reparse` flag that indicates whether to reparsing the file
-    /// instead of creating a new [`Source`] when the file is changed.
-    /// Default to `true`.
-    ///
-    /// You usually want to set this flag to `true` for better performance.
-    /// However, one could disable this flag for debugging purpose.
-    pub fn set_do_reparse(&mut self, do_reparse: bool) {
-        self.do_reparse = do_reparse;
     }
 
     /// Returns the overall memory usage for the stored files.
@@ -192,7 +179,7 @@ impl SourceDb {
 
                     // otherwise reparse the source
                     match prev {
-                        Some(mut source) if self.do_reparse => {
+                        Some(mut source) => {
                             source.replace(&next);
                             Ok(source)
                         }

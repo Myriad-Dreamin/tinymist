@@ -144,9 +144,6 @@ pub trait WorldDeps {
     fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath));
 }
 
-type CodespanResult<T> = Result<T, CodespanError>;
-type CodespanError = codespan_reporting::files::Error;
-
 /// type trait interface of [`CompilerWorld`].
 pub trait CompilerFeat {
     /// Specify the font resolver for typst compiler.

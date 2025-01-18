@@ -19,6 +19,7 @@ use typst::{
     Library, World,
 };
 
+use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::{
     entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY},
     font::FontResolver,
@@ -27,9 +28,11 @@ use crate::{
         get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
         SemanticTokensLegend,
     },
-    source::{SharedState, SourceCache, SourceDb},
-    CodespanError, CodespanResult, CompilerFeat, ShadowApi, WorldDeps,
+    CompilerFeat, ShadowApi, WorldDeps,
 };
+
+type CodespanResult<T> = Result<T, CodespanError>;
+type CodespanError = codespan_reporting::files::Error;
 
 pub struct Revising<'a, T> {
     pub revision: NonZeroUsize,
@@ -75,11 +78,6 @@ impl<F: CompilerFeat> Revising<'_, CompilerUniverse<F>> {
         Ok(())
     }
 
-    /// Set the `do_reparse` flag.
-    pub fn set_do_reparse(&mut self, do_reparse: bool) {
-        self.inner.do_reparse = do_reparse;
-    }
-
     /// Set the inputs for the compiler.
     pub fn set_inputs(&mut self, inputs: Arc<LazyHash<Dict>>) {
         self.inner.inputs = inputs;
@@ -105,8 +103,6 @@ pub struct CompilerUniverse<F: CompilerFeat> {
     entry: EntryState,
     /// Additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
-    /// Whether to reparse the source files.
-    do_reparse: bool,
 
     /// Provides font management for typst compiler.
     pub font_resolver: Arc<F::FontResolver>,
@@ -139,7 +135,6 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         Self {
             entry,
             inputs: inputs.unwrap_or_default(),
-            do_reparse: true,
 
             revision: RwLock::new(NonZeroUsize::new(1).expect("initial revision is 1")),
             shared: Arc::new(RwLock::new(SharedState::default())),
@@ -154,10 +149,6 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn with_entry_file(mut self, entry_file: PathBuf) -> Self {
         let _ = self.increment_revision(|this| this.set_entry_file_(entry_file.as_path().into()));
         self
-    }
-
-    pub fn do_reparse(&self) -> bool {
-        self.do_reparse
     }
 
     pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
@@ -180,7 +171,6 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             vfs: self.vfs.snapshot(),
             source_db: SourceDb {
                 revision: *rev_lock,
-                do_reparse: self.do_reparse,
                 shared: self.shared.clone(),
                 slots: Default::default(),
             },
