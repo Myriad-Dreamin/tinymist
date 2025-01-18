@@ -53,13 +53,14 @@ reqwest.workspace = true
 
 default = []
 lazy-fontdb = []
-browser-embedded-fonts = []
+browser-embedded-fonts = ["fonts"]
 web = [
     "wasm-bindgen",
     "web-sys",
     "js-sys",
     "serde-wasm-bindgen",
     "tinymist-std/web",
+    "tinymist-vfs/web",
 ]
 browser = ["web"]
 system = [

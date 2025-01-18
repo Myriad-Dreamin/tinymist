@@ -19,7 +19,7 @@ log.workspace = true
 rpds = "1"
 
 wasm-bindgen = { workspace = true, optional = true }
-web-sys = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["console"] }
 js-sys = { workspace = true, optional = true }
 
 [features]

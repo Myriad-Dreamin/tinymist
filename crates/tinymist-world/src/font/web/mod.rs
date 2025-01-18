@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use js_sys::ArrayBuffer;
-use reflexo::error::prelude::*;
+use tinymist_std::error::prelude::*;
 use typst::foundations::Bytes;
 use typst::text::{
     Coverage, Font, FontBook, FontFlags, FontInfo, FontStretch, FontStyle, FontVariant, FontWeight,
@@ -405,32 +405,13 @@ impl BrowserFontSearcher {
 
     /// Add fonts that are embedded in the binary.
     pub fn add_embedded(&mut self) {
-        #[cfg(feature = "browser-embedded-fonts")]
-        macro_rules! embed_font {
-            ($fp:literal) => {
-                let buffer = Bytes::from_static(include_bytes!($fp));
-                for (_, font) in Font::iter(buffer).enumerate() {
-                    self.book.push(font.info().clone());
-                    self.fonts.push(FontSlot::with_value(Some(font)));
-                }
-            };
+        for font_data in typst_assets::fonts() {
+            let buffer = Bytes::from_static(font_data);
+            for font in Font::iter(buffer) {
+                self.book.push(font.info().clone());
+                self.fonts.push(FontSlot::with_value(Some(font)));
+            }
         }
-
-        #[cfg(not(feature = "browser-embedded-fonts"))]
-        macro_rules! embed_font {
-            ($fp:literal) => {};
-        }
-
-        // Embed default fonts.
-        embed_font!("../../../../assets/fonts/LinLibertine_R.ttf");
-        embed_font!("../../../../assets/fonts/LinLibertine_RB.ttf");
-        embed_font!("../../../../assets/fonts/LinLibertine_RBI.ttf");
-        embed_font!("../../../../assets/fonts/LinLibertine_RI.ttf");
-        embed_font!("../../../../assets/fonts/NewCMMath-Book.otf");
-        embed_font!("../../../../assets/fonts/NewCMMath-Regular.otf");
-        embed_font!("../../../../assets/fonts/DejaVuSansMono.ttf");
-        embed_font!("../../../../assets/fonts/DejaVuSansMono-Bold.ttf");
-        embed_font!("../../../../assets/fonts/Roboto-Regular.ttf");
     }
 
     pub async fn add_web_fonts(&mut self, fonts: js_sys::Array) -> ZResult<()> {

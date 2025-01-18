@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use reflexo_vfs::browser::ProxyAccessModel;
+use tinymist_vfs::browser::ProxyAccessModel;
 use typst::foundations::Dict as TypstDict;
 use typst::utils::LazyHash;
 
@@ -39,7 +39,7 @@ impl TypstBrowserUniverse {
         registry: ProxyRegistry,
         font_resolver: FontResolverImpl,
     ) -> Self {
-        let vfs = reflexo_vfs::Vfs::new(access_model);
+        let vfs = tinymist_vfs::Vfs::new(access_model);
 
         Self::new_raw(
             EntryState::new_rooted(root_dir.into(), None),
