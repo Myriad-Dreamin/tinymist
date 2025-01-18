@@ -3,7 +3,7 @@ use std::path::Path;
 use typst::diag::{FileError, FileResult};
 use wasm_bindgen::prelude::*;
 
-use crate::{AccessModel, Bytes};
+use crate::{Bytes, PathAccessModel};
 
 /// Provides proxy access model from typst compiler to some JavaScript
 /// implementation.
@@ -22,7 +22,7 @@ pub struct ProxyAccessModel {
     pub read_all_fn: js_sys::Function,
 }
 
-impl AccessModel for ProxyAccessModel {
+impl PathAccessModel for ProxyAccessModel {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         self.is_file_fn
             .call1(&self.context, &src.to_string_lossy().as_ref().into())

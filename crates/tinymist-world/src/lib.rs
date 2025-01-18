@@ -36,7 +36,7 @@ use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
 use tinymist_std::ImmutPath;
-use tinymist_vfs::AccessModel as VfsAccessModel;
+use tinymist_vfs::PathAccessModel as VfsAccessModel;
 use typst::diag::{At, FileResult, SourceResult};
 use typst::foundations::Bytes;
 use typst::syntax::{FileId, Span};

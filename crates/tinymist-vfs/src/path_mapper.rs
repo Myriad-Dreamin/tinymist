@@ -14,6 +14,10 @@ use typst::syntax::VirtualPath;
 
 use super::TypstFileId;
 
+pub trait PathMapper {
+    fn path_for_id(&self, file_id: TypstFileId) -> FileResult<ImmutPath>;
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct WorkspaceId(u16);
 
@@ -26,7 +30,7 @@ const NO_VERSION: PackageVersion = PackageVersion {
 impl WorkspaceId {
     fn package(&self) -> PackageSpec {
         PackageSpec {
-            namespace: PathMapper::WORKSPACE_NS.clone(),
+            namespace: WorkspaceResolver::WORKSPACE_NS.clone(),
             name: eco_format!("p{}", self.0),
             version: NO_VERSION,
         }
@@ -59,7 +63,7 @@ static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
     })
 });
 
-pub enum PathResolution {
+pub enum WorkspaceResolution {
     Workspace(WorkspaceId),
     Untitled(WorkspaceId),
     Package,
@@ -72,20 +76,20 @@ struct Interner {
 }
 
 #[derive(Default)]
-pub struct PathMapper {}
+pub struct WorkspaceResolver {}
 
-impl PathMapper {
+impl WorkspaceResolver {
     pub const WORKSPACE_NS: EcoString = EcoString::inline("ws");
     pub const UNTITLED_NS: EcoString = EcoString::inline("untitled");
 
     pub fn is_workspace_file(fid: TypstFileId) -> bool {
         fid.package()
-            .is_some_and(|p| p.namespace == PathMapper::WORKSPACE_NS)
+            .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
     }
 
     pub fn is_untitled_file(fid: TypstFileId) -> bool {
         fid.package()
-            .is_some_and(|p| p.namespace == PathMapper::UNTITLED_NS)
+            .is_some_and(|p| p.namespace == WorkspaceResolver::UNTITLED_NS)
     }
 
     /// Id of the given path if it exists in the `Vfs` and is not deleted.
@@ -119,7 +123,7 @@ impl PathMapper {
     }
 
     /// File path corresponding to the given `fid`.
-    pub fn resolve(fid: TypstFileId) -> FileResult<PathResolution> {
+    pub fn resolve(fid: TypstFileId) -> FileResult<WorkspaceResolution> {
         let package = fid.package().ok_or_else(|| {
             FileError::Other(Some(eco_format!(
                 "cannot map file id without package spec: {fid:?}"
@@ -135,7 +139,7 @@ impl PathMapper {
                 // let res = fid.vpath().resolve(&id.path());
                 // res.ok_or_else(|| FileError::AccessDenied)
 
-                Ok(PathResolution::Workspace(id))
+                Ok(WorkspaceResolution::Workspace(id))
             }
             "untitled" => {
                 let id = WorkspaceId::from_package_name(&package.name).ok_or_else(|| {
@@ -145,9 +149,9 @@ impl PathMapper {
                 // let res = fid.vpath().resolve(&id.path());
                 // res.ok_or_else(|| FileError::AccessDenied)
 
-                Ok(PathResolution::Workspace(id))
+                Ok(WorkspaceResolution::Workspace(id))
             }
-            _ => Ok(PathResolution::Package),
+            _ => Ok(WorkspaceResolution::Package),
         }
 
         // let path_interner = self.intern.lock();

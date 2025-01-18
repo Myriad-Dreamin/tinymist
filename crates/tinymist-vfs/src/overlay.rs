@@ -1,10 +1,10 @@
 use std::path::Path;
-use std::sync::Arc;
 
 use rpds::RedBlackTreeMapSync;
+use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes, Time};
+use crate::{Bytes, PathAccessModel, Time};
 
 #[derive(Debug, Clone)]
 struct OverlayFileMeta {
@@ -16,12 +16,12 @@ struct OverlayFileMeta {
 /// model with memory contents.
 #[derive(Default, Debug, Clone)]
 pub struct OverlayAccessModel<M> {
-    files: RedBlackTreeMapSync<Arc<Path>, OverlayFileMeta>,
+    files: RedBlackTreeMapSync<ImmutPath, OverlayFileMeta>,
     /// The underlying access model
     pub inner: M,
 }
 
-impl<M: AccessModel> OverlayAccessModel<M> {
+impl<M: PathAccessModel> OverlayAccessModel<M> {
     /// Create a new [`OverlayAccessModel`] with the given inner access model
     pub fn new(inner: M) -> Self {
         Self {
@@ -46,19 +46,19 @@ impl<M: AccessModel> OverlayAccessModel<M> {
     }
 
     /// Get the shadowed file paths
-    pub fn file_paths(&self) -> Vec<Arc<Path>> {
+    pub fn file_paths(&self) -> Vec<ImmutPath> {
         self.files.keys().cloned().collect()
     }
 
     /// Add a shadow file to the [`OverlayAccessModel`]
-    pub fn add_file(&mut self, path: Arc<Path>, content: Bytes) {
+    pub fn add_file(&mut self, path: &Path, content: Bytes) {
         // we change mt every time, since content almost changes every time
         // Note: we can still benefit from cache, since we incrementally parse source
 
         let mt = tinymist_std::time::now();
         let meta = OverlayFileMeta { mt, content };
 
-        match self.files.get_mut(&path) {
+        match self.files.get_mut(path) {
             Some(e) => {
                 if e.mt == meta.mt && e.content != meta.content {
                     e.mt = meta
@@ -74,7 +74,7 @@ impl<M: AccessModel> OverlayAccessModel<M> {
                 }
             }
             None => {
-                self.files.insert_mut(path, meta);
+                self.files.insert_mut(path.into(), meta);
             }
         }
     }
@@ -85,7 +85,7 @@ impl<M: AccessModel> OverlayAccessModel<M> {
     }
 }
 
-impl<M: AccessModel> AccessModel for OverlayAccessModel<M> {
+impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<M> {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         if self.files.get(src).is_some() {
             return Ok(true);

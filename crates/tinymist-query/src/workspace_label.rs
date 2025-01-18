@@ -25,10 +25,9 @@ impl SemanticRequest for WorkspaceLabelRequest {
             let Ok(source) = ctx.source_by_id(fid) else {
                 continue;
             };
-            let Ok(path) = ctx.path_for_id(fid) else {
+            let Ok(uri) = ctx.uri_for_id(fid) else {
                 continue;
             };
-            let uri = path_to_url(&path).unwrap();
             let res = get_lexical_hierarchy(&source, LexicalScopeKind::Symbol).map(|hierarchy| {
                 filter_document_labels(&hierarchy, &source, &uri, ctx.position_encoding())
             });

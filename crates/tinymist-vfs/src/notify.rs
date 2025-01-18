@@ -4,7 +4,7 @@ use std::path::Path;
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
 
-use crate::{AccessModel, Bytes, ImmutPath};
+use crate::{Bytes, ImmutPath, PathAccessModel};
 
 /// internal representation of [`NotifyFile`]
 #[derive(Debug, Clone)]
@@ -212,7 +212,7 @@ pub struct NotifyAccessModel<M> {
     pub inner: M,
 }
 
-impl<M: AccessModel> NotifyAccessModel<M> {
+impl<M: PathAccessModel> NotifyAccessModel<M> {
     /// Create a new notify access model
     pub fn new(inner: M) -> Self {
         Self {
@@ -238,7 +238,7 @@ impl<M: AccessModel> NotifyAccessModel<M> {
     }
 }
 
-impl<M: AccessModel> AccessModel for NotifyAccessModel<M> {
+impl<M: PathAccessModel> PathAccessModel for NotifyAccessModel<M> {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         if let Some(entry) = self.files.get(src) {
             return entry.is_file();

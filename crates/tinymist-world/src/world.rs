@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
 use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{notify::FilesystemEvent, AccessModel, PathMapper, PathResolution, Vfs};
+use tinymist_vfs::{notify::FilesystemEvent, AccessModel, Vfs};
 use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
@@ -129,7 +129,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         entry: EntryState,
         inputs: Option<Arc<LazyHash<Dict>>>,
         vfs: Vfs<F::AccessModel>,
-        registry: F::Registry,
+        registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
     ) -> Self {
         Self {
@@ -140,7 +140,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             shared: Arc::new(RwLock::new(SharedState::default())),
 
             font_resolver,
-            registry: Arc::new(registry),
+            registry,
             vfs,
         }
     }
@@ -222,21 +222,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 
     /// Resolve the real path for a file id.
     pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
-        if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().into());
-        }
-
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match PathMapper::resolve(id)? {
-            PathResolution::Workspace(id) | PathResolution::Untitled(id) => id.path().clone(),
-            PathResolution::Package => self.registry.resolve(id.package().unwrap())?,
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        let path = id.vpath().resolve(&root).map(From::from);
-        path.ok_or(FileError::AccessDenied)
+        self.vfs.access_model.resolver.path_for_id(id)
     }
 
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
@@ -387,21 +373,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
     /// Resolve the real path for a file id.
     pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
-        if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().into());
-        }
-
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match PathMapper::resolve(id)? {
-            PathResolution::Workspace(id) | PathResolution::Untitled(id) => id.path().clone(),
-            PathResolution::Package => self.registry.resolve(id.package().unwrap())?,
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        let path = id.vpath().resolve(&root).map(From::from);
-        path.ok_or(FileError::AccessDenied)
+        self.vfs.access_model.resolver.path_for_id(id)
     }
     /// Lookup a source file by id.
     #[track_caller]
@@ -456,16 +428,16 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath> {
-        self.path_for_id(id)
+    fn file_path(&self, fid: TypstFileId) -> FileResult<ImmutPath> {
+        self.vfs.access_model.resolver.path_for_id(fid)
     }
 
-    fn read(&self, src: TypstFileId) -> FileResult<Bytes> {
-        self.vfs.access_model.content(&self.file_path(src)?)
+    fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
+        self.vfs.access_model.content(fid)
     }
 
-    fn is_file(&self, src: TypstFileId) -> FileResult<bool> {
-        self.vfs.access_model.is_file(&self.file_path(src)?)
+    fn is_file(&self, fid: TypstFileId) -> FileResult<bool> {
+        self.vfs.access_model.is_file(fid)
     }
 }
 

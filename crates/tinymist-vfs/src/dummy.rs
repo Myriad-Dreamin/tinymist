@@ -2,8 +2,7 @@ use std::path::Path;
 
 use typst::diag::{FileError, FileResult};
 
-use super::AccessModel;
-use crate::Bytes;
+use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
 
 /// Provides dummy access model.
 ///
@@ -14,6 +13,16 @@ use crate::Bytes;
 pub struct DummyAccessModel;
 
 impl AccessModel for DummyAccessModel {
+    fn is_file(&self, _src: TypstFileId) -> FileResult<bool> {
+        Ok(true)
+    }
+
+    fn content(&self, _src: TypstFileId) -> FileResult<Bytes> {
+        Err(FileError::AccessDenied)
+    }
+}
+
+impl PathAccessModel for DummyAccessModel {
     fn is_file(&self, _src: &Path) -> FileResult<bool> {
         Ok(true)
     }

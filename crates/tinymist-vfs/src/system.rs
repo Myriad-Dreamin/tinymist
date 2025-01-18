@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, path::Path};
 
 use typst::diag::{FileError, FileResult};
 
-use crate::{AccessModel, Bytes};
+use crate::{Bytes, PathAccessModel};
 use tinymist_std::ReadAllOnce;
 
 /// Provides SystemAccessModel that makes access to the local file system for
@@ -19,7 +19,7 @@ impl SystemAccessModel {
     }
 }
 
-impl AccessModel for SystemAccessModel {
+impl PathAccessModel for SystemAccessModel {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         let f = |e| FileError::from_io(e, src);
         Ok(self.stat(src).map_err(f)?.is_file)

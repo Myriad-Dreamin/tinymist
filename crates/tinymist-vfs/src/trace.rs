@@ -1,8 +1,8 @@
-use std::{path::Path, sync::atomic::AtomicU64};
+use std::sync::atomic::AtomicU64;
 
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes};
+use crate::{AccessModel, Bytes, TypstFileId};
 
 /// Provides trace access model which traces the underlying access model.
 ///
@@ -29,7 +29,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
         self.inner.clear();
     }
 
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
+    fn is_file(&self, src: TypstFileId) -> FileResult<bool> {
         let instant = tinymist_std::time::Instant::now();
         let res = self.inner.is_file(src);
         let elapsed = instant.elapsed();
@@ -41,7 +41,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
         res
     }
 
-    fn content(&self, src: &Path) -> FileResult<Bytes> {
+    fn content(&self, src: TypstFileId) -> FileResult<Bytes> {
         let instant = tinymist_std::time::Instant::now();
         let res = self.inner.content(src);
         let elapsed = instant.elapsed();
