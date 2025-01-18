@@ -1071,10 +1071,8 @@ mod tests {
     #[test]
     fn test_substitute_path() {
         let root = Path::new("/root");
-        let entry = EntryState::new_rooted(
-            root.into(),
-            Some(FileId::new(None, VirtualPath::new("/dir1/dir2/file.txt"))),
-        );
+        let entry =
+            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
 
         assert_eq!(
             PathPattern::new("/substitute/$dir/$name").substitute(&entry),

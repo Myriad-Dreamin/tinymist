@@ -673,7 +673,7 @@ impl LanguageState {
                 let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
                 let entry_point = toml_id.join(&manifest.package.entrypoint);
 
-                Ok(EntryState::new_rooted(pkg_root.into(), Some(entry_point)))
+                Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
             });
             let entry = entry.map_err(|e| internal_error(e.to_string()))?;
 

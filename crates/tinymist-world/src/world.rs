@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
 use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{notify::FilesystemEvent, AccessModel, Vfs};
+use tinymist_vfs::{notify::FilesystemEvent, Vfs};
 use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
@@ -202,7 +202,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     fn set_entry_file_(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         let state = self.entry_state();
         let state = state
-            .try_select_path_in_workspace(&entry_file, true)
+            .try_select_path_in_workspace(&entry_file)
             .map_err(|e| eco_format!("cannot select entry file out of workspace: {e}"))
             .at(Span::detached())?
             .ok_or_else(|| eco_format!("failed to determine root"))
@@ -222,7 +222,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 
     /// Resolve the real path for a file id.
     pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
-        self.vfs.access_model.resolver.path_for_id(id)
+        self.vfs.file_path(id)
     }
 
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
@@ -239,7 +239,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
                 let path = Path::new(&e);
                 let s = self
                     .entry_state()
-                    .try_select_path_in_workspace(path, true)?
+                    .try_select_path_in_workspace(path)?
                     .ok_or_else(|| error_once!("cannot select file", path: e))?;
 
                 self.snapshot_with(Some(TaskInputs {
@@ -259,18 +259,16 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<ImmutPath> {
-        self.path_for_id(file_id)
+    fn reset_shadow(&mut self) {
+        self.increment_revision(|this| this.vfs.reset_shadow())
     }
 
-    #[inline]
     fn shadow_paths(&self) -> Vec<Arc<Path>> {
         self.vfs.shadow_paths()
     }
 
-    #[inline]
-    fn reset_shadow(&mut self) {
-        self.increment_revision(|this| this.vfs.reset_shadow())
+    fn shadow_ids(&self) -> Vec<TypstFileId> {
+        self.vfs.shadow_ids()
     }
 
     #[inline]
@@ -282,6 +280,19 @@ impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
         self.increment_revision(|this| {
             this.vfs().remove_shadow(path);
+            Ok(())
+        })
+    }
+
+    #[inline]
+    fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()> {
+        self.increment_revision(|this| this.vfs().map_shadow_by_id(file_id, content))
+    }
+
+    #[inline]
+    fn unmap_shadow_by_id(&mut self, file_id: FileId) -> FileResult<()> {
+        self.increment_revision(|this| {
+            this.vfs().remove_shadow_by_id(file_id);
             Ok(())
         })
     }
@@ -373,7 +384,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
     /// Resolve the real path for a file id.
     pub fn path_for_id(&self, id: FileId) -> Result<ImmutPath, FileError> {
-        self.vfs.access_model.resolver.path_for_id(id)
+        self.vfs.file_path(id)
     }
     /// Lookup a source file by id.
     #[track_caller]
@@ -401,8 +412,8 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<ImmutPath> {
-        self.path_for_id(file_id)
+    fn shadow_ids(&self) -> Vec<TypstFileId> {
+        self.vfs.shadow_ids()
     }
 
     #[inline]
@@ -425,19 +436,30 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
         self.vfs.remove_shadow(path);
         Ok(())
     }
+
+    #[inline]
+    fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
+        self.vfs.map_shadow_by_id(file_id, content)
+    }
+
+    #[inline]
+    fn unmap_shadow_by_id(&mut self, file_id: TypstFileId) -> FileResult<()> {
+        self.vfs.remove_shadow_by_id(file_id);
+        Ok(())
+    }
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
     fn file_path(&self, fid: TypstFileId) -> FileResult<ImmutPath> {
-        self.vfs.access_model.resolver.path_for_id(fid)
+        self.vfs.file_path(fid)
     }
 
     fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        self.vfs.access_model.content(fid)
+        self.vfs.read(fid)
     }
 
     fn is_file(&self, fid: TypstFileId) -> FileResult<bool> {
-        self.vfs.access_model.is_file(fid)
+        self.vfs.is_file(fid)
     }
 }
 

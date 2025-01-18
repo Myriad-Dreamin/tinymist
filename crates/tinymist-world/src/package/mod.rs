@@ -53,9 +53,7 @@ impl<T: PackageRegistry> tinymist_vfs::PathMapper for RegistryPathMapper<T> {
         // Determine the root path relative to which the file path
         // will be resolved.
         let root = match WorkspaceResolver::resolve(id)? {
-            WorkspaceResolution::Workspace(id) | WorkspaceResolution::Untitled(id) => {
-                id.path().clone()
-            }
+            WorkspaceResolution::Workspace(id) => id.path().clone(),
             WorkspaceResolution::Package => self.registry.resolve(id.package().unwrap())?,
         };
 

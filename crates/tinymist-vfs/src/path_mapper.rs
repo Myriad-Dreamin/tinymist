@@ -65,7 +65,6 @@ static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
 
 pub enum WorkspaceResolution {
     Workspace(WorkspaceId),
-    Untitled(WorkspaceId),
     Package,
 }
 
@@ -80,16 +79,10 @@ pub struct WorkspaceResolver {}
 
 impl WorkspaceResolver {
     pub const WORKSPACE_NS: EcoString = EcoString::inline("ws");
-    pub const UNTITLED_NS: EcoString = EcoString::inline("untitled");
 
     pub fn is_workspace_file(fid: TypstFileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
-    }
-
-    pub fn is_untitled_file(fid: TypstFileId) -> bool {
-        fid.package()
-            .is_some_and(|p| p.namespace == WorkspaceResolver::UNTITLED_NS)
     }
 
     /// Id of the given path if it exists in the `Vfs` and is not deleted.
@@ -116,10 +109,17 @@ impl WorkspaceResolver {
         id
     }
 
-    /// Id of the given path if it exists in the `Vfs` and is not deleted.
-    pub fn workspace_file(root: &ImmutPath, path: &ImmutPath) -> TypstFileId {
-        let cano_root = Self::workspace_id(root);
-        TypstFileId::new(Some(cano_root.package()), VirtualPath::new(path.as_ref()))
+    /// Creates a file id for a rootless file.
+    pub fn rootless_file(path: VirtualPath) -> TypstFileId {
+        TypstFileId::new(None, path)
+    }
+
+    /// Creates a file id for a file in some workspace. The `root` is the root
+    /// directory of the workspace. If `root` is `None`, the source code at the
+    /// `path` will not be able to access physical files.
+    pub fn workspace_file(root: Option<&ImmutPath>, path: VirtualPath) -> TypstFileId {
+        let workspace = root.map(Self::workspace_id);
+        TypstFileId::new(workspace.as_ref().map(WorkspaceId::package), path)
     }
 
     /// File path corresponding to the given `fid`.
@@ -136,26 +136,10 @@ impl WorkspaceResolver {
                     FileError::Other(Some(eco_format!("bad workspace id: {fid:?}")))
                 })?;
 
-                // let res = fid.vpath().resolve(&id.path());
-                // res.ok_or_else(|| FileError::AccessDenied)
-
-                Ok(WorkspaceResolution::Workspace(id))
-            }
-            "untitled" => {
-                let id = WorkspaceId::from_package_name(&package.name).ok_or_else(|| {
-                    FileError::Other(Some(eco_format!("bad workspace id: {fid:?}")))
-                })?;
-
-                // let res = fid.vpath().resolve(&id.path());
-                // res.ok_or_else(|| FileError::AccessDenied)
-
                 Ok(WorkspaceResolution::Workspace(id))
             }
             _ => Ok(WorkspaceResolution::Package),
         }
-
-        // let path_interner = self.intern.lock();
-        // path_interner.lookup(file_id).clone()
     }
 }
 

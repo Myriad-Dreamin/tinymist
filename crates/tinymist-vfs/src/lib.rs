@@ -43,7 +43,7 @@ pub use tinymist_std::time::Time;
 pub use tinymist_std::ImmutPath;
 
 use core::fmt;
-use std::{hash::Hash, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use parking_lot::RwLock;
 use typst::diag::{FileError, FileResult};
@@ -51,13 +51,7 @@ use typst::diag::{FileError, FileResult};
 use self::overlay::OverlayAccessModel;
 
 /// Handle to a file in [`Vfs`]
-///
-/// Most functions in typst-ts use this when they need to refer to a file.
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct FileId(pub TypstFileId);
-
-/// safe because `FileId` is a new type of `u32`
-impl nohash_hasher::IsEnabled for FileId {}
+pub type FileId = TypstFileId;
 
 /// A trait for accessing underlying file system.
 ///
@@ -125,10 +119,10 @@ where
     }
 }
 
+type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<SharedAccessModel<M>>>;
 /// we add notify access model here since notify access model doesn't introduce
 /// overheads by our observation
-type VfsAccessModel<M> =
-    ResolveAccessModel<OverlayAccessModel<NotifyAccessModel<SharedAccessModel<M>>>>;
+type VfsAccessModel<M> = OverlayAccessModel<TypstFileId, ResolveAccessModel<VfsPathAccessModel<M>>>;
 
 pub trait FsProvider {
     /// Arbitrary one of file path corresponding to the given `id`.
@@ -144,7 +138,7 @@ pub trait FsProvider {
 pub struct Vfs<M: PathAccessModel + Sized> {
     // access_model: TraceAccessModel<VfsAccessModel<M>>,
     /// The wrapped access model.
-    pub access_model: VfsAccessModel<M>,
+    access_model: VfsAccessModel<M>,
 }
 
 impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
@@ -182,6 +176,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
             resolver,
             inner: access_model,
         };
+        let access_model = OverlayAccessModel::new(access_model);
 
         // If you want to trace the access model, uncomment the following line
         // let access_model = TraceAccessModel::new(access_model);
@@ -200,35 +195,61 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         self.access_model.clear();
     }
 
+    /// Resolve the real path for a file id.
+    pub fn file_path(&self, id: TypstFileId) -> Result<ImmutPath, FileError> {
+        self.access_model.inner.resolver.path_for_id(id)
+    }
+
     /// Reset the shadowing files in [`OverlayAccessModel`].
     ///
     /// Note: This function is independent from [`Vfs::reset`].
     pub fn reset_shadow(&mut self) {
-        self.access_model.inner.clear_shadow();
+        self.access_model.clear_shadow();
+        self.access_model.inner.inner.clear_shadow();
     }
 
     /// Get paths to all the shadowing files in [`OverlayAccessModel`].
     pub fn shadow_paths(&self) -> Vec<ImmutPath> {
-        self.access_model.inner.file_paths()
+        self.access_model.inner.inner.file_paths()
+    }
+
+    /// Get paths to all the shadowing files in [`OverlayAccessModel`].
+    pub fn shadow_ids(&self) -> Vec<TypstFileId> {
+        self.access_model.file_paths()
     }
 
     /// Add a shadowing file to the [`OverlayAccessModel`].
     pub fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()> {
-        self.access_model.inner.add_file(path, content);
+        self.access_model
+            .inner
+            .inner
+            .add_file(path, content, |c| c.into());
 
         Ok(())
     }
 
     /// Remove a shadowing file from the [`OverlayAccessModel`].
     pub fn remove_shadow(&mut self, path: &Path) {
-        self.access_model.inner.remove_file(path);
+        self.access_model.inner.inner.remove_file(path);
+    }
+
+    /// Add a shadowing file to the [`OverlayAccessModel`] by file id.
+    pub fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
+        self.access_model.add_file(&file_id, content, |c| *c);
+
+        Ok(())
+    }
+
+    /// Remove a shadowing file from the [`OverlayAccessModel`] by file id.
+    pub fn remove_shadow_by_id(&mut self, file_id: TypstFileId) {
+        self.access_model.remove_file(&file_id);
     }
 
     /// Let the vfs notify the access model with a filesystem event.
     ///
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_event(&mut self, event: FilesystemEvent) {
-        self.access_model.inner.inner.notify(event);
+        self.access_model.inner.inner.inner.notify(event);
     }
 
     /// Returns the overall memory usage for the stored files.
@@ -243,6 +264,11 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         } else {
             Err(FileError::IsDirectory)
         }
+    }
+
+    /// Whether the given path is a file.
+    pub fn is_file(&self, path: TypstFileId) -> FileResult<bool> {
+        self.access_model.is_file(path)
     }
 }
 

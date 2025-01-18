@@ -3,6 +3,7 @@ use std::sync::{Arc, LazyLock};
 
 use serde::{Deserialize, Serialize};
 use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist_vfs::{WorkspaceResolution, WorkspaceResolver};
 use typst::diag::SourceResult;
 use typst::syntax::{FileId, VirtualPath};
 
@@ -28,10 +29,6 @@ pub trait EntryManager: EntryReader {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 pub struct EntryState {
-    /// The differences is that: if the entry is rooted, the workspace root is
-    /// the parent of the entry file and cannot be used by workspace functions
-    /// like [`EntryState::try_select_path_in_workspace`].
-    rooted: bool,
     /// Path to the root directory of compilation.
     /// The world forbids direct access to files outside this directory.
     root: Option<ImmutPath>,
@@ -49,7 +46,6 @@ impl EntryState {
     /// Create an entry state with no workspace root and no main file.
     pub fn new_detached() -> Self {
         Self {
-            rooted: false,
             root: None,
             main: None,
         }
@@ -61,20 +57,23 @@ impl EntryState {
     }
 
     /// Create an entry state with a workspace root and an optional main file.
-    pub fn new_rooted(root: ImmutPath, main: Option<FileId>) -> Self {
+    pub fn new_rooted(root: ImmutPath, main: Option<VirtualPath>) -> Self {
+        let main = main.map(|main| WorkspaceResolver::workspace_file(Some(&root), main));
         Self {
-            rooted: true,
             root: Some(root),
             main,
         }
     }
 
     /// Create an entry state with only a main file given.
-    pub fn new_rootless(entry: ImmutPath) -> Option<Self> {
+    pub fn new_rooted_by_parent(entry: ImmutPath) -> Option<Self> {
+        let root = entry.parent().map(ImmutPath::from);
+        let main =
+            WorkspaceResolver::workspace_file(root.as_ref(), VirtualPath::new(entry.file_name()?));
+
         Some(Self {
-            rooted: false,
-            root: entry.parent().map(From::from),
-            main: Some(FileId::new(None, VirtualPath::new(entry.file_name()?))),
+            root,
+            main: Some(main),
         })
     }
 
@@ -87,27 +86,32 @@ impl EntryState {
     }
 
     pub fn workspace_root(&self) -> Option<ImmutPath> {
-        self.rooted.then(|| self.root.clone()).flatten()
+        if let Some(main) = self.main {
+            let pkg = WorkspaceResolver::resolve(main).ok()?;
+            match pkg {
+                WorkspaceResolution::Workspace(id) => Some(id.path().clone()),
+                WorkspaceResolution::Package => self.root.clone(),
+            }
+        } else {
+            self.root.clone()
+        }
     }
 
-    pub fn select_in_workspace(&self, id: FileId) -> EntryState {
+    pub fn select_in_workspace(&self, id: &Path) -> EntryState {
+        let id = WorkspaceResolver::workspace_file(self.root.as_ref(), VirtualPath::new(id));
+
         Self {
-            rooted: self.rooted,
             root: self.root.clone(),
             main: Some(id),
         }
     }
 
-    pub fn try_select_path_in_workspace(
-        &self,
-        p: &Path,
-        allow_rootless: bool,
-    ) -> ZResult<Option<EntryState>> {
+    pub fn try_select_path_in_workspace(&self, p: &Path) -> ZResult<Option<EntryState>> {
         Ok(match self.workspace_root() {
             Some(root) => match p.strip_prefix(&root) {
                 Ok(p) => Some(EntryState::new_rooted(
                     root.clone(),
-                    Some(FileId::new(None, VirtualPath::new(p))),
+                    Some(VirtualPath::new(p)),
                 )),
                 Err(e) => {
                     return Err(
@@ -115,8 +119,7 @@ impl EntryState {
                     )
                 }
             },
-            None if allow_rootless => EntryState::new_rootless(p.into()),
-            None => None,
+            None => EntryState::new_rooted_by_parent(p.into()),
         })
     }
 
@@ -138,11 +141,9 @@ pub enum EntryOpts {
         /// Relative path to the main file in the workspace.
         entry: Option<PathBuf>,
     },
-    RootlessEntry {
+    RootByParent {
         /// Path to the entry file of compilation.
         entry: PathBuf,
-        /// Parent directory of the entry file.
-        root: Option<PathBuf>,
     },
     Detached,
 }
@@ -171,9 +172,8 @@ impl EntryOpts {
             return None;
         }
 
-        Some(Self::RootlessEntry {
+        Some(Self::RootByParent {
             entry: entry.clone(),
-            root: entry.parent().map(From::from),
         })
     }
 }
@@ -185,33 +185,16 @@ impl TryFrom<EntryOpts> for EntryState {
         match value {
             EntryOpts::Workspace { root, entry } => Ok(EntryState::new_rooted(
                 root.as_path().into(),
-                entry.map(|e| FileId::new(None, VirtualPath::new(e))),
+                entry.map(VirtualPath::new),
             )),
-            EntryOpts::RootlessEntry { entry, root } => {
+            EntryOpts::RootByParent { entry } => {
                 if entry.is_relative() {
                     return Err(error_once!("entry path must be absolute", path: entry.display()));
                 }
 
                 // todo: is there path that has no parent?
-                let root = root
-                    .as_deref()
-                    .or_else(|| entry.parent())
-                    .ok_or_else(|| error_once!("a root must be determined for EntryOpts::PreparedEntry", path: entry.display()))?;
-
-                let relative_entry = match entry.strip_prefix(root) {
-                    Ok(e) => e,
-                    Err(_) => {
-                        return Err(
-                            error_once!("entry path must be inside the root", path: entry.display()),
-                        )
-                    }
-                };
-
-                Ok(EntryState {
-                    rooted: false,
-                    root: Some(root.into()),
-                    main: Some(FileId::new(None, VirtualPath::new(relative_entry))),
-                })
+                EntryState::new_rooted_by_parent(entry.as_path().into())
+                    .ok_or_else(|| error_once!("entry path is invalid", path: entry.display()))
             }
             EntryOpts::Detached => Ok(EntryState::new_detached()),
         }

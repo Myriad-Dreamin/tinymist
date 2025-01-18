@@ -6,6 +6,7 @@ pub mod scopes;
 pub mod value;
 
 use core::fmt;
+use std::path::Path;
 use std::sync::Arc;
 use std::{fmt::Write, sync::LazyLock};
 
@@ -28,7 +29,7 @@ use value::{Args, Value};
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
+    FileId, Source, SyntaxKind, SyntaxNode,
 };
 
 pub use typst_syntax as syntax;
@@ -446,14 +447,14 @@ impl TypliteWorker {
         let main = Bytes::from(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
-        let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
-        let entry = self.world.entry_state().select_in_workspace(main_id);
+        let path = Path::new("__render__.typ");
+        let entry = self.world.entry_state().select_in_workspace(path);
         let mut world = self.world.task(tinymist_project::TaskInputs {
             entry: Some(entry),
             inputs,
         });
         world.source_db.take_state();
-        world.map_shadow_by_id(main_id, main).unwrap();
+        world.map_shadow_by_id(world.main(), main).unwrap();
 
         let document = typst::compile(&world).output;
         let document = document.map_err(|diagnostics| {
