@@ -23,8 +23,9 @@ pub struct ProxyAccessModel {
 }
 
 impl PathAccessModel for ProxyAccessModel {
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        self.is_file_fn
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        let is_file = self
+            .is_file_fn
             .call1(&self.context, &src.to_string_lossy().as_ref().into())
             .map(|v| v.as_bool().unwrap())
             .map_err(|e| {
@@ -34,10 +35,13 @@ impl PathAccessModel for ProxyAccessModel {
                     &e,
                 );
                 FileError::AccessDenied
-            })
-    }
+            });
 
-    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        // todo: remove this compatibility code
+        if !is_file? {
+            return Err(FileError::IsDirectory);
+        }
+
         let data = self
             .read_all_fn
             .call1(&self.context, &src.to_string_lossy().as_ref().into())

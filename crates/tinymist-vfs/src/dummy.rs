@@ -13,20 +13,12 @@ use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
 pub struct DummyAccessModel;
 
 impl AccessModel for DummyAccessModel {
-    fn is_file(&self, _src: TypstFileId) -> FileResult<bool> {
-        Ok(true)
-    }
-
     fn content(&self, _src: TypstFileId) -> FileResult<Bytes> {
         Err(FileError::AccessDenied)
     }
 }
 
 impl PathAccessModel for DummyAccessModel {
-    fn is_file(&self, _src: &Path) -> FileResult<bool> {
-        Ok(true)
-    }
-
     fn content(&self, _src: &Path) -> FileResult<Bytes> {
         Err(FileError::AccessDenied)
     }

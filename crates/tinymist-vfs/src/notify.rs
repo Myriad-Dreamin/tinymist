@@ -228,14 +228,6 @@ impl<M: PathAccessModel> NotifyAccessModel<M> {
 }
 
 impl<M: PathAccessModel> PathAccessModel for NotifyAccessModel<M> {
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        if let Some(entry) = self.files.get(src) {
-            return entry.is_file();
-        }
-
-        self.inner.is_file(src)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(entry) = self.files.get(src) {
             return entry.content().cloned();

@@ -22,11 +22,6 @@ impl SystemAccessModel {
 }
 
 impl PathAccessModel for SystemAccessModel {
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        let f = |e| FileError::from_io(e, src);
-        Ok(self.stat(src).map_err(f)?.is_file)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         let f = |e| FileError::from_io(e, src);
         let mut buf = Vec::<u8>::new();
