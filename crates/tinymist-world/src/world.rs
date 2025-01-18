@@ -7,9 +7,7 @@ use std::{
 
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
-use tinymist_std::error::prelude::*;
-use tinymist_std::time::Time;
-use tinymist_std::ImmutPath;
+use tinymist_std::{error::prelude::*, ImmutPath};
 use tinymist_vfs::{notify::FilesystemEvent, AccessModel, PathMapper, PathResolution, Vfs};
 use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
@@ -460,10 +458,6 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
     fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath> {
         self.path_for_id(id)
-    }
-
-    fn mtime(&self, src: TypstFileId) -> FileResult<Time> {
-        self.vfs.access_model.mtime(&self.file_path(src)?)
     }
 
     fn read(&self, src: TypstFileId) -> FileResult<Bytes> {

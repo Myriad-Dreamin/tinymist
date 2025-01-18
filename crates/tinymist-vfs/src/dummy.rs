@@ -3,7 +3,7 @@ use std::path::Path;
 use typst::diag::{FileError, FileResult};
 
 use super::AccessModel;
-use crate::{Bytes, Time};
+use crate::Bytes;
 
 /// Provides dummy access model.
 ///
@@ -14,10 +14,6 @@ use crate::{Bytes, Time};
 pub struct DummyAccessModel;
 
 impl AccessModel for DummyAccessModel {
-    fn mtime(&self, _src: &Path) -> FileResult<Time> {
-        Ok(Time::UNIX_EPOCH)
-    }
-
     fn is_file(&self, _src: &Path) -> FileResult<bool> {
         Ok(true)
     }

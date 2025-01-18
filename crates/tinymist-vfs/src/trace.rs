@@ -29,19 +29,6 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
         self.inner.clear();
     }
 
-    fn mtime(&self, src: &Path) -> FileResult<crate::Time> {
-        let instant = tinymist_std::time::Instant::now();
-        let res = self.inner.mtime(src);
-        let elapsed = instant.elapsed();
-        // self.trace[0] += elapsed.as_nanos() as u64;
-        self.trace[0].fetch_add(
-            elapsed.as_nanos() as u64,
-            std::sync::atomic::Ordering::Relaxed,
-        );
-        crate::utils::console_log!("mtime: {:?} {:?} => {:?}", src, elapsed, res);
-        res
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         let instant = tinymist_std::time::Instant::now();
         let res = self.inner.is_file(src);

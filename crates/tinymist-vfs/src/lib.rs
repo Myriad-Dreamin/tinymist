@@ -68,11 +68,6 @@ pub trait AccessModel {
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
     fn clear(&mut self) {}
-    /// Return a mtime corresponding to the path.
-    ///
-    /// Note: vfs won't touch the file entry if mtime is same between vfs reset
-    /// lifecycles for performance design.
-    fn mtime(&self, src: &Path) -> FileResult<Time>;
 
     /// Return whether a path is corresponding to a file.
     fn is_file(&self, src: &Path) -> FileResult<bool>;
@@ -102,10 +97,6 @@ where
         self.inner.write().clear();
     }
 
-    fn mtime(&self, src: &Path) -> FileResult<Time> {
-        self.inner.read().mtime(src)
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         self.inner.read().is_file(src)
     }
@@ -122,8 +113,6 @@ type VfsAccessModel<M> = OverlayAccessModel<NotifyAccessModel<SharedAccessModel<
 pub trait FsProvider {
     /// Arbitrary one of file path corresponding to the given `id`.
     fn file_path(&self, id: TypstFileId) -> FileResult<ImmutPath>;
-
-    fn mtime(&self, id: TypstFileId) -> FileResult<Time>;
 
     fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
 

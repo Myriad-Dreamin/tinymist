@@ -3,7 +3,7 @@ use std::path::Path;
 use typst::diag::{FileError, FileResult};
 use wasm_bindgen::prelude::*;
 
-use crate::{AccessModel, Bytes, Time};
+use crate::{AccessModel, Bytes};
 
 /// Provides proxy access model from typst compiler to some JavaScript
 /// implementation.
@@ -23,23 +23,6 @@ pub struct ProxyAccessModel {
 }
 
 impl AccessModel for ProxyAccessModel {
-    fn mtime(&self, src: &Path) -> FileResult<Time> {
-        self.mtime_fn
-            .call1(&self.context, &src.to_string_lossy().as_ref().into())
-            .map(|v| {
-                let v = v.as_f64().unwrap();
-                Time::UNIX_EPOCH + std::time::Duration::from_secs_f64(v)
-            })
-            .map_err(|e| {
-                web_sys::console::error_3(
-                    &"typst_ts::compiler::ProxyAccessModel::mtime failure".into(),
-                    &src.to_string_lossy().as_ref().into(),
-                    &e,
-                );
-                FileError::AccessDenied
-            })
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         self.is_file_fn
             .call1(&self.context, &src.to_string_lossy().as_ref().into())

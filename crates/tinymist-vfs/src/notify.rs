@@ -239,14 +239,6 @@ impl<M: AccessModel> NotifyAccessModel<M> {
 }
 
 impl<M: AccessModel> AccessModel for NotifyAccessModel<M> {
-    fn mtime(&self, src: &Path) -> FileResult<crate::Time> {
-        if let Some(entry) = self.files.get(src) {
-            return entry.mtime().cloned();
-        }
-
-        self.inner.mtime(src)
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         if let Some(entry) = self.files.get(src) {
             return entry.is_file();

@@ -2,7 +2,7 @@ use std::{fs::File, io::Read, path::Path};
 
 use typst::diag::{FileError, FileResult};
 
-use crate::{AccessModel, Bytes, Time};
+use crate::{AccessModel, Bytes};
 use tinymist_std::ReadAllOnce;
 
 /// Provides SystemAccessModel that makes access to the local file system for
@@ -14,18 +14,12 @@ impl SystemAccessModel {
     fn stat(&self, src: &Path) -> std::io::Result<SystemFileMeta> {
         let meta = std::fs::metadata(src)?;
         Ok(SystemFileMeta {
-            mt: meta.modified()?,
             is_file: meta.is_file(),
         })
     }
 }
 
 impl AccessModel for SystemAccessModel {
-    fn mtime(&self, src: &Path) -> FileResult<Time> {
-        let f = |e| FileError::from_io(e, src);
-        Ok(self.stat(src).map_err(f)?.mt)
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         let f = |e| FileError::from_io(e, src);
         Ok(self.stat(src).map_err(f)?.is_file)
@@ -74,6 +68,5 @@ impl ReadAllOnce for LazyFile {
 /// Meta data of a file in the local file system.
 #[derive(Debug, Clone, Copy)]
 pub struct SystemFileMeta {
-    mt: std::time::SystemTime,
     is_file: bool,
 }

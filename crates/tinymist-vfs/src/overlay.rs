@@ -86,14 +86,6 @@ impl<M: AccessModel> OverlayAccessModel<M> {
 }
 
 impl<M: AccessModel> AccessModel for OverlayAccessModel<M> {
-    fn mtime(&self, src: &Path) -> FileResult<Time> {
-        if let Some(meta) = self.files.get(src) {
-            return Ok(meta.mt);
-        }
-
-        self.inner.mtime(src)
-    }
-
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         if self.files.get(src).is_some() {
             return Ok(true);
