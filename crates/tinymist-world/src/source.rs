@@ -55,6 +55,7 @@ impl<T: Revised> SharedState<T> {
 }
 
 pub struct SourceCache {
+    touched_by_compile: bool,
     last_accessed_rev: NonZeroUsize,
     fid: TypstFileId,
     source: IncrFileQuery<Source>,
@@ -101,6 +102,7 @@ impl SourceState {
 
 #[derive(Clone)]
 pub struct SourceDb {
+    pub is_compiling: bool,
     pub revision: NonZeroUsize,
     pub shared: Arc<RwLock<SharedState<SourceCache>>>,
     /// The slots for all the files during a single lifecycle.
@@ -119,6 +121,10 @@ impl SourceDb {
             revision: self.revision,
             slots: std::mem::take(&mut self.slots),
         }
+    }
+
+    pub fn set_is_compiling(&mut self, is_compiling: bool) {
+        self.is_compiling = is_compiling;
     }
 
     /// Returns the overall memory usage for the stored files.
@@ -152,8 +158,11 @@ impl SourceDb {
     /// When you don't reset the vfs for each compilation, this function will
     /// still return remaining files from the previous compilation.
     pub fn iter_dependencies_dyn(&self, f: &mut dyn FnMut(TypstFileId)) {
-        for slot in self.slots.lock().iter() {
-            f(slot.1.fid);
+        for slot in self.slots.lock().values() {
+            if !slot.touched_by_compile {
+                continue;
+            }
+            f(slot.fid);
         }
     }
 
@@ -196,6 +205,7 @@ impl SourceDb {
 
             cache_entry
                 .map(|e| SourceCache {
+                    touched_by_compile: self.is_compiling,
                     last_accessed_rev: self.revision.max(e.last_accessed_rev),
                     fid,
                     source: IncrFileQuery::with_context(
@@ -209,6 +219,7 @@ impl SourceDb {
                     buffer: FileQuery::default(),
                 })
                 .unwrap_or_else(|| SourceCache {
+                    touched_by_compile: self.is_compiling,
                     last_accessed_rev: self.revision,
                     fid,
                     source: IncrFileQuery::with_context(None),

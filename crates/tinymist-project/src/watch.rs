@@ -16,9 +16,9 @@ use tokio::sync::mpsc;
 use typst::diag::{EcoString, FileError, FileResult};
 
 use crate::vfs::{
-    notify::{FileChangeSet, FileSnapshot, FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
+    notify::{FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
-    Bytes, PathAccessModel,
+    Bytes, FileChangeSet, FileSnapshot, PathAccessModel,
 };
 use tinymist_std::ImmutPath;
 

@@ -454,7 +454,7 @@ impl TypliteWorker {
             entry: Some(entry),
             inputs,
         });
-        world.source_db.take_state();
+        world.take_state();
         world.map_shadow_by_id(world.main(), main).unwrap();
 
         let document = typst::compile(&world).output;

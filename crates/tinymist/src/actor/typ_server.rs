@@ -12,8 +12,8 @@ use reflexo_typst::{
     features::WITH_COMPILING_STATUS_FEATURE, typst::prelude::EcoVec, CompileEnv, CompileReport,
     Compiler, ConsoleDiagReporter, FeatureSet, GenericExporter, TypstDocument,
 };
-use tinymist_project::vfs::FsProvider;
 use tinymist_project::watch_deps;
+use tinymist_project::{vfs::FsProvider, RevisingUniverse};
 use tokio::sync::{mpsc, oneshot};
 use typst::diag::{SourceDiagnostic, SourceResult};
 
@@ -26,7 +26,6 @@ use crate::world::base::{
     CompilerUniverse,
     CompilerWorld,
     EntryReader,
-    Revising,
     TaskInputs,
     WorldDeps,
 };
@@ -578,7 +577,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 if self
                     .watch_snap
                     .get()
-                    .is_some_and(|e| e.world.revision() < *self.verse.revision.read())
+                    .is_some_and(|e| e.world.revision() < self.verse.revision)
                 {
                     self.watch_snap = OnceLock::new();
                 }
@@ -613,7 +612,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     if self.suspended {
                         log::info!("CompileServerActor: removing diag");
                         self.compile_handle
-                            .status(self.verse.revision.get_mut().get(), CompileReport::Suspend);
+                            .status(self.verse.revision.get(), CompileReport::Suspend);
                     }
 
                     // Reset the watch state and document state.
@@ -682,7 +681,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                         // Actual a delayed memory event.
                         reason = reason_by_mem();
                     }
-                    verse.notify_fs_event(event)
+                    verse.vfs().notify_fs_event(event)
                 });
 
                 reason
@@ -699,7 +698,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
     /// Apply delayed memory changes to underlying compiler.
     fn apply_delayed_memory_changes(
-        verse: &mut Revising<CompilerUniverse<F>>,
+        verse: &mut RevisingUniverse<F>,
         dirty_shadow_logical_tick: &mut usize,
         event: &mut FilesystemEvent,
     ) -> Option<()> {
@@ -723,25 +722,18 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     }
 
     /// Apply memory changes to underlying compiler.
-    fn apply_memory_changes(verse: &mut Revising<CompilerUniverse<F>>, event: MemoryEvent) {
+    fn apply_memory_changes(verse: &mut RevisingUniverse<F>, event: MemoryEvent) {
+        let mut vfs = verse.vfs();
         if matches!(event, MemoryEvent::Sync(..)) {
-            verse.reset_shadow();
+            vfs.reset_shadow();
         }
         match event {
             MemoryEvent::Update(event) | MemoryEvent::Sync(event) => {
-                for removes in event.removes {
-                    let _ = verse.unmap_shadow(&removes);
+                for path in event.removes {
+                    let _ = vfs.unmap_shadow(&path);
                 }
-                for (p, t) in event.inserts {
-                    let insert_file = match t.content().cloned() {
-                        Ok(content) => content,
-                        Err(err) => {
-                            log::error!("CompileServerActor: read memory file at {p:?}: {err}");
-                            continue;
-                        }
-                    };
-
-                    let _ = verse.map_shadow(&p, insert_file);
+                for (path, snap) in event.inserts {
+                    let _ = vfs.map_shadow(&path, snap);
                 }
             }
         }

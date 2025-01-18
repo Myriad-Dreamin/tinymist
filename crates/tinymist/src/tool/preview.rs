@@ -3,7 +3,7 @@
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};

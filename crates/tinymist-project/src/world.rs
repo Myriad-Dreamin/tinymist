@@ -7,7 +7,9 @@ pub use tinymist_world::config::CompileFontOpts;
 use tinymist_world::package::RegistryPathMapper;
 pub use tinymist_world::vfs;
 pub use tinymist_world::{entry::*, EntryOpts, EntryState};
-pub use tinymist_world::{font, package, CompilerUniverse, CompilerWorld, Revising, TaskInputs};
+pub use tinymist_world::{
+    font, package, CompilerUniverse, CompilerWorld, RevisingUniverse, TaskInputs,
+};
 
 use std::path::Path;
 use std::{borrow::Cow, sync::Arc};
