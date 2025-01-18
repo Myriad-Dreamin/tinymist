@@ -132,7 +132,7 @@ pub enum MemoryEvent {
     /// this:
     ///
     /// ```
-    /// use typst_ts_compiler::vfs::notify::{MemoryEvent, FileChangeSet};
+    /// use crate::notify::{MemoryEvent, FileChangeSet};
     /// let event = MemoryEvent::Sync(FileChangeSet::default());
     /// ```
     Sync(FileChangeSet),
