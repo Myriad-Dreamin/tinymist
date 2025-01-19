@@ -436,7 +436,11 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     pub fn take_cache(&mut self) -> SourceCache {
-        self.vfs.take_state()
+        self.vfs.take_source_cache()
+    }
+
+    pub fn clone_cache(&mut self) -> SourceCache {
+        self.vfs.clone_source_cache()
     }
 
     pub fn take_db(&mut self) -> SourceDb {
@@ -489,6 +493,16 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
     pub fn revision(&self) -> NonZeroUsize {
         self.revision
+    }
+
+    pub fn evict_vfs(&mut self, threshold: usize) {
+        self.vfs.evict(threshold);
+    }
+
+    pub fn evict_source_cache(&mut self, threshold: usize) {
+        self.vfs
+            .clone_source_cache()
+            .evict(self.vfs.revision(), threshold);
     }
 }
 

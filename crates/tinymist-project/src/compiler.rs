@@ -712,8 +712,6 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
 
         let mut world = artifact.snap.world;
 
-        let rev = world.revision();
-        let cache = world.take_cache();
         let is_primary = self.id == ProjectInsId("primary".into());
 
         // Trigger an evict task.
@@ -721,10 +719,14 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
             let evict_start = std::time::Instant::now();
             if is_primary {
                 comemo::evict(10);
+
+                // Since all the projects share the same cache, we need to evict the cache
+                // on the primary instance for all the projects.
+                world.evict_source_cache(30);
             }
-            cache.evict(rev, 10);
+            world.evict_vfs(60);
             let elapsed = evict_start.elapsed();
-            log::info!("CacheEvictTask: evict cache in {elapsed:?}");
+            log::info!("ProjectCompiler: evict cache in {elapsed:?}");
         });
     }
 
