@@ -91,7 +91,7 @@ impl RenderActor {
                 log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
                 // end position is used
                 if let Some(spans) = spans {
-                    self.resolve_span_range(spans.0..spans.1);
+                    self.editor_resolve_span_range(spans.0..spans.1);
                 }
             }
             RenderActorRequest::ResolveSourceLoc(req) => {
