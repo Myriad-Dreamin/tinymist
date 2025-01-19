@@ -710,10 +710,19 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
         let err = self.dep_tx.send(event);
         log_send_error("dep_tx", err);
 
+        let mut world = artifact.snap.world;
+
+        let rev = world.revision();
+        let cache = world.take_cache();
+        let is_primary = self.id == ProjectInsId("primary".into());
+
         // Trigger an evict task.
-        rayon::spawn(|| {
+        rayon::spawn(move || {
             let evict_start = std::time::Instant::now();
-            comemo::evict(30);
+            if is_primary {
+                comemo::evict(10);
+            }
+            cache.evict(rev, 10);
             let elapsed = evict_start.elapsed();
             log::info!("CacheEvictTask: evict cache in {elapsed:?}");
         });
