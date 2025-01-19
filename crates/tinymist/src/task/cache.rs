@@ -1,17 +1,26 @@
 //! The actor that handles cache evicting.
 
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::{
+    num::NonZeroUsize,
+    sync::{atomic::AtomicUsize, Arc},
+};
+
+use crate::world::vfs::SourceCache;
 
 use super::{FutureFolder, SyncTaskFactory};
 
 #[derive(Debug, Clone)]
 pub struct CacheUserConfig {
     pub max_age: usize,
+    pub vfs_age: usize,
 }
 
 impl Default for CacheUserConfig {
     fn default() -> Self {
-        Self { max_age: 30 }
+        Self {
+            max_age: 30,
+            vfs_age: 15,
+        }
     }
 }
 
@@ -31,7 +40,7 @@ impl CacheTask {
         }
     }
 
-    pub fn evict(&self) {
+    pub fn evict(&self, rev: NonZeroUsize, source_cache: SourceCache) {
         let revision = self
             .revision
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -42,6 +51,7 @@ impl CacheTask {
                     // Evict compilation cache.
                     let evict_start = std::time::Instant::now();
                     comemo::evict(task.max_age);
+                    source_cache.evict(rev, task.vfs_age);
                     let elapsed = evict_start.elapsed();
                     log::info!("CacheEvictTask: evict cache in {elapsed:?}");
                 })

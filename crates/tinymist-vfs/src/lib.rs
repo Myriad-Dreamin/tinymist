@@ -23,7 +23,7 @@ pub mod dummy;
 /// Provides snapshot models
 pub mod snapshot;
 pub use snapshot::*;
-use tinymist_std::hash::FxHashMap;
+use tinymist_std::hash::{FxDashMap, FxHashMap};
 
 /// Provides notify access model which retrieves file system events and changes
 /// from some notify backend.
@@ -131,12 +131,52 @@ pub trait FsProvider {
     fn file_path(&self, id: TypstFileId) -> FileResult<PathResolution>;
 
     fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
+    fn read_source(&self, id: TypstFileId) -> FileResult<Source>;
+}
+
+struct SourceEntry {
+    last_accessed_rev: NonZeroUsize,
+    source: FileResult<Source>,
+}
+
+#[derive(Default)]
+struct SourceIdShard {
+    last_accessed_rev: usize,
+    recent_source: Option<Source>,
+    sources: FxHashMap<Bytes, SourceEntry>,
+}
+
+#[derive(Default, Clone)]
+pub struct SourceCache {
+    /// The cache entries for each paths
+    cache_entries: Arc<FxDashMap<TypstFileId, SourceIdShard>>,
+}
+
+impl SourceCache {
+    pub fn evict(&self, curr: NonZeroUsize, threshold: usize) {
+        self.cache_entries.retain(|_, shard| {
+            let diff = curr.get().saturating_sub(shard.last_accessed_rev);
+            if diff > threshold {
+                return false;
+            }
+
+            shard.sources.retain(|_, entry| {
+                let diff = curr.get().saturating_sub(entry.last_accessed_rev.get());
+                diff <= threshold
+            });
+
+            true
+        });
+    }
 }
 
 /// Create a new `Vfs` harnessing over the given `access_model` specific for
 /// `reflexo_world::CompilerWorld`. With vfs, we can minimize the
 /// implementation overhead for [`AccessModel`] trait.
 pub struct Vfs<M: PathAccessModel + Sized> {
+    source_cache: SourceCache,
+    // The slots for all the files during a single lifecycle.
+    // pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
     managed: Arc<Mutex<EntryMap>>,
     paths: Arc<Mutex<PathMap>>,
     revision: NonZeroUsize,
@@ -158,11 +198,16 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
 
     pub fn snapshot(&self) -> Self {
         Self {
+            source_cache: self.source_cache.clone(),
             managed: self.managed.clone(),
             paths: self.paths.clone(),
             revision: self.revision,
             access_model: self.access_model.clone(),
         }
+    }
+
+    pub fn take_state(&self) -> SourceCache {
+        self.source_cache.clone()
     }
 }
 
@@ -193,6 +238,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         // let access_model = TraceAccessModel::new(access_model);
 
         Self {
+            source_cache: SourceCache::default(),
             managed: Arc::default(),
             paths: Arc::default(),
             revision: NonZeroUsize::new(1).expect("initial revision is 1"),
@@ -271,21 +317,57 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Reads a source.
-    pub fn source(&self, fid: TypstFileId) -> FileResult<Source> {
+    pub fn source(&self, file_id: TypstFileId) -> FileResult<Source> {
         let (bytes, source) = self
             .managed
             .lock()
-            .slot(fid, |entry| (entry.bytes.clone(), entry.source.clone()));
+            .slot(file_id, |entry| (entry.bytes.clone(), entry.source.clone()));
 
         let source = source.get_or_init(|| {
             let content = self
-                .read_content(&bytes, fid)
+                .read_content(&bytes, file_id)
                 .as_ref()
                 .map_err(Clone::clone)?;
 
-            let content = std::str::from_utf8(content).map_err(|_| FileError::InvalidUtf8)?;
+            let mut cache_entry = self.source_cache.cache_entries.entry(file_id).or_default();
+            if let Some(source) = cache_entry.sources.get(content) {
+                return source.source.clone();
+            }
 
-            Ok(Source::new(fid, content.into()))
+            let source = (|| {
+                let prev = cache_entry.recent_source.clone();
+                let content = from_utf8_or_bom(content).map_err(|_| FileError::InvalidUtf8)?;
+
+                let next = match prev {
+                    Some(mut prev) => {
+                        prev.replace(content);
+                        prev
+                    }
+                    None => Source::new(file_id, content.to_owned()),
+                };
+
+                let should_update = cache_entry.recent_source.is_none()
+                    || cache_entry.last_accessed_rev < self.revision.get();
+                if should_update {
+                    cache_entry.recent_source = Some(next.clone());
+                }
+
+                Ok(next)
+            })();
+
+            let entry = cache_entry
+                .sources
+                .entry(content.clone())
+                .or_insert_with(|| SourceEntry {
+                    last_accessed_rev: self.revision,
+                    source: source.clone(),
+                });
+
+            if entry.last_accessed_rev < self.revision {
+                entry.last_accessed_rev = self.revision;
+            }
+
+            source
         });
 
         source.clone()
@@ -468,6 +550,17 @@ impl PathMap {
     fn remove(&mut self, path: &Path) -> Option<Vec<TypstFileId>> {
         self.paths.remove(path)
     }
+}
+
+/// Convert a byte slice to a string, removing UTF-8 BOM if present.
+fn from_utf8_or_bom(buf: &[u8]) -> FileResult<&str> {
+    Ok(std::str::from_utf8(if buf.starts_with(b"\xef\xbb\xbf") {
+        // remove UTF-8 BOM
+        &buf[3..]
+    } else {
+        // Assume UTF-8
+        buf
+    })?)
 }
 
 #[cfg(test)]

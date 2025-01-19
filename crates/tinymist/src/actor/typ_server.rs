@@ -532,7 +532,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
         self.compiling = false;
 
-        let world = &artifact.snap.world;
+        let mut world = artifact.snap.world;
         let compiled_revision = world.revision().get();
         if self.committed_revision >= compiled_revision {
             return;
@@ -558,7 +558,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        self.cache.evict();
+        self.cache.evict(world.revision(), world.take_state());
     }
 
     /// Process some interrupt. Return whether it needs compilation.

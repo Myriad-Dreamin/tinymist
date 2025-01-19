@@ -3,7 +3,7 @@
 use core::fmt;
 use std::{num::NonZeroUsize, sync::Arc};
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use tinymist_std::hash::FxHashMap;
 use tinymist_std::QueryRef;
 use tinymist_vfs::{Bytes, FsProvider, TypstFileId};
@@ -22,41 +22,8 @@ pub trait Revised {
     fn last_accessed_rev(&self) -> NonZeroUsize;
 }
 
-pub struct SharedState<T> {
-    pub committed_revision: Option<usize>,
-    // todo: fine-grained lock
-    /// The cache entries for each paths
-    cache_entries: FxHashMap<TypstFileId, T>,
-}
-
-impl<T> fmt::Debug for SharedState<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SharedState")
-            .field("committed_revision", &self.committed_revision)
-            .finish()
-    }
-}
-
-impl<T> Default for SharedState<T> {
-    fn default() -> Self {
-        SharedState {
-            committed_revision: None,
-            cache_entries: FxHashMap::default(),
-        }
-    }
-}
-
-impl<T: Revised> SharedState<T> {
-    fn gc(&mut self) {
-        let committed = self.committed_revision.unwrap_or(0);
-        self.cache_entries
-            .retain(|_, v| committed.saturating_sub(v.last_accessed_rev().get()) <= 30);
-    }
-}
-
 pub struct SourceCache {
     touched_by_compile: bool,
-    last_accessed_rev: NonZeroUsize,
     fid: TypstFileId,
     source: IncrFileQuery<Source>,
     buffer: FileQuery<Bytes>,
@@ -68,43 +35,9 @@ impl fmt::Debug for SourceCache {
     }
 }
 
-impl Revised for SourceCache {
-    fn last_accessed_rev(&self) -> NonZeroUsize {
-        self.last_accessed_rev
-    }
-}
-
-pub struct SourceState {
-    pub revision: NonZeroUsize,
-    pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
-}
-
-impl SourceState {
-    pub fn commit_impl(self, state: &mut SharedState<SourceCache>) {
-        log::debug!("drop source db revision {}", self.revision);
-
-        if let Ok(slots) = Arc::try_unwrap(self.slots) {
-            // todo: utilize the committed revision is not zero
-            if state
-                .committed_revision
-                .is_some_and(|committed| committed >= self.revision.get())
-            {
-                return;
-            }
-
-            log::debug!("committing source db revision {}", self.revision);
-            state.committed_revision = Some(self.revision.get());
-            state.cache_entries = slots.into_inner();
-            state.gc();
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct SourceDb {
     pub is_compiling: bool,
-    pub revision: NonZeroUsize,
-    pub shared: Arc<RwLock<SharedState<SourceCache>>>,
     /// The slots for all the files during a single lifecycle.
     pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
 }
@@ -116,13 +49,6 @@ impl fmt::Debug for SourceDb {
 }
 
 impl SourceDb {
-    pub fn take_state(&mut self) -> SourceState {
-        SourceState {
-            revision: self.revision,
-            slots: std::mem::take(&mut self.slots),
-        }
-    }
-
     pub fn set_is_compiling(&mut self, is_compiling: bool) {
         self.is_compiling = is_compiling;
     }
@@ -199,33 +125,20 @@ impl SourceDb {
     /// Insert a new slot into the vfs.
     fn slot<T>(&self, fid: TypstFileId, f: impl FnOnce(&SourceCache) -> T) -> T {
         let mut slots = self.slots.lock();
-        f(slots.entry(fid).or_insert_with(|| {
-            let state = self.shared.read();
-            let cache_entry = state.cache_entries.get(&fid);
-
-            cache_entry
-                .map(|e| SourceCache {
-                    touched_by_compile: self.is_compiling,
-                    last_accessed_rev: self.revision.max(e.last_accessed_rev),
-                    fid,
-                    source: IncrFileQuery::with_context(
-                        e.source
-                            .get_uninitialized()
-                            .cloned()
-                            .transpose()
-                            .ok()
-                            .flatten(),
-                    ),
-                    buffer: FileQuery::default(),
-                })
-                .unwrap_or_else(|| SourceCache {
-                    touched_by_compile: self.is_compiling,
-                    last_accessed_rev: self.revision,
-                    fid,
-                    source: IncrFileQuery::with_context(None),
-                    buffer: FileQuery::default(),
-                })
-        }))
+        f({
+            let entry = slots.entry(fid).or_insert_with(|| SourceCache {
+                touched_by_compile: self.is_compiling,
+                fid,
+                source: IncrFileQuery::with_context(None),
+                buffer: FileQuery::default(),
+            });
+            if self.is_compiling && !entry.touched_by_compile {
+                // We put the mutation behind the if statement to avoid
+                // unnecessary writes to the cache.
+                entry.touched_by_compile = true;
+            }
+            entry
+        })
     }
 }
 

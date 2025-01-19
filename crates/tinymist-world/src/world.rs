@@ -6,9 +6,10 @@ use std::{
 };
 
 use chrono::{DateTime, Datelike, Local};
-use parking_lot::RwLock;
 use tinymist_std::error::prelude::*;
-use tinymist_vfs::{FsProvider, PathResolution, RevisingVfs, TypstFileId, Vfs, WorkspaceResolver};
+use tinymist_vfs::{
+    FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
+};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
@@ -18,16 +19,16 @@ use typst::{
     Library, World,
 };
 
-use crate::package::{PackageRegistry, PackageSpec};
 use crate::parser::{
     get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
     SemanticTokensLegend,
 };
-use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::{
-    entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY},
-    source::SourceState,
+    package::{PackageRegistry, PackageSpec},
+    source::SourceDb,
 };
+// use crate::source::{SharedState, SourceCache, SourceDb};
+use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
 use crate::{font::FontResolver, CompilerFeat, ShadowApi, WorldDeps};
 
 type CodespanResult<T> = Result<T, CodespanError>;
@@ -54,8 +55,6 @@ pub struct CompilerUniverse<F: CompilerFeat> {
 
     /// The current revision of the universe.
     pub revision: NonZeroUsize,
-    /// Shared state for source cache.
-    pub shared: Arc<RwLock<SharedState<SourceCache>>>,
 }
 
 /// Creates, snapshots, and manages the compiler universe.
@@ -78,7 +77,6 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             inputs: inputs.unwrap_or_default(),
 
             revision: NonZeroUsize::new(1).expect("initial revision is 1"),
-            shared: Arc::new(RwLock::new(SharedState::default())),
 
             font_resolver,
             registry,
@@ -108,10 +106,9 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
+            revision: self.revision,
             source_db: SourceDb {
                 is_compiling: true,
-                revision: self.revision,
-                shared: self.shared.clone(),
                 slots: Default::default(),
             },
             now: OnceLock::new(),
@@ -382,6 +379,7 @@ pub struct CompilerWorld<F: CompilerFeat> {
     /// Provides path-based data access for typst compiler.
     vfs: Vfs<F::AccessModel>,
 
+    revision: NonZeroUsize,
     /// Provides source database for typst compiler.
     source_db: SourceDb,
     /// The current datetime if requested. This is stored here to ensure it is
@@ -392,15 +390,6 @@ pub struct CompilerWorld<F: CompilerFeat> {
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
     fn clone(&self) -> Self {
         self.task(TaskInputs::default())
-    }
-}
-
-impl<F: CompilerFeat> Drop for CompilerWorld<F> {
-    fn drop(&mut self) {
-        let state = self.source_db.shared.clone();
-        let source_state = self.source_db.take_state();
-        let mut state = state.write();
-        source_state.commit_impl(&mut state);
     }
 }
 
@@ -430,6 +419,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
+            revision: self.revision,
             source_db: self.source_db.clone(),
             now: self.now.clone(),
         };
@@ -441,8 +431,8 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         world
     }
 
-    pub fn take_state(&mut self) -> SourceState {
-        self.source_db.take_state()
+    pub fn take_state(&mut self) -> SourceCache {
+        self.vfs.take_state()
     }
 
     /// Sets flag to indicate whether the compiler is currently compiling.
@@ -490,7 +480,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     pub fn revision(&self) -> NonZeroUsize {
-        self.source_db.revision
+        self.revision
     }
 }
 
@@ -535,12 +525,16 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, fid: TypstFileId) -> FileResult<PathResolution> {
-        self.vfs.file_path(fid)
+    fn file_path(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+        self.vfs.file_path(file_id)
     }
 
-    fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        self.vfs.read(fid)
+    fn read(&self, file_id: TypstFileId) -> FileResult<Bytes> {
+        self.vfs.read(file_id)
+    }
+
+    fn read_source(&self, file_id: TypstFileId) -> FileResult<Source> {
+        self.vfs.source(file_id)
     }
 }
 
@@ -579,12 +573,12 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             return Ok(DETACH_SOURCE.clone());
         }
 
-        self.vfs.source(id)
+        self.source_db.source(id, self)
     }
 
     /// Try to access the specified file.
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.vfs.read(id)
+        self.source_db.file(id, self)
     }
 
     /// Get the current date.
