@@ -56,8 +56,8 @@
 //!                      ^ SurroundingSyntax::Regular
 //! ```
 
-use reflexo_typst::debug_loc::SourceSpanOffset;
 use serde::{Deserialize, Serialize};
+use tinymist_std::debug_loc::SourceSpanOffset;
 use typst::syntax::Span;
 
 use crate::prelude::*;

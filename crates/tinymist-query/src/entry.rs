@@ -1,6 +1,7 @@
 use anyhow::bail;
-use reflexo_typst::{EntryState, ImmutPath, TypstFileId};
-use typst::syntax::VirtualPath;
+use tinymist_std::ImmutPath;
+use tinymist_world::EntryState;
+use typst::syntax::{FileId, VirtualPath};
 
 /// Entry resolver
 #[derive(Debug, Default, Clone)]
@@ -59,7 +60,7 @@ impl EntryResolver {
             (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
                 Ok(stripped) => Some(EntryState::new_rooted(
                     root,
-                    Some(TypstFileId::new(None, VirtualPath::new(stripped))),
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
                 )),
                 Err(err) => {
                     log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
@@ -126,7 +127,7 @@ mod entry_tests {
         assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
         assert_eq!(
             entry.main(),
-            Some(TypstFileId::new(None, VirtualPath::new("main.typ")))
+            Some(FileId::new(None, VirtualPath::new("main.typ")))
         );
     }
 
@@ -151,7 +152,7 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
             assert_eq!(
                 entry.main(),
-                Some(TypstFileId::new(None, VirtualPath::new("main.typ")))
+                Some(FileId::new(None, VirtualPath::new("main.typ")))
             );
         }
 
@@ -165,7 +166,7 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
             assert_eq!(
                 entry.main(),
-                Some(TypstFileId::new(None, VirtualPath::new("main.typ")))
+                Some(FileId::new(None, VirtualPath::new("main.typ")))
             );
         }
     }

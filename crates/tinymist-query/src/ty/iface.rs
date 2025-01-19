@@ -1,4 +1,4 @@
-use reflexo_typst::TypstFileId;
+use typst::syntax::FileId;
 use typst::{
     foundations::{Dict, Module, Scope, Type},
     syntax::Span,
@@ -27,7 +27,7 @@ pub enum Iface<'a> {
         at: &'a Ty,
     },
     Module {
-        val: TypstFileId,
+        val: FileId,
         at: &'a Ty,
     },
     ModuleVal {

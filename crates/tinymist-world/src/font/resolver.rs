@@ -1,5 +1,3 @@
-//! Font resolver implementation.
-
 use core::fmt;
 use std::{
     collections::HashMap,
@@ -7,56 +5,85 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use system::SystemFontSearcher;
+use tinymist_std::debug_loc::DataSource;
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
-use reflexo_typst::debug_loc::DataSource;
-use reflexo_typst::Bytes;
+use super::{BufferFontLoader, FontProfile, FontSlot, PartialFontBook};
+use crate::Bytes;
 
-pub use reflexo_typst::font::*;
+/// A FontResolver can resolve a font by index.
+/// It also reuse FontBook for font-related query.
+/// The index is the index of the font in the `FontBook.infos`.
+pub trait FontResolver {
+    fn font_book(&self) -> &LazyHash<FontBook>;
+    fn font(&self, idx: usize) -> Option<Font>;
+
+    fn default_get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        // todo: font alternative
+        let mut alternative_text = 'c';
+        if let Some(codepoint) = info.coverage.iter().next() {
+            alternative_text = std::char::from_u32(codepoint).unwrap();
+        };
+
+        let idx = self
+            .font_book()
+            .select_fallback(Some(info), info.variant, &alternative_text.to_string())
+            .unwrap();
+        self.font(idx)
+    }
+    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        self.default_get_by_info(info)
+    }
+}
 
 #[derive(Debug)]
 /// The default FontResolver implementation.
-pub struct TinymistFontResolver {
+pub struct FontResolverImpl {
     font_paths: Vec<PathBuf>,
     book: LazyHash<FontBook>,
     partial_book: Arc<Mutex<PartialFontBook>>,
     fonts: Vec<FontSlot>,
+    profile: FontProfile,
 }
 
-impl TinymistFontResolver {
-    /// Create a new TinymistFontResolver.
+impl FontResolverImpl {
     pub fn new(
         font_paths: Vec<PathBuf>,
         book: FontBook,
         partial_book: Arc<Mutex<PartialFontBook>>,
         fonts: Vec<FontSlot>,
+        profile: FontProfile,
     ) -> Self {
         Self {
             font_paths,
             book: LazyHash::new(book),
             partial_book,
             fonts,
+            profile,
         }
     }
 
-    /// Get the number of fonts.
     pub fn len(&self) -> usize {
         self.fonts.len()
     }
 
-    /// Check if the font resolver is empty.
     pub fn is_empty(&self) -> bool {
         self.fonts.is_empty()
     }
 
-    /// Get the configured font paths.
+    pub fn profile(&self) -> &FontProfile {
+        &self.profile
+    }
+
     pub fn font_paths(&self) -> &[PathBuf] {
         &self.font_paths
     }
 
-    /// Get the loaded fonts.
+    pub fn partial_resolved(&self) -> bool {
+        self.partial_book.lock().unwrap().partial_hit
+    }
+
     pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
         let slots_with_index = self.fonts.iter().enumerate();
 
@@ -66,7 +93,6 @@ impl TinymistFontResolver {
         })
     }
 
-    /// Describe a font.
     pub fn describe_font(&self, font: &Font) -> Option<Arc<DataSource>> {
         let f = Some(Some(font.clone()));
         for slot in &self.fonts {
@@ -77,12 +103,6 @@ impl TinymistFontResolver {
         None
     }
 
-    /// Describe a font by id.
-    pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
-        self.fonts[id].description.clone()
-    }
-
-    /// Change the font data.
     pub fn modify_font_data(&mut self, idx: usize, buffer: Bytes) {
         let mut font_book = self.partial_book.lock().unwrap();
         for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
@@ -100,13 +120,11 @@ impl TinymistFontResolver {
         }
     }
 
-    /// Append a font.
     pub fn append_font(&mut self, info: FontInfo, slot: FontSlot) {
         let mut font_book = self.partial_book.lock().unwrap();
         font_book.push((None, info, slot));
     }
 
-    /// Rebuild the font resolver.
     pub fn rebuild(&mut self) {
         let mut partial_book = self.partial_book.lock().unwrap();
         if !partial_book.partial_hit {
@@ -152,9 +170,13 @@ impl TinymistFontResolver {
         self.book = LazyHash::new(book);
         self.fonts = font_slots;
     }
+
+    pub fn add_glyph_packs(&mut self) {
+        todo!()
+    }
 }
 
-impl FontResolver for TinymistFontResolver {
+impl FontResolver for FontResolverImpl {
     fn font_book(&self) -> &LazyHash<FontBook> {
         &self.book
     }
@@ -168,23 +190,12 @@ impl FontResolver for TinymistFontResolver {
     }
 }
 
-impl fmt::Display for TinymistFontResolver {
+impl fmt::Display for FontResolverImpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (idx, slot) in self.fonts.iter().enumerate() {
             writeln!(f, "{:?} -> {:?}", idx, slot.get_uninitialized())?;
         }
 
         Ok(())
-    }
-}
-
-impl From<SystemFontSearcher> for TinymistFontResolver {
-    fn from(searcher: SystemFontSearcher) -> Self {
-        TinymistFontResolver::new(
-            searcher.font_paths,
-            searcher.book,
-            Arc::new(Mutex::new(PartialFontBook::default())),
-            searcher.fonts,
-        )
     }
 }

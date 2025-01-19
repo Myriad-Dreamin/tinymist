@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use clap::Parser;
-use tinymist_world::CompileOnceArgs;
+use tinymist_project::{CompileOnceArgs, WorldProvider};
 
 /// Common arguments of crityp benchmark.
 #[derive(Debug, Clone, Parser, Default)]

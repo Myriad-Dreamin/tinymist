@@ -7,11 +7,11 @@ use comemo::{Track, Tracked};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use reflexo::debug_loc::DataSource;
-use reflexo::hash::{hash128, FxDashMap};
-use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
-use tinymist_world::{LspWorld, DETACHED_ENTRY};
+use tinymist_project::LspWorld;
+use tinymist_std::debug_loc::DataSource;
+use tinymist_std::hash::{hash128, FxDashMap};
+use tinymist_world::{EntryReader, WorldDeps, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
@@ -380,7 +380,7 @@ impl LocalContext {
 
     /// Get depended paths of a compilation.
     /// Note: must be called after compilation.
-    pub(crate) fn depended_paths(&self) -> EcoVec<reflexo::ImmutPath> {
+    pub(crate) fn depended_paths(&self) -> EcoVec<tinymist_std::ImmutPath> {
         let mut deps = EcoVec::new();
         self.world.iter_dependencies(&mut |path| {
             deps.push(path);

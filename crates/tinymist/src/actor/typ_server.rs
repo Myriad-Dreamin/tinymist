@@ -8,19 +8,27 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use tokio::sync::{mpsc, oneshot};
-
 use reflexo_typst::{
-    features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
-    typst::prelude::EcoVec,
-    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-    watch_deps, CompileEnv, CompileReport, Compiler, CompilerFeat, CompilerUniverse, CompilerWorld,
-    ConsoleDiagReporter, EntryReader, GenericExporter, Revising, TaskInputs, TypstDocument,
-    WorldDeps,
+    features::WITH_COMPILING_STATUS_FEATURE, typst::prelude::EcoVec, CompileEnv, CompileReport,
+    Compiler, ConsoleDiagReporter, FeatureSet, GenericExporter, TypstDocument,
 };
+use tinymist_project::watch_deps;
+use tokio::sync::{mpsc, oneshot};
 use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::task::CacheTask;
+use crate::world::base::{
+    // features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
+    // typst::prelude::EcoVec,
+    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
+    CompilerFeat,
+    CompilerUniverse,
+    CompilerWorld,
+    EntryReader,
+    Revising,
+    TaskInputs,
+    WorldDeps,
+};
 
 /// A signal that possibly triggers an export.
 ///

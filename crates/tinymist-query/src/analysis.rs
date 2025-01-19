@@ -40,9 +40,10 @@ pub use global::*;
 
 use ecow::eco_format;
 use lsp_types::Url;
-use reflexo_typst::{EntryReader, TypstFileId};
+use tinymist_world::EntryReader;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
+use typst::syntax::FileId;
 
 use crate::path_to_url;
 
@@ -63,17 +64,17 @@ impl ToFunc for Value {
 /// Extension trait for `typst::World`.
 pub trait LspWorldExt {
     /// Get file's id by its path
-    fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId>;
+    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId>;
 
     /// Get the source of a file by file path.
     fn source_by_path(&self, path: &Path) -> FileResult<Source>;
 
     /// Resolve the uri for a file id.
-    fn uri_for_id(&self, fid: TypstFileId) -> FileResult<Url>;
+    fn uri_for_id(&self, fid: FileId) -> FileResult<Url>;
 }
 
-impl LspWorldExt for tinymist_world::LspWorld {
-    fn file_id_by_path(&self, path: &Path) -> FileResult<TypstFileId> {
+impl LspWorldExt for tinymist_project::LspWorld {
+    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
         // todo: source in packages
         let root = self.workspace_root().ok_or_else(|| {
             let reason = eco_format!("workspace root not found");
@@ -84,7 +85,7 @@ impl LspWorldExt for tinymist_world::LspWorld {
             FileError::Other(Some(reason))
         })?;
 
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        Ok(FileId::new(None, VirtualPath::new(relative_path)))
     }
 
     fn source_by_path(&self, path: &Path) -> FileResult<Source> {
@@ -92,7 +93,7 @@ impl LspWorldExt for tinymist_world::LspWorld {
         self.source(self.file_id_by_path(path)?)
     }
 
-    fn uri_for_id(&self, fid: TypstFileId) -> Result<Url, FileError> {
+    fn uri_for_id(&self, fid: FileId) -> Result<Url, FileError> {
         self.path_for_id(fid).and_then(|path| {
             path_to_url(&path)
                 .map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
@@ -131,7 +132,7 @@ mod matcher_tests {
 #[cfg(test)]
 mod expr_tests {
 
-    use reflexo::path::unix_slash;
+    use tinymist_std::path::unix_slash;
     use typst::syntax::Source;
 
     use crate::syntax::{Expr, RefExpr};
@@ -241,8 +242,9 @@ mod expr_tests {
 
 #[cfg(test)]
 mod module_tests {
-    use reflexo::path::unix_slash;
     use serde_json::json;
+    use tinymist_std::path::unix_slash;
+    use typst::syntax::FileId;
 
     use crate::prelude::*;
     use crate::syntax::module::*;
@@ -251,7 +253,7 @@ mod module_tests {
     #[test]
     fn test() {
         snapshot_testing("modules", &|ctx, _| {
-            fn ids(ids: EcoVec<TypstFileId>) -> Vec<String> {
+            fn ids(ids: EcoVec<FileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
                     .map(|id| unix_slash(id.vpath().as_rooted_path()))

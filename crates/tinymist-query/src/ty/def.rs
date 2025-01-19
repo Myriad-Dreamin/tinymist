@@ -11,12 +11,11 @@ use std::{
 use ecow::EcoString;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
     foundations::{Content, Element, ParamInfo, Type, Value},
-    syntax::{ast, Span, SyntaxKind, SyntaxNode},
+    syntax::{ast, FileId, Span, SyntaxKind, SyntaxNode},
 };
 
 use super::{BoundPred, PackageId};
@@ -1169,7 +1168,7 @@ pub struct TypeInfo {
     /// Whether the typing is valid
     pub valid: bool,
     /// The belonging file id
-    pub fid: Option<TypstFileId>,
+    pub fid: Option<FileId>,
     /// The revision used
     pub revision: usize,
     /// The exported types
@@ -1284,7 +1283,7 @@ impl TyCtxMut for TypeInfo {
         Ty::Any
     }
 
-    fn check_module_item(&mut self, _module: TypstFileId, _key: &StrRef) -> Option<Ty> {
+    fn check_module_item(&mut self, _module: FileId, _key: &StrRef) -> Option<Ty> {
         None
     }
 }

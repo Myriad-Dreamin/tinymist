@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
 use actor::editor::EditorActor;
 use anyhow::anyhow;
 use anyhow::Context;
@@ -12,11 +13,7 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use reflexo_typst::{
-    error::prelude::*,
-    vfs::notify::{FileChangeSet, MemoryEvent},
-    Bytes, Error, ImmutPath, Time,
-};
+use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath, Time};
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
@@ -27,13 +24,13 @@ use tinymist_query::{
     PositionEncoding, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
-use tinymist_world::TaskInputs;
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
 
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
+use crate::world::TaskInputs;
 
 pub(crate) use futures::Future;
 

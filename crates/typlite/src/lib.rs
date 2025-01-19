@@ -13,8 +13,8 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
-use tinymist_world::reflexo_typst::path::unix_slash;
-use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
+use tinymist_project::{base::ShadowApi, EntryReader, LspWorld};
+use tinymist_std::path::unix_slash;
 use typst::foundations::IntoValue;
 use typst::WorldExt;
 use typst::{
@@ -36,7 +36,7 @@ pub use typst_syntax as syntax;
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
-pub use tinymist_world::CompileOnceArgs;
+pub use tinymist_project::CompileOnceArgs;
 
 /// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
 #[derive(Debug, Default, Clone, Copy)]
@@ -448,7 +448,7 @@ impl TypliteWorker {
         // let world = LiteWorld::new(main);
         let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
         let entry = self.world.entry_state().select_in_workspace(main_id);
-        let mut world = self.world.task(tinymist_world::TaskInputs {
+        let mut world = self.world.task(tinymist_project::TaskInputs {
             entry: Some(entry),
             inputs,
         });

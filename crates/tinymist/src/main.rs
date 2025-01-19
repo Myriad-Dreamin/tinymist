@@ -24,13 +24,13 @@ use sync_lsp::{
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
+use tinymist::world::TaskInputs;
 use tinymist::{
     tool::project::{project_main, task_main},
     CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask,
 };
 use tinymist_core::LONG_VERSION;
 use tinymist_query::{package::PackageInfo, EntryResolver};
-use tinymist_world::TaskInputs;
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
 
@@ -238,7 +238,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
 /// The main entry point for language server queries.
 pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
-    use reflexo_typst::package::PackageRegistry;
+    use tinymist::package::PackageRegistry;
 
     with_stdio_transport(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);

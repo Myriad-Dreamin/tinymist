@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
-use reflexo::debug_loc::DataSource;
 use serde::{Deserialize, Serialize};
+use tinymist_std::debug_loc::DataSource;
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},

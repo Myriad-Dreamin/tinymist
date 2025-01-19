@@ -1,9 +1,9 @@
 use core::fmt;
 use std::{collections::BTreeMap, ops::Range};
 
-use reflexo_typst::package::PackageSpec;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::DeclEnum;
+use tinymist_world::package::PackageSpec;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
     syntax::{Span, SyntaxNode},

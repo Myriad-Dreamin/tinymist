@@ -3,6 +3,8 @@
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
+use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
+use crate::world::EntryReader;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
@@ -10,8 +12,7 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
-use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;

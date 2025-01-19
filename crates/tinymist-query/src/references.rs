@@ -177,7 +177,7 @@ impl ReferencesWorker<'_> {
 
 #[cfg(test)]
 mod tests {
-    use reflexo::path::unix_slash;
+    use tinymist_std::path::unix_slash;
 
     use super::*;
     use crate::syntax::find_module_level_docs;

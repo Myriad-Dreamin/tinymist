@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use reflexo::debug_loc::DataSource;
-use reflexo_typst::font::FontResolver;
 use serde::{Deserialize, Serialize};
+use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
 use crate::actor::typ_client::WorldSnapFut;
+use crate::world::font::FontResolver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct FontResourceItem {

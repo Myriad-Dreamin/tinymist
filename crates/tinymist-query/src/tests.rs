@@ -9,12 +9,12 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use reflexo_typst::package::PackageSpec;
-use reflexo_typst::world::EntryState;
-use reflexo_typst::{Compiler, EntryManager, EntryReader, ShadowApi};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_world::CompileFontArgs;
+use tinymist_project::CompileFontArgs;
+use tinymist_world::package::PackageSpec;
+use tinymist_world::EntryState;
 use tinymist_world::TaskInputs;
+use tinymist_world::{EntryManager, EntryReader, ShadowApi};
 use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
@@ -22,7 +22,7 @@ use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, Virtu
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
-pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
+pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
 use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -187,8 +187,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     }
 
     verse.mutate_entry(EntryState::new_detached()).unwrap();
-    let world = verse.snapshot();
-    let _ = std::marker::PhantomData.compile(&world, &mut Default::default());
 
     let pw = last_pw.unwrap();
     verse

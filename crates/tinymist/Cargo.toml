@@ -60,8 +60,9 @@ sync-lsp.workspace = true
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-fs.workspace = true
+tinymist-std.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
-tinymist-world.workspace = true
+tinymist-project.workspace = true
 tinymist-render.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
@@ -94,12 +95,12 @@ dhat-heap = ["dhat"]
 # - code (Deja Vu Sans Mono)
 # and additionally New Computer Modern for text
 # into the binary.
-embed-fonts = ["tinymist-world/fonts"]
+embed-fonts = ["tinymist-project/fonts"]
 
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = [
-    "tinymist-world/no-content-hint",
+    "tinymist-project/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",
 ]

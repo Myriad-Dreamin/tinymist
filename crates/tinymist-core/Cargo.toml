@@ -17,12 +17,15 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["web"] # "no-content-hint"
 
+# todo: bootstrap me on web
+# , "tinymist-world/web"
 web = ["wasm-bindgen"]
 
 # no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [dependencies]
 wasm-bindgen = { version = "0.2.92", optional = true }
+# tinymist-world.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

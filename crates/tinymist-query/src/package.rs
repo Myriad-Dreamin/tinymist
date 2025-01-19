@@ -4,14 +4,15 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+use ecow::{eco_format, eco_vec, EcoVec};
 use parking_lot::Mutex;
-use reflexo_typst::typst::prelude::*;
-use reflexo_typst::{package::PackageSpec, TypstFileId};
+// use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::http::HttpRegistry;
+use tinymist_world::package::PackageSpec;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::VirtualPath;
+use typst::syntax::{FileId, VirtualPath};
 use typst::World;
 
 use crate::LocalContext;
@@ -41,8 +42,8 @@ impl From<(PathBuf, PackageSpec)> for PackageInfo {
 }
 
 /// Parses the manifest of the package located at `package_path`.
-pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<TypstFileId> {
-    Ok(TypstFileId::new(
+pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<FileId> {
+    Ok(FileId::new(
         Some(PackageSpec {
             namespace: spec.namespace.clone(),
             name: spec.name.clone(),
@@ -53,7 +54,7 @@ pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<TypstFileId> {
 }
 
 /// Parses the manifest of the package located at `package_path`.
-pub fn get_manifest(world: &dyn World, toml_id: TypstFileId) -> StrResult<PackageManifest> {
+pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageManifest> {
     let toml_data = world
         .file(toml_id)
         .map_err(|err| eco_format!("failed to read package manifest ({})", err))?;

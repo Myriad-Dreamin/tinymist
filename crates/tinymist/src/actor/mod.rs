@@ -8,9 +8,9 @@ pub mod typ_server;
 
 use std::sync::Arc;
 
+use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
+use crate::world::EntryState;
 use reflexo::ImmutPath;
-use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
-use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
@@ -18,8 +18,8 @@ use tokio::sync::mpsc;
 use typst::layout::Position;
 
 use crate::{
+    project::{ImmutDict, LspUniverseBuilder},
     task::{ExportConfig, ExportTask, ExportUserConfig},
-    world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
 use typ_client::{CompileClientActor, CompileHandler};

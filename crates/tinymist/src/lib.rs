@@ -33,8 +33,9 @@ mod utils;
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
+pub use tinymist_project as project;
+pub use tinymist_project::world;
 pub use tinymist_query as query;
-pub use tinymist_world as world;
 pub use world::*;
 
 use lsp_server::{RequestId, ResponseError};

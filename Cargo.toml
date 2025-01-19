@@ -45,22 +45,44 @@ parking_lot = "0.12.1"
 walkdir = "2"
 chrono = "0.4"
 dirs = "5"
+fontdb = "0.21"
+notify = "6"
+path-clean = "1.0.1"
 windows-sys = "0.59"
 tempfile = "3.10.1"
 same-file = "1.0.6"
 libc = "0.2.155"
 core-foundation = { version = "0.10.0", features = ["mac_os_10_7_support"] }
 
+# Web
+js-sys = "^0.3"
+wasm-bindgen = "^0.2"
+wasm-bindgen-futures = "^0.4"
+wasm-bindgen-test = "0.3.45"
+web-sys = "^0.3"
+web-time = { version = "1.1.0" }
+console_error_panic_hook = { version = "0.1.7" }
+
 # Networking
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1.7", features = ["tokio"] }
 hyper-tungstenite = "0.15.0"
+reqwest = { version = "^0.12", default-features = false, features = [
+    "rustls-tls",
+    "blocking",
+    "multipart",
+] }
 
 # Algorithms
 base64 = "0.22"
 regex = "1.10.5"
+
+# Cryptography and data processing
 rustc-hash = { version = "2", features = ["std"] }
 siphasher = "1"
+fxhash = "0.2.1"
+sha2 = "0.10.6"
+nohash-hasher = "0.2.0"
 
 # Data Structures
 comemo = "0.4"
@@ -75,15 +97,21 @@ indexmap = "2.7.0"
 rpds = "1"
 
 # Data/Text Format and Processing
+hex = "0.4.3"
+flate2 = "1"
+tar = "0.4"
 biblatex = "0.10"
 pathdiff = "0.2"
 percent-encoding = "2"
 rust_iso639 = "0.0.3"
 rust_iso3166 = "0.1.4"
+rkyv = "0.7.42"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
+serde_with = { version = "3.6", features = ["base64"] }
+serde-wasm-bindgen = "^0.6"
 toml = { version = "0.8", default-features = false, features = [
     "parse",
     "display",
@@ -102,7 +130,6 @@ log = "0.4"
 reflexo = { version = "=0.5.4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "=0.5.4", features = ["system"] }
 reflexo-typst = { version = "=0.5.4", features = [
     "system",
 ], default-features = false }
@@ -121,7 +148,7 @@ typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1"
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.13", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
+typst-shim = { path = "./crates/typst-shim" }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -154,13 +181,15 @@ insta = { version = "1.39", features = ["glob"] }
 typst-preview = { path = "./crates/typst-preview" }
 tinymist-assets = { version = "0.12.18" }
 tinymist = { path = "./crates/tinymist/" }
+tinymist-std = { path = "./crates/tinymist-std/", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", default-features = false }
 tinymist-core = { path = "./crates/tinymist-core/", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", default-features = false }
 tinymist-project = { path = "./crates/tinymist-project/" }
 tinymist-fs = { path = "./crates/tinymist-fs/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
-tinymist-world = { path = "./crates/tinymist-world/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
 
 [profile.dev.package.insta]
@@ -237,16 +266,14 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
 # reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }

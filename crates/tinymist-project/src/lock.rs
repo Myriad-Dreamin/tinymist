@@ -1,7 +1,8 @@
 use std::{path::Path, sync::Arc};
 
-use reflexo_typst::{path::unix_slash, EntryReader, TypstFileId};
-use typst::diag::EcoString;
+use tinymist_std::path::unix_slash;
+use tinymist_world::EntryReader;
+use typst::{diag::EcoString, syntax::FileId};
 
 use super::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask, ResourcePath};
 use crate::LspWorld;
@@ -80,7 +81,7 @@ impl ProjectLockUpdater {
         self.updates.push(LockUpdate::Task(task));
     }
 
-    pub fn update_materials(&mut self, doc_id: Id, ids: Vec<TypstFileId>) {
+    pub fn update_materials(&mut self, doc_id: Id, ids: Vec<FileId>) {
         let mut files = ids
             .into_iter()
             .map(ResourcePath::from_file_id)
@@ -103,7 +104,7 @@ impl ProjectLockUpdater {
     pub fn commit(self) {
         let err = super::LockFile::update(&self.root, |l| {
             let root: EcoString = unix_slash(&self.root).into();
-            let root_hash = reflexo_typst::hash::hash128(&root);
+            let root_hash = tinymist_std::hash::hash128(&root);
             for update in self.updates {
                 match update {
                     LockUpdate::Input(input) => {
@@ -116,7 +117,7 @@ impl ProjectLockUpdater {
                         mat.root = root.clone();
                         let cache_dir = dirs::cache_dir();
                         if let Some(cache_dir) = cache_dir {
-                            let id = reflexo_typst::hash::hash128(&mat.id);
+                            let id = tinymist_std::hash::hash128(&mat.id);
                             let lower4096 = root_hash & 0xfff;
                             let upper4096 = root_hash >> 12;
 

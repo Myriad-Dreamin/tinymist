@@ -11,8 +11,8 @@ use hashbrown::HashMap;
 use lsp_types::SemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use parking_lot::Mutex;
-use reflexo::ImmutPath;
 use strum::EnumIter;
+use tinymist_std::ImmutPath;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
 use crate::{

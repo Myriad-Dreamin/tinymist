@@ -27,10 +27,8 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 use anyhow::bail;
 use log::{error, info, trace};
 use reflexo::path::unix_slash;
-use reflexo_typst::{
-    error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
-    CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
-};
+use reflexo_typst::{error::prelude::*, typst::prelude::*, CompileReport, Error, ImmutPath};
+
 use sync_lsp::just_future;
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
@@ -46,6 +44,7 @@ use super::{
         CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
     },
 };
+use crate::world::{vfs::notify::MemoryEvent, EntryReader, EntryState, TaskInputs};
 use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},

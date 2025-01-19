@@ -19,10 +19,10 @@ pub(crate) use builtin::*;
 pub use def::*;
 pub(crate) use iface::*;
 pub(crate) use mutate::*;
-use reflexo_typst::TypstFileId;
 pub(crate) use select::*;
 pub(crate) use sig::*;
 use typst::foundations::{self, Func, Module, Value};
+use typst::syntax::FileId;
 
 /// A type context.
 pub trait TyCtx {
@@ -83,7 +83,7 @@ pub trait TyCtxMut: TyCtx {
         ty
     }
     /// Check a module item.
-    fn check_module_item(&mut self, module: TypstFileId, key: &StrRef) -> Option<Ty>;
+    fn check_module_item(&mut self, module: FileId, key: &StrRef) -> Option<Ty>;
 }
 
 #[cfg(test)]

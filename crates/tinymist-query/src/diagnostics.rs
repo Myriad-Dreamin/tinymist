@@ -1,5 +1,5 @@
-use reflexo_typst::EntryReader;
-use tinymist_world::LspWorld;
+use tinymist_project::LspWorld;
+use tinymist_world::EntryReader;
 use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};

@@ -1,5 +1,5 @@
 use ecow::{eco_format, EcoString};
-use reflexo::hash::hash128;
+use tinymist_std::hash::hash128;
 use typst::foundations::Repr;
 
 use crate::{

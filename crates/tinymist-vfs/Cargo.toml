@@ -1,0 +1,32 @@
+[package]
+name = "tinymist-vfs"
+description = "Vfs for tinymist."
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+typst.workspace = true
+tinymist-std = { workspace = true, features = ["typst"] }
+parking_lot.workspace = true
+nohash-hasher.workspace = true
+indexmap.workspace = true
+log.workspace = true
+rpds = "1"
+
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["console"] }
+js-sys = { workspace = true, optional = true }
+
+[features]
+
+web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
+browser = ["web"]
+system = ["tinymist-std/system"]
+
+[lints]
+workspace = true

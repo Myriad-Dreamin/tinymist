@@ -1,6 +1,6 @@
 [package]
 name = "tinymist-world"
-description = "World implementation of typst for tinymist."
+description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 authors.workspace = true
@@ -12,11 +12,18 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
+codespan-reporting.workspace = true
 comemo.workspace = true
-dirs.workspace = true
+dirs = { workspace = true, optional = true }
+ecow.workspace = true
+flate2.workspace = true
+fontdb = { workspace = true, optional = true }
+hex.workspace = true
+js-sys = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
 pathdiff.workspace = true
@@ -27,15 +34,57 @@ reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_with.workspace = true
+serde-wasm-bindgen = { workspace = true, optional = true }
+sha2.workspace = true
+strum.workspace = true
+tar.workspace = true
 tinymist-fs.workspace = true
+tinymist-std.workspace = true
+tinymist-vfs.workspace = true
 typst.workspace = true
 toml.workspace = true
 typst-assets.workspace = true
-
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["console"] }
+reqwest.workspace = true
 
 [features]
-fonts = ["typst-assets/fonts"]
-no-content-hint = ["reflexo-typst/no-content-hint"]
+
+default = []
+lazy-fontdb = []
+browser-embedded-fonts = ["fonts"]
+web = [
+    "wasm-bindgen",
+    "web-sys",
+    "js-sys",
+    "serde-wasm-bindgen",
+    "tinymist-std/web",
+    "tinymist-vfs/web",
+]
+browser = ["web"]
+system = [
+    "dep:dirs",
+    "dep:fontdb",
+    "tinymist-std/system",
+    "tinymist-vfs/system",
+]
+
+# todo: remove me
+fonts = []
+no-content-hint = []
 
 [lints]
 workspace = true
+
+# ====
+
+# [dependencies]
+
+
+# [features]
+# fonts = ["typst-assets/fonts"]
+# no-content-hint = ["reflexo-typst/no-content-hint"]
+
+# [lints]
+# workspace = true

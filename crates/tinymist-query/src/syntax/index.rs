@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use reflexo_typst::package::PackageSpec;
 use rustc_hash::FxHashSet;
+use tinymist_world::package::PackageSpec;
 
 use crate::{adt::interner::Interned, prelude::*};
 
