@@ -40,7 +40,6 @@ impl LinkTarget {
             LinkTarget::Url(url) => Some(url.as_ref().clone()),
             LinkTarget::Path(id, path) => {
                 // Avoid creating new ids here.
-                let base = id.vpath().join(path.as_str());
                 let root = ctx.path_for_id(id.join("/")).ok()?;
                 crate::path_res_to_url(root.join(path).ok()?).ok()
             }

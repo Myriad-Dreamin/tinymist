@@ -41,12 +41,11 @@ pub use global::*;
 
 use ecow::eco_format;
 use lsp_types::Url;
-use tinymist_world::EntryReader;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::{path_res_to_url, path_to_url};
+use crate::path_res_to_url;
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;

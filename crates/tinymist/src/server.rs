@@ -13,7 +13,7 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath, Time};
+use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath};
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};

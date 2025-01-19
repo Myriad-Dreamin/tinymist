@@ -3,7 +3,6 @@ use std::{path::Path, sync::Arc};
 
 use ecow::EcoString;
 use tinymist_std::ImmutPath;
-use tinymist_vfs::{TypstFileId, WorkspaceResolution, WorkspaceResolver};
 use typst::diag::FileResult;
 pub use typst::diag::PackageError;
 pub use typst::syntax::package::PackageSpec;

@@ -4,7 +4,6 @@ use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
-use crate::world::EntryReader;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
@@ -12,14 +11,14 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::{error::prelude::*, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, Error, TypstDocument};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
+use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
@@ -63,10 +62,7 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(loc) = loc;
 
-        let filepath = Path::new(&loc.filepath);
-        let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
-
-        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        let source_id = world.id_for_path(Path::new(&loc.filepath))?;
         let source = world.source(source_id).ok()?;
         let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
 
@@ -85,7 +81,6 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
-        let path = Path::new(&src_loc.filepath).to_owned();
         let line = src_loc.pos.line;
         let column = src_loc.pos.column;
 
@@ -93,14 +88,10 @@ impl typst_preview::CompileView for PreviewCompileView {
         let Some(doc) = doc.as_deref() else {
             return vec![];
         };
-        let Some(root) = world.workspace_root() else {
-            return vec![];
-        };
-        let Some(relative_path) = path.strip_prefix(root).ok() else {
+        let Some(source_id) = world.id_for_path(Path::new(&src_loc.filepath)) else {
             return vec![];
         };
 
-        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
         let Some(source) = world.source(source_id).ok() else {
             return vec![];
         };
@@ -123,7 +114,7 @@ impl typst_preview::CompileView for PreviewCompileView {
                 range.start += off;
             }
         }
-        let filepath = world.path_for_id(span.id()?).ok()?;
+        let filepath = world.path_for_id(span.id()?).ok()?.to_err().ok()?;
         Some(DocToSrcJumpInfo {
             filepath: filepath.to_string_lossy().to_string(),
             start: resolve_off(&source, range.start),
@@ -139,7 +130,6 @@ impl EditorServer for CompileHandler {
         reset_shadow: bool,
     ) -> Result<(), Error> {
         // todo: is it safe to believe that the path is normalized?
-        let now = std::time::SystemTime::now();
         let files = FileChangeSet::new_inserts(
             files
                 .files
@@ -147,7 +137,7 @@ impl EditorServer for CompileHandler {
                 .map(|(path, content)| {
                     let content = content.as_bytes().into();
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok((now, content)).into())
+                    (path.into(), Ok(content).into())
                 })
                 .collect(),
         );
