@@ -3,7 +3,10 @@
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
-use crate::project::{CompiledArtifact, ExportSignal};
+use crate::project::{
+    update_lock, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
+    ExportPngTask, ExportSignal, ExportTextTask, ProjectTask, TaskWhen,
+};
 use anyhow::{bail, Context};
 use reflexo_typst::TypstDatetime;
 use tinymist_project::{EntryReader, EntryState, TaskInputs};
@@ -79,7 +82,7 @@ impl SyncTaskFactory<ExportConfig> {
             });
 
             let artifact = snap.compile();
-            export.do_export(&kind, artifact).await
+            export.do_export(&kind, artifact, false).await
         }
     }
 }
@@ -129,7 +132,7 @@ impl ExportConfig {
             let this = self.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(this.do_export(&this.kind, artifact).await);
+                log_err(this.do_export(&this.kind, artifact, true).await);
                 Some(())
             })
         })?;
@@ -177,6 +180,7 @@ impl ExportConfig {
         &self,
         kind: &ExportKind,
         artifact: CompiledArtifact<LspCompilerFeat>,
+        passive: bool,
     ) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use ExportKind::*;
@@ -203,6 +207,70 @@ impl ExportConfig {
                     format!("RenderActor({kind:?}): failed to create directory")
                 })?;
             }
+        }
+
+        if !passive {
+            let updater = update_lock(&snap.world);
+
+            let _ = updater.and_then(|mut updater| {
+                let doc_id = updater.compiled(&snap.world)?;
+                let task_id = doc_id.clone();
+
+                let when = match self.config.mode {
+                    ExportMode::Never => TaskWhen::Never,
+                    ExportMode::OnType => TaskWhen::OnType,
+                    ExportMode::OnSave => TaskWhen::OnSave,
+                    ExportMode::OnDocumentHasTitle => TaskWhen::OnSave,
+                };
+
+                // todo: page transforms
+                let transforms = vec![];
+
+                use tinymist_project::ExportTask as ProjectExportTask;
+
+                let export = ProjectExportTask {
+                    document: doc_id,
+                    id: task_id,
+                    when,
+                    transform: transforms,
+                };
+
+                let task = match kind {
+                    Pdf { creation_timestamp } => {
+                        let _ = creation_timestamp;
+                        ProjectTask::ExportPdf(ExportPdfTask {
+                            export,
+                            pdf_standards: Default::default(),
+                        })
+                    }
+                    Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+                    Markdown {} => ProjectTask::ExportMarkdown(ExportMarkdownTask { export }),
+                    Text {} => ProjectTask::ExportText(ExportTextTask { export }),
+                    Query { .. } => {
+                        // todo: ignoring query task.
+                        return None;
+                    }
+                    Svg { page } => {
+                        // todo: ignoring page selection.
+                        let _ = page;
+                        return None;
+                    }
+                    Png { ppi, fill, page } => {
+                        // todo: ignoring page fill.
+                        let _ = fill;
+                        // todo: ignoring page selection.
+                        let _ = page;
+
+                        let ppi = ppi.unwrap_or(144.) as f32;
+                        ProjectTask::ExportPng(ExportPngTask { export, ppi })
+                    }
+                };
+
+                updater.task(task);
+                updater.commit();
+
+                Some(())
+            });
         }
 
         // Prepare the document.
