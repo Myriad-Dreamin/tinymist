@@ -24,7 +24,8 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-use typst::syntax::{Source, VirtualPath};
+use tinymist_world::vfs::WorkspaceResolver;
+use typst::syntax::Source;
 use typst::World;
 mod post_tyck;
 mod tyck;
@@ -40,12 +41,11 @@ pub use global::*;
 
 use ecow::eco_format;
 use lsp_types::Url;
-use tinymist_world::EntryReader;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::path_to_url;
+use crate::path_res_to_url;
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -76,16 +76,13 @@ pub trait LspWorldExt {
 impl LspWorldExt for tinymist_project::LspWorld {
     fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
         // todo: source in packages
-        let root = self.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = path.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {path:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(FileId::new(None, VirtualPath::new(relative_path)))
+        match self.id_for_path(path) {
+            Some(id) => Ok(id),
+            None => WorkspaceResolver::file_with_parent_root(path).ok_or_else(|| {
+                let reason = eco_format!("invalid path: {path:?}");
+                FileError::Other(Some(reason))
+            }),
+        }
     }
 
     fn source_by_path(&self, path: &Path) -> FileResult<Source> {
@@ -94,10 +91,10 @@ impl LspWorldExt for tinymist_project::LspWorld {
     }
 
     fn uri_for_id(&self, fid: FileId) -> Result<Url, FileError> {
-        self.path_for_id(fid).and_then(|path| {
-            path_to_url(&path)
-                .map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
-        })
+        let res = path_res_to_url(self.path_for_id(fid)?);
+
+        log::info!("uri_for_id: {fid:?} -> {res:?}");
+        res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
     }
 }
 
@@ -133,6 +130,7 @@ mod matcher_tests {
 mod expr_tests {
 
     use tinymist_std::path::unix_slash;
+    use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
 
     use crate::syntax::{Expr, RefExpr};
@@ -150,8 +148,10 @@ mod expr_tests {
                     let fid = if let Some(fid) = decl.file_id() {
                         let vpath = fid.vpath().as_rooted_path();
                         match fid.package() {
-                            Some(package) => format!(" in {package:?}{}", unix_slash(vpath)),
-                            None => format!(" in {}", unix_slash(vpath)),
+                            Some(package) if WorkspaceResolver::is_package_file(fid) => {
+                                format!(" in {package:?}{}", unix_slash(vpath))
+                            }
+                            Some(_) | None => format!(" in {}", unix_slash(vpath)),
                         }
                     } else {
                         "".to_string()

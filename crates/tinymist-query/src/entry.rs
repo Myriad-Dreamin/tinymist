@@ -1,7 +1,7 @@
 use anyhow::bail;
 use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
-use typst::syntax::{FileId, VirtualPath};
+use typst::syntax::VirtualPath;
 
 /// Entry resolver
 #[derive(Debug, Default, Clone)]
@@ -60,14 +60,14 @@ impl EntryResolver {
             (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
                 Ok(stripped) => Some(EntryState::new_rooted(
                     root,
-                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                    Some(VirtualPath::new(stripped)),
                 )),
                 Err(err) => {
                     log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
-                    EntryState::new_rootless(entry)
+                    EntryState::new_rooted_by_parent(entry)
                 }
             },
-            (Some(entry), None) => EntryState::new_rootless(entry),
+            (Some(entry), None) => EntryState::new_rooted_by_parent(entry),
             (None, Some(root)) => Some(EntryState::new_workspace(root)),
             (None, None) => None,
         };
@@ -106,6 +106,8 @@ impl EntryResolver {
 #[cfg(test)]
 #[cfg(any(windows, unix, target_os = "macos"))]
 mod entry_tests {
+    use tinymist_world::vfs::WorkspaceResolver;
+
     use super::*;
     use std::path::Path;
 
@@ -127,7 +129,10 @@ mod entry_tests {
         assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
         assert_eq!(
             entry.main(),
-            Some(FileId::new(None, VirtualPath::new("main.typ")))
+            Some(WorkspaceResolver::workspace_file(
+                entry.root().as_ref(),
+                VirtualPath::new("main.typ")
+            ))
         );
     }
 
@@ -152,7 +157,10 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
             assert_eq!(
                 entry.main(),
-                Some(FileId::new(None, VirtualPath::new("main.typ")))
+                Some(WorkspaceResolver::workspace_file(
+                    entry.root().as_ref(),
+                    VirtualPath::new("main.typ")
+                ))
             );
         }
 
@@ -166,7 +174,10 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
             assert_eq!(
                 entry.main(),
-                Some(FileId::new(None, VirtualPath::new("main.typ")))
+                Some(WorkspaceResolver::workspace_file(
+                    entry.root().as_ref(),
+                    VirtualPath::new("main.typ")
+                ))
             );
         }
     }

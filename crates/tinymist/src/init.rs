@@ -20,6 +20,7 @@ use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::FileId;
 use typst_shim::utils::{Deferred, LazyHash};
+use vfs::WorkspaceResolver;
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -853,7 +854,7 @@ impl PathPattern {
         let (root, main) = root.zip(main)?;
 
         // Files in packages are not exported
-        if main.package().is_some() {
+        if WorkspaceResolver::is_package_file(main) {
             return None;
         }
         // Files without a path are not exported
@@ -1071,10 +1072,8 @@ mod tests {
     #[test]
     fn test_substitute_path() {
         let root = Path::new("/root");
-        let entry = EntryState::new_rooted(
-            root.into(),
-            Some(FileId::new(None, VirtualPath::new("/dir1/dir2/file.txt"))),
-        );
+        let entry =
+            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
 
         assert_eq!(
             PathPattern::new("/substitute/$dir/$name").substitute(&entry),

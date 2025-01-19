@@ -2,8 +2,8 @@ use std::{fs::File, io::Read, path::Path};
 
 use typst::diag::{FileError, FileResult};
 
-use crate::{AccessModel, Bytes, Time};
-use tinymist_std::{ImmutPath, ReadAllOnce};
+use crate::{Bytes, PathAccessModel};
+use tinymist_std::ReadAllOnce;
 
 /// Provides SystemAccessModel that makes access to the local file system for
 /// system compilation.
@@ -14,25 +14,15 @@ impl SystemAccessModel {
     fn stat(&self, src: &Path) -> std::io::Result<SystemFileMeta> {
         let meta = std::fs::metadata(src)?;
         Ok(SystemFileMeta {
-            mt: meta.modified()?,
             is_file: meta.is_file(),
         })
     }
 }
 
-impl AccessModel for SystemAccessModel {
-    fn mtime(&self, src: &Path) -> FileResult<Time> {
-        let f = |e| FileError::from_io(e, src);
-        Ok(self.stat(src).map_err(f)?.mt)
-    }
-
+impl PathAccessModel for SystemAccessModel {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         let f = |e| FileError::from_io(e, src);
         Ok(self.stat(src).map_err(f)?.is_file)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        Ok(src.into())
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {
@@ -78,6 +68,5 @@ impl ReadAllOnce for LazyFile {
 /// Meta data of a file in the local file system.
 #[derive(Debug, Clone, Copy)]
 pub struct SystemFileMeta {
-    mt: std::time::SystemTime,
     is_file: bool,
 }

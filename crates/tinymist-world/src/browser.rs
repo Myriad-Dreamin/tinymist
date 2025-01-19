@@ -7,6 +7,7 @@ use typst::utils::LazyHash;
 use crate::entry::EntryState;
 use crate::font::FontResolverImpl;
 use crate::package::browser::ProxyRegistry;
+use crate::package::RegistryPathMapper;
 
 /// A world that provides access to the browser.
 /// It is under development.
@@ -39,7 +40,10 @@ impl TypstBrowserUniverse {
         registry: ProxyRegistry,
         font_resolver: FontResolverImpl,
     ) -> Self {
-        let vfs = tinymist_vfs::Vfs::new(access_model);
+        let registry = Arc::new(registry);
+        let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
+
+        let vfs = tinymist_vfs::Vfs::new(resolver, access_model);
 
         Self::new_raw(
             EntryState::new_rooted(root_dir.into(), None),

@@ -8,12 +8,12 @@ use std::{
 use chrono::{DateTime, Datelike, Local};
 use parking_lot::RwLock;
 use tinymist_std::error::prelude::*;
-use tinymist_std::ImmutPath;
-use tinymist_vfs::{notify::FilesystemEvent, Vfs};
+use tinymist_vfs::{notify::FilesystemEvent, PathResolution, Vfs, WorkspaceResolver};
+use tinymist_vfs::{FsProvider, TypstFileId};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
-    syntax::{FileId, Source, Span},
+    syntax::{FileId, Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
     Library, World,
@@ -129,7 +129,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         entry: EntryState,
         inputs: Option<Arc<LazyHash<Dict>>>,
         vfs: Vfs<F::AccessModel>,
-        registry: F::Registry,
+        registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
     ) -> Self {
         Self {
@@ -140,7 +140,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             shared: Arc::new(RwLock::new(SharedState::default())),
 
             font_resolver,
-            registry: Arc::new(registry),
+            registry,
             vfs,
         }
     }
@@ -202,7 +202,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     fn set_entry_file_(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         let state = self.entry_state();
         let state = state
-            .try_select_path_in_workspace(&entry_file, true)
+            .try_select_path_in_workspace(&entry_file)
             .map_err(|e| eco_format!("cannot select entry file out of workspace: {e}"))
             .at(Span::detached())?
             .ok_or_else(|| eco_format!("failed to determine root"))
@@ -221,24 +221,17 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<PathBuf, FileError> {
-        if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().to_owned());
-        }
+    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
+        self.vfs.file_path(id)
+    }
 
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match id.package() {
-            Some(spec) => self.registry.resolve(spec)?,
-            None => self.entry.root().ok_or(FileError::Other(Some(eco_format!(
-                "cannot access directory without root: state: {:?}",
-                self.entry
-            ))))?,
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+    /// Resolve the root of the workspace.
+    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        let root = self.entry.workspace_root()?;
+        Some(WorkspaceResolver::workspace_file(
+            Some(&root),
+            VirtualPath::new(path.strip_prefix(&root).ok()?),
+        ))
     }
 
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
@@ -255,7 +248,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
                 let path = Path::new(&e);
                 let s = self
                     .entry_state()
-                    .try_select_path_in_workspace(path, true)?
+                    .try_select_path_in_workspace(path)?
                     .ok_or_else(|| error_once!("cannot select file", path: e))?;
 
                 self.snapshot_with(Some(TaskInputs {
@@ -275,18 +268,16 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<PathBuf> {
-        self.path_for_id(file_id)
+    fn reset_shadow(&mut self) {
+        self.increment_revision(|this| this.vfs.reset_shadow())
     }
 
-    #[inline]
     fn shadow_paths(&self) -> Vec<Arc<Path>> {
         self.vfs.shadow_paths()
     }
 
-    #[inline]
-    fn reset_shadow(&mut self) {
-        self.increment_revision(|this| this.vfs.reset_shadow())
+    fn shadow_ids(&self) -> Vec<TypstFileId> {
+        self.vfs.shadow_ids()
     }
 
     #[inline]
@@ -298,6 +289,19 @@ impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
         self.increment_revision(|this| {
             this.vfs().remove_shadow(path);
+            Ok(())
+        })
+    }
+
+    #[inline]
+    fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()> {
+        self.increment_revision(|this| this.vfs().map_shadow_by_id(file_id, content))
+    }
+
+    #[inline]
+    fn unmap_shadow_by_id(&mut self, file_id: FileId) -> FileResult<()> {
+        self.increment_revision(|this| {
+            this.vfs().remove_shadow_by_id(file_id);
             Ok(())
         })
     }
@@ -388,25 +392,19 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<PathBuf, FileError> {
-        if id == *DETACHED_ENTRY {
-            return Ok(DETACHED_ENTRY.vpath().as_rooted_path().to_owned());
-        }
-
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match id.package() {
-            Some(spec) => self.registry.resolve(spec)?,
-            None => self.entry.root().ok_or(FileError::Other(Some(eco_format!(
-                "cannot access directory without root: state: {:?}",
-                self.entry
-            ))))?,
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
+        self.vfs.file_path(id)
     }
+
+    /// Resolve the root of the workspace.
+    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        let root = self.entry.workspace_root()?;
+        Some(WorkspaceResolver::workspace_file(
+            Some(&root),
+            VirtualPath::new(path.strip_prefix(&root).ok()?),
+        ))
+    }
+
     /// Lookup a source file by id.
     #[track_caller]
     fn lookup(&self, id: FileId) -> Source {
@@ -433,8 +431,8 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     #[inline]
-    fn _shadow_map_id(&self, file_id: FileId) -> FileResult<PathBuf> {
-        self.path_for_id(file_id)
+    fn shadow_ids(&self) -> Vec<TypstFileId> {
+        self.vfs.shadow_ids()
     }
 
     #[inline]
@@ -456,6 +454,31 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
         self.vfs.remove_shadow(path);
         Ok(())
+    }
+
+    #[inline]
+    fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
+        self.vfs.map_shadow_by_id(file_id, content)
+    }
+
+    #[inline]
+    fn unmap_shadow_by_id(&mut self, file_id: TypstFileId) -> FileResult<()> {
+        self.vfs.remove_shadow_by_id(file_id);
+        Ok(())
+    }
+}
+
+impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
+    fn file_path(&self, fid: TypstFileId) -> FileResult<PathResolution> {
+        self.vfs.file_path(fid)
+    }
+
+    fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
+        self.vfs.read(fid)
+    }
+
+    fn is_file(&self, fid: TypstFileId) -> FileResult<bool> {
+        self.vfs.is_file(fid)
     }
 }
 
@@ -494,14 +517,12 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             return Ok(DETACH_SOURCE.clone());
         }
 
-        let fid = self.vfs.file_id(&self.path_for_id(id)?);
-        self.source_db.source(id, fid, &self.vfs)
+        self.source_db.source(id, self)
     }
 
     /// Try to access the specified file.
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        let fid = self.vfs.file_id(&self.path_for_id(id)?);
-        self.source_db.file(id, fid, &self.vfs)
+        self.source_db.file(id, self)
     }
 
     /// Get the current date.
@@ -545,8 +566,8 @@ impl<F: CompilerFeat> EntryReader for CompilerWorld<F> {
 
 impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     #[inline]
-    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath)) {
-        self.source_db.iter_dependencies_dyn(&self.vfs, f)
+    fn iter_dependencies(&self, f: &mut dyn FnMut(TypstFileId)) {
+        self.source_db.iter_dependencies_dyn(f)
     }
 }
 
@@ -563,24 +584,9 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
-        let vpath = id.vpath();
-        Ok(if let Some(package) = id.package() {
-            format!("{package}{}", vpath.as_rooted_path().display())
-        } else {
-            match self.entry.root() {
-                Some(root) => {
-                    // Try to express the path relative to the working directory.
-                    vpath
-                        .resolve(&root)
-                        // differ from typst
-                        // .and_then(|abs| pathdiff::diff_paths(&abs, self.workdir()))
-                        .as_deref()
-                        .unwrap_or_else(|| vpath.as_rootless_path())
-                        .to_string_lossy()
-                        .into()
-                }
-                None => vpath.as_rooted_path().display().to_string(),
-            }
+        Ok(match self.path_for_id(id) {
+            Ok(path) => path.as_path().display().to_string(),
+            Err(_) => format!("{id:?}"),
         })
     }
 

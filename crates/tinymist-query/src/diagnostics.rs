@@ -1,5 +1,4 @@
 use tinymist_project::LspWorld;
-use tinymist_world::EntryReader;
 use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};
@@ -54,19 +53,10 @@ fn convert_diagnostic(
     ctx: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, Diagnostic)> {
-    let uri;
-    let lsp_range;
-    if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-        uri = ctx.uri_for_id(id)?;
-        let source = ctx.source(id)?;
-        lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
-    } else {
-        let root = ctx
-            .workspace_root()
-            .ok_or_else(|| anyhow::anyhow!("no workspace root"))?;
-        uri = path_to_url(&root)?;
-        lsp_range = LspRange::default();
-    };
+    let (id, span) = diagnostic_span_id(ctx, typst_diagnostic);
+    let uri = ctx.uri_for_id(id)?;
+    let source = ctx.source(id)?;
+    let lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
 
     let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
 
@@ -131,10 +121,14 @@ fn diagnostic_related_information(
     Ok(tracepoints)
 }
 
-fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(TypstFileId, Span)> {
+fn diagnostic_span_id(
+    ctx: &LocalDiagContext,
+    typst_diagnostic: &TypstDiagnostic,
+) -> (TypstFileId, Span) {
     iter::once(typst_diagnostic.span)
         .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
         .find_map(|span| Some((span.id()?, span)))
+        .unwrap_or_else(|| (ctx.main(), Span::detached()))
 }
 
 fn diagnostic_range(

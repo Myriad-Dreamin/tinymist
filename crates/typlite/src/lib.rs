@@ -6,6 +6,7 @@ pub mod scopes;
 pub mod value;
 
 use core::fmt;
+use std::path::Path;
 use std::sync::Arc;
 use std::{fmt::Write, sync::LazyLock};
 
@@ -13,6 +14,7 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
+use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{base::ShadowApi, EntryReader, LspWorld};
 use tinymist_std::path::unix_slash;
 use typst::foundations::IntoValue;
@@ -28,7 +30,7 @@ use value::{Args, Value};
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
+    FileId, Source, SyntaxKind, SyntaxNode,
 };
 
 pub use typst_syntax as syntax;
@@ -446,14 +448,14 @@ impl TypliteWorker {
         let main = Bytes::from(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
-        let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
-        let entry = self.world.entry_state().select_in_workspace(main_id);
+        let path = Path::new("__render__.typ");
+        let entry = self.world.entry_state().select_in_workspace(path);
         let mut world = self.world.task(tinymist_project::TaskInputs {
             entry: Some(entry),
             inputs,
         });
         world.source_db.take_state();
-        world.map_shadow_by_id(main_id, main).unwrap();
+        world.map_shadow_by_id(world.main(), main).unwrap();
 
         let document = typst::compile(&world).output;
         let document = document.map_err(|diagnostics| {
@@ -461,10 +463,10 @@ impl TypliteWorker {
             let _ = write!(err, "compiling node: ");
             let write_span = |span: typst_syntax::Span, err: &mut String| {
                 let file = span.id().map(|id| match id.package() {
-                    Some(package) => {
+                    Some(package) if WorkspaceResolver::is_package_file(id) => {
                         format!("{package}:{}", unix_slash(id.vpath().as_rooted_path()))
                     }
-                    None => unix_slash(id.vpath().as_rooted_path()),
+                    Some(_) | None => unix_slash(id.vpath().as_rooted_path()),
                 });
                 let range = world.range(span);
                 match (file, range) {

@@ -4,33 +4,20 @@ use std::path::Path;
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
 
-use crate::{AccessModel, Bytes, ImmutPath};
-
-/// internal representation of [`NotifyFile`]
-#[derive(Debug, Clone)]
-struct NotifyFileRepr {
-    mtime: crate::Time,
-    content: Bytes,
-}
+use crate::{Bytes, ImmutPath, PathAccessModel};
 
 /// A file snapshot that is notified by some external source
 ///
 /// Note: The error is boxed to avoid large stack size
 #[derive(Clone)]
-pub struct FileSnapshot(Result<NotifyFileRepr, Box<FileError>>);
+pub struct FileSnapshot(Result<Bytes, Box<FileError>>);
 
 impl fmt::Debug for FileSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0.as_ref() {
             Ok(v) => f
                 .debug_struct("FileSnapshot")
-                .field("mtime", &v.mtime)
-                .field(
-                    "content",
-                    &FileContent {
-                        len: v.content.len(),
-                    },
-                )
+                .field("content", &FileContent { len: v.len() })
                 .finish(),
             Err(e) => f.debug_struct("FileSnapshot").field("error", &e).finish(),
         }
@@ -38,37 +25,25 @@ impl fmt::Debug for FileSnapshot {
 }
 
 impl FileSnapshot {
-    /// Access the internal data of the file snapshot
+    /// content of the file
     #[inline]
     #[track_caller]
-    fn retrieve<'a, T>(&'a self, f: impl FnOnce(&'a NotifyFileRepr) -> T) -> FileResult<T> {
-        self.0.as_ref().map(f).map_err(|e| *e.clone())
-    }
-
-    /// mtime of the file
-    pub fn mtime(&self) -> FileResult<&crate::Time> {
-        self.retrieve(|e| &e.mtime)
-    }
-
-    /// content of the file
     pub fn content(&self) -> FileResult<&Bytes> {
-        self.retrieve(|e| &e.content)
+        self.0.as_ref().map_err(|e| *e.clone())
     }
 
     /// Whether the related file is a file
+    #[inline]
+    #[track_caller]
     pub fn is_file(&self) -> FileResult<bool> {
-        self.retrieve(|_| true)
+        self.content().map(|_| true)
     }
 }
 
 /// Convenient function to create a [`FileSnapshot`] from tuple
-impl From<FileResult<(crate::Time, Bytes)>> for FileSnapshot {
-    fn from(result: FileResult<(crate::Time, Bytes)>) -> Self {
-        Self(
-            result
-                .map(|(mtime, content)| NotifyFileRepr { mtime, content })
-                .map_err(Box::new),
-        )
+impl From<FileResult<Bytes>> for FileSnapshot {
+    fn from(result: FileResult<Bytes>) -> Self {
+        Self(result.map_err(Box::new))
     }
 }
 
@@ -212,7 +187,7 @@ pub struct NotifyAccessModel<M> {
     pub inner: M,
 }
 
-impl<M: AccessModel> NotifyAccessModel<M> {
+impl<M: PathAccessModel> NotifyAccessModel<M> {
     /// Create a new notify access model
     pub fn new(inner: M) -> Self {
         Self {
@@ -238,29 +213,13 @@ impl<M: AccessModel> NotifyAccessModel<M> {
     }
 }
 
-impl<M: AccessModel> AccessModel for NotifyAccessModel<M> {
-    fn mtime(&self, src: &Path) -> FileResult<crate::Time> {
-        if let Some(entry) = self.files.get(src) {
-            return entry.mtime().cloned();
-        }
-
-        self.inner.mtime(src)
-    }
-
+impl<M: PathAccessModel> PathAccessModel for NotifyAccessModel<M> {
     fn is_file(&self, src: &Path) -> FileResult<bool> {
         if let Some(entry) = self.files.get(src) {
             return entry.is_file();
         }
 
         self.inner.is_file(src)
-    }
-
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        if self.files.contains_key(src) {
-            return Ok(src.into());
-        }
-
-        self.inner.real_path(src)
     }
 
     fn content(&self, src: &Path) -> FileResult<Bytes> {

@@ -12,18 +12,18 @@ use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::CompileFontArgs;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::EntryState;
 use tinymist_world::TaskInputs;
 use tinymist_world::{EntryManager, EntryReader, ShadowApi};
 use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
 pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
-use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::syntax::find_module_level_docs;
@@ -57,11 +57,16 @@ pub fn run_with_ctx<T>(
     path: PathBuf,
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
-    let root = verse.workspace_root().unwrap();
+    let root = verse.entry_state().workspace_root().unwrap();
     let paths = verse
         .shadow_paths()
         .into_iter()
-        .map(|path| TypstFileId::new(None, VirtualPath::new(path.strip_prefix(&root).unwrap())))
+        .map(|path| {
+            WorkspaceResolver::workspace_file(
+                Some(&root),
+                VirtualPath::new(path.strip_prefix(&root).unwrap()),
+            )
+        })
         .collect::<Vec<_>>();
 
     let world = verse.snapshot();
@@ -115,20 +120,19 @@ pub fn compile_doc_for_test(
     ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
 ) -> Option<VersionedDocument> {
-    let main_id = properties.get("compile").and_then(|v| match v.trim() {
-        "true" => Some(ctx.world.main()),
-        "false" => None,
+    let entry = match properties.get("compile")?.trim() {
+        "true" => ctx.world.entry_state(),
+        "false" => return None,
         path if path.ends_with(".typ") => {
-            let vp = VirtualPath::new(path);
-            Some(TypstFileId::new(None, vp))
+            ctx.world.entry_state().select_in_workspace(Path::new(path))
         }
-        _ => panic!("invalid value for 'compile' property: {v}"),
-    })?;
+        v => panic!("invalid value for 'compile' property: {v}"),
+    };
 
     let mut world = Cow::Borrowed(&ctx.world);
-    if main_id != ctx.world.main() {
+    if entry != ctx.world.entry_state() {
         world = Cow::Owned(world.task(TaskInputs {
-            entry: Some(world.entry_state().select_in_workspace(main_id)),
+            entry: Some(entry),
             ..Default::default()
         }));
     }
@@ -192,10 +196,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     verse
         .mutate_entry(EntryState::new_rooted(
             root.as_path().into(),
-            Some(TypstFileId::new(
-                None,
-                VirtualPath::new(pw.strip_prefix(root).unwrap()),
-            )),
+            Some(VirtualPath::new(pw.strip_prefix(root).unwrap())),
         ))
         .unwrap();
     f(&mut verse, pw)

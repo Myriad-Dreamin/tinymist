@@ -59,7 +59,8 @@ impl StatefulRequest for RenameRequest {
                 };
 
                 let def_fid = def.location(ctx.shared())?.0;
-                let old_path = ctx.path_for_id(def_fid).ok()?;
+                // todo: rename in untitled files
+                let old_path = ctx.path_for_id(def_fid).ok()?.to_err().ok()?;
 
                 let rename_loc = Path::new(ref_path_str.as_str());
                 let diff = pathdiff::diff_paths(Path::new(&new_path_str), rename_loc)?;

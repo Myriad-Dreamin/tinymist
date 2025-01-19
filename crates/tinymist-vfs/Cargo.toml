@@ -15,6 +15,7 @@ tinymist-std = { workspace = true, features = ["typst"] }
 parking_lot.workspace = true
 nohash-hasher.workspace = true
 indexmap.workspace = true
+comemo.workspace = true
 log.workspace = true
 rpds = "1"
 

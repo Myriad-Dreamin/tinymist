@@ -4213,6 +4213,7 @@ dependencies = [
 name = "tinymist-vfs"
 version = "0.12.18"
 dependencies = [
+ "comemo",
  "indexmap 2.7.0",
  "js-sys",
  "log",

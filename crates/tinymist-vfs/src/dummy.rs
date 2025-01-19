@@ -1,10 +1,8 @@
 use std::path::Path;
 
-use tinymist_std::ImmutPath;
 use typst::diag::{FileError, FileResult};
 
-use super::AccessModel;
-use crate::{Bytes, Time};
+use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
 
 /// Provides dummy access model.
 ///
@@ -15,16 +13,18 @@ use crate::{Bytes, Time};
 pub struct DummyAccessModel;
 
 impl AccessModel for DummyAccessModel {
-    fn mtime(&self, _src: &Path) -> FileResult<Time> {
-        Ok(Time::UNIX_EPOCH)
-    }
-
-    fn is_file(&self, _src: &Path) -> FileResult<bool> {
+    fn is_file(&self, _src: TypstFileId) -> FileResult<bool> {
         Ok(true)
     }
 
-    fn real_path(&self, src: &Path) -> FileResult<ImmutPath> {
-        Ok(src.into())
+    fn content(&self, _src: TypstFileId) -> FileResult<Bytes> {
+        Err(FileError::AccessDenied)
+    }
+}
+
+impl PathAccessModel for DummyAccessModel {
+    fn is_file(&self, _src: &Path) -> FileResult<bool> {
+        Ok(true)
     }
 
     fn content(&self, _src: &Path) -> FileResult<Bytes> {

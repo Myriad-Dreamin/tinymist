@@ -1,10 +1,12 @@
 //! Completion of paths (string literal).
 
+use tinymist_world::vfs::WorkspaceResolver;
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     pub fn complete_path(&mut self, preference: &PathPreference) -> Option<Vec<CompletionItem>> {
         let id = self.cursor.source.id();
-        if id.package().is_some() {
+        if WorkspaceResolver::is_package_file(id) {
             return None;
         }
 

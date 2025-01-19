@@ -4,6 +4,7 @@ pub use tinymist_std::error::prelude;
 pub use tinymist_world as base;
 pub use tinymist_world::args::*;
 pub use tinymist_world::config::CompileFontOpts;
+use tinymist_world::package::RegistryPathMapper;
 pub use tinymist_world::vfs;
 pub use tinymist_world::{entry::*, EntryOpts, EntryState};
 pub use tinymist_world::{font, package, CompilerUniverse, CompilerWorld, Revising, TaskInputs};
@@ -132,13 +133,28 @@ impl LspUniverseBuilder {
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
     ) -> ZResult<LspUniverse> {
+        let registry = Arc::new(package_registry);
+        let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
+
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
-            Vfs::new(SystemAccessModel {}),
-            package_registry,
+            Vfs::new(resolver, SystemAccessModel {}),
+            registry,
             font_resolver,
         ))
+    }
+
+    /// Resolve fonts from given options.
+    pub fn only_embedded_fonts() -> ZResult<TinymistFontResolver> {
+        let mut searcher = SystemFontSearcher::new();
+        searcher.resolve_opts(CompileFontOpts {
+            font_profile_cache_path: Default::default(),
+            font_paths: vec![],
+            no_system_fonts: true,
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+        })?;
+        Ok(searcher.into())
     }
 
     /// Resolve fonts from given options.

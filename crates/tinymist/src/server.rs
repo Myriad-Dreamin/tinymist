@@ -13,7 +13,7 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath, Time};
+use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath};
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
@@ -280,7 +280,7 @@ impl LanguageState {
                 .iter()
                 .map(|(path, meta)| {
                     let content = meta.content.clone().text().as_bytes().into();
-                    (path.clone(), FileResult::Ok((meta.mt, content)).into())
+                    (path.clone(), FileResult::Ok(content).into())
                 })
                 .collect(),
         )
@@ -918,13 +918,11 @@ impl LanguageState {
 
     /// Create a new source file.
     pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<(), Error> {
-        let now = Time::now();
         let path: ImmutPath = path.into();
 
         self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
-                mt: now,
                 content: Source::detached(content.clone()),
             },
         );
@@ -933,7 +931,7 @@ impl LanguageState {
         log::info!("create source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
+        let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok(content).into())]);
 
         self.update_source(files)
     }
@@ -958,7 +956,6 @@ impl LanguageState {
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
     ) -> Result<(), Error> {
-        let now = Time::now();
         let path: ImmutPath = path.into();
 
         let meta = self
@@ -980,9 +977,7 @@ impl LanguageState {
             }
         }
 
-        meta.mt = now;
-
-        let snapshot = FileResult::Ok((now, meta.content.text().as_bytes().into())).into();
+        let snapshot = FileResult::Ok(meta.content.text().as_bytes().into()).into();
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
 
@@ -1048,7 +1043,7 @@ impl LanguageState {
             .map(|path| client.entry_resolver().resolve(Some(path.into())))
             .or_else(|| {
                 let root = client.entry_resolver().root(None)?;
-                Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
+                Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY))
             });
 
         just_future(async move {
@@ -1103,8 +1098,6 @@ impl LanguageState {
 /// Metadata for a source file.
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
-    /// The last modified time.
-    pub mt: Time,
     /// The content of the file.
     pub content: Source,
 }
