@@ -9,7 +9,7 @@ use crate::{Bytes, ImmutPath, PathAccessModel};
 /// A file snapshot that is notified by some external source
 ///
 /// Note: The error is boxed to avoid large stack size
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FileSnapshot(Result<Bytes, Box<FileError>>);
 
 impl fmt::Debug for FileSnapshot {
@@ -228,14 +228,6 @@ impl<M: PathAccessModel> NotifyAccessModel<M> {
 }
 
 impl<M: PathAccessModel> PathAccessModel for NotifyAccessModel<M> {
-    fn is_file(&self, src: &Path) -> FileResult<bool> {
-        if let Some(entry) = self.files.get(src) {
-            return entry.is_file();
-        }
-
-        self.inner.is_file(src)
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(entry) = self.files.get(src) {
             return entry.content().cloned();
