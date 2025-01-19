@@ -17,7 +17,7 @@ use prelude::*;
 use project::watch_deps;
 use project::world::EntryState;
 use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
-use reflexo_typst::{Bytes, Compiler};
+use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
@@ -28,7 +28,7 @@ use task::{
 use tinymist_project::ProjectInsId;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
-    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
+    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, LspWorldExt,
     OnExportRequest, PositionEncoding, ServerInfoResponse, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
@@ -1003,21 +1003,12 @@ impl LanguageState {
         let snap = self.query_snapshot()?;
 
         let update_dep = async move {
-            let mut snap = snap.receive().await?;
+            let snap = snap.receive().await?;
             let world = snap.world.clone();
             let updater = update_lock(&world);
 
-            // todo: Introducing additional compilation here, but we must get accurate
-            // dependencies by compiling it again.
-            snap.snap.world.take_db();
-            let err = std::marker::PhantomData.compile(&snap.world, &mut Default::default());
-            if err.is_err() {
-                return ZResult::Ok(());
-            }
-
-            let ids = snap.run_analysis(|lg| lg.depended_files()).ok();
-
-            let _ = updater.zip(ids).and_then(|(mut updater, file_ids)| {
+            let file_ids = snap.world.depended_files();
+            let _ = updater.and_then(|mut updater| {
                 let doc_id = updater.compiled(&world)?;
 
                 updater.update_materials(doc_id.clone(), file_ids);
