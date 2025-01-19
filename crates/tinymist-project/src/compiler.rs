@@ -6,6 +6,7 @@
 
 #![allow(missing_docs)]
 
+use core::fmt;
 use std::{
     collections::HashSet,
     path::Path,
@@ -155,7 +156,7 @@ pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
     fn on_any_compile_reason(&self, state: &mut ProjectCompiler<F, Ext>);
     // todo: notify project specific compile
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
-    fn status(&self, revision: usize, rep: CompileReport);
+    fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport);
 }
 
 /// No need so no compilation.
@@ -166,7 +167,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
         log::info!("ProjectHandle: no need to compile");
     }
     fn notify_compile(&self, _res: &CompiledArtifact<F>, _rep: CompileReport) {}
-    fn status(&self, _revision: usize, _rep: CompileReport) {}
+    fn status(&self, _revision: usize, _id: &ProjectInsId, _rep: CompileReport) {}
 }
 
 pub enum Interrupt<F: CompilerFeat> {
@@ -184,6 +185,22 @@ pub enum Interrupt<F: CompilerFeat> {
     Memory(MemoryEvent),
     /// File system event.
     Fs(FilesystemEvent),
+}
+
+impl fmt::Debug for Interrupt<LspCompilerFeat> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Interrupt::Compile(id) => write!(f, "Compile({id:?})"),
+            Interrupt::Settle(id) => write!(f, "Settle({id:?})"),
+            Interrupt::Compiled(artifact) => write!(f, "Compiled({:?})", artifact.id),
+            Interrupt::ChangeTask(id, change) => {
+                write!(f, "ChangeTask({id:?}, entry={:?})", change.entry.is_some())
+            }
+            Interrupt::Font(..) => write!(f, "Font(..)"),
+            Interrupt::Memory(..) => write!(f, "Memory(..)"),
+            Interrupt::Fs(..) => write!(f, "Fs(..)"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -462,8 +479,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     // todo: dedicate suspended
                     if proj.suspended {
                         log::info!("ProjectCompiler: removing diag");
-                        self.handler
-                            .status(proj.verse.revision.get(), CompileReport::Suspend);
+                        self.handler.status(
+                            proj.verse.revision.get(),
+                            &proj.id,
+                            CompileReport::Suspend,
+                        );
                     }
 
                     // Reset the watch state and document state.
@@ -744,7 +764,11 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
         let id = snap.world.main_id().unwrap();
         let revision = snap.world.revision().get();
 
-        h.status(revision, CompileReport::Stage(id, "compiling", start));
+        h.status(
+            revision,
+            &snap.id,
+            CompileReport::Stage(id, "compiling", start),
+        );
 
         move || {
             let compiled = snap.compile();

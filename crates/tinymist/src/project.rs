@@ -19,15 +19,16 @@
 
 #![allow(missing_docs)]
 
-use sync_lsp::LspClient;
 pub use tinymist_project::*;
 
 use std::sync::Arc;
 
 use anyhow::bail;
 use log::{error, info, trace};
-use reflexo::path::unix_slash;
+use parking_lot::Mutex;
+use reflexo::{hash::FxHashMap, path::unix_slash};
 use reflexo_typst::{typst::prelude::EcoVec, CompileReport};
+use sync_lsp::LspClient;
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, SemanticRequest, StatefulRequest,
@@ -43,34 +44,45 @@ use crate::world::vfs::MemoryEvent;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
-#[derive(Default)]
-pub struct ProjectStateExt {
+#[derive(Default, Clone)]
+pub struct LspPreviewState {
     #[cfg(feature = "preview")]
-    pub(crate) inner: Option<Arc<typst_preview::CompileWatcher>>,
+    pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<typst_preview::CompileWatcher>>>>,
 }
 
 #[cfg(feature = "preview")]
-impl ProjectStateExt {
+impl LspPreviewState {
     // todo: multiple preview support
     #[must_use]
-    pub fn register_preview(&mut self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
-        let p = &mut self.inner;
-        if p.as_ref().is_some() {
+    pub fn register(&self, id: &ProjectInsId, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        let mut p = self.inner.lock();
+        if p.contains_key(id) {
             return false;
         }
-        *p = Some(handle.clone());
+
+        p.insert(id.clone(), handle.clone());
         true
     }
 
     #[must_use]
-    pub fn unregister_preview(&mut self, task_id: &str) -> bool {
-        let p = &mut self.inner;
-        if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
-            *p = None;
+    pub fn unregister(&self, task_id: &ProjectInsId) -> bool {
+        let mut p = self.inner.lock();
+        if p.remove(task_id).is_some() {
             return true;
         }
+
         false
     }
+
+    #[must_use]
+    pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<typst_preview::CompileWatcher>> {
+        self.inner.lock().get(task_id).cloned()
+    }
+}
+
+#[derive(Default)]
+pub struct ProjectStateExt {
+    pub is_compiling: bool,
 }
 
 /// LSP project compiler.
@@ -79,6 +91,7 @@ pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectStateExt>;
 pub struct Project {
     pub diag_group: String,
     pub state: LspProjectCompiler,
+    pub preview: LspPreviewState,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,
     pub export: crate::task::ExportTask,
@@ -137,8 +150,7 @@ pub struct CompileHandlerImpl {
     pub(crate) diag_group: String,
     pub(crate) analysis: Arc<Analysis>,
 
-    #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
+    pub(crate) preview: LspPreviewState,
 
     pub(crate) export: crate::task::ExportTask,
     pub(crate) editor_tx: EditorSender,
@@ -212,7 +224,7 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
         }
     }
 
-    fn status(&self, revision: usize, rep: CompileReport) {
+    fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport) {
         // todo: seems to duplicate with CompileStatus
         let status = match rep {
             CompileReport::Suspend => {
@@ -239,7 +251,7 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = this.inner.read().as_ref() {
+        if let Some(inner) = this.preview.get(id) {
             use typst_preview::CompileStatus;
 
             let status = match rep {
@@ -294,7 +306,7 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.read().as_ref() {
+        if let Some(inner) = self.preview.get(&snap.id) {
             let snap = snap.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
         }

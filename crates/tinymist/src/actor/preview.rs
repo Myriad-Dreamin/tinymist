@@ -7,7 +7,10 @@ use sync_lsp::{internal_error, LspClient, LspResult};
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
-use crate::tool::preview::{HttpServer, PreviewProjectHandler};
+use crate::{
+    project::LspPreviewState,
+    tool::preview::{HttpServer, PreviewProjectHandler},
+};
 
 pub struct PreviewTab {
     /// Task ID
@@ -34,6 +37,8 @@ pub struct PreviewActor {
     pub client: LspClient,
     pub tabs: HashMap<String, PreviewTab>,
     pub preview_rx: mpsc::UnboundedReceiver<PreviewRequest>,
+    /// the watchers for the preview
+    pub(crate) watchers: LspPreviewState,
 }
 
 impl PreviewActor {
@@ -51,7 +56,7 @@ impl PreviewActor {
                     };
 
                     // Unregister preview early
-                    let unregistered = tab.compile_handler.unregister_preview(&task_id);
+                    let unregistered = self.watchers.unregister(&tab.compile_handler.project_id);
                     if !unregistered {
                         log::warn!("PreviewTask({task_id}): failed to unregister preview");
                     }

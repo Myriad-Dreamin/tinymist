@@ -283,9 +283,10 @@ impl LanguageState {
         }
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+        let watcher = previewer.compile_watcher();
 
         let primary = &mut self.project.state.primary;
-        if !cli_args.not_as_primary && primary.ext.register_preview(previewer.compile_watcher()) {
+        if !cli_args.not_as_primary && self.preview.watchers.register(&primary.id, watcher) {
             let id = primary.id.clone();
             // todo: recover pin status reliably
             self.pin_entry(Some(entry))
@@ -305,7 +306,7 @@ impl LanguageState {
                 ));
             };
 
-            if !dedicate.ext.register_preview(previewer.compile_watcher()) {
+            if !self.project.preview.register(&dedicate.id, watcher) {
                 return Err(invalid_params(
                     "cannot register preview to the compiler instance",
                 ));

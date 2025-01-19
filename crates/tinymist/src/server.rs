@@ -14,8 +14,8 @@ use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
 use prelude::*;
-use project::watch_deps;
 use project::world::EntryState;
+use project::{watch_deps, LspPreviewState};
 use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
 use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
@@ -116,6 +116,7 @@ impl LanguageState {
         let formatter = FormatTask::new(config.formatter());
 
         let default_path = config.compile.entry_resolver.resolve_default();
+        let watchers = LspPreviewState::default();
         let handle = Self::server(
             &config,
             editor_tx.clone(),
@@ -123,6 +124,7 @@ impl LanguageState {
             "primary".to_string(),
             config.compile.entry_resolver.resolve(default_path),
             config.compile.determine_inputs(),
+            watchers.clone(),
         );
 
         Self {
@@ -131,7 +133,7 @@ impl LanguageState {
             editor_tx,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -285,12 +287,15 @@ impl LanguageState {
         mut state: ServiceState<T, T::S>,
         params: LspInterrupt,
     ) -> anyhow::Result<()> {
+        let start = std::time::Instant::now();
+        log::info!("incoming interrupt: {params:?}");
         let Some(ready) = state.ready() else {
             log::info!("interrupted on not ready server");
             return Ok(());
         };
 
         ready.project.interrupt(params);
+        log::info!("interrupted in {:?}", start.elapsed());
         Ok(())
     }
 }
@@ -1062,6 +1067,10 @@ impl LanguageState {
         let entry = self.entry_resolver().resolve_default();
         let config = &self.config;
 
+        // todo: hot replacement
+        #[cfg(feature = "preview")]
+        self.preview.stop_all();
+
         let new_project = Self::server(
             config,
             self.editor_tx.clone(),
@@ -1069,6 +1078,7 @@ impl LanguageState {
             "primary".to_string(),
             config.compile.entry_resolver.resolve(entry),
             config.compile.determine_inputs(),
+            self.preview.watchers.clone(),
         );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
@@ -1098,6 +1108,7 @@ impl LanguageState {
         diag_group: String,
         entry: EntryState,
         inputs: ImmutDict,
+        preview: project::LspPreviewState,
     ) -> Project {
         let compile_config = &config.compile;
         let const_config = &config.const_config;
@@ -1126,7 +1137,7 @@ impl LanguageState {
         let periscope_args = compile_config.periscope_args.clone();
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
-            inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
+            preview,
             diag_group: diag_group.clone(),
             export: export.clone(),
             editor_tx: editor_tx.clone(),
@@ -1202,6 +1213,7 @@ impl LanguageState {
         Project {
             diag_group,
             state: server,
+            preview: Default::default(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
             export: handle.export.clone(),

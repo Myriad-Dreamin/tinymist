@@ -3,6 +3,7 @@
 #![allow(missing_docs)]
 
 use std::num::NonZeroUsize;
+use std::ops::DerefMut;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
@@ -37,8 +38,8 @@ use crate::project::{
 use crate::world::LspCompilerFeat;
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
-use project::watch_deps;
 use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
+use project::{watch_deps, LspPreviewState};
 
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
@@ -189,11 +190,13 @@ pub struct PreviewState {
     client: TypedLspClient<PreviewState>,
     /// The backend running actor.
     preview_tx: mpsc::UnboundedSender<PreviewRequest>,
+    /// the watchers for the preview
+    pub(crate) watchers: LspPreviewState,
 }
 
 impl PreviewState {
     /// Create a new preview state.
-    pub fn new(client: TypedLspClient<PreviewState>) -> Self {
+    pub fn new(watchers: LspPreviewState, client: TypedLspClient<PreviewState>) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 
         client.handle.spawn(
@@ -201,11 +204,29 @@ impl PreviewState {
                 client: client.clone().to_untyped(),
                 tabs: HashMap::default(),
                 preview_rx,
+                watchers: watchers.clone(),
             }
             .run(),
         );
 
-        Self { client, preview_tx }
+        Self {
+            client,
+            preview_tx,
+            watchers,
+        }
+    }
+
+    pub(crate) fn stop_all(&mut self) {
+        let watchers = std::mem::take(self.watchers.inner.lock().deref_mut());
+        for (_, watcher) in watchers {
+            let res = self.preview_tx.send(PreviewRequest::Kill(
+                watcher.task_id().to_owned(),
+                oneshot::channel().0,
+            ));
+            if let Err(e) = res {
+                log::error!("failed to send kill request({:?}): {e}", watcher.task_id());
+            }
+        }
     }
 }
 
@@ -220,10 +241,8 @@ pub struct StartPreviewResponse {
 }
 
 pub struct PreviewProjectHandler {
-    project_id: ProjectInsId,
-    task_id: String,
+    pub project_id: ProjectInsId,
     client: Box<dyn ProjectClient>,
-    preview_tx: Option<mpsc::UnboundedSender<PreviewRequest>>,
 }
 
 impl PreviewProjectHandler {
@@ -237,16 +256,6 @@ impl PreviewProjectHandler {
         self.client
             .send_event(LspInterrupt::Settle(self.project_id.clone()));
         Ok(())
-    }
-
-    pub fn unregister_preview(&self, _task_id: &str) -> bool {
-        let Some(preview_tx) = &self.preview_tx else {
-            return false;
-        };
-
-        let req = PreviewRequest::Kill(self.task_id.clone(), oneshot::channel().0);
-        let _ = preview_tx.send(req);
-        true
     }
 }
 
@@ -300,8 +309,6 @@ impl PreviewState {
     ) -> SchedulableResponse<StartPreviewResponse> {
         let compile_handler = Arc::new(PreviewProjectHandler {
             project_id,
-            task_id: args.preview.task_id.clone(),
-            preview_tx: Some(self.preview_tx.clone()),
             client: Box::new(self.client.clone().to_untyped()),
         });
 
@@ -565,7 +572,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::process::exit(0);
     });
 
-    let task_id = args.preview.task_id.clone();
     let verse = args.compile.resolve()?;
     let previewer = PreviewBuilder::new(args.preview);
 
@@ -584,10 +590,11 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
+        let preview_state = LspPreviewState::default();
+
         // Create the actor
         let compile_handle = Arc::new(CompileHandlerImpl {
-            #[cfg(feature = "preview")]
-            inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
+            preview: preview_state.clone(),
             diag_group: "main".to_owned(),
             export: crate::task::ExportTask::new(handle, Default::default()),
             editor_tx,
@@ -606,17 +613,13 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
                 ..Default::default()
             },
         );
-        let registered = server
-            .primary
-            .ext
-            .register_preview(previewer.compile_watcher());
-        assert!(registered, "failed to register preview");
+        let registered = preview_state.register(&server.primary.id, previewer.compile_watcher());
+        if !registered {
+            anyhow::bail!("failed to register preview");
+        }
 
         let handle = Arc::new(PreviewProjectHandler {
             project_id: server.primary.id.clone(),
-            // todo: seems not quite good
-            task_id,
-            preview_tx: None,
             client: Box::new(intr_tx),
         });
 
