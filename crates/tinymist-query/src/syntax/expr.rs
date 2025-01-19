@@ -107,6 +107,7 @@ pub(crate) fn expr_of(
         w.route.insert(w.fid, Some(root_scope.clone()));
 
         w.lexical = LexicalContext::default();
+        w.comment_matcher.reset();
         w.buffer.clear();
         w.import_buffer.clear();
         let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
@@ -293,8 +294,8 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn check_docstring(&mut self, decl: &DeclExpr, kind: DefKind) {
-        if let Some(docs) = self.comment_matcher.collect() {
+    fn check_docstring(&mut self, decl: &DeclExpr, docs: Option<String>, kind: DefKind) {
+        if let Some(docs) = docs {
             let docstring = compute_docstring(&self.ctx, self.fid, docs, kind);
             if let Some(docstring) = docstring {
                 self.docstrings
@@ -442,12 +443,13 @@ impl ExprWorker<'_> {
                 typed.init().map_or_else(none_expr, |expr| self.check(expr))
             }
             ast::LetBindingKind::Normal(pat) => {
+                let docs = self.comment_matcher.collect();
                 // Check init expression before pattern checking
                 let body = typed.init().map(|init| self.defer(init));
 
                 let span = pat.span();
                 let decl = Decl::pattern(span).into();
-                self.check_docstring(&decl, DefKind::Variable);
+                self.check_docstring(&decl, docs, DefKind::Variable);
                 let pattern = self.check_pattern(pat);
                 Expr::Let(Interned::new(LetExpr {
                     span,
@@ -459,11 +461,12 @@ impl ExprWorker<'_> {
     }
 
     fn check_closure(&mut self, typed: ast::Closure) -> Expr {
+        let docs = self.comment_matcher.collect();
         let decl = match typed.name() {
             Some(name) => Decl::func(name).into(),
             None => Decl::closure(typed.span()).into(),
         };
-        self.check_docstring(&decl, DefKind::Function);
+        self.check_docstring(&decl, docs, DefKind::Function);
         self.resolve_as(Decl::as_def(&decl, None));
 
         let (params, body) = self.with_scope(|this| {
@@ -1058,8 +1061,8 @@ impl ExprWorker<'_> {
                 self.comment_matcher.reset();
                 continue;
             }
-            if !self.init_stage {
-                self.comment_matcher.process(n);
+            if !self.init_stage && self.comment_matcher.process(n) {
+                self.comment_matcher.reset();
             }
         }
 

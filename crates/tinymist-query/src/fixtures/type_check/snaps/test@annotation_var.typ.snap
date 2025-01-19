@@ -6,7 +6,7 @@ snapshot_kind: text
 ---
 "x" = Any
 "y" = Any
-"mapper" = (Any, Any) => Any
+"mapper" = (Type(function) | (Any, Any) => Any)
 "" = (Any, Any) => Any
 "x" = Any
 "f" = Any
