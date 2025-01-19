@@ -106,7 +106,7 @@ impl EntryResolver {
 #[cfg(test)]
 #[cfg(any(windows, unix, target_os = "macos"))]
 mod entry_tests {
-    use typst::syntax::FileId;
+    use tinymist_world::vfs::WorkspaceResolver;
 
     use super::*;
     use std::path::Path;
@@ -129,7 +129,10 @@ mod entry_tests {
         assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
         assert_eq!(
             entry.main(),
-            Some(FileId::new(None, VirtualPath::new("main.typ")))
+            Some(WorkspaceResolver::workspace_file(
+                entry.root().as_ref(),
+                VirtualPath::new("main.typ")
+            ))
         );
     }
 
@@ -154,7 +157,10 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
             assert_eq!(
                 entry.main(),
-                Some(FileId::new(None, VirtualPath::new("main.typ")))
+                Some(WorkspaceResolver::workspace_file(
+                    entry.root().as_ref(),
+                    VirtualPath::new("main.typ")
+                ))
             );
         }
 
@@ -168,7 +174,10 @@ mod entry_tests {
             assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
             assert_eq!(
                 entry.main(),
-                Some(FileId::new(None, VirtualPath::new("main.typ")))
+                Some(WorkspaceResolver::workspace_file(
+                    entry.root().as_ref(),
+                    VirtualPath::new("main.typ")
+                ))
             );
         }
     }
