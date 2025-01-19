@@ -46,7 +46,7 @@ web-sys = { workspace = true, optional = true, features = ["console"] }
 [features]
 
 default = []
-browser-embedded-fonts = ["fonts"]
+browser-embedded-fonts = ["typst-assets/fonts"]
 http-registry = ["dep:reqwest"]
 web = [
     "wasm-bindgen",
@@ -68,7 +68,6 @@ system = [
 ]
 
 # todo: remove me
-fonts = []
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]

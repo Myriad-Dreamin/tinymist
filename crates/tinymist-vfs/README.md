@@ -1,5 +1,3 @@
-# reflexo-vfs
+# tinymist-vfs
 
-Vfs for reflexo.
-
-See [Typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
+Vfs for [tinymist.](https://github.com/Myriad-Dreamin/tinymist)

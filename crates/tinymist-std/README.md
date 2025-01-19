@@ -1,5 +1,3 @@
-# reflexo
+# tinymist-std
 
-A portable format to show (typst) document in web browser.
-
-See [Typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
+Additional functions wrapping Rust's std library for [tinymist.](https://github.com/Myriad-Dreamin/tinymist)
