@@ -130,9 +130,7 @@ log = "0.4"
 reflexo = { version = "=0.5.4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.5.4", features = [
-    "system",
-], default-features = false }
+reflexo-typst = { version = "=0.5.4", default-features = false }
 reflexo-vec2svg = { version = "=0.5.4" }
 reflexo-typst-shim = { version = "=0.5.4", features = ["nightly"] }
 

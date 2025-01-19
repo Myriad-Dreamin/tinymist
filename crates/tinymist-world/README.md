@@ -1,5 +1,3 @@
-# reflexo-world
+# tinymist-world
 
-Typst's World implementation for reflexo.
-
-See [Typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
+Typst's World implementation for [tinymist.](https://github.com/Myriad-Dreamin/tinymist)

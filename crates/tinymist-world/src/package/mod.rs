@@ -10,7 +10,7 @@ pub mod dummy;
 #[cfg(feature = "browser")]
 pub mod browser;
 
-#[cfg(feature = "system")]
+#[cfg(feature = "http-registry")]
 pub mod http;
 
 pub trait PackageRegistry {
