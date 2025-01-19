@@ -28,7 +28,7 @@ use task::{
 use tinymist_project::ProjectInsId;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
-    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, LspWorldExt,
+    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     OnExportRequest, PositionEncoding, ServerInfoResponse, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
@@ -41,7 +41,6 @@ use typst::layout::Position as TypstPosition;
 use typst::{diag::FileResult, syntax::Source};
 
 use crate::project::LspInterrupt;
-use crate::project::{update_lock, PROJECT_ROUTE_USER_ACTION_PRIORITY};
 use crate::project::{CompileServerOpts, ProjectCompiler};
 use crate::stats::CompilerQueryStats;
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
@@ -1010,33 +1009,10 @@ impl LanguageState {
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, kind, open } = req;
 
-        let snap = self.query_snapshot()?;
-
-        let update_dep = async move {
-            let snap = snap.receive().await?;
-            let world = snap.world.clone();
-            let updater = update_lock(&world);
-
-            let file_ids = snap.world.depended_files();
-            let _ = updater.and_then(|mut updater| {
-                let doc_id = updater.compiled(&world)?;
-
-                updater.update_materials(doc_id.clone(), file_ids);
-                updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
-
-                updater.commit();
-
-                Some(())
-            });
-
-            ZResult::Ok(())
-        };
-
         let snap = self.snapshot()?;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
         let export = self.project.export.factory.oneshot(snap, Some(entry), kind);
         just_future(async move {
-            tokio::spawn(update_dep);
             let res = export.await?;
 
             // See https://github.com/Myriad-Dreamin/tinymist/issues/837
