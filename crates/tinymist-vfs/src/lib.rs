@@ -205,10 +205,6 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
             access_model: self.access_model.clone(),
         }
     }
-
-    pub fn take_state(&mut self) -> SourceCache {
-        std::mem::take(&mut self.source_cache)
-    }
 }
 
 impl<M: PathAccessModel + Sized> Vfs<M> {
@@ -250,6 +246,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     pub fn reset_all(&mut self) {
         self.reset_access_model();
         self.reset_cache();
+        self.take_state();
     }
 
     /// Reset access model.
@@ -272,6 +269,10 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
                 m.entries.remove_mut(id);
             }
         }
+    }
+
+    pub fn take_state(&mut self) -> SourceCache {
+        std::mem::take(&mut self.source_cache)
     }
 
     /// Resolve the real path for a file id.
