@@ -5,7 +5,7 @@ use std::{
     thread,
 };
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 
 use crate::{Connection, ConnectionRx, ConnectionTx, Message};
 
@@ -67,7 +67,7 @@ pub fn with_stdio_transport(
     };
     let o = || std::io::stdout().lock();
 
-    let (event_sender, event_receiver) = bounded::<crate::Event>(10);
+    let (event_sender, event_receiver) = unbounded::<crate::Event>();
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this
     // could also be implemented to use sockets or HTTP.

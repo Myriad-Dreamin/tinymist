@@ -28,7 +28,7 @@ use tinymist::{
     tool::project::{project_main, task_main},
     CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask,
 };
-use tinymist::{world::TaskInputs, WorldProvider};
+use tinymist::{world::TaskInputs, world::WorldProvider};
 use tinymist_core::LONG_VERSION;
 use tinymist_query::{package::PackageInfo, EntryResolver};
 use typst::foundations::IntoValue;
@@ -253,7 +253,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let entry = state.entry_resolver().resolve(Some(input.as_path().into()));
 
-        let snap = state.primary().snapshot().unwrap();
+        let snap = state.snapshot().unwrap();
 
         RUNTIMES.tokio_runtime.block_on(async {
             let snap = snap.receive().await.unwrap();
@@ -274,7 +274,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
 /// The main entry point for language server queries.
 pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
-    use tinymist::package::PackageRegistry;
+    use tinymist_project::package::PackageRegistry;
 
     with_stdio_transport(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
@@ -302,7 +302,7 @@ pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
 
         let state = service.state_mut().unwrap();
 
-        let snap = state.primary().snapshot().unwrap();
+        let snap = state.snapshot().unwrap();
         let res = RUNTIMES.tokio_runtime.block_on(async move {
             let w = snap.receive().await.map_err(internal_error)?;
             match cmds {

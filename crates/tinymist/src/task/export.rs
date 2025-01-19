@@ -3,10 +3,10 @@
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
-use crate::world::TaskInputs;
-use crate::world::{EntryReader, EntryState};
+use crate::project::{CompiledArtifact, ExportSignal};
 use anyhow::{bail, Context};
 use reflexo_typst::TypstDatetime;
+use tinymist_project::{EntryReader, EntryState, TaskInputs};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -20,13 +20,7 @@ use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
-    actor::{
-        editor::EditorRequest,
-        typ_client::WorldSnapFut,
-        typ_server::{CompiledArtifact, ExportSignal},
-    },
-    tool::word_count,
-    world::LspCompilerFeat,
+    actor::editor::EditorRequest, project::WorldSnapFut, tool::word_count, world::LspCompilerFeat,
     ExportMode, PathPattern,
 };
 
@@ -41,18 +35,21 @@ pub struct ExportUserConfig {
     pub mode: ExportMode,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ExportTask {
+    pub handle: tokio::runtime::Handle,
     pub factory: SyncTaskFactory<ExportConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
 
 impl ExportTask {
-    pub fn new(data: ExportConfig) -> Self {
+    pub fn new(handle: tokio::runtime::Handle, data: ExportConfig) -> Self {
         Self {
+            handle,
             factory: SyncTaskFactory::new(data),
-            ..ExportTask::default()
+            export_folder: FutureFolder::default(),
+            count_word_folder: FutureFolder::default(),
         }
     }
 
@@ -81,7 +78,7 @@ impl SyncTaskFactory<ExportConfig> {
                 ..Default::default()
             });
 
-            let artifact = snap.compile().await;
+            let artifact = snap.compile();
             export.do_export(&kind, artifact).await
         }
     }
@@ -128,29 +125,33 @@ impl ExportConfig {
             return None;
         }
 
-        t.export_folder.spawn(artifact.world.revision().get(), || {
+        let fut = t.export_folder.spawn(artifact.world.revision().get(), || {
             let this = self.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
                 log_err(this.do_export(&this.kind, artifact).await);
                 Some(())
             })
-        });
+        })?;
+
+        t.handle.spawn(fut);
 
         Some(())
     }
 
-    fn signal_count_word(&self, artifact: &CompiledArtifact<LspCompilerFeat>, t: &ExportTask) {
+    fn signal_count_word(
+        &self,
+        artifact: &CompiledArtifact<LspCompilerFeat>,
+        t: &ExportTask,
+    ) -> Option<()> {
         if !self.count_words {
-            return;
+            return None;
         }
 
-        let Some(editor_tx) = self.editor_tx.clone() else {
-            return;
-        };
+        let editor_tx = self.editor_tx.clone()?;
         let revision = artifact.world.revision().get();
 
-        t.count_word_folder.spawn(revision, || {
+        let fut = t.count_word_folder.spawn(revision, || {
             let artifact = artifact.clone();
             let group = self.group.clone();
             Box::pin(async move {
@@ -165,7 +166,11 @@ impl ExportConfig {
 
                 Some(())
             })
-        });
+        })?;
+
+        t.handle.spawn(fut);
+
+        Some(())
     }
 
     async fn do_export(

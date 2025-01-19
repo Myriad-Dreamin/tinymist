@@ -25,6 +25,7 @@ pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
 use tinymist_world::vfs::WorkspaceResolver;
+use tinymist_world::WorldDeps;
 use typst::syntax::Source;
 use typst::World;
 mod post_tyck;
@@ -39,7 +40,7 @@ mod prelude;
 mod global;
 pub use global::*;
 
-use ecow::eco_format;
+use ecow::{eco_format, EcoVec};
 use lsp_types::Url;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
@@ -71,6 +72,10 @@ pub trait LspWorldExt {
 
     /// Resolve the uri for a file id.
     fn uri_for_id(&self, fid: FileId) -> FileResult<Url>;
+
+    /// Get all depended file ids of a compilation, inclusively.
+    /// Note: must be called after compilation.
+    fn depended_files(&self) -> EcoVec<FileId>;
 }
 
 impl LspWorldExt for tinymist_project::LspWorld {
@@ -95,6 +100,14 @@ impl LspWorldExt for tinymist_project::LspWorld {
 
         log::info!("uri_for_id: {fid:?} -> {res:?}");
         res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
+    }
+
+    fn depended_files(&self) -> EcoVec<FileId> {
+        let mut deps = EcoVec::new();
+        self.iter_dependencies(&mut |file_id| {
+            deps.push(file_id);
+        });
+        deps
     }
 }
 

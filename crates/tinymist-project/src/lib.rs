@@ -2,14 +2,16 @@
 
 #![allow(missing_docs)]
 
-mod lock;
-pub use lock::*;
-mod model;
-pub use model::*;
 mod args;
-pub use args::*;
-mod watch;
-pub use watch::*;
-pub mod world;
-pub use world::*;
+mod compiler;
 pub mod font;
+mod lock;
+mod model;
+mod watch;
+pub mod world;
+pub use args::*;
+pub use compiler::*;
+pub use lock::*;
+pub use model::*;
+pub use watch::*;
+pub use world::*;

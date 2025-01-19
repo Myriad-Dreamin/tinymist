@@ -205,6 +205,16 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
             access_model: self.access_model.clone(),
         }
     }
+
+    pub fn fork(&self) -> Self {
+        Self {
+            source_cache: self.source_cache.clone(),
+            managed: Arc::new(Mutex::new(EntryMap::default())),
+            paths: Arc::new(Mutex::new(PathMap::default())),
+            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
+            access_model: self.access_model.clone(),
+        }
+    }
 }
 
 impl<M: PathAccessModel + Sized> Vfs<M> {
@@ -245,8 +255,8 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     /// Reset all state.
     pub fn reset_all(&mut self) {
         self.reset_access_model();
-        self.reset_cache();
-        self.take_state();
+        self.reset_mapping();
+        self.take_source_cache();
     }
 
     /// Reset access model.
@@ -255,7 +265,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Reset all possible caches.
-    pub fn reset_cache(&mut self) {
+    pub fn reset_mapping(&mut self) {
         self.revise().reset_cache();
     }
 
@@ -271,8 +281,12 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         }
     }
 
-    pub fn take_state(&mut self) -> SourceCache {
+    pub fn take_source_cache(&mut self) -> SourceCache {
         std::mem::take(&mut self.source_cache)
+    }
+
+    pub fn clone_source_cache(&self) -> SourceCache {
+        self.source_cache.clone()
     }
 
     /// Resolve the real path for a file id.

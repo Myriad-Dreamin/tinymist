@@ -1,10 +1,10 @@
 //! tinymist's language server
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use actor::editor::EditorActor;
 use anyhow::anyhow;
 use anyhow::Context;
@@ -13,24 +13,41 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use reflexo_typst::{error::prelude::*, Bytes, Error, ImmutPath};
+use prelude::*;
+use project::world::EntryState;
+use project::{watch_deps, LspPreviewState};
+use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
+use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{CacheTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask};
+use task::{
+    ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
+};
+use tinymist_project::ProjectInsId;
+use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
     to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
-    PositionEncoding, SyntaxRequest,
+    OnExportRequest, PositionEncoding, ServerInfoResponse, SyntaxRequest,
 };
 use tinymist_query::{EntryResolver, PageSelection};
+use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
+use tinymist_render::PeriscopeRenderer;
+use tinymist_std::Error;
+use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
+use typst::layout::Position as TypstPosition;
 use typst::{diag::FileResult, syntax::Source};
+
+use crate::project::LspInterrupt;
+use crate::project::{CompileServerOpts, ProjectCompiler};
+use crate::stats::CompilerQueryStats;
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
+use crate::world::{ImmutDict, LspUniverseBuilder, TaskInputs};
 
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
-use crate::actor::typ_client::CompileClientActor;
-use crate::world::TaskInputs;
 
 pub(crate) use futures::Future;
 
@@ -50,6 +67,8 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct LanguageState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
+    /// The project state.
+    pub project: Project,
 
     // State to synchronize with the client.
     /// Whether the server has registered semantic tokens capabilities.
@@ -77,18 +96,12 @@ pub struct LanguageState {
     pub preview: tool::preview::PreviewState,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
-    /// The primary compiler actor.
-    pub primary: Option<CompileClientActor>,
-    /// The compiler actors for tasks
-    pub dedicates: Vec<CompileClientActor>,
     /// The formatter tasks running in backend, which will be scheduled by async
     /// runtime.
     pub formatter: FormatTask,
     /// The user action tasks running in backend, which will be scheduled by
     /// async runtime.
     pub user_action: UserActionTask,
-    /// The cache task running in backend
-    pub cache: CacheTask,
 }
 
 /// Getters and the main loop.
@@ -101,14 +114,25 @@ impl LanguageState {
     ) -> Self {
         let formatter = FormatTask::new(config.formatter());
 
+        let default_path = config.compile.entry_resolver.resolve_default();
+        let watchers = LspPreviewState::default();
+        let handle = Self::server(
+            &config,
+            editor_tx.clone(),
+            client.clone(),
+            "primary".to_string(),
+            config.compile.entry_resolver.resolve(default_path),
+            config.compile.determine_inputs(),
+            watchers.clone(),
+        );
+
         Self {
             client: client.clone(),
+            project: handle,
             editor_tx,
-            primary: None,
-            dedicates: Vec::new(),
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -119,7 +143,6 @@ impl LanguageState {
             focusing: None,
             formatter,
             user_action: Default::default(),
-            cache: CacheTask::default(),
         }
     }
 
@@ -139,7 +162,10 @@ impl LanguageState {
                 service.config.compile.notify_status,
             );
 
-            service.restart_primary();
+            let err = service.restart_primary();
+            if let Err(err) = err {
+                error!("could not restart primary: {err}");
+            }
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
@@ -158,30 +184,8 @@ impl LanguageState {
         &self.config.compile
     }
 
-    /// Get the entry resolver.
-    pub fn entry_resolver(&self) -> &EntryResolver {
-        &self.compile_config().entry_resolver
-    }
-
-    /// Get the primary compile server for those commands without task context.
-    pub fn primary(&self) -> &CompileClientActor {
-        self.primary.as_ref().expect("primary")
-    }
-
-    /// Get the task-dedicated compile server.
-    pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
-        self.dedicates
-            .iter()
-            .find(|dedicate| dedicate.handle.diag_group == group)
-    }
-
-    /// Get all compile servers in current state.
-    pub fn servers_mut(&mut self) -> impl Iterator<Item = &mut CompileClientActor> {
-        self.primary.iter_mut().chain(self.dedicates.iter_mut())
-    }
-
     /// Install handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands>(
+    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = LanguageState;
@@ -197,6 +201,11 @@ impl LanguageState {
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
+            // customized event
+            .with_event(
+                &LspInterrupt::Compile(ProjectInsId::default()),
+                State::compile_interrupt::<T>,
+            )
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
             .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
@@ -273,17 +282,20 @@ impl LanguageState {
         provider
     }
 
-    /// Get all sources in current state.
-    pub fn vfs_snapshot(&self) -> FileChangeSet {
-        FileChangeSet::new_inserts(
-            self.memory_changes
-                .iter()
-                .map(|(path, meta)| {
-                    let content = meta.content.clone().text().as_bytes().into();
-                    (path.clone(), FileResult::Ok(content).into())
-                })
-                .collect(),
-        )
+    fn compile_interrupt<T: Initializer<S = Self>>(
+        mut state: ServiceState<T, T::S>,
+        params: LspInterrupt,
+    ) -> anyhow::Result<()> {
+        let start = std::time::Instant::now();
+        log::info!("incoming interrupt: {params:?}");
+        let Some(ready) = state.ready() else {
+            log::info!("interrupted on not ready server");
+            return Ok(());
+        };
+
+        ready.project.interrupt(params);
+        log::info!("interrupted in {:?}", start.elapsed());
+        Ok(())
     }
 }
 
@@ -526,10 +538,6 @@ impl LanguageState {
             }
         }
 
-        for e in self.primary.iter_mut().chain(self.dedicates.iter_mut()) {
-            e.sync_config(self.config.compile.clone());
-        }
-
         if config.compile.output_path != self.config.compile.output_path
             || config.compile.export_pdf != self.config.compile.export_pdf
         {
@@ -538,16 +546,15 @@ impl LanguageState {
                 mode: self.config.compile.export_pdf,
             };
 
-            self.primary
-                .as_mut()
-                .unwrap()
-                .change_export_config(config.clone());
+            self.change_export_config(config.clone());
         }
 
         if config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
-            self.restart_primary();
-            // todo: restart dedicates
+            let err = self.restart_primary();
+            if let Err(err) = err {
+                error!("could not restart primary: {err}");
+            }
         }
 
         if config.semantic_tokens != self.config.semantic_tokens {
@@ -836,11 +843,24 @@ impl LanguageState {
 
 impl LanguageState {
     /// Focus main file to some path.
-    pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
-        self.primary
-            .as_mut()
-            .unwrap()
-            .change_entry(new_entry.clone())
+    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool, Error> {
+        if path
+            .as_deref()
+            .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
+        {
+            return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
+        }
+
+        let next_entry = self.entry_resolver().resolve(path);
+
+        info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
+
+        self.change_task(TaskInputs {
+            entry: Some(next_entry.clone()),
+            ..Default::default()
+        });
+
+        Ok(true)
     }
 
     /// Pin the entry to the given path
@@ -849,7 +869,7 @@ impl LanguageState {
         let entry = new_entry
             .or_else(|| self.entry_resolver().resolve_default())
             .or_else(|| self.focusing.clone());
-        self.do_change_entry(entry).map(|_| ())
+        self.change_entry(entry).map(|_| ())
     }
 
     /// Updates the primary (focusing) entry
@@ -859,7 +879,7 @@ impl LanguageState {
             return Ok(false);
         }
 
-        self.do_change_entry(new_entry.clone())
+        self.change_entry(new_entry.clone())
     }
 
     /// This is used for tracking activating document status if a client is not
@@ -905,13 +925,295 @@ impl LanguageState {
             Ok(false) => {}
         }
     }
+
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+        self.project.snapshot()
+    }
+
+    /// Get the entry resolver.
+    pub fn entry_resolver(&self) -> &EntryResolver {
+        &self.compile_config().entry_resolver
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&mut self) -> ZResult<QuerySnapFut> {
+        self.project.query_snapshot(None)
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot_with_stat(
+        &mut self,
+        q: &CompilerQueryRequest,
+    ) -> ZResult<QuerySnapWithStat> {
+        let name: &'static str = q.into();
+        let path = q.associated_path();
+        let stat = self.project.stats.query_stat(path, name);
+        let fut = self.project.query_snapshot(Some(q))?;
+        Ok(QuerySnapWithStat { fut, stat })
+    }
+
+    fn add_memory_changes(&mut self, event: MemoryEvent) {
+        self.project.add_memory_changes(event);
+    }
+
+    fn change_task(&mut self, task_inputs: TaskInputs) {
+        self.project.change_task(task_inputs);
+    }
+
+    pub(crate) fn change_export_config(&mut self, config: ExportUserConfig) {
+        self.project.export.change_config(config);
+    }
+
+    // pub async fn settle(&mut self) {
+    //     let _ = self.change_entry(None);
+    //     info!("TypstActor({}): settle requested", self.handle.diag_group);
+    //     match self.handle.settle().await {
+    //         Ok(()) => info!("TypstActor({}): settled", self.handle.diag_group),
+    //         Err(err) => error!(
+    //             "TypstActor({}): failed to settle: {err:#}",
+    //             self.handle.diag_group
+    //         ),
+    //     }
+    // }
+
+    /// Get the current server info.
+    pub fn collect_server_info(&mut self) -> QueryFuture {
+        let dg = self.project.diag_group.clone();
+        let api_stats = self.project.stats.report();
+        let query_stats = self.project.analysis.report_query_stats();
+        let alloc_stats = self.project.analysis.report_alloc_stats();
+
+        let snap = self.snapshot()?;
+        just_future(async move {
+            let snap = snap.receive().await?;
+            let w = &snap.world;
+
+            let info = ServerInfoResponse {
+                root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
+                font_paths: w.font_resolver.font_paths().to_owned(),
+                inputs: w.inputs().as_ref().deref().clone(),
+                stats: HashMap::from_iter([
+                    ("api".to_owned(), api_stats),
+                    ("query".to_owned(), query_stats),
+                    ("alloc".to_owned(), alloc_stats),
+                ]),
+            };
+
+            let info = Some(HashMap::from_iter([(dg, info)]));
+            Ok(tinymist_query::CompilerQueryResponse::ServerInfo(info))
+        })
+    }
+
+    /// Export the current document.
+    pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
+        let OnExportRequest { path, kind, open } = req;
+
+        let snap = self.snapshot()?;
+        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
+        let export = self.project.export.factory.oneshot(snap, Some(entry), kind);
+        just_future(async move {
+            let res = export.await?;
+
+            // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+            // Also see https://github.com/Byron/open-rs/issues/105
+            #[cfg(not(target_os = "windows"))]
+            let do_open = ::open::that_detached;
+            #[cfg(target_os = "windows")]
+            fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+                ::open::with_detached(path, "explorer")
+            }
+
+            if let Some(Some(path)) = open.then_some(res.as_ref()) {
+                log::info!("open with system default apps: {path:?}");
+                if let Err(e) = do_open(path) {
+                    log::error!("failed to open with system default apps: {e}");
+                };
+            }
+
+            log::info!("CompileActor: on export end: {path:?} as {res:?}");
+            Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
+        })
+    }
+}
+
+impl LanguageState {
+    /// Restart the primary server.
+    pub fn restart_primary(&mut self) -> ZResult<ProjectInsId> {
+        let entry = self.entry_resolver().resolve_default();
+        let config = &self.config;
+
+        // todo: hot replacement
+        #[cfg(feature = "preview")]
+        self.preview.stop_all();
+
+        let new_project = Self::server(
+            config,
+            self.editor_tx.clone(),
+            self.client.clone(),
+            "primary".to_string(),
+            config.compile.entry_resolver.resolve(entry),
+            config.compile.determine_inputs(),
+            self.preview.watchers.clone(),
+        );
+
+        let mut old_project = std::mem::replace(&mut self.project, new_project);
+
+        rayon::spawn(move || {
+            old_project.stop();
+        });
+
+        Ok(self.project.state.primary.id.clone())
+    }
+
+    /// Restart the server with the given group.
+    pub fn restart_dedicate(
+        &mut self,
+        dedicate: &str,
+        entry: Option<ImmutPath>,
+    ) -> ZResult<ProjectInsId> {
+        let entry = self.config.compile.entry_resolver.resolve(entry);
+        self.project.restart_dedicate(dedicate, entry)
+    }
+
+    /// Create a new server for the given group.
+    pub fn server(
+        config: &Config,
+        editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
+        client: TypedLspClient<LanguageState>,
+        diag_group: String,
+        entry: EntryState,
+        inputs: ImmutDict,
+        preview: project::LspPreviewState,
+    ) -> Project {
+        let compile_config = &config.compile;
+        let const_config = &config.const_config;
+
+        // use codespan_reporting::term::Config;
+        // Run Export actors before preparing cluster to avoid loss of events
+        let export_config = ExportConfig {
+            group: diag_group.clone(),
+            editor_tx: Some(editor_tx.clone()),
+            config: ExportUserConfig {
+                output: compile_config.output_path.clone(),
+                mode: compile_config.export_pdf,
+            },
+            kind: ExportKind::Pdf {
+                creation_timestamp: config.compile.determine_creation_timestamp(),
+            },
+            count_words: config.compile.notify_status,
+        };
+        let export = ExportTask::new(client.handle.clone(), export_config);
+
+        log::info!(
+            "TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}"
+        );
+
+        // Create the compile handler for client consuming results.
+        let periscope_args = compile_config.periscope_args.clone();
+        let handle = Arc::new(CompileHandlerImpl {
+            #[cfg(feature = "preview")]
+            preview,
+            diag_group: diag_group.clone(),
+            export: export.clone(),
+            editor_tx: editor_tx.clone(),
+            client: Box::new(client.clone().to_untyped()),
+            analysis: Arc::new(Analysis {
+                position_encoding: const_config.position_encoding,
+                allow_overlapping_token: const_config.tokens_overlapping_token_support,
+                allow_multiline_token: const_config.tokens_multiline_token_support,
+                remove_html: !config.support_html_in_markdown,
+                completion_feat: config.completion.clone(),
+                color_theme: match compile_config.color_theme.as_deref() {
+                    Some("dark") => tinymist_query::ColorTheme::Dark,
+                    _ => tinymist_query::ColorTheme::Light,
+                },
+                periscope: periscope_args.map(|args| {
+                    let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
+                    Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
+                }),
+                tokens_caches: Arc::default(),
+                workers: Default::default(),
+                caches: Default::default(),
+                analysis_rev_cache: Arc::default(),
+                stats: Arc::default(),
+            }),
+
+            notified_revision: parking_lot::Mutex::new(0),
+        });
+
+        let font_resolver = compile_config.determine_fonts();
+        let entry_ = entry.clone();
+        let compile_handle = handle.clone();
+        let cert_path = compile_config.determine_certification_path();
+        let package = compile_config.determine_package_opts();
+
+        // todo: never fail?
+        let default_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let package_registry =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let verse =
+            LspUniverseBuilder::build(entry_.clone(), inputs, default_fonts, package_registry)
+                .expect("incorrect options");
+
+        // todo: unify filesystem watcher
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        let fs_client = client.clone().to_untyped();
+        let async_handle = client.handle.clone();
+        async_handle.spawn(watch_deps(dep_rx, move |event| {
+            fs_client.send_event(LspInterrupt::Fs(event));
+        }));
+
+        // Create the actor
+        let server = ProjectCompiler::new(
+            verse,
+            dep_tx,
+            CompileServerOpts {
+                handler: compile_handle,
+                enable_watch: true,
+                ..Default::default()
+            },
+        );
+        let font_client = client.clone();
+        client.handle.spawn_blocking(move || {
+            // Create the world
+            let font_resolver = font_resolver.wait().clone();
+            font_client.send_event(LspInterrupt::Font(font_resolver));
+        });
+
+        // todo: restart loses the memory changes
+        // We do send memory changes instead of initializing compiler with them.
+        // This is because there are state recorded inside of the compiler actor, and we
+        // must update them.
+        // client.add_memory_changes(MemoryEvent::Update(snapshot));
+        Project {
+            diag_group,
+            state: server,
+            preview: Default::default(),
+            analysis: handle.analysis.clone(),
+            stats: CompilerQueryStats::default(),
+            export: handle.export.clone(),
+        }
+    }
+}
+
+struct TypstPeriscopeProvider(PeriscopeRenderer);
+
+impl PeriscopeProvider for TypstPeriscopeProvider {
+    /// Resolve periscope image at the given position.
+    fn periscope_at(
+        &self,
+        ctx: &mut LocalContext,
+        doc: VersionedDocument,
+        pos: TypstPosition,
+    ) -> Option<String> {
+        self.0.render_marked(ctx, doc, pos)
+    }
 }
 
 impl LanguageState {
     fn update_source(&mut self, files: FileChangeSet) -> Result<(), Error> {
-        for srv in self.servers_mut() {
-            srv.add_memory_changes(MemoryEvent::Update(files.clone()));
-        }
+        self.add_memory_changes(MemoryEvent::Update(files.clone()));
 
         Ok(())
     }
@@ -920,6 +1222,7 @@ impl LanguageState {
     pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<(), Error> {
         let path: ImmutPath = path.into();
 
+        log::info!("create source: {path:?}");
         self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
@@ -928,7 +1231,6 @@ impl LanguageState {
         );
 
         let content: Bytes = content.as_bytes().into();
-        log::info!("create source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok(content).into())]);
@@ -1014,7 +1316,6 @@ impl LanguageState {
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        let primary = || self.primary();
         let is_pinning = self.pinning;
         just_ok(match query {
             FoldingRange(req) => query_source!(self, FoldingRange, req)?,
@@ -1022,27 +1323,24 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
-            OnExport(req) => return primary().on_export(req),
-            ServerInfo(_) => return primary().collect_server_info(),
-            _ => return Self::query_on(primary(), is_pinning, query),
+            OnExport(req) => return self.on_export(req),
+            ServerInfo(_) => return self.collect_server_info(),
+            // todo: query on dedicate projects
+            _ => return self.query_on(is_pinning, query),
         })
     }
 
-    fn query_on(
-        client: &CompileClientActor,
-        is_pinning: bool,
-        query: CompilerQueryRequest,
-    ) -> QueryFuture {
+    fn query_on(&mut self, is_pinning: bool, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let fut_stat = client.query_snapshot_with_stat(&query)?;
+        let fut_stat = self.query_snapshot_with_stat(&query)?;
         let entry = query
             .associated_path()
-            .map(|path| client.entry_resolver().resolve(Some(path.into())))
+            .map(|path| self.entry_resolver().resolve(Some(path.into())))
             .or_else(|| {
-                let root = client.entry_resolver().root(None)?;
+                let root = self.entry_resolver().root(None)?;
                 Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY))
             });
 

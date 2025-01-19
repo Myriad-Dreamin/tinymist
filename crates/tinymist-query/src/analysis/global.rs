@@ -12,7 +12,7 @@ use tinymist_project::LspWorld;
 use tinymist_std::debug_loc::DataSource;
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
-use tinymist_world::{EntryReader, WorldDeps, DETACHED_ENTRY};
+use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
@@ -370,12 +370,7 @@ impl LocalContext {
     /// Get all depended file ids of a compilation, inclusively.
     /// Note: must be called after compilation.
     pub fn depended_files(&self) -> EcoVec<TypstFileId> {
-        let mut deps = EcoVec::new();
-        self.world.iter_dependencies(&mut |file_id| {
-            deps.push(file_id);
-        });
-
-        deps
+        self.world.depended_files()
     }
 
     /// Get the world surface for Typst compiler.

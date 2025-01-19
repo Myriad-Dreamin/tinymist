@@ -5,7 +5,7 @@ use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
-use crate::actor::typ_client::WorldSnapFut;
+use crate::project::WorldSnapFut;
 use crate::world::font::FontResolver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -8,8 +8,6 @@ mod format;
 pub use format::*;
 mod user_action;
 pub use user_action::*;
-mod cache;
-pub use cache::*;
 
 use std::{ops::DerefMut, pin::Pin, sync::Arc};
 
@@ -64,7 +62,12 @@ impl FutureFolder {
             .map_err(|e| anyhow::anyhow!("compute error: {e:?}"))
     }
 
-    fn spawn(&self, revision: usize, fut: impl FnOnce() -> FoldFuture) {
+    #[must_use]
+    fn spawn(
+        &self,
+        revision: usize,
+        fut: impl FnOnce() -> FoldFuture,
+    ) -> Option<impl Future<Output = ()> + Send + 'static> {
         let mut state = self.state.lock();
         let state = state.deref_mut();
 
@@ -75,7 +78,7 @@ impl FutureFolder {
                     *prev_revision = revision;
                 }
 
-                return;
+                return None;
             }
             next_update => {
                 *next_update = Some((revision, fut()));
@@ -83,13 +86,13 @@ impl FutureFolder {
         }
 
         if state.running {
-            return;
+            return None;
         }
 
         state.running = true;
 
         let state = self.state.clone();
-        tokio::spawn(async move {
+        Some(async move {
             loop {
                 let fut = {
                     let mut state = state.lock();
@@ -101,6 +104,6 @@ impl FutureFolder {
                 };
                 fut.await;
             }
-        });
+        })
     }
 }
