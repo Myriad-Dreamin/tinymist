@@ -130,6 +130,7 @@ mod matcher_tests {
 mod expr_tests {
 
     use tinymist_std::path::unix_slash;
+    use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
 
     use crate::syntax::{Expr, RefExpr};
@@ -147,8 +148,10 @@ mod expr_tests {
                     let fid = if let Some(fid) = decl.file_id() {
                         let vpath = fid.vpath().as_rooted_path();
                         match fid.package() {
-                            Some(package) => format!(" in {package:?}{}", unix_slash(vpath)),
-                            None => format!(" in {}", unix_slash(vpath)),
+                            Some(package) if WorkspaceResolver::is_package_file(fid) => {
+                                format!(" in {package:?}{}", unix_slash(vpath))
+                            }
+                            Some(_) | None => format!(" in {}", unix_slash(vpath)),
                         }
                     } else {
                         "".to_string()

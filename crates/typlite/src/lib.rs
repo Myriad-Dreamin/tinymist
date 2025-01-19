@@ -14,6 +14,7 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
+use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{base::ShadowApi, EntryReader, LspWorld};
 use tinymist_std::path::unix_slash;
 use typst::foundations::IntoValue;
@@ -462,10 +463,10 @@ impl TypliteWorker {
             let _ = write!(err, "compiling node: ");
             let write_span = |span: typst_syntax::Span, err: &mut String| {
                 let file = span.id().map(|id| match id.package() {
-                    Some(package) => {
+                    Some(package) if WorkspaceResolver::is_package_file(id) => {
                         format!("{package}:{}", unix_slash(id.vpath().as_rooted_path()))
                     }
-                    None => unix_slash(id.vpath().as_rooted_path()),
+                    Some(_) | None => unix_slash(id.vpath().as_rooted_path()),
                 });
                 let range = world.range(span);
                 match (file, range) {
