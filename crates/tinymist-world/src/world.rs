@@ -431,8 +431,12 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         world
     }
 
-    pub fn take_state(&mut self) -> SourceCache {
+    pub fn take_cache(&mut self) -> SourceCache {
         self.vfs.take_state()
+    }
+
+    pub fn take_db(&mut self) -> SourceDb {
+        self.source_db.take_state()
     }
 
     /// Sets flag to indicate whether the compiler is currently compiling.

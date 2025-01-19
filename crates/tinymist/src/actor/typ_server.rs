@@ -558,7 +558,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        self.cache.evict(world.revision(), world.take_state());
+        self.cache.evict(world.revision(), world.take_cache());
     }
 
     /// Process some interrupt. Return whether it needs compilation.

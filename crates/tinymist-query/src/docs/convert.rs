@@ -25,7 +25,7 @@ pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoS
     });
     w.map_shadow_by_id(w.main(), Bytes::from(content.as_bytes().to_owned()))?;
     // todo: bad performance
-    w.take_state();
+    w.take_db();
 
     let conv = typlite::Typlite::new(Arc::new(w))
         .with_library(DOCS_LIB.clone())

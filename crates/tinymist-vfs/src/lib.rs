@@ -206,8 +206,8 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
         }
     }
 
-    pub fn take_state(&self) -> SourceCache {
-        self.source_cache.clone()
+    pub fn take_state(&mut self) -> SourceCache {
+        std::mem::take(&mut self.source_cache)
     }
 }
 

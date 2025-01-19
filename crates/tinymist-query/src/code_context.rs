@@ -106,7 +106,7 @@ impl SemanticRequest for InteractCodeContextRequest {
                         mapped_source.id(),
                         Bytes::from(mapped_source.text().as_bytes()),
                     );
-                    world.take_state();
+                    world.take_db();
 
                     let root = LinkedNode::new(mapped_source.root());
                     let leaf = root.leaf_at_compat(start + offset)?;

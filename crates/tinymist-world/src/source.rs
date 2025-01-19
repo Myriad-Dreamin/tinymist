@@ -140,6 +140,15 @@ impl SourceDb {
             entry
         })
     }
+
+    pub(crate) fn take_state(&mut self) -> SourceDb {
+        let slots = std::mem::take(&mut self.slots);
+
+        SourceDb {
+            is_compiling: self.is_compiling,
+            slots,
+        }
+    }
 }
 
 pub trait MergeCache: Sized {
