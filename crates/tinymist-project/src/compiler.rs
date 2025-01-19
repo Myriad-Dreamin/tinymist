@@ -338,7 +338,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         feature_set: FeatureSet,
     ) -> ProjectState<F, Ext> {
-        let entry = verse.entry_state();
         ProjectState {
             id,
             ext: Default::default(),
@@ -356,9 +355,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     .clone()
                     .configure(&WITH_COMPILING_STATUS_FEATURE, true),
             ),
-            suspended: entry.is_inactive(),
-            compiling: false,
-            suspended_reason: no_reason(),
             committed_revision: 0,
         }
     }
@@ -433,7 +429,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dedicates.iter_mut().find(|e| e.id == *id).unwrap()
     }
 
-    fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
+    pub fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
         std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut())
     }
 
@@ -452,8 +448,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &artifact.id);
 
                 proj.process_compile(artifact);
-                let reason = proj.process_lagged_compile();
-                proj.reason.see(reason);
             }
             Interrupt::Settle(id) => {
                 self.remove_dedicates(&id);
@@ -475,9 +469,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
                 // After incrementing the revision
                 if let Some(entry) = change.entry {
-                    proj.suspended = entry.is_inactive();
                     // todo: dedicate suspended
-                    if proj.suspended {
+                    if entry.is_inactive() {
                         log::info!("ProjectCompiler: removing diag");
                         self.handler.status(
                             proj.verse.revision.get(),
@@ -489,7 +482,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     // Reset the watch state and document state.
                     proj.latest_doc = None;
                     proj.latest_success_doc = None;
-                    proj.suspended_reason = no_reason();
                 }
 
                 proj.reason.see(reason_by_entry_change());
@@ -653,9 +645,6 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    suspended: bool,
-    compiling: bool,
-    suspended_reason: CompileReasons,
     committed_revision: usize,
 }
 
@@ -696,8 +685,6 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
     }
 
     fn process_compile(&mut self, artifact: CompiledArtifact<F>) {
-        self.compiling = false;
-
         let world = &artifact.snap.world;
         let compiled_revision = world.revision().get();
         if self.committed_revision >= compiled_revision {
@@ -730,12 +717,6 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
             let elapsed = evict_start.elapsed();
             log::info!("CacheEvictTask: evict cache in {elapsed:?}");
         });
-    }
-
-    /// Process reason after each compilation.
-    fn process_lagged_compile(&mut self) -> CompileReasons {
-        // The reason which is kept but not used.
-        std::mem::take(&mut self.suspended_reason)
     }
 
     #[must_use]

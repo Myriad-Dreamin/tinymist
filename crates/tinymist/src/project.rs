@@ -125,6 +125,13 @@ impl Project {
     }
 
     pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
+        if let Interrupt::Compiled(compiled) = &intr {
+            let proj = self.state.projects().find(|p| p.id == compiled.id);
+            if let Some(proj) = proj {
+                proj.ext.is_compiling = false;
+            }
+        }
+
         self.state.process(intr);
     }
 
@@ -217,10 +224,17 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
         let instances_mut = std::iter::once(&mut c.primary).chain(c.dedicates.iter_mut());
         for s in instances_mut {
-            let compile_fn = s.may_compile(&c.handler);
-            if let Some(compile_fn) = compile_fn {
-                compile_fn();
+            if s.ext.is_compiling {
+                continue;
             }
+
+            let Some(compile_fn) = s.may_compile(&c.handler) else {
+                continue;
+            };
+            s.ext.is_compiling = true;
+            rayon::spawn(move || {
+                compile_fn();
+            });
         }
     }
 
