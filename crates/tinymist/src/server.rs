@@ -68,8 +68,8 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct LanguageState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
-    /// The handle
-    pub handle: Project,
+    /// The project state.
+    pub project: Project,
 
     // State to synchronize with the client.
     /// Whether the server has registered semantic tokens capabilities.
@@ -127,7 +127,7 @@ impl LanguageState {
 
         Self {
             client: client.clone(),
-            handle,
+            project: handle,
             editor_tx,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
@@ -161,7 +161,10 @@ impl LanguageState {
                 service.config.compile.notify_status,
             );
 
-            service.restart_primary();
+            let err = service.restart_primary();
+            if let Err(err) = err {
+                error!("could not restart primary: {err}");
+            }
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
@@ -287,7 +290,7 @@ impl LanguageState {
             return Ok(());
         };
 
-        ready.handle.interrupt(params);
+        ready.project.interrupt(params);
         Ok(())
     }
 }
@@ -544,8 +547,10 @@ impl LanguageState {
 
         if config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
-            self.restart_primary();
-            // todo: restart dedicates
+            let err = self.restart_primary();
+            if let Err(err) = err {
+                error!("could not restart primary: {err}");
+            }
         }
 
         if config.semantic_tokens != self.config.semantic_tokens {
@@ -919,7 +924,7 @@ impl LanguageState {
 
     /// Snapshot the compiler thread for tasks
     pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
-        self.handle.snapshot()
+        self.project.snapshot()
     }
 
     /// Get the entry resolver.
@@ -929,7 +934,7 @@ impl LanguageState {
 
     /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&mut self) -> ZResult<QuerySnapFut> {
-        self.handle.query_snapshot(None)
+        self.project.query_snapshot(None)
     }
 
     /// Snapshot the compiler thread for language queries
@@ -939,21 +944,21 @@ impl LanguageState {
     ) -> ZResult<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
-        let stat = self.handle.stats.query_stat(path, name);
-        let fut = self.handle.query_snapshot(Some(q))?;
+        let stat = self.project.stats.query_stat(path, name);
+        let fut = self.project.query_snapshot(Some(q))?;
         Ok(QuerySnapWithStat { fut, stat })
     }
 
     fn add_memory_changes(&mut self, event: MemoryEvent) {
-        self.handle.add_memory_changes(event);
+        self.project.add_memory_changes(event);
     }
 
     fn change_task(&mut self, task_inputs: TaskInputs) {
-        self.handle.change_task(task_inputs);
+        self.project.change_task(task_inputs);
     }
 
     pub(crate) fn change_export_config(&mut self, config: ExportUserConfig) {
-        self.handle.export.change_config(config);
+        self.project.export.change_config(config);
     }
 
     // pub async fn settle(&mut self) {
@@ -970,10 +975,10 @@ impl LanguageState {
 
     /// Get the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
-        let dg = self.handle.diag_group.clone();
-        let api_stats = self.handle.stats.report();
-        let query_stats = self.handle.analysis.report_query_stats();
-        let alloc_stats = self.handle.analysis.report_alloc_stats();
+        let dg = self.project.diag_group.clone();
+        let api_stats = self.project.stats.report();
+        let query_stats = self.project.analysis.report_query_stats();
+        let alloc_stats = self.project.analysis.report_alloc_stats();
 
         let snap = self.snapshot()?;
         just_future(async move {
@@ -1024,7 +1029,7 @@ impl LanguageState {
 
         let snap = self.snapshot()?;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let export = self.handle.export.factory.oneshot(snap, Some(entry), kind);
+        let export = self.project.export.factory.oneshot(snap, Some(entry), kind);
         just_future(async move {
             tokio::spawn(update_dep);
             let res = export.await?;
@@ -1053,47 +1058,36 @@ impl LanguageState {
 
 impl LanguageState {
     /// Restart the primary server.
-    pub fn restart_primary(&mut self) {
+    pub fn restart_primary(&mut self) -> ZResult<ProjectInsId> {
         let entry = self.entry_resolver().resolve_default();
-        self.restart_server("primary", entry);
+        let config = &self.config;
+
+        let new_project = Self::server(
+            config,
+            self.editor_tx.clone(),
+            self.client.clone(),
+            "primary".to_string(),
+            config.compile.entry_resolver.resolve(entry),
+            config.compile.determine_inputs(),
+        );
+
+        let mut old_project = std::mem::replace(&mut self.project, new_project);
+
+        rayon::spawn(move || {
+            old_project.stop();
+        });
+
+        Ok(self.project.state.primary.id.clone())
     }
 
     /// Restart the server with the given group.
-    pub fn restart_dedicate(&mut self, dedicate: &str, entry: Option<ImmutPath>) {
-        self.restart_server(dedicate, entry);
-    }
-
-    /// Restart the server with the given group.
-    fn restart_server(&mut self, group: &str, entry: Option<ImmutPath>) {
-        let _ = group;
-        let _ = entry;
-        // let server = self.server(
-        //     group.to_owned(),
-        //     self.entry_resolver().resolve(entry),
-        //     self.compile_config().determine_inputs(),
-        // );
-
-        // let prev = if group == "primary" {
-        //     self.primary.replace(server)
-        // } else {
-        //     let cell = self
-        //         .dedicates
-        //         .iter_mut()
-        //         .find(|dedicate| dedicate.handle.diag_group == group);
-        //     if let Some(dedicate) = cell {
-        //         Some(std::mem::replace(dedicate, server))
-        //     } else {
-        //         self.dedicates.push(server);
-        //         None
-        //     }
-        //     todo!()
-        // };
-
-        // if let Some(mut prev) = prev {
-        //     self.client.handle.spawn(async move { prev.settle().await });
-        // }
-
-        todo!()
+    pub fn restart_dedicate(
+        &mut self,
+        dedicate: &str,
+        entry: Option<ImmutPath>,
+    ) -> ZResult<ProjectInsId> {
+        let entry = self.config.compile.entry_resolver.resolve(entry);
+        self.project.restart_dedicate(dedicate, entry)
     }
 
     /// Create a new server for the given group.
@@ -1207,7 +1201,7 @@ impl LanguageState {
         // client.add_memory_changes(MemoryEvent::Update(snapshot));
         Project {
             diag_group,
-            wrapper: server,
+            state: server,
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
             export: handle.export.clone(),

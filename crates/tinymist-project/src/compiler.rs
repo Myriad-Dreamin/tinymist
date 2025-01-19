@@ -17,14 +17,17 @@ use reflexo_typst::{
     features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     CompileEnv, CompileReport, Compiler, TypstDocument,
 };
+use tinymist_std::error::prelude::ZResult;
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::LspCompilerFeat;
 use tinymist_world::{
-    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-    vfs::{FsProvider, RevisingVfs},
-    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, TaskInputs, WorldDeps,
+    vfs::{
+        notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
+        FsProvider, RevisingVfs,
+    },
+    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
 };
 
 /// LSP interrupt.
@@ -169,6 +172,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
 pub enum Interrupt<F: CompilerFeat> {
     /// Compile anyway.
     Compile(ProjectInsId),
+    /// Settle a dedicated project.
+    Settle(ProjectInsId),
     /// Compiled from computing thread.
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
@@ -287,8 +292,13 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             enable_watch,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
-        let primary =
-            Self::create_project(verse, handler.clone(), dep_tx.clone(), feature_set.clone());
+        let primary = Self::create_project(
+            ProjectInsId("primary".into()),
+            verse,
+            handler.clone(),
+            dep_tx.clone(),
+            feature_set.clone(),
+        );
         Self {
             handler,
             dep_tx,
@@ -305,6 +315,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     fn create_project(
+        id: ProjectInsId,
         verse: CompilerUniverse<F>,
         handler: Arc<dyn CompileHandler<F, Ext>>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
@@ -312,7 +323,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     ) -> ProjectState<F, Ext> {
         let entry = verse.entry_state();
         ProjectState {
-            id: ProjectInsId("primary".into()),
+            id,
             ext: Default::default(),
             verse,
             reason: no_reason(),
@@ -426,6 +437,9 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 proj.process_compile(artifact);
                 let reason = proj.process_lagged_compile();
                 proj.reason.see(reason);
+            }
+            Interrupt::Settle(id) => {
+                self.remove_dedicates(&id);
             }
             Interrupt::ChangeTask(id, change) => {
                 let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &id);
@@ -554,6 +568,41 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     }
                 }
             }
+        }
+    }
+
+    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> ZResult<ProjectInsId> {
+        let id = ProjectInsId(group.into());
+
+        let verse = CompilerUniverse::<F>::new_raw(
+            entry,
+            Some(self.primary.verse.inputs().clone()),
+            self.primary.verse.vfs().fork(),
+            self.primary.verse.registry.clone(),
+            self.primary.verse.font_resolver.clone(),
+        );
+
+        let proj = Self::create_project(
+            id.clone(),
+            verse,
+            self.handler.clone(),
+            self.dep_tx.clone(),
+            self.primary.once_feature_set.as_ref().to_owned(),
+        );
+
+        self.remove_dedicates(&id);
+        self.dedicates.push(proj);
+
+        Ok(id)
+    }
+
+    fn remove_dedicates(&mut self, id: &ProjectInsId) {
+        let proj = self.dedicates.iter().position(|e| e.id == *id);
+        if let Some(idx) = proj {
+            let _proj = self.dedicates.remove(idx);
+            // todo: kill compilations
+        } else {
+            log::warn!("ProjectCompiler: settle project not found {id:?}");
         }
     }
 }

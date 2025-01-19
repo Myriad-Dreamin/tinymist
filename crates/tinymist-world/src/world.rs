@@ -147,6 +147,10 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         self.mutate_entry_(state).map(|_| ())?;
         Ok(())
     }
+
+    pub fn vfs(&self) -> &Vfs<F::AccessModel> {
+        &self.vfs
+    }
 }
 
 impl<F: CompilerFeat> CompilerUniverse<F> {

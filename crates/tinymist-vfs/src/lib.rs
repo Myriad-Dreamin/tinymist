@@ -205,6 +205,16 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
             access_model: self.access_model.clone(),
         }
     }
+
+    pub fn fork(&self) -> Self {
+        Self {
+            source_cache: self.source_cache.clone(),
+            managed: Arc::new(Mutex::new(EntryMap::default())),
+            paths: Arc::new(Mutex::new(PathMap::default())),
+            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
+            access_model: self.access_model.clone(),
+        }
+    }
 }
 
 impl<M: PathAccessModel + Sized> Vfs<M> {

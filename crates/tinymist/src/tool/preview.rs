@@ -220,8 +220,10 @@ pub struct StartPreviewResponse {
 }
 
 pub struct PreviewProjectHandler {
-    client: Box<dyn ProjectClient>,
     project_id: ProjectInsId,
+    task_id: String,
+    client: Box<dyn ProjectClient>,
+    preview_tx: Option<mpsc::UnboundedSender<PreviewRequest>>,
 }
 
 impl PreviewProjectHandler {
@@ -232,17 +234,19 @@ impl PreviewProjectHandler {
     }
 
     pub async fn settle(&self) -> Result<(), Error> {
-        // let req = PreviewRequest::Kill(task_id.to_owned(), oneshot::channel().1);
-        // let _ = self.client.send_event(req);
-        // true
-        todo!()
+        self.client
+            .send_event(LspInterrupt::Settle(self.project_id.clone()));
+        Ok(())
     }
 
     pub fn unregister_preview(&self, _task_id: &str) -> bool {
-        // let req = PreviewRequest::Kill(task_id.to_owned(), oneshot::channel().1);
-        // let _ = self.client.send_event(req);
-        // true
-        todo!()
+        let Some(preview_tx) = &self.preview_tx else {
+            return false;
+        };
+
+        let req = PreviewRequest::Kill(self.task_id.clone(), oneshot::channel().0);
+        let _ = preview_tx.send(req);
+        true
     }
 }
 
@@ -296,6 +300,8 @@ impl PreviewState {
     ) -> SchedulableResponse<StartPreviewResponse> {
         let compile_handler = Arc::new(PreviewProjectHandler {
             project_id,
+            task_id: args.preview.task_id.clone(),
+            preview_tx: Some(self.preview_tx.clone()),
             client: Box::new(self.client.clone().to_untyped()),
         });
 
@@ -559,6 +565,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::process::exit(0);
     });
 
+    let task_id = args.preview.task_id.clone();
     let verse = args.compile.resolve()?;
     let previewer = PreviewBuilder::new(args.preview);
 
@@ -607,6 +614,9 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
         let handle = Arc::new(PreviewProjectHandler {
             project_id: server.primary.id.clone(),
+            // todo: seems not quite good
+            task_id,
+            preview_tx: None,
             client: Box::new(intr_tx),
         });
 

@@ -211,7 +211,7 @@ impl LanguageState {
     /// Clear all cached resources.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
-        self.handle.analysis.clear_cache();
+        self.project.analysis.clear_cache();
         just_ok(JsonValue::Null)
     }
 
@@ -252,7 +252,6 @@ impl LanguageState {
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
-        use crate::project::ProjectStateExt;
         use crate::tool::preview::PreviewCliArgs;
         use clap::Parser;
 
@@ -285,9 +284,7 @@ impl LanguageState {
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
-        let handle = &mut self.handle;
-        let primary = &mut handle.wrapper.primary;
-        let _ = ProjectStateExt::unregister_preview;
+        let primary = &mut self.project.state.primary;
         if !cli_args.not_as_primary && primary.ext.register_preview(previewer.compile_watcher()) {
             let id = primary.id.clone();
             // todo: recover pin status reliably
@@ -296,33 +293,25 @@ impl LanguageState {
 
             self.preview.start(cli_args, previewer, id, true)
         } else {
-            // Get the task-dedicated compile server.
-            // pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
-            //     self.dedicates
-            //         .iter()
-            //         .find(|dedicate| dedicate.handle.diag_group == group)
-            // }
+            let id = self
+                .restart_dedicate(&task_id, Some(entry))
+                .map_err(internal_error)?;
 
-            // self.restart_dedicate(&task_id, Some(entry));
-            // let Some(dedicate) = self.dedicate(&task_id) else {
-            //     return Err(invalid_params(
-            //         "just restarted compiler instance for the task is not found",
-            //     ));
-            // };
+            // Gets the task-dedicated compile server.
+            let Some(dedicate) = self.project.state.dedicates.iter_mut().find(|d| d.id == id)
+            else {
+                return Err(invalid_params(
+                    "just restarted compiler instance for the task is not found",
+                ));
+            };
 
-            // let _ = dedicate;
+            if !dedicate.ext.register_preview(previewer.compile_watcher()) {
+                return Err(invalid_params(
+                    "cannot register preview to the compiler instance",
+                ));
+            }
 
-            // let handle = dedicate.handle.clone();
-
-            // if !handle.register_preview(previewer.compile_watcher()) {
-            //     return Err(invalid_params(
-            //         "cannot register preview to the compiler instance",
-            //     ));
-            // }
-
-            // self.preview.start(cli_args, previewer, handle, false)
-
-            todo!()
+            self.preview.start(cli_args, previewer, id, false)
         }
     }
 

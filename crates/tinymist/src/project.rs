@@ -46,15 +46,15 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 #[derive(Default)]
 pub struct ProjectStateExt {
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
+    pub(crate) inner: Option<Arc<typst_preview::CompileWatcher>>,
 }
 
 #[cfg(feature = "preview")]
 impl ProjectStateExt {
     // todo: multiple preview support
     #[must_use]
-    pub fn register_preview(&self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
-        let mut p = self.inner.write();
+    pub fn register_preview(&mut self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        let p = &mut self.inner;
         if p.as_ref().is_some() {
             return false;
         }
@@ -63,8 +63,8 @@ impl ProjectStateExt {
     }
 
     #[must_use]
-    pub fn unregister_preview(&self, task_id: &str) -> bool {
-        let mut p = self.inner.write();
+    pub fn unregister_preview(&mut self, task_id: &str) -> bool {
+        let p = &mut self.inner;
         if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
             *p = None;
             return true;
@@ -78,7 +78,7 @@ pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectStateExt>;
 
 pub struct Project {
     pub diag_group: String,
-    pub wrapper: LspProjectCompiler,
+    pub state: LspProjectCompiler,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,
     pub export: crate::task::ExportTask,
@@ -88,7 +88,7 @@ impl Project {
     /// Snapshot the compiler thread for tasks
     pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
         let (tx, rx) = oneshot::channel();
-        let snap = self.wrapper.snapshot();
+        let snap = self.state.snapshot();
         let _ = tx.send(snap);
 
         Ok(WorldSnapFut { rx })
@@ -108,24 +108,28 @@ impl Project {
     }
 
     pub fn add_memory_changes(&mut self, event: MemoryEvent) {
-        self.wrapper.process(Interrupt::Memory(event));
+        self.state.process(Interrupt::Memory(event));
     }
 
     pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
-        self.wrapper.process(intr);
+        self.state.process(intr);
     }
 
     pub fn change_task(&mut self, task: TaskInputs) {
-        self.wrapper
-            .process(Interrupt::ChangeTask(self.wrapper.primary.id.clone(), task));
+        self.state
+            .process(Interrupt::ChangeTask(self.state.primary.id.clone(), task));
     }
 
-    pub async fn settle(&self) -> anyhow::Result<()> {
-        // let (tx, rx) = oneshot::channel();
-        // let _ = self.intr_tx.send(Interrupt::Settle(tx));
-        // rx.await?;
-        // Ok(())
-        todo!()
+    pub(crate) fn stop(&mut self) {
+        // todo: stop all compilations
+    }
+
+    pub(crate) fn restart_dedicate(
+        &mut self,
+        group: &str,
+        entry: EntryState,
+    ) -> ZResult<ProjectInsId> {
+        self.state.restart_dedicate(group, entry)
     }
 }
 
