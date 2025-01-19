@@ -12,15 +12,15 @@
 use std::collections::HashMap;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
-use typst::diag::{EcoString, FileError, FileResult};
+use typst::diag::FileError;
 
 use crate::vfs::{
     notify::{FileChangeSet, FileSnapshot, FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
     PathAccessModel,
 };
-use tinymist_std::ImmutPath;
 
 type WatcherPair = (RecommendedWatcher, mpsc::UnboundedReceiver<NotifyEvent>);
 type NotifyEvent = notify::Result<notify::Event>;
@@ -65,8 +65,6 @@ struct WatchedEntry {
     state: WatchState,
     /// Previous content of the file.
     prev: Option<FileSnapshot>,
-    /// Previous metadata of the file.
-    prev_meta: FileResult<std::fs::Metadata>,
 }
 
 /// Self produced event that check whether the file is stable after a while.
@@ -253,7 +251,6 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                     seen: true,
                     state: WatchState::Stable,
                     prev: None,
-                    prev_meta: Err(FileError::Other(Some(EcoString::from("_not-init_")))),
                 });
 
             // Update in-memory metadata for now.
@@ -276,7 +273,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                     .is_some();
                 }
 
-                changeset.may_insert(self.notify_entry_update(path.clone(), Some(meta)));
+                changeset.may_insert(self.notify_entry_update(path.clone()));
             } else {
                 let watched = self.inner.content(path);
                 changeset.inserts.push((path.clone(), watched.into()));
@@ -311,7 +308,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         let mut changeset = FileChangeSet::default();
         for path in event.paths.iter() {
             // todo: remove this clone: path.into()
-            changeset.may_insert(self.notify_entry_update(path.as_path().into(), None));
+            changeset.may_insert(self.notify_entry_update(path.as_path().into()));
         }
 
         // Workaround for notify-rs' implicit unwatch on remove/rename
@@ -349,14 +346,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
     }
 
     /// Notify any update of the file entry
-    fn notify_entry_update(
-        &mut self,
-        path: ImmutPath,
-        meta: Option<FileResult<std::fs::Metadata>>,
-    ) -> Option<FileEntry> {
-        let mut meta =
-            meta.unwrap_or_else(|| path.metadata().map_err(|e| FileError::from_io(e, &path)));
-
+    fn notify_entry_update(&mut self, path: ImmutPath) -> Option<FileEntry> {
         // The following code in rust-analyzer is commented out
         // todo: check whether we need this
         // if meta.file_type().is_dir() && self
@@ -369,45 +359,19 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         // Find entry and continue
         let entry = self.watched_entries.get_mut(&path)?;
 
-        std::mem::swap(&mut entry.prev_meta, &mut meta);
-        let prev_meta = meta;
-        let next_meta = &entry.prev_meta;
-
-        let meta = match (prev_meta, next_meta) {
-            (Err(prev), Err(next)) => {
-                if prev != *next {
-                    return Some((path.clone(), FileSnapshot::from(Err(next.clone()))));
-                }
-                return None;
-            }
-            // todo: check correctness
-            (Ok(..), Err(next)) => {
-                // Invalidate the entry content
-                entry.prev = None;
-
-                return Some((path.clone(), FileSnapshot::from(Err(next.clone()))));
-            }
-            (_, Ok(meta)) => meta,
-        };
-
-        if !meta.file_type().is_file() {
-            return None;
-        }
-
         // Check meta, path, and content
-
-        let mut file = FileSnapshot::from(self.inner.content(&path));
+        let file = FileSnapshot::from(self.inner.content(&path));
 
         // Check state in fast path: compare state, return None on not sending
         // the file change
-        match (entry.prev.as_deref(), file.as_mut()) {
+        match (entry.prev.as_deref(), file.as_ref()) {
             // update the content of the entry in the following cases:
             // + Case 1: previous content is clear
             // + Case 2: previous content is not clear but some error, and the
             // current content is ok
             (None, ..) | (Some(Err(..)), Ok(..)) => {}
             // Meet some error currently
-            (Some(..), Err(err)) => match &mut entry.state {
+            (Some(it), Err(err)) => match &mut entry.state {
                 // If the file is stable, check whether the editor is removing
                 // or truncating the file. They are possibly flushing the file
                 // but not finished yet.
@@ -427,6 +391,11 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                         return None;
                     }
                     // Otherwise, we push the error to the consumer.
+
+                    // Ignores the error if the error is stable
+                    if it.as_ref().is_err_and(|it| it == err) {
+                        return None;
+                    }
                 }
 
                 // Very complicated case of check error sequence, so we simplify
@@ -492,6 +461,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         if reserved < std::time::Duration::from_millis(50) {
             let send = self.undetermined_send.clone();
             tokio::spawn(async move {
+                // todo: sleep in browser
                 tokio::time::sleep(std::time::Duration::from_millis(50) - reserved).await;
                 log_send_error("reschedule", send.send(event));
             });
@@ -514,9 +484,14 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 if recheck_at == event.at_logical_tick {
                     log::debug!("notify event real happened {event:?}, state: {payload:?}");
 
+                    if Some(&payload) == entry.prev.as_ref() {
+                        return None;
+                    }
+
                     // Send the underlying change to the consumer
                     let mut changeset = FileChangeSet::default();
                     changeset.inserts.push((event.path, payload));
+
                     (self.interrupted_by_events)(FilesystemEvent::Update(changeset));
                 }
             }
