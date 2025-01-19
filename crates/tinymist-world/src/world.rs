@@ -6,10 +6,10 @@ use std::{
 };
 
 use chrono::{DateTime, Datelike, Local};
-use parking_lot::RwLock;
 use tinymist_std::error::prelude::*;
-use tinymist_vfs::{notify::FilesystemEvent, PathResolution, Vfs, WorkspaceResolver};
-use tinymist_vfs::{FsProvider, TypstFileId};
+use tinymist_vfs::{
+    FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
+};
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
@@ -19,78 +19,20 @@ use typst::{
     Library, World,
 };
 
-use crate::source::{SharedState, SourceCache, SourceDb};
-use crate::{
-    entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY},
-    font::FontResolver,
-    package::{PackageRegistry, PackageSpec},
-    parser::{
-        get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
-        SemanticTokensLegend,
-    },
-    CompilerFeat, ShadowApi, WorldDeps,
+use crate::parser::{
+    get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
+    SemanticTokensLegend,
 };
+use crate::{
+    package::{PackageRegistry, PackageSpec},
+    source::SourceDb,
+};
+// use crate::source::{SharedState, SourceCache, SourceDb};
+use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
+use crate::{font::FontResolver, CompilerFeat, ShadowApi, WorldDeps};
 
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
-
-pub struct Revising<'a, T> {
-    pub revision: NonZeroUsize,
-    pub inner: &'a mut T,
-}
-
-impl<T> std::ops::Deref for Revising<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner
-    }
-}
-
-impl<T> std::ops::DerefMut for Revising<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.inner
-    }
-}
-
-impl<F: CompilerFeat> Revising<'_, CompilerUniverse<F>> {
-    pub fn vfs(&mut self) -> &mut Vfs<F::AccessModel> {
-        &mut self.inner.vfs
-    }
-
-    /// Let the vfs notify the access model with a filesystem event.
-    ///
-    /// See `reflexo_vfs::NotifyAccessModel` for more information.
-    pub fn notify_fs_event(&mut self, event: FilesystemEvent) {
-        self.inner.vfs.notify_fs_event(event);
-    }
-
-    pub fn reset_shadow(&mut self) {
-        self.inner.vfs.reset_shadow()
-    }
-
-    pub fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()> {
-        self.inner.vfs.map_shadow(path, content)
-    }
-
-    pub fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
-        self.inner.vfs.remove_shadow(path);
-        Ok(())
-    }
-
-    /// Set the inputs for the compiler.
-    pub fn set_inputs(&mut self, inputs: Arc<LazyHash<Dict>>) {
-        self.inner.inputs = inputs;
-    }
-
-    pub fn set_entry_file(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
-        self.inner.set_entry_file_(entry_file)
-    }
-
-    pub fn mutate_entry(&mut self, state: EntryState) -> SourceResult<EntryState> {
-        self.inner.mutate_entry_(state)
-    }
-}
 
 /// A universe that provides access to the operating system.
 ///
@@ -111,10 +53,8 @@ pub struct CompilerUniverse<F: CompilerFeat> {
     /// Provides path-based data access for typst compiler.
     vfs: Vfs<F::AccessModel>,
 
-    /// The current revision of the source database.
-    pub revision: RwLock<NonZeroUsize>,
-    /// Shared state for source cache.
-    pub shared: Arc<RwLock<SharedState<SourceCache>>>,
+    /// The current revision of the universe.
+    pub revision: NonZeroUsize,
 }
 
 /// Creates, snapshots, and manages the compiler universe.
@@ -136,8 +76,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             entry,
             inputs: inputs.unwrap_or_default(),
 
-            revision: RwLock::new(NonZeroUsize::new(1).expect("initial revision is 1")),
-            shared: Arc::new(RwLock::new(SharedState::default())),
+            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
 
             font_resolver,
             registry,
@@ -160,8 +99,6 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     }
 
     pub fn snapshot_with(&self, mutant: Option<TaskInputs>) -> CompilerWorld<F> {
-        let rev_lock = self.revision.read();
-
         let w = CompilerWorld {
             entry: self.entry.clone(),
             inputs: self.inputs.clone(),
@@ -169,9 +106,9 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
+            revision: self.revision,
             source_db: SourceDb {
-                revision: *rev_lock,
-                shared: self.shared.clone(),
+                is_compiling: true,
                 slots: Default::default(),
             },
             now: OnceLock::new(),
@@ -181,19 +118,18 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     }
 
     /// Increment revision with actions.
-    pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut Revising<Self>) -> T) -> T {
-        let rev_lock = self.revision.get_mut();
-        *rev_lock = rev_lock.checked_add(1).unwrap();
-        let revision = *rev_lock;
-        f(&mut Revising {
+    pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut RevisingUniverse<F>) -> T) -> T {
+        f(&mut RevisingUniverse {
+            vfs_revision: self.vfs.revision(),
+            font_revision: self.font_resolver.revision(),
+            registry_revision: self.registry.revision(),
+            view_changed: false,
             inner: self,
-            revision,
         })
     }
 
     /// Mutate the entry state and return the old state.
     fn mutate_entry_(&mut self, mut state: EntryState) -> SourceResult<EntryState> {
-        self.reset();
         std::mem::swap(&mut self.entry, &mut state);
         Ok(state)
     }
@@ -216,8 +152,14 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 impl<F: CompilerFeat> CompilerUniverse<F> {
     /// Reset the world for a new lifecycle (of garbage collection).
     pub fn reset(&mut self) {
-        self.vfs.reset();
+        self.vfs.reset_all();
         // todo: shared state
+    }
+
+    /// Clear the vfs cache that is not touched for a long time.
+    pub fn evict(&mut self, vfs_threshold: usize) {
+        self.vfs.reset_access_model();
+        self.vfs.evict(vfs_threshold);
     }
 
     /// Resolve the real path for a file id.
@@ -269,7 +211,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
 impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
     #[inline]
     fn reset_shadow(&mut self) {
-        self.increment_revision(|this| this.vfs.reset_shadow())
+        self.increment_revision(|this| this.vfs.revise().reset_shadow())
     }
 
     fn shadow_paths(&self) -> Vec<Arc<Path>> {
@@ -282,20 +224,17 @@ impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
 
     #[inline]
     fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()> {
-        self.increment_revision(|this| this.vfs().map_shadow(path, content))
+        self.increment_revision(|this| this.vfs().map_shadow(path, Ok(content).into()))
     }
 
     #[inline]
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
-        self.increment_revision(|this| {
-            this.vfs().remove_shadow(path);
-            Ok(())
-        })
+        self.increment_revision(|this| this.vfs().unmap_shadow(path))
     }
 
     #[inline]
     fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()> {
-        self.increment_revision(|this| this.vfs().map_shadow_by_id(file_id, content))
+        self.increment_revision(|this| this.vfs().map_shadow_by_id(file_id, Ok(content).into()))
     }
 
     #[inline]
@@ -314,14 +253,114 @@ impl<F: CompilerFeat> EntryReader for CompilerUniverse<F> {
 }
 
 impl<F: CompilerFeat> EntryManager for CompilerUniverse<F> {
-    fn reset(&mut self) -> SourceResult<()> {
-        self.reset();
-        Ok(())
-    }
-
     fn mutate_entry(&mut self, state: EntryState) -> SourceResult<EntryState> {
         self.increment_revision(|this| this.mutate_entry_(state))
     }
+}
+
+pub struct RevisingUniverse<'a, F: CompilerFeat> {
+    view_changed: bool,
+    vfs_revision: NonZeroUsize,
+    font_revision: Option<NonZeroUsize>,
+    registry_revision: Option<NonZeroUsize>,
+    pub inner: &'a mut CompilerUniverse<F>,
+}
+
+impl<F: CompilerFeat> std::ops::Deref for RevisingUniverse<'_, F> {
+    type Target = CompilerUniverse<F>;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner
+    }
+}
+
+impl<F: CompilerFeat> std::ops::DerefMut for RevisingUniverse<'_, F> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner
+    }
+}
+
+impl<F: CompilerFeat> Drop for RevisingUniverse<'_, F> {
+    fn drop(&mut self) {
+        let mut view_changed = self.view_changed;
+        // If the revision is none, it means the fonts should be viewed as
+        // changed unconditionally.
+        if self.font_changed() {
+            view_changed = true;
+        }
+        // If the revision is none, it means the packages should be viewed as
+        // changed unconditionally.
+        if self.registry_changed() {
+            view_changed = true;
+
+            // The registry has changed affects the vfs cache.
+            self.vfs().reset_cache();
+        }
+        let view_changed = view_changed || self.vfs_changed();
+
+        if view_changed {
+            self.vfs.reset_access_model();
+            let revision = &mut self.revision;
+            *revision = revision.checked_add(1).unwrap();
+        }
+    }
+}
+
+impl<F: CompilerFeat> RevisingUniverse<'_, F> {
+    pub fn vfs(&mut self) -> RevisingVfs<'_, F::AccessModel> {
+        self.vfs.revise()
+    }
+
+    pub fn set_fonts(&mut self, fonts: Arc<F::FontResolver>) {
+        self.inner.font_resolver = fonts;
+    }
+
+    pub fn set_package(&mut self, packages: Arc<F::Registry>) {
+        self.inner.registry = packages;
+    }
+
+    /// Set the inputs for the compiler.
+    pub fn set_inputs(&mut self, inputs: Arc<LazyHash<Dict>>) {
+        self.view_changed = true;
+        self.inner.inputs = inputs;
+    }
+
+    pub fn set_entry_file(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
+        self.view_changed = true;
+        self.inner.set_entry_file_(entry_file)
+    }
+
+    pub fn mutate_entry(&mut self, state: EntryState) -> SourceResult<EntryState> {
+        self.view_changed = true;
+
+        // Resets the cache if the workspace root has changed.
+        let root_changed = self.inner.entry.workspace_root() == state.workspace_root();
+        if root_changed {
+            self.vfs().reset_cache();
+        }
+
+        self.inner.mutate_entry_(state)
+    }
+
+    pub fn flush(&mut self) {
+        self.view_changed = true;
+    }
+
+    pub fn font_changed(&self) -> bool {
+        is_revision_changed(self.font_revision, self.font_resolver.revision())
+    }
+
+    pub fn registry_changed(&self) -> bool {
+        is_revision_changed(self.registry_revision, self.registry.revision())
+    }
+
+    pub fn vfs_changed(&self) -> bool {
+        self.vfs_revision != self.vfs.revision()
+    }
+}
+
+fn is_revision_changed(a: Option<NonZeroUsize>, b: Option<NonZeroUsize>) -> bool {
+    a.is_none() || b.is_none() || a != b
 }
 
 pub struct CompilerWorld<F: CompilerFeat> {
@@ -340,8 +379,9 @@ pub struct CompilerWorld<F: CompilerFeat> {
     /// Provides path-based data access for typst compiler.
     vfs: Vfs<F::AccessModel>,
 
+    revision: NonZeroUsize,
     /// Provides source database for typst compiler.
-    pub source_db: SourceDb,
+    source_db: SourceDb,
     /// The current datetime if requested. This is stored here to ensure it is
     /// always the same within one compilation. Reset between compilations.
     now: OnceLock<DateTime<Local>>,
@@ -350,15 +390,6 @@ pub struct CompilerWorld<F: CompilerFeat> {
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
     fn clone(&self) -> Self {
         self.task(TaskInputs::default())
-    }
-}
-
-impl<F: CompilerFeat> Drop for CompilerWorld<F> {
-    fn drop(&mut self) {
-        let state = self.source_db.shared.clone();
-        let source_state = self.source_db.take_state();
-        let mut state = state.write();
-        source_state.commit_impl(&mut state);
     }
 }
 
@@ -375,16 +406,44 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
         let library = mutant.inputs.clone().map(create_library);
 
-        CompilerWorld {
+        let root_changed = if let Some(e) = mutant.entry.as_ref() {
+            self.entry.workspace_root() != e.workspace_root()
+        } else {
+            false
+        };
+
+        let mut world = CompilerWorld {
             inputs: mutant.inputs.unwrap_or_else(|| self.inputs.clone()),
             library: library.unwrap_or_else(|| self.library.clone()),
             entry: mutant.entry.unwrap_or_else(|| self.entry.clone()),
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
+            revision: self.revision,
             source_db: self.source_db.clone(),
             now: self.now.clone(),
+        };
+
+        if root_changed {
+            world.vfs.revise().reset_cache();
         }
+
+        world
+    }
+
+    pub fn take_cache(&mut self) -> SourceCache {
+        self.vfs.take_state()
+    }
+
+    pub fn take_db(&mut self) -> SourceDb {
+        self.source_db.take_state()
+    }
+
+    /// Sets flag to indicate whether the compiler is currently compiling.
+    /// Note: Since `CompilerWorld` can be cloned, you can clone the world and
+    /// set the flag then to avoid affecting the original world.
+    pub fn set_is_compiling(&mut self, is_compiling: bool) {
+        self.source_db.is_compiling = is_compiling;
     }
 
     pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
@@ -425,7 +484,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     pub fn revision(&self) -> NonZeroUsize {
-        self.source_db.revision
+        self.revision
     }
 }
 
@@ -442,39 +501,44 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
 
     #[inline]
     fn reset_shadow(&mut self) {
-        self.vfs.reset_shadow()
+        self.vfs.revise().reset_shadow()
     }
 
     #[inline]
     fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()> {
-        self.vfs.map_shadow(path, content)
+        self.vfs.revise().map_shadow(path, Ok(content).into())
     }
 
     #[inline]
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
-        self.vfs.remove_shadow(path);
-        Ok(())
+        self.vfs.revise().unmap_shadow(path)
     }
 
     #[inline]
     fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
-        self.vfs.map_shadow_by_id(file_id, content)
+        self.vfs
+            .revise()
+            .map_shadow_by_id(file_id, Ok(content).into())
     }
 
     #[inline]
     fn unmap_shadow_by_id(&mut self, file_id: TypstFileId) -> FileResult<()> {
-        self.vfs.remove_shadow_by_id(file_id);
+        self.vfs.revise().remove_shadow_by_id(file_id);
         Ok(())
     }
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, fid: TypstFileId) -> FileResult<PathResolution> {
-        self.vfs.file_path(fid)
+    fn file_path(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+        self.vfs.file_path(file_id)
     }
 
-    fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        self.vfs.read(fid)
+    fn read(&self, file_id: TypstFileId) -> FileResult<Bytes> {
+        self.vfs.read(file_id)
+    }
+
+    fn read_source(&self, file_id: TypstFileId) -> FileResult<Source> {
+        self.vfs.source(file_id)
     }
 }
 

@@ -1,4 +1,5 @@
 impl Notifier for DummyNotifier {}
+use std::num::NonZeroUsize;
 use std::{path::Path, sync::Arc};
 
 use ecow::EcoString;
@@ -17,6 +18,10 @@ pub mod http;
 
 pub trait PackageRegistry {
     fn reset(&mut self) {}
+
+    fn revision(&self) -> Option<NonZeroUsize> {
+        None
+    }
 
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
 

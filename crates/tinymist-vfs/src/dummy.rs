@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use tinymist_std::ImmutPath;
 use typst::diag::{FileError, FileResult};
 
 use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
@@ -13,8 +14,8 @@ use crate::{AccessModel, Bytes, PathAccessModel, TypstFileId};
 pub struct DummyAccessModel;
 
 impl AccessModel for DummyAccessModel {
-    fn content(&self, _src: TypstFileId) -> FileResult<Bytes> {
-        Err(FileError::AccessDenied)
+    fn content(&self, _src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
+        (None, Err(FileError::AccessDenied))
     }
 }
 

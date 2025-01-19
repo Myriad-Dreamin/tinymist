@@ -1,5 +1,6 @@
 use std::{fmt::Debug, sync::Arc};
 
+use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{path_mapper::RootResolver, AccessModel, Bytes, PathAccessModel, TypstFileId};
@@ -18,8 +19,17 @@ impl<M> Debug for ResolveAccessModel<M> {
 }
 
 impl<M: PathAccessModel> AccessModel for ResolveAccessModel<M> {
-    fn content(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        self.inner
-            .content(&self.resolver.path_for_id(fid)?.to_err()?)
+    #[inline]
+    fn reset(&mut self) {
+        self.inner.reset();
+    }
+
+    fn content(&self, fid: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
+        let resolved = Ok(()).and_then(|_| self.resolver.path_for_id(fid)?.to_err());
+
+        match resolved {
+            Ok(path) => (Some(path.as_path().into()), self.inner.content(&path)),
+            Err(e) => (None, Err(e)),
+        }
     }
 }

@@ -1,5 +1,6 @@
 use std::sync::atomic::AtomicU64;
 
+use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes, TypstFileId};
@@ -25,11 +26,12 @@ impl<M: AccessModel + Sized> TraceAccessModel<M> {
 }
 
 impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
-    fn clear(&mut self) {
-        self.inner.clear();
+    #[inline]
+    fn reset(&mut self) {
+        self.inner.reset();
     }
 
-    fn content(&self, src: TypstFileId) -> FileResult<Bytes> {
+    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
         let instant = tinymist_std::time::Instant::now();
         let res = self.inner.content(src);
         let elapsed = instant.elapsed();

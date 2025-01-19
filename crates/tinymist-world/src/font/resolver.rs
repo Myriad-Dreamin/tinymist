@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{
     collections::HashMap,
+    num::NonZeroUsize,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -16,6 +17,10 @@ use crate::Bytes;
 /// It also reuse FontBook for font-related query.
 /// The index is the index of the font in the `FontBook.infos`.
 pub trait FontResolver {
+    fn revision(&self) -> Option<NonZeroUsize> {
+        None
+    }
+
     fn font_book(&self) -> &LazyHash<FontBook>;
     fn font(&self, idx: usize) -> Option<Font>;
 

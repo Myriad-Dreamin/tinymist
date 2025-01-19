@@ -133,7 +133,7 @@ pub trait WorldDeps {
 }
 
 /// type trait interface of [`CompilerWorld`].
-pub trait CompilerFeat {
+pub trait CompilerFeat: Send + Sync + 'static {
     /// Specify the font resolver for typst compiler.
     type FontResolver: FontResolver + Send + Sync + Sized;
     /// Specify the access model for VFS.

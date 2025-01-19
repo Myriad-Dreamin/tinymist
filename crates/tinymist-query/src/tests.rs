@@ -45,8 +45,8 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
             #[cfg(windows)]
             let contents = contents.replace("\r\n", "\n");
 
-            run_with_sources(&contents, |world, path| {
-                run_with_ctx(world, path, f);
+            run_with_sources(&contents, |verse, path| {
+                run_with_ctx(verse, path, f);
             });
         });
     });
@@ -69,7 +69,8 @@ pub fn run_with_ctx<T>(
         })
         .collect::<Vec<_>>();
 
-    let world = verse.snapshot();
+    let mut world = verse.snapshot();
+    world.set_is_compiling(false);
 
     let source = world.source_by_path(&path).ok().unwrap();
     let docs = find_module_level_docs(&source).unwrap_or_default();
@@ -120,24 +121,25 @@ pub fn compile_doc_for_test(
     ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
 ) -> Option<VersionedDocument> {
-    let entry = match properties.get("compile")?.trim() {
-        "true" => ctx.world.entry_state(),
+    let prev = ctx.world.entry_state();
+    let next = match properties.get("compile")?.trim() {
+        "true" => prev.clone(),
         "false" => return None,
-        path if path.ends_with(".typ") => {
-            ctx.world.entry_state().select_in_workspace(Path::new(path))
-        }
+        path if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
         v => panic!("invalid value for 'compile' property: {v}"),
     };
 
     let mut world = Cow::Borrowed(&ctx.world);
-    if entry != ctx.world.entry_state() {
+    if next != prev {
         world = Cow::Owned(world.task(TaskInputs {
-            entry: Some(entry),
+            entry: Some(next),
             ..Default::default()
         }));
     }
+    let mut world = world.into_owned();
+    world.set_is_compiling(true);
 
-    let doc = typst::compile(world.as_ref()).output.unwrap();
+    let doc = typst::compile(&world).output.unwrap();
     Some(VersionedDocument {
         version: 0,
         document: Arc::new(doc),
@@ -189,8 +191,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
             .unwrap();
         last_pw = Some(pw);
     }
-
-    verse.mutate_entry(EntryState::new_detached()).unwrap();
 
     let pw = last_pw.unwrap();
     verse

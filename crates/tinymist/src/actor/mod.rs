@@ -8,7 +8,7 @@ pub mod typ_server;
 
 use std::sync::Arc;
 
-use crate::world::vfs::notify::{FileChangeSet, MemoryEvent};
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::EntryState;
 use reflexo::ImmutPath;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
