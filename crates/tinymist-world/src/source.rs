@@ -1,31 +1,20 @@
 // use std::sync::Arc;
 
 use core::fmt;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
-use tinymist_std::hash::FxHashMap;
-use tinymist_std::QueryRef;
+use tinymist_std::{hash::FxHashMap, QueryRef};
 use tinymist_vfs::{Bytes, FsProvider, TypstFileId};
-use typst::{
-    diag::{FileError, FileResult},
-    syntax::Source,
-};
-
-/// incrementally query a value from a self holding state
-type IncrQueryRef<S, E> = QueryRef<S, E, Option<S>>;
+use typst::diag::{FileError, FileResult};
+use typst::syntax::Source;
 
 type FileQuery<T> = QueryRef<T, FileError>;
-type IncrFileQuery<T> = IncrQueryRef<T, FileError>;
-
-pub trait Revised {
-    fn last_accessed_rev(&self) -> NonZeroUsize;
-}
 
 pub struct SourceCache {
     touched_by_compile: bool,
     fid: TypstFileId,
-    source: IncrFileQuery<Source>,
+    source: FileQuery<Source>,
     buffer: FileQuery<Bytes>,
 }
 
@@ -103,22 +92,7 @@ impl SourceDb {
     /// See `Vfs::resolve_with_f` for more information.
     pub fn source(&self, fid: TypstFileId, p: &impl FsProvider) -> FileResult<Source> {
         self.slot(fid, |slot| {
-            slot.source
-                .compute_with_context(|prev| {
-                    let content = p.read(fid)?;
-                    let next = from_utf8_or_bom(&content)?.to_owned();
-
-                    // otherwise reparse the source
-                    match prev {
-                        Some(mut source) => {
-                            source.replace(&next);
-                            Ok(source)
-                        }
-                        // Return a new source if we don't have a reparse feature or no prev
-                        _ => Ok(Source::new(fid, next)),
-                    }
-                })
-                .cloned()
+            slot.source.compute(|| p.read_source(fid)).cloned()
         })
     }
 
@@ -129,7 +103,7 @@ impl SourceDb {
             let entry = slots.entry(fid).or_insert_with(|| SourceCache {
                 touched_by_compile: self.is_compiling,
                 fid,
-                source: IncrFileQuery::with_context(None),
+                source: FileQuery::default(),
                 buffer: FileQuery::default(),
             });
             if self.is_compiling && !entry.touched_by_compile {
@@ -149,24 +123,4 @@ impl SourceDb {
             slots,
         }
     }
-}
-
-pub trait MergeCache: Sized {
-    fn merge(self, _other: Self) -> Self {
-        self
-    }
-}
-
-pub struct FontDb {}
-pub struct PackageDb {}
-
-/// Convert a byte slice to a string, removing UTF-8 BOM if present.
-fn from_utf8_or_bom(buf: &[u8]) -> FileResult<&str> {
-    Ok(std::str::from_utf8(if buf.starts_with(b"\xef\xbb\xbf") {
-        // remove UTF-8 BOM
-        &buf[3..]
-    } else {
-        // Assume UTF-8
-        buf
-    })?)
 }

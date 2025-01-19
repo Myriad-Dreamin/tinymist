@@ -26,7 +26,7 @@ use crate::LspCompilerFeat;
 use tinymist_world::{
     vfs::{
         notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-        FsProvider, RevisingVfs,
+        FileId, FsProvider, RevisingVfs,
     },
     CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
 };
@@ -99,6 +99,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
             snap,
             doc,
             warnings,
+            deps: OnceLock::default(),
         }
     }
 }
@@ -122,6 +123,8 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     pub warnings: EcoVec<SourceDiagnostic>,
     /// The compiled document.
     pub doc: SourceResult<Arc<TypstDocument>>,
+    /// The depended files.
+    pub deps: OnceLock<EcoVec<FileId>>,
 }
 
 impl<F: CompilerFeat> std::ops::Deref for CompiledArtifact<F> {
@@ -138,6 +141,7 @@ impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
             snap: self.snap.clone(),
             doc: self.doc.clone(),
             warnings: self.warnings.clone(),
+            deps: self.deps.clone(),
         }
     }
 }
@@ -149,6 +153,17 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             .ok()
             .cloned()
             .or_else(|| self.snap.success_doc.clone())
+    }
+
+    pub fn depended_files(&self) -> &EcoVec<FileId> {
+        self.deps.get_or_init(|| {
+            let mut deps = EcoVec::default();
+            self.world.iter_dependencies(&mut |f| {
+                deps.push(f);
+            });
+
+            deps
+        })
     }
 }
 
@@ -224,6 +239,14 @@ impl CompileReasons {
     /// Whether there is any reason to compile.
     pub fn any(&self) -> bool {
         self.by_memory_events || self.by_fs_events || self.by_entry_update
+    }
+
+    pub fn exclude(&self, excluded: Self) -> Self {
+        Self {
+            by_memory_events: self.by_memory_events && !excluded.by_memory_events,
+            by_fs_events: self.by_fs_events && !excluded.by_fs_events,
+            by_entry_update: self.by_entry_update && !excluded.by_entry_update,
+        }
     }
 }
 
