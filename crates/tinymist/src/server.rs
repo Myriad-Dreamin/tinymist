@@ -286,15 +286,15 @@ impl LanguageState {
         mut state: ServiceState<T, T::S>,
         params: LspInterrupt,
     ) -> anyhow::Result<()> {
-        let start = std::time::Instant::now();
-        log::info!("incoming interrupt: {params:?}");
+        let _start = std::time::Instant::now();
+        // log::info!("incoming interrupt: {params:?}");
         let Some(ready) = state.ready() else {
             log::info!("interrupted on not ready server");
             return Ok(());
         };
 
         ready.project.interrupt(params);
-        log::info!("interrupted in {:?}", start.elapsed());
+        // log::info!("interrupted in {:?}", _start.elapsed());
         Ok(())
     }
 }

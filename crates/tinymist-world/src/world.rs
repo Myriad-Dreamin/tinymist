@@ -121,7 +121,9 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut RevisingUniverse<F>) -> T) -> T {
         f(&mut RevisingUniverse {
             vfs_revision: self.vfs.revision(),
+            font_changed: false,
             font_revision: self.font_resolver.revision(),
+            registry_changed: false,
             registry_revision: self.registry.revision(),
             view_changed: false,
             inner: self,
@@ -265,7 +267,9 @@ impl<F: CompilerFeat> EntryManager for CompilerUniverse<F> {
 pub struct RevisingUniverse<'a, F: CompilerFeat> {
     view_changed: bool,
     vfs_revision: NonZeroUsize,
+    font_changed: bool,
     font_revision: Option<NonZeroUsize>,
+    registry_changed: bool,
     registry_revision: Option<NonZeroUsize>,
     pub inner: &'a mut CompilerUniverse<F>,
 }
@@ -298,6 +302,7 @@ impl<F: CompilerFeat> Drop for RevisingUniverse<'_, F> {
             view_changed = true;
 
             // The registry has changed affects the vfs cache.
+            log::info!("resetting shadow registry_changed");
             self.vfs().reset_cache();
         }
         let view_changed = view_changed || self.vfs_changed();
@@ -316,10 +321,12 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
     }
 
     pub fn set_fonts(&mut self, fonts: Arc<F::FontResolver>) {
+        self.font_changed = true;
         self.inner.font_resolver = fonts;
     }
 
     pub fn set_package(&mut self, packages: Arc<F::Registry>) {
+        self.registry_changed = true;
         self.inner.registry = packages;
     }
 
@@ -340,6 +347,7 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         // Resets the cache if the workspace root has changed.
         let root_changed = self.inner.entry.workspace_root() == state.workspace_root();
         if root_changed {
+            log::info!("resetting shadow root_changed");
             self.vfs().reset_cache();
         }
 
@@ -351,11 +359,12 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
     }
 
     pub fn font_changed(&self) -> bool {
-        is_revision_changed(self.font_revision, self.font_resolver.revision())
+        self.font_changed && is_revision_changed(self.font_revision, self.font_resolver.revision())
     }
 
     pub fn registry_changed(&self) -> bool {
-        is_revision_changed(self.registry_revision, self.registry.revision())
+        self.registry_changed
+            && is_revision_changed(self.registry_revision, self.registry.revision())
     }
 
     pub fn vfs_changed(&self) -> bool {
@@ -445,6 +454,10 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
     pub fn take_db(&mut self) -> SourceDb {
         self.source_db.take_state()
+    }
+
+    pub fn vfs(&self) -> &Vfs<F::AccessModel> {
+        &self.vfs
     }
 
     /// Sets flag to indicate whether the compiler is currently compiling.

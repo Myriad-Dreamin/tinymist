@@ -187,7 +187,11 @@ pub struct Vfs<M: PathAccessModel + Sized> {
 
 impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Vfs").finish()
+        f.debug_struct("Vfs")
+            .field("revision", &self.revision)
+            .field("managed", &self.managed.lock().entries.size())
+            .field("paths", &self.paths.lock().paths.len())
+            .finish()
     }
 }
 
@@ -211,9 +215,24 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
             source_cache: self.source_cache.clone(),
             managed: Arc::new(Mutex::new(EntryMap::default())),
             paths: Arc::new(Mutex::new(PathMap::default())),
-            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
+            revision: NonZeroUsize::new(2).expect("initial revision is 2"),
             access_model: self.access_model.clone(),
         }
+    }
+
+    pub fn is_clean_compile(&self, rev: usize, file_ids: &[FileId]) -> bool {
+        let mut m = self.managed.lock();
+        for id in file_ids {
+            let Some(entry) = m.entries.get_mut(id) else {
+                log::info!("Vfs(dirty, {id:?}): file id not found");
+                return false;
+            };
+            if entry.changed_at == 0 || entry.changed_at >= rev {
+                log::info!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -247,7 +266,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
             source_cache: SourceCache::default(),
             managed: Arc::default(),
             paths: Arc::default(),
-            revision: NonZeroUsize::new(1).expect("initial revision is 1"),
+            revision: NonZeroUsize::new(2).expect("initial revision is 2"),
             access_model,
         }
     }
@@ -326,17 +345,20 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
 
     /// Reads a file.
     pub fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
+        let bytes = self.managed.lock().slot(fid, |entry| {
+            entry.changed_at = entry.changed_at.max(1);
+            entry.bytes.clone()
+        });
 
         self.read_content(&bytes, fid).clone()
     }
 
     /// Reads a source.
     pub fn source(&self, file_id: TypstFileId) -> FileResult<Source> {
-        let (bytes, source) = self
-            .managed
-            .lock()
-            .slot(file_id, |entry| (entry.bytes.clone(), entry.source.clone()));
+        let (bytes, source) = self.managed.lock().slot(file_id, |entry| {
+            entry.changed_at = entry.changed_at.max(1);
+            (entry.bytes.clone(), entry.source.clone())
+        });
 
         let source = source.get_or_init(|| {
             let content = self
@@ -442,6 +464,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     fn invalidate_file_id(&mut self, file_id: TypstFileId) {
         self.view_changed = true;
         self.managed.slot(file_id, |e| {
+            e.changed_at = self.inner.revision.get();
             e.bytes = Arc::default();
             e.source = Arc::default();
         });
@@ -524,6 +547,7 @@ type BytesQuery = Arc<OnceLock<(Option<ImmutPath>, usize, FileResult<Bytes>)>>;
 
 #[derive(Debug, Clone, Default)]
 struct VfsEntry {
+    changed_at: usize,
     bytes: BytesQuery,
     source: Arc<OnceLock<FileResult<Source>>>,
 }

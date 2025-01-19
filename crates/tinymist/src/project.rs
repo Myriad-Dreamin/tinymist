@@ -83,6 +83,7 @@ impl LspPreviewState {
 #[derive(Default)]
 pub struct ProjectStateExt {
     pub is_compiling: bool,
+    pub last_compilation: Option<CompiledArtifact<LspCompilerFeat>>,
 }
 
 /// LSP project compiler.
@@ -129,6 +130,7 @@ impl Project {
             let proj = self.state.projects().find(|p| p.id == compiled.id);
             if let Some(proj) = proj {
                 proj.ext.is_compiling = false;
+                proj.ext.last_compilation = Some(compiled.clone());
             }
         }
 
@@ -228,6 +230,33 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
                 continue;
             }
 
+            let reason = s.reason;
+
+            const VFS_SUB: CompileReasons = CompileReasons {
+                by_memory_events: true,
+                by_fs_events: true,
+                by_entry_update: false,
+            };
+
+            let is_vfs_sub = reason.any() && !reason.exclude(VFS_SUB).any();
+            let id = &s.id;
+
+            if is_vfs_sub
+                && 'vfs_is_clean: {
+                    let Some(compilation) = &s.ext.last_compilation else {
+                        break 'vfs_is_clean false;
+                    };
+
+                    let last_rev = compilation.world.vfs().revision();
+                    let deps = compilation.depended_files().clone();
+                    s.verse.vfs().is_clean_compile(last_rev.get(), &deps)
+                }
+            {
+                log::info!("Project: skip compilation for {id:?} due to harmless vfs changes");
+                s.reason = CompileReasons::default();
+                continue;
+            }
+
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
@@ -287,7 +316,7 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
             let mut n_rev = self.notified_revision.lock();
             if *n_rev >= snap.world.revision().get() {
                 log::info!(
-                    "TypstActor: already notified for revision {} <= {n_rev}",
+                    "Project: already notified for revision {} <= {n_rev}",
                     snap.world.revision(),
                 );
                 return;
@@ -407,11 +436,11 @@ impl QuerySnap {
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
         let world = self.snap.world;
         let Some(main) = world.main_id() else {
-            error!("TypstActor: main file is not set");
+            error!("Project: main file is not set");
             bail!("main file is not set");
         };
         world.source(main).map_err(|err| {
-            info!("TypstActor: failed to prepare main file: {err:?}");
+            info!("Project: failed to prepare main file: {err:?}");
             anyhow::anyhow!("failed to get source: {err}")
         })?;
 
