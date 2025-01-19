@@ -30,6 +30,7 @@ use tinymist::{
     CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask,
 };
 use tinymist_core::LONG_VERSION;
+use tinymist_project::WorldProvider;
 use tinymist_query::{package::PackageInfo, EntryResolver};
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
@@ -274,7 +275,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
 /// The main entry point for language server queries.
 pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
-    use tinymist::package::PackageRegistry;
+    use tinymist_project::package::PackageRegistry;
 
     with_stdio_transport(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);

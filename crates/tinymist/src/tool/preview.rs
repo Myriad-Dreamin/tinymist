@@ -12,7 +12,9 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, Error, TypstDocument};
+use serde::Serialize;
+use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::ProjectInsId;
@@ -66,10 +68,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(loc) = loc;
 
-        let filepath = Path::new(&loc.filepath);
-        let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
+        let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
-        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
         let source = world.source(source_id).ok()?;
         let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
 
@@ -95,14 +95,10 @@ impl typst_preview::CompileView for PreviewCompileView {
         let Some(doc) = doc.as_deref() else {
             return vec![];
         };
-        let Some(root) = world.workspace_root() else {
-            return vec![];
-        };
-        let Some(relative_path) = path.strip_prefix(root).ok() else {
-            return vec![];
-        };
 
-        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        let Some(source_id) = world.id_for_path(Path::new(&src_loc.filepath)) else {
+            return vec![];
+        };
         let Some(source) = world.source(source_id).ok() else {
             return vec![];
         };
@@ -131,43 +127,6 @@ impl typst_preview::CompileView for PreviewCompileView {
             start: resolve_off(&source, range.start),
             end: resolve_off(&source, range.end),
         })
-    }
-}
-
-impl EditorServer for CompileHandler {
-    async fn update_memory_files(
-        &self,
-        files: MemoryFiles,
-        reset_shadow: bool,
-    ) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let now = std::time::SystemTime::now();
-        let files = FileChangeSet::new_inserts(
-            files
-                .files
-                .into_iter()
-                .map(|(path, content)| {
-                    let content = content.as_bytes().into();
-                    // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok((now, content)).into())
-                })
-                .collect(),
-        );
-        self.add_memory_changes(if reset_shadow {
-            MemoryEvent::Sync(files)
-        } else {
-            MemoryEvent::Update(files)
-        });
-
-        Ok(())
-    }
-
-    async fn remove_shadow_files(&self, files: MemoryFilesShort) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-        self.add_memory_changes(MemoryEvent::Update(files));
-
-        Ok(())
     }
 }
 
