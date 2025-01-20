@@ -1,9 +1,9 @@
 use std::{fs::File, io::Read, path::Path};
 
+use tinymist_std::ReadAllOnce;
 use typst::diag::{FileError, FileResult};
 
 use crate::{Bytes, PathAccessModel};
-use tinymist_std::ReadAllOnce;
 
 /// Provides SystemAccessModel that makes access to the local file system for
 /// system compilation.

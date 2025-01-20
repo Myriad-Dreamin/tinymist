@@ -4,32 +4,26 @@
 //!
 //! Please check `tinymist::actor::typ_client` for architecture details.
 
-#![allow(missing_docs)]
-
 use core::fmt;
-use std::{
-    collections::HashSet,
-    path::Path,
-    sync::{Arc, OnceLock},
-};
+use std::collections::HashSet;
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
 
 use ecow::{EcoString, EcoVec};
-use reflexo_typst::{
-    features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE},
-    CompileEnv, CompileReport, Compiler, TypstDocument,
-};
+use reflexo_typst::features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE};
+use reflexo_typst::{CompileEnv, CompileReport, Compiler, TypstDocument};
 use tinymist_std::error::prelude::Result;
+use tinymist_world::vfs::notify::{
+    FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent,
+};
+use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs};
+use tinymist_world::{
+    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
+};
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::LspCompilerFeat;
-use tinymist_world::{
-    vfs::{
-        notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
-        FileId, FsProvider, RevisingVfs,
-    },
-    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
-};
 
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;

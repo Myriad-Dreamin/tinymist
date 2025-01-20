@@ -4,20 +4,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_attribute]
-pub fn toml_model(
-    _metadata: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let output = quote! {
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[serde(rename_all = "kebab-case")]
-        #input
-    };
-    output.into()
-}
-
 #[proc_macro_derive(BindTyCtx, attributes(bind))]
 pub fn bind_ty_ctx(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree

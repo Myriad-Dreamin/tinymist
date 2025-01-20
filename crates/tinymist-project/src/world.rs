@@ -1,27 +1,25 @@
 //! World implementation of typst for tinymist.
 
-pub use tinymist_std::error::prelude;
 pub use tinymist_world as base;
 pub use tinymist_world::args::*;
 pub use tinymist_world::config::CompileFontOpts;
-use tinymist_world::package::RegistryPathMapper;
-pub use tinymist_world::vfs;
-pub use tinymist_world::{entry::*, EntryOpts, EntryState};
+pub use tinymist_world::entry::*;
+pub use tinymist_world::{font, package, vfs};
 pub use tinymist_world::{
-    font, package, CompilerUniverse, CompilerWorld, RevisingUniverse, TaskInputs,
+    CompilerUniverse, CompilerWorld, EntryOpts, EntryState, RevisingUniverse, TaskInputs,
 };
 
 use std::path::Path;
 use std::{borrow::Cow, sync::Arc};
 
-use ::typst::utils::LazyHash;
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_world::font::system::SystemFontSearcher;
-use tinymist_world::package::http::HttpRegistry;
+use tinymist_world::package::{http::HttpRegistry, RegistryPathMapper};
 use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
 use tinymist_world::CompilerFeat;
 use typst::foundations::{Dict, Str, Value};
+use typst::utils::LazyHash;
 
 use crate::font::TinymistFontResolver;
 

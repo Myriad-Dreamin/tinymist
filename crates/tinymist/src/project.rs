@@ -11,11 +11,11 @@
 //! ```
 //!
 //! We use typst by creating a [`ProjectCompiler`] and
-//! running compiler with callbacking [`LspProjectHandler`] incrementally. An
+//! running compiler with callbacking [`CompileHandlerImpl`] incrementally. An
 //! additional [`LocalCompileHandler`] is also created to control the
 //! [`ProjectCompiler`].
 //!
-//! The [`LspProjectHandler`] will push information to other actors.
+//! The [`CompileHandlerImpl`] will push information to other actors.
 
 #![allow(missing_docs)]
 

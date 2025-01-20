@@ -11,7 +11,6 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use prelude::*;
 use project::world::EntryState;
 use project::{watch_deps, LspPreviewState};
 use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
@@ -32,7 +31,8 @@ use tinymist_query::{
     ServerInfoResponse, SyntaxRequest, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
-use tinymist_std::{Error, ImmutPath};
+use tinymist_std::error::prelude::*;
+use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
 use typst::layout::Position as TypstPosition;
 use typst::{diag::FileResult, syntax::Source};
@@ -844,7 +844,7 @@ impl LanguageState {
 
 impl LanguageState {
     /// Focus main file to some path.
-    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool, Error> {
+    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool> {
         if path
             .as_deref()
             .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
@@ -865,7 +865,7 @@ impl LanguageState {
     }
 
     /// Pin the entry to the given path
-    pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<()> {
         self.pinning = new_entry.is_some();
         let entry = new_entry
             .or_else(|| self.entry_resolver().resolve_default())
@@ -874,7 +874,7 @@ impl LanguageState {
     }
 
     /// Updates the primary (focusing) entry
-    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
+    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
         if self.pinning || self.config.compile.has_default_entry_path {
             self.focusing = new_entry;
             return Ok(false);
@@ -1287,14 +1287,14 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
 }
 
 impl LanguageState {
-    fn update_source(&mut self, files: FileChangeSet) -> Result<(), Error> {
+    fn update_source(&mut self, files: FileChangeSet) -> Result<()> {
         self.add_memory_changes(MemoryEvent::Update(files.clone()));
 
         Ok(())
     }
 
     /// Create a new source file.
-    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<(), Error> {
+    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<()> {
         let path: ImmutPath = path.into();
 
         log::info!("create source: {path:?}");
@@ -1314,7 +1314,7 @@ impl LanguageState {
     }
 
     /// Remove a source file.
-    pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
+    pub fn remove_source(&mut self, path: PathBuf) -> Result<()> {
         let path: ImmutPath = path.into();
 
         self.memory_changes.remove(&path);
@@ -1332,7 +1332,7 @@ impl LanguageState {
         path: PathBuf,
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let path: ImmutPath = path.into();
 
         let meta = self
