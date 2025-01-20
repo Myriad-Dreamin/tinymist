@@ -19,6 +19,7 @@ use project::{watch_deps, LspPreviewState};
 use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
 use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
+use route::ProjectRouteState;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
@@ -66,6 +67,8 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct LanguageState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
+    /// The lcok state.
+    pub lock: ProjectRouteState,
     /// The project state.
     pub project: Project,
 
@@ -127,6 +130,7 @@ impl LanguageState {
 
         Self {
             client: client.clone(),
+            lock: ProjectRouteState::default(),
             project: handle,
             editor_tx,
             memory_changes: HashMap::new(),

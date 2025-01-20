@@ -12,7 +12,7 @@ pub use anyhow::Result;
 
 use super::{Pages, PdfStandard, TaskWhen};
 
-const LOCKFILE_PATH: &str = "tinymist.lock";
+pub const LOCK_FILENAME: &str = "tinymist.lock";
 
 const LOCK_VERSION: &str = "0.1.0-beta0";
 
@@ -176,7 +176,7 @@ impl LockFile {
     pub fn update(cwd: &Path, f: impl FnOnce(&mut Self) -> Result<()>) -> Result<()> {
         let fs = tinymist_fs::flock::Filesystem::new(cwd.to_owned());
 
-        let mut lock_file = fs.open_rw_exclusive_create(LOCKFILE_PATH, "project commands")?;
+        let mut lock_file = fs.open_rw_exclusive_create(LOCK_FILENAME, "project commands")?;
 
         let mut data = vec![];
         lock_file.read_to_end(&mut data)?;
