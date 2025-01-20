@@ -129,6 +129,11 @@ impl<S> TypedLspClient<S> {
 }
 
 impl<S: 'static> TypedLspClient<S> {
+    /// Returns the untyped lsp client.
+    pub fn untyped(&self) -> &LspClient {
+        &self.client
+    }
+
     /// Casts the service to another type.
     pub fn cast<T: 'static>(&self, f: fn(&mut S) -> &mut T) -> TypedLspClient<T> {
         let caster = self.caster.clone();
@@ -221,6 +226,11 @@ pub struct LspClient {
 }
 
 impl LspClient {
+    /// Returns the untyped lsp client.
+    pub fn untyped(&self) -> &Self {
+        self
+    }
+
     /// converts the client to a typed client.
     pub fn to_typed<S: Any>(&self) -> TypedLspClient<S> {
         TypedLspClient {

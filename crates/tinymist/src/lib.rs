@@ -25,7 +25,6 @@ mod resource;
 mod state;
 mod stats;
 mod task;
-use futures::future::MaybeDone;
 pub use task::UserActionTask;
 pub mod tool;
 mod utils;
@@ -37,36 +36,10 @@ pub use tinymist_project::world;
 pub use tinymist_query as query;
 pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
-use lsp_server::{RequestId, ResponseError};
+use lsp_server::ResponseError;
 use serde_json::from_value;
+use state::query::QueryFuture;
 use sync_lsp::*;
 use tinymist_std::error::Result;
 use utils::*;
 use world::*;
-
-use tinymist_query::CompilerQueryResponse;
-
-/// The future type for a lsp query.
-pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;
-
-trait LspClientExt {
-    fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult;
-}
-
-impl LspClientExt for LspClient {
-    /// Schedules a query from the client.
-    fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: SchedulableResponse<CompilerQueryResponse> = Ok(match fut {
-            MaybeDone::Done(res) => {
-                MaybeDone::Done(res.map_err(|err| internal_error(err.to_string())))
-            }
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
-    }
-}
