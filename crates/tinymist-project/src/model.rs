@@ -1,14 +1,21 @@
 use core::fmt;
+use std::hash::{Hash, Hasher};
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::PathBuf;
 use std::{cmp::Ordering, path::Path, str::FromStr};
 
 use anyhow::{bail, Context};
 use clap::ValueHint;
+use ecow::{eco_vec, EcoVec};
 use tinymist_std::path::unix_slash;
+use tinymist_std::ImmutPath;
+use tinymist_world::EntryReader;
 use typst::diag::EcoString;
 use typst::syntax::FileId;
 
 pub use anyhow::Result;
+
+use crate::LspWorld;
 
 use super::{Pages, PdfStandard, TaskWhen};
 
@@ -51,7 +58,7 @@ impl LockFileCompat {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct LockFile {
     // The lock file version.
     // version: String,
@@ -62,11 +69,15 @@ pub struct LockFile {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub task: Vec<ProjectTask>,
     /// The project's task route.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub route: Vec<ProjectRoute>,
+    #[serde(skip_serializing_if = "EcoVec::is_empty", default)]
+    pub route: EcoVec<ProjectRoute>,
 }
 
 impl LockFile {
+    pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {
+        self.document.iter().find(|i| &i.id == id)
+    }
+
     pub fn replace_document(&mut self, input: ProjectInput) {
         let id = input.id.clone();
         let index = self.document.iter().position(|i| i.id == id);
@@ -188,7 +199,7 @@ impl LockFile {
             LockFile {
                 document: vec![],
                 task: vec![],
-                route: vec![],
+                route: eco_vec![],
             }
         } else {
             let old_state = toml::from_str::<LockFileCompat>(old_data)
@@ -235,6 +246,64 @@ impl LockFile {
 
         Ok(())
     }
+
+    pub fn read(dir: &Path) -> Result<Self> {
+        let fs = tinymist_fs::flock::Filesystem::new(dir.to_owned());
+
+        let mut lock_file = fs.open_ro_shared(LOCK_FILENAME, "project commands")?;
+
+        let mut data = vec![];
+        lock_file.read_to_end(&mut data)?;
+
+        let data = std::str::from_utf8(&data).context("tinymist.lock file is not valid utf-8")?;
+
+        let state = toml::from_str::<LockFileCompat>(data)
+            .context("tinymist.lock file is not a valid TOML file")?;
+
+        state.migrate()
+    }
+}
+
+/// A scalar that is not NaN.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Scalar(f32);
+
+impl TryFrom<f32> for Scalar {
+    type Error = &'static str;
+
+    fn try_from(value: f32) -> Result<Self, Self::Error> {
+        if value.is_nan() {
+            Err("NaN is not a valid scalar value")
+        } else {
+            Ok(Scalar(value))
+        }
+    }
+}
+
+impl PartialEq for Scalar {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for Scalar {}
+
+impl Hash for Scalar {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+
+impl PartialOrd for Scalar {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Scalar {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.partial_cmp(&other.0).unwrap()
+    }
 }
 
 /// A project ID.
@@ -247,6 +316,14 @@ pub struct Id(String);
 impl Id {
     pub fn new(s: String) -> Self {
         Id(s)
+    }
+
+    pub fn from_world(world: &LspWorld) -> Option<Self> {
+        let entry = world.entry_state();
+        let id = unix_slash(entry.main()?.vpath().as_rootless_path());
+
+        let path = &ResourcePath::from_user_sys(Path::new(&id));
+        Some(path.into())
     }
 }
 
@@ -286,7 +363,7 @@ impl From<&DocIdArgs> for Id {
 }
 
 /// A resource path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ResourcePath(EcoString, String);
 
 impl fmt::Display for ResourcePath {
@@ -354,10 +431,23 @@ impl ResourcePath {
             ),
         }
     }
+
+    pub fn to_abs_path(&self, rel: &Path) -> Option<PathBuf> {
+        if self.0 == "file" {
+            let path = Path::new(&self.1);
+            if path.is_absolute() {
+                Some(path.to_owned())
+            } else {
+                Some(rel.join(path))
+            }
+        } else {
+            None
+        }
+    }
 }
 
 /// A project input specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectInput {
     /// The project's ID.
@@ -365,6 +455,9 @@ pub struct ProjectInput {
     /// The project's root directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ResourcePath>,
+    /// The project's main file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub main: Option<ResourcePath>,
     /// The project's font paths.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub font_paths: Vec<ResourcePath>,
@@ -380,7 +473,7 @@ pub struct ProjectInput {
 }
 
 /// A project task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type")]
 pub enum ProjectTask {
     /// A preview task.
@@ -433,7 +526,7 @@ impl ProjectTask {
 }
 
 /// An lsp task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct PreviewTask {
     /// The task's ID.
@@ -445,7 +538,7 @@ pub struct PreviewTask {
 }
 
 /// An export task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTask {
     /// The task's ID.
@@ -460,7 +553,7 @@ pub struct ExportTask {
 }
 
 /// A project export transform specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportTransform {
     /// Only pick a subset of pages.
@@ -468,7 +561,7 @@ pub enum ExportTransform {
 }
 
 /// An export pdf task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportPdfTask {
     /// The shared export arguments
@@ -480,18 +573,18 @@ pub struct ExportPdfTask {
 }
 
 /// An export png task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportPngTask {
     /// The shared export arguments
     #[serde(flatten)]
     pub export: ExportTask,
     /// The PPI (pixels per inch) to use for PNG export.
-    pub ppi: f32,
+    pub ppi: Scalar,
 }
 
 /// An export svg task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportSvgTask {
     /// The shared export arguments
@@ -500,7 +593,7 @@ pub struct ExportSvgTask {
 }
 
 /// An export html task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportHtmlTask {
     /// The shared export arguments
@@ -509,7 +602,7 @@ pub struct ExportHtmlTask {
 }
 
 /// An export markdown task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportMarkdownTask {
     /// The shared export arguments
@@ -518,7 +611,7 @@ pub struct ExportMarkdownTask {
 }
 
 /// An export text task specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTextTask {
     /// The shared export arguments
@@ -527,7 +620,7 @@ pub struct ExportTextTask {
 }
 
 /// A project route specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectMaterial {
     /// The root of the project that the material belongs to.
@@ -539,12 +632,37 @@ pub struct ProjectMaterial {
 }
 
 /// A project route specifier.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ProjectPathMaterial {
+    /// The root of the project that the material belongs to.
+    pub root: EcoString,
+    /// A project.
+    pub id: Id,
+    /// The files.
+    pub files: Vec<PathBuf>,
+}
+
+impl ProjectPathMaterial {
+    pub fn from_deps(doc_id: Id, files: EcoVec<ImmutPath>) -> Self {
+        let mut files: Vec<_> = files.into_iter().map(|p| p.as_ref().to_owned()).collect();
+        files.sort();
+
+        ProjectPathMaterial {
+            root: EcoString::default(),
+            id: doc_id,
+            files,
+        }
+    }
+}
+
+/// A project route specifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectRoute {
     /// A project.
     pub id: Id,
-    /// The priority of the project.
+    /// The priority of the project. (lower numbers are higher priority).
     pub priority: u32,
 }
 

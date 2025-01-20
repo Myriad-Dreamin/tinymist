@@ -24,6 +24,7 @@ macro_rules! display_possible_values {
     Clone,
     Eq,
     PartialEq,
+    Hash,
     Ord,
     PartialOrd,
     serde::Serialize,
@@ -71,7 +72,9 @@ pub enum OutputFormat {
 display_possible_values!(OutputFormat);
 
 /// A PDF standard that Typst can enforce conformance with.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, ValueEnum, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, serde::Serialize, serde::Deserialize,
+)]
 #[allow(non_camel_case_types)]
 pub enum PdfStandard {
     /// PDF 1.7.
@@ -91,7 +94,7 @@ display_possible_values!(PdfStandard);
 /// value parser, in order to generate better errors.
 ///
 /// See also: <https://github.com/clap-rs/clap/issues/5065>
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
 impl FromStr for Pages {

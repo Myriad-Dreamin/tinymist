@@ -52,6 +52,7 @@ rayon.workspace = true
 reflexo.workspace = true
 reflexo-typst = { workspace = true, features = ["system"] }
 reflexo-vec2svg.workspace = true
+rpds.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

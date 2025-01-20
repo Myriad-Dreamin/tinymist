@@ -19,14 +19,14 @@ use project::{watch_deps, LspPreviewState};
 use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
 use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
-use route::ProjectRouteState;
+use route::{ProjectResolution, ProjectRouteState};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
 use task::{
     ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
 };
-use tinymist_project::{CompileSnapshot, EntryResolver, ProjectInsId};
+use tinymist_project::{CompileSnapshot, EntryResolver, ProjectInsId, ProjectResolutionKind};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
     to_typst_range, CompilerQueryRequest, CompilerQueryResponse, ExportKind, FoldRequestFeature,
@@ -68,7 +68,7 @@ pub struct LanguageState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
     /// The lcok state.
-    pub lock: ProjectRouteState,
+    pub route: ProjectRouteState,
     /// The project state.
     pub project: Project,
 
@@ -130,7 +130,7 @@ impl LanguageState {
 
         Self {
             client: client.clone(),
-            lock: ProjectRouteState::default(),
+            route: ProjectRouteState::default(),
             project: handle,
             editor_tx,
             memory_changes: HashMap::new(),
@@ -929,6 +929,56 @@ impl LanguageState {
         }
     }
 
+    fn resolve_task(&self, path: ImmutPath) -> TaskInputs {
+        let entry = self.entry_resolver().resolve(Some(path));
+
+        TaskInputs {
+            entry: Some(entry),
+            ..Default::default()
+        }
+    }
+
+    fn resolve_task_with_state(&mut self, path: ImmutPath) -> TaskInputs {
+        let proj_input = matches!(
+            self.config.project_resolution,
+            ProjectResolutionKind::LockDatabase
+        )
+        .then(|| {
+            let resolution = self.route.resolve(&path)?;
+            let lock = self.route.locate(&resolution)?;
+
+            let ProjectResolution {
+                lock_dir,
+                project_id,
+            } = &resolution;
+
+            let input = lock.get_document(project_id)?;
+            let root = input
+                .root
+                .as_ref()
+                .and_then(|res| Some(res.to_abs_path(lock_dir)?.as_path().into()))
+                .unwrap_or_else(|| lock_dir.clone());
+            let main = input
+                .main
+                .as_ref()
+                .and_then(|main| Some(main.to_abs_path(lock_dir)?.as_path().into()))
+                .unwrap_or_else(|| path.clone());
+            let entry = self
+                .entry_resolver()
+                .resolve_with_root(Some(root), Some(main));
+            log::info!("resolved task with state: {path:?} -> {project_id:?} -> {entry:?}");
+
+            Some(TaskInputs {
+                entry: Some(entry),
+                ..Default::default()
+            })
+        });
+
+        proj_input
+            .flatten()
+            .unwrap_or_else(|| self.resolve_task(path))
+    }
+
     /// Snapshot the compiler thread for tasks
     pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
         self.project.snapshot()
@@ -1020,7 +1070,7 @@ impl LanguageState {
                 let world = snap.world.clone();
                 let doc_id = updater.compiled(&world)?;
 
-                updater.update_materials(doc_id.clone(), snap.world.depended_files());
+                updater.update_materials(doc_id.clone(), snap.world.depended_fs_paths());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
                 updater.commit();
@@ -1363,22 +1413,24 @@ impl LanguageState {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         let fut_stat = self.query_snapshot_with_stat(&query)?;
-        let entry = query
+        let input = query
             .associated_path()
-            .map(|path| self.entry_resolver().resolve(Some(path.into())))
+            .map(|path| self.resolve_task_with_state(path.into()))
             .or_else(|| {
                 let root = self.entry_resolver().root(None)?;
-                Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY))
+                Some(TaskInputs {
+                    entry: Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY)),
+                    ..Default::default()
+                })
             });
 
         just_future(async move {
             let mut snap = fut_stat.fut.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
             if !is_pinning {
-                snap = snap.task(TaskInputs {
-                    entry,
-                    ..Default::default()
-                });
+                if let Some(input) = input {
+                    snap = snap.task(input);
+                }
             }
             fut_stat.stat.snap();
 

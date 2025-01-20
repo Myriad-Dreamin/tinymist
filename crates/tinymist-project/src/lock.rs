@@ -3,11 +3,11 @@ use std::{path::Path, sync::Arc};
 use ecow::EcoVec;
 use reflexo_typst::ImmutPath;
 use tinymist_std::path::unix_slash;
-use tinymist_world::EntryReader;
-use typst::{diag::EcoString, syntax::FileId};
+use typst::diag::EcoString;
+use typst::World;
 
-use crate::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask, ResourcePath};
-use crate::LspWorld;
+use crate::model::{Id, ProjectInput, ProjectRoute, ProjectTask, ResourcePath};
+use crate::{LspWorld, ProjectPathMaterial};
 
 /// Make a new project lock updater.
 pub fn update_lock(root: ImmutPath) -> ProjectLockUpdater {
@@ -20,7 +20,7 @@ pub fn update_lock(root: ImmutPath) -> ProjectLockUpdater {
 enum LockUpdate {
     Input(ProjectInput),
     Task(ProjectTask),
-    Material(ProjectMaterial),
+    Material(ProjectPathMaterial),
     Route(ProjectRoute),
 }
 
@@ -31,17 +31,10 @@ pub struct ProjectLockUpdater {
 
 impl ProjectLockUpdater {
     pub fn compiled(&mut self, world: &LspWorld) -> Option<Id> {
-        let entry = world.entry_state();
-        log::info!("ProjectCompiler: record compile for {entry:?}");
-        // todo: correct root
-        let root = entry.workspace_root()?;
-        let id = unix_slash(entry.main()?.vpath().as_rootless_path());
-        log::info!("ProjectCompiler: record compile for id {id} at {root:?}");
-
-        let path = &ResourcePath::from_user_sys(Path::new(&id));
-        let id: Id = path.into();
+        let id = Id::from_world(world)?;
 
         let root = ResourcePath::from_user_sys(Path::new("."));
+        let main = ResourcePath::from_user_sys(world.path_for_id(world.main()).ok()?.as_path());
 
         let font_resolver = &world.font_resolver;
         let font_paths = font_resolver
@@ -67,6 +60,7 @@ impl ProjectLockUpdater {
         let input = ProjectInput {
             id: id.clone(),
             root: Some(root),
+            main: Some(main),
             font_paths,
             system_fonts: true, // !args.font.ignore_system_fonts,
             package_path: None,
@@ -82,17 +76,11 @@ impl ProjectLockUpdater {
         self.updates.push(LockUpdate::Task(task));
     }
 
-    pub fn update_materials(&mut self, doc_id: Id, ids: EcoVec<FileId>) {
-        let mut files = ids
-            .into_iter()
-            .map(ResourcePath::from_file_id)
-            .collect::<Vec<_>>();
-        files.sort();
-        self.updates.push(LockUpdate::Material(ProjectMaterial {
-            root: EcoString::default(),
-            id: doc_id,
-            files,
-        }));
+    pub fn update_materials(&mut self, doc_id: Id, files: EcoVec<ImmutPath>) {
+        self.updates
+            .push(LockUpdate::Material(ProjectPathMaterial::from_deps(
+                doc_id, files,
+            )));
     }
 
     pub fn route(&mut self, doc_id: Id, priority: u32) {
@@ -115,21 +103,24 @@ impl ProjectLockUpdater {
                         l.replace_task(task);
                     }
                     LockUpdate::Material(mut mat) => {
+                        let root: EcoString = unix_slash(&self.root).into();
                         mat.root = root.clone();
                         let cache_dir = dirs::cache_dir();
                         if let Some(cache_dir) = cache_dir {
                             let id = tinymist_std::hash::hash128(&mat.id);
-                            let lower4096 = root_hash & 0xfff;
-                            let upper4096 = root_hash >> 12;
+                            let root_lo = root_hash & 0xfff;
+                            let root_hi = root_hash >> 12;
+                            let id_lo = id & 0xfff;
+                            let id_hi = id >> 12;
 
-                            // let hash_str = format!("{root:016x}/{id:016x}");
-                            let hash_str = format!("{lower4096:03x}/{upper4096:013x}/{id:016x}");
+                            let hash_str =
+                                format!("{root_lo:03x}/{root_hi:013x}/{id_lo:03x}/{id_hi:016x}");
 
                             let cache_dir = cache_dir.join("tinymist/projects").join(hash_str);
                             let _ = std::fs::create_dir_all(&cache_dir);
 
                             let data = serde_json::to_string(&mat).unwrap();
-                            let path = cache_dir.join("material.json");
+                            let path = cache_dir.join("path-material.json");
                             let result = tinymist_fs::paths::write_atomic(path, data);
                             if let Err(err) = result {
                                 log::error!("ProjectCompiler: write material error: {err}");

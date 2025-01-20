@@ -252,6 +252,7 @@ impl ExportConfig {
                     let _ = page;
 
                     let ppi = ppi.unwrap_or(144.) as f32;
+                    let ppi = ppi.try_into().unwrap();
                     ProjectTask::ExportPng(ExportPngTask { export, ppi })
                 }
             };
