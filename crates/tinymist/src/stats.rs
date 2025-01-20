@@ -32,11 +32,11 @@ impl Default for QueryStatBucketData {
 
 /// Statistics about some query
 #[derive(Default, Clone)]
-pub(crate) struct QueryStatBucket {
-    pub data: Arc<Mutex<QueryStatBucketData>>,
+pub struct QueryStatBucket {
+    pub(crate) data: Arc<Mutex<QueryStatBucketData>>,
 }
 
-pub(crate) struct QueryStatGuard {
+pub struct QueryStatGuard {
     pub bucket: QueryStatBucket,
     pub since: std::time::SystemTime,
     pub snap_since: OnceLock<std::time::Duration>,

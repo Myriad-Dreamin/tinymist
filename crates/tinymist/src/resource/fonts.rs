@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tinymist_project::LspCompileSnapshot;
 use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
-use crate::project::WorldSnapFut;
 use crate::world::font::FontResolver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,8 +43,7 @@ struct FontResourceResult {
 
 impl ServerState {
     /// Get the all valid fonts
-    pub async fn get_font_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
-        let snap = snap.receive().await.map_err(internal_error)?;
+    pub async fn get_font_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
         // fonts
         let resolver = &snap.world.font_resolver;
         let font_book = resolver.font_book();
