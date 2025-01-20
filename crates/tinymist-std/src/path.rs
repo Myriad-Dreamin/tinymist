@@ -1,3 +1,5 @@
+//! Path utilities.
+
 use std::path::{Component, Path};
 
 pub use path_clean::PathClean;

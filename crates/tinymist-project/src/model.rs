@@ -4,17 +4,15 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::{cmp::Ordering, path::Path, str::FromStr};
 
-use anyhow::{bail, Context};
 use clap::ValueHint;
 use ecow::{eco_vec, EcoVec};
 use serde::{Deserialize, Serialize};
+use tinymist_std::error::prelude::*;
 use tinymist_std::path::unix_slash;
-use tinymist_std::ImmutPath;
+use tinymist_std::{bail, ImmutPath};
 use tinymist_world::EntryReader;
 use typst::diag::EcoString;
 use typst::syntax::FileId;
-
-pub use anyhow::Result;
 
 pub mod task;
 pub use task::*;
@@ -39,17 +37,17 @@ pub enum LockFileCompat {
 }
 
 impl LockFileCompat {
-    pub fn version(&self) -> anyhow::Result<&str> {
+    pub fn version(&self) -> Result<&str> {
         match self {
             LockFileCompat::Version010Beta0(..) => Ok(LOCK_VERSION),
             LockFileCompat::Other(v) => v
                 .get("version")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("missing version field")),
+                .context("missing version field"),
         }
     }
 
-    pub fn migrate(self) -> anyhow::Result<LockFile> {
+    pub fn migrate(self) -> Result<LockFile> {
         match self {
             LockFileCompat::Version010Beta0(v) => Ok(v),
             this @ LockFileCompat::Other(..) => {
@@ -189,12 +187,14 @@ impl LockFile {
     }
 
     pub fn update(cwd: &Path, f: impl FnOnce(&mut Self) -> Result<()>) -> Result<()> {
-        let fs = tinymist_fs::flock::Filesystem::new(cwd.to_owned());
+        let fs = tinymist_std::fs::flock::Filesystem::new(cwd.to_owned());
 
-        let mut lock_file = fs.open_rw_exclusive_create(LOCK_FILENAME, "project commands")?;
+        let mut lock_file = fs
+            .open_rw_exclusive_create(LOCK_FILENAME, "project commands")
+            .context("tinymist.lock")?;
 
         let mut data = vec![];
-        lock_file.read_to_end(&mut data)?;
+        lock_file.read_to_end(&mut data).context("read lock")?;
 
         let old_data =
             std::str::from_utf8(&data).context("tinymist.lock file is not valid utf-8")?;
@@ -207,7 +207,7 @@ impl LockFile {
             }
         } else {
             let old_state = toml::from_str::<LockFileCompat>(old_data)
-                .context("tinymist.lock file is not a valid TOML file")?;
+                .context_ut("tinymist.lock file is not a valid TOML file")?;
 
             let version = old_state.version()?;
             match Version(version).partial_cmp(&Version(LOCK_VERSION)) {
@@ -244,25 +244,29 @@ impl LockFile {
         // while writing the lock file. This is sensible because `Cargo.lock` is
         // only a "resolved result" of the `Cargo.toml`. Thus, we should inform
         // users that don't only persist configuration in the lock file.
-        lock_file.file().set_len(0)?;
-        lock_file.seek(SeekFrom::Start(0))?;
-        lock_file.write_all(new_data.as_bytes())?;
+        lock_file.file().set_len(0).context(LOCK_FILENAME)?;
+        lock_file.seek(SeekFrom::Start(0)).context(LOCK_FILENAME)?;
+        lock_file
+            .write_all(new_data.as_bytes())
+            .context(LOCK_FILENAME)?;
 
         Ok(())
     }
 
     pub fn read(dir: &Path) -> Result<Self> {
-        let fs = tinymist_fs::flock::Filesystem::new(dir.to_owned());
+        let fs = tinymist_std::fs::flock::Filesystem::new(dir.to_owned());
 
-        let mut lock_file = fs.open_ro_shared(LOCK_FILENAME, "project commands")?;
+        let mut lock_file = fs
+            .open_ro_shared(LOCK_FILENAME, "project commands")
+            .context(LOCK_FILENAME)?;
 
         let mut data = vec![];
-        lock_file.read_to_end(&mut data)?;
+        lock_file.read_to_end(&mut data).context(LOCK_FILENAME)?;
 
         let data = std::str::from_utf8(&data).context("tinymist.lock file is not valid utf-8")?;
 
         let state = toml::from_str::<LockFileCompat>(data)
-            .context("tinymist.lock file is not a valid TOML file")?;
+            .context_ut("tinymist.lock file is not a valid TOML file")?;
 
         state.migrate()
     }

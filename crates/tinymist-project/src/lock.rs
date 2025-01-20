@@ -121,7 +121,7 @@ impl ProjectLockUpdater {
 
                             let data = serde_json::to_string(&mat).unwrap();
                             let path = cache_dir.join("path-material.json");
-                            let result = tinymist_fs::paths::write_atomic(path, data);
+                            let result = tinymist_std::fs::paths::write_atomic(path, data);
                             if let Err(err) = result {
                                 log::error!("ProjectCompiler: write material error: {err}");
                             }

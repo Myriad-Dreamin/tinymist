@@ -1,3 +1,5 @@
+//! This module contains the implementation of the abstract data types.
+
 pub mod fmap;
 pub use fmap::FingerprintMap;
 

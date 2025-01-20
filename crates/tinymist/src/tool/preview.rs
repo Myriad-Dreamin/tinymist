@@ -555,7 +555,7 @@ pub async fn make_http_server(
 }
 
 /// Entry point of the preview tool.
-pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
+pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
     let handle = tokio::runtime::Handle::current();
 
@@ -615,7 +615,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         );
         let registered = preview_state.register(&server.primary.id, previewer.compile_watcher());
         if !registered {
-            anyhow::bail!("failed to register preview");
+            tinymist_std::bail!("failed to register preview");
         }
 
         let handle = Arc::new(PreviewProjectHandler {

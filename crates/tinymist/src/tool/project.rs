@@ -3,13 +3,13 @@
 use std::path::Path;
 
 use crate::project::*;
-use prelude::ZResult;
+use prelude::Result;
 
 trait LockFileExt {
     fn declare(&mut self, args: &DocNewArgs) -> Id;
-    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> ZResult<Id>;
-    fn compile(&mut self, args: TaskCompileArgs) -> ZResult<Id>;
-    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> ZResult<Id>;
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
+    fn compile(&mut self, args: TaskCompileArgs) -> Result<Id>;
+    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> Result<Id>;
 }
 
 impl LockFileExt for LockFile {
@@ -56,12 +56,12 @@ impl LockFileExt for LockFile {
         id
     }
 
-    fn compile(&mut self, args: TaskCompileArgs) -> ZResult<Id> {
+    fn compile(&mut self, args: TaskCompileArgs) -> Result<Id> {
         let id = self.declare(&args.declare);
         self.export(id, args)
     }
 
-    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> ZResult<Id> {
+    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> Result<Id> {
         let task = args.to_task(doc_id)?;
         let task_id = task.id().clone();
 
@@ -70,7 +70,7 @@ impl LockFileExt for LockFile {
         Ok(task_id)
     }
 
-    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> ZResult<Id> {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
         let task_id = args
             .name
             .as_ref()
@@ -91,7 +91,7 @@ impl LockFileExt for LockFile {
 }
 
 /// Project document commands' main
-pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
+pub fn project_main(args: DocCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
         match args {
             DocCommands::New(args) => {
@@ -112,7 +112,7 @@ pub fn project_main(args: DocCommands) -> anyhow::Result<()> {
 }
 
 /// Project task commands' main
-pub fn task_main(args: TaskCommands) -> anyhow::Result<()> {
+pub fn task_main(args: TaskCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
         match args {
             TaskCommands::Compile(args) => {

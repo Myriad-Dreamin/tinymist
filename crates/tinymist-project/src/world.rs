@@ -15,7 +15,6 @@ use std::path::Path;
 use std::{borrow::Cow, sync::Arc};
 
 use ::typst::utils::LazyHash;
-use anyhow::Context;
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_world::font::system::SystemFontSearcher;
@@ -47,13 +46,13 @@ pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
 
 pub trait WorldProvider {
     /// Get the entry options from the arguments.
-    fn entry(&self) -> anyhow::Result<EntryOpts>;
+    fn entry(&self) -> Result<EntryOpts>;
     /// Get a universe instance from the given arguments.
-    fn resolve(&self) -> anyhow::Result<LspUniverse>;
+    fn resolve(&self) -> Result<LspUniverse>;
 }
 
 impl WorldProvider for CompileOnceArgs {
-    fn resolve(&self) -> anyhow::Result<LspUniverse> {
+    fn resolve(&self) -> Result<LspUniverse> {
         let entry = self.entry()?.try_into()?;
         let inputs = self
             .inputs
@@ -75,7 +74,7 @@ impl WorldProvider for CompileOnceArgs {
         .context("failed to create universe")
     }
 
-    fn entry(&self) -> anyhow::Result<EntryOpts> {
+    fn entry(&self) -> Result<EntryOpts> {
         let input = self.input.as_ref().context("entry file must be provided")?;
         let input = Path::new(&input);
         let entry = if input.is_absolute() {
@@ -134,7 +133,7 @@ impl LspUniverseBuilder {
         inputs: ImmutDict,
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
-    ) -> ZResult<LspUniverse> {
+    ) -> Result<LspUniverse> {
         let registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
 
@@ -148,7 +147,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub fn only_embedded_fonts() -> ZResult<TinymistFontResolver> {
+    pub fn only_embedded_fonts() -> Result<TinymistFontResolver> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
             font_profile_cache_path: Default::default(),
@@ -160,7 +159,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<TinymistFontResolver> {
+    pub fn resolve_fonts(args: CompileFontArgs) -> Result<TinymistFontResolver> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
             font_profile_cache_path: Default::default(),

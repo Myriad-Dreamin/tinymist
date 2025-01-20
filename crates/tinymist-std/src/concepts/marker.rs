@@ -7,6 +7,7 @@ use serde_with::{
 };
 use serde_with::{DeserializeAs, SerializeAs};
 
+/// A marker type for serializing and deserializing `Cow<[u8]>` as base64.
 pub struct AsCowBytes;
 
 type StdBase64 = Base64<Standard, Padded>;

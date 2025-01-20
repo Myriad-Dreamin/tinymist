@@ -21,7 +21,7 @@ pub(crate) fn convert_pair(pair: JsValue) -> (JsValue, JsValue) {
 }
 struct FontBuilder {}
 
-fn font_family_web_to_typst(family: &str, full_name: &str) -> ZResult<String> {
+fn font_family_web_to_typst(family: &str, full_name: &str) -> Result<String> {
     let mut family = family;
     if family.starts_with("Noto")
         || family.starts_with("NewCM")
@@ -51,7 +51,7 @@ fn infer_info_from_web_font(
         postscript_name,
         style,
     }: WebFontInfo,
-) -> ZResult<FontInfo> {
+) -> Result<FontInfo> {
     let family = font_family_web_to_typst(&family, &full_name)?;
 
     let mut full = full_name;
@@ -237,7 +237,7 @@ impl FontBuilder {
     // {:?}", field, val)))         .unwrap())
     // }
 
-    fn to_string(&self, field: &str, val: &JsValue) -> ZResult<String> {
+    fn to_string(&self, field: &str, val: &JsValue) -> Result<String> {
         Ok(val
             .as_string()
             .ok_or_else(|| JsValue::from_str(&format!("expected string for {field}, got {val:?}")))
@@ -247,7 +247,7 @@ impl FontBuilder {
     fn font_web_to_typst(
         &self,
         val: &JsValue,
-    ) -> ZResult<(JsValue, js_sys::Function, Vec<typst::text::FontInfo>)> {
+    ) -> Result<(JsValue, js_sys::Function, Vec<typst::text::FontInfo>)> {
         let mut postscript_name = String::new();
         let mut family = String::new();
         let mut full_name = String::new();
@@ -414,7 +414,7 @@ impl BrowserFontSearcher {
         }
     }
 
-    pub async fn add_web_fonts(&mut self, fonts: js_sys::Array) -> ZResult<()> {
+    pub async fn add_web_fonts(&mut self, fonts: js_sys::Array) -> Result<()> {
         let font_builder = FontBuilder {};
 
         for v in fonts.iter() {
@@ -451,7 +451,7 @@ impl BrowserFontSearcher {
         }
     }
 
-    pub async fn add_glyph_pack(&mut self) -> ZResult<()> {
+    pub async fn add_glyph_pack(&mut self) -> Result<()> {
         Err(error_once!(
             "BrowserFontSearcher.add_glyph_pack is not implemented"
         ))

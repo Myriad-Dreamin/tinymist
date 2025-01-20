@@ -1,7 +1,6 @@
 //! Upstream: <https://github.com/rust-lang/cargo/blob/rust-1.83.0/crates/cargo-util/src/paths.rs>
 //! Various utilities for working with files and paths.
 
-use anyhow::{Context, Result};
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs::{self, File, Metadata, OpenOptions};
@@ -9,6 +8,8 @@ use std::io;
 use std::io::prelude::*;
 use std::iter;
 use std::path::{Component, Path, PathBuf};
+
+use anyhow::{Context, Result};
 use tempfile::Builder as TempFileBuilder;
 
 /// Joins paths into a string suitable for the `PATH` environment variable.

@@ -1,3 +1,5 @@
+//! Cross platform time utilities.
+
 pub use std::time::SystemTime as Time;
 pub use web_time::Duration;
 pub use web_time::Instant;

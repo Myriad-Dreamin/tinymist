@@ -42,13 +42,14 @@ pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 use lsp_server::{RequestId, ResponseError};
 use serde_json::from_value;
 use sync_lsp::*;
+use tinymist_std::error::Result;
 use utils::*;
 use world::*;
 
 use tinymist_query::CompilerQueryResponse;
 
 /// The future type for a lsp query.
-pub type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
+pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;
 
 trait LspClientExt {
     fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult;

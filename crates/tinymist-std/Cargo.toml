@@ -1,6 +1,6 @@
 [package]
 name = "tinymist-std"
-description = "Additional functions wrapping Rust's std library."
+description = "Additional functions wrapping Rust's standard library."
 authors.workspace = true
 version.workspace = true
 license.workspace = true
@@ -10,31 +10,53 @@ repository.workspace = true
 
 [dependencies]
 
-comemo.workspace = true
-ecow.workspace = true
-parking_lot.workspace = true
-web-time.workspace = true
-wasm-bindgen = { workspace = true, optional = true }
-js-sys = { workspace = true, optional = true }
-
-bitvec = { version = "1" }
-dashmap = { version = "5" }
-# tiny-skia-path.workspace = true
-
-path-clean.workspace = true
+anyhow.workspace = true
 base64.workspace = true
+bitvec.workspace = true
+comemo.workspace = true
+dashmap.workspace = true
+ecow.workspace = true
 fxhash.workspace = true
+log.workspace = true
+path-clean.workspace = true
+parking_lot.workspace = true
 rustc-hash.workspace = true
-siphasher.workspace = true
-
 serde = { workspace = true, features = ["derive"] }
-serde_repr = "0.1"
+serde_repr.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
+siphasher.workspace = true
+web-time.workspace = true
+tempfile = { workspace = true, optional = true }
+same-file = { workspace = true, optional = true }
+
+# feature = "web"
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+
+# feature = "rkyv"
 rkyv = { workspace = true, optional = true }
 
+# feature = "typst"
 typst = { workspace = true, optional = true }
 typst-shim = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Console",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 hex.workspace = true
@@ -48,13 +70,11 @@ typst = ["dep:typst", "dep:typst-shim"]
 
 rkyv = ["dep:rkyv", "rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["dep:rkyv", "rkyv/validation"]
-# flat-vector = ["rkyv", "rkyv-validation"]
 
 __web = ["dep:wasm-bindgen", "dep:js-sys"]
 web = ["__web"]
-system = []
+system = ["dep:tempfile", "dep:same-file"]
 bi-hash = []
-item-dashmap = []
 
 [lints]
 workspace = true

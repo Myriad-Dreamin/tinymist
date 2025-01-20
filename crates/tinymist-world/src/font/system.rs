@@ -105,7 +105,7 @@ impl SystemFontSearcher {
     }
 
     /// Resolve fonts from given options.
-    pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> ZResult<()> {
+    pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> Result<()> {
         if opts
             .font_profile_cache_path
             .to_str()

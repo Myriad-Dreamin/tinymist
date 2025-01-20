@@ -15,6 +15,7 @@ pub struct QueryRef<Res, Err, QueryContext = ()> {
 }
 
 impl<T, E, QC> QueryRef<T, E, QC> {
+    /// Create a new query reference with the given value.
     pub fn with_value(value: T) -> Self {
         let cell = OnceLock::new();
         cell.get_or_init(|| Ok(value));
@@ -24,6 +25,8 @@ impl<T, E, QC> QueryRef<T, E, QC> {
         }
     }
 
+    /// Create a new query reference with the given context to execute the
+    /// query.
     pub fn with_context(ctx: QC) -> Self {
         Self {
             ctx: Mutex::new(Some(ctx)),

@@ -6,8 +6,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use actor::editor::EditorActor;
-use anyhow::anyhow;
-use anyhow::Context;
 use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
@@ -304,7 +302,7 @@ impl LanguageState {
 
 impl LanguageState {
     // todo: handle error
-    fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
+    fn register_capability(&self, registrations: Vec<Registration>) -> Result<()> {
         self.client.send_request_::<RegisterCapability>(
             RegistrationParams { registrations },
             |_, resp| {
@@ -316,7 +314,7 @@ impl LanguageState {
         Ok(())
     }
 
-    fn unregister_capability(&self, unregisterations: Vec<Unregistration>) -> anyhow::Result<()> {
+    fn unregister_capability(&self, unregisterations: Vec<Unregistration>) -> Result<()> {
         self.client.send_request_::<UnregisterCapability>(
             UnregistrationParams { unregisterations },
             |_, resp| {
@@ -329,7 +327,7 @@ impl LanguageState {
     }
 
     /// Registers or unregisters semantic tokens.
-    fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
+    fn enable_sema_token_caps(&mut self, enable: bool) -> Result<()> {
         if !self.const_config().tokens_dynamic_registration {
             trace!("skip register semantic by config");
             return Ok(());
@@ -375,7 +373,7 @@ impl LanguageState {
     }
 
     /// Registers or unregisters document formatter.
-    fn enable_formatter_caps(&mut self, enable: bool) -> anyhow::Result<()> {
+    fn enable_formatter_caps(&mut self, enable: bool) -> Result<()> {
         if !self.const_config().doc_fmt_dynamic_registration {
             trace!("skip dynamic register formatter by config");
             return Ok(());
@@ -980,7 +978,7 @@ impl LanguageState {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+    pub fn snapshot(&mut self) -> Result<WorldSnapFut> {
         self.project.snapshot()
     }
 
@@ -990,7 +988,7 @@ impl LanguageState {
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&mut self) -> ZResult<QuerySnapFut> {
+    pub fn query_snapshot(&mut self) -> Result<QuerySnapFut> {
         self.project.query_snapshot(None)
     }
 
@@ -998,7 +996,7 @@ impl LanguageState {
     pub fn query_snapshot_with_stat(
         &mut self,
         q: &CompilerQueryRequest,
-    ) -> ZResult<QuerySnapWithStat> {
+    ) -> Result<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.project.stats.query_stat(path, name);
@@ -1116,7 +1114,7 @@ impl LanguageState {
 
 impl LanguageState {
     /// Restart the primary server.
-    pub fn restart_primary(&mut self) -> ZResult<ProjectInsId> {
+    pub fn restart_primary(&mut self) -> Result<ProjectInsId> {
         let entry = self.entry_resolver().resolve_default();
         let config = &self.config;
 
@@ -1148,7 +1146,7 @@ impl LanguageState {
         &mut self,
         dedicate: &str,
         entry: Option<ImmutPath>,
-    ) -> ZResult<ProjectInsId> {
+    ) -> Result<ProjectInsId> {
         let entry = self.config.compile.entry_resolver.resolve(entry);
         self.project.restart_dedicate(dedicate, entry)
     }
@@ -1367,10 +1365,10 @@ impl LanguageState {
     pub fn query_source<T>(
         &self,
         path: ImmutPath,
-        f: impl FnOnce(Source) -> anyhow::Result<T>,
-    ) -> anyhow::Result<T> {
+        f: impl FnOnce(Source) -> Result<T>,
+    ) -> Result<T> {
         let snapshot = self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {path:?}"))?;
+        let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
         let source = snapshot.content.clone();
         f(source)
     }

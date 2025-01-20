@@ -1,3 +1,6 @@
+//! The debug location that can be used to locate a position in a document or a
+//! file.
+
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -38,6 +41,7 @@ pub type RawSourceSpan = u64;
 /// See [`CharPosition`] for the definition of the position inside a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileLocation {
+    /// The file path.
     pub filepath: String,
 }
 
@@ -73,11 +77,14 @@ impl From<Option<(usize, usize)>> for CharPosition {
 /// See [`CharPosition`] for the definition of the position inside a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceLocation {
+    /// The file path.
     pub filepath: String,
+    /// The position in the file.
     pub pos: CharPosition,
 }
 
 impl SourceLocation {
+    /// Create a new source location.
     pub fn from_flat(
         flat: FlatSourceLocation,
         i: &impl std::ops::Index<usize, Output = FileLocation>,
@@ -94,16 +101,20 @@ impl SourceLocation {
 /// See [`CharPosition`] for the definition of the position inside a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlatSourceLocation {
+    /// The file path.
     pub filepath: u32,
+    /// The position in the file.
     pub pos: CharPosition,
 }
 
-// /// A resolved file range.
-// ///
-// /// See [`CharPosition`] for the definition of the position inside a file.
+/// A resolved file range.
+///
+/// See [`CharPosition`] for the definition of the position inside a file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CharRange {
+    /// The start position.
     pub start: CharPosition,
+    /// The end position.
     pub end: CharPosition,
 }
 
@@ -117,12 +128,14 @@ impl fmt::Display for CharRange {
     }
 }
 
-// /// A resolved source (text) range.
-// ///
-// /// See [`CharPosition`] for the definition of the position inside a file.
+/// A resolved source (text) range.
+///
+/// See [`CharPosition`] for the definition of the position inside a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceRange {
+    /// The file path.
     pub path: String,
+    /// The range in the file.
     pub range: CharRange,
 }
 
@@ -144,7 +157,10 @@ mod typst_ext {
     /// text or string content.
     #[derive(Debug, Clone, Copy)]
     pub struct SourceSpanOffset {
+        /// The source span.
         pub span: SourceSpan,
+        /// The offset relative to the start of the span. This is usually useful
+        /// if the location is not a span created by the parser.
         pub offset: usize,
     }
 

@@ -32,7 +32,7 @@ impl TypstSystemUniverse {
     /// Create [`TypstSystemWorld`] with the given options.
     /// See SystemCompilerFeat for instantiation details.
     /// See [`CompileOpts`] for available options.
-    pub fn new(mut opts: CompileOpts) -> ZResult<Self> {
+    pub fn new(mut opts: CompileOpts) -> Result<Self> {
         let registry: Arc<HttpRegistry> = Arc::default();
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
         let inputs = std::mem::take(&mut opts.inputs);
@@ -46,7 +46,7 @@ impl TypstSystemUniverse {
     }
 
     /// Resolve fonts from given options.
-    fn resolve_fonts(opts: CompileOpts) -> ZResult<FontResolverImpl> {
+    fn resolve_fonts(opts: CompileOpts) -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(opts.into())?;
         Ok(searcher.into())
