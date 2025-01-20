@@ -211,6 +211,9 @@ debug = true
 inherits = "release"
 lto = "thin"
 
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "warn"
+
 [workspace.lints.rust]
 missing_docs = "warn"
 # missing_crate_level_docs = "warn"

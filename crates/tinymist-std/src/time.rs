@@ -1,8 +1,7 @@
 //! Cross platform time utilities.
 
 pub use std::time::SystemTime as Time;
-pub use web_time::Duration;
-pub use web_time::Instant;
+pub use web_time::{Duration, Instant};
 
 /// Returns the current system time (UTC+0).
 #[cfg(any(feature = "system", feature = "web"))]

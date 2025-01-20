@@ -1,20 +1,18 @@
 //! Font resolver implementation.
 
-use core::fmt;
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+pub use crate::world::base::font::*;
 
+use core::fmt;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use tinymist_std::debug_loc::DataSource;
 use tinymist_world::font::system::SystemFontSearcher;
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
 use crate::world::vfs::Bytes;
-use tinymist_std::debug_loc::DataSource;
-
-pub use crate::world::base::font::*;
 
 #[derive(Debug)]
 /// The default FontResolver implementation.

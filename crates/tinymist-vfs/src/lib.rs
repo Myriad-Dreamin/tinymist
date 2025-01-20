@@ -471,8 +471,6 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     }
 
     /// Reset the shadowing files in [`OverlayAccessModel`].
-    ///
-    /// Note: This function is independent from [`Vfs::reset`].
     pub fn reset_shadow(&mut self) {
         for path in self.am().inner.inner.file_paths() {
             self.invalidate_path(&path);

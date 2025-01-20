@@ -2,8 +2,9 @@
 
 use std::path::Path;
 
+use tinymist_std::error::prelude::*;
+
 use crate::project::*;
-use prelude::Result;
 
 trait LockFileExt {
     fn declare(&mut self, args: &DocNewArgs) -> Id;

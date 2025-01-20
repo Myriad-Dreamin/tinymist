@@ -1,10 +1,8 @@
 use std::borrow::{Borrow, Cow};
 
 use serde::{Deserializer, Serializer};
-use serde_with::{
-    base64::{Base64, Standard},
-    formats::Padded,
-};
+use serde_with::base64::{Base64, Standard};
+use serde_with::formats::Padded;
 use serde_with::{DeserializeAs, SerializeAs};
 
 /// A marker type for serializing and deserializing `Cow<[u8]>` as base64.

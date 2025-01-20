@@ -13,10 +13,11 @@ use std::io;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Display, Path, PathBuf};
 
-use self::sys::*;
-use super::paths;
 use anyhow::Context as _;
 use anyhow::Result;
+
+use self::sys::*;
+use super::paths;
 
 /// A locked file.
 ///
