@@ -945,7 +945,7 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
     ])
 });
 
-impl LanguageState {
+impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
         let snap = snap.receive().await.map_err(z_internal_error)?;

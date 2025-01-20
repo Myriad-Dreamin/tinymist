@@ -39,7 +39,7 @@ pub trait AddCommands {
 /// The regular initializer.
 pub struct RegularInit {
     /// The connection to the client.
-    pub client: TypedLspClient<LanguageState>,
+    pub client: TypedLspClient<ServerState>,
     /// The font options for the compiler.
     pub font_opts: CompileFontArgs,
     /// The commands to execute.
@@ -54,7 +54,7 @@ impl AddCommands for RegularInit {
 
 impl Initializer for RegularInit {
     type I = InitializeParams;
-    type S = LanguageState;
+    type S = ServerState;
     /// The [`initialize`] request is the first request sent from the client to
     /// the server.
     ///
@@ -70,7 +70,7 @@ impl Initializer for RegularInit {
     ///
     /// # Errors
     /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
+    fn initialize(mut self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
         // Initialize configurations
         let roots = match params.workspace_folders.as_ref() {
             Some(roots) => roots
@@ -120,7 +120,7 @@ impl Initializer for RegularInit {
 /// The super LSP initializer.
 pub struct SuperInit {
     /// Using the connection to the client.
-    pub client: TypedLspClient<LanguageState>,
+    pub client: TypedLspClient<ServerState>,
     /// The valid commands for `workspace/executeCommand` requests.
     pub exec_cmds: Vec<String>,
     /// The configuration for the server.
@@ -137,8 +137,8 @@ impl AddCommands for SuperInit {
 
 impl Initializer for SuperInit {
     type I = ();
-    type S = LanguageState;
-    fn initialize(self, _params: ()) -> (LanguageState, AnySchedulableResponse) {
+    type S = ServerState;
+    fn initialize(self, _params: ()) -> (ServerState, AnySchedulableResponse) {
         let SuperInit {
             client,
             exec_cmds,
@@ -147,7 +147,7 @@ impl Initializer for SuperInit {
         } = self;
         let const_config = config.const_config.clone();
         // Bootstrap server
-        let service = LanguageState::main(client, config, err.is_none());
+        let service = ServerState::main(client, config, err.is_none());
 
         if let Some(err) = err {
             return (service, Err(err));
@@ -840,7 +840,7 @@ pub struct CompileExtraOpts {
 /// - `$root/main` will help store pdf file to `$root/main.pdf` constantly.
 /// - (default) `$root/$dir/$name` will help store pdf file along with the input
 ///   file.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PathPattern(pub String);
 
 impl PathPattern {

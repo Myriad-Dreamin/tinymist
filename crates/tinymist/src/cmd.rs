@@ -16,8 +16,9 @@ use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use world::TaskInputs;
 
-use super::server::*;
+use super::state::*;
 use super::*;
+use crate::state::query::{run_query, LspClientExt};
 use crate::tool::package::InitTask;
 
 /// See [`ExportKind`].
@@ -54,7 +55,7 @@ struct HighlightRangeOpts {
 }
 
 /// Here are implemented the handlers for each command.
-impl LanguageState {
+impl ServerState {
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
@@ -526,7 +527,7 @@ impl LanguageState {
     }
 }
 
-impl LanguageState {
+impl ServerState {
     /// Get the all valid fonts
     pub fn resource_fonts(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snapshot = self.snapshot().map_err(z_internal_error)?;

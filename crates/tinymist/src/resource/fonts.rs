@@ -41,7 +41,7 @@ struct FontResourceResult {
     families: Vec<FontResourceItem>,
 }
 
-impl LanguageState {
+impl ServerState {
     /// Get the all valid fonts
     pub async fn get_font_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
         let snap = snap.receive().await.map_err(internal_error)?;

@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
 use crate::{
-    project::LspPreviewState,
+    project::ProjectPreviewState,
     tool::preview::{HttpServer, PreviewProjectHandler},
 };
 
@@ -38,7 +38,7 @@ pub struct PreviewActor {
     pub tabs: HashMap<String, PreviewTab>,
     pub preview_rx: mpsc::UnboundedReceiver<PreviewRequest>,
     /// the watchers for the preview
-    pub(crate) watchers: LspPreviewState,
+    pub(crate) watchers: ProjectPreviewState,
 }
 
 impl PreviewActor {

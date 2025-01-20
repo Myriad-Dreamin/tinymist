@@ -30,7 +30,7 @@ impl PathAccessModel for ProxyAccessModel {
             .map(|v| v.as_bool().unwrap())
             .map_err(|e| {
                 web_sys::console::error_3(
-                    &"typst_ts::compiler::ProxyAccessModel::is_file failure".into(),
+                    &"tinymist-vfs::ProxyAccessModel::is_file failure".into(),
                     &src.to_string_lossy().as_ref().into(),
                     &e,
                 );
@@ -47,7 +47,7 @@ impl PathAccessModel for ProxyAccessModel {
             .call1(&self.context, &src.to_string_lossy().as_ref().into())
             .map_err(|e| {
                 web_sys::console::error_3(
-                    &"typst_ts::compiler::ProxyAccessModel::read_all failure".into(),
+                    &"tinymist-vfs::ProxyAccessModel::read_all failure".into(),
                     &src.to_string_lossy().as_ref().into(),
                     &e,
                 );

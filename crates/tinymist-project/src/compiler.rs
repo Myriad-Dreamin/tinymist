@@ -334,9 +334,9 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     estimated_shadow_files: HashSet<Arc<Path>>,
 
     /// The primary state.
-    pub primary: ProjectState<F, Ext>,
+    pub primary: ProjectInsState<F, Ext>,
     /// The states for dedicate tasks
-    pub dedicates: Vec<ProjectState<F, Ext>>,
+    pub dedicates: Vec<ProjectInsState<F, Ext>>,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCompiler<F, Ext> {
@@ -380,11 +380,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     /// Compiles the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
         let snap = self.primary.make_snapshot(true);
-        ProjectState::run_compile(self.handler.clone(), snap)()
+        ProjectInsState::run_compile(self.handler.clone(), snap)()
     }
 
     /// Gets the iterator of all projects.
-    pub fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
+    pub fn projects(&mut self) -> impl Iterator<Item = &mut ProjectInsState<F, Ext>> {
         std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut())
     }
 
@@ -394,8 +394,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         handler: Arc<dyn CompileHandler<F, Ext>>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         feature_set: FeatureSet,
-    ) -> ProjectState<F, Ext> {
-        ProjectState {
+    ) -> ProjectInsState<F, Ext> {
+        ProjectInsState {
             id,
             ext: Default::default(),
             verse,
@@ -418,10 +418,10 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
     /// Find a project by id, but with less borrow checker restriction.
     pub fn find_project<'a>(
-        primary: &'a mut ProjectState<F, Ext>,
-        dedicates: &'a mut [ProjectState<F, Ext>],
+        primary: &'a mut ProjectInsState<F, Ext>,
+        dedicates: &'a mut [ProjectInsState<F, Ext>],
         id: &ProjectInsId,
-    ) -> &'a mut ProjectState<F, Ext> {
+    ) -> &'a mut ProjectInsState<F, Ext> {
         if id == &primary.id {
             return primary;
         }
@@ -665,8 +665,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 }
 
-/// A project state.
-pub struct ProjectState<F: CompilerFeat, Ext> {
+/// A project instance state.
+pub struct ProjectInsState<F: CompilerFeat, Ext> {
     /// The project instance id.
     pub id: ProjectInsId,
     /// The extension
@@ -696,7 +696,7 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
     committed_revision: usize,
 }
 
-impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
+impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Creates a new compile environment.
     pub fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
         CompileEnv::default().configure_shared(feature_set)

@@ -16,7 +16,7 @@ mod prelude {
     pub use typst::foundations::{Scope, Value};
     pub use typst::symbols::Symbol;
 
-    pub use crate::LanguageState;
+    pub(crate) use crate::ServerState;
 
     pub type Svg<'a> = SvgTask<'a, DefaultExportFeature>;
 }

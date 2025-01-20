@@ -43,14 +43,17 @@ use crate::world::vfs::MemoryEvent;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
+/// LSP project compiler.
+pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectInsStateExt>;
+
 #[derive(Default, Clone)]
-pub struct LspPreviewState {
+pub struct ProjectPreviewState {
     #[cfg(feature = "preview")]
     pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<typst_preview::CompileWatcher>>>>,
 }
 
 #[cfg(feature = "preview")]
-impl LspPreviewState {
+impl ProjectPreviewState {
     // todo: multiple preview support
     #[must_use]
     pub fn register(&self, id: &ProjectInsId, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
@@ -80,24 +83,21 @@ impl LspPreviewState {
 }
 
 #[derive(Default)]
-pub struct ProjectStateExt {
+pub struct ProjectInsStateExt {
     pub is_compiling: bool,
     pub last_compilation: Option<LspCompiledArtifact>,
 }
 
-/// LSP project compiler.
-pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectStateExt>;
-
-pub struct Project {
+pub struct ProjectState {
     pub diag_group: String,
     pub state: LspProjectCompiler,
-    pub preview: LspPreviewState,
+    pub preview: ProjectPreviewState,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,
     pub export: crate::task::ExportTask,
 }
 
-impl Project {
+impl ProjectState {
     /// Snapshot the compiler thread for tasks
     pub fn snapshot(&mut self) -> Result<WorldSnapFut> {
         let (tx, rx) = oneshot::channel();
@@ -158,7 +158,7 @@ pub struct CompileHandlerImpl {
     pub(crate) diag_group: String,
     pub(crate) analysis: Arc<Analysis>,
 
-    pub(crate) preview: LspPreviewState,
+    pub(crate) preview: ProjectPreviewState,
 
     pub(crate) export: crate::task::ExportTask,
     pub(crate) editor_tx: EditorSender,
@@ -221,7 +221,7 @@ impl CompileHandlerImpl {
     }
 }
 
-impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
+impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl {
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
         let instances_mut = std::iter::once(&mut c.primary).chain(c.dedicates.iter_mut());
         for s in instances_mut {
