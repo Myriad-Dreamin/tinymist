@@ -293,14 +293,14 @@ pub trait WithContextUntyped<T>: Sized {
 
 impl<T, E: std::fmt::Display> WithContextUntyped<T> for Result<T, E> {
     fn context_ut(self, loc: &'static str) -> Result<T> {
-        self.map_err(|e| Error::new(loc, ErrKind::Msg(eco_format!("{e}")), None))
+        self.map_err(|e| Error::new(loc, ErrKind::Msg(ecow::eco_format!("{e}")), None))
     }
 
     fn with_context_ut<F>(self, loc: &'static str, f: F) -> Result<T>
     where
         F: FnOnce() -> Option<Box<[(&'static str, String)]>>,
     {
-        self.map_err(|e| Error::new(loc, ErrKind::Msg(eco_format!("{e}")), f()))
+        self.map_err(|e| Error::new(loc, ErrKind::Msg(ecow::eco_format!("{e}")), f()))
     }
 }
 
