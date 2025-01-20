@@ -44,8 +44,8 @@ impl DiagMessage {}
 #[non_exhaustive]
 pub enum ErrKind {
     None,
-    Msg(String),
-    Diag(DiagMessage),
+    Msg(EcoString),
+    Diag(Box<DiagMessage>),
     Inner(Error),
 }
 
@@ -61,43 +61,43 @@ impl ErrKindExt for ErrKind {
 
 impl ErrKindExt for std::io::Error {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self.to_string().into())
     }
 }
 
 impl ErrKindExt for String {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self)
+        ErrKind::Msg(self.into())
     }
 }
 
 impl ErrKindExt for &str {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self.into())
     }
 }
 
 impl ErrKindExt for &String {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self.into())
     }
 }
 
 impl ErrKindExt for EcoString {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self)
     }
 }
 
 impl ErrKindExt for &dyn std::fmt::Display {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self.to_string().into())
     }
 }
 
 impl ErrKindExt for serde_json::Error {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(self.to_string())
+        ErrKind::Msg(self.to_string().into())
     }
 }
 
@@ -160,7 +160,7 @@ impl std::error::Error for Error {}
 #[cfg(feature = "web")]
 impl ErrKindExt for wasm_bindgen::JsValue {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(format!("{self:?}"))
+        ErrKind::Msg(ecow::eco_format!("{self:?}"))
     }
 }
 
@@ -179,7 +179,6 @@ impl From<&Error> for wasm_bindgen::JsValue {
 }
 
 pub mod prelude {
-
     use super::ErrKindExt;
     use crate::Error;
 
@@ -285,6 +284,20 @@ pub mod prelude {
         Error::new(loc, crate::ErrKind::None, args)
     }
 
+    pub fn _msg(loc: &'static str, msg: EcoString) -> Error {
+        Error::new(loc, crate::ErrKind::Msg(msg), Box::new([]))
+    }
+
+    pub use ecow::eco_format as _eco_format;
+
+    #[macro_export]
+    macro_rules! bail {
+        ($($arg:tt)+) => {{
+            let args = $crate::error::prelude::_eco_format!($($arg)+);
+            return Err($crate::error::prelude::_msg(file!(), args))
+        }};
+    }
+
     #[macro_export]
     macro_rules! error_once {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
@@ -315,6 +328,7 @@ pub mod prelude {
         };
     }
 
+    use ecow::EcoString;
     pub use error_once;
     pub use error_once_map;
     pub use error_once_map_string;

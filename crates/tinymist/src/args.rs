@@ -3,7 +3,7 @@ use std::path::Path;
 use sync_lsp::transport::MirrorArgs;
 
 use tinymist::{
-    tool::project::{DocCommands, TaskCommands},
+    project::{DocCommands, TaskCommands},
     CompileFontArgs, CompileOnceArgs,
 };
 use tinymist_core::LONG_VERSION;

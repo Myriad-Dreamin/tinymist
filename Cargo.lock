@@ -4110,6 +4110,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "tinymist-derive",
  "tinymist-fs",
  "tinymist-std",
  "tinymist-world",
@@ -4117,6 +4118,7 @@ dependencies = [
  "toml",
  "typst",
  "typst-assets",
+ "typst-preview",
 ]
 
 [[package]]
