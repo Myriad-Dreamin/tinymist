@@ -63,10 +63,10 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 }
 
 /// The object providing the language server functionality.
-pub struct LanguageState {
+pub struct ServerState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
-    /// The lcok state.
+    /// The project route state.
     pub route: ProjectRouteState,
     /// The project state.
     pub project: ProjectState,
@@ -91,7 +91,7 @@ pub struct LanguageState {
 
     // Resources
     /// Source synchronized with client
-    pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
+    pub memory_changes: HashMap<Arc<Path>, Source>,
     /// The preview state.
     #[cfg(feature = "preview")]
     pub preview: tool::preview::PreviewState,
@@ -106,10 +106,10 @@ pub struct LanguageState {
 }
 
 /// Getters and the main loop.
-impl LanguageState {
+impl ServerState {
     /// Create a new language server.
     pub fn new(
-        client: TypedLspClient<LanguageState>,
+        client: TypedLspClient<ServerState>,
         config: Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
@@ -155,7 +155,7 @@ impl LanguageState {
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = LanguageState::new(client.clone(), config, editor_tx);
+        let mut service = ServerState::new(client.clone(), config, editor_tx);
 
         if start {
             let editor_actor = EditorActor::new(
@@ -190,7 +190,7 @@ impl LanguageState {
     pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
-        type State = LanguageState;
+        type State = ServerState;
         use lsp_types::notification::*;
         use lsp_types::request::*;
 
@@ -301,7 +301,7 @@ impl LanguageState {
     }
 }
 
-impl LanguageState {
+impl ServerState {
     // todo: handle error
     fn register_capability(&self, registrations: Vec<Registration>) -> Result<()> {
         self.client.send_request_::<RegisterCapability>(
@@ -423,7 +423,7 @@ impl LanguageState {
 /// low-level implementation details.
 ///
 /// [Language Server Protocol]: https://microsoft.github.io/language-server-protocol/
-impl LanguageState {
+impl ServerState {
     /// The [`initialized`] notification is sent from the client to the server
     /// after the client received the result of the initialize request but
     /// before the client sends anything else.
@@ -492,7 +492,7 @@ impl LanguageState {
 }
 
 /// Document Synchronization
-impl LanguageState {
+impl ServerState {
     fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         log::info!("did open {:?}", params.text_document.uri);
         let path = as_path_(params.text_document.uri);
@@ -626,7 +626,7 @@ macro_rules! run_query {
 pub(crate) use run_query;
 
 /// Standard Language Features
-impl LanguageState {
+impl ServerState {
     fn goto_definition(
         &mut self,
         req_id: RequestId,
@@ -843,7 +843,7 @@ impl LanguageState {
     }
 }
 
-impl LanguageState {
+impl ServerState {
     /// Focus main file to some path.
     pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool> {
         if path
@@ -1113,7 +1113,7 @@ impl LanguageState {
     }
 }
 
-impl LanguageState {
+impl ServerState {
     /// Restart the primary server.
     pub fn restart_primary(&mut self) -> Result<ProjectInsId> {
         let entry = self.entry_resolver().resolve_default();
@@ -1156,7 +1156,7 @@ impl LanguageState {
     pub fn server(
         config: &Config,
         editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
-        client: TypedLspClient<LanguageState>,
+        client: TypedLspClient<ServerState>,
         diag_group: String,
         entry: EntryState,
         inputs: ImmutDict,
@@ -1287,7 +1287,7 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     }
 }
 
-impl LanguageState {
+impl ServerState {
     fn update_source(&mut self, files: FileChangeSet) -> Result<()> {
         self.add_memory_changes(MemoryEvent::Update(files.clone()));
 
@@ -1299,12 +1299,8 @@ impl LanguageState {
         let path: ImmutPath = path.into();
 
         log::info!("create source: {path:?}");
-        self.memory_changes.insert(
-            path.clone(),
-            MemoryFileMeta {
-                content: Source::detached(content.clone()),
-            },
-        );
+        self.memory_changes
+            .insert(path.clone(), Source::detached(content.clone()));
 
         let content: Bytes = content.as_bytes().into();
 
@@ -1336,7 +1332,7 @@ impl LanguageState {
     ) -> Result<()> {
         let path: ImmutPath = path.into();
 
-        let meta = self
+        let source = self
             .memory_changes
             .get_mut(&path)
             .ok_or_else(|| error_once!("file missing", path: path.display()))?;
@@ -1345,17 +1341,17 @@ impl LanguageState {
             let replacement = change.text;
             match change.range {
                 Some(lsp_range) => {
-                    let range = to_typst_range(lsp_range, position_encoding, &meta.content)
+                    let range = to_typst_range(lsp_range, position_encoding, source)
                         .expect("invalid range");
-                    meta.content.edit(range, &replacement);
+                    source.edit(range, &replacement);
                 }
                 None => {
-                    meta.content.replace(&replacement);
+                    source.replace(&replacement);
                 }
             }
         }
 
-        let snapshot = FileResult::Ok(meta.content.text().as_bytes().into()).into();
+        let snapshot = FileResult::Ok(source.text().as_bytes().into()).into();
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
 
@@ -1370,7 +1366,7 @@ impl LanguageState {
     ) -> Result<T> {
         let snapshot = self.memory_changes.get(&path);
         let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
-        let source = snapshot.content.clone();
+        let source = snapshot.clone();
         f(source)
     }
 }
@@ -1387,7 +1383,7 @@ macro_rules! query_source {
     }};
 }
 
-impl LanguageState {
+impl ServerState {
     /// Perform a language query.
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
@@ -1469,13 +1465,6 @@ impl LanguageState {
             }
         })
     }
-}
-
-/// Metadata for a source file.
-#[derive(Debug, Clone)]
-pub struct MemoryFileMeta {
-    /// The content of the file.
-    pub content: Source,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -14,7 +14,7 @@ use sync_lsp::{just_future, LspClient, SchedulableResponse};
 use tinymist_project::LspWorld;
 use typst::{syntax::Span, World};
 
-use crate::{internal_error, LanguageState};
+use crate::{internal_error, ServerState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,7 +44,7 @@ impl UserActionTask {
     /// Run a trace request in subprocess.
     pub async fn trace_main(
         client: LspClient,
-        state: &mut LanguageState,
+        state: &mut ServerState,
         w: &LspWorld,
         rpc_kind: String,
         req_id: RequestId,
@@ -158,7 +158,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
 
 async fn trace_main(
     client: LspClient,
-    state: &mut LanguageState,
+    state: &mut ServerState,
     w: &LspWorld,
     rpc_kind: String,
     req_id: RequestId,

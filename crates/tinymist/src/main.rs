@@ -25,7 +25,7 @@ use sync_lsp::{
 };
 use tinymist::{
     tool::project::{project_main, task_main},
-    CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask,
+    CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask,
 };
 use tinymist::{world::TaskInputs, world::WorldProvider};
 use tinymist_core::LONG_VERSION;
@@ -161,7 +161,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        LanguageState::install(LspBuilder::new(
+        ServerState::install(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
@@ -220,7 +220,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
             ..Config::default()
         };
 
-        let mut service = LanguageState::install(LspBuilder::new(
+        let mut service = ServerState::install(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
@@ -284,7 +284,7 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
         // todo: roots, inputs, font_opts
         let config = Config::default();
 
-        let mut service = LanguageState::install(LspBuilder::new(
+        let mut service = ServerState::install(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
