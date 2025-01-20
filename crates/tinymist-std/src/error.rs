@@ -1,6 +1,6 @@
 use core::fmt;
 
-use ecow::{eco_format, EcoString};
+use ecow::EcoString;
 use serde::{Deserialize, Serialize};
 
 use crate::debug_loc::CharRange;
@@ -160,7 +160,7 @@ impl std::error::Error for Error {}
 #[cfg(feature = "web")]
 impl ErrKindExt for wasm_bindgen::JsValue {
     fn to_error_kind(self) -> ErrKind {
-        ErrKind::Msg(eco_format!("{self:?}"))
+        ErrKind::Msg(ecow::eco_format!("{self:?}"))
     }
 }
 
