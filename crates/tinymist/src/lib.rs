@@ -23,6 +23,7 @@ mod cmd;
 mod init;
 pub mod project;
 mod resource;
+mod route;
 mod server;
 mod stats;
 mod task;

@@ -23,6 +23,7 @@ impl LockFileExt for LockFile {
             .root
             .as_ref()
             .map(|root| ResourcePath::from_user_sys(Path::new(root)));
+        let main = ResourcePath::from_user_sys(Path::new(&args.id.input));
 
         let font_paths = args
             .font
@@ -46,6 +47,7 @@ impl LockFileExt for LockFile {
         let input = ProjectInput {
             id: id.clone(),
             root,
+            main: Some(main),
             font_paths,
             system_fonts: !args.font.ignore_system_fonts,
             package_path,
@@ -106,7 +108,7 @@ impl LockFileExt for LockFile {
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
                 export,
-                ppi: args.ppi,
+                ppi: args.ppi.try_into().unwrap(),
             }),
             OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
             OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),

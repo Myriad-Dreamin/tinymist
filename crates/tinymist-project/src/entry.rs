@@ -67,11 +67,20 @@ impl EntryResolver {
 
     /// Resolves the entry state.
     pub fn resolve(&self, entry: Option<ImmutPath>) -> EntryState {
+        let root_dir = self.root(entry.as_ref());
+        self.resolve_with_root(root_dir, entry)
+    }
+
+    /// Resolves the entry state.
+    pub fn resolve_with_root(
+        &self,
+        root_dir: Option<ImmutPath>,
+        entry: Option<ImmutPath>,
+    ) -> EntryState {
         // todo: formalize untitled path
         // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
         // let root_dir = self.determine_root(if is_untitled { None } else {
         // entry.as_ref() });
-        let root_dir = self.root(entry.as_ref());
 
         let entry = match (entry, root_dir) {
             // (Some(entry), Some(root)) if is_untitled => Some(EntryState::new_rooted(

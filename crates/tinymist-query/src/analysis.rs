@@ -24,6 +24,7 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
+use tinymist_std::ImmutPath;
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::WorldDeps;
 use typst::syntax::Source;
@@ -76,6 +77,10 @@ pub trait LspWorldExt {
     /// Get all depended file ids of a compilation, inclusively.
     /// Note: must be called after compilation.
     fn depended_files(&self) -> EcoVec<FileId>;
+
+    /// Get all depended paths in file system of a compilation, inclusively.
+    /// Note: must be called after compilation.
+    fn depended_fs_paths(&self) -> EcoVec<ImmutPath>;
 }
 
 impl LspWorldExt for tinymist_project::LspWorld {
@@ -106,6 +111,16 @@ impl LspWorldExt for tinymist_project::LspWorld {
         let mut deps = EcoVec::new();
         self.iter_dependencies(&mut |file_id| {
             deps.push(file_id);
+        });
+        deps
+    }
+
+    fn depended_fs_paths(&self) -> EcoVec<ImmutPath> {
+        let mut deps = EcoVec::new();
+        self.iter_dependencies(&mut |file_id| {
+            if let Ok(path) = self.path_for_id(file_id) {
+                deps.push(path.as_path().into());
+            }
         });
         deps
     }
