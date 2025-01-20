@@ -141,11 +141,13 @@ pub struct TaskCompileArgs {
     #[arg(long = "ppi", default_value_t = 144.0)]
     pub ppi: f32,
 
+    /// The output format.
     #[clap(skip)]
     pub output_format: OnceLock<Result<OutputFormat>>,
 }
 
 impl TaskCompileArgs {
+    /// Convert the arguments to a project task.
     pub fn to_task(self, doc_id: Id) -> Result<ProjectTask> {
         let new_task_id = self.task_name.map(Id::new);
         let task_id = new_task_id.unwrap_or(doc_id.clone());

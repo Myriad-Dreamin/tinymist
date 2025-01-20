@@ -10,7 +10,7 @@ use ecow::EcoVec;
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::prelude::*;
 use tinymist_std::path::unix_slash;
-use tinymist_std::ImmutPath;
+use tinymist_std::{bail, ImmutPath};
 use tinymist_world::EntryReader;
 use typst::diag::EcoString;
 use typst::syntax::FileId;
@@ -19,6 +19,9 @@ pub mod task;
 pub use task::*;
 
 use crate::LspWorld;
+
+/// The currently using lock file version.
+pub const LOCK_VERSION: &str = "0.1.0-beta0";
 
 /// A scalar that is not NaN.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -68,10 +71,12 @@ impl Ord for Scalar {
 pub struct Id(String);
 
 impl Id {
+    /// Creates a new project Id.
     pub fn new(s: String) -> Self {
         Id(s)
     }
 
+    /// Creates a new project Id from a world.
     pub fn from_world(world: &LspWorld) -> Option<Self> {
         let entry = world.entry_state();
         let id = unix_slash(entry.main()?.vpath().as_rootless_path());
@@ -299,6 +304,7 @@ impl<'de> serde::Deserialize<'de> for ResourcePath {
 }
 
 impl ResourcePath {
+    /// Creates a new resource path from a user passing system path.
     pub fn from_user_sys(inp: &Path) -> Self {
         let rel = if inp.is_relative() {
             inp.to_path_buf()
@@ -309,7 +315,7 @@ impl ResourcePath {
         let rel = unix_slash(&rel);
         ResourcePath("file".into(), rel.to_string())
     }
-
+    /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
         let package = id.package();
         match package {
@@ -323,7 +329,7 @@ impl ResourcePath {
             ),
         }
     }
-
+    /// Converts the resource path to an absolute file system path.
     pub fn to_abs_path(&self, rel: &Path) -> Option<PathBuf> {
         if self.0 == "file" {
             let path = Path::new(&self.1);
@@ -336,6 +342,60 @@ impl ResourcePath {
             None
         }
     }
+}
+
+/// A lock file compatibility wrapper.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "version")]
+pub enum LockFileCompat {
+    /// The lock file schema with version 0.1.0-beta0.
+    #[serde(rename = "0.1.0-beta0")]
+    Version010Beta0(LockFile),
+    /// Other lock file schema.
+    #[serde(untagged)]
+    Other(serde_json::Value),
+}
+
+impl LockFileCompat {
+    /// Returns the lock file version.
+    pub fn version(&self) -> Result<&str> {
+        match self {
+            LockFileCompat::Version010Beta0(..) => Ok(LOCK_VERSION),
+            LockFileCompat::Other(v) => v
+                .get("version")
+                .and_then(|v| v.as_str())
+                .context("missing version field"),
+        }
+    }
+
+    /// Migrates the lock file to the current version.
+    pub fn migrate(self) -> Result<LockFile> {
+        match self {
+            LockFileCompat::Version010Beta0(v) => Ok(v),
+            this @ LockFileCompat::Other(..) => {
+                bail!(
+                    "cannot migrate from version: {}",
+                    this.version().unwrap_or("unknown version")
+                )
+            }
+        }
+    }
+}
+
+/// A lock file storing project information.
+#[derive(Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct LockFile {
+    // The lock file version.
+    // version: String,
+    /// The project's document (input).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub document: Vec<ProjectInput>,
+    /// The project's task (output).
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub task: Vec<ProjectTask>,
+    /// The project's task route.
+    #[serde(skip_serializing_if = "EcoVec::is_empty", default)]
+    pub route: EcoVec<ProjectRoute>,
 }
 
 /// A project input specifier.
@@ -389,6 +449,8 @@ pub struct ProjectPathMaterial {
 }
 
 impl ProjectPathMaterial {
+    /// Creates a new project path material from a document ID and a list of
+    /// files.
     pub fn from_deps(doc_id: Id, files: EcoVec<ImmutPath>) -> Self {
         let mut files: Vec<_> = files.into_iter().map(|p| p.as_ref().to_owned()).collect();
         files.sort();

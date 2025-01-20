@@ -23,7 +23,7 @@ use sync_lsp::*;
 use task::{
     ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
 };
-use tinymist_project::{CompileSnapshot, EntryResolver, ProjectInsId, ProjectResolutionKind};
+use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId, ProjectResolutionKind};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
     to_typst_range, CompilerQueryRequest, CompilerQueryResponse, ExportKind, FoldRequestFeature,
@@ -1063,7 +1063,7 @@ impl LanguageState {
         let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
-            |snap: CompileSnapshot<LspCompilerFeat>| async move {
+            |snap: LspCompileSnapshot| async move {
                 let mut updater = update_lock(lock_dir);
                 let world = snap.world.clone();
                 let doc_id = updater.compiled(&world)?;

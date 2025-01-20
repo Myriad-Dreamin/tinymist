@@ -1,3 +1,5 @@
+//! Project task models.
+
 use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};

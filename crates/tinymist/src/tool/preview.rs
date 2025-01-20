@@ -32,10 +32,9 @@ use typst_preview::{
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
-    CompileHandlerImpl, CompileServerOpts, CompiledArtifact, LspInterrupt, ProjectClient,
+    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, ProjectClient,
     ProjectCompiler,
 };
-use crate::world::LspCompilerFeat;
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
@@ -44,7 +43,7 @@ use project::{watch_deps, LspPreviewState};
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
     /// The artifact and snap.
-    pub snap: CompiledArtifact<LspCompilerFeat>,
+    pub snap: LspCompiledArtifact,
 }
 
 impl typst_preview::CompileView for PreviewCompileView {

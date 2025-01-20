@@ -26,9 +26,9 @@ use crate::font::TinymistFontResolver;
 /// Compiler feature for LSP universe and worlds without typst.ts to implement
 /// more for tinymist. type trait of [`CompilerUniverse`].
 #[derive(Debug, Clone, Copy)]
-pub struct SystemCompilerFeatExtend;
+pub struct LspCompilerFeat;
 
-impl CompilerFeat for SystemCompilerFeatExtend {
+impl CompilerFeat for LspCompilerFeat {
     /// Uses [`TinymistFontResolver`] directly.
     type FontResolver = TinymistFontResolver;
     /// It accesses a physical file system.
@@ -37,11 +37,14 @@ impl CompilerFeat for SystemCompilerFeatExtend {
     type Registry = HttpRegistry;
 }
 
-/// The compiler universe in system environment.
-pub type TypstSystemUniverseExtend = CompilerUniverse<SystemCompilerFeatExtend>;
-/// The compiler world in system environment.
-pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
+/// LSP universe that spawns LSP worlds.
+pub type LspUniverse = CompilerUniverse<LspCompilerFeat>;
+/// LSP world that holds compilation resources
+pub type LspWorld = CompilerWorld<LspCompilerFeat>;
+/// Immutable prehashed reference to dictionary.
+pub type ImmutDict = Arc<LazyHash<Dict>>;
 
+/// World provider for LSP universe and worlds.
 pub trait WorldProvider {
     /// Get the entry options from the arguments.
     fn entry(&self) -> Result<EntryOpts>;
@@ -110,15 +113,6 @@ impl WorldProvider for CompileOnceArgs {
         ))
     }
 }
-
-/// Compiler feature for LSP universe and worlds.
-pub type LspCompilerFeat = SystemCompilerFeatExtend;
-/// LSP universe that spawns LSP worlds.
-pub type LspUniverse = TypstSystemUniverseExtend;
-/// LSP world.
-pub type LspWorld = TypstSystemWorldExtend;
-/// Immutable prehashed reference to dictionary.
-pub type ImmutDict = Arc<LazyHash<Dict>>;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;

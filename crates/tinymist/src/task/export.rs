@@ -10,7 +10,7 @@ use crate::project::{
 use anyhow::{bail, Context};
 use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
-use tinymist_project::{CompileSnapshot, EntryReader};
+use tinymist_project::{EntryReader, LspCompileSnapshot, LspCompiledArtifact};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -23,9 +23,7 @@ use typst::{
 use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
-use crate::{
-    actor::editor::EditorRequest, tool::word_count, world::LspCompilerFeat, ExportMode, PathPattern,
-};
+use crate::{actor::editor::EditorRequest, tool::word_count, ExportMode, PathPattern};
 
 use super::*;
 
@@ -60,7 +58,7 @@ impl ExportTask {
         self.factory.mutate(|data| data.config = config);
     }
 
-    pub fn signal(&self, snap: &CompiledArtifact<LspCompilerFeat>, s: ExportSignal) {
+    pub fn signal(&self, snap: &LspCompiledArtifact, s: ExportSignal) {
         let task = self.factory.task();
         task.signal(snap, s, self);
     }
@@ -68,7 +66,7 @@ impl ExportTask {
 
 pub struct ExportOnceTask<'a> {
     pub kind: &'a ExportKind,
-    pub artifact: CompiledArtifact<LspCompilerFeat>,
+    pub artifact: LspCompiledArtifact,
     pub lock_path: Option<ImmutPath>,
 }
 
@@ -82,19 +80,14 @@ pub struct ExportConfig {
 }
 
 impl ExportConfig {
-    fn signal(
-        self: Arc<Self>,
-        snap: &CompiledArtifact<LspCompilerFeat>,
-        s: ExportSignal,
-        t: &ExportTask,
-    ) {
+    fn signal(self: Arc<Self>, snap: &LspCompiledArtifact, s: ExportSignal, t: &ExportTask) {
         self.signal_export(snap, s, t);
         self.signal_count_word(snap, t);
     }
 
     fn signal_export(
         self: &Arc<Self>,
-        artifact: &CompiledArtifact<LspCompilerFeat>,
+        artifact: &LspCompiledArtifact,
         s: ExportSignal,
         t: &ExportTask,
     ) -> Option<()> {
@@ -134,11 +127,7 @@ impl ExportConfig {
         Some(())
     }
 
-    fn signal_count_word(
-        &self,
-        artifact: &CompiledArtifact<LspCompilerFeat>,
-        t: &ExportTask,
-    ) -> Option<()> {
+    fn signal_count_word(&self, artifact: &LspCompiledArtifact, t: &ExportTask) -> Option<()> {
         if !self.count_words {
             return None;
         }
@@ -393,7 +382,7 @@ impl ExportConfig {
 
     pub async fn oneshot(
         &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
+        snap: LspCompileSnapshot,
         kind: ExportKind,
         lock_path: Option<ImmutPath>,
     ) -> anyhow::Result<Option<PathBuf>> {

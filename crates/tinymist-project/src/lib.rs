@@ -1,7 +1,5 @@
 //! Project Model for tinymist
 
-#![allow(missing_docs)]
-
 mod args;
 mod compiler;
 mod entry;

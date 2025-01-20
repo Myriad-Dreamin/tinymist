@@ -82,7 +82,7 @@ impl LspPreviewState {
 #[derive(Default)]
 pub struct ProjectStateExt {
     pub is_compiling: bool,
-    pub last_compilation: Option<CompiledArtifact<LspCompilerFeat>>,
+    pub last_compilation: Option<LspCompiledArtifact>,
 }
 
 /// LSP project compiler.
@@ -309,7 +309,7 @@ impl CompileHandler<LspCompilerFeat, ProjectStateExt> for CompileHandlerImpl {
         }
     }
 
-    fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, rep: CompileReport) {
+    fn notify_compile(&self, snap: &LspCompiledArtifact, rep: CompileReport) {
         // todo: we need to manage the revision for fn status() as well
         {
             let mut n_rev = self.notified_revision.lock();
@@ -361,12 +361,12 @@ pub struct QuerySnapWithStat {
 }
 
 pub struct WorldSnapFut {
-    rx: oneshot::Receiver<CompileSnapshot<LspCompilerFeat>>,
+    rx: oneshot::Receiver<LspCompileSnapshot>,
 }
 
 impl WorldSnapFut {
     /// wait for the snapshot to be ready
-    pub async fn receive(self) -> Result<CompileSnapshot<LspCompilerFeat>> {
+    pub async fn receive(self) -> Result<LspCompileSnapshot> {
         self.rx
             .await
             .map_err(map_string_err("failed to get snapshot"))
@@ -392,13 +392,13 @@ impl QuerySnapFut {
 }
 
 pub struct QuerySnap {
-    pub snap: CompileSnapshot<LspCompilerFeat>,
+    pub snap: LspCompileSnapshot,
     analysis: Arc<Analysis>,
     rev_lock: AnalysisRevLock,
 }
 
 impl std::ops::Deref for QuerySnap {
-    type Target = CompileSnapshot<LspCompilerFeat>;
+    type Target = LspCompileSnapshot;
 
     fn deref(&self) -> &Self::Target {
         &self.snap

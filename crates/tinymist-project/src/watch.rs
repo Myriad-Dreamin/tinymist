@@ -513,6 +513,7 @@ fn log_send_error<T>(chan: &'static str, res: Result<(), mpsc::error::SendError<
         .is_ok()
 }
 
+/// Watches on a set of *files*.
 pub async fn watch_deps(
     inbox: mpsc::UnboundedReceiver<NotifyMessage>,
     interrupted_by_events: impl FnMut(FilesystemEvent) + Send + Sync + 'static,

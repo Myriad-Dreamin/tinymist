@@ -1,8 +1,4 @@
-//! Project Model for tinymist
-//!
-//! The [`ProjectCompiler`] implementation borrowed from typst.ts.
-//!
-//! Please check `tinymist::actor::typ_client` for architecture details.
+//! Project compiler for tinymist.
 
 use core::fmt;
 use std::collections::HashSet;
@@ -25,9 +21,15 @@ use typst::diag::{SourceDiagnostic, SourceResult};
 
 use crate::LspCompilerFeat;
 
+/// LSP compile snapshot.
+pub type LspCompileSnapshot = CompileSnapshot<LspCompilerFeat>;
+/// LSP compiled artifact.
+pub type LspCompiledArtifact = CompiledArtifact<LspCompilerFeat>;
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 
+/// Project instance id. This is slightly different from the project ids that
+/// persist in disk.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct ProjectInsId(EcoString);
 
@@ -45,6 +47,7 @@ pub struct ExportSignal {
     pub by_entry_update: bool,
 }
 
+/// A snapshot of the project and compilation state.
 pub struct CompileSnapshot<F: CompilerFeat> {
     /// The project id.
     pub id: ProjectInsId,
@@ -59,6 +62,11 @@ pub struct CompileSnapshot<F: CompilerFeat> {
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
+    /// Forks a new snapshot that compiles a different document.
+    ///
+    /// Note: the resulting document should not be shared in system, because we
+    /// generally believe that the document is revisioned, but temporary
+    /// tasks break this assumption.
     pub fn task(mut self, inputs: TaskInputs) -> Self {
         'check_changed: {
             if let Some(entry) = &inputs.entry {
@@ -80,6 +88,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         self
     }
 
+    /// Runs the compiler and returns the compiled document.
     pub fn compile(self) -> CompiledArtifact<F> {
         let mut snap = self;
         snap.world.set_is_compiling(true);
@@ -110,6 +119,7 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
     }
 }
 
+/// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
     /// The used snapshot.
     pub snap: CompileSnapshot<F>,
@@ -141,6 +151,7 @@ impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
 }
 
 impl<F: CompilerFeat> CompiledArtifact<F> {
+    /// Returns the last successfully compiled document.
     pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
         self.doc
             .as_ref()
@@ -149,6 +160,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             .or_else(|| self.snap.success_doc.clone())
     }
 
+    /// Returns the depended files.
     pub fn depended_files(&self) -> &EcoVec<FileId> {
         self.deps.get_or_init(|| {
             let mut deps = EcoVec::default();
@@ -161,10 +173,15 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 }
 
+/// A project compiler handler.
 pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
+    /// Called when there is any reason to compile. This doesn't mean that the
+    /// project should be compiled.
     fn on_any_compile_reason(&self, state: &mut ProjectCompiler<F, Ext>);
     // todo: notify project specific compile
+    /// Called when a compilation is done.
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
+    /// Called when the compilation status is changed.
     fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport);
 }
 
@@ -179,6 +196,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
     fn status(&self, _revision: usize, _id: &ProjectInsId, _rep: CompileReport) {}
 }
 
+/// An interrupt to the compiler.
 pub enum Interrupt<F: CompilerFeat> {
     /// Compile anyway.
     Compile(ProjectInsId),
@@ -212,6 +230,7 @@ impl fmt::Debug for Interrupt<LspCompilerFeat> {
     }
 }
 
+/// An accumulated compile reason stored in the project state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CompileReasons {
     /// The snapshot is taken by the memory editing events.
@@ -235,6 +254,7 @@ impl CompileReasons {
         self.by_memory_events || self.by_fs_events || self.by_entry_update
     }
 
+    /// Exclude some reasons.
     pub fn exclude(&self, excluded: Self) -> Self {
         Self {
             by_memory_events: self.by_memory_events && !excluded.by_memory_events,
@@ -277,9 +297,13 @@ struct TaggedMemoryEvent {
     event: MemoryEvent,
 }
 
+/// The compiler server options.
 pub struct CompileServerOpts<F: CompilerFeat, Ext> {
+    /// The compilation handler.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
+    /// The feature set.
     pub feature_set: FeatureSet,
+    /// Whether to enable file system watching.
     pub enable_watch: bool,
 }
 
@@ -316,7 +340,7 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCompiler<F, Ext> {
-    /// Create a compiler with options
+    /// Creates a compiler with options
     pub fn new(
         verse: CompilerUniverse<F>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
@@ -348,6 +372,22 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
     }
 
+    /// Creates a snapshot of the primary project.
+    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+        self.primary.snapshot()
+    }
+
+    /// Compiles the document once.
+    pub fn compile_once(&mut self) -> CompiledArtifact<F> {
+        let snap = self.primary.make_snapshot(true);
+        ProjectState::run_compile(self.handler.clone(), snap)()
+    }
+
+    /// Gets the iterator of all projects.
+    pub fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
+        std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut())
+    }
+
     fn create_project(
         id: ProjectInsId,
         verse: CompilerUniverse<F>,
@@ -376,65 +416,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
     }
 
-    pub fn process(&mut self, intr: Interrupt<F>) {
-        // todo: evcit cache
-        self.process_inner(intr);
-        // Customized Project Compilation Handler
-        self.handler.clone().on_any_compile_reason(self);
-    }
-
-    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
-        self.primary.snapshot()
-    }
-
-    /// Compile the document once.
-    pub fn compile_once(&mut self) -> CompiledArtifact<F> {
-        let snap = self.primary.make_snapshot(true);
-        ProjectState::run_compile(self.handler.clone(), snap)()
-    }
-
-    /// Apply delayed memory changes to underlying compiler.
-    fn apply_delayed_memory_changes(
-        verse: &mut RevisingVfs<'_, F::AccessModel>,
-        dirty_shadow_logical_tick: &mut usize,
-        event: &Option<UpstreamUpdateEvent>,
-    ) -> Option<()> {
-        // Handle delayed upstream update event before applying file system changes
-        if let Some(event) = event {
-            let TaggedMemoryEvent {
-                logical_tick,
-                event,
-            } = event.opaque.as_ref().downcast_ref()?;
-
-            // Recovery from dirty shadow state.
-            if logical_tick == dirty_shadow_logical_tick {
-                *dirty_shadow_logical_tick = 0;
-            }
-
-            Self::apply_memory_changes(verse, event.clone());
-        }
-
-        Some(())
-    }
-
-    /// Apply memory changes to underlying compiler.
-    fn apply_memory_changes(vfs: &mut RevisingVfs<'_, F::AccessModel>, event: MemoryEvent) {
-        if matches!(event, MemoryEvent::Sync(..)) {
-            vfs.reset_shadow();
-        }
-        match event {
-            MemoryEvent::Update(event) | MemoryEvent::Sync(event) => {
-                for path in event.removes {
-                    let _ = vfs.unmap_shadow(&path);
-                }
-                for (path, snap) in event.inserts {
-                    let _ = vfs.map_shadow(&path, snap);
-                }
-            }
-        }
-    }
-
-    fn find_project<'a>(
+    /// Find a project by id, but with less borrow checker restriction.
+    pub fn find_project<'a>(
         primary: &'a mut ProjectState<F, Ext>,
         dedicates: &'a mut [ProjectState<F, Ext>],
         id: &ProjectInsId,
@@ -446,8 +429,48 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dedicates.iter_mut().find(|e| e.id == *id).unwrap()
     }
 
-    pub fn projects(&mut self) -> impl Iterator<Item = &mut ProjectState<F, Ext>> {
-        std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut())
+    /// Restart a dedicate project.
+    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> Result<ProjectInsId> {
+        let id = ProjectInsId(group.into());
+
+        let verse = CompilerUniverse::<F>::new_raw(
+            entry,
+            Some(self.primary.verse.inputs().clone()),
+            self.primary.verse.vfs().fork(),
+            self.primary.verse.registry.clone(),
+            self.primary.verse.font_resolver.clone(),
+        );
+
+        let proj = Self::create_project(
+            id.clone(),
+            verse,
+            self.handler.clone(),
+            self.dep_tx.clone(),
+            self.primary.once_feature_set.as_ref().to_owned(),
+        );
+
+        self.remove_dedicates(&id);
+        self.dedicates.push(proj);
+
+        Ok(id)
+    }
+
+    fn remove_dedicates(&mut self, id: &ProjectInsId) {
+        let proj = self.dedicates.iter().position(|e| e.id == *id);
+        if let Some(idx) = proj {
+            let _proj = self.dedicates.remove(idx);
+            // todo: kill compilations
+        } else {
+            log::warn!("ProjectCompiler: settle project not found {id:?}");
+        }
+    }
+
+    /// Process an interrupt.
+    pub fn process(&mut self, intr: Interrupt<F>) {
+        // todo: evcit cache
+        self.process_inner(intr);
+        // Customized Project Compilation Handler
+        self.handler.clone().on_any_compile_reason(self);
     }
 
     fn process_inner(&mut self, intr: Interrupt<F>) {
@@ -600,43 +623,51 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
     }
 
-    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> Result<ProjectInsId> {
-        let id = ProjectInsId(group.into());
+    /// Apply delayed memory changes to underlying compiler.
+    fn apply_delayed_memory_changes(
+        verse: &mut RevisingVfs<'_, F::AccessModel>,
+        dirty_shadow_logical_tick: &mut usize,
+        event: &Option<UpstreamUpdateEvent>,
+    ) -> Option<()> {
+        // Handle delayed upstream update event before applying file system changes
+        if let Some(event) = event {
+            let TaggedMemoryEvent {
+                logical_tick,
+                event,
+            } = event.opaque.as_ref().downcast_ref()?;
 
-        let verse = CompilerUniverse::<F>::new_raw(
-            entry,
-            Some(self.primary.verse.inputs().clone()),
-            self.primary.verse.vfs().fork(),
-            self.primary.verse.registry.clone(),
-            self.primary.verse.font_resolver.clone(),
-        );
+            // Recovery from dirty shadow state.
+            if logical_tick == dirty_shadow_logical_tick {
+                *dirty_shadow_logical_tick = 0;
+            }
 
-        let proj = Self::create_project(
-            id.clone(),
-            verse,
-            self.handler.clone(),
-            self.dep_tx.clone(),
-            self.primary.once_feature_set.as_ref().to_owned(),
-        );
+            Self::apply_memory_changes(verse, event.clone());
+        }
 
-        self.remove_dedicates(&id);
-        self.dedicates.push(proj);
-
-        Ok(id)
+        Some(())
     }
 
-    fn remove_dedicates(&mut self, id: &ProjectInsId) {
-        let proj = self.dedicates.iter().position(|e| e.id == *id);
-        if let Some(idx) = proj {
-            let _proj = self.dedicates.remove(idx);
-            // todo: kill compilations
-        } else {
-            log::warn!("ProjectCompiler: settle project not found {id:?}");
+    /// Apply memory changes to underlying compiler.
+    fn apply_memory_changes(vfs: &mut RevisingVfs<'_, F::AccessModel>, event: MemoryEvent) {
+        if matches!(event, MemoryEvent::Sync(..)) {
+            vfs.reset_shadow();
+        }
+        match event {
+            MemoryEvent::Update(event) | MemoryEvent::Sync(event) => {
+                for path in event.removes {
+                    let _ = vfs.unmap_shadow(&path);
+                }
+                for (path, snap) in event.inserts {
+                    let _ = vfs.map_shadow(&path, snap);
+                }
+            }
         }
     }
 }
 
+/// A project state.
 pub struct ProjectState<F: CompilerFeat, Ext> {
+    /// The project instance id.
     pub id: ProjectInsId,
     /// The extension
     pub ext: Ext,
@@ -666,10 +697,12 @@ pub struct ProjectState<F: CompilerFeat, Ext> {
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
+    /// Creates a new compile environment.
     pub fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
         CompileEnv::default().configure_shared(feature_set)
     }
 
+    /// Creates a snapshot of the project.
     pub fn snapshot(&mut self) -> CompileSnapshot<F> {
         match self.snapshot.as_ref() {
             Some(snap) if snap.world.revision() == self.verse.revision => snap.clone(),
@@ -701,52 +734,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
         }
     }
 
-    fn process_compile(&mut self, artifact: CompiledArtifact<F>) {
-        let world = &artifact.snap.world;
-        let compiled_revision = world.revision().get();
-        if self.committed_revision >= compiled_revision {
-            return;
-        }
-
-        // Update state.
-        let doc = artifact.doc.ok();
-        self.committed_revision = compiled_revision;
-        self.latest_doc.clone_from(&doc);
-        if doc.is_some() {
-            self.latest_success_doc.clone_from(&self.latest_doc);
-        }
-
-        // Notify the new file dependencies.
-        let mut deps = vec![];
-        world.iter_dependencies(&mut |dep| {
-            if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
-                deps.push(x.into())
-            }
-        });
-        let event = NotifyMessage::SyncDependency(deps);
-        let err = self.dep_tx.send(event);
-        log_send_error("dep_tx", err);
-
-        let mut world = artifact.snap.world;
-
-        let is_primary = self.id == ProjectInsId("primary".into());
-
-        // Trigger an evict task.
-        rayon::spawn(move || {
-            let evict_start = std::time::Instant::now();
-            if is_primary {
-                comemo::evict(10);
-
-                // Since all the projects share the same cache, we need to evict the cache
-                // on the primary instance for all the projects.
-                world.evict_source_cache(30);
-            }
-            world.evict_vfs(60);
-            let elapsed = evict_start.elapsed();
-            log::info!("ProjectCompiler: evict cache in {elapsed:?}");
-        });
-    }
-
+    /// Compile the document once if there is any reason and the entry is
+    /// active.
     #[must_use]
     pub fn may_compile(
         &mut self,
@@ -794,6 +783,52 @@ impl<F: CompilerFeat, Ext: 'static> ProjectState<F, Ext> {
 
             compiled
         }
+    }
+
+    fn process_compile(&mut self, artifact: CompiledArtifact<F>) {
+        let world = &artifact.snap.world;
+        let compiled_revision = world.revision().get();
+        if self.committed_revision >= compiled_revision {
+            return;
+        }
+
+        // Update state.
+        let doc = artifact.doc.ok();
+        self.committed_revision = compiled_revision;
+        self.latest_doc.clone_from(&doc);
+        if doc.is_some() {
+            self.latest_success_doc.clone_from(&self.latest_doc);
+        }
+
+        // Notify the new file dependencies.
+        let mut deps = vec![];
+        world.iter_dependencies(&mut |dep| {
+            if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
+                deps.push(x.into())
+            }
+        });
+        let event = NotifyMessage::SyncDependency(deps);
+        let err = self.dep_tx.send(event);
+        log_send_error("dep_tx", err);
+
+        let mut world = artifact.snap.world;
+
+        let is_primary = self.id == ProjectInsId("primary".into());
+
+        // Trigger an evict task.
+        rayon::spawn(move || {
+            let evict_start = std::time::Instant::now();
+            if is_primary {
+                comemo::evict(10);
+
+                // Since all the projects share the same cache, we need to evict the cache
+                // on the primary instance for all the projects.
+                world.evict_source_cache(30);
+            }
+            world.evict_vfs(60);
+            let elapsed = evict_start.elapsed();
+            log::info!("ProjectCompiler: evict cache in {elapsed:?}");
+        });
     }
 }
 

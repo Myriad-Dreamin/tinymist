@@ -1,5 +1,6 @@
+#![allow(missing_docs)]
+
 use std::cmp::Ordering;
-use std::hash::Hash;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::{path::Path, sync::Arc};
 
@@ -11,61 +12,11 @@ use typst::diag::EcoString;
 use typst::World;
 
 use crate::model::{Id, ProjectInput, ProjectRoute, ProjectTask, ResourcePath};
-use crate::{LspWorld, ProjectPathMaterial};
+use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_VERSION};
 
 pub const LOCK_FILENAME: &str = "tinymist.lock";
 
-const LOCK_VERSION: &str = "0.1.0-beta0";
-
 pub const PROJECT_ROUTE_USER_ACTION_PRIORITY: u32 = 256;
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "kebab-case", tag = "version")]
-pub enum LockFileCompat {
-    #[serde(rename = "0.1.0-beta0")]
-    Version010Beta0(LockFile),
-    #[serde(untagged)]
-    Other(serde_json::Value),
-}
-
-impl LockFileCompat {
-    pub fn version(&self) -> Result<&str> {
-        match self {
-            LockFileCompat::Version010Beta0(..) => Ok(LOCK_VERSION),
-            LockFileCompat::Other(v) => v
-                .get("version")
-                .and_then(|v| v.as_str())
-                .context("missing version field"),
-        }
-    }
-
-    pub fn migrate(self) -> Result<LockFile> {
-        match self {
-            LockFileCompat::Version010Beta0(v) => Ok(v),
-            this @ LockFileCompat::Other(..) => {
-                bail!(
-                    "cannot migrate from version: {}",
-                    this.version().unwrap_or("unknown version")
-                )
-            }
-        }
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct LockFile {
-    // The lock file version.
-    // version: String,
-    /// The project's document (input).
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub document: Vec<ProjectInput>,
-    /// The project's task (output).
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub task: Vec<ProjectTask>,
-    /// The project's task route.
-    #[serde(skip_serializing_if = "EcoVec::is_empty", default)]
-    pub route: EcoVec<ProjectRoute>,
-}
 
 impl LockFile {
     pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {

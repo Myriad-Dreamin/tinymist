@@ -108,6 +108,7 @@ impl EntryResolver {
         })
     }
 
+    /// Resolves the directory to store the lock file.
     pub fn resolve_lock(&self, entry: &EntryState) -> Option<ImmutPath> {
         match self.project_resolution {
             ProjectResolutionKind::LockDatabase if entry.is_in_package() => {
@@ -124,7 +125,7 @@ impl EntryResolver {
         }
     }
 
-    /// Determines the default entry path.
+    /// Resolves the default entry path.
     pub fn resolve_default(&self) -> Option<ImmutPath> {
         let entry = self.entry.as_ref();
         // todo: pre-compute this when updating config
