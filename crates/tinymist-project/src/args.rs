@@ -182,25 +182,29 @@ impl TaskCompileArgs {
         }
 
         let export = ExportTask {
-            document: doc_id,
-            id: task_id.clone(),
             when,
             transform: transforms,
         };
 
-        Ok(match output_format {
-            OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
+        let config = match output_format {
+            OutputFormat::Pdf => ProjectTaskConfig::ExportPdf(ExportPdfTask {
                 export,
                 pdf_standards: self.pdf_standard.clone(),
                 creation_timestamp: None,
             }),
-            OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
+            OutputFormat::Png => ProjectTaskConfig::ExportPng(ExportPngTask {
                 export,
                 ppi: self.ppi.try_into().unwrap(),
                 fill: None,
             }),
-            OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
-            OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
+            OutputFormat::Svg => ProjectTaskConfig::ExportSvg(ExportSvgTask { export }),
+            OutputFormat::Html => ProjectTaskConfig::ExportSvg(ExportSvgTask { export }),
+        };
+
+        Ok(ProjectTask {
+            id: task_id.clone(),
+            document: doc_id,
+            config,
         })
     }
 }

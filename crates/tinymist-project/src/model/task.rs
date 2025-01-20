@@ -32,7 +32,20 @@ use super::{Id, Pages, PdfStandard, Scalar, TaskWhen};
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type")]
-pub enum ProjectTask {
+pub struct ProjectTask {
+    /// The task's ID.
+    pub id: Id,
+    /// The document's ID.
+    pub document: Id,
+    /// The task's configuration.
+    #[serde(flatten)]
+    pub config: ProjectTaskConfig,
+}
+
+/// A project task configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "type")]
+pub enum ProjectTaskConfig {
     /// A preview task.
     Preview(PreviewTask),
     /// An export PDF task.
@@ -57,32 +70,12 @@ pub enum ProjectTask {
 impl ProjectTask {
     /// Returns the task's ID.
     pub fn doc_id(&self) -> &Id {
-        match self {
-            ProjectTask::Preview(task) => &task.document,
-            ProjectTask::ExportPdf(task) => &task.export.document,
-            ProjectTask::ExportPng(task) => &task.export.document,
-            ProjectTask::ExportSvg(task) => &task.export.document,
-            ProjectTask::ExportHtml(task) => &task.export.document,
-            ProjectTask::ExportMarkdown(task) => &task.export.document,
-            ProjectTask::ExportText(task) => &task.export.document,
-            ProjectTask::Query(task) => &task.export.document,
-            // ProjectTask::Other(_) => return None,
-        }
+        &self.document
     }
 
     /// Returns the document's ID.
     pub fn id(&self) -> &Id {
-        match self {
-            ProjectTask::Preview(task) => &task.id,
-            ProjectTask::ExportPdf(task) => &task.export.id,
-            ProjectTask::ExportPng(task) => &task.export.id,
-            ProjectTask::ExportSvg(task) => &task.export.id,
-            ProjectTask::ExportHtml(task) => &task.export.id,
-            ProjectTask::ExportMarkdown(task) => &task.export.id,
-            ProjectTask::ExportText(task) => &task.export.id,
-            ProjectTask::Query(task) => &task.export.id,
-            // ProjectTask::Other(_) => return None,
-        }
+        &self.id
     }
 }
 
@@ -90,10 +83,6 @@ impl ProjectTask {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct PreviewTask {
-    /// The task's ID.
-    pub id: Id,
-    /// The document's ID.
-    pub document: Id,
     /// When to run the task. See [`TaskWhen`] for more
     /// information.
     pub when: TaskWhen,
@@ -103,15 +92,21 @@ pub struct PreviewTask {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTask {
-    /// The task's ID.
-    pub id: Id,
-    /// The document's ID.
-    pub document: Id,
     /// When to run the task
     pub when: TaskWhen,
     /// The task's transforms.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub transform: Vec<ExportTransform>,
+}
+
+impl ExportTask {
+    /// Creates a new unmounted export task.
+    pub fn new(when: TaskWhen) -> Self {
+        Self {
+            when,
+            transform: Vec::new(),
+        }
+    }
 }
 
 /// A project export transform specifier.

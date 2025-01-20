@@ -79,11 +79,12 @@ impl LockFileExt for LockFile {
             .unwrap_or(doc_id.clone());
 
         let when = args.when.unwrap_or(TaskWhen::OnType);
-        let task = ProjectTask::Preview(PreviewTask {
+        let task = ProjectTaskConfig::Preview(PreviewTask { when });
+        let task = ProjectTask {
             id: task_id.clone(),
             document: doc_id,
-            when,
-        });
+            config: task,
+        };
 
         self.replace_task(task);
 

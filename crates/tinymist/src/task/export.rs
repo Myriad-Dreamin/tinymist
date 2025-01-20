@@ -10,7 +10,7 @@ use crate::project::{
 use anyhow::{bail, Context};
 use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
-use tinymist_project::{EntryReader, LspCompileSnapshot, LspCompiledArtifact};
+use tinymist_project::{EntryReader, LspCompileSnapshot, LspCompiledArtifact, ProjectTaskConfig};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -208,24 +208,22 @@ impl ExportConfig {
             use tinymist_project::ExportTask as ProjectExportTask;
 
             let export = ProjectExportTask {
-                document: doc_id,
-                id: task_id,
                 when,
                 transform: transforms,
             };
 
-            let task = match kind {
+            let config = match kind {
                 Pdf { creation_timestamp } => {
                     let _ = creation_timestamp;
-                    ProjectTask::ExportPdf(ExportPdfTask {
+                    ProjectTaskConfig::ExportPdf(ExportPdfTask {
                         export,
                         pdf_standards: Default::default(),
                         creation_timestamp: None,
                     })
                 }
-                Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
-                Markdown {} => ProjectTask::ExportMarkdown(ExportMarkdownTask { export }),
-                Text {} => ProjectTask::ExportText(ExportTextTask { export }),
+                Html {} => ProjectTaskConfig::ExportHtml(ExportHtmlTask { export }),
+                Markdown {} => ProjectTaskConfig::ExportMarkdown(ExportMarkdownTask { export }),
+                Text {} => ProjectTaskConfig::ExportText(ExportTextTask { export }),
                 Query { .. } => {
                     // todo: ignoring query task.
                     return None;
@@ -243,12 +241,18 @@ impl ExportConfig {
 
                     let ppi = ppi.unwrap_or(144.) as f32;
                     let ppi = ppi.try_into().unwrap();
-                    ProjectTask::ExportPng(ExportPngTask {
+                    ProjectTaskConfig::ExportPng(ExportPngTask {
                         export,
                         ppi,
                         fill: None,
                     })
                 }
+            };
+
+            let task = ProjectTask {
+                id: task_id,
+                document: doc_id,
+                config,
             };
 
             updater.task(task);
