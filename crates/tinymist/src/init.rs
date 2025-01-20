@@ -1070,6 +1070,54 @@ mod tests {
     }
 
     #[test]
+    fn test_entry_by_extra_args() {
+        let simple_config = {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": ["main.typ"]
+            });
+
+            // It should be able to resolve the entry file from the extra arguments.
+            config.update(&update).expect("updated");
+            // Passing it twice doesn't affect the result.
+            config.update(&update).expect("updated");
+            config
+        };
+        {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": ["main.typ", "main.typ"]
+            });
+
+            let err = format!("{}", config.update(&update).unwrap_err());
+            assert!(
+                err.contains("unexpected argument"),
+                "unexpected error: {err}"
+            );
+            assert!(err.contains("help"), "unexpected error: {err}");
+        }
+        {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": ["main2.typ"],
+                "tinymist": {
+                    "typstExtraArgs": ["main.typ"]
+                }
+            });
+
+            // It should be able to resolve the entry file from the extra arguments.
+            config.update(&update).expect("updated");
+            // Passing it twice doesn't affect the result.
+            config.update(&update).expect("updated");
+
+            assert_eq!(
+                config.compile.typst_extra_args,
+                simple_config.compile.typst_extra_args
+            );
+        }
+    }
+
+    #[test]
     fn test_substitute_path() {
         let root = Path::new("/root");
         let entry =
