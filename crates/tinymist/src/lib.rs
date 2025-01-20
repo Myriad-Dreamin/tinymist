@@ -21,10 +21,8 @@
 mod actor;
 mod cmd;
 mod init;
-pub mod project;
 mod resource;
-mod route;
-mod server;
+mod state;
 mod stats;
 mod task;
 use futures::future::MaybeDone;
@@ -33,7 +31,7 @@ pub mod tool;
 mod utils;
 
 pub use init::*;
-pub use server::*;
+pub use state::*;
 pub use sync_lsp::LspClient;
 pub use tinymist_project::world;
 pub use tinymist_query as query;

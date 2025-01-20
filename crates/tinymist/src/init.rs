@@ -840,7 +840,7 @@ pub struct CompileExtraOpts {
 /// - `$root/main` will help store pdf file to `$root/main.pdf` constantly.
 /// - (default) `$root/$dir/$name` will help store pdf file along with the input
 ///   file.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PathPattern(pub String);
 
 impl PathPattern {

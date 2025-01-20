@@ -38,7 +38,7 @@ use crate::project::{
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
-use project::{watch_deps, LspPreviewState};
+use project::{watch_deps, ProjectPreviewState};
 
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
@@ -190,12 +190,12 @@ pub struct PreviewState {
     /// The backend running actor.
     preview_tx: mpsc::UnboundedSender<PreviewRequest>,
     /// the watchers for the preview
-    pub(crate) watchers: LspPreviewState,
+    pub(crate) watchers: ProjectPreviewState,
 }
 
 impl PreviewState {
     /// Create a new preview state.
-    pub fn new(watchers: LspPreviewState, client: TypedLspClient<PreviewState>) -> Self {
+    pub fn new(watchers: ProjectPreviewState, client: TypedLspClient<PreviewState>) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 
         client.handle.spawn(
@@ -589,7 +589,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
-        let preview_state = LspPreviewState::default();
+        let preview_state = ProjectPreviewState::default();
 
         // Create the actor
         let compile_handle = Arc::new(CompileHandlerImpl {

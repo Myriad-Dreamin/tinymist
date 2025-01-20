@@ -16,7 +16,7 @@ use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use world::TaskInputs;
 
-use super::server::*;
+use super::state::*;
 use super::*;
 use crate::tool::package::InitTask;
 

@@ -5,24 +5,16 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use actor::editor::EditorActor;
 use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use project::world::EntryState;
-use project::{watch_deps, LspPreviewState};
-use project::{CompileHandlerImpl, Project, QuerySnapFut, QuerySnapWithStat, WorldSnapFut};
 use reflexo_typst::Bytes;
 use request::{RegisterCapability, UnregisterCapability};
-use route::{ProjectResolution, ProjectRouteState};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{
-    ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
-};
 use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId, ProjectResolutionKind};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
@@ -37,23 +29,32 @@ use tokio::sync::mpsc;
 use typst::layout::Position as TypstPosition;
 use typst::{diag::FileResult, syntax::Source};
 
+use crate::actor::editor::EditorActor;
+use crate::actor::editor::EditorRequest;
+use crate::project::world::EntryState;
 use crate::project::LspInterrupt;
 use crate::project::{update_lock, PROJECT_ROUTE_USER_ACTION_PRIORITY};
+use crate::project::{watch_deps, ProjectPreviewState};
+use crate::project::{
+    CompileHandlerImpl, ProjectState, QuerySnapFut, QuerySnapWithStat, WorldSnapFut,
+};
 use crate::project::{CompileServerOpts, ProjectCompiler};
+use crate::route::{ProjectResolution, ProjectRouteState};
 use crate::stats::CompilerQueryStats;
+use crate::task::{
+    ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
+};
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::{ImmutDict, LspUniverseBuilder, TaskInputs};
-
-use super::{init::*, *};
-use crate::actor::editor::EditorRequest;
+use crate::{init::*, *};
 
 pub(crate) use futures::Future;
 
-pub(super) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
+pub(crate) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(inp.uri)
 }
 
-pub(super) fn as_path_(uri: Url) -> PathBuf {
+pub(crate) fn as_path_(uri: Url) -> PathBuf {
     tinymist_query::url_to_path(uri)
 }
 
@@ -68,7 +69,7 @@ pub struct LanguageState {
     /// The lcok state.
     pub route: ProjectRouteState,
     /// The project state.
-    pub project: Project,
+    pub project: ProjectState,
 
     // State to synchronize with the client.
     /// Whether the server has registered semantic tokens capabilities.
@@ -115,7 +116,7 @@ impl LanguageState {
         let formatter = FormatTask::new(config.formatter());
 
         let default_path = config.compile.entry_resolver.resolve_default();
-        let watchers = LspPreviewState::default();
+        let watchers = ProjectPreviewState::default();
         let handle = Self::server(
             &config,
             editor_tx.clone(),
@@ -1159,8 +1160,8 @@ impl LanguageState {
         diag_group: String,
         entry: EntryState,
         inputs: ImmutDict,
-        preview: project::LspPreviewState,
-    ) -> Project {
+        preview: project::ProjectPreviewState,
+    ) -> ProjectState {
         let compile_config = &config.compile;
         let const_config = &config.const_config;
 
@@ -1261,7 +1262,7 @@ impl LanguageState {
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.
         // client.add_memory_changes(MemoryEvent::Update(snapshot));
-        Project {
+        ProjectState {
             diag_group,
             state: server,
             preview: Default::default(),
