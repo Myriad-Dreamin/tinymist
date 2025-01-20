@@ -231,6 +231,7 @@ impl ExportConfig {
                     ProjectTask::ExportPdf(ExportPdfTask {
                         export,
                         pdf_standards: Default::default(),
+                        creation_timestamp: None,
                     })
                 }
                 Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
@@ -253,7 +254,11 @@ impl ExportConfig {
 
                     let ppi = ppi.unwrap_or(144.) as f32;
                     let ppi = ppi.try_into().unwrap();
-                    ProjectTask::ExportPng(ExportPngTask { export, ppi })
+                    ProjectTask::ExportPng(ExportPngTask {
+                        export,
+                        ppi,
+                        fill: None,
+                    })
                 }
             };
 
