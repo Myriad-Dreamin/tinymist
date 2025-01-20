@@ -19,8 +19,6 @@ pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt}
 pub use completion::PostfixSnippet;
 pub use upstream::with_vm;
 
-mod entry;
-pub use entry::*;
 mod diagnostics;
 pub use diagnostics::*;
 mod code_action;

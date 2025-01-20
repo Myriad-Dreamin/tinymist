@@ -1,6 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
+use reflexo_typst::ImmutPath;
 use tinymist_std::path::unix_slash;
 use tinymist_world::EntryReader;
 use typst::{diag::EcoString, syntax::FileId};
@@ -9,12 +10,11 @@ use crate::model::{Id, ProjectInput, ProjectMaterial, ProjectRoute, ProjectTask,
 use crate::LspWorld;
 
 /// Make a new project lock updater.
-pub fn update_lock(world: &LspWorld) -> Option<ProjectLockUpdater> {
-    let root = world.entry_state().workspace_root()?;
-    Some(ProjectLockUpdater {
+pub fn update_lock(root: ImmutPath) -> ProjectLockUpdater {
+    ProjectLockUpdater {
         root,
         updates: vec![],
-    })
+    }
 }
 
 enum LockUpdate {

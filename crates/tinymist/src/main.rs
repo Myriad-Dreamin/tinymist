@@ -30,7 +30,8 @@ use tinymist::{
 };
 use tinymist::{world::TaskInputs, world::WorldProvider};
 use tinymist_core::LONG_VERSION;
-use tinymist_query::{package::PackageInfo, EntryResolver};
+use tinymist_project::EntryResolver;
+use tinymist_query::package::PackageInfo;
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
 

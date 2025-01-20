@@ -3,10 +3,14 @@
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
-use crate::project::{CompiledArtifact, ExportSignal};
+use crate::project::{
+    CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask,
+    ExportSignal, ExportTextTask, ProjectTask, TaskWhen,
+};
 use anyhow::{bail, Context};
+use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
-use tinymist_project::{EntryReader, EntryState, TaskInputs};
+use tinymist_project::{CompileSnapshot, EntryReader};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -20,8 +24,7 @@ use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
-    actor::editor::EditorRequest, project::WorldSnapFut, tool::word_count, world::LspCompilerFeat,
-    ExportMode, PathPattern,
+    actor::editor::EditorRequest, tool::word_count, world::LspCompilerFeat, ExportMode, PathPattern,
 };
 
 use super::*;
@@ -63,25 +66,10 @@ impl ExportTask {
     }
 }
 
-impl SyncTaskFactory<ExportConfig> {
-    pub fn oneshot(
-        &self,
-        snap: WorldSnapFut,
-        entry: Option<EntryState>,
-        kind: ExportKind,
-    ) -> impl Future<Output = anyhow::Result<Option<PathBuf>>> {
-        let export = self.task();
-        async move {
-            let snap = snap.receive().await?;
-            let snap = snap.task(TaskInputs {
-                entry,
-                ..Default::default()
-            });
-
-            let artifact = snap.compile();
-            export.do_export(&kind, artifact).await
-        }
-    }
+pub struct ExportOnceTask<'a> {
+    pub kind: &'a ExportKind,
+    pub artifact: CompiledArtifact<LspCompilerFeat>,
+    pub lock_path: Option<ImmutPath>,
 }
 
 #[derive(Clone, Default)]
@@ -129,7 +117,14 @@ impl ExportConfig {
             let this = self.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(this.do_export(&this.kind, artifact).await);
+                log_err(
+                    this.do_export(ExportOnceTask {
+                        kind: &this.kind,
+                        artifact,
+                        lock_path: None,
+                    })
+                    .await,
+                );
                 Some(())
             })
         })?;
@@ -173,16 +168,16 @@ impl ExportConfig {
         Some(())
     }
 
-    async fn do_export(
-        &self,
-        kind: &ExportKind,
-        artifact: CompiledArtifact<LspCompilerFeat>,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    async fn do_export(&self, task: ExportOnceTask<'_>) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use ExportKind::*;
         use PageSelection::*;
 
-        let CompiledArtifact { snap, doc, .. } = artifact;
+        let ExportOnceTask {
+            kind,
+            artifact: CompiledArtifact { snap, doc, .. },
+            lock_path: lock_dir,
+        } = task;
 
         // Prepare the output path.
         let entry = snap.world.entry_state();
@@ -204,6 +199,68 @@ impl ExportConfig {
                 })?;
             }
         }
+
+        let _: Option<()> = lock_dir.and_then(|lock_dir| {
+            let mut updater = crate::project::update_lock(lock_dir);
+
+            let doc_id = updater.compiled(&snap.world)?;
+            let task_id = doc_id.clone();
+
+            let when = match self.config.mode {
+                ExportMode::Never => TaskWhen::Never,
+                ExportMode::OnType => TaskWhen::OnType,
+                ExportMode::OnSave => TaskWhen::OnSave,
+                ExportMode::OnDocumentHasTitle => TaskWhen::OnSave,
+            };
+
+            // todo: page transforms
+            let transforms = vec![];
+
+            use tinymist_project::ExportTask as ProjectExportTask;
+
+            let export = ProjectExportTask {
+                document: doc_id,
+                id: task_id,
+                when,
+                transform: transforms,
+            };
+
+            let task = match kind {
+                Pdf { creation_timestamp } => {
+                    let _ = creation_timestamp;
+                    ProjectTask::ExportPdf(ExportPdfTask {
+                        export,
+                        pdf_standards: Default::default(),
+                    })
+                }
+                Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+                Markdown {} => ProjectTask::ExportMarkdown(ExportMarkdownTask { export }),
+                Text {} => ProjectTask::ExportText(ExportTextTask { export }),
+                Query { .. } => {
+                    // todo: ignoring query task.
+                    return None;
+                }
+                Svg { page } => {
+                    // todo: ignoring page selection.
+                    let _ = page;
+                    return None;
+                }
+                Png { ppi, fill, page } => {
+                    // todo: ignoring page fill.
+                    let _ = fill;
+                    // todo: ignoring page selection.
+                    let _ = page;
+
+                    let ppi = ppi.unwrap_or(144.) as f32;
+                    ProjectTask::ExportPng(ExportPngTask { export, ppi })
+                }
+            };
+
+            updater.task(task);
+            updater.commit();
+
+            Some(())
+        });
 
         // Prepare the document.
         let doc = doc.map_err(|_| anyhow::anyhow!("no document"))?;
@@ -326,6 +383,21 @@ impl ExportConfig {
 
         log::info!("RenderActor({kind:?}): export complete");
         Ok(Some(to))
+    }
+
+    pub async fn oneshot(
+        &self,
+        snap: CompileSnapshot<LspCompilerFeat>,
+        kind: ExportKind,
+        lock_path: Option<ImmutPath>,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        let artifact = snap.compile();
+        self.do_export(ExportOnceTask {
+            kind: &kind,
+            artifact,
+            lock_path,
+        })
+        .await
     }
 }
 
