@@ -9,7 +9,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{bail, Context};
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
@@ -32,6 +31,7 @@ use tinymist::{world::TaskInputs, world::WorldProvider};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
+use tinymist_std::{bail, error::prelude::*};
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
 
@@ -61,7 +61,7 @@ impl Default for Runtimes {
 static RUNTIMES: Lazy<Runtimes> = Lazy::new(Default::default);
 
 /// The main entry point.
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -103,9 +103,9 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Generates completion script to stdout.
-pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
+pub fn completion(args: ShellCompletionArgs) -> Result<()> {
     let Some(shell) = args.shell.or_else(Shell::from_env) else {
-        anyhow::bail!("could not infer shell");
+        tinymist_std::bail!("could not infer shell");
     };
 
     let mut cmd = CliArguments::command();
@@ -115,7 +115,7 @@ pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
 }
 
 /// Runs compilation
-pub fn compile(args: CompileArgs) -> anyhow::Result<()> {
+pub fn compile(args: CompileArgs) -> Result<()> {
     use std::io::Write;
 
     let input = args
@@ -150,7 +150,7 @@ pub fn compile(args: CompileArgs) -> anyhow::Result<()> {
 }
 
 /// The main entry point for the language server.
-pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
+pub fn lsp_main(args: LspArgs) -> Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
         .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
@@ -178,19 +178,19 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 /// The main entry point for the compiler.
-pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
+pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
-        None => return Err(anyhow::anyhow!("provide a valid path")),
+        None => Err(anyhow::anyhow!("provide a valid path"))?,
     });
 
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
 
     if root_path.is_relative() {
-        root_path = std::env::current_dir()?.join(root_path);
+        root_path = std::env::current_dir().context("cwd")?.join(root_path);
     }
     if input.is_relative() {
-        input = std::env::current_dir()?.join(input);
+        input = std::env::current_dir().context("cwd")?.join(input);
     }
     if !input.starts_with(&root_path) {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
@@ -233,7 +233,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let resp = service.ready(()).unwrap();
         let MaybeDone::Done(resp) = resp else {
-            bail!("internal error: not sync init")
+            anyhow::bail!("internal error: not sync init")
         };
         resp.unwrap();
 
@@ -274,7 +274,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 }
 
 /// The main entry point for language server queries.
-pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
+pub fn query_main(cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
 
     with_stdio_transport(MirrorArgs::default(), |conn| {
@@ -297,7 +297,7 @@ pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
 
         let resp = service.ready(()).unwrap();
         let MaybeDone::Done(resp) = resp else {
-            bail!("internal error: not sync init")
+            anyhow::bail!("internal error: not sync init")
         };
         resp.unwrap();
 

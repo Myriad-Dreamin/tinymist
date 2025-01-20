@@ -23,8 +23,7 @@ pub use tinymist_project::*;
 
 use std::sync::Arc;
 
-use anyhow::bail;
-use log::{error, info, trace};
+use log::{error, trace};
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
 use reflexo_typst::{typst::prelude::EcoVec, CompileReport};
@@ -34,9 +33,9 @@ use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, SemanticRequest, StatefulRequest,
     VersionedDocument,
 };
-use tinymist_std::error::prelude::*;
+use tinymist_std::{bail, error::prelude::*};
 use tokio::sync::{mpsc, oneshot};
-use typst::{diag::SourceDiagnostic, World};
+use typst::diag::SourceDiagnostic;
 
 use crate::actor::editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
@@ -100,7 +99,7 @@ pub struct Project {
 
 impl Project {
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> ZResult<WorldSnapFut> {
+    pub fn snapshot(&mut self) -> Result<WorldSnapFut> {
         let (tx, rx) = oneshot::channel();
         let snap = self.state.snapshot();
         let _ = tx.send(snap);
@@ -109,7 +108,7 @@ impl Project {
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
+    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<QuerySnapFut> {
         let fut = self.snapshot()?;
         let analysis = self.analysis.clone();
         let rev_lock = analysis.lock_revision(q);
@@ -150,7 +149,7 @@ impl Project {
         &mut self,
         group: &str,
         entry: EntryState,
-    ) -> ZResult<ProjectInsId> {
+    ) -> Result<ProjectInsId> {
         self.state.restart_dedicate(group, entry)
     }
 }
@@ -367,7 +366,7 @@ pub struct WorldSnapFut {
 
 impl WorldSnapFut {
     /// wait for the snapshot to be ready
-    pub async fn receive(self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
+    pub async fn receive(self) -> Result<CompileSnapshot<LspCompilerFeat>> {
         self.rx
             .await
             .map_err(map_string_err("failed to get snapshot"))
@@ -382,7 +381,7 @@ pub struct QuerySnapFut {
 
 impl QuerySnapFut {
     /// wait for the snapshot to be ready
-    pub async fn receive(self) -> ZResult<QuerySnap> {
+    pub async fn receive(self) -> Result<QuerySnap> {
         let snap = self.fut.receive().await?;
         Ok(QuerySnap {
             snap,
@@ -416,7 +415,7 @@ impl QuerySnap {
         self,
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> anyhow::Result<CompilerQueryResponse> {
+    ) -> Result<CompilerQueryResponse> {
         let doc = self.snap.success_doc.as_ref().map(|doc| VersionedDocument {
             version: self.world.revision().get(),
             document: doc.clone(),
@@ -429,20 +428,16 @@ impl QuerySnap {
         self,
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> anyhow::Result<CompilerQueryResponse> {
+    ) -> Result<CompilerQueryResponse> {
         self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
     }
 
-    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
+    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
         let world = self.snap.world;
-        let Some(main) = world.main_id() else {
+        let Some(..) = world.main_id() else {
             error!("Project: main file is not set");
             bail!("main file is not set");
         };
-        world.source(main).map_err(|err| {
-            info!("Project: failed to prepare main file: {err:?}");
-            anyhow::anyhow!("failed to get source: {err}")
-        })?;
 
         let mut analysis = self.analysis.snapshot_(world, self.rev_lock);
         Ok(f(&mut analysis))

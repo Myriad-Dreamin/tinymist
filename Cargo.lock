@@ -4007,7 +4007,6 @@ dependencies = [
  "sync-lsp",
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
- "tinymist-fs",
  "tinymist-project",
  "tinymist-query",
  "tinymist-render",
@@ -4079,19 +4078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymist-fs"
-version = "0.12.18"
-dependencies = [
- "anyhow",
- "core-foundation",
- "libc",
- "log",
- "same-file",
- "tempfile",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "tinymist-project"
 version = "0.12.18"
 dependencies = [
@@ -4111,7 +4097,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-derive",
- "tinymist-fs",
  "tinymist-std",
  "tinymist-world",
  "tokio",
@@ -4190,27 +4175,34 @@ dependencies = [
 name = "tinymist-std"
 version = "0.12.18"
 dependencies = [
+ "anyhow",
  "base64",
  "bitvec",
  "comemo",
+ "core-foundation",
  "dashmap",
  "ecow",
  "fxhash",
  "hex",
  "js-sys",
+ "libc",
+ "log",
  "parking_lot",
  "path-clean",
  "rkyv",
  "rustc-hash 2.1.0",
+ "same-file",
  "serde",
  "serde_json",
  "serde_repr",
  "serde_with",
  "siphasher 1.0.1",
+ "tempfile",
  "typst",
  "typst-shim",
  "wasm-bindgen",
  "web-time",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

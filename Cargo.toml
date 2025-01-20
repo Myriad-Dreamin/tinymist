@@ -85,6 +85,7 @@ sha2 = "0.10.6"
 nohash-hasher = "0.2.0"
 
 # Data Structures
+bitvec = "1"
 comemo = "0.4"
 # We need to freeze the version of the crate, as the raw-api feature is considered unstable
 dashmap = { version = "=5.5.3", features = ["raw-api"] }
@@ -109,8 +110,9 @@ rkyv = "0.7.42"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9"
+serde_repr = "0.1"
 serde_with = { version = "3.6", features = ["base64"] }
+serde_yaml = "0.9"
 serde-wasm-bindgen = "^0.6"
 toml = { version = "0.8", default-features = false, features = [
     "parse",
@@ -184,7 +186,6 @@ tinymist-vfs = { path = "./crates/tinymist-vfs/", default-features = false }
 tinymist-core = { path = "./crates/tinymist-core/", default-features = false }
 tinymist-world = { path = "./crates/tinymist-world/", default-features = false }
 tinymist-project = { path = "./crates/tinymist-project/" }
-tinymist-fs = { path = "./crates/tinymist-fs/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }

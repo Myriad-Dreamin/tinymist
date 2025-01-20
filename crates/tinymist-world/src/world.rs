@@ -190,7 +190,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         &self,
         file_path: Option<String>,
         encoding: OffsetEncoding,
-    ) -> ZResult<Arc<Vec<SemanticToken>>> {
+    ) -> Result<Arc<Vec<SemanticToken>>> {
         let world = match file_path {
             Some(e) => {
                 let path = Path::new(&e);

@@ -1,3 +1,5 @@
+//! A map that shards items by their fingerprint.
+
 use std::{collections::HashMap, num::NonZeroU32};
 
 use crate::hash::Fingerprint;
@@ -31,12 +33,13 @@ fn default_shard_size() -> NonZeroU32 {
 
 type FMapBase<V> = parking_lot::RwLock<HashMap<Fingerprint, V>>;
 
-/// A map that shards items by their fingerprint.
+/// A map that shards items by their fingerprint. This is faster
+/// than the dashmap in some cases.
 ///
 /// It is fast since a fingerprint could split items into different shards
 /// efficiently.
 ///
-/// Note: If a fingerprint is calculated from a hash function, it is not
+/// Note: If a fingerprint is not calculated from a hash function, it is not
 /// guaranteed that the fingerprint is evenly distributed. Thus, in that case,
 /// the performance of this map is not guaranteed.
 pub struct FingerprintMap<V> {
@@ -76,6 +79,7 @@ impl<V> FingerprintMap<V> {
             .flat_map(|shard| shard.into_inner().into_iter())
     }
 
+    /// Get the shard
     pub fn shard(&self, fg: Fingerprint) -> &FMapBase<V> {
         let shards = &self.shards;
         let route_idx = (fg.lower32() & self.mask) as usize;
@@ -92,6 +96,7 @@ impl<V> FingerprintMap<V> {
         &mut self.shards
     }
 
+    /// Checks if the map is empty.
     pub fn contains_key(&self, fg: &Fingerprint) -> bool {
         self.shard(*fg).read().contains_key(fg)
     }

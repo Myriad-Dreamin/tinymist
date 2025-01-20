@@ -18,7 +18,7 @@ use reflexo_typst::{
     features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     CompileEnv, CompileReport, Compiler, TypstDocument,
 };
-use tinymist_std::error::prelude::ZResult;
+use tinymist_std::error::prelude::Result;
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult};
 
@@ -606,7 +606,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         }
     }
 
-    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> ZResult<ProjectInsId> {
+    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> Result<ProjectInsId> {
         let id = ProjectInsId(group.into());
 
         let verse = CompilerUniverse::<F>::new_raw(

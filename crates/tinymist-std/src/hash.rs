@@ -1,8 +1,10 @@
+//! The hash extension module. It provides extra concepts like `Fingerprint` and
+//! `HashedTrait`.
+
 use core::fmt;
-use std::{
-    any::Any,
-    hash::{Hash, Hasher},
-};
+use std::any::Any;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 use base64::Engine;
 use fxhash::FxHasher32;
@@ -11,12 +13,13 @@ use siphasher::sip128::{Hasher128, SipHasher13};
 #[cfg(feature = "rkyv")]
 use rkyv::{Archive, Deserialize as rDeser, Serialize as rSer};
 
-use crate::error::prelude::ZResult;
+use crate::error::prelude::Result;
 
 pub(crate) type FxBuildHasher = std::hash::BuildHasherDefault<FxHasher>;
 pub use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 // pub type FxIndexSet<K> = indexmap::IndexSet<K, FxHasher>;
 // pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxHasher>;
+/// A dashmap that uses the FxHasher as the underlying hasher.
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, FxBuildHasher>;
 
 /// See <https://github.com/rust-lang/rust/blob/master/compiler/rustc_hir/src/stable_hash_impls.rs#L22>
@@ -85,7 +88,7 @@ impl Fingerprint {
     }
 
     /// Creates a new `Fingerprint` from a svg id that **doesn't have prefix**.
-    pub fn try_from_str(s: &str) -> ZResult<Self> {
+    pub fn try_from_str(s: &str) -> Result<Self> {
         let bytes = base64::engine::general_purpose::STANDARD_NO_PAD
             .decode(&s.as_bytes()[..11])
             .expect("invalid base64 string");
@@ -135,9 +138,11 @@ pub struct FingerprintSipHasher {
     data: Vec<u8>,
 }
 
+/// The base hasher for the [`FingerprintSipHasher`].
 pub type FingerprintSipHasherBase = SipHasher13;
 
 impl FingerprintSipHasher {
+    /// Get the fast hash value and the underlying data.
     pub fn fast_hash(&self) -> (u32, &Vec<u8>) {
         let mut inner = FxHasher32::default();
         self.data.hash(&mut inner);
@@ -187,6 +192,7 @@ pub struct FingerprintBuilder {
 
 #[cfg(not(feature = "bi-hash"))]
 impl FingerprintBuilder {
+    /// Resolve the fingerprint without checking the conflict.
     pub fn resolve_unchecked<T: Hash>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.hash(&mut s);
@@ -194,6 +200,7 @@ impl FingerprintBuilder {
         fingerprint
     }
 
+    /// Resolve the fingerprint and check the conflict.
     pub fn resolve<T: Hash + 'static>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.type_id().hash(&mut s);
@@ -216,6 +223,7 @@ impl FingerprintBuilder {
 
 #[cfg(feature = "bi-hash")]
 impl FingerprintBuilder {
+    /// Resolve the fingerprint without checking the conflict.
     pub fn resolve_unchecked<T: Hash>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.hash(&mut s);
@@ -233,6 +241,7 @@ impl FingerprintBuilder {
         fingerprint
     }
 
+    /// Resolve the fingerprint and check the conflict.
     pub fn resolve<T: Hash + 'static>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.type_id().hash(&mut s);
@@ -296,6 +305,66 @@ pub fn hash64<T: Hash + ?Sized>(v: &T) -> u64 {
 
 // todo: rustc hash doesn't have 32-bit hash
 pub use fxhash::hash32;
+
+/// A trait that provides a static prehashed 128-bit hash.
+pub trait StaticHash128 {
+    /// Get the prehashed 128-bit hash.
+    fn get_hash(&self) -> u128;
+}
+
+impl Hash for dyn StaticHash128 {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u128(self.get_hash());
+    }
+}
+
+/// A trait that provides a static prehashed 64-bit hash for any internal `T`.
+///
+/// Please ensure that the `T` is really mapped to the hash. Use it at your own
+/// risk.
+pub struct HashedTrait<T: ?Sized> {
+    hash: u128,
+    t: Box<T>,
+}
+
+impl<T: ?Sized> HashedTrait<T> {
+    /// Create a new `HashedTrait` with the given hash and the trait object.
+    pub fn new(hash: u128, t: Box<T>) -> Self {
+        Self { hash, t }
+    }
+}
+
+impl<T: ?Sized> Deref for HashedTrait<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.t
+    }
+}
+
+impl<T> Hash for HashedTrait<T> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u128(self.hash);
+    }
+}
+
+impl<T: Hash + Default + 'static> Default for HashedTrait<T> {
+    fn default() -> Self {
+        let t = T::default();
+        Self {
+            hash: item_hash128(&t),
+            t: Box::new(t),
+        }
+    }
+}
+
+impl<T: ?Sized> StaticHash128 for HashedTrait<T> {
+    fn get_hash(&self) -> u128 {
+        self.hash
+    }
+}
 
 #[test]
 fn test_fingerprint() {

@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-pub use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::toml_model;
 

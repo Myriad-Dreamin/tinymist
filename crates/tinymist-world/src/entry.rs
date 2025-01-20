@@ -113,7 +113,7 @@ impl EntryState {
         }
     }
 
-    pub fn try_select_path_in_workspace(&self, p: &Path) -> ZResult<Option<EntryState>> {
+    pub fn try_select_path_in_workspace(&self, p: &Path) -> Result<Option<EntryState>> {
         Ok(match self.workspace_root() {
             Some(root) => match p.strip_prefix(&root) {
                 Ok(p) => Some(EntryState::new_rooted(

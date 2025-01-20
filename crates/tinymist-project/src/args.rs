@@ -2,11 +2,10 @@ use crate::DocIdArgs;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{num::NonZeroUsize, ops::RangeInclusive, path::Path, str::FromStr, sync::OnceLock};
-use tinymist_std::{bail, error::prelude::ZResult};
+use tinymist_std::{bail, error::prelude::Result};
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
 pub use typst_preview::{PreviewArgs, PreviewMode};
 
-use anyhow::Result;
 use clap::{ValueEnum, ValueHint};
 
 use crate::model::*;
@@ -271,11 +270,11 @@ pub struct TaskCompileArgs {
     pub ppi: f32,
 
     #[clap(skip)]
-    pub output_format: OnceLock<ZResult<OutputFormat>>,
+    pub output_format: OnceLock<Result<OutputFormat>>,
 }
 
 impl TaskCompileArgs {
-    pub fn to_task(self, doc_id: Id) -> ZResult<ProjectTask> {
+    pub fn to_task(self, doc_id: Id) -> Result<ProjectTask> {
         let new_task_id = self.task_name.map(Id::new);
         let task_id = new_task_id.unwrap_or(doc_id.clone());
 
