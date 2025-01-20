@@ -25,17 +25,15 @@ use sync_lsp::*;
 use task::{
     ExportConfig, ExportTask, ExportUserConfig, FormatTask, FormatterConfig, UserActionTask,
 };
-use tinymist_project::ProjectInsId;
+use tinymist_project::{CompileSnapshot, EntryResolver, ProjectInsId};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
-    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, LspWorldExt,
-    OnExportRequest, PositionEncoding, ServerInfoResponse, SyntaxRequest,
+    to_typst_range, CompilerQueryRequest, CompilerQueryResponse, ExportKind, FoldRequestFeature,
+    LocalContext, LspWorldExt, OnExportRequest, PageSelection, PositionEncoding,
+    ServerInfoResponse, SyntaxRequest, VersionedDocument,
 };
-use tinymist_query::{EntryResolver, PageSelection};
-use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
-use tinymist_std::Error;
-use tinymist_std::ImmutPath;
+use tinymist_std::{Error, ImmutPath};
 use tokio::sync::mpsc;
 use typst::layout::Position as TypstPosition;
 use typst::{diag::FileResult, syntax::Source};
@@ -1009,35 +1007,36 @@ impl LanguageState {
     /// Export the current document.
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, kind, open } = req;
+        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
+        let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
 
-        let snap = self.query_snapshot()?;
-
-        let update_dep = async move {
-            let snap = snap.receive().await?;
-            let world = snap.world.clone();
-            let updater = update_lock(&world);
-
-            let file_ids = snap.world.depended_files();
-            let _ = updater.and_then(|mut updater| {
+        let update_dep = lock_dir.clone().map(|lock_dir| {
+            |snap: CompileSnapshot<LspCompilerFeat>| async move {
+                let mut updater = update_lock(lock_dir);
+                let world = snap.world.clone();
                 let doc_id = updater.compiled(&world)?;
 
-                updater.update_materials(doc_id.clone(), file_ids);
+                updater.update_materials(doc_id.clone(), snap.world.depended_files());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
                 updater.commit();
 
                 Some(())
-            });
-
-            ZResult::Ok(())
-        };
+            }
+        });
 
         let snap = self.snapshot()?;
-        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let export = self.project.export.factory.oneshot(snap, Some(entry), kind);
+        let task = self.project.export.factory.task();
         just_future(async move {
-            tokio::spawn(update_dep);
-            let res = export.await?;
+            let snap = snap.receive().await?;
+            let snap = snap.task(TaskInputs {
+                entry: Some(entry),
+                ..Default::default()
+            });
+            let res = task.oneshot(snap.clone(), kind, lock_dir).await?;
+            if let Some(update_dep) = update_dep {
+                tokio::spawn(update_dep(snap));
+            }
 
             // See https://github.com/Myriad-Dreamin/tinymist/issues/837
             // Also see https://github.com/Byron/open-rs/issues/105

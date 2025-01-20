@@ -14,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{FormatUserConfig, FormatterConfig};
+use tinymist_project::{EntryResolver, ProjectResolutionKind};
 use tinymist_query::analysis::{Modifier, TokenType};
-use tinymist_query::{CompletionFeat, EntryResolver, PositionEncoding};
+use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::FileId;
@@ -271,6 +272,7 @@ impl Initializer for SuperInit {
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
     "tinymist",
+    "projectResolution",
     "outputPath",
     "exportPdf",
     "rootPath",
@@ -292,6 +294,8 @@ const CONFIG_ITEMS: &[&str] = &[
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
+    /// The resolution kind of the project.
+    pub project_resolution: ProjectResolutionKind,
     /// Constant configuration for the server.
     pub const_config: ConstConfig,
     /// The compile configurations
@@ -383,6 +387,7 @@ impl Config {
                 .ok()
         }
 
+        assign_config!(project_resolution := "projectResolution"?: ProjectResolutionKind);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
@@ -529,6 +534,7 @@ impl CompileConfig {
             };
         }
 
+        let project_resolution = deser_or_default!("projectResolution", ProjectResolutionKind);
         self.output_path = deser_or_default!("outputPath", PathPattern);
         self.export_pdf = deser_or_default!("exportPdf", ExportMode);
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
@@ -597,6 +603,7 @@ impl CompileConfig {
         self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
         self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
 
+        self.entry_resolver.project_resolution = project_resolution;
         self.entry_resolver.root_path =
             try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into())).or_else(|| {
                 self.typst_extra_args

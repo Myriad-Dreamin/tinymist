@@ -1,11 +1,32 @@
 use anyhow::bail;
+use serde::{Deserialize, Serialize};
 use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
 use typst::syntax::VirtualPath;
 
+/// The kind of project resolution.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectResolutionKind {
+    /// Manage typst documents like what we did in Markdown. Each single file is
+    /// an individual document and no project resolution is needed.
+    /// This is the default behavior.
+    #[default]
+    SingleFile,
+    /// Manage typst documents like what we did in Rust. For each workspace,
+    /// tinymist tracks your preview and compilation history, and stores the
+    /// information in a lock file. Tinymist will automatically selects the main
+    /// file to use according to the lock file. This also allows other tools
+    /// push preview and export tasks to language server by updating the
+    /// lock file.
+    LockDatabase,
+}
+
 /// Entry resolver
 #[derive(Debug, Default, Clone)]
 pub struct EntryResolver {
+    /// The kind of project resolution.
+    pub project_resolution: ProjectResolutionKind,
     /// Specifies the root path of the project manually.
     pub root_path: Option<ImmutPath>,
     /// The workspace roots from initialization.
@@ -76,6 +97,22 @@ impl EntryResolver {
             Some(root) => EntryState::new_workspace(root),
             None => EntryState::new_detached(),
         })
+    }
+
+    pub fn resolve_lock(&self, entry: &EntryState) -> Option<ImmutPath> {
+        match self.project_resolution {
+            ProjectResolutionKind::LockDatabase if entry.is_in_package() => {
+                log::info!("ProjectResolver: no lock for package: {entry:?}");
+                None
+            }
+            ProjectResolutionKind::LockDatabase => {
+                let root = entry.workspace_root();
+                log::info!("ProjectResolver: lock for {entry:?} at {root:?}");
+
+                root
+            }
+            ProjectResolutionKind::SingleFile => None,
+        }
     }
 
     /// Determines the default entry path.

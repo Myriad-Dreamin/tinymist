@@ -34,7 +34,7 @@ impl<T: Clone> SyncTaskFactory<T> {
         *w = Arc::new(config);
     }
 
-    fn task(&self) -> Arc<T> {
+    pub fn task(&self) -> Arc<T> {
         self.0.read().unwrap().clone()
     }
 }

@@ -137,6 +137,10 @@ impl EntryState {
     pub fn is_inactive(&self) -> bool {
         self.main.is_none()
     }
+
+    pub fn is_in_package(&self) -> bool {
+        self.main.is_some_and(WorkspaceResolver::is_package_file)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
