@@ -12,7 +12,7 @@
 //!
 //! We use typst by creating a [`ProjectCompiler`] and
 //! running compiler with callbacking [`CompileHandlerImpl`] incrementally. An
-//! additional [`LocalCompileHandler`] is also created to control the
+//! additional [`ProjectState`] is also created to control the
 //! [`ProjectCompiler`].
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
@@ -34,12 +34,11 @@ use tinymist_query::{
     VersionedDocument,
 };
 use tinymist_std::{bail, error::prelude::*};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use typst::diag::SourceDiagnostic;
 
 use crate::actor::editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
-use crate::world::vfs::MemoryEvent;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -99,29 +98,21 @@ pub struct ProjectState {
 
 impl ProjectState {
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> Result<WorldSnapFut> {
-        let (tx, rx) = oneshot::channel();
-        let snap = self.state.snapshot();
-        let _ = tx.send(snap);
-
-        Ok(WorldSnapFut { rx })
+    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+        Ok(self.state.snapshot())
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<QuerySnapFut> {
-        let fut = self.snapshot()?;
+    pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<LspQuerySnapshot> {
+        let snap = self.snapshot()?;
         let analysis = self.analysis.clone();
         let rev_lock = analysis.lock_revision(q);
 
-        Ok(QuerySnapFut {
-            fut,
+        Ok(LspQuerySnapshot {
+            snap,
             analysis,
             rev_lock,
         })
-    }
-
-    pub fn add_memory_changes(&mut self, event: MemoryEvent) {
-        self.state.process(Interrupt::Memory(event));
     }
 
     pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
@@ -134,11 +125,6 @@ impl ProjectState {
         }
 
         self.state.process(intr);
-    }
-
-    pub fn change_task(&mut self, task: TaskInputs) {
-        self.state
-            .process(Interrupt::ChangeTask(self.state.primary.id.clone(), task));
     }
 
     pub(crate) fn stop(&mut self) {
@@ -355,49 +341,15 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     }
 }
 
-pub struct QuerySnapWithStat {
-    pub fut: QuerySnapFut,
-    pub(crate) stat: QueryStatGuard,
-}
+pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
 
-pub struct WorldSnapFut {
-    rx: oneshot::Receiver<LspCompileSnapshot>,
-}
-
-impl WorldSnapFut {
-    /// wait for the snapshot to be ready
-    pub async fn receive(self) -> Result<LspCompileSnapshot> {
-        self.rx
-            .await
-            .map_err(map_string_err("failed to get snapshot"))
-    }
-}
-
-pub struct QuerySnapFut {
-    fut: WorldSnapFut,
-    analysis: Arc<Analysis>,
-    rev_lock: AnalysisRevLock,
-}
-
-impl QuerySnapFut {
-    /// wait for the snapshot to be ready
-    pub async fn receive(self) -> Result<QuerySnap> {
-        let snap = self.fut.receive().await?;
-        Ok(QuerySnap {
-            snap,
-            analysis: self.analysis,
-            rev_lock: self.rev_lock,
-        })
-    }
-}
-
-pub struct QuerySnap {
+pub struct LspQuerySnapshot {
     pub snap: LspCompileSnapshot,
     analysis: Arc<Analysis>,
     rev_lock: AnalysisRevLock,
 }
 
-impl std::ops::Deref for QuerySnap {
+impl std::ops::Deref for LspQuerySnapshot {
     type Target = LspCompileSnapshot;
 
     fn deref(&self) -> &Self::Target {
@@ -405,7 +357,7 @@ impl std::ops::Deref for QuerySnap {
     }
 }
 
-impl QuerySnap {
+impl LspQuerySnapshot {
     pub fn task(mut self, inputs: TaskInputs) -> Self {
         self.snap = self.snap.task(inputs);
         self

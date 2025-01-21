@@ -336,7 +336,7 @@ impl ServerState {
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let fut_stat = self.query_snapshot_with_stat(&query)?;
+        let (mut snap, stat) = self.query_snapshot_with_stat(&query)?;
         let input = query
             .associated_path()
             .map(|path| self.resolve_task_with_state(path.into()))
@@ -349,14 +349,13 @@ impl ServerState {
             });
 
         just_future(async move {
-            let mut snap = fut_stat.fut.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
             if !is_pinning {
                 if let Some(input) = input {
                     snap = snap.task(input);
                 }
             }
-            fut_stat.stat.snap();
+            stat.snap();
 
             if matches!(query, Completion(..)) {
                 // Prefetch the package index for completion.

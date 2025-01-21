@@ -352,8 +352,6 @@ impl ServerState {
         let snap = self.snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
-
             // Parse the package specification. If the user didn't specify the version,
             // we try to figure it out automatically by downloading the package index
             // or searching the disk.
@@ -397,8 +395,6 @@ impl ServerState {
         let snap = self.snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
-
             // Parse the package specification. If the user didn't specify the version,
             // we try to figure it out automatically by downloading the package index
             // or searching the disk.
@@ -466,7 +462,6 @@ impl ServerState {
         let user_action = self.user_action;
 
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
             let display_entry = || format!("{entry:?}");
 
             // todo: rootless file
@@ -555,7 +550,6 @@ impl ServerState {
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.paths();
             let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
@@ -569,7 +563,6 @@ impl ServerState {
     ) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.local_path();
             let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
@@ -585,7 +578,6 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(z_internal_error)?;
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
             let packages =
                 tinymist_query::package::list_package_by_namespace(&snap.world.registry, ns)
                     .into_iter()
@@ -601,12 +593,10 @@ impl ServerState {
         &mut self,
         mut arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let fut = self.query_snapshot().map_err(internal_error)?;
+        let snap = self.query_snapshot().map_err(internal_error)?;
         let info = get_arg!(arguments[1] as PackageInfo);
 
         just_future(async move {
-            let snap = fut.receive().await.map_err(z_internal_error)?;
-
             let symbols = snap
                 .run_analysis(|a| {
                     tinymist_query::docs::package_module_docs(a, &info)
@@ -661,10 +651,9 @@ impl ServerState {
         info: PackageInfo,
         f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
-        let fut = self.query_snapshot().map_err(internal_error)?;
+        let snap = self.query_snapshot().map_err(internal_error)?;
 
         Ok(async move {
-            let snap = fut.receive().await.map_err(z_internal_error)?;
             let world = &snap.world;
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {

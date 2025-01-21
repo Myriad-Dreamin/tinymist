@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 use reflexo_typst::Bytes;
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use tinymist_project::ProjectResolutionKind;
+use tinymist_project::{Interrupt, ProjectResolutionKind};
 use tinymist_query::{to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -165,10 +165,12 @@ impl ServerState {
 
         info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
 
-        self.project.change_task(TaskInputs {
+        let id = self.project.state.primary.id.clone();
+        let task = TaskInputs {
             entry: Some(next_entry.clone()),
             ..Default::default()
-        });
+        };
+        self.project.interrupt(Interrupt::ChangeTask(id, task));
 
         Ok(true)
     }
@@ -287,8 +289,8 @@ impl ServerState {
     }
 
     fn update_source(&mut self, files: FileChangeSet) -> Result<()> {
-        self.project
-            .add_memory_changes(MemoryEvent::Update(files.clone()));
+        let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
+        self.project.interrupt(intr);
 
         Ok(())
     }

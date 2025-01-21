@@ -25,8 +25,8 @@ use typst::syntax::Source;
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::project::world::EntryState;
 use crate::project::{
-    update_lock, watch_deps, CompileHandlerImpl, CompileServerOpts, LspInterrupt, ProjectCompiler,
-    ProjectPreviewState, ProjectState, QuerySnapFut, QuerySnapWithStat, WorldSnapFut,
+    update_lock, watch_deps, CompileHandlerImpl, CompileServerOpts, LspInterrupt, LspQuerySnapshot,
+    ProjectCompiler, ProjectPreviewState, ProjectState, QuerySnapWithStat,
     PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
 use crate::route::ProjectRouteState;
@@ -180,12 +180,12 @@ impl ServerState {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> Result<WorldSnapFut> {
+    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
         self.project.snapshot()
     }
 
     /// Snapshot the compiler thread for language queries
-    pub fn query_snapshot(&mut self) -> Result<QuerySnapFut> {
+    pub fn query_snapshot(&mut self) -> Result<LspQuerySnapshot> {
         self.project.query_snapshot(None)
     }
 
@@ -197,8 +197,8 @@ impl ServerState {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.project.stats.query_stat(path, name);
-        let fut = self.project.query_snapshot(Some(q))?;
-        Ok(QuerySnapWithStat { fut, stat })
+        let snap = self.project.query_snapshot(Some(q))?;
+        Ok((snap, stat))
     }
 
     /// Install handlers to the language server.
@@ -326,7 +326,6 @@ impl ServerState {
 
         let snap = self.snapshot()?;
         just_future(async move {
-            let snap = snap.receive().await?;
             let w = &snap.world;
 
             let info = ServerInfoResponse {
@@ -545,7 +544,6 @@ impl ServerState {
         let snap = self.snapshot()?;
         let task = self.project.export.factory.task();
         just_future(async move {
-            let snap = snap.receive().await?;
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 ..Default::default()

@@ -3,10 +3,11 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 // use reflexo_typst::font::GlyphId;
 use reflexo_typst::{vector::font::GlyphId, TypstDocument, TypstFont};
 use sync_lsp::LspResult;
+use tinymist_project::LspCompileSnapshot;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
-use crate::{project::WorldSnapFut, z_internal_error};
+use crate::z_internal_error;
 
 use super::prelude::*;
 
@@ -947,9 +948,7 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 
 impl ServerState {
     /// Get the all valid symbols
-    pub async fn get_symbol_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
-        let snap = snap.receive().await.map_err(z_internal_error)?;
-
+    pub async fn get_symbol_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();
         use typst::symbols::{emoji, sym};
         populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
