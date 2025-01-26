@@ -595,7 +595,12 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         let compile_handle = Arc::new(CompileHandlerImpl {
             preview: preview_state.clone(),
             diag_group: "main".to_owned(),
-            export: crate::task::ExportTask::new(handle, Default::default()),
+            export: crate::task::ExportTask::new(
+                handle,
+                String::default(),
+                None,
+                Default::default(),
+            ),
             editor_tx,
             client: Box::new(intr_tx.clone()),
             analysis: Arc::default(),

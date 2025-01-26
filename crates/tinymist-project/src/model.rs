@@ -25,7 +25,7 @@ use crate::LspWorld;
 pub const LOCK_VERSION: &str = "0.1.0-beta0";
 
 /// A scalar that is not NaN.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Scalar(f32);
 
 impl TryFrom<f32> for Scalar {
@@ -37,6 +37,13 @@ impl TryFrom<f32> for Scalar {
         } else {
             Ok(Scalar(value))
         }
+    }
+}
+
+impl Scalar {
+    /// Converts the scalar to an f32.
+    pub fn to_f32(self) -> f32 {
+        self.0
     }
 }
 

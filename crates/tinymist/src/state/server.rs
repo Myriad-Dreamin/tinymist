@@ -410,18 +410,22 @@ impl ServerState {
         // use codespan_reporting::term::Config;
         // Run Export actors before preparing cluster to avoid loss of events
         let export_config = ExportConfig {
-            group: diag_group.clone(),
-            editor_tx: Some(editor_tx.clone()),
-            config: ExportUserConfig {
-                output: compile_config.output_path.clone(),
-                when: compile_config.export_pdf,
-            },
-            kind: ExportKind::Pdf {
-                creation_timestamp: config.compile.determine_creation_timestamp(),
-            },
+            // config: ExportUserConfig {
+            //     output: compile_config.output_path.clone(),
+            //     when: compile_config.export_pdf,
+            //     kind: ExportKind::Pdf {
+            //         creation_timestamp: config.compile.determine_creation_timestamp(),
+            //     },
+            // },
+            config: todo!(),
             count_words: config.compile.notify_status,
         };
-        let export = ExportTask::new(client.handle.clone(), export_config);
+        let export = ExportTask::new(
+            client.handle.clone(),
+            diag_group.clone(),
+            Some(editor_tx.clone()),
+            export_config,
+        );
 
         log::info!(
             "TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}"
@@ -542,13 +546,15 @@ impl ServerState {
         });
 
         let snap = self.snapshot()?;
-        let task = self.project.export.factory.task();
+        // todo: clone all
+        let task = self.project.export.clone();
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 ..Default::default()
             });
-            let res = task.oneshot(snap.clone(), kind, lock_dir).await?;
+            // kind
+            let res = task.oneshot(snap.clone(), todo!(), lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }

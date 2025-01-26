@@ -76,12 +76,14 @@ impl ServerState {
         if config.compile.output_path != self.config.compile.output_path
             || config.compile.export_pdf != self.config.compile.export_pdf
         {
-            let config = ExportUserConfig {
-                output: self.config.compile.output_path.clone(),
-                when: self.config.compile.export_pdf,
-            };
+            // let config = ExportUserConfig {
+            //     output: self.config.compile.output_path.clone(),
+            //     when: self.config.compile.export_pdf,
+            // };
 
-            self.change_export_config(config.clone());
+            let config = todo!();
+
+            self.change_export_config(config);
         }
 
         if config.compile.primary_opts() != self.config.compile.primary_opts() {
