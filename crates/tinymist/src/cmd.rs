@@ -56,6 +56,55 @@ struct HighlightRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
+    // let when = self.config.when;
+
+    // // todo: page transforms
+    // let transforms = vec![];
+
+    // use tinymist_project::ExportTask as ProjectExportTask;
+
+    // let export = ProjectExportTask {
+    //     when,
+    //     transform: transforms,
+    // };
+
+    // let config = match kind {
+    //     Pdf { creation_timestamp } => {
+    //         let _ = creation_timestamp;
+    //         ProjectTaskConfig::ExportPdf(ExportPdfTask {
+    //             export,
+    //             pdf_standards: Default::default(),
+    //             creation_timestamp: None,
+    //         })
+    //     }
+    //     Html {} => ProjectTaskConfig::ExportHtml(ExportHtmlTask { export }),
+    //     Markdown {} => ProjectTaskConfig::ExportMarkdown(ExportMarkdownTask {
+    // export }),     Text {} => ProjectTaskConfig::ExportText(ExportTextTask {
+    // export }),     Query { .. } => {
+    //         // todo: ignoring query task.
+    //         return None;
+    //     }
+    //     Svg { page } => {
+    //         // todo: ignoring page selection.
+    //         let _ = page;
+    //         return None;
+    //     }
+    //     Png { ppi, fill, page } => {
+    //         // todo: ignoring page fill.
+    //         let _ = fill;
+    //         // todo: ignoring page selection.
+    //         let _ = page;
+
+    //         let ppi = ppi.unwrap_or(144.) as f32;
+    //         let ppi = ppi.try_into().unwrap();
+    //         ProjectTaskConfig::ExportPng(ExportPngTask {
+    //             export,
+    //             ppi,
+    //             fill: None,
+    //         })
+    //     }
+    // };
+
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);

@@ -183,6 +183,7 @@ impl TaskCompileArgs {
 
         let export = ExportTask {
             when,
+            output: None,
             transform: transforms,
         };
 

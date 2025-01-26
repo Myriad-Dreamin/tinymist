@@ -5,13 +5,14 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::project::{
     CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask,
-    ExportSignal, ExportTextTask, ProjectTask, TaskWhen,
+    ExportTextTask, ProjectTask, TaskWhen,
 };
 use anyhow::{bail, Context};
 use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
 use tinymist_project::{
-    EntryReader, LspCompileSnapshot, LspCompiledArtifact, PathPattern, ProjectTaskConfig,
+    EntryReader, ExportTask as ProjectExportTask, LspCompileSnapshot, LspCompiledArtifact,
+    PathPattern, ProjectTaskConfig,
 };
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
@@ -29,13 +30,75 @@ use crate::{actor::editor::EditorRequest, tool::word_count};
 
 use super::*;
 
+// let when = self.config.when;
+
+// // todo: page transforms
+// let transforms = vec![];
+
+// use tinymist_project::ExportTask as ProjectExportTask;
+
+// let export = ProjectExportTask {
+//     when,
+//     transform: transforms,
+// };
+
+// let config = match kind {
+//     Pdf { creation_timestamp } => {
+//         let _ = creation_timestamp;
+//         ProjectTaskConfig::ExportPdf(ExportPdfTask {
+//             export,
+//             pdf_standards: Default::default(),
+//             creation_timestamp: None,
+//         })
+//     }
+//     Html {} => ProjectTaskConfig::ExportHtml(ExportHtmlTask { export }),
+//     Markdown {} => ProjectTaskConfig::ExportMarkdown(ExportMarkdownTask {
+// export }),     Text {} => ProjectTaskConfig::ExportText(ExportTextTask {
+// export }),     Query { .. } => {
+//         // todo: ignoring query task.
+//         return None;
+//     }
+//     Svg { page } => {
+//         // todo: ignoring page selection.
+//         let _ = page;
+//         return None;
+//     }
+//     Png { ppi, fill, page } => {
+//         // todo: ignoring page fill.
+//         let _ = fill;
+//         // todo: ignoring page selection.
+//         let _ = page;
+
+//         let ppi = ppi.unwrap_or(144.) as f32;
+//         let ppi = ppi.try_into().unwrap();
+//         ProjectTaskConfig::ExportPng(ExportPngTask {
+//             export,
+//             ppi,
+//             fill: None,
+//         })
+//     }
+// };
 /// User configuration for export.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ExportUserConfig {
-    /// The output path pattern.
-    pub output: PathPattern,
-    /// When to export an output file.
-    pub when: TaskWhen,
+    /// The task configuration
+    pub task: ProjectTaskConfig,
+}
+
+impl Default for ExportUserConfig {
+    fn default() -> Self {
+        Self {
+            task: ProjectTaskConfig::ExportPdf(ExportPdfTask {
+                export: ProjectExportTask {
+                    when: TaskWhen::Never,
+                    output: None,
+                    transform: vec![],
+                },
+                pdf_standards: vec![],
+                creation_timestamp: None,
+            }),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -60,14 +123,13 @@ impl ExportTask {
         self.factory.mutate(|data| data.config = config);
     }
 
-    pub fn signal(&self, snap: &LspCompiledArtifact, s: ExportSignal) {
-        let task = self.factory.task();
-        task.signal(snap, s, self);
+    pub fn signal(&self, snap: &LspCompiledArtifact) {
+        self.factory.task().signal(snap, self);
     }
 }
 
-pub struct ExportOnceTask<'a> {
-    pub kind: &'a ExportKind,
+pub struct ExportOnceTask {
+    pub task: ProjectTaskConfig,
     pub artifact: LspCompiledArtifact,
     pub lock_path: Option<ImmutPath>,
 }
@@ -77,27 +139,28 @@ pub struct ExportConfig {
     pub group: String,
     pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
     pub config: ExportUserConfig,
-    pub kind: ExportKind,
+    // pub kind: ExportKind,
+    // pub config: ProjectTaskConfig,
     pub count_words: bool,
 }
 
 impl ExportConfig {
-    fn signal(self: Arc<Self>, snap: &LspCompiledArtifact, s: ExportSignal, t: &ExportTask) {
-        self.signal_export(snap, s, t);
+    fn signal(self: Arc<Self>, snap: &LspCompiledArtifact, t: &ExportTask) {
+        self.signal_export(snap, t);
         self.signal_count_word(snap, t);
     }
 
     fn signal_export(
         self: &Arc<Self>,
         artifact: &LspCompiledArtifact,
-        s: ExportSignal,
         t: &ExportTask,
     ) -> Option<()> {
         let doc = artifact.doc.as_ref().ok()?;
+        let s = artifact.signal;
 
-        let mode = self.config.when;
-        let need_export = (!matches!(mode, TaskWhen::Never) && s.by_entry_update)
-            || match mode {
+        let when = self.config.task.when().unwrap_or_default();
+        let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
+            || match when {
                 TaskWhen::Never => false,
                 TaskWhen::OnType => s.by_mem_events,
                 TaskWhen::OnSave => s.by_fs_events,
@@ -109,12 +172,12 @@ impl ExportConfig {
         }
 
         let fut = t.export_folder.spawn(artifact.world.revision().get(), || {
-            let this = self.clone();
+            let task = self.config.task.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
                 log_err(
-                    this.do_export(ExportOnceTask {
-                        kind: &this.kind,
+                    Self::do_export(ExportOnceTask {
+                        task,
                         artifact,
                         lock_path: None,
                     })
@@ -159,20 +222,22 @@ impl ExportConfig {
         Some(())
     }
 
-    async fn do_export(&self, task: ExportOnceTask<'_>) -> anyhow::Result<Option<PathBuf>> {
+    async fn do_export(task: ExportOnceTask<'_>) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use ExportKind::*;
         use PageSelection::*;
 
         let ExportOnceTask {
-            kind,
+            task: kind,
             artifact: CompiledArtifact { snap, doc, .. },
             lock_path: lock_dir,
         } = task;
 
         // Prepare the output path.
         let entry = snap.world.entry_state();
-        let Some(to) = self.config.output.substitute(&entry) else {
+        let config = task.task.as_export().unwrap();
+        let output = config.output.unwrap_or_default();
+        let Some(to) = output.substitute(&entry) else {
             return Ok(None);
         };
         if to.is_relative() {
@@ -206,6 +271,7 @@ impl ExportConfig {
 
             let export = ProjectExportTask {
                 when,
+                output: Some(self.config.output.clone()),
                 transform: transforms,
             };
 
@@ -389,7 +455,7 @@ impl ExportConfig {
     ) -> anyhow::Result<Option<PathBuf>> {
         let artifact = snap.compile();
         self.do_export(ExportOnceTask {
-            kind: &kind,
+            task: &kind,
             artifact,
             lock_path,
         })

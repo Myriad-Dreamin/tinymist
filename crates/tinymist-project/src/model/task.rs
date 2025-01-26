@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Id, Pages, PdfStandard, Scalar, TaskWhen};
+use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 
 /// A project task specifier. This is used for specifying tasks in a project.
 /// When the language service notifies an update event of the project, it will
@@ -79,6 +79,53 @@ impl ProjectTask {
     }
 }
 
+impl ProjectTaskConfig {
+    /// Returns the timing of executing the task.
+    pub fn when(&self) -> Option<TaskWhen> {
+        Some(match self {
+            Self::Preview(task) => task.when,
+            Self::ExportPdf(..)
+            | Self::ExportPng(..)
+            | Self::ExportSvg(..)
+            | Self::ExportHtml(..)
+            | Self::ExportMarkdown(..)
+            | Self::ExportText(..)
+            | Self::Query(..) => self.as_export()?.when,
+        })
+    }
+
+    /// Returns the export configuration of a task.
+    pub fn as_export(&self) -> Option<&ExportTask> {
+        Some(match self {
+            Self::Preview(..) => return None,
+            Self::ExportPdf(task) => &task.export,
+            Self::ExportPng(task) => &task.export,
+            Self::ExportSvg(task) => &task.export,
+            Self::ExportHtml(task) => &task.export,
+            Self::ExportMarkdown(task) => &task.export,
+            Self::ExportText(task) => &task.export,
+            Self::Query(task) => &task.export,
+        })
+    }
+
+    /// Returns extension of the artifact.
+    pub fn extension(&self) -> &str {
+        match self {
+            Self::ExportPdf { .. } => "pdf",
+            Self::Preview(..) | Self::ExportHtml { .. } => "html",
+            Self::ExportMarkdown { .. } => "md",
+            Self::ExportText { .. } => "txt",
+            Self::ExportSvg { .. } => "svg",
+            Self::ExportPng { .. } => "png",
+            Self::Query(QueryTask {
+                format,
+                output_extension,
+                ..
+            }) => output_extension.as_deref().unwrap_or(format),
+        }
+    }
+}
+
 /// A preview task specifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -94,6 +141,8 @@ pub struct PreviewTask {
 pub struct ExportTask {
     /// When to run the task
     pub when: TaskWhen,
+    /// The output path pattern.
+    pub output: Option<PathPattern>,
     /// The task's transforms.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub transform: Vec<ExportTransform>,
@@ -104,6 +153,7 @@ impl ExportTask {
     pub fn new(when: TaskWhen) -> Self {
         Self {
             when,
+            output: None,
             transform: Vec::new(),
         }
     }
@@ -223,7 +273,7 @@ pub struct QueryTask {
     pub format: String,
     /// Uses a different output extension from the one inferring from the
     /// [`Self::format`].
-    pub output_extension: String,
+    pub output_extension: Option<String>,
     /// Defines which elements to retrieve.
     pub selector: String,
     /// Extracts just one field from all retrieved elements.
