@@ -158,7 +158,7 @@ impl FontResolver for TinymistFontResolver {
     }
 
     fn font(&self, idx: usize) -> Option<Font> {
-        self.fonts[idx].get_or_init()
+        self.fonts.get(idx)?.get_or_init()
     }
 
     fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
