@@ -78,7 +78,7 @@ impl ServerState {
         {
             let config = ExportUserConfig {
                 output: self.config.compile.output_path.clone(),
-                mode: self.config.compile.export_pdf,
+                when: self.config.compile.export_pdf,
             };
 
             self.change_export_config(config.clone());

@@ -10,7 +10,9 @@ use crate::project::{
 use anyhow::{bail, Context};
 use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
-use tinymist_project::{EntryReader, LspCompileSnapshot, LspCompiledArtifact, ProjectTaskConfig};
+use tinymist_project::{
+    EntryReader, LspCompileSnapshot, LspCompiledArtifact, PathPattern, ProjectTaskConfig,
+};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
@@ -23,7 +25,7 @@ use typst::{
 use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
-use crate::{actor::editor::EditorRequest, tool::word_count, ExportMode, PathPattern};
+use crate::{actor::editor::EditorRequest, tool::word_count};
 
 use super::*;
 
@@ -32,8 +34,8 @@ use super::*;
 pub struct ExportUserConfig {
     /// The output path pattern.
     pub output: PathPattern,
-    /// The export mode.
-    pub mode: ExportMode,
+    /// When to export an output file.
+    pub when: TaskWhen,
 }
 
 #[derive(Clone)]
@@ -93,13 +95,13 @@ impl ExportConfig {
     ) -> Option<()> {
         let doc = artifact.doc.as_ref().ok()?;
 
-        let mode = self.config.mode;
-        let need_export = (!matches!(mode, ExportMode::Never) && s.by_entry_update)
+        let mode = self.config.when;
+        let need_export = (!matches!(mode, TaskWhen::Never) && s.by_entry_update)
             || match mode {
-                ExportMode::Never => false,
-                ExportMode::OnType => s.by_mem_events,
-                ExportMode::OnSave => s.by_fs_events,
-                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
+                TaskWhen::Never => false,
+                TaskWhen::OnType => s.by_mem_events,
+                TaskWhen::OnSave => s.by_fs_events,
+                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
             };
 
         if !need_export {
@@ -195,12 +197,7 @@ impl ExportConfig {
             let doc_id = updater.compiled(&snap.world)?;
             let task_id = doc_id.clone();
 
-            let when = match self.config.mode {
-                ExportMode::Never => TaskWhen::Never,
-                ExportMode::OnType => TaskWhen::OnType,
-                ExportMode::OnSave => TaskWhen::OnSave,
-                ExportMode::OnDocumentHasTitle => TaskWhen::OnSave,
-            };
+            let when = self.config.when;
 
             // todo: page transforms
             let transforms = vec![];
@@ -511,7 +508,7 @@ mod tests {
     fn test_default_never() {
         let conf = ExportConfig::default();
         assert!(!conf.count_words);
-        assert_eq!(conf.config.mode, ExportMode::Never);
+        assert_eq!(conf.config.when, TaskWhen::Never);
     }
 
     #[test]

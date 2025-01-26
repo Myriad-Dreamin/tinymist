@@ -2,26 +2,22 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::project::font::TinymistFontResolver;
-use crate::world::EntryState;
 use anyhow::bail;
 use clap::Parser;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
-use reflexo::path::PathClean;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{FormatUserConfig, FormatterConfig};
-use tinymist_project::{EntryResolver, ProjectResolutionKind};
+use tinymist_project::{EntryResolver, PathPattern, ProjectResolutionKind, TaskWhen};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
-use typst::syntax::FileId;
 use typst_shim::utils::{Deferred, LazyHash};
-use vfs::WorkspaceResolver;
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -491,7 +487,7 @@ pub struct CompileConfig {
     /// The output directory for PDF export.
     pub output_path: PathPattern,
     /// The mode of PDF export.
-    pub export_pdf: ExportMode,
+    pub export_pdf: TaskWhen,
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
     /// Whether to ignore system fonts
@@ -536,7 +532,7 @@ impl CompileConfig {
 
         let project_resolution = deser_or_default!("projectResolution", ProjectResolutionKind);
         self.output_path = deser_or_default!("outputPath", PathPattern);
-        self.export_pdf = deser_or_default!("exportPdf", ExportMode);
+        self.export_pdf = deser_or_default!("exportPdf", TaskWhen);
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
@@ -772,22 +768,6 @@ pub enum FormatterMode {
     Typstfmt,
 }
 
-/// The mode of PDF/SVG/PNG export.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportMode {
-    /// Never export.
-    #[default]
-    Never,
-    /// Export on saving the document, i.e. on `textDocument/didSave` events.
-    OnSave,
-    /// Export on typing, i.e. on `textDocument/didChange` events.
-    OnType,
-    /// Export when a document has a title and on saved, which is useful to
-    /// filter out template files.
-    OnDocumentHasTitle,
-}
-
 /// The mode of semantic tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -832,76 +812,11 @@ pub struct CompileExtraOpts {
     pub cert: Option<ImmutPath>,
 }
 
-/// The path pattern that could be substituted.
-///
-/// # Examples
-/// - `$root` is the root of the project.
-/// - `$root/$dir` is the parent directory of the input (main) file.
-/// - `$root/main` will help store pdf file to `$root/main.pdf` constantly.
-/// - (default) `$root/$dir/$name` will help store pdf file along with the input
-///   file.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PathPattern(pub String);
-
-impl PathPattern {
-    /// Creates a new path pattern.
-    pub fn new(pattern: &str) -> Self {
-        Self(pattern.to_owned())
-    }
-
-    /// Substitutes the path pattern with `$root`, and `$dir/$name`.
-    pub fn substitute(&self, entry: &EntryState) -> Option<ImmutPath> {
-        self.substitute_impl(entry.root(), entry.main())
-    }
-
-    #[comemo::memoize]
-    fn substitute_impl(&self, root: Option<ImmutPath>, main: Option<FileId>) -> Option<ImmutPath> {
-        log::info!("Check path {main:?} and root {root:?} with output directory {self:?}");
-
-        let (root, main) = root.zip(main)?;
-
-        // Files in packages are not exported
-        if WorkspaceResolver::is_package_file(main) {
-            return None;
-        }
-        // Files without a path are not exported
-        let path = main.vpath().resolve(&root)?;
-
-        // todo: handle untitled path
-        if let Ok(path) = path.strip_prefix("/untitled") {
-            let tmp = std::env::temp_dir();
-            let path = tmp.join("typst").join(path);
-            return Some(path.as_path().into());
-        }
-
-        if self.0.is_empty() {
-            return Some(path.to_path_buf().clean().into());
-        }
-
-        let path = path.strip_prefix(&root).ok()?;
-        let dir = path.parent();
-        let file_name = path.file_name().unwrap_or_default();
-
-        let w = root.to_string_lossy();
-        let f = file_name.to_string_lossy();
-
-        // replace all $root
-        let mut path = self.0.replace("$root", &w);
-        if let Some(dir) = dir {
-            let d = dir.to_string_lossy();
-            path = path.replace("$dir", &d);
-        }
-        path = path.replace("$name", &f);
-
-        Some(PathBuf::from(path).clean().into())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-    use typst::syntax::VirtualPath;
+    use tinymist_project::PathPattern;
 
     #[test]
     fn test_default_encoding() {
@@ -935,7 +850,7 @@ mod tests {
         }
 
         assert_eq!(config.compile.output_path, PathPattern::new("out"));
-        assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
+        assert_eq!(config.compile.export_pdf, TaskWhen::OnSave);
         assert_eq!(
             config.compile.entry_resolver.root_path,
             Some(ImmutPath::from(root_path))
@@ -965,7 +880,7 @@ mod tests {
 
         config.update(&update).unwrap();
 
-        assert_eq!(config.compile.export_pdf, ExportMode::OnType);
+        assert_eq!(config.compile.export_pdf, TaskWhen::OnType);
     }
 
     #[test]
@@ -1122,30 +1037,6 @@ mod tests {
                 simple_config.compile.typst_extra_args
             );
         }
-    }
-
-    #[test]
-    fn test_substitute_path() {
-        let root = Path::new("/root");
-        let entry =
-            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
-
-        assert_eq!(
-            PathPattern::new("/substitute/$dir/$name").substitute(&entry),
-            Some(PathBuf::from("/substitute/dir1/dir2/file.txt").into())
-        );
-        assert_eq!(
-            PathPattern::new("/substitute/$dir/../$name").substitute(&entry),
-            Some(PathBuf::from("/substitute/dir1/file.txt").into())
-        );
-        assert_eq!(
-            PathPattern::new("/substitute/$name").substitute(&entry),
-            Some(PathBuf::from("/substitute/file.txt").into())
-        );
-        assert_eq!(
-            PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
-            Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
-        );
     }
 
     #[test]

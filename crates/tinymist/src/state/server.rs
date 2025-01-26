@@ -414,7 +414,7 @@ impl ServerState {
             editor_tx: Some(editor_tx.clone()),
             config: ExportUserConfig {
                 output: compile_config.output_path.clone(),
-                mode: compile_config.export_pdf,
+                when: compile_config.export_pdf,
             },
             kind: ExportKind::Pdf {
                 creation_timestamp: config.compile.determine_creation_timestamp(),
