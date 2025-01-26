@@ -53,7 +53,7 @@ A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This wil
 
 ## Checking publish tokens
 
-Please check the deadline of the publish tokens. The publish tokens are stored in the GitHub secrets. If the tokens are expired, please renew them.
+Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
 
 - Renew the `VSCODE_MARKETPLACE_TOKEN` according to the [Azure DevOps -- Use personal access tokens.](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows)
 - Renew the `OPENVSX_ACCESS_TOKEN` at the [Open VSX Registry -- Access Tokens.](https://open-vsx.org/user-settings/tokens)
