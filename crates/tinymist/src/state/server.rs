@@ -533,15 +533,14 @@ impl ServerState {
         });
 
         let snap = self.snapshot()?;
-        // todo: merge all
-        let task_base = self.project.export.clone();
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 ..Default::default()
             });
-            // kind
-            let res = task_base.oneshot(snap.clone(), task, lock_dir).await?;
+
+            let artifact = snap.clone().compile();
+            let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }

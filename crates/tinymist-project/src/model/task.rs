@@ -2,6 +2,7 @@
 
 use std::hash::Hash;
 
+use reflexo_typst::TypstAbs;
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::prelude::*;
 
@@ -159,32 +160,28 @@ impl ExportTask {
         }
     }
 
-    /// Applies page selection to the export task.
-    pub fn select_page(&mut self, selection: PageSelection) -> Result<()> {
-        match selection {
-            PageSelection::First => self.transform.push(ExportTransform::Pages {
-                ranges: vec![Pages::FIRST],
-            }),
-            PageSelection::Merged { gap } => {
-                let gap = gap
-                    .map(|gap| gap.parse::<f32>())
-                    .transpose()
-                    .context_ut("failed to parse gap")?
-                    .unwrap_or_default()
-                    .try_into()
-                    .context("invalid gap (e.g. NaN)")?;
-
-                self.transform.push(ExportTransform::Merge { gap });
-            }
-        }
-
-        Ok(())
-    }
-
     /// Pretty prints the output whenever possible.
     pub fn apply_pretty(&mut self) {
         self.transform
             .push(ExportTransform::Pretty { script: None });
+    }
+
+    /// Gets legacy page selection
+    pub fn get_page_selection(&self) -> Result<(bool, TypstAbs)> {
+        let is_first = self.transform.iter().any(
+            |t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]),
+        );
+
+        let mut gap_res = TypstAbs::default();
+        if !is_first {
+            for trans in &self.transform {
+                if let ExportTransform::Merge { gap } = trans {
+                    gap_res = TypstAbs::pt(gap.to_f32() as f64);
+                }
+            }
+        }
+
+        Ok((is_first, gap_res))
     }
 }
 
