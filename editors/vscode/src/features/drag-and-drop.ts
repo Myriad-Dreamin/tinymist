@@ -20,6 +20,7 @@ enum ResourceKind {
   Yaml,
   Bib,
   Xlsx,
+  Ods,
 }
 
 const resourceKinds: Record<string, ResourceKind> = {
@@ -44,6 +45,7 @@ const resourceKinds: Record<string, ResourceKind> = {
   ".yml": ResourceKind.Yaml,
   ".bib": ResourceKind.Bib,
   ".xlsx": ResourceKind.Xlsx,
+  ".ods": ResourceKind.Ods,
 };
 
 export class TextProvider implements vscode.DocumentDropEditProvider {
@@ -89,6 +91,11 @@ export class TextProvider implements vscode.DocumentDropEditProvider {
         additionalPkgs.push(["@preview/rexllent", "0.3.0", "xlsx-parser"]);
         codeSnippet = `xlsx-parser(read(${strPath}, encoding: none))`;
         break;
+      case ResourceKind.Ods:
+        additionalPkgs.push(["@preview/spreet", "0.1.0", undefined]);
+        additionalPkgs.push(["@preview/rexllent", "0.3.0", "spreet-parser"]);
+        codeSnippet = `spreet-parser(spreet.decode(read(${strPath}, encoding: none)))`;
+        break
       case ResourceKind.Source:
         codeSnippet = `include ${strPath}`;
         break;
