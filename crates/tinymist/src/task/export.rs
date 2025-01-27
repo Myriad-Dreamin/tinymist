@@ -457,8 +457,7 @@ mod tests {
     fn test_default_never() {
         let conf = ExportUserConfig::default();
         assert!(!conf.count_words);
-        assert_eq!(conf.task.when(), None);
-        assert_eq!(conf.task.when().unwrap_or_default(), TaskWhen::Never);
+        assert_eq!(conf.task.when(), Some(TaskWhen::Never));
     }
 
     #[test]
