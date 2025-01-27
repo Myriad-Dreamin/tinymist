@@ -107,10 +107,6 @@ impl ExportTask {
     }
 
     pub fn signal(&self, snap: &LspCompiledArtifact) {
-        //     self.factory.task().signal(snap, self);
-        // }
-
-        // fn signal(self: Arc<Self>, snap: &LspCompiledArtifact, t: &ExportTask) {
         let config = self.factory.task();
 
         self.signal_export(snap, &config);
