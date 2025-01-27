@@ -3,10 +3,8 @@
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use anyhow::bail;
 use lsp_server::RequestId;
 use lsp_types::*;
-use reflexo_typst::TypstAbs;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
@@ -20,7 +18,6 @@ use tinymist_query::LocalContextGuard;
 use tinymist_std::error::prelude::*;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
-use typst::syntax::{ast, SyntaxNode};
 use world::TaskInputs;
 
 use super::state::*;
@@ -725,67 +722,9 @@ fn select_page(task: &mut ExportTask, selection: PageSelection) -> Result<()> {
             ranges: vec![Pages::FIRST],
         }),
         PageSelection::Merged { gap } => {
-            let gap = gap
-                .map(parse_length)
-                .transpose()
-                .context_ut("failed to parse gap")?
-                .map(|abs| abs.to_pt() as f32)
-                .unwrap_or_default()
-                .try_into()
-                .context("invalid gap (e.g. NaN)")?;
-
             task.transform.push(ExportTransform::Merge { gap });
         }
     }
 
     Ok(())
-}
-
-fn parse_length(gap: String) -> anyhow::Result<TypstAbs> {
-    let length = typst::syntax::parse_code(&gap);
-    if length.erroneous() {
-        bail!("invalid length: {gap}, errors: {:?}", length.errors());
-    }
-
-    let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);
-
-    let Some(length) = length else {
-        bail!("not a length: {gap}");
-    };
-
-    let (value, unit) = length.get();
-    match unit {
-        ast::Unit::Pt => Ok(TypstAbs::pt(value)),
-        ast::Unit::Mm => Ok(TypstAbs::mm(value)),
-        ast::Unit::Cm => Ok(TypstAbs::cm(value)),
-        ast::Unit::In => Ok(TypstAbs::inches(value)),
-        _ => bail!("invalid unit: {unit:?} in {gap}"),
-    }
-}
-
-/// Low performance but simple recursive iterator.
-fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ {
-    let mut res = vec![];
-    for child in node.children() {
-        res.push(child);
-        res.extend(descendants(child));
-    }
-
-    res
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use TypstAbs as Abs;
-
-    #[test]
-    fn test_parse_length() {
-        assert_eq!(parse_length("1pt".to_owned()).unwrap(), Abs::pt(1.));
-        assert_eq!(parse_length("1mm".to_owned()).unwrap(), Abs::mm(1.));
-        assert_eq!(parse_length("1cm".to_owned()).unwrap(), Abs::cm(1.));
-        assert_eq!(parse_length("1in".to_owned()).unwrap(), Abs::inches(1.));
-        assert!(parse_length("1".to_owned()).is_err());
-        assert!(parse_length("1px".to_owned()).is_err());
-    }
 }

@@ -2,9 +2,7 @@
 
 use std::hash::Hash;
 
-use reflexo_typst::TypstAbs;
 use serde::{Deserialize, Serialize};
-use tinymist_std::error::prelude::*;
 
 use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 
@@ -165,24 +163,6 @@ impl ExportTask {
         self.transform
             .push(ExportTransform::Pretty { script: None });
     }
-
-    /// Gets legacy page selection
-    pub fn get_page_selection(&self) -> Result<(bool, TypstAbs)> {
-        let is_first = self.transform.iter().any(
-            |t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]),
-        );
-
-        let mut gap_res = TypstAbs::default();
-        if !is_first {
-            for trans in &self.transform {
-                if let ExportTransform::Merge { gap } = trans {
-                    gap_res = TypstAbs::pt(gap.to_f32() as f64);
-                }
-            }
-        }
-
-        Ok((is_first, gap_res))
-    }
 }
 
 /// The legacy page selection specifier.
@@ -210,8 +190,8 @@ pub enum ExportTransform {
     },
     /// Merge pages into a single page.
     Merge {
-        /// The gap between pages (in pt).
-        gap: Scalar,
+        /// The gap between pages (typst code expression, e.g. `1pt`).
+        gap: Option<String>,
     },
     /// Execute a transform script.
     Script {

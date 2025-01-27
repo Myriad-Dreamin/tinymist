@@ -7,17 +7,18 @@ use crate::project::{
     ApplyProjectTask, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
     ExportPngTask, ExportTextTask, TaskWhen,
 };
-use anyhow::{bail, Context};
+use anyhow::bail;
 use reflexo::ImmutPath;
-use reflexo_typst::TypstDatetime;
+use reflexo_typst::{TypstAbs as Abs, TypstDatetime};
 use tinymist_project::{
     convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
-    LspCompiledArtifact, ProjectTask, QueryTask,
+    ExportTransform, LspCompiledArtifact, Pages, ProjectTask, QueryTask,
 };
-use tinymist_std::error::WithContextUntyped;
+use tinymist_std::error::prelude::*;
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
+use typst::syntax::{ast, SyntaxNode};
 use typst::visualize::Color;
 use typst_pdf::PdfOptions;
 
@@ -25,55 +26,6 @@ use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
 use super::*;
-
-// let when = self.config.when;
-
-// // todo: page transforms
-// let transforms = vec![];
-
-// use tinymist_project::ExportTask as ProjectExportTask;
-
-// let export = ProjectExportTask {
-//     when,
-//     transform: transforms,
-// };
-
-// let config = match kind {
-//     Pdf { creation_timestamp } => {
-//         let _ = creation_timestamp;
-//         ProjectTaskConfig::ExportPdf(ExportPdfTask {
-//             export,
-//             pdf_standards: Default::default(),
-//             creation_timestamp: None,
-//         })
-//     }
-//     Html {} => ProjectTaskConfig::ExportHtml(ExportHtmlTask { export }),
-//     Markdown {} => ProjectTaskConfig::ExportMarkdown(ExportMarkdownTask {
-// export }),     Text {} => ProjectTaskConfig::ExportText(ExportTextTask {
-// export }),     Query { .. } => {
-//         // todo: ignoring query task.
-//         return None;
-//     }
-//     Svg { page } => {
-//         // todo: ignoring page selection.
-//         let _ = page;
-//         return None;
-//     }
-//     Png { ppi, fill, page } => {
-//         // todo: ignoring page fill.
-//         let _ = fill;
-//         // todo: ignoring page selection.
-//         let _ = page;
-
-//         let ppi = ppi.unwrap_or(144.) as f32;
-//         let ppi = ppi.try_into().unwrap();
-//         ProjectTaskConfig::ExportPng(ExportPngTask {
-//             export,
-//             ppi,
-//             fill: None,
-//         })
-//     }
-// };
 
 #[derive(Clone)]
 pub struct ExportTask {
@@ -209,9 +161,7 @@ impl ExportTask {
         log::info!("RenderActor({task:?}): exporting {entry:?} to {to:?}");
         if let Some(e) = to.parent() {
             if !e.exists() {
-                std::fs::create_dir_all(e).with_context(|| {
-                    format!("RenderActor({task:?}): failed to create directory")
-                })?;
+                std::fs::create_dir_all(e).context("failed to create directory")?;
             }
         }
 
@@ -309,7 +259,7 @@ impl ExportTask {
                     conv.as_bytes().to_owned()
                 }
                 ExportSvg(ExportSvgTask { export }) => {
-                    let (is_first, merged_gap) = export.get_page_selection()?;
+                    let (is_first, merged_gap) = get_page_selection(&export)?;
 
                     if is_first {
                         typst_svg::svg(first_page).into_bytes()
@@ -329,7 +279,7 @@ impl ExportTask {
                         Color::WHITE
                     };
 
-                    let (is_first, merged_gap) = export.get_page_selection()?;
+                    let (is_first, merged_gap) = get_page_selection(&export)?;
 
                     let pixmap = if is_first {
                         typst_render::render(first_page, ppi / 72.)
@@ -346,7 +296,7 @@ impl ExportTask {
 
         tokio::fs::write(&to, data.await??)
             .await
-            .with_context(|| format!("RenderActor({task:?}): failed to export"))?;
+            .context("failed to export")?;
 
         log::info!("RenderActor({task:?}): export complete");
         Ok(Some(to))
@@ -376,8 +326,6 @@ impl Default for ExportUserConfig {
         }
     }
 }
-
-impl ExportUserConfig {}
 
 fn parse_color(fill: String) -> anyhow::Result<Color> {
     match fill.as_str() {
@@ -444,6 +392,63 @@ fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> anyhow
     })
 }
 
+/// Gets legacy page selection
+pub fn get_page_selection(task: &tinymist_project::ExportTask) -> Result<(bool, Abs)> {
+    let is_first = task
+        .transform
+        .iter()
+        .any(|t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]));
+
+    let mut gap_res = Abs::default();
+    if !is_first {
+        for trans in &task.transform {
+            if let ExportTransform::Merge { gap } = trans {
+                let gap = gap
+                    .as_deref()
+                    .map(parse_length)
+                    .transpose()
+                    .context_ut("failed to parse gap")?;
+                gap_res = gap.unwrap_or_default();
+            }
+        }
+    }
+
+    Ok((is_first, gap_res))
+}
+
+fn parse_length(gap: &str) -> anyhow::Result<Abs> {
+    let length = typst::syntax::parse_code(gap);
+    if length.erroneous() {
+        bail!("invalid length: {gap}, errors: {:?}", length.errors());
+    }
+
+    let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);
+
+    let Some(length) = length else {
+        bail!("not a length: {gap}");
+    };
+
+    let (value, unit) = length.get();
+    match unit {
+        ast::Unit::Pt => Ok(Abs::pt(value)),
+        ast::Unit::Mm => Ok(Abs::mm(value)),
+        ast::Unit::Cm => Ok(Abs::cm(value)),
+        ast::Unit::In => Ok(Abs::inches(value)),
+        _ => bail!("invalid unit: {unit:?} in {gap}"),
+    }
+}
+
+/// Low performance but simple recursive iterator.
+fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ {
+    let mut res = vec![];
+    for child in node.children() {
+        res.push(child);
+        res.extend(descendants(child));
+    }
+
+    res
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -476,5 +481,15 @@ mod tests {
             "#000000cc"
         );
         assert!(parse_color("invalid".to_owned()).is_err());
+    }
+
+    #[test]
+    fn test_parse_length() {
+        assert_eq!(parse_length("1pt").unwrap(), Abs::pt(1.));
+        assert_eq!(parse_length("1mm").unwrap(), Abs::mm(1.));
+        assert_eq!(parse_length("1cm").unwrap(), Abs::cm(1.));
+        assert_eq!(parse_length("1in").unwrap(), Abs::inches(1.));
+        assert!(parse_length("1").is_err());
+        assert!(parse_length("1px").is_err());
     }
 }
