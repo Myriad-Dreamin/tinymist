@@ -16,7 +16,7 @@ use tinymist_std::ImmutPath;
 use typst::{diag::FileResult, syntax::Source};
 
 use crate::route::ProjectResolution;
-use crate::task::{ExportUserConfig, FormatterConfig};
+use crate::task::FormatterConfig;
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;
 use crate::{init::*, *};
@@ -61,11 +61,11 @@ impl ServerState {
         &mut self,
         values: Map<String, JsonValue>,
     ) -> LspResult<()> {
-        let config = self.config.clone();
+        let old_config = self.config.clone();
         match self.config.update_by_map(&values) {
             Ok(()) => {}
             Err(err) => {
-                self.config = config;
+                self.config = old_config;
                 error!("error applying new settings: {err}");
                 return Err(invalid_params(format!(
                     "error applying new settings: {err}"
@@ -73,18 +73,12 @@ impl ServerState {
             }
         }
 
-        if config.compile.output_path != self.config.compile.output_path
-            || config.compile.export_pdf != self.config.compile.export_pdf
-        {
-            let config = ExportUserConfig {
-                output: self.config.compile.output_path.clone(),
-                mode: self.config.compile.export_pdf,
-            };
-
-            self.change_export_config(config.clone());
+        let new_export_config = self.config.export();
+        if old_config.export() != new_export_config {
+            self.change_export_config(new_export_config);
         }
 
-        if config.compile.primary_opts() != self.config.compile.primary_opts() {
+        if old_config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
             let err = self.restart_primary();
             if let Err(err) = err {
@@ -92,7 +86,7 @@ impl ServerState {
             }
         }
 
-        if config.semantic_tokens != self.config.semantic_tokens {
+        if old_config.semantic_tokens != self.config.semantic_tokens {
             let err = self
                 .enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable);
             if let Err(err) = err {
@@ -101,7 +95,7 @@ impl ServerState {
         }
 
         let new_formatter_config = self.config.formatter();
-        if !config.formatter().eq(&new_formatter_config) {
+        if !old_config.formatter().eq(&new_formatter_config) {
             let enabled = !matches!(new_formatter_config.config, FormatterConfig::Disable);
             let err = self.enable_formatter_caps(enabled);
             if let Err(err) = err {

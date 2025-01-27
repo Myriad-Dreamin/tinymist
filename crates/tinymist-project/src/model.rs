@@ -9,9 +9,10 @@ use clap::ValueEnum;
 use ecow::EcoVec;
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::prelude::*;
-use tinymist_std::path::unix_slash;
+use tinymist_std::path::{unix_slash, PathClean};
 use tinymist_std::{bail, ImmutPath};
-use tinymist_world::EntryReader;
+use tinymist_world::vfs::WorkspaceResolver;
+use tinymist_world::{EntryReader, EntryState};
 use typst::diag::EcoString;
 use typst::syntax::FileId;
 
@@ -24,7 +25,7 @@ use crate::LspWorld;
 pub const LOCK_VERSION: &str = "0.1.0-beta0";
 
 /// A scalar that is not NaN.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Scalar(f32);
 
 impl TryFrom<f32> for Scalar {
@@ -36,6 +37,13 @@ impl TryFrom<f32> for Scalar {
         } else {
             Ok(Scalar(value))
         }
+    }
+}
+
+impl Scalar {
+    /// Converts the scalar to an f32.
+    pub fn to_f32(self) -> f32 {
+        self.0
     }
 }
 
@@ -118,17 +126,16 @@ macro_rules! display_possible_values {
 /// alias typst="tinymist compile --when=onSave"
 /// typst compile main.typ
 /// ```
-#[derive(
-    Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, ValueEnum, Serialize, Deserialize,
-)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[clap(rename_all = "camelCase")]
 pub enum TaskWhen {
     /// Never watch to run task.
+    #[default]
     Never,
-    /// Run task on save.
+    /// Run task on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,
-    /// Run task on type.
+    /// Run task on typing, i.e. on `textDocument/didChange` events.
     OnType,
     /// *DEPRECATED* Run task when a document has a title and on saved, which is
     /// useful to filter out template files.
@@ -161,6 +168,71 @@ pub enum OutputFormat {
 
 display_possible_values!(OutputFormat);
 
+/// The path pattern that could be substituted.
+///
+/// # Examples
+/// - `$root` is the root of the project.
+/// - `$root/$dir` is the parent directory of the input (main) file.
+/// - `$root/main` will help store pdf file to `$root/main.pdf` constantly.
+/// - (default) `$root/$dir/$name` will help store pdf file along with the input
+///   file.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PathPattern(pub String);
+
+impl PathPattern {
+    /// Creates a new path pattern.
+    pub fn new(pattern: &str) -> Self {
+        Self(pattern.to_owned())
+    }
+
+    /// Substitutes the path pattern with `$root`, and `$dir/$name`.
+    pub fn substitute(&self, entry: &EntryState) -> Option<ImmutPath> {
+        self.substitute_impl(entry.root(), entry.main())
+    }
+
+    #[comemo::memoize]
+    fn substitute_impl(&self, root: Option<ImmutPath>, main: Option<FileId>) -> Option<ImmutPath> {
+        log::info!("Check path {main:?} and root {root:?} with output directory {self:?}");
+
+        let (root, main) = root.zip(main)?;
+
+        // Files in packages are not exported
+        if WorkspaceResolver::is_package_file(main) {
+            return None;
+        }
+        // Files without a path are not exported
+        let path = main.vpath().resolve(&root)?;
+
+        // todo: handle untitled path
+        if let Ok(path) = path.strip_prefix("/untitled") {
+            let tmp = std::env::temp_dir();
+            let path = tmp.join("typst").join(path);
+            return Some(path.as_path().into());
+        }
+
+        if self.0.is_empty() {
+            return Some(path.to_path_buf().clean().into());
+        }
+
+        let path = path.strip_prefix(&root).ok()?;
+        let dir = path.parent();
+        let file_name = path.file_name().unwrap_or_default();
+
+        let w = root.to_string_lossy();
+        let f = file_name.to_string_lossy();
+
+        // replace all $root
+        let mut path = self.0.replace("$root", &w);
+        if let Some(dir) = dir {
+            let d = dir.to_string_lossy();
+            path = path.replace("$dir", &d);
+        }
+        path = path.replace("$name", &f);
+
+        Some(PathBuf::from(path).clean().into())
+    }
+}
+
 /// A PDF standard that Typst can enforce conformance with.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
@@ -184,6 +256,11 @@ display_possible_values!(PdfStandard);
 /// See also: <https://github.com/clap-rs/clap/issues/5065>
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
+
+impl Pages {
+    /// Selects the first page.
+    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=None);
+}
 
 impl FromStr for Pages {
     type Err = &'static str;
@@ -392,7 +469,7 @@ pub struct LockFile {
     pub document: Vec<ProjectInput>,
     /// The project's task (output).
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub task: Vec<ProjectTask>,
+    pub task: Vec<ApplyProjectTask>,
     /// The project's task route.
     #[serde(skip_serializing_if = "EcoVec::is_empty", default)]
     pub route: EcoVec<ProjectRoute>,
@@ -471,4 +548,34 @@ pub struct ProjectRoute {
     pub id: Id,
     /// The priority of the project. (lower numbers are higher priority).
     pub priority: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use typst::syntax::VirtualPath;
+
+    #[test]
+    fn test_substitute_path() {
+        let root = Path::new("/root");
+        let entry =
+            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
+
+        assert_eq!(
+            PathPattern::new("/substitute/$dir/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/dir1/dir2/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/$dir/../$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/dir1/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
+        );
+    }
 }

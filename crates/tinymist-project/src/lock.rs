@@ -11,7 +11,7 @@ use tinymist_std::{bail, ImmutPath};
 use typst::diag::EcoString;
 use typst::World;
 
-use crate::model::{Id, ProjectInput, ProjectRoute, ProjectTask, ResourcePath};
+use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePath};
 use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_VERSION};
 
 pub const LOCK_FILENAME: &str = "tinymist.lock";
@@ -33,7 +33,7 @@ impl LockFile {
         }
     }
 
-    pub fn replace_task(&mut self, task: ProjectTask) {
+    pub fn replace_task(&mut self, task: ApplyProjectTask) {
         let id = task.id().clone();
         let index = self.task.iter().position(|i| *i.id() == id);
         if let Some(index) = index {
@@ -225,7 +225,7 @@ pub fn update_lock(root: ImmutPath) -> LockFileUpdate {
 
 enum LockUpdate {
     Input(ProjectInput),
-    Task(ProjectTask),
+    Task(ApplyProjectTask),
     Material(ProjectPathMaterial),
     Route(ProjectRoute),
 }
@@ -278,7 +278,7 @@ impl LockFileUpdate {
         Some(id)
     }
 
-    pub fn task(&mut self, task: ProjectTask) {
+    pub fn task(&mut self, task: ApplyProjectTask) {
         self.updates.push(LockUpdate::Task(task));
     }
 

@@ -7,13 +7,13 @@ use std::sync::Arc;
 
 use log::{error, info};
 use lsp_types::*;
-use serde::{Deserialize, Serialize};
 use sync_lsp::*;
+use task::ExportUserConfig;
 use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
-    CompilerQueryRequest, ExportKind, LocalContext, LspWorldExt, OnExportRequest, PageSelection,
-    ServerInfoResponse, VersionedDocument,
+    CompilerQueryRequest, LocalContext, LspWorldExt, OnExportRequest, ServerInfoResponse,
+    VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::error::prelude::*;
@@ -32,7 +32,7 @@ use crate::project::{
 use crate::route::ProjectRouteState;
 use crate::state::query::OnEnter;
 use crate::stats::CompilerQueryStats;
-use crate::task::{ExportConfig, ExportTask, ExportUserConfig, FormatTask, UserActionTask};
+use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::{ImmutDict, LspUniverseBuilder, TaskInputs};
 use crate::{init::*, *};
 
@@ -406,22 +406,13 @@ impl ServerState {
     ) -> ProjectState {
         let compile_config = &config.compile;
         let const_config = &config.const_config;
-
-        // use codespan_reporting::term::Config;
         // Run Export actors before preparing cluster to avoid loss of events
-        let export_config = ExportConfig {
-            group: diag_group.clone(),
-            editor_tx: Some(editor_tx.clone()),
-            config: ExportUserConfig {
-                output: compile_config.output_path.clone(),
-                mode: compile_config.export_pdf,
-            },
-            kind: ExportKind::Pdf {
-                creation_timestamp: config.compile.determine_creation_timestamp(),
-            },
-            count_words: config.compile.notify_status,
-        };
-        let export = ExportTask::new(client.handle.clone(), export_config);
+        let export = ExportTask::new(
+            client.handle.clone(),
+            diag_group.clone(),
+            Some(editor_tx.clone()),
+            config.export(),
+        );
 
         log::info!(
             "TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}"
@@ -522,7 +513,7 @@ impl ServerState {
 
     /// Export the current document.
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
-        let OnExportRequest { path, kind, open } = req;
+        let OnExportRequest { path, task, open } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
         let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
 
@@ -542,13 +533,14 @@ impl ServerState {
         });
 
         let snap = self.snapshot()?;
-        let task = self.project.export.factory.task();
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 ..Default::default()
             });
-            let res = task.oneshot(snap.clone(), kind, lock_dir).await?;
+
+            let artifact = snap.clone().compile();
+            let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }
@@ -587,11 +579,6 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     ) -> Option<String> {
         self.0.render_marked(ctx, doc, pos)
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ExportOpts {
-    page: PageSelection,
 }
 
 #[test]

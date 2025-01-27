@@ -316,7 +316,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         );
 
         self.client.send_event(LspInterrupt::Compiled(snap.clone()));
-        self.export.signal(snap, snap.signal);
+        self.export.signal(snap);
 
         self.editor_tx
             .send(EditorRequest::Status(CompileStatus {

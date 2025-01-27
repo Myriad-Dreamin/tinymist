@@ -4,50 +4,50 @@ use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::project::{
-    CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask,
-    ExportSignal, ExportTextTask, ProjectTask, TaskWhen,
+    ApplyProjectTask, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
+    ExportPngTask, ExportTextTask, TaskWhen,
 };
-use anyhow::{bail, Context};
+use anyhow::bail;
 use reflexo::ImmutPath;
-use reflexo_typst::TypstDatetime;
-use tinymist_project::{EntryReader, LspCompileSnapshot, LspCompiledArtifact};
-use tinymist_query::{ExportKind, PageSelection};
+use reflexo_typst::{TypstAbs as Abs, TypstDatetime};
+use tinymist_project::{
+    convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
+    ExportTransform, LspCompiledArtifact, Pages, ProjectTask, QueryTask,
+};
+use tinymist_std::error::prelude::*;
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
-use typst::{
-    layout::Abs,
-    syntax::{ast, SyntaxNode},
-    visualize::Color,
-};
+use typst::syntax::{ast, SyntaxNode};
+use typst::visualize::Color;
 use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
-use crate::{actor::editor::EditorRequest, tool::word_count, ExportMode, PathPattern};
+use crate::{actor::editor::EditorRequest, tool::word_count};
 
 use super::*;
-
-/// User configuration for export.
-#[derive(Debug, Clone, Default)]
-pub struct ExportUserConfig {
-    /// The output path pattern.
-    pub output: PathPattern,
-    /// The export mode.
-    pub mode: ExportMode,
-}
 
 #[derive(Clone)]
 pub struct ExportTask {
     pub handle: tokio::runtime::Handle,
-    pub factory: SyncTaskFactory<ExportConfig>,
+    pub group: String,
+    pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
+    pub factory: SyncTaskFactory<ExportUserConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
 
 impl ExportTask {
-    pub fn new(handle: tokio::runtime::Handle, data: ExportConfig) -> Self {
+    pub fn new(
+        handle: tokio::runtime::Handle,
+        group: String,
+        editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
+        data: ExportUserConfig,
+    ) -> Self {
         Self {
             handle,
+            group,
+            editor_tx,
             factory: SyncTaskFactory::new(data),
             export_folder: FutureFolder::default(),
             count_word_folder: FutureFolder::default(),
@@ -55,94 +55,71 @@ impl ExportTask {
     }
 
     pub fn change_config(&self, config: ExportUserConfig) {
-        self.factory.mutate(|data| data.config = config);
+        self.factory.mutate(|data| *data = config);
     }
 
-    pub fn signal(&self, snap: &LspCompiledArtifact, s: ExportSignal) {
-        let task = self.factory.task();
-        task.signal(snap, s, self);
-    }
-}
+    pub fn signal(&self, snap: &LspCompiledArtifact) {
+        let config = self.factory.task();
 
-pub struct ExportOnceTask<'a> {
-    pub kind: &'a ExportKind,
-    pub artifact: LspCompiledArtifact,
-    pub lock_path: Option<ImmutPath>,
-}
-
-#[derive(Clone, Default)]
-pub struct ExportConfig {
-    pub group: String,
-    pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
-    pub config: ExportUserConfig,
-    pub kind: ExportKind,
-    pub count_words: bool,
-}
-
-impl ExportConfig {
-    fn signal(self: Arc<Self>, snap: &LspCompiledArtifact, s: ExportSignal, t: &ExportTask) {
-        self.signal_export(snap, s, t);
-        self.signal_count_word(snap, t);
+        self.signal_export(snap, &config);
+        self.signal_count_word(snap, &config);
     }
 
     fn signal_export(
-        self: &Arc<Self>,
+        &self,
         artifact: &LspCompiledArtifact,
-        s: ExportSignal,
-        t: &ExportTask,
+        config: &Arc<ExportUserConfig>,
     ) -> Option<()> {
         let doc = artifact.doc.as_ref().ok()?;
+        let s = artifact.signal;
 
-        let mode = self.config.mode;
-        let need_export = (!matches!(mode, ExportMode::Never) && s.by_entry_update)
-            || match mode {
-                ExportMode::Never => false,
-                ExportMode::OnType => s.by_mem_events,
-                ExportMode::OnSave => s.by_fs_events,
-                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
+        let when = config.task.when().unwrap_or_default();
+        let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
+            || match when {
+                TaskWhen::Never => false,
+                TaskWhen::OnType => s.by_mem_events,
+                TaskWhen::OnSave => s.by_fs_events,
+                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
             };
 
         if !need_export {
             return None;
         }
 
-        let fut = t.export_folder.spawn(artifact.world.revision().get(), || {
-            let this = self.clone();
+        let rev = artifact.world.revision().get();
+        let fut = self.export_folder.spawn(rev, || {
+            let task = config.task.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(
-                    this.do_export(ExportOnceTask {
-                        kind: &this.kind,
-                        artifact,
-                        lock_path: None,
-                    })
-                    .await,
-                );
+                log_err(Self::do_export(task, artifact, None).await);
                 Some(())
             })
         })?;
 
-        t.handle.spawn(fut);
+        self.handle.spawn(fut);
 
         Some(())
     }
 
-    fn signal_count_word(&self, artifact: &LspCompiledArtifact, t: &ExportTask) -> Option<()> {
-        if !self.count_words {
+    fn signal_count_word(
+        &self,
+        artifact: &LspCompiledArtifact,
+        config: &Arc<ExportUserConfig>,
+    ) -> Option<()> {
+        if !config.count_words {
             return None;
         }
 
         let editor_tx = self.editor_tx.clone()?;
-        let revision = artifact.world.revision().get();
-
-        let fut = t.count_word_folder.spawn(revision, || {
+        let rev = artifact.world.revision().get();
+        let fut = self.count_word_folder.spawn(rev, || {
             let artifact = artifact.clone();
             let group = self.group.clone();
             Box::pin(async move {
                 let doc = artifact.doc.ok()?;
                 let wc =
                     log_err(FutureFolder::compute(move |_| word_count::word_count(&doc)).await);
-                log::debug!("WordCount({group}:{revision}): {wc:?}");
+                log::debug!("WordCount({group}:{rev}): {wc:?}");
 
                 if let Some(wc) = wc {
                     let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
@@ -152,40 +129,39 @@ impl ExportConfig {
             })
         })?;
 
-        t.handle.spawn(fut);
+        self.handle.spawn(fut);
 
         Some(())
     }
 
-    async fn do_export(&self, task: ExportOnceTask<'_>) -> anyhow::Result<Option<PathBuf>> {
+    pub async fn do_export(
+        task: ProjectTask,
+        artifact: LspCompiledArtifact,
+        lock_dir: Option<ImmutPath>,
+    ) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
-        use ExportKind::*;
-        use PageSelection::*;
+        use ProjectTask::*;
 
-        let ExportOnceTask {
-            kind,
-            artifact: CompiledArtifact { snap, doc, .. },
-            lock_path: lock_dir,
-        } = task;
+        let CompiledArtifact { snap, doc, .. } = artifact;
 
         // Prepare the output path.
         let entry = snap.world.entry_state();
-        let Some(to) = self.config.output.substitute(&entry) else {
+        let config = task.as_export().unwrap();
+        let output = config.output.clone().unwrap_or_default();
+        let Some(to) = output.substitute(&entry) else {
             return Ok(None);
         };
         if to.is_relative() {
-            bail!("RenderActor({kind:?}): path is relative: {to:?}");
+            bail!("RenderActor({task:?}): output path is relative: {to:?}");
         }
         if to.is_dir() {
-            bail!("RenderActor({kind:?}): path is a directory: {to:?}");
+            bail!("RenderActor({task:?}): output path is a directory: {to:?}");
         }
-        let to = to.with_extension(kind.extension());
-        log::info!("RenderActor({kind:?}): exporting {entry:?} to {to:?}");
+        let to = to.with_extension(task.extension());
+        log::info!("RenderActor({task:?}): exporting {entry:?} to {to:?}");
         if let Some(e) = to.parent() {
             if !e.exists() {
-                std::fs::create_dir_all(e).with_context(|| {
-                    format!("RenderActor({kind:?}): failed to create directory")
-                })?;
+                std::fs::create_dir_all(e).context("failed to create directory")?;
             }
         }
 
@@ -193,65 +169,12 @@ impl ExportConfig {
             let mut updater = crate::project::update_lock(lock_dir);
 
             let doc_id = updater.compiled(&snap.world)?;
-            let task_id = doc_id.clone();
 
-            let when = match self.config.mode {
-                ExportMode::Never => TaskWhen::Never,
-                ExportMode::OnType => TaskWhen::OnType,
-                ExportMode::OnSave => TaskWhen::OnSave,
-                ExportMode::OnDocumentHasTitle => TaskWhen::OnSave,
-            };
-
-            // todo: page transforms
-            let transforms = vec![];
-
-            use tinymist_project::ExportTask as ProjectExportTask;
-
-            let export = ProjectExportTask {
+            updater.task(ApplyProjectTask {
+                id: doc_id.clone(),
                 document: doc_id,
-                id: task_id,
-                when,
-                transform: transforms,
-            };
-
-            let task = match kind {
-                Pdf { creation_timestamp } => {
-                    let _ = creation_timestamp;
-                    ProjectTask::ExportPdf(ExportPdfTask {
-                        export,
-                        pdf_standards: Default::default(),
-                        creation_timestamp: None,
-                    })
-                }
-                Html {} => ProjectTask::ExportHtml(ExportHtmlTask { export }),
-                Markdown {} => ProjectTask::ExportMarkdown(ExportMarkdownTask { export }),
-                Text {} => ProjectTask::ExportText(ExportTextTask { export }),
-                Query { .. } => {
-                    // todo: ignoring query task.
-                    return None;
-                }
-                Svg { page } => {
-                    // todo: ignoring page selection.
-                    let _ = page;
-                    return None;
-                }
-                Png { ppi, fill, page } => {
-                    // todo: ignoring page fill.
-                    let _ = fill;
-                    // todo: ignoring page selection.
-                    let _ = page;
-
-                    let ppi = ppi.unwrap_or(144.) as f32;
-                    let ppi = ppi.try_into().unwrap();
-                    ProjectTask::ExportPng(ExportPngTask {
-                        export,
-                        ppi,
-                        fill: None,
-                    })
-                }
-            };
-
-            updater.task(task);
+                task: task.clone(),
+            });
             updater.commit();
 
             Some(())
@@ -261,36 +184,44 @@ impl ExportConfig {
         let doc = doc.map_err(|_| anyhow::anyhow!("no document"))?;
 
         // Prepare data.
-        let kind2 = kind.clone();
+        let kind2 = task.clone();
         let data = FutureFolder::compute(move |_| -> anyhow::Result<Vec<u8>> {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
             let first_page = doc.pages.first().unwrap();
             Ok(match kind2 {
-                Pdf { creation_timestamp } => {
-                    let timestamp =
-                        convert_datetime(creation_timestamp.unwrap_or_else(chrono::Utc::now));
-                    // todo: Some(pdf_uri.as_str())
+                Preview(..) => vec![],
+                // todo: more pdf flags
+                ExportPdf(ExportPdfTask {
+                    creation_timestamp, ..
+                }) => {
                     // todo: timestamp world.now()
+                    let creation_timestamp = creation_timestamp
+                        .map(convert_source_date_epoch)
+                        .transpose()
+                        .context_ut("parse pdf creation timestamp")?
+                        .unwrap_or_else(chrono::Utc::now);
+
+                    // todo: Some(pdf_uri.as_str())
                     typst_pdf::pdf(
                         doc,
                         &PdfOptions {
-                            timestamp,
+                            timestamp: convert_datetime(creation_timestamp),
                             ..Default::default()
                         },
                     )
                     .map_err(|e| anyhow::anyhow!("failed to convert to pdf: {e:?}"))?
                 }
-                Query {
-                    format,
+                Query(QueryTask {
+                    export: _,
                     output_extension: _,
-                    strict,
+                    format,
                     selector,
                     field,
                     one,
-                    pretty,
-                } => {
+                }) => {
+                    let pretty = false;
                     let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
                         .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
@@ -309,46 +240,35 @@ impl ExportConfig {
                         let Some(value) = mapped.first() else {
                             bail!("no such field found for element");
                         };
-                        serialize(value, &format, strict, pretty).map(String::into_bytes)?
+                        serialize(value, &format, pretty).map(String::into_bytes)?
                     } else {
-                        serialize(&mapped, &format, strict, pretty).map(String::into_bytes)?
+                        serialize(&mapped, &format, pretty).map(String::into_bytes)?
                     }
                 }
-                Html {} => {
+                ExportHtml(ExportHtmlTask { export: _ }) => {
                     reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(doc).into_bytes()
                 }
-                Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
-                Markdown {} => {
+                ExportText(ExportTextTask { export: _ }) => {
+                    format!("{}", FullTextDigest(doc.clone())).into_bytes()
+                }
+                ExportMarkdown(ExportMarkdownTask { export: _ }) => {
                     let conv = Typlite::new(Arc::new(snap.world))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 
                     conv.as_bytes().to_owned()
                 }
-                Svg { page: First } => typst_svg::svg(first_page).into_bytes(),
-                Svg {
-                    page: Merged { .. },
-                } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
-                Png {
-                    ppi,
-                    fill: _,
-                    page: First,
-                } => {
-                    let ppi = ppi.unwrap_or(144.) as f32;
-                    if ppi <= 1e-6 {
-                        bail!("invalid ppi: {ppi}");
-                    }
+                ExportSvg(ExportSvgTask { export }) => {
+                    let (is_first, merged_gap) = get_page_selection(&export)?;
 
-                    typst_render::render(first_page, ppi / 72.)
-                        .encode_png()
-                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+                    if is_first {
+                        typst_svg::svg(first_page).into_bytes()
+                    } else {
+                        typst_svg::svg_merged(doc, merged_gap).into_bytes()
+                    }
                 }
-                Png {
-                    ppi,
-                    fill,
-                    page: Merged { gap },
-                } => {
-                    let ppi = ppi.unwrap_or(144.) as f32;
+                ExportPng(ExportPngTask { export, ppi, fill }) => {
+                    let ppi = ppi.to_f32();
                     if ppi <= 1e-6 {
                         bail!("invalid ppi: {ppi}");
                     }
@@ -359,13 +279,15 @@ impl ExportConfig {
                         Color::WHITE
                     };
 
-                    let gap = if let Some(gap) = gap {
-                        parse_length(gap).map_err(|err| anyhow::anyhow!("invalid gap ({err})"))?
+                    let (is_first, merged_gap) = get_page_selection(&export)?;
+
+                    let pixmap = if is_first {
+                        typst_render::render(first_page, ppi / 72.)
                     } else {
-                        Abs::zero()
+                        typst_render::render_merged(doc, ppi / 72., merged_gap, Some(fill))
                     };
 
-                    typst_render::render_merged(doc, ppi / 72., gap, Some(fill))
+                    pixmap
                         .encode_png()
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
@@ -374,25 +296,34 @@ impl ExportConfig {
 
         tokio::fs::write(&to, data.await??)
             .await
-            .with_context(|| format!("RenderActor({kind:?}): failed to export"))?;
+            .context("failed to export")?;
 
-        log::info!("RenderActor({kind:?}): export complete");
+        log::info!("RenderActor({task:?}): export complete");
         Ok(Some(to))
     }
+}
 
-    pub async fn oneshot(
-        &self,
-        snap: LspCompileSnapshot,
-        kind: ExportKind,
-        lock_path: Option<ImmutPath>,
-    ) -> anyhow::Result<Option<PathBuf>> {
-        let artifact = snap.compile();
-        self.do_export(ExportOnceTask {
-            kind: &kind,
-            artifact,
-            lock_path,
-        })
-        .await
+/// User configuration for export.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ExportUserConfig {
+    pub task: ProjectTask,
+    pub count_words: bool,
+}
+
+impl Default for ExportUserConfig {
+    fn default() -> Self {
+        Self {
+            task: ProjectTask::ExportPdf(ExportPdfTask {
+                export: ProjectExportTask {
+                    when: TaskWhen::Never,
+                    output: None,
+                    transform: vec![],
+                },
+                pdf_standards: vec![],
+                creation_timestamp: None,
+            }),
+            count_words: false,
+        }
     }
 }
 
@@ -410,8 +341,83 @@ fn parse_color(fill: String) -> anyhow::Result<Color> {
     }
 }
 
-fn parse_length(gap: String) -> anyhow::Result<Abs> {
-    let length = typst::syntax::parse_code(&gap);
+fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
+    match artifact {
+        Ok(v) => Some(v),
+        Err(err) => {
+            log::error!("{err}");
+            None
+        }
+    }
+}
+
+/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
+fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
+    use chrono::{Datelike, Timelike};
+    TypstDatetime::from_ymd_hms(
+        date_time.year(),
+        date_time.month().try_into().ok()?,
+        date_time.day().try_into().ok()?,
+        date_time.hour().try_into().ok()?,
+        date_time.minute().try_into().ok()?,
+        date_time.second().try_into().ok()?,
+    )
+}
+
+/// Serialize data to the output format.
+fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> anyhow::Result<String> {
+    Ok(match format {
+        "json" if pretty => serde_json::to_string_pretty(data)?,
+        "json" => serde_json::to_string(data)?,
+        "yaml" => serde_yaml::to_string(&data)?,
+        "txt" => {
+            use serde_json::Value::*;
+            let value = serde_json::to_value(data)?;
+            match value {
+                String(s) => s,
+                _ => {
+                    let kind = match value {
+                        Null => "null",
+                        Bool(_) => "boolean",
+                        Number(_) => "number",
+                        String(_) => "string",
+                        Array(_) => "array",
+                        Object(_) => "object",
+                    };
+                    bail!("expected a string value for format: {format}, got {kind}")
+                }
+            }
+        }
+        _ => bail!("unsupported format for query: {format}"),
+    })
+}
+
+/// Gets legacy page selection
+pub fn get_page_selection(task: &tinymist_project::ExportTask) -> Result<(bool, Abs)> {
+    let is_first = task
+        .transform
+        .iter()
+        .any(|t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]));
+
+    let mut gap_res = Abs::default();
+    if !is_first {
+        for trans in &task.transform {
+            if let ExportTransform::Merge { gap } = trans {
+                let gap = gap
+                    .as_deref()
+                    .map(parse_length)
+                    .transpose()
+                    .context_ut("failed to parse gap")?;
+                gap_res = gap.unwrap_or_default();
+            }
+        }
+    }
+
+    Ok((is_first, gap_res))
+}
+
+fn parse_length(gap: &str) -> anyhow::Result<Abs> {
+    let length = typst::syntax::parse_code(gap);
     if length.erroneous() {
         bail!("invalid length: {gap}, errors: {:?}", length.errors());
     }
@@ -443,81 +449,15 @@ fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ 
     res
 }
 
-fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
-    match artifact {
-        Ok(v) => Some(v),
-        Err(err) => {
-            log::error!("{err}");
-            None
-        }
-    }
-}
-
-/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
-    use chrono::{Datelike, Timelike};
-    TypstDatetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    )
-}
-
-/// Serialize data to the output format.
-fn serialize(
-    data: &impl serde::Serialize,
-    format: &str,
-    strict: bool,
-    pretty: bool,
-) -> anyhow::Result<String> {
-    Ok(match format {
-        "json" if pretty => serde_json::to_string_pretty(data)?,
-        "json" => serde_json::to_string(data)?,
-        "yaml" => serde_yaml::to_string(&data)?,
-        format if format == "txt" || !strict => {
-            use serde_json::Value::*;
-            let value = serde_json::to_value(data)?;
-            match value {
-                String(s) => s,
-                _ => {
-                    let kind = match value {
-                        Null => "null",
-                        Bool(_) => "boolean",
-                        Number(_) => "number",
-                        String(_) => "string",
-                        Array(_) => "array",
-                        Object(_) => "object",
-                    };
-                    bail!("expected a string value for format: {format}, got {kind}")
-                }
-            }
-        }
-        _ => bail!("unsupported format for query: {format}"),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_default_never() {
-        let conf = ExportConfig::default();
+        let conf = ExportUserConfig::default();
         assert!(!conf.count_words);
-        assert_eq!(conf.config.mode, ExportMode::Never);
-    }
-
-    #[test]
-    fn test_parse_length() {
-        assert_eq!(parse_length("1pt".to_owned()).unwrap(), Abs::pt(1.));
-        assert_eq!(parse_length("1mm".to_owned()).unwrap(), Abs::mm(1.));
-        assert_eq!(parse_length("1cm".to_owned()).unwrap(), Abs::cm(1.));
-        assert_eq!(parse_length("1in".to_owned()).unwrap(), Abs::inches(1.));
-        assert!(parse_length("1".to_owned()).is_err());
-        assert!(parse_length("1px".to_owned()).is_err());
+        assert_eq!(conf.task.when(), Some(TaskWhen::Never));
     }
 
     #[test]
@@ -540,5 +480,15 @@ mod tests {
             "#000000cc"
         );
         assert!(parse_color("invalid".to_owned()).is_err());
+    }
+
+    #[test]
+    fn test_parse_length() {
+        assert_eq!(parse_length("1pt").unwrap(), Abs::pt(1.));
+        assert_eq!(parse_length("1mm").unwrap(), Abs::mm(1.));
+        assert_eq!(parse_length("1cm").unwrap(), Abs::cm(1.));
+        assert_eq!(parse_length("1in").unwrap(), Abs::inches(1.));
+        assert!(parse_length("1").is_err());
+        assert!(parse_length("1px").is_err());
     }
 }

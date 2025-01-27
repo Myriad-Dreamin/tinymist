@@ -4,11 +4,11 @@ use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Id, Pages, PdfStandard, Scalar, TaskWhen};
+use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 
-/// A project task specifier. This is used for specifying tasks in a project.
-/// When the language service notifies an update event of the project, it will
-/// check whether any associated tasks need to be run.
+/// A project task application specifier. This is used for specifying tasks to
+/// run in a project. When the language service notifies an update event of the
+/// project, it will check whether any associated tasks need to be run.
 ///
 /// Each task can have different timing and conditions for running. See
 /// [`TaskWhen`] for more information.
@@ -30,6 +30,31 @@ use super::{Id, Pages, PdfStandard, Scalar, TaskWhen};
 /// ```bash
 /// tinymist project compile main.typ --pipe 'import "@local/postprocess:0.0.1": ghostscript; ghostscript(output.path)'
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "type")]
+pub struct ApplyProjectTask {
+    /// The task's ID.
+    pub id: Id,
+    /// The document's ID.
+    pub document: Id,
+    /// The task to run.
+    #[serde(flatten)]
+    pub task: ProjectTask,
+}
+
+impl ApplyProjectTask {
+    /// Returns the document's ID.
+    pub fn doc_id(&self) -> &Id {
+        &self.document
+    }
+
+    /// Returns the task's ID.
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+}
+
+/// A project task specifier. This structure specifies the arguments for a task.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type")]
 pub enum ProjectTask {
@@ -55,33 +80,48 @@ pub enum ProjectTask {
 }
 
 impl ProjectTask {
-    /// Returns the task's ID.
-    pub fn doc_id(&self) -> &Id {
-        match self {
-            ProjectTask::Preview(task) => &task.document,
-            ProjectTask::ExportPdf(task) => &task.export.document,
-            ProjectTask::ExportPng(task) => &task.export.document,
-            ProjectTask::ExportSvg(task) => &task.export.document,
-            ProjectTask::ExportHtml(task) => &task.export.document,
-            ProjectTask::ExportMarkdown(task) => &task.export.document,
-            ProjectTask::ExportText(task) => &task.export.document,
-            ProjectTask::Query(task) => &task.export.document,
-            // ProjectTask::Other(_) => return None,
-        }
+    /// Returns the timing of executing the task.
+    pub fn when(&self) -> Option<TaskWhen> {
+        Some(match self {
+            Self::Preview(task) => task.when,
+            Self::ExportPdf(..)
+            | Self::ExportPng(..)
+            | Self::ExportSvg(..)
+            | Self::ExportHtml(..)
+            | Self::ExportMarkdown(..)
+            | Self::ExportText(..)
+            | Self::Query(..) => self.as_export()?.when,
+        })
     }
 
-    /// Returns the document's ID.
-    pub fn id(&self) -> &Id {
+    /// Returns the export configuration of a task.
+    pub fn as_export(&self) -> Option<&ExportTask> {
+        Some(match self {
+            Self::Preview(..) => return None,
+            Self::ExportPdf(task) => &task.export,
+            Self::ExportPng(task) => &task.export,
+            Self::ExportSvg(task) => &task.export,
+            Self::ExportHtml(task) => &task.export,
+            Self::ExportMarkdown(task) => &task.export,
+            Self::ExportText(task) => &task.export,
+            Self::Query(task) => &task.export,
+        })
+    }
+
+    /// Returns extension of the artifact.
+    pub fn extension(&self) -> &str {
         match self {
-            ProjectTask::Preview(task) => &task.id,
-            ProjectTask::ExportPdf(task) => &task.export.id,
-            ProjectTask::ExportPng(task) => &task.export.id,
-            ProjectTask::ExportSvg(task) => &task.export.id,
-            ProjectTask::ExportHtml(task) => &task.export.id,
-            ProjectTask::ExportMarkdown(task) => &task.export.id,
-            ProjectTask::ExportText(task) => &task.export.id,
-            ProjectTask::Query(task) => &task.export.id,
-            // ProjectTask::Other(_) => return None,
+            Self::ExportPdf { .. } => "pdf",
+            Self::Preview(..) | Self::ExportHtml { .. } => "html",
+            Self::ExportMarkdown { .. } => "md",
+            Self::ExportText { .. } => "txt",
+            Self::ExportSvg { .. } => "svg",
+            Self::ExportPng { .. } => "png",
+            Self::Query(QueryTask {
+                format,
+                output_extension,
+                ..
+            }) => output_extension.as_deref().unwrap_or(format),
         }
     }
 }
@@ -90,28 +130,53 @@ impl ProjectTask {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct PreviewTask {
-    /// The task's ID.
-    pub id: Id,
-    /// The document's ID.
-    pub document: Id,
     /// When to run the task. See [`TaskWhen`] for more
     /// information.
     pub when: TaskWhen,
 }
 
 /// An export task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTask {
-    /// The task's ID.
-    pub id: Id,
-    /// The document's ID.
-    pub document: Id,
     /// When to run the task
     pub when: TaskWhen,
+    /// The output path pattern.
+    pub output: Option<PathPattern>,
     /// The task's transforms.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub transform: Vec<ExportTransform>,
+}
+
+impl ExportTask {
+    /// Creates a new unmounted export task.
+    pub fn new(when: TaskWhen) -> Self {
+        Self {
+            when,
+            output: None,
+            transform: Vec::new(),
+        }
+    }
+
+    /// Pretty prints the output whenever possible.
+    pub fn apply_pretty(&mut self) {
+        self.transform
+            .push(ExportTransform::Pretty { script: None });
+    }
+}
+
+/// The legacy page selection specifier.
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PageSelection {
+    /// Selects the first page.
+    #[default]
+    First,
+    /// Merges all pages into a single page.
+    Merged {
+        /// The gap between pages (in pt).
+        gap: Option<String>,
+    },
 }
 
 /// A project export transform specifier.
@@ -125,8 +190,8 @@ pub enum ExportTransform {
     },
     /// Merge pages into a single page.
     Merge {
-        /// The gap between pages (in pt).
-        gap: Scalar,
+        /// The gap between pages (typst code expression, e.g. `1pt`).
+        gap: Option<String>,
     },
     /// Execute a transform script.
     Script {
@@ -228,7 +293,7 @@ pub struct QueryTask {
     pub format: String,
     /// Uses a different output extension from the one inferring from the
     /// [`Self::format`].
-    pub output_extension: String,
+    pub output_extension: Option<String>,
     /// Defines which elements to retrieve.
     pub selector: String,
     /// Extracts just one field from all retrieved elements.

@@ -148,7 +148,7 @@ pub struct TaskCompileArgs {
 
 impl TaskCompileArgs {
     /// Convert the arguments to a project task.
-    pub fn to_task(self, doc_id: Id) -> Result<ProjectTask> {
+    pub fn to_task(self, doc_id: Id) -> Result<ApplyProjectTask> {
         let new_task_id = self.task_name.map(Id::new);
         let task_id = new_task_id.unwrap_or(doc_id.clone());
 
@@ -182,13 +182,12 @@ impl TaskCompileArgs {
         }
 
         let export = ExportTask {
-            document: doc_id,
-            id: task_id.clone(),
             when,
+            output: None,
             transform: transforms,
         };
 
-        Ok(match output_format {
+        let config = match output_format {
             OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
                 export,
                 pdf_standards: self.pdf_standard.clone(),
@@ -201,6 +200,12 @@ impl TaskCompileArgs {
             }),
             OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
             OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
+        };
+
+        Ok(ApplyProjectTask {
+            id: task_id.clone(),
+            document: doc_id,
+            task: config,
         })
     }
 }
