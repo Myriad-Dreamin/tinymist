@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::project::{
     CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask,
-    ExportTextTask, ProjectTask, TaskWhen,
+    ExportTextTask, ApplyProjectTask, TaskWhen,
 };
 use anyhow::{bail, Context};
 use chrono::DateTime;
@@ -13,7 +13,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::TypstDatetime;
 use tinymist_project::{
     EntryReader, ExportTask as ProjectExportTask, LspCompileSnapshot, LspCompiledArtifact,
-    PathPattern, ProjectTaskConfig, QueryTask,
+    PathPattern, ProjectTask, QueryTask,
 };
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
@@ -83,13 +83,13 @@ use super::*;
 #[derive(Debug, Clone)]
 pub struct ExportUserConfig {
     /// The task configuration
-    pub task: ProjectTaskConfig,
+    pub task: ProjectTask,
 }
 
 impl Default for ExportUserConfig {
     fn default() -> Self {
         Self {
-            task: ProjectTaskConfig::ExportPdf(ExportPdfTask {
+            task: ProjectTask::ExportPdf(ExportPdfTask {
                 export: ProjectExportTask {
                     when: TaskWhen::Never,
                     output: None,
@@ -223,7 +223,7 @@ impl ExportTask {
     async fn do_export(task: ExportOnceTask) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use PageSelection::*;
-        use ProjectTaskConfig::*;
+        use ProjectTask::*;
 
         let ExportOnceTask {
             task,
@@ -311,10 +311,10 @@ impl ExportTask {
             //     }
             // };
 
-            let task = ProjectTask {
+            let task = ApplyProjectTask {
                 id: task_id,
                 document: doc_id,
-                config: task.clone(),
+                task: task.clone(),
             };
 
             updater.task(task);
@@ -464,7 +464,7 @@ impl ExportTask {
     pub async fn oneshot(
         &self,
         snap: LspCompileSnapshot,
-        task: ProjectTaskConfig,
+        task: ProjectTask,
         lock_path: Option<ImmutPath>,
     ) -> anyhow::Result<Option<PathBuf>> {
         let artifact = snap.compile();
@@ -478,7 +478,7 @@ impl ExportTask {
 }
 
 pub struct ExportOnceTask {
-    pub task: ProjectTaskConfig,
+    pub task: ProjectTask,
     pub artifact: LspCompiledArtifact,
     pub lock_path: Option<ImmutPath>,
 }

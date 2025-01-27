@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 
-/// A project task specifier. This is used for specifying tasks in a project.
-/// When the language service notifies an update event of the project, it will
-/// check whether any associated tasks need to be run.
+/// A project task application specifier. This is used for specifying tasks to
+/// run in a project. When the language service notifies an update event of the
+/// project, it will check whether any associated tasks need to be run.
 ///
 /// Each task can have different timing and conditions for running. See
 /// [`TaskWhen`] for more information.
@@ -32,20 +32,32 @@ use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type")]
-pub struct ProjectTask {
+pub struct ApplyProjectTask {
     /// The task's ID.
     pub id: Id,
     /// The document's ID.
     pub document: Id,
-    /// The task's configuration.
+    /// The task to run.
     #[serde(flatten)]
-    pub config: ProjectTaskConfig,
+    pub task: ProjectTask,
 }
 
-/// A project task configuration.
+impl ApplyProjectTask {
+    /// Returns the document's ID.
+    pub fn doc_id(&self) -> &Id {
+        &self.document
+    }
+
+    /// Returns the task's ID.
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+}
+
+/// A project task specifier. This structure specifies the arguments for a task.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "type")]
-pub enum ProjectTaskConfig {
+pub enum ProjectTask {
     /// A preview task.
     Preview(PreviewTask),
     /// An export PDF task.
@@ -68,18 +80,6 @@ pub enum ProjectTaskConfig {
 }
 
 impl ProjectTask {
-    /// Returns the task's ID.
-    pub fn doc_id(&self) -> &Id {
-        &self.document
-    }
-
-    /// Returns the document's ID.
-    pub fn id(&self) -> &Id {
-        &self.id
-    }
-}
-
-impl ProjectTaskConfig {
     /// Returns the timing of executing the task.
     pub fn when(&self) -> Option<TaskWhen> {
         Some(match self {

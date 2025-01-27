@@ -464,7 +464,7 @@ pub struct LockFile {
     pub document: Vec<ProjectInput>,
     /// The project's task (output).
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub task: Vec<ProjectTask>,
+    pub task: Vec<ApplyProjectTask>,
     /// The project's task route.
     #[serde(skip_serializing_if = "EcoVec::is_empty", default)]
     pub route: EcoVec<ProjectRoute>,
