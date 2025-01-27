@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use log::{error, info};
 use lsp_types::*;
-use serde::{Deserialize, Serialize};
 use sync_lsp::*;
+use task::ExportUserConfig;
 use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
@@ -32,7 +32,7 @@ use crate::project::{
 use crate::route::ProjectRouteState;
 use crate::state::query::OnEnter;
 use crate::stats::CompilerQueryStats;
-use crate::task::{ExportConfig, ExportTask, ExportUserConfig, FormatTask, UserActionTask};
+use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::{ImmutDict, LspUniverseBuilder, TaskInputs};
 use crate::{init::*, *};
 
@@ -406,25 +406,12 @@ impl ServerState {
     ) -> ProjectState {
         let compile_config = &config.compile;
         let const_config = &config.const_config;
-
-        // use codespan_reporting::term::Config;
         // Run Export actors before preparing cluster to avoid loss of events
-        let export_config = ExportConfig {
-            // config: ExportUserConfig {
-            //     output: compile_config.output_path.clone(),
-            //     when: compile_config.export_pdf,
-            //     kind: ExportKind::Pdf {
-            //         creation_timestamp: config.compile.determine_creation_timestamp(),
-            //     },
-            // },
-            config: todo!(),
-            count_words: config.compile.notify_status,
-        };
         let export = ExportTask::new(
             client.handle.clone(),
             diag_group.clone(),
             Some(editor_tx.clone()),
-            export_config,
+            config.export(),
         );
 
         log::info!(

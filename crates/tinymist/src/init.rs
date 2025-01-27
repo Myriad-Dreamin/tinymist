@@ -11,8 +11,11 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::{FormatUserConfig, FormatterConfig};
-use tinymist_project::{EntryResolver, PathPattern, ProjectResolutionKind, TaskWhen};
+use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
+use tinymist_project::{
+    EntryResolver, ExportPdfTask, ExportTask, PathPattern, ProjectResolutionKind, ProjectTask,
+    TaskWhen,
+};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -396,7 +399,7 @@ impl Config {
         self.compile.validate()
     }
 
-    /// Get the formatter configuration.
+    /// Gets the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
         let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
 
@@ -412,6 +415,24 @@ impl Config {
                 FormatterMode::Disable => FormatterConfig::Disable,
             },
             position_encoding: self.const_config.position_encoding,
+        }
+    }
+
+    /// Gets the export configuration.
+    pub(crate) fn export(&self) -> ExportUserConfig {
+        let compile_config = &self.compile;
+
+        ExportUserConfig {
+            task: ProjectTask::ExportPdf(ExportPdfTask {
+                export: ExportTask {
+                    output: Some(compile_config.output_path.clone()),
+                    when: compile_config.export_pdf,
+                    transform: vec![],
+                },
+                pdf_standards: vec![],
+                creation_timestamp: compile_config.determine_creation_timestamp(),
+            }),
+            count_words: self.compile.notify_status,
         }
     }
 }

@@ -78,35 +78,13 @@ use super::*;
 //         })
 //     }
 // };
-/// User configuration for export.
-#[derive(Debug, Clone)]
-pub struct ExportUserConfig {
-    /// The task configuration
-    pub task: ProjectTask,
-}
-
-impl Default for ExportUserConfig {
-    fn default() -> Self {
-        Self {
-            task: ProjectTask::ExportPdf(ExportPdfTask {
-                export: ProjectExportTask {
-                    when: TaskWhen::Never,
-                    output: None,
-                    transform: vec![],
-                },
-                pdf_standards: vec![],
-                creation_timestamp: None,
-            }),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct ExportTask {
     pub handle: tokio::runtime::Handle,
     pub group: String,
     pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
-    pub factory: SyncTaskFactory<ExportConfig>,
+    pub factory: SyncTaskFactory<ExportUserConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
@@ -116,7 +94,7 @@ impl ExportTask {
         handle: tokio::runtime::Handle,
         group: String,
         editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
-        data: ExportConfig,
+        data: ExportUserConfig,
     ) -> Self {
         Self {
             handle,
@@ -129,7 +107,7 @@ impl ExportTask {
     }
 
     pub fn change_config(&self, config: ExportUserConfig) {
-        self.factory.mutate(|data| data.config = config);
+        self.factory.mutate(|data| *data = config);
     }
 
     pub fn signal(&self, snap: &LspCompiledArtifact) {
@@ -146,12 +124,12 @@ impl ExportTask {
     fn signal_export(
         &self,
         artifact: &LspCompiledArtifact,
-        config: &Arc<ExportConfig>,
+        config: &Arc<ExportUserConfig>,
     ) -> Option<()> {
         let doc = artifact.doc.as_ref().ok()?;
         let s = artifact.signal;
 
-        let when = config.config.task.when().unwrap_or_default();
+        let when = config.task.when().unwrap_or_default();
         let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
             || match when {
                 TaskWhen::Never => false,
@@ -166,7 +144,7 @@ impl ExportTask {
 
         let rev = artifact.world.revision().get();
         let fut = self.export_folder.spawn(rev, || {
-            let task = config.config.task.clone();
+            let task = config.task.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
                 log_err(
@@ -189,7 +167,7 @@ impl ExportTask {
     fn signal_count_word(
         &self,
         artifact: &LspCompiledArtifact,
-        config: &Arc<ExportConfig>,
+        config: &Arc<ExportUserConfig>,
     ) -> Option<()> {
         if !config.count_words {
             return None;
@@ -481,15 +459,31 @@ pub struct ExportOnceTask {
     pub lock_path: Option<ImmutPath>,
 }
 
-#[derive(Clone, Default)]
-pub struct ExportConfig {
-    pub config: ExportUserConfig,
-    // pub kind: ExportKind,
-    // pub config: ProjectTaskConfig,
+/// User configuration for export.
+#[derive(Clone,  PartialEq, Eq)]
+pub struct ExportUserConfig {
+    pub task: ProjectTask,
     pub count_words: bool,
 }
 
-impl ExportConfig {}
+impl Default for ExportUserConfig {
+    fn default() -> Self {
+        Self {
+            task: ProjectTask::ExportPdf(ExportPdfTask {
+                export: ProjectExportTask {
+                    when: TaskWhen::Never,
+                    output: None,
+                    transform: vec![],
+                },
+                pdf_standards: vec![],
+                creation_timestamp: None,
+            }),
+            count_words: false,
+        }
+    }
+}
+
+impl ExportUserConfig {}
 
 fn parse_color(fill: String) -> anyhow::Result<Color> {
     match fill.as_str() {
@@ -595,10 +589,10 @@ mod tests {
 
     #[test]
     fn test_default_never() {
-        let conf = ExportConfig::default();
+        let conf = ExportUserConfig::default();
         assert!(!conf.count_words);
-        assert_eq!(conf.config.task.when(), None);
-        assert_eq!(conf.config.task.when().unwrap_or_default(), TaskWhen::Never);
+        assert_eq!(conf.task.when(), None);
+        assert_eq!(conf.task.when().unwrap_or_default(), TaskWhen::Never);
     }
 
     #[test]
