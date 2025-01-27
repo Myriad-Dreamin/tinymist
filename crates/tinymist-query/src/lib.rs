@@ -155,80 +155,18 @@ mod polymorphic {
     use completion::CompletionList;
     use lsp_types::TextEdit;
     use serde::{Deserialize, Serialize};
+    use tinymist_project::ProjectTask;
     use typst::foundations::Dict;
 
     use super::prelude::*;
     use super::*;
 
-    #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    pub enum PageSelection {
-        #[default]
-        First,
-        Merged {
-            gap: Option<String>,
-        },
-    }
-
-    #[derive(Debug, Clone)]
-    pub enum ExportKind {
-        Pdf {
-            creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
-        },
-        Html {},
-        Markdown {},
-        Text {},
-        Query {
-            format: String,
-            output_extension: Option<String>,
-            strict: bool,
-            selector: String,
-            field: Option<String>,
-            one: bool,
-            pretty: bool,
-        },
-        Svg {
-            page: PageSelection,
-        },
-        Png {
-            ppi: Option<f64>,
-            fill: Option<String>,
-            page: PageSelection,
-        },
-    }
-
-    impl Default for ExportKind {
-        fn default() -> Self {
-            Self::Pdf {
-                creation_timestamp: None,
-            }
-        }
-    }
-
-    impl ExportKind {
-        pub fn extension(&self) -> &str {
-            match self {
-                Self::Pdf { .. } => "pdf",
-                Self::Html { .. } => "html",
-                Self::Markdown { .. } => "md",
-                Self::Text { .. } => "txt",
-                Self::Svg { .. } => "svg",
-                Self::Png { .. } => "png",
-                Self::Query {
-                    format,
-                    output_extension,
-                    ..
-                } => output_extension.as_deref().unwrap_or(format),
-            }
-        }
-    }
-
     #[derive(Debug, Clone)]
     pub struct OnExportRequest {
         /// The path of the document to export.
         pub path: PathBuf,
-        /// The kind of the export.
-        pub kind: ExportKind,
+        /// The export task to run.
+        pub task: ProjectTask,
         /// Whether to open the exported file(s) after the export is done.
         pub open: bool,
     }

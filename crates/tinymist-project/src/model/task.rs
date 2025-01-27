@@ -3,6 +3,7 @@
 use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
+use tinymist_std::error::prelude::*;
 
 use super::{Id, Pages, PathPattern, PdfStandard, Scalar, TaskWhen};
 
@@ -136,7 +137,7 @@ pub struct PreviewTask {
 }
 
 /// An export task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTask {
     /// When to run the task
@@ -157,6 +158,48 @@ impl ExportTask {
             transform: Vec::new(),
         }
     }
+
+    /// Applies page selection to the export task.
+    pub fn select_page(&mut self, selection: PageSelection) -> Result<()> {
+        match selection {
+            PageSelection::First => self.transform.push(ExportTransform::Pages {
+                ranges: vec![Pages::FIRST],
+            }),
+            PageSelection::Merged { gap } => {
+                let gap = gap
+                    .map(|gap| gap.parse::<f32>())
+                    .transpose()
+                    .context_ut("failed to parse gap")?
+                    .unwrap_or_default()
+                    .try_into()
+                    .context("invalid gap (e.g. NaN)")?;
+
+                self.transform.push(ExportTransform::Merge { gap });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Pretty prints the output whenever possible.
+    pub fn apply_pretty(&mut self) {
+        self.transform
+            .push(ExportTransform::Pretty { script: None });
+    }
+}
+
+/// The legacy page selection specifier.
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PageSelection {
+    /// Selects the first page.
+    #[default]
+    First,
+    /// Merges all pages into a single page.
+    Merged {
+        /// The gap between pages (in pt).
+        gap: Option<String>,
+    },
 }
 
 /// A project export transform specifier.

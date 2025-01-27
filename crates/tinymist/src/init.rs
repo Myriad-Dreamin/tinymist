@@ -708,7 +708,7 @@ impl CompileConfig {
     }
 
     /// Determines the creation timestamp.
-    pub fn determine_creation_timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    pub fn determine_creation_timestamp(&self) -> Option<i64> {
         self.typst_extra_args.as_ref()?.creation_timestamp
     }
 
@@ -806,8 +806,8 @@ pub struct CompileExtraOpts {
     pub font: CompileFontArgs,
     /// Package related arguments.
     pub package: CompilePackageArgs,
-    /// The creation timestamp for various output.
-    pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+    /// The creation timestamp for various output (in seconds).
+    pub creation_timestamp: Option<i64>,
     /// Path to certification file
     pub cert: Option<ImmutPath>,
 }
@@ -885,7 +885,7 @@ mod tests {
 
     #[test]
     fn test_config_creation_timestamp() {
-        type Timestamp = Option<chrono::DateTime<chrono::Utc>>;
+        type Timestamp = Option<i64>;
 
         fn timestamp(f: impl FnOnce(&mut Config)) -> Timestamp {
             let mut config = Config::default();

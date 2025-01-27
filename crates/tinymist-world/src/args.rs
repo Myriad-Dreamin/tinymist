@@ -70,7 +70,7 @@ pub struct CompileOnceArgs {
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 
-    /// The document's creation date formatted as a UNIX timestamp.
+    /// The document's creation date formatted as a UNIX timestamp (in seconds).
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
     #[clap(
@@ -80,7 +80,7 @@ pub struct CompileOnceArgs {
         value_parser = parse_source_date_epoch,
         hide(true),
     )]
-    pub creation_timestamp: Option<DateTime<Utc>>,
+    pub creation_timestamp: Option<i64>,
 
     /// Path to CA certificate file for network access, especially for
     /// downloading typst packages.
@@ -105,9 +105,12 @@ fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
 }
 
 /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
-pub fn parse_source_date_epoch(raw: &str) -> Result<DateTime<Utc>, String> {
-    let timestamp: i64 = raw
-        .parse()
-        .map_err(|err| format!("timestamp must be decimal integer ({err})"))?;
-    DateTime::from_timestamp(timestamp, 0).ok_or_else(|| "timestamp out of range".to_string())
+pub fn parse_source_date_epoch(raw: &str) -> Result<i64, String> {
+    raw.parse()
+        .map_err(|err| format!("timestamp must be decimal integer ({err})"))
+}
+
+/// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+pub fn convert_source_date_epoch(seconds: i64) -> Result<chrono::DateTime<Utc>, String> {
+    DateTime::from_timestamp(seconds, 0).ok_or_else(|| "timestamp out of range".to_string())
 }

@@ -9,8 +9,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_project::{
+    ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask,
+    ExportTextTask, PageSelection, ProjectTask, QueryTask,
+};
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
+use tinymist_query::LocalContextGuard;
 use tinymist_std::error::prelude::*;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
@@ -21,19 +25,19 @@ use super::*;
 use crate::state::query::{run_query, LspClientExt};
 use crate::tool::package::InitTask;
 
-/// See [`ExportKind`].
+/// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
     creation_timestamp: Option<String>,
     fill: Option<String>,
-    ppi: Option<f64>,
+    ppi: Option<f32>,
     #[serde(default)]
     page: PageSelection,
     /// Whether to open the exported file(s) after the export is done.
     open: Option<bool>,
 }
 
-/// See [`ExportKind`].
+/// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryOpts {
@@ -56,55 +60,6 @@ struct HighlightRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
-    // let when = self.config.when;
-
-    // // todo: page transforms
-    // let transforms = vec![];
-
-    // use tinymist_project::ExportTask as ProjectExportTask;
-
-    // let export = ProjectExportTask {
-    //     when,
-    //     transform: transforms,
-    // };
-
-    // let config = match kind {
-    //     Pdf { creation_timestamp } => {
-    //         let _ = creation_timestamp;
-    //         ProjectTaskConfig::ExportPdf(ExportPdfTask {
-    //             export,
-    //             pdf_standards: Default::default(),
-    //             creation_timestamp: None,
-    //         })
-    //     }
-    //     Html {} => ProjectTaskConfig::ExportHtml(ExportHtmlTask { export }),
-    //     Markdown {} => ProjectTaskConfig::ExportMarkdown(ExportMarkdownTask {
-    // export }),     Text {} => ProjectTaskConfig::ExportText(ExportTextTask {
-    // export }),     Query { .. } => {
-    //         // todo: ignoring query task.
-    //         return None;
-    //     }
-    //     Svg { page } => {
-    //         // todo: ignoring page selection.
-    //         let _ = page;
-    //         return None;
-    //     }
-    //     Png { ppi, fill, page } => {
-    //         // todo: ignoring page fill.
-    //         let _ = fill;
-    //         // todo: ignoring page selection.
-    //         let _ = page;
-
-    //         let ppi = ppi.unwrap_or(144.) as f32;
-    //         let ppi = ppi.try_into().unwrap();
-    //         ProjectTaskConfig::ExportPng(ExportPngTask {
-    //             export,
-    //             ppi,
-    //             fill: None,
-    //         })
-    //     }
-    // };
-
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
@@ -120,7 +75,11 @@ impl ServerState {
 
         self.export(
             req_id,
-            ExportKind::Pdf { creation_timestamp },
+            ProjectTask::ExportPdf(ExportPdfTask {
+                export: ExportTask::default(),
+                pdf_standards: vec![],
+                creation_timestamp,
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -131,7 +90,9 @@ impl ServerState {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(
             req_id,
-            ExportKind::Html {},
+            ProjectTask::ExportHtml(ExportHtmlTask {
+                export: ExportTask::default(),
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -146,7 +107,9 @@ impl ServerState {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(
             req_id,
-            ExportKind::Markdown {},
+            ProjectTask::ExportMarkdown(ExportMarkdownTask {
+                export: ExportTask::default(),
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -157,7 +120,9 @@ impl ServerState {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(
             req_id,
-            ExportKind::Text {},
+            ProjectTask::ExportText(ExportTextTask {
+                export: ExportTask::default(),
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -166,17 +131,24 @@ impl ServerState {
     /// Query the current document and export the result as JSON file(s).
     pub fn export_query(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as QueryOpts);
+        // todo: deprecate it
+        let _ = opts.strict;
+
+        let mut export = ExportTask::default();
+        if opts.pretty.unwrap_or(true) {
+            export.apply_pretty();
+        }
+
         self.export(
             req_id,
-            ExportKind::Query {
+            ProjectTask::Query(QueryTask {
                 format: opts.format,
                 output_extension: opts.output_extension,
-                strict: opts.strict.unwrap_or(true),
                 selector: opts.selector,
                 field: opts.field,
-                pretty: opts.pretty.unwrap_or(true),
                 one: opts.one.unwrap_or(false),
-            },
+                export,
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -185,9 +157,13 @@ impl ServerState {
     /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
+
+        let mut export = ExportTask::default();
+        export.select_page(opts.page).map_err(invalid_params)?;
+
         self.export(
             req_id,
-            ExportKind::Svg { page: opts.page },
+            ProjectTask::ExportSvg(ExportSvgTask { export }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -196,13 +172,23 @@ impl ServerState {
     /// Export the current document as Png file(s).
     pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
+
+        let ppi = opts.ppi.unwrap_or(144.);
+        let ppi = ppi
+            .try_into()
+            .context("cannot convert ppi")
+            .map_err(invalid_params)?;
+
+        let mut export = ExportTask::default();
+        export.select_page(opts.page).map_err(invalid_params)?;
+
         self.export(
             req_id,
-            ExportKind::Png {
+            ProjectTask::ExportPng(ExportPngTask {
                 fill: opts.fill,
-                ppi: opts.ppi,
-                page: opts.page,
-            },
+                ppi,
+                export,
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -213,13 +199,13 @@ impl ServerState {
     pub fn export(
         &mut self,
         req_id: RequestId,
-        kind: ExportKind,
+        task: ProjectTask,
         open: bool,
         mut args: Vec<JsonValue>,
     ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
 
-        run_query!(req_id, self.OnExport(path, open, kind))
+        run_query!(req_id, self.OnExport(path, open, task))
     }
 
     /// Export a range of the current document as Ansi highlighted text.

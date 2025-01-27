@@ -257,6 +257,11 @@ display_possible_values!(PdfStandard);
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
+impl Pages {
+    /// Selects the first page.
+    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=None);
+}
+
 impl FromStr for Pages {
     type Err = &'static str;
 

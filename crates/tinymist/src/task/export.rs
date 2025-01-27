@@ -15,7 +15,6 @@ use tinymist_project::{
     EntryReader, ExportTask as ProjectExportTask, LspCompileSnapshot, LspCompiledArtifact,
     PathPattern, ProjectTask, QueryTask,
 };
-use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
@@ -222,7 +221,6 @@ impl ExportTask {
 
     async fn do_export(task: ExportOnceTask) -> anyhow::Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
-        use PageSelection::*;
         use ProjectTask::*;
 
         let ExportOnceTask {

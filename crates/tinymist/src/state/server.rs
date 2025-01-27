@@ -12,8 +12,8 @@ use sync_lsp::*;
 use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
-    CompilerQueryRequest, ExportKind, LocalContext, LspWorldExt, OnExportRequest, PageSelection,
-    ServerInfoResponse, VersionedDocument,
+    CompilerQueryRequest, LocalContext, LspWorldExt, OnExportRequest, ServerInfoResponse,
+    VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::error::prelude::*;
@@ -526,7 +526,7 @@ impl ServerState {
 
     /// Export the current document.
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
-        let OnExportRequest { path, kind, open } = req;
+        let OnExportRequest { path, task, open } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
         let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
 
@@ -546,15 +546,15 @@ impl ServerState {
         });
 
         let snap = self.snapshot()?;
-        // todo: clone all
-        let task = self.project.export.clone();
+        // todo: merge all
+        let task_base = self.project.export.clone();
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 ..Default::default()
             });
             // kind
-            let res = task.oneshot(snap.clone(), todo!(), lock_dir).await?;
+            let res = task_base.oneshot(snap.clone(), task, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }
@@ -593,11 +593,6 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     ) -> Option<String> {
         self.0.render_marked(ctx, doc, pos)
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ExportOpts {
-    page: PageSelection,
 }
 
 #[test]
