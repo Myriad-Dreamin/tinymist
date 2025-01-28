@@ -201,7 +201,7 @@ impl EditorActor {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);
-                            self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).unwrap_or_default();
+                            self.world_sender.send(TypstActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
                         }
                         ControlPlaneMessage::SrcToDocJump(jump_info) => {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
