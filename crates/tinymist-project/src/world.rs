@@ -13,7 +13,7 @@ use std::path::Path;
 use std::{borrow::Cow, sync::Arc};
 
 use tinymist_std::error::prelude::*;
-use tinymist_std::ImmutPath;
+use tinymist_std::{bail, ImmutPath};
 use tinymist_world::font::system::SystemFontSearcher;
 use tinymist_world::package::{http::HttpRegistry, RegistryPathMapper};
 use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
@@ -22,6 +22,7 @@ use typst::foundations::{Dict, Str, Value};
 use typst::utils::LazyHash;
 
 use crate::font::TinymistFontResolver;
+use crate::ProjectInput;
 
 /// Compiler feature for LSP universe and worlds without typst.ts to implement
 /// more for tinymist. type trait of [`CompilerUniverse`].
@@ -105,6 +106,80 @@ impl WorldProvider for CompileOnceArgs {
                 log::error!("entry path must be inside the root: {}", entry.display());
                 std::process::exit(1);
             }
+        };
+
+        Ok(EntryOpts::new_rooted(
+            root.clone(),
+            Some(relative_entry.to_owned()),
+        ))
+    }
+}
+
+// todo: merge me with the above impl
+impl WorldProvider for (ProjectInput, ImmutPath) {
+    fn resolve(&self) -> Result<LspUniverse> {
+        let (proj, lock_dir) = self;
+        let entry = self.entry()?.try_into()?;
+        let inputs = proj
+            .inputs
+            .iter()
+            .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
+            .collect();
+        let fonts = LspUniverseBuilder::resolve_fonts(CompileFontArgs {
+            font_paths: {
+                proj.font_paths
+                    .iter()
+                    .flat_map(|p| p.to_abs_path(lock_dir))
+                    .collect::<Vec<_>>()
+            },
+            ignore_system_fonts: !proj.system_fonts,
+        })?;
+        let package = LspUniverseBuilder::resolve_package(
+            // todo: recover certificate path
+            None,
+            Some(&CompilePackageArgs {
+                package_path: proj
+                    .package_path
+                    .as_ref()
+                    .and_then(|p| p.to_abs_path(lock_dir)),
+                package_cache_path: proj
+                    .package_cache_path
+                    .as_ref()
+                    .and_then(|p| p.to_abs_path(lock_dir)),
+            }),
+        );
+
+        LspUniverseBuilder::build(
+            entry,
+            Arc::new(LazyHash::new(inputs)),
+            Arc::new(fonts),
+            package,
+        )
+        .context("failed to create universe")
+    }
+
+    fn entry(&self) -> Result<EntryOpts> {
+        let (proj, lock_dir) = self;
+
+        let entry = proj
+            .main
+            .to_abs_path(lock_dir)
+            .context("failed to resolve entry file")?;
+
+        let root = if let Some(root) = &proj.root {
+            root.to_abs_path(lock_dir)
+                .context("failed to resolve root")?
+        } else {
+            lock_dir.as_ref().to_owned()
+        };
+
+        if !entry.starts_with(&root) {
+            bail!("entry file must be in the root directory, {entry:?}, {root:?}");
+        }
+
+        let relative_entry = match entry.strip_prefix(&root) {
+            Ok(relative_entry) => relative_entry,
+            Err(_) => bail!("entry path must be inside the root: {}", entry.display()),
         };
 
         Ok(EntryOpts::new_rooted(

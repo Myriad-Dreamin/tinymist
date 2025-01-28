@@ -407,13 +407,13 @@ impl ResourcePath {
         }
     }
     /// Converts the resource path to an absolute file system path.
-    pub fn to_abs_path(&self, rel: &Path) -> Option<PathBuf> {
+    pub fn to_abs_path(&self, base: &Path) -> Option<PathBuf> {
         if self.0 == "file" {
             let path = Path::new(&self.1);
             if path.is_absolute() {
                 Some(path.to_owned())
             } else {
-                Some(rel.join(path))
+                Some(base.join(path))
             }
         } else {
             None
@@ -481,12 +481,13 @@ pub struct LockFile {
 pub struct ProjectInput {
     /// The project's ID.
     pub id: Id,
-    /// The project's root directory.
+    /// The path to the root directory of the project.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ResourcePath>,
-    /// The project's main file.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub main: Option<ResourcePath>,
+    /// The path to the main file of the project.
+    pub main: ResourcePath,
+    /// The key-value pairs visible through `sys.inputs`
+    pub inputs: Vec<(String, String)>,
     /// The project's font paths.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub font_paths: Vec<ResourcePath>,

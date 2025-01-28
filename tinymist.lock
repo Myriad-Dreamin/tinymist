@@ -4,10 +4,16 @@ version = "0.1.0-beta0"
 
 [[document]]
 id = "file:docs/tinymist/book.typ"
+inputs = []
+main = "file:docs/tinymist/book.typ"
+root = "file:."
 system-fonts = true
 
 [[document]]
 id = "file:docs/tinymist/ebook.typ"
+inputs = []
+main = "file:docs/tinymist/ebook.typ"
+root = "file:."
 system-fonts = true
 
 [[task]]
@@ -23,7 +29,9 @@ type = "export-svg"
 when = "never"
 
 [[task.transform]]
-pages = ["1-1"]
+
+[task.transform.pages]
+ranges = ["1-1"]
 
 [[task]]
 document = "file:docs/tinymist/ebook.typ"

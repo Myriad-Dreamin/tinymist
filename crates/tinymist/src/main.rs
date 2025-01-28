@@ -16,18 +16,18 @@ use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
-use reflexo_typst::{package::PackageSpec, Compiler, TypstDict};
+use reflexo_typst::{package::PackageSpec, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{
     internal_error,
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
+use tinymist::world::TaskInputs;
 use tinymist::{
-    tool::project::{project_main, task_main},
+    tool::project::{compile_main, project_main, task_main},
     CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask,
 };
-use tinymist::{world::TaskInputs, world::WorldProvider};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
@@ -65,27 +65,29 @@ fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
+    // Parse command line arguments
+    let args = CliArguments::parse();
+
+    let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+
     // Start logging
     let _ = {
         use log::LevelFilter::*;
+        let base_level = if is_transient_cmd { Warn } else { Info };
+
         env_logger::builder()
-            .filter_module("tinymist", Info)
+            .filter_module("tinymist", base_level)
             .filter_module("typst_preview", Debug)
-            .filter_module("typlite", Info)
-            .filter_module("reflexo", Info)
-            .filter_module("sync_lsp", Info)
-            .filter_module("reflexo_typst::service::compile", Info)
-            .filter_module("reflexo_typst::service::watch", Info)
+            .filter_module("typlite", base_level)
+            .filter_module("reflexo", base_level)
+            .filter_module("sync_lsp", base_level)
             .filter_module("reflexo_typst::diag::console", Info)
             .try_init()
     };
 
-    // Parse command line arguments
-    let args = CliArguments::parse();
-
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
-        Commands::Compile(args) => compile(args),
+        Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
@@ -110,41 +112,6 @@ pub fn completion(args: ShellCompletionArgs) -> Result<()> {
 
     let mut cmd = CliArguments::command();
     generate(shell, &mut cmd, "tinymist", &mut io::stdout());
-
-    Ok(())
-}
-
-/// Runs compilation
-pub fn compile(args: CompileArgs) -> Result<()> {
-    use std::io::Write;
-
-    let input = args
-        .compile
-        .input
-        .as_ref()
-        .context("Missing required argument: INPUT")?;
-    let output = match args.output {
-        Some(stdout_path) if stdout_path == "-" => None,
-        Some(output_path) => Some(PathBuf::from(output_path)),
-        None => Some(Path::new(input).with_extension("pdf")),
-    };
-
-    let universe = args.compile.resolve()?;
-    let world = universe.snapshot();
-
-    let converter = std::marker::PhantomData.compile(&world, &mut Default::default());
-    let pdf = typst_pdf::pdf(&converter.unwrap().output, &Default::default());
-
-    match (pdf, output) {
-        (Ok(pdf), None) => {
-            std::io::stdout().write_all(&pdf).unwrap();
-        }
-        (Ok(pdf), Some(output)) => std::fs::write(output, pdf).unwrap(),
-        (Err(err), ..) => {
-            eprintln!("{err:?}");
-            std::process::exit(1);
-        }
-    }
 
     Ok(())
 }

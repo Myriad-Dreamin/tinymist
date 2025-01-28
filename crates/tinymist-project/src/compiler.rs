@@ -37,7 +37,7 @@ pub struct ProjectInsId(EcoString);
 ///
 /// Whether to export depends on the current state of the document and the user
 /// settings.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ExportSignal {
     /// Whether the revision is annotated by memory events.
     pub by_mem_events: bool,
@@ -62,6 +62,17 @@ pub struct CompileSnapshot<F: CompilerFeat> {
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
+    /// Creates a snapshot from the world.
+    pub fn from_world(world: CompilerWorld<F>) -> Self {
+        Self {
+            id: ProjectInsId("primary".into()),
+            signal: ExportSignal::default(),
+            env: CompileEnv::default(),
+            world,
+            success_doc: None,
+        }
+    }
+
     /// Forks a new snapshot that compiles a different document.
     ///
     /// Note: the resulting document should not be shared in system, because we

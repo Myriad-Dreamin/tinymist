@@ -263,8 +263,8 @@ impl ServerState {
                 .unwrap_or_else(|| lock_dir.clone());
             let main = input
                 .main
-                .as_ref()
-                .and_then(|main| Some(main.to_abs_path(lock_dir)?.as_path().into()))
+                .to_abs_path(lock_dir)
+                .map(|path| path.as_path().into())
                 .unwrap_or_else(|| path.clone());
             let entry = self
                 .entry_resolver()

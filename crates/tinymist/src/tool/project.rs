@@ -1,76 +1,34 @@
 //! Project management tools.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use reflexo::ImmutPath;
 use tinymist_std::error::prelude::*;
 
-use crate::project::*;
+use crate::{project::*, task::ExportTask};
+
+/// Common arguments of compile, watch, and query.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct CompileArgs {
+    /// Inherits the compile task arguments.
+    #[clap(flatten)]
+    pub compile: TaskCompileArgs,
+
+    /// Saves the compilation arguments to the lock file.
+    #[clap(long)]
+    pub save_lock: bool,
+
+    /// Specifies the path to the lock file. If the path is
+    /// set, the lock file will be saved.
+    #[clap(long)]
+    pub lockfile: Option<PathBuf>,
+}
 
 trait LockFileExt {
-    fn declare(&mut self, args: &DocNewArgs) -> Id;
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
-    fn compile(&mut self, args: TaskCompileArgs) -> Result<Id>;
-    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> Result<Id>;
 }
 
 impl LockFileExt for LockFile {
-    fn declare(&mut self, args: &DocNewArgs) -> Id {
-        let id: Id = (&args.id).into();
-
-        let root = args
-            .root
-            .as_ref()
-            .map(|root| ResourcePath::from_user_sys(Path::new(root)));
-        let main = ResourcePath::from_user_sys(Path::new(&args.id.input));
-
-        let font_paths = args
-            .font
-            .font_paths
-            .iter()
-            .map(|p| ResourcePath::from_user_sys(p))
-            .collect::<Vec<_>>();
-
-        let package_path = args
-            .package
-            .package_path
-            .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
-
-        let package_cache_path = args
-            .package
-            .package_cache_path
-            .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
-
-        let input = ProjectInput {
-            id: id.clone(),
-            root,
-            main: Some(main),
-            font_paths,
-            system_fonts: !args.font.ignore_system_fonts,
-            package_path,
-            package_cache_path,
-        };
-
-        self.replace_document(input);
-
-        id
-    }
-
-    fn compile(&mut self, args: TaskCompileArgs) -> Result<Id> {
-        let id = self.declare(&args.declare);
-        self.export(id, args)
-    }
-
-    fn export(&mut self, doc_id: Id, args: TaskCompileArgs) -> Result<Id> {
-        let task = args.to_task(doc_id)?;
-        let task_id = task.id().clone();
-
-        self.replace_task(task);
-
-        Ok(task_id)
-    }
-
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
         let task_id = args
             .name
@@ -92,12 +50,51 @@ impl LockFileExt for LockFile {
     }
 }
 
+/// Runs project compilation(s)
+pub async fn compile_main(args: CompileArgs) -> Result<()> {
+    // Identifies the input and output
+    let input = args.compile.declare.to_input();
+    let output = args.compile.to_task(input.id.clone())?;
+
+    // Saves the lock file if the flags are set
+    let save_lock = args.save_lock || args.lockfile.is_some();
+    // todo: respect the name of the lock file
+    let lock_dir: ImmutPath = if let Some(lockfile) = args.lockfile {
+        lockfile.parent().context("no parent")?.into()
+    } else {
+        std::env::current_dir().context("lock directory")?.into()
+    };
+
+    if save_lock {
+        LockFile::update(&lock_dir, |state| {
+            state.replace_document(input.clone());
+            state.replace_task(output.clone());
+
+            Ok(())
+        })?;
+    }
+
+    // Prepares for the compilation
+    let universe = (input, lock_dir.clone()).resolve()?;
+    let world = universe.snapshot();
+    let snap = CompileSnapshot::from_world(world);
+
+    // Compiles the project
+    let compiled = snap.compile();
+
+    // Exports the compiled project
+    let lock_dir = save_lock.then_some(lock_dir);
+    ExportTask::do_export(output.task, compiled, lock_dir).await?;
+
+    Ok(())
+}
+
 /// Project document commands' main
 pub fn project_main(args: DocCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
         match args {
             DocCommands::New(args) => {
-                state.declare(&args);
+                state.replace_document(args.to_input());
             }
             DocCommands::Configure(args) => {
                 let id: Id = (&args.id).into();
@@ -117,11 +114,10 @@ pub fn project_main(args: DocCommands) -> Result<()> {
 pub fn task_main(args: TaskCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
         match args {
-            TaskCommands::Compile(args) => {
-                let _ = state.compile(args);
-            }
             TaskCommands::Preview(args) => {
-                let id = state.declare(&args.declare);
+                let input = args.declare.to_input();
+                let id = input.id.clone();
+                state.replace_document(input);
                 let _ = state.preview(id, &args);
             }
         }

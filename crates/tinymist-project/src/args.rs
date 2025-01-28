@@ -22,11 +22,7 @@ pub enum DocCommands {
 /// Project task commands.
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "kebab-case")]
-// clippy bug: TaskCompileArgs is evaluated as 0 bytes
-#[allow(clippy::large_enum_variant)]
 pub enum TaskCommands {
-    /// Declare a compile task (output).
-    Compile(TaskCompileArgs),
     /// Declare a preview task.
     Preview(TaskPreviewArgs),
 }
@@ -46,6 +42,50 @@ pub struct DocNewArgs {
     /// Common package arguments.
     #[clap(flatten)]
     pub package: CompilePackageArgs,
+}
+
+impl DocNewArgs {
+    /// Converts to project input.
+    pub fn to_input(&self) -> ProjectInput {
+        let id: Id = (&self.id).into();
+
+        let root = self
+            .root
+            .as_ref()
+            .map(|root| ResourcePath::from_user_sys(Path::new(root)));
+        let main = ResourcePath::from_user_sys(Path::new(&self.id.input));
+
+        let font_paths = self
+            .font
+            .font_paths
+            .iter()
+            .map(|p| ResourcePath::from_user_sys(p))
+            .collect::<Vec<_>>();
+
+        let package_path = self
+            .package
+            .package_path
+            .as_ref()
+            .map(|p| ResourcePath::from_user_sys(p));
+
+        let package_cache_path = self
+            .package
+            .package_cache_path
+            .as_ref()
+            .map(|p| ResourcePath::from_user_sys(p));
+
+        ProjectInput {
+            id: id.clone(),
+            root,
+            main,
+            // todo: inputs
+            inputs: vec![],
+            font_paths,
+            system_fonts: !self.font.ignore_system_fonts,
+            package_path,
+            package_cache_path,
+        }
+    }
 }
 
 /// The id of a document.

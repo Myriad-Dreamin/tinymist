@@ -23,6 +23,10 @@ impl LockFile {
         self.document.iter().find(|i| &i.id == id)
     }
 
+    pub fn get_task(&self, id: &Id) -> Option<&ApplyProjectTask> {
+        self.task.iter().find(|i| &i.id == id)
+    }
+
     pub fn replace_document(&mut self, input: ProjectInput) {
         let id = input.id.clone();
         let index = self.document.iter().position(|i| i.id == id);
@@ -263,10 +267,13 @@ impl LockFileUpdate {
         let _ = package_cache_path;
         let _ = package_path;
 
+        // todo: freeze the sys.inputs
+
         let input = ProjectInput {
             id: id.clone(),
             root: Some(root),
-            main: Some(main),
+            main,
+            inputs: vec![],
             font_paths,
             system_fonts: true, // !args.font.ignore_system_fonts,
             package_path: None,
