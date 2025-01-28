@@ -4035,17 +4035,10 @@ dependencies = [
 name = "tinymist-analysis"
 version = "0.12.18"
 dependencies = [
- "base64",
- "comemo",
- "ecow",
  "insta",
- "log",
  "regex",
- "tinymist-world",
  "toml",
  "typst",
- "typst-svg",
- "typst-syntax",
 ]
 
 [[package]]
