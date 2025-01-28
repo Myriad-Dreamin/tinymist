@@ -23,7 +23,7 @@ use sync_lsp::{
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
-use tinymist::world::TaskInputs;
+use tinymist::{tool::project::generate_script_main, world::TaskInputs};
 use tinymist::{
     tool::project::{compile_main, project_main, task_main},
     CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask,
@@ -88,6 +88,7 @@ fn main() -> Result<()> {
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
+        Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),

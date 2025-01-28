@@ -4,7 +4,7 @@ use sync_lsp::transport::MirrorArgs;
 
 use tinymist::{
     project::{DocCommands, TaskCommands},
-    tool::project::CompileArgs,
+    tool::project::{CompileArgs, GenerateScriptArgs},
     CompileFontArgs, CompileOnceArgs,
 };
 use tinymist_core::LONG_VERSION;
@@ -18,6 +18,7 @@ pub struct CliArguments {
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
+#[clap(rename_all = "kebab-case")]
 pub enum Commands {
     /// Probes existence (Nop run)
     Probe,
@@ -35,6 +36,9 @@ pub enum Commands {
 
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
+    /// Generates build script for compilation
+    #[clap(hide(true))] // still in development
+    GenerateScript(GenerateScriptArgs),
     /// Runs language query
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]

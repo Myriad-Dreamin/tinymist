@@ -179,6 +179,12 @@ display_possible_values!(OutputFormat);
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PathPattern(pub String);
 
+impl fmt::Display for PathPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 impl PathPattern {
     /// Creates a new path pattern.
     pub fn new(pattern: &str) -> Self {
@@ -406,6 +412,22 @@ impl ResourcePath {
             ),
         }
     }
+
+    /// Converts the resource path to a path relative to the `base` (usually the
+    /// directory storing the lockfile).
+    pub fn to_rel_path(&self, base: &Path) -> Option<PathBuf> {
+        if self.0 == "file" {
+            let path = Path::new(&self.1);
+            if path.is_absolute() {
+                Some(pathdiff::diff_paths(path, base).unwrap_or_else(|| path.to_owned()))
+            } else {
+                Some(path.to_owned())
+            }
+        } else {
+            None
+        }
+    }
+
     /// Converts the resource path to an absolute file system path.
     pub fn to_abs_path(&self, base: &Path) -> Option<PathBuf> {
         if self.0 == "file" {
