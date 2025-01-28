@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: "Completion on \n (50..51)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/raw_lang_middle.typ
-snapshot_kind: text
 ---
 [
  {
@@ -12,7 +11,7 @@ snapshot_kind: text
    {
     "kind": 21,
     "label": "Typst",
-    "sortText": "142",
+    "sortText": "145",
     "textEdit": {
      "newText": "typ",
      "range": {

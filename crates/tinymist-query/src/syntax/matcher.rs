@@ -296,7 +296,7 @@ pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
 pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> {
     use SyntaxKind::*;
     Some(match kind {
-        LineComment | BlockComment => InterpretMode::Comment,
+        LineComment | BlockComment | Shebang => InterpretMode::Comment,
         Raw => InterpretMode::Raw,
         Str => InterpretMode::String,
         CodeBlock | Code => InterpretMode::Code,
@@ -313,7 +313,7 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
-        | MathRoot | MathShorthand => InterpretMode::Math,
+        | MathRoot | MathShorthand | MathText => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
         | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
@@ -1372,7 +1372,7 @@ Text
 
         assert_snapshot!(test_fn("#(a.b)", 5), @r"Field: b");
         assert_snapshot!(test_fn("#a.", 3), @"DotSuffix: 3");
-        assert_snapshot!(test_fn("$a.$", 3), @"DotSuffix: 3");
+        assert_snapshot!(test_fn("$a.$", 3), @"");
         assert_snapshot!(test_fn("#(a.)", 4), @"DotSuffix: 4");
         assert_snapshot!(test_fn("#(a..b)", 4), @"DotSuffix: 4");
         assert_snapshot!(test_fn("#(a..b())", 4), @"DotSuffix: 4");
