@@ -56,8 +56,8 @@
 //!                      ^ SurroundingSyntax::Regular
 //! ```
 
+use crate::debug_loc::SourceSpanOffset;
 use serde::{Deserialize, Serialize};
-use tinymist_std::debug_loc::SourceSpanOffset;
 use typst::syntax::Span;
 
 use crate::prelude::*;
@@ -84,6 +84,7 @@ pub enum PreviousItem<'a> {
 }
 
 impl<'a> PreviousItem<'a> {
+    /// Gets the underlying [`LinkedNode`] of the item.
     pub fn node(&self) -> &'a LinkedNode<'a> {
         match self {
             PreviousItem::Sibling(node) => node,
@@ -124,9 +125,38 @@ pub fn previous_items<T>(
     None
 }
 
+/// A declaration that is an ancestor of the given node or the previous sibling
+/// of some ancestor.
 pub enum PreviousDecl<'a> {
+    /// An declaration having an identifier.
+    ///
+    /// ## Example
+    ///
+    /// The `x` in the following code:
+    ///
+    /// ```typst
+    /// #let x = 1;
+    /// ```
     Ident(ast::Ident<'a>),
+    /// An declaration yielding from an import source.
+    ///
+    /// ## Example
+    ///
+    /// The `x` in the following code:
+    ///
+    /// ```typst
+    /// #import "path.typ": x;
+    /// ```
     ImportSource(ast::Expr<'a>),
+    /// A wildcard import that possibly containing visible declarations.
+    ///
+    /// ## Example
+    ///
+    /// The following import is matched:
+    ///
+    /// ```typst
+    /// #import "path.typ": *;
+    /// ```
     ImportAll(ast::ModuleImport<'a>),
 }
 
@@ -458,7 +488,26 @@ fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
 /// Classes of field syntax that can be operated on by IDE functionality.
 #[derive(Debug, Clone)]
 pub enum FieldClass<'a> {
+    /// A field node.
+    ///
+    /// ## Example
+    ///
+    /// The `x` in the following code:
+    ///
+    /// ```typst
+    /// #a.x
+    /// ```
     Field(LinkedNode<'a>),
+
+    /// A dot suffix missing a field.
+    ///
+    /// ## Example
+    ///
+    /// The `.` in the following code:
+    ///
+    /// ```typst
+    /// #a.
+    /// ```
     DotSuffix(SourceSpanOffset),
 }
 
@@ -560,7 +609,9 @@ pub enum SyntaxClass<'a> {
     VarAccess(VarClass<'a>),
     /// A (content) label expression.
     Label {
+        /// The node of the label.
         node: LinkedNode<'a>,
+        /// Whether the label is converted from an error node.
         is_error: bool,
     },
     /// A (content) reference expression.
@@ -734,8 +785,11 @@ fn possible_in_code_trivia(kind: SyntaxKind) -> bool {
 pub enum ArgClass<'a> {
     /// A positional argument.
     Positional {
+        /// The spread arguments met before the positional argument.
         spreads: EcoVec<LinkedNode<'a>>,
+        /// The index of the positional argument.
         positional: usize,
+        /// Whether the positional argument is a spread argument.
         is_spread: bool,
     },
     /// A named argument.
@@ -744,7 +798,7 @@ pub enum ArgClass<'a> {
 
 impl ArgClass<'_> {
     /// Creates the class refer to the first positional argument.
-    pub(crate) fn first_positional() -> Self {
+    pub fn first_positional() -> Self {
         ArgClass::Positional {
             spreads: EcoVec::new(),
             positional: 0,
@@ -754,17 +808,26 @@ impl ArgClass<'_> {
 }
 
 // todo: whether we can merge `SurroundingSyntax` and `SyntaxContext`?
+/// Classes of syntax context (outer syntax) that can be operated on by IDE
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::EnumIter)]
 pub enum SurroundingSyntax {
+    /// Regular syntax.
     Regular,
+    /// Content in a string.
     StringContent,
+    /// The cursor is directly on the selector of a show rule.
     Selector,
+    /// The cursor is directly on the transformation of a show rule.
     ShowTransform,
+    /// The cursor is directly on the import list.
     ImportList,
+    /// The cursor is directly on the set rule.
     SetRule,
+    /// The cursor is directly on the parameter list.
     ParamList,
 }
 
+/// Determines the surrounding syntax of the node at the position.
 pub fn surrounding_syntax(node: &LinkedNode) -> SurroundingSyntax {
     check_previous_syntax(node)
         .or_else(|| check_surrounding_syntax(node))
@@ -907,19 +970,28 @@ fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool 
 pub enum SyntaxContext<'a> {
     /// A cursor on an argument.
     Arg {
+        /// The callee node.
         callee: LinkedNode<'a>,
+        /// The arguments node.
         args: LinkedNode<'a>,
+        /// The argument target pointed by the cursor.
         target: ArgClass<'a>,
+        /// Whether the callee is a set rule.
         is_set: bool,
     },
     /// A cursor on an element in an array or dictionary literal.
     Element {
+        /// The container node.
         container: LinkedNode<'a>,
+        /// The element target pointed by the cursor.
         target: ArgClass<'a>,
     },
     /// A cursor on a parenthesized expression.
     Paren {
+        /// The parenthesized expression node.
         container: LinkedNode<'a>,
+        /// Whether the cursor is on the left side of the parenthesized
+        /// expression.
         is_before: bool,
     },
     /// A variable access expression.
@@ -932,7 +1004,9 @@ pub enum SyntaxContext<'a> {
     IncludePath(LinkedNode<'a>),
     /// A cursor on a label.
     Label {
+        /// The label node.
         node: LinkedNode<'a>,
+        /// Whether the label is converted from an error node.
         is_error: bool,
     },
     /// A cursor on a normal [`SyntaxClass`].
@@ -1201,8 +1275,7 @@ fn arg_context<'a>(
 mod tests {
     use super::*;
     use insta::assert_snapshot;
-    use typst::syntax::{is_newline, Source};
-    use typst_shim::syntax::LinkedNodeExt;
+    use typst::syntax::{is_newline, Side, Source};
 
     fn map_node(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
@@ -1230,7 +1303,7 @@ mod tests {
 
     fn map_syntax(source: &str) -> String {
         map_node(source, |root, cursor| {
-            let node = root.leaf_at_compat(cursor);
+            let node = root.leaf_at(cursor, Side::Before);
             let kind = node.and_then(|node| classify_syntax(node, cursor));
             match kind {
                 Some(SyntaxClass::VarAccess(..)) => 'v',
@@ -1247,7 +1320,7 @@ mod tests {
 
     fn map_context(source: &str) -> String {
         map_node(source, |root, cursor| {
-            let node = root.leaf_at_compat(cursor);
+            let node = root.leaf_at(cursor, Side::Before);
             let kind = node.and_then(|node| classify_context(node, Some(cursor)));
             match kind {
                 Some(SyntaxContext::Arg { .. }) => 'p',
@@ -1353,7 +1426,7 @@ Text
             };
             let source = Source::detached(s.to_owned());
             let root = LinkedNode::new(source.root());
-            let node = root.leaf_at_compat(cursor as usize)?;
+            let node = root.leaf_at(cursor as usize, Side::Before)?;
             let syntax = classify_syntax(node, cursor as usize)?;
             let SyntaxClass::VarAccess(var) = syntax else {
                 return None;

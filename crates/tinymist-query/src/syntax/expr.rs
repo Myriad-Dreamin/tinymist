@@ -4,7 +4,6 @@ use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
-use tinymist_analysis::import::resolve_id_by_path;
 use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Value},
@@ -16,7 +15,7 @@ use typst::{
 use crate::{
     analysis::{QueryStatGuard, SharedContext},
     prelude::*,
-    syntax::{find_module_level_docs, DefKind},
+    syntax::{find_module_level_docs, resolve_id_by_path, DefKind},
     ty::{BuiltinTy, InsTy, Interned, Ty},
 };
 

@@ -5,15 +5,13 @@
 // todo: remove this
 #![allow(missing_docs)]
 
-pub use tinymist_analysis::import::*;
+pub use tinymist_analysis::syntax::comment::*;
+pub use tinymist_analysis::syntax::import::*;
+pub use tinymist_analysis::syntax::matcher::*;
 pub(crate) mod lexical_hierarchy;
 pub use lexical_hierarchy::*;
-pub mod matcher;
-pub use matcher::*;
 pub(crate) mod module;
 pub use module::*;
-pub(crate) mod comment;
-pub use comment::*;
 pub(crate) mod expr;
 pub use expr::*;
 pub(crate) mod docs;
