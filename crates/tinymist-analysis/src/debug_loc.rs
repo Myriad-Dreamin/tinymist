@@ -1,9 +1,8 @@
 //! The debug location that can be used to locate a position in a document or a
 //! file.
 
-use core::fmt;
-
 use serde::{Deserialize, Serialize};
+pub use typst::layout::Position as TypstPosition;
 
 /// A serializable physical position in a document.
 ///
@@ -23,15 +22,15 @@ pub struct DocumentPosition {
     pub y: f32,
 }
 
-// impl From<TypstPosition> for DocumentPosition {
-//     fn from(position: TypstPosition) -> Self {
-//         Self {
-//             page_no: position.page.into(),
-//             x: position.point.x.to_pt() as f32,
-//             y: position.point.y.to_pt() as f32,
-//         }
-//     }
-// }
+impl From<TypstPosition> for DocumentPosition {
+    fn from(position: TypstPosition) -> Self {
+        Self {
+            page_no: position.page.into(),
+            x: position.point.x.to_pt() as f32,
+            y: position.point.y.to_pt() as f32,
+        }
+    }
+}
 
 /// Raw representation of a source span.
 pub type RawSourceSpan = u64;
@@ -45,33 +44,6 @@ pub struct FileLocation {
     pub filepath: String,
 }
 
-/// A char position represented in form of line and column.
-/// The position is encoded in Utf-8 or Utf-16, and the encoding is
-/// determined by usage.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
-pub struct CharPosition {
-    /// The line number, starting at 0.
-    pub line: usize,
-    /// The column number, starting at 0.
-    pub column: usize,
-}
-
-impl fmt::Display for CharPosition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.line, self.column)
-    }
-}
-
-impl From<Option<(usize, usize)>> for CharPosition {
-    fn from(loc: Option<(usize, usize)>) -> Self {
-        let (start, end) = loc.unwrap_or_default();
-        CharPosition {
-            line: start,
-            column: end,
-        }
-    }
-}
-
 /// A resolved source (text) location.
 ///
 /// See [`CharPosition`] for the definition of the position inside a file.
@@ -80,7 +52,7 @@ pub struct SourceLocation {
     /// The file path.
     pub filepath: String,
     /// The position in the file.
-    pub pos: CharPosition,
+    pub pos: LspPosition,
 }
 
 impl SourceLocation {
@@ -104,29 +76,24 @@ pub struct FlatSourceLocation {
     /// The file path.
     pub filepath: u32,
     /// The position in the file.
-    pub pos: CharPosition,
+    pub pos: LspPosition,
 }
+
+/// A resolved file position. The position is encoded in Utf-8, Utf-16 or
+/// Utf-32. The position encoding must be negotiated via some protocol like LSP.
+pub type LspPosition = lsp_types::Position;
 
 /// A resolved file range.
 ///
-/// See [`CharPosition`] for the definition of the position inside a file.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CharRange {
-    /// The start position.
-    pub start: CharPosition,
-    /// The end position.
-    pub end: CharPosition,
-}
+/// See [`LspPosition`] for the definition of the position inside a file.
+pub type LspRange = lsp_types::Range;
 
-impl fmt::Display for CharRange {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.start == self.end {
-            write!(f, "{}", self.start)
-        } else {
-            write!(f, "{}-{}", self.start, self.end)
-        }
-    }
-}
+/// The legacy name of the character position.
+#[deprecated(note = "Use `LspPosition` instead.")]
+pub type CharPosition = LspPosition;
+/// The legacy name of the character range.
+#[deprecated(note = "Use `LspRange` instead.")]
+pub type CharRange = LspRange;
 
 /// A resolved source (text) range.
 ///
@@ -136,53 +103,46 @@ pub struct SourceRange {
     /// The file path.
     pub path: String,
     /// The range in the file.
-    pub range: CharRange,
+    pub range: LspRange,
 }
 
-#[cfg(feature = "typst")]
-mod typst_ext {
-    pub use typst::layout::Position as TypstPosition;
+/// Unevaluated source span.
+/// The raw source span is unsafe to serialize and deserialize.
+/// Because the real source location is only known during liveness of
+/// the compiled document.
+pub type SourceSpan = typst::syntax::Span;
 
-    /// Unevaluated source span.
-    /// The raw source span is unsafe to serialize and deserialize.
-    /// Because the real source location is only known during liveness of
-    /// the compiled document.
-    pub type SourceSpan = typst::syntax::Span;
+/// Unevaluated source span with offset.
+///
+/// It adds an additional offset relative to the start of the span.
+///
+/// The offset is usually generated when the location is inside of some
+/// text or string content.
+#[derive(Debug, Clone, Copy)]
+pub struct SourceSpanOffset {
+    /// The source span.
+    pub span: SourceSpan,
+    /// The offset relative to the start of the span. This is usually useful
+    /// if the location is not a span created by the parser.
+    pub offset: usize,
+}
 
-    /// Unevaluated source span with offset.
-    ///
-    /// It adds an additional offset relative to the start of the span.
-    ///
-    /// The offset is usually generated when the location is inside of some
-    /// text or string content.
-    #[derive(Debug, Clone, Copy)]
-    pub struct SourceSpanOffset {
-        /// The source span.
-        pub span: SourceSpan,
-        /// The offset relative to the start of the span. This is usually useful
-        /// if the location is not a span created by the parser.
-        pub offset: usize,
+/// Lifts a [`SourceSpan`] to [`SourceSpanOffset`].
+impl From<SourceSpan> for SourceSpanOffset {
+    fn from(span: SourceSpan) -> Self {
+        Self { span, offset: 0 }
     }
+}
 
-    /// Lifts a [`SourceSpan`] to [`SourceSpanOffset`].
-    impl From<SourceSpan> for SourceSpanOffset {
-        fn from(span: SourceSpan) -> Self {
-            Self { span, offset: 0 }
-        }
-    }
-
-    /// Converts a [`SourceSpan`] and an in-text offset to [`SourceSpanOffset`].
-    impl From<(SourceSpan, u16)> for SourceSpanOffset {
-        fn from((span, offset): (SourceSpan, u16)) -> Self {
-            Self {
-                span,
-                offset: offset as usize,
-            }
+/// Converts a [`SourceSpan`] and an in-text offset to [`SourceSpanOffset`].
+impl From<(SourceSpan, u16)> for SourceSpanOffset {
+    fn from((span, offset): (SourceSpan, u16)) -> Self {
+        Self {
+            span,
+            offset: offset as usize,
         }
     }
 }
-#[cfg(feature = "typst")]
-pub use typst_ext::*;
 
 /// A point on the element tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]

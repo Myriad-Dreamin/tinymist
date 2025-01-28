@@ -14,6 +14,8 @@ rust-version.workspace = true
 [dependencies]
 toml.workspace = true
 typst.workspace = true
+serde.workspace = true
+lsp-types.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
