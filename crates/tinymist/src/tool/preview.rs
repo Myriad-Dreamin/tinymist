@@ -462,11 +462,12 @@ pub async fn make_http_server(
                     // header ourselves. See the comment on CORS below for more details.
                     //
                     // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
-                    // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any `Origin`
-                    // starting with `vscode-webview://` as well. I think that's okay from a security point
-                    // of view, because I think malicious websites can't trick browsers into sending
+                    // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
+                    // `Origin` starting with `vscode-webview://` as well. I
+                    // think that's okay from a security point of view, because
+                    // I think malicious websites can't trick browsers into sending
                     // `vscode-webview://...` as `Origin`.
-                    if req.headers().get("Origin").map_or(false, |h| {
+                    if req.headers().get("Origin").is_some_and(|h| {
                         *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://")
                     }) {
                         let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
@@ -500,19 +501,23 @@ pub async fn make_http_server(
                     Ok(res)
                 };
 
-                // When a user visits a website in a browser, that website can try to connect to our http / websocket
-                // server on `127.0.0.1` which may leak sensitive information. Thus, use CORS to explicitly disallow this.
+                // When a user visits a website in a browser, that website can try to connect to
+                // our http / websocket server on `127.0.0.1` which may leak
+                // sensitive information. Thus, use CORS to explicitly disallow this.
                 //
-                // However, for Websockets, CORS does not work. Thus, we have additional checks of the `Origin` header
-                // above in the websocket upgrade path.
+                // However, for Websockets, CORS does not work. Thus, we have additional checks
+                // of the `Origin` header above in the websocket upgrade path.
                 //
-                // Stricly speaking, setting the `Acess-Control-Allow-Origin` header is not required here since browsers
-                // disallow cross origin access also when that header is missing. But I think it's better to be explicit.
+                // Strictly speaking, setting the `Access-Control-Allow-Origin` header is not
+                // required here since browsers disallow cross origin access
+                // also when that header is missing. But I think it's better to be explicit.
                 //
-                // Important: This does _not_ protect against malicious users that share the same computer as us (i.e. multi-
-                // user systems where the users don't trust each other). In this case, malicious attackers can _still_ connect
-                // to our http / websocket servers (using a browser and otherwise). And additionally they can impersonate
-                // a tinymist http / websocket server towards a legitimate frontend/html client.
+                // Important: This does _not_ protect against malicious users that share the
+                // same computer as us (i.e. multi- user systems where the users
+                // don't trust each other). In this case, malicious attackers can _still_
+                // connect to our http / websocket servers (using a browser and
+                // otherwise). And additionally they can impersonate a tinymist
+                // http / websocket server towards a legitimate frontend/html client.
                 // This requires additional protection that may be added in the future.
                 response.map(|mut response| {
                     response.headers_mut().insert(
