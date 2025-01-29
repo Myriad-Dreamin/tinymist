@@ -710,7 +710,7 @@ impl TypliteWorker {
 
         let path = include.source();
         let src =
-            tinymist_analysis::import::find_source_by_expr(self.world.as_ref(), self.current, path)
+            tinymist_analysis::syntax::find_source_by_expr(self.world.as_ref(), self.current, path)
                 .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
 
         self.clone().sub_file(src).map(Value::Content)

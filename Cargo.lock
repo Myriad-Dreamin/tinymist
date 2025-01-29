@@ -4035,10 +4035,12 @@ dependencies = [
 name = "tinymist-analysis"
 version = "0.12.18"
 dependencies = [
+ "ecow",
  "insta",
  "lsp-types",
  "regex",
  "serde",
+ "strum",
  "toml",
  "typst",
 ]
