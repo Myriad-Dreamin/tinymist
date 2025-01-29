@@ -4090,6 +4090,7 @@ dependencies = [
  "pathdiff",
  "rayon",
  "reflexo-typst",
+ "rpds",
  "semver",
  "serde",
  "serde_json",

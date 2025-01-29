@@ -5,12 +5,13 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{EcoString, EcoVec};
+use ecow::{eco_vec, EcoString, EcoVec};
 use reflexo_typst::features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE};
 use reflexo_typst::{CompileEnv, CompileReport, Compiler, TypstDocument};
 use tinymist_std::error::prelude::Result;
+use tinymist_std::ImmutPath;
 use tinymist_world::vfs::notify::{
-    FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent,
+    FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs};
 use tinymist_world::{
@@ -30,7 +31,7 @@ pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 
 /// Project instance id. This is slightly different from the project ids that
 /// persist in disk.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProjectInsId(EcoString);
 
 impl fmt::Display for ProjectInsId {
@@ -368,6 +369,8 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     pub primary: ProjectInsState<F, Ext>,
     /// The states for dedicate tasks
     pub dedicates: Vec<ProjectInsState<F, Ext>>,
+    /// The project file dependencies.
+    deps: ProjectDeps,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCompiler<F, Ext> {
@@ -385,7 +388,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             ProjectInsId("primary".into()),
             verse,
             handler.clone(),
-            dep_tx.clone(),
             feature_set.clone(),
         );
         Self {
@@ -399,6 +401,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             estimated_shadow_files: Default::default(),
 
             primary,
+            deps: Default::default(),
             dedicates: vec![],
         }
     }
@@ -423,7 +426,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         id: ProjectInsId,
         verse: CompilerUniverse<F>,
         handler: Arc<dyn CompileHandler<F, Ext>>,
-        dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         feature_set: FeatureSet,
     ) -> ProjectInsState<F, Ext> {
         ProjectInsState {
@@ -433,7 +435,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             reason: no_reason(),
             snapshot: None,
             handler,
-            dep_tx,
             compilation: OnceLock::default(),
             latest_doc: None,
             latest_success_doc: None,
@@ -443,6 +444,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     .clone()
                     .configure(&WITH_COMPILING_STATUS_FEATURE, true),
             ),
+            deps: Default::default(),
             committed_revision: 0,
         }
     }
@@ -476,7 +478,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             id.clone(),
             verse,
             self.handler.clone(),
-            self.dep_tx.clone(),
             self.primary.once_feature_set.as_ref().to_owned(),
         );
 
@@ -491,9 +492,15 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         if let Some(idx) = proj {
             // Resets the handle state, e.g. notified revision
             self.handler.notify_removed(id);
+            self.deps.project_deps.remove_mut(id);
 
             let _proj = self.dedicates.remove(idx);
             // todo: kill compilations
+
+            let res = self
+                .dep_tx
+                .send(NotifyMessage::SyncDependency(Box::new(self.deps.clone())));
+            log_send_error("dep_tx", res);
         } else {
             log::warn!("ProjectCompiler: settle project not found {id:?}");
         }
@@ -521,7 +528,17 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             Interrupt::Compiled(artifact) => {
                 let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &artifact.id);
 
-                proj.process_compile(artifact);
+                let processed = proj.process_compile(artifact);
+
+                if processed {
+                    self.deps
+                        .project_deps
+                        .insert_mut(proj.id.clone(), proj.deps.clone());
+
+                    let event = NotifyMessage::SyncDependency(Box::new(self.deps.clone()));
+                    let err = self.dep_tx.send(event);
+                    log_send_error("dep_tx", err);
+                }
             }
             Interrupt::Settle(id) => {
                 self.remove_dedicates(&id);
@@ -715,8 +732,8 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
-    /// Channel for sending interrupts to the compiler actor.
-    dep_tx: mpsc::UnboundedSender<NotifyMessage>,
+    /// The file dependencies.
+    deps: EcoVec<ImmutPath>,
 
     /// The latest compiled document.
     pub(crate) latest_doc: Option<Arc<TypstDocument>>,
@@ -819,11 +836,11 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         }
     }
 
-    fn process_compile(&mut self, artifact: CompiledArtifact<F>) {
+    fn process_compile(&mut self, artifact: CompiledArtifact<F>) -> bool {
         let world = &artifact.snap.world;
         let compiled_revision = world.revision().get();
         if self.committed_revision >= compiled_revision {
-            return;
+            return false;
         }
 
         // Update state.
@@ -835,15 +852,14 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         }
 
         // Notify the new file dependencies.
-        let mut deps = vec![];
+        let mut deps = eco_vec![];
         world.iter_dependencies(&mut |dep| {
             if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
                 deps.push(x.into())
             }
         });
-        let event = NotifyMessage::SyncDependency(deps);
-        let err = self.dep_tx.send(event);
-        log_send_error("dep_tx", err);
+
+        self.deps = deps.clone();
 
         let mut world = artifact.snap.world;
 
@@ -863,6 +879,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             let elapsed = evict_start.elapsed();
             log::info!("ProjectCompiler: evict cache in {elapsed:?}");
         });
+
+        true
     }
 }
 
@@ -876,4 +894,17 @@ fn log_compile_report(env: &CompileEnv, rep: &CompileReport) {
 fn log_send_error<T>(chan: &'static str, res: Result<(), mpsc::error::SendError<T>>) -> bool {
     res.map_err(|err| log::warn!("ProjectCompiler: send to {chan} error: {err}"))
         .is_ok()
+}
+
+#[derive(Debug, Clone, Default)]
+struct ProjectDeps {
+    project_deps: rpds::RedBlackTreeMapSync<ProjectInsId, EcoVec<ImmutPath>>,
+}
+
+impl NotifyDeps for ProjectDeps {
+    fn dependencies(&self, f: &mut dyn FnMut(&ImmutPath)) {
+        for deps in self.project_deps.values().flat_map(|e| e.iter()) {
+            f(deps);
+        }
+    }
 }

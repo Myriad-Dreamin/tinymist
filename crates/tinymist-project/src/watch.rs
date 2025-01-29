@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use tinymist_std::ImmutPath;
+use tinymist_world::vfs::notify::NotifyDeps;
 use tokio::sync::mpsc;
 use typst::diag::FileError;
 
@@ -187,7 +188,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                     self.invalidate_upstream(event);
                 }
                 ActorEvent::Message(Some(SyncDependency(paths))) => {
-                    if let Some(changeset) = self.update_watches(&paths) {
+                    if let Some(changeset) = self.update_watches(paths.as_ref()) {
                         (self.interrupted_by_events)(FilesystemEvent::Update(changeset));
                     }
                 }
@@ -219,7 +220,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
     }
 
     /// Update the watches of corresponding files.
-    fn update_watches(&mut self, paths: &[ImmutPath]) -> Option<FileChangeSet> {
+    fn update_watches(&mut self, paths: &dyn NotifyDeps) -> Option<FileChangeSet> {
         // Increase the lifetime per external message.
         self.lifetime += 1;
 
@@ -234,7 +235,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         //
         // Also check whether the file is updated since there is a window
         // between unwatch the file and watch the file again.
-        for path in paths.iter() {
+        paths.dependencies(&mut |path| {
             let mut contained = false;
             // Update or insert the entry with the new lifetime.
             let entry = self
@@ -243,15 +244,19 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 .and_modify(|watch_entry| {
                     contained = true;
                     watch_entry.lifetime = self.lifetime;
-                    watch_entry.seen = true;
                 })
                 .or_insert_with(|| WatchedEntry {
                     lifetime: self.lifetime,
                     watching: false,
-                    seen: true,
+                    seen: false,
                     state: WatchState::Stable,
                     prev: None,
                 });
+
+            if entry.seen {
+                return;
+            }
+            entry.seen = true;
 
             // Update in-memory metadata for now.
             let meta = path.metadata().map_err(|e| FileError::from_io(e, path));
@@ -278,7 +283,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 let watched = self.inner.content(path);
                 changeset.inserts.push((path.clone(), watched.into()));
             }
-        }
+        });
 
         // Remove old entries.
         // Note: since we have increased the lifetime, it is safe to remove the
