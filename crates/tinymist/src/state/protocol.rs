@@ -1,5 +1,3 @@
-//! tinymist's language server
-
 use lsp_types::*;
 use request::{RegisterCapability, UnregisterCapability};
 use sync_lsp::*;

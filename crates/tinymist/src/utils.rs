@@ -1,7 +1,5 @@
 use core::fmt;
 
-use lsp_server::{ErrorCode, ResponseError};
-
 #[derive(Clone)]
 pub struct Derived<T>(pub T);
 
@@ -46,14 +44,6 @@ macro_rules! get_arg_or_default {
     }};
 }
 pub(crate) use get_arg_or_default;
-
-pub fn z_internal_error(msg: tinymist_std::Error) -> ResponseError {
-    ResponseError {
-        code: ErrorCode::InternalError as i32,
-        message: format!("internal: {msg:?}"),
-        data: None,
-    }
-}
 
 pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
     f()

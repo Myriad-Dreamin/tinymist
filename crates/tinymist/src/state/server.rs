@@ -1,5 +1,3 @@
-//! tinymist's language server
-
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};

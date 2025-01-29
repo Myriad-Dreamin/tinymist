@@ -1,5 +1,3 @@
-//! tinymist's language server
-
 use std::path::PathBuf;
 
 use lsp_types::request::WorkspaceConfiguration;

@@ -1,13 +1,11 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
-// use reflexo_typst::font::GlyphId;
 use reflexo_typst::{vector::font::GlyphId, TypstDocument, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
-use crate::z_internal_error;
 
 use super::prelude::*;
 
@@ -987,12 +985,12 @@ impl ServerState {
             forked
                 .map_shadow_by_id(forked.main(), math_shaping_text.into_bytes().into())
                 .map_err(|e| error_once!("cannot map shadow", err: e))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             let sym_doc = std::marker::PhantomData
                 .compile(&forked, &mut Default::default())
                 .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
             Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
@@ -1086,7 +1084,7 @@ impl ServerState {
 
         serde_json::to_value(resp)
             .context("cannot serialize response")
-            .map_err(z_internal_error)
+            .map_err(internal_error)
     }
 }
 
