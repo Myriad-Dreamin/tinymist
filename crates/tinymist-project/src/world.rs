@@ -67,13 +67,12 @@ impl WorldProvider for CompileOnceArgs {
             Some(&self.package),
         );
 
-        LspUniverseBuilder::build(
+        Ok(LspUniverseBuilder::build(
             entry,
             Arc::new(LazyHash::new(inputs)),
             Arc::new(fonts),
             package,
-        )
-        .context("failed to create universe")
+        ))
     }
 
     fn entry(&self) -> Result<EntryOpts> {
@@ -149,13 +148,12 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             }),
         );
 
-        LspUniverseBuilder::build(
+        Ok(LspUniverseBuilder::build(
             entry,
             Arc::new(LazyHash::new(inputs)),
             Arc::new(fonts),
             package,
-        )
-        .context("failed to create universe")
+        ))
     }
 
     fn entry(&self) -> Result<EntryOpts> {
@@ -200,17 +198,17 @@ impl LspUniverseBuilder {
         inputs: ImmutDict,
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
-    ) -> Result<LspUniverse> {
+    ) -> LspUniverse {
         let registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
 
-        Ok(LspUniverse::new_raw(
+        LspUniverse::new_raw(
             entry,
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             font_resolver,
-        ))
+        )
     }
 
     /// Resolve fonts from given options.
