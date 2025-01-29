@@ -76,40 +76,47 @@ impl WorldProvider for CompileOnceArgs {
     }
 
     fn entry(&self) -> Result<EntryOpts> {
-        let input = self.input.as_ref().context("entry file must be provided")?;
-        let input = Path::new(&input);
-        let entry = if input.is_absolute() {
-            input.to_owned()
-        } else {
-            std::env::current_dir().unwrap().join(input)
+        let mut cwd = None;
+        let mut cwd = move || {
+            cwd.get_or_insert_with(|| {
+                std::env::current_dir().context("failed to get current directory")
+            })
+            .clone()
+        };
+
+        let main = {
+            let input = self.input.as_ref().context("entry file must be provided")?;
+            let input = Path::new(&input);
+            if input.is_absolute() {
+                input.to_owned()
+            } else {
+                cwd()?.join(input)
+            }
         };
 
         let root = if let Some(root) = &self.root {
             if root.is_absolute() {
                 root.clone()
             } else {
-                std::env::current_dir().unwrap().join(root)
+                cwd()?.join(root)
             }
         } else {
-            std::env::current_dir().unwrap()
+            main.parent()
+                .context("entry file don't have a valid parent as root")?
+                .to_owned()
         };
 
-        if !entry.starts_with(&root) {
-            log::error!("entry file must be in the root directory");
-            std::process::exit(1);
-        }
-
-        let relative_entry = match entry.strip_prefix(&root) {
-            Ok(relative_entry) => relative_entry,
+        let relative_main = match main.strip_prefix(&root) {
+            Ok(relative_main) => relative_main,
             Err(_) => {
-                log::error!("entry path must be inside the root: {}", entry.display());
-                std::process::exit(1);
+                log::error!("entry file must be inside the root, file: {main:?}, root: {root:?}");
+                bail!("entry file must be inside the root, file: {main:?}, root: {root:?}");
             }
         };
 
         Ok(EntryOpts::new_rooted(
             root.clone(),
-            Some(relative_entry.to_owned()),
+            Some(relative_main.to_owned()),
         ))
     }
 }

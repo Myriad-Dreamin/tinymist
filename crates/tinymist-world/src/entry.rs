@@ -150,7 +150,7 @@ pub enum EntryOpts {
         /// The world forbids direct access to files outside this directory.
         root: PathBuf,
         /// Relative path to the main file in the workspace.
-        entry: Option<PathBuf>,
+        main: Option<PathBuf>,
     },
     RootByParent {
         /// Path to the entry file of compilation.
@@ -171,11 +171,11 @@ impl EntryOpts {
     }
 
     pub fn new_workspace(root: PathBuf) -> Self {
-        Self::Workspace { root, entry: None }
+        Self::Workspace { root, main: None }
     }
 
-    pub fn new_rooted(root: PathBuf, entry: Option<PathBuf>) -> Self {
-        Self::Workspace { root, entry }
+    pub fn new_rooted(root: PathBuf, main: Option<PathBuf>) -> Self {
+        Self::Workspace { root, main }
     }
 
     pub fn new_rootless(entry: PathBuf) -> Option<Self> {
@@ -194,7 +194,7 @@ impl TryFrom<EntryOpts> for EntryState {
 
     fn try_from(value: EntryOpts) -> Result<Self, Self::Error> {
         match value {
-            EntryOpts::Workspace { root, entry } => Ok(EntryState::new_rooted(
+            EntryOpts::Workspace { root, main: entry } => Ok(EntryState::new_rooted(
                 root.as_path().into(),
                 entry.map(VirtualPath::new),
             )),
