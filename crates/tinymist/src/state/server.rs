@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use log::{error, info};
 use lsp_types::*;
+use parking_lot::Mutex;
 use sync_lsp::*;
 use task::ExportUserConfig;
 use tinymist_project::{EntryResolver, Interrupt, LspCompileSnapshot, ProjectInsId};
@@ -22,7 +23,6 @@ use tokio::sync::mpsc;
 use typst::diag::FileResult;
 use typst::layout::Position as TypstPosition;
 use typst::syntax::Source;
-use vfs::{Bytes, FileChangeSet, MemoryEvent};
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::project::{
@@ -34,6 +34,7 @@ use crate::route::ProjectRouteState;
 use crate::state::query::OnEnter;
 use crate::stats::CompilerQueryStats;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
+use crate::vfs::{Bytes, FileChangeSet, MemoryEvent};
 use crate::world::{LspUniverseBuilder, TaskInputs};
 use crate::{init::*, *};
 
@@ -436,7 +437,7 @@ impl ServerState {
                 stats: Arc::default(),
             }),
 
-            notified_revision: parking_lot::Mutex::new(0),
+            notified_revision: Mutex::default(),
         });
 
         let default_path = config.compile.entry_resolver.resolve_default();

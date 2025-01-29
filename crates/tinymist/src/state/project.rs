@@ -147,7 +147,8 @@ pub struct CompileHandlerImpl {
     pub(crate) editor_tx: EditorSender,
     pub(crate) client: Box<dyn ProjectClient>,
 
-    pub(crate) notified_revision: parking_lot::Mutex<usize>,
+    // todo: leaking notification
+    pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
 }
 
 pub trait ProjectClient: Send + Sync + 'static {
@@ -295,10 +296,16 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
     }
 
+    fn notify_removed(&self, id: &ProjectInsId) {
+        let n_revs = &mut self.notified_revision.lock();
+        n_revs.remove(id);
+    }
+
     fn notify_compile(&self, snap: &LspCompiledArtifact, rep: CompileReport) {
         // todo: we need to manage the revision for fn status() as well
         {
-            let mut n_rev = self.notified_revision.lock();
+            let mut n_revs = self.notified_revision.lock();
+            let n_rev = n_revs.entry(snap.id.clone()).or_default();
             if *n_rev >= snap.world.revision().get() {
                 log::info!(
                     "Project: already notified for revision {} <= {n_rev}",

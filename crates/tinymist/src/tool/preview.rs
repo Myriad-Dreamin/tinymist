@@ -13,6 +13,7 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
+use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::{error::prelude::*, Error, TypstDocument};
 use serde::Serialize;
@@ -646,7 +647,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             client: Box::new(intr_tx.clone()),
             analysis: Arc::default(),
 
-            notified_revision: parking_lot::Mutex::new(0),
+            notified_revision: Mutex::default(),
         });
 
         let mut server = ProjectCompiler::new(
