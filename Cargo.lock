@@ -4909,14 +4909,13 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.12.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e41b06eb6bc136c9978a073bc6ec477b4a13e6db1ee477f5df61879b6ffcd0ec"
+source = "git+https://github.com/ParaN3xus/typstyle/?rev=a0f7aa658f13267c23aa9745b2c77ec114c0c3d0#a0f7aa658f13267c23aa9745b2c77ec114c0c3d0"
 dependencies = [
  "ecow",
  "itertools 0.13.0",
  "pretty",
  "rustc-hash 2.1.1",
- "typst-syntax 0.12.0",
+ "typst-syntax 0.13.0",
 ]
 
 [[package]]
