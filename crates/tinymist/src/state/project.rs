@@ -147,7 +147,6 @@ pub struct CompileHandlerImpl {
     pub(crate) editor_tx: EditorSender,
     pub(crate) client: Box<dyn ProjectClient>,
 
-    // todo: leaking notification
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
 }
 
