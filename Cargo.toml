@@ -46,7 +46,7 @@ walkdir = "2"
 chrono = "0.4"
 dirs = "5"
 windows-sys = "0.59"
-tempfile = "3.10.1"
+tempfile = "=3.15.0"
 same-file = "1.0.6"
 libc = "0.2.155"
 core-foundation = { version = "0.10.0", features = ["mac_os_10_7_support"] }
