@@ -210,6 +210,8 @@ pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
     // todo: notify project specific compile
     /// Called when a compilation is done.
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
+    /// Called when a project is removed.
+    fn notify_removed(&self, _id: &ProjectInsId) {}
     /// Called when the compilation status is changed.
     fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport);
 }
@@ -487,6 +489,9 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     fn remove_dedicates(&mut self, id: &ProjectInsId) {
         let proj = self.dedicates.iter().position(|e| e.id == *id);
         if let Some(idx) = proj {
+            // Resets the handle state, e.g. notified revision
+            self.handler.notify_removed(id);
+
             let _proj = self.dedicates.remove(idx);
             // todo: kill compilations
         } else {
