@@ -1,3 +1,4 @@
+use core::fmt;
 use std::path::Path;
 
 use rpds::RedBlackTreeMapSync;
@@ -62,13 +63,25 @@ impl FilesystemEvent {
     }
 }
 
+pub trait NotifyDeps: fmt::Debug + Send + Sync {
+    fn dependencies(&self, f: &mut dyn FnMut(&ImmutPath));
+}
+
+impl NotifyDeps for Vec<ImmutPath> {
+    fn dependencies(&self, f: &mut dyn FnMut(&ImmutPath)) {
+        for path in self.iter() {
+            f(path);
+        }
+    }
+}
+
 /// A message that is sent to some file watcher
 #[derive(Debug)]
 pub enum NotifyMessage {
     /// Oettle the watching
     Settle,
     /// Overrides all dependencies
-    SyncDependency(Vec<ImmutPath>),
+    SyncDependency(Box<dyn NotifyDeps>),
     /// upstream invalidation This is very important to make some atomic changes
     ///
     /// Example:

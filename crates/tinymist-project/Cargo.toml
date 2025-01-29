@@ -24,6 +24,7 @@ pathdiff.workspace = true
 tokio.workspace = true
 rayon.workspace = true
 reflexo-typst.workspace = true
+rpds.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
