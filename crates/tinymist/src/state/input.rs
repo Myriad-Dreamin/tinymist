@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 
-use log::{error, info};
 use lsp_types::request::WorkspaceConfiguration;
 use lsp_types::*;
 use once_cell::sync::OnceCell;
@@ -66,7 +65,7 @@ impl ServerState {
             Ok(()) => {}
             Err(err) => {
                 self.config = old_config;
-                error!("error applying new settings: {err}");
+                log::error!("error applying new settings: {err}");
                 return Err(invalid_params(format!(
                     "error applying new settings: {err}"
                 )));
@@ -82,7 +81,7 @@ impl ServerState {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
             let err = self.restart_primary();
             if let Err(err) = err {
-                error!("could not restart primary: {err}");
+                log::error!("could not restart primary: {err}");
             }
         }
 
@@ -90,7 +89,7 @@ impl ServerState {
             let err = self
                 .enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable);
             if let Err(err) = err {
-                error!("could not change semantic tokens config: {err}");
+                log::error!("could not change semantic tokens config: {err}");
             }
         }
 
@@ -99,13 +98,13 @@ impl ServerState {
             let enabled = !matches!(new_formatter_config.config, FormatterConfig::Disable);
             let err = self.enable_formatter_caps(enabled);
             if let Err(err) = err {
-                error!("could not change formatter config: {err}");
+                log::error!("could not change formatter config: {err}");
             }
 
             self.formatter.change_config(new_formatter_config);
         }
 
-        info!("new settings applied");
+        log::info!("new settings applied");
         Ok(())
     }
 
@@ -157,7 +156,7 @@ impl ServerState {
 
         let next_entry = self.entry_resolver().resolve(path);
 
-        info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
+        log::info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
 
         let id = self.project.state.primary.id.clone();
         let task = TaskInputs {

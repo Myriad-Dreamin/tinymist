@@ -636,17 +636,12 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         let preview_state = ProjectPreviewState::default();
+        let config = Config::default();
 
         // Create the actor
         let compile_handle = Arc::new(CompileHandlerImpl {
             preview: preview_state.clone(),
-            diag_group: "main".to_owned(),
-            export: crate::task::ExportTask::new(
-                handle,
-                String::default(),
-                None,
-                Default::default(),
-            ),
+            export: crate::task::ExportTask::new(handle, None, config.export()),
             editor_tx,
             client: Box::new(intr_tx.clone()),
             analysis: Arc::default(),

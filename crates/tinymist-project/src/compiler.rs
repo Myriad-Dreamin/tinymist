@@ -33,6 +33,17 @@ pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct ProjectInsId(EcoString);
 
+impl fmt::Display for ProjectInsId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl ProjectInsId {
+    /// The primary project id.
+    pub const PRIMARY: ProjectInsId = ProjectInsId(EcoString::inline("primary"));
+}
+
 /// A signal that possibly triggers an export.
 ///
 /// Whether to export depends on the current state of the document and the user
@@ -140,6 +151,13 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     pub doc: SourceResult<Arc<TypstDocument>>,
     /// The depended files.
     pub deps: OnceLock<EcoVec<FileId>>,
+}
+
+impl fmt::Display for CompiledArtifact<LspCompilerFeat> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rev = self.world.revision();
+        write!(f, "CompiledArtifact({:?}, rev={rev:?})", self.id)
+    }
 }
 
 impl<F: CompilerFeat> std::ops::Deref for CompiledArtifact<F> {

@@ -4,19 +4,21 @@
 use std::collections::HashMap;
 
 use lsp_types::{notification::PublishDiagnostics, Diagnostic, PublishDiagnosticsParams, Url};
+use tinymist_project::ProjectInsId;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
 
 use crate::{tool::word_count::WordsCount, LspClient};
 
+#[derive(Debug, Clone)]
 pub struct DocVersion {
-    pub group: String,
+    pub id: ProjectInsId,
     pub revision: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct CompileStatus {
-    pub group: String,
+    pub id: ProjectInsId,
     pub path: String,
     pub status: TinymistCompileStatusEnum,
 }
@@ -24,15 +26,15 @@ pub struct CompileStatus {
 pub enum EditorRequest {
     Diag(DocVersion, Option<DiagnosticsMap>),
     Status(CompileStatus),
-    WordCount(String, WordsCount),
+    WordCount(ProjectInsId, WordsCount),
 }
 
 pub struct EditorActor {
     client: LspClient,
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
-    diagnostics: HashMap<Url, HashMap<String, Vec<Diagnostic>>>,
-    affect_map: HashMap<String, Vec<Url>>,
+    diagnostics: HashMap<Url, HashMap<ProjectInsId, Vec<Diagnostic>>>,
+    affect_map: HashMap<ProjectInsId, Vec<Url>>,
     notify_compile_status: bool,
 }
 
@@ -53,7 +55,7 @@ impl EditorActor {
 
     pub async fn run(mut self) {
         let mut compile_status = CompileStatus {
-            group: "primary".to_owned(),
+            id: ProjectInsId::PRIMARY.clone(),
             status: TinymistCompileStatusEnum::Compiling,
             path: "".to_owned(),
         };
@@ -61,17 +63,17 @@ impl EditorActor {
         while let Some(req) = self.editor_rx.recv().await {
             match req {
                 EditorRequest::Diag(dv, diagnostics) => {
-                    let DocVersion { group, revision } = dv;
+                    let DocVersion { id, revision } = dv;
                     log::debug!(
-                        "received diagnostics from {group}:{revision}: diag({:?})",
+                        "received diagnostics from {id:?}:{revision}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
                     );
 
-                    self.publish(group, diagnostics).await;
+                    self.publish(id, diagnostics).await;
                 }
                 EditorRequest::Status(status) => {
                     log::debug!("received status request({status:?})");
-                    if self.notify_compile_status && status.group == "primary" {
+                    if self.notify_compile_status && status.id == ProjectInsId::PRIMARY {
                         compile_status = status;
                         self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
@@ -84,7 +86,7 @@ impl EditorActor {
                 }
                 EditorRequest::WordCount(group, wc) => {
                     log::debug!("received word count request");
-                    if self.notify_compile_status && group == "primary" {
+                    if self.notify_compile_status && group == ProjectInsId::PRIMARY {
                         words_count = Some(wc);
                         self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
@@ -100,12 +102,12 @@ impl EditorActor {
         log::info!("editor actor is stopped");
     }
 
-    pub async fn publish(&mut self, group: String, next_diag: Option<DiagnosticsMap>) {
+    pub async fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
         let affected = match next_diag.as_ref() {
             Some(e) => self
                 .affect_map
-                .insert(group.clone(), e.keys().cloned().collect()),
-            None => self.affect_map.remove(&group),
+                .insert(id.clone(), e.keys().cloned().collect()),
+            None => self.affect_map.remove(&id),
         };
 
         // Get sources which had some diagnostic published last time, but not this time.
@@ -117,17 +119,17 @@ impl EditorActor {
         // Get sources that affected by this group in last round but not this time
         for url in affected.into_iter().flatten() {
             if !next_diag.as_ref().is_some_and(|e| e.contains_key(&url)) {
-                self.publish_inner(&group, url, None)
+                self.publish_inner(&id, url, None)
             }
         }
 
         // Get touched updates
         for (url, next) in next_diag.into_iter().flatten() {
-            self.publish_inner(&group, url, Some(next))
+            self.publish_inner(&id, url, Some(next))
         }
     }
 
-    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<Diagnostic>>) {
+    fn publish_inner(&mut self, group: &ProjectInsId, url: Url, next: Option<Vec<Diagnostic>>) {
         let mut to_publish = Vec::new();
 
         // Get the diagnostics from other groups
@@ -144,7 +146,7 @@ impl EditorActor {
         }
 
         match next {
-            Some(next) => path_diags.insert(group.to_owned(), next),
+            Some(next) => path_diags.insert(group.clone(), next),
             None => path_diags.remove(group),
         };
 
