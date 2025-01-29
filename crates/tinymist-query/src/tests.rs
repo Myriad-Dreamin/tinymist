@@ -163,8 +163,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
             .unwrap(),
         ),
         LspUniverseBuilder::resolve_package(None, None),
-    )
-    .unwrap();
+    );
     let sources = source.split("-----");
 
     let mut last_pw = None;

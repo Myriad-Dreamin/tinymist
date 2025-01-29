@@ -25,7 +25,6 @@ use typst::syntax::Source;
 use vfs::{Bytes, FileChangeSet, MemoryEvent};
 
 use crate::actor::editor::{EditorActor, EditorRequest};
-use crate::project::world::EntryState;
 use crate::project::{
     update_lock, watch_deps, CompileHandlerImpl, CompileServerOpts, LspInterrupt, LspQuerySnapshot,
     ProjectCompiler, ProjectPreviewState, ProjectState, QuerySnapWithStat,
@@ -35,7 +34,7 @@ use crate::route::ProjectRouteState;
 use crate::state::query::OnEnter;
 use crate::stats::CompilerQueryStats;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
-use crate::world::{ImmutDict, LspUniverseBuilder, TaskInputs};
+use crate::world::{LspUniverseBuilder, TaskInputs};
 use crate::{init::*, *};
 
 pub(crate) use futures::Future;
@@ -105,16 +104,8 @@ impl ServerState {
     ) -> Self {
         let formatter = FormatTask::new(config.formatter());
 
-        let default_path = config.compile.entry_resolver.resolve_default();
         let watchers = ProjectPreviewState::default();
-        let handle = Self::server(
-            &config,
-            editor_tx.clone(),
-            client.clone(),
-            config.compile.entry_resolver.resolve(default_path),
-            config.compile.determine_inputs(),
-            watchers.clone(),
-        );
+        let handle = Self::project(&config, editor_tx.clone(), client.clone(), watchers.clone());
 
         Self {
             client: client.clone(),
@@ -347,21 +338,14 @@ impl ServerState {
 
     /// Restart the primary server.
     pub fn restart_primary(&mut self) -> Result<ProjectInsId> {
-        let entry = self.entry_resolver().resolve_default();
-        let config = &self.config;
-
         // todo: hot replacement
         #[cfg(feature = "preview")]
         self.preview.stop_all();
 
-        let new_project = Self::server(
-            config,
-            self.editor_tx.clone(),
-            self.client.clone(),
-            config.compile.entry_resolver.resolve(entry),
-            config.compile.determine_inputs(),
-            self.preview.watchers.clone(),
-        );
+        let watchers = self.preview.watchers.clone();
+        let editor_tx = self.editor_tx.clone();
+
+        let new_project = Self::project(&self.config, editor_tx, self.client.clone(), watchers);
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
 
@@ -407,17 +391,15 @@ impl ServerState {
     //     }
     // }
 
-    /// Create a new server for the given group.
-    pub fn server(
+    /// Create a fresh [`ProjectState`].
+    pub fn project(
         config: &Config,
         editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
-        entry: EntryState,
-        inputs: ImmutDict,
         preview: project::ProjectPreviewState,
     ) -> ProjectState {
-        let compile_config = &config.compile;
         let const_config = &config.const_config;
+
         // Run Export actors before preparing cluster to avoid loss of events
         let export = ExportTask::new(
             client.handle.clone(),
@@ -425,10 +407,8 @@ impl ServerState {
             config.export(),
         );
 
-        log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
-
         // Create the compile handler for client consuming results.
-        let periscope_args = compile_config.periscope_args.clone();
+        let periscope_args = config.compile.periscope_args.clone();
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             preview,
@@ -441,7 +421,7 @@ impl ServerState {
                 allow_multiline_token: const_config.tokens_multiline_token_support,
                 remove_html: !config.support_html_in_markdown,
                 completion_feat: config.completion.clone(),
-                color_theme: match compile_config.color_theme.as_deref() {
+                color_theme: match config.compile.color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
                 },
@@ -459,17 +439,19 @@ impl ServerState {
             notified_revision: parking_lot::Mutex::new(0),
         });
 
-        let entry_ = entry.clone();
-        let cert_path = compile_config.determine_certification_path();
-        let package = compile_config.determine_package_opts();
+        let default_path = config.compile.entry_resolver.resolve_default();
+        let entry = config.compile.entry_resolver.resolve(default_path);
+        let inputs = config.compile.determine_inputs();
+        let cert_path = config.compile.determine_certification_path();
+        let package = config.compile.determine_package_opts();
+
+        log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         // todo: never fail?
-        let default_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let embedded_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
         let package_registry =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-        let verse =
-            LspUniverseBuilder::build(entry_.clone(), inputs, default_fonts, package_registry)
-                .expect("incorrect options");
+        let verse = LspUniverseBuilder::build(entry, inputs, embedded_fonts, package_registry);
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -493,11 +475,10 @@ impl ServerState {
 
         // Delayed Loads fonts
         let font_client = client.clone();
-        let font_resolver = compile_config.determine_fonts();
+        let font_resolver = config.compile.determine_fonts();
         client.handle.spawn_blocking(move || {
-            // Create the world
-            let font_resolver = font_resolver.wait().clone();
-            font_client.send_event(LspInterrupt::Font(font_resolver));
+            // Refresh fonts
+            font_client.send_event(LspInterrupt::Font(font_resolver.wait().clone()));
         });
 
         ProjectState {

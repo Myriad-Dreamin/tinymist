@@ -26,8 +26,7 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
         Default::default(),
         FONT_RESOLVER.clone(),
         Default::default(),
-    )
-    .unwrap();
+    );
     let main_id = universe.main_id().unwrap();
     universe
         .map_shadow_by_id(main_id, Bytes::from(main.text().as_bytes().to_owned()))
