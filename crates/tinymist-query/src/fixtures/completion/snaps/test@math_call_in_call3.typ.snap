@@ -7,6 +7,28 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_call_in_call3.typ
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 3,
+    "label": "abs",
+    "labelDetails": {
+     "description": "(content, size: relative) => content"
+    },
+    "sortText": "055",
+    "textEdit": {
+     "newText": "abs(${1:})",
+     "range": {
+      "end": {
+       "character": 9,
+       "line": 2
+      },
+      "start": {
+       "character": 8,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]

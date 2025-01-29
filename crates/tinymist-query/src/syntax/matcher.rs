@@ -655,8 +655,10 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     if node.offset() + 1 == cursor && {
         // Check if the cursor is exactly after single dot.
         matches!(node.kind(), SyntaxKind::Dot)
-            || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
-                && node.text().starts_with("."))
+            || (matches!(
+                node.kind(),
+                SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
+            ) && node.text().starts_with("."))
     } {
         let dot_target = node.clone().prev_leaf().and_then(first_ancestor_expr);
 
@@ -1372,7 +1374,7 @@ Text
 
         assert_snapshot!(test_fn("#(a.b)", 5), @r"Field: b");
         assert_snapshot!(test_fn("#a.", 3), @"DotSuffix: 3");
-        assert_snapshot!(test_fn("$a.$", 3), @"");
+        assert_snapshot!(test_fn("$a.$", 3), @"DotSuffix: 3");
         assert_snapshot!(test_fn("#(a.)", 4), @"DotSuffix: 4");
         assert_snapshot!(test_fn("#(a..b)", 4), @"DotSuffix: 4");
         assert_snapshot!(test_fn("#(a..b())", 4), @"DotSuffix: 4");

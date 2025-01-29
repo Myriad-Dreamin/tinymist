@@ -7,6 +7,28 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_ident_in_call.typ
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 3,
+    "label": "norm",
+    "labelDetails": {
+     "description": "(content, size: relative) => content"
+    },
+    "sortText": "222",
+    "textEdit": {
+     "newText": "norm(${1:})",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 2
+      },
+      "start": {
+       "character": 6,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]
