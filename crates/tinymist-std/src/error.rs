@@ -5,7 +5,7 @@ use core::fmt;
 use ecow::EcoString;
 use serde::{Deserialize, Serialize};
 
-use crate::debug_loc::CharRange;
+use crate::debug_loc::LspRange;
 
 /// The severity of a diagnostic message, following the LSP specification.
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, Debug, Clone)]
@@ -46,7 +46,7 @@ pub struct DiagMessage {
     /// The severity of the diagnostic message.
     pub severity: DiagSeverity,
     /// The char range in the file. The position encoding must be negotiated.
-    pub range: Option<CharRange>,
+    pub range: Option<LspRange>,
 }
 
 impl DiagMessage {}

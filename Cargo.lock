@@ -4036,7 +4036,9 @@ name = "tinymist-analysis"
 version = "0.12.18"
 dependencies = [
  "insta",
+ "lsp-types",
  "regex",
+ "serde",
  "toml",
  "typst",
 ]
@@ -4191,6 +4193,7 @@ dependencies = [
  "serde_with",
  "siphasher 1.0.1",
  "tempfile",
+ "tinymist-analysis",
  "typst",
  "typst-shim",
  "wasm-bindgen",

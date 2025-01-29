@@ -1,7 +1,7 @@
 //! Additional functions wrapping Rust's standard library.
 
 pub mod adt;
-pub mod debug_loc;
+pub use tinymist_analysis::debug_loc;
 pub mod error;
 pub mod fs;
 pub mod hash;
