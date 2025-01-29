@@ -9,7 +9,7 @@ use log::{error, info};
 use lsp_types::*;
 use sync_lsp::*;
 use task::ExportUserConfig;
-use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
+use tinymist_project::{EntryResolver, Interrupt, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
 use tinymist_query::{
     CompilerQueryRequest, LocalContext, LspWorldExt, OnExportRequest, ServerInfoResponse,
@@ -19,8 +19,10 @@ use tinymist_render::PeriscopeRenderer;
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
+use typst::diag::FileResult;
 use typst::layout::Position as TypstPosition;
 use typst::syntax::Source;
+use vfs::{Bytes, FileChangeSet, MemoryEvent};
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::project::world::EntryState;
@@ -363,6 +365,19 @@ impl ServerState {
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
 
+        let snapshot = FileChangeSet::new_inserts(
+            self.memory_changes
+                .iter()
+                .map(|(path, content)| {
+                    let content = Bytes::from(content.clone().text().as_bytes());
+                    (path.clone(), FileResult::Ok(content).into())
+                })
+                .collect(),
+        );
+
+        self.project
+            .interrupt(Interrupt::Memory(MemoryEvent::Update(snapshot)));
+
         rayon::spawn(move || {
             old_project.stop();
         });
@@ -485,11 +500,6 @@ impl ServerState {
             font_client.send_event(LspInterrupt::Font(font_resolver));
         });
 
-        // todo: restart loses the memory changes
-        // We do send memory changes instead of initializing compiler with them.
-        // This is because there are state recorded inside of the compiler actor, and we
-        // must update them.
-        // client.add_memory_changes(MemoryEvent::Update(snapshot));
         ProjectState {
             state: server,
             preview: Default::default(),
