@@ -384,7 +384,7 @@ impl ServerState {
         let from_source = get_arg!(args[0] as String);
         let to_path = get_arg!(args[1] as Option<PathBuf>).map(From::from);
 
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
 
         just_future(async move {
             // Parse the package specification. If the user didn't specify the version,
@@ -400,7 +400,7 @@ impl ServerState {
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             let from_source = TemplateSource::Package(spec);
 
@@ -412,7 +412,7 @@ impl ServerState {
                 },
             )
             .map_err(map_string_err("failed to initialize template"))
-            .map_err(z_internal_error)?;
+            .map_err(internal_error)?;
 
             log::info!("template initialized: {from_source:?} to {to_path:?}");
 
@@ -427,7 +427,7 @@ impl ServerState {
 
         let from_source = get_arg!(args[0] as String);
 
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
 
         just_future(async move {
             // Parse the package specification. If the user didn't specify the version,
@@ -443,13 +443,13 @@ impl ServerState {
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             let from_source = TemplateSource::Package(spec);
 
             let entry = package::get_entry(&snap.world, from_source)
                 .map_err(map_string_err("failed to get template entry"))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             let entry = String::from_utf8(entry.to_vec())
                 .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
@@ -493,7 +493,7 @@ impl ServerState {
 
         let entry = self.entry_resolver().resolve(Some(path));
 
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
         let user_action = self.user_action;
 
         just_future(async move {
@@ -504,14 +504,14 @@ impl ServerState {
             let root = entry
                 .root()
                 .ok_or_else(|| error_once!("root must be determined for trace, got", entry: display_entry()))
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
             let main = entry
                 .main()
                 .and_then(|e| e.vpath().resolve(&root))
                 .ok_or_else(
                     || error_once!("main file must be resolved, got", entry: display_entry()),
                 )
-                .map_err(z_internal_error)?;
+                .map_err(internal_error)?;
 
             let task = user_action.trace(TraceParams {
                 compiler_program: self_path,
@@ -560,13 +560,13 @@ impl ServerState {
 impl ServerState {
     /// Get the all valid fonts
     pub fn resource_fonts(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snapshot = self.snapshot().map_err(z_internal_error)?;
+        let snapshot = self.snapshot().map_err(internal_error)?;
         just_future(Self::get_font_resources(snapshot))
     }
 
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snapshot = self.snapshot().map_err(z_internal_error)?;
+        let snapshot = self.snapshot().map_err(internal_error)?;
         just_future(Self::get_symbol_resources(snapshot))
     }
 
@@ -583,7 +583,7 @@ impl ServerState {
 
     /// Get directory of packages
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
             let paths = snap.world.registry.paths();
             let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
@@ -596,7 +596,7 @@ impl ServerState {
         &mut self,
         _arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
             let paths = snap.world.registry.local_path();
             let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
@@ -611,7 +611,7 @@ impl ServerState {
     ) -> AnySchedulableResponse {
         let ns = get_arg!(arguments[1] as EcoString);
 
-        let snap = self.snapshot().map_err(z_internal_error)?;
+        let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
             let packages =
                 tinymist_query::package::list_package_by_namespace(&snap.world.registry, ns)
@@ -664,7 +664,7 @@ impl ServerState {
         self.within_package(info.clone(), move |a| {
             tinymist_query::docs::package_docs(a, &info)
                 .map_err(map_string_err("failed to generate docs"))
-                .map_err(z_internal_error)
+                .map_err(internal_error)
         })
     }
 
@@ -676,7 +676,7 @@ impl ServerState {
         self.within_package(info.clone(), move |a| {
             tinymist_query::package::check_package(a, &info)
                 .map_err(map_string_err("failed to check package"))
-                .map_err(z_internal_error)
+                .map_err(internal_error)
         })
     }
 
