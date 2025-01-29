@@ -26,7 +26,7 @@ use std::sync::Arc;
 use log::{error, trace};
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
-use reflexo_typst::{typst::prelude::EcoVec, CompileReport};
+use reflexo_typst::CompileReport;
 use sync_lsp::LspClient;
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
@@ -35,7 +35,6 @@ use tinymist_query::{
 };
 use tinymist_std::{bail, error::prelude::*};
 use tokio::sync::mpsc;
-use typst::diag::SourceDiagnostic;
 
 use crate::actor::editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
@@ -88,7 +87,6 @@ pub struct ProjectInsStateExt {
 }
 
 pub struct ProjectState {
-    pub diag_group: String,
     pub state: LspProjectCompiler,
     pub preview: ProjectPreviewState,
     pub analysis: Arc<Analysis>,
@@ -141,7 +139,6 @@ impl ProjectState {
 }
 
 pub struct CompileHandlerImpl {
-    pub(crate) diag_group: String,
     pub(crate) analysis: Arc<Analysis>,
 
     pub(crate) preview: ProjectPreviewState,
@@ -172,38 +169,37 @@ impl ProjectClient for tokio::sync::mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
-    fn push_diagnostics(&self, revision: usize, diagnostics: Option<DiagnosticsMap>) {
-        let dv = DocVersion {
-            group: self.diag_group.clone(),
-            revision,
-        };
+    fn push_diagnostics(&self, dv: DocVersion, diagnostics: Option<DiagnosticsMap>) {
         let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
         if let Err(err) = res {
             error!("failed to send diagnostics: {err:#}");
         }
     }
 
-    fn notify_diagnostics(
-        &self,
-        world: &LspWorld,
-        errors: EcoVec<SourceDiagnostic>,
-        warnings: EcoVec<SourceDiagnostic>,
-    ) {
-        let revision = world.revision().get();
-        trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
+    fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
+        let world = &snap.world;
+        let dv = DocVersion {
+            id: snap.id.clone(),
+            revision: world.revision().get(),
+        };
 
-        let diagnostics = tinymist_query::convert_diagnostics(
-            world,
-            errors.iter().chain(warnings.iter()),
-            self.analysis.position_encoding,
-        );
-
-        let entry = world.entry_state();
         // todo: better way to remove diagnostics
         // todo: check all errors in this file
-        let detached = entry.is_inactive();
-        let valid = !detached;
-        self.push_diagnostics(revision, valid.then_some(diagnostics));
+        let valid = !world.entry_state().is_inactive();
+        let diagnostics = valid.then(|| {
+            let errors = snap.doc.as_ref().err().into_iter().flatten();
+            let warnings = snap.warnings.as_ref();
+            let diagnostics = tinymist_query::convert_diagnostics(
+                world,
+                errors.chain(warnings),
+                self.analysis.position_encoding,
+            );
+
+            trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+            diagnostics
+        });
+
+        self.push_diagnostics(dv, diagnostics);
     }
 }
 
@@ -256,7 +252,11 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         // todo: seems to duplicate with CompileStatus
         let status = match rep {
             CompileReport::Suspend => {
-                self.push_diagnostics(revision, None);
+                let dv = DocVersion {
+                    id: id.clone(),
+                    revision,
+                };
+                self.push_diagnostics(dv, None);
                 TinymistCompileStatusEnum::CompileSuccess
             }
             CompileReport::Stage(_, _, _) => TinymistCompileStatusEnum::Compiling,
@@ -269,7 +269,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         let this = &self;
         this.editor_tx
             .send(EditorRequest::Status(CompileStatus {
-                group: this.diag_group.clone(),
+                id: id.clone(),
                 path: rep
                     .compiling_id()
                     .map(|s| unix_slash(s.vpath().as_rooted_path()))
@@ -309,18 +309,14 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             *n_rev = snap.world.revision().get();
         }
 
-        self.notify_diagnostics(
-            &snap.world,
-            snap.doc.clone().err().unwrap_or_default(),
-            snap.warnings.clone(),
-        );
+        self.notify_diagnostics(snap);
 
         self.client.send_event(LspInterrupt::Compiled(snap.clone()));
         self.export.signal(snap);
 
         self.editor_tx
             .send(EditorRequest::Status(CompileStatus {
-                group: self.diag_group.clone(),
+                id: snap.id.clone(),
                 path: rep
                     .compiling_id()
                     .map(|s| unix_slash(s.vpath().as_rooted_path()))

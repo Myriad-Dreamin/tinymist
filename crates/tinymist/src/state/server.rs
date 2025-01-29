@@ -109,7 +109,6 @@ impl ServerState {
             &config,
             editor_tx.clone(),
             client.clone(),
-            "primary".to_string(),
             config.compile.entry_resolver.resolve(default_path),
             config.compile.determine_inputs(),
             watchers.clone(),
@@ -319,7 +318,7 @@ impl ServerState {
 impl ServerState {
     /// Get the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
-        let dg = self.project.diag_group.clone();
+        let dg = self.project.state.primary.id.to_string();
         let api_stats = self.project.stats.report();
         let query_stats = self.project.analysis.report_query_stats();
         let alloc_stats = self.project.analysis.report_alloc_stats();
@@ -357,7 +356,6 @@ impl ServerState {
             config,
             self.editor_tx.clone(),
             self.client.clone(),
-            "primary".to_string(),
             config.compile.entry_resolver.resolve(entry),
             config.compile.determine_inputs(),
             self.preview.watchers.clone(),
@@ -399,7 +397,6 @@ impl ServerState {
         config: &Config,
         editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
-        diag_group: String,
         entry: EntryState,
         inputs: ImmutDict,
         preview: project::ProjectPreviewState,
@@ -409,21 +406,17 @@ impl ServerState {
         // Run Export actors before preparing cluster to avoid loss of events
         let export = ExportTask::new(
             client.handle.clone(),
-            diag_group.clone(),
             Some(editor_tx.clone()),
             config.export(),
         );
 
-        log::info!(
-            "TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}"
-        );
+        log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         // Create the compile handler for client consuming results.
         let periscope_args = compile_config.periscope_args.clone();
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             preview,
-            diag_group: diag_group.clone(),
             export: export.clone(),
             editor_tx: editor_tx.clone(),
             client: Box::new(client.clone().to_untyped()),
@@ -451,9 +444,7 @@ impl ServerState {
             notified_revision: parking_lot::Mutex::new(0),
         });
 
-        let font_resolver = compile_config.determine_fonts();
         let entry_ = entry.clone();
-        let compile_handle = handle.clone();
         let cert_path = compile_config.determine_certification_path();
         let package = compile_config.determine_package_opts();
 
@@ -474,6 +465,7 @@ impl ServerState {
         }));
 
         // Create the actor
+        let compile_handle = handle.clone();
         let server = ProjectCompiler::new(
             verse,
             dep_tx,
@@ -483,7 +475,10 @@ impl ServerState {
                 ..Default::default()
             },
         );
+
+        // Delayed Loads fonts
         let font_client = client.clone();
+        let font_resolver = compile_config.determine_fonts();
         client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
@@ -496,7 +491,6 @@ impl ServerState {
         // must update them.
         // client.add_memory_changes(MemoryEvent::Update(snapshot));
         ProjectState {
-            diag_group,
             state: server,
             preview: Default::default(),
             analysis: handle.analysis.clone(),

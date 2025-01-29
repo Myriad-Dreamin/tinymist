@@ -30,7 +30,6 @@ use super::*;
 #[derive(Clone)]
 pub struct ExportTask {
     pub handle: tokio::runtime::Handle,
-    pub group: String,
     pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
     pub factory: SyncTaskFactory<ExportUserConfig>,
     export_folder: FutureFolder,
@@ -40,15 +39,13 @@ pub struct ExportTask {
 impl ExportTask {
     pub fn new(
         handle: tokio::runtime::Handle,
-        group: String,
         editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
-        data: ExportUserConfig,
+        export_config: ExportUserConfig,
     ) -> Self {
         Self {
             handle,
-            group,
             editor_tx,
-            factory: SyncTaskFactory::new(data),
+            factory: SyncTaskFactory::new(export_config),
             export_folder: FutureFolder::default(),
             count_word_folder: FutureFolder::default(),
         }
@@ -114,15 +111,15 @@ impl ExportTask {
         let rev = artifact.world.revision().get();
         let fut = self.count_word_folder.spawn(rev, || {
             let artifact = artifact.clone();
-            let group = self.group.clone();
             Box::pin(async move {
+                let id = artifact.snap.id;
                 let doc = artifact.doc.ok()?;
                 let wc =
                     log_err(FutureFolder::compute(move |_| word_count::word_count(&doc)).await);
-                log::debug!("WordCount({group}:{rev}): {wc:?}");
+                log::debug!("WordCount({id:?}:{rev}): {wc:?}");
 
                 if let Some(wc) = wc {
-                    let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+                    let _ = editor_tx.send(EditorRequest::WordCount(id, wc));
                 }
 
                 Some(())
