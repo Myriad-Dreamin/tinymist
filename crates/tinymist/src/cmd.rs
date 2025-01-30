@@ -321,7 +321,7 @@ impl ServerState {
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
         let watcher = previewer.compile_watcher();
 
-        let primary = &mut self.project.state.primary;
+        let primary = &mut self.project.compiler.primary;
         if !cli_args.not_as_primary && self.preview.watchers.register(&primary.id, watcher) {
             let id = primary.id.clone();
             // todo: recover pin status reliably
@@ -335,8 +335,8 @@ impl ServerState {
                 .map_err(internal_error)?;
 
             // Gets the task-dedicated compile server.
-            let Some(dedicate) = self.project.state.dedicates.iter_mut().find(|d| d.id == id)
-            else {
+            let mut dedicates = self.project.compiler.dedicates.iter_mut();
+            let Some(dedicate) = dedicates.find(|d| d.id == id) else {
                 return Err(invalid_params(
                     "just restarted compiler instance for the task is not found",
                 ));

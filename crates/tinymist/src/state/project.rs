@@ -44,42 +44,6 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 /// LSP project compiler.
 pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectInsStateExt>;
 
-#[derive(Default, Clone)]
-pub struct ProjectPreviewState {
-    #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<typst_preview::CompileWatcher>>>>,
-}
-
-#[cfg(feature = "preview")]
-impl ProjectPreviewState {
-    // todo: multiple preview support
-    #[must_use]
-    pub fn register(&self, id: &ProjectInsId, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
-        let mut p = self.inner.lock();
-        if p.contains_key(id) {
-            return false;
-        }
-
-        p.insert(id.clone(), handle.clone());
-        true
-    }
-
-    #[must_use]
-    pub fn unregister(&self, task_id: &ProjectInsId) -> bool {
-        let mut p = self.inner.lock();
-        if p.remove(task_id).is_some() {
-            return true;
-        }
-
-        false
-    }
-
-    #[must_use]
-    pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<typst_preview::CompileWatcher>> {
-        self.inner.lock().get(task_id).cloned()
-    }
-}
-
 #[derive(Default)]
 pub struct ProjectInsStateExt {
     pub is_compiling: bool,
@@ -87,7 +51,7 @@ pub struct ProjectInsStateExt {
 }
 
 pub struct ProjectState {
-    pub state: LspProjectCompiler,
+    pub compiler: LspProjectCompiler,
     pub preview: ProjectPreviewState,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,
@@ -95,9 +59,14 @@ pub struct ProjectState {
 }
 
 impl ProjectState {
+    /// The primary instance id
+    pub fn primary_id(&self) -> &ProjectInsId {
+        &self.compiler.primary.id
+    }
+
     /// Snapshot the compiler thread for tasks
     pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
-        Ok(self.state.snapshot())
+        Ok(self.compiler.snapshot())
     }
 
     /// Snapshot the compiler thread for language queries
@@ -115,14 +84,14 @@ impl ProjectState {
 
     pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
         if let Interrupt::Compiled(compiled) = &intr {
-            let proj = self.state.projects().find(|p| p.id == compiled.id);
+            let proj = self.compiler.projects().find(|p| p.id == compiled.id);
             if let Some(proj) = proj {
                 proj.ext.is_compiling = false;
                 proj.ext.last_compilation = Some(compiled.clone());
             }
         }
 
-        self.state.process(intr);
+        self.compiler.process(intr);
     }
 
     pub(crate) fn stop(&mut self) {
@@ -134,7 +103,39 @@ impl ProjectState {
         group: &str,
         entry: EntryState,
     ) -> Result<ProjectInsId> {
-        self.state.restart_dedicate(group, entry)
+        self.compiler.restart_dedicate(group, entry)
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct ProjectPreviewState {
+    #[cfg(feature = "preview")]
+    pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<typst_preview::CompileWatcher>>>>,
+}
+
+#[cfg(feature = "preview")]
+impl ProjectPreviewState {
+    #[must_use]
+    pub fn register(&self, id: &ProjectInsId, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        let mut p = self.inner.lock();
+
+        // Don't replace the existing watcher if it exists
+        if p.contains_key(id) {
+            return false;
+        }
+
+        p.insert(id.clone(), handle.clone());
+        true
+    }
+
+    #[must_use]
+    pub fn unregister(&self, task_id: &ProjectInsId) -> bool {
+        self.inner.lock().remove(task_id).is_some()
+    }
+
+    #[must_use]
+    pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<typst_preview::CompileWatcher>> {
+        self.inner.lock().get(task_id).cloned()
     }
 }
 
