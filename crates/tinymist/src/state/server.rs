@@ -146,7 +146,7 @@ impl ServerState {
             );
 
             service
-                .restart_primary()
+                .reload_projects()
                 .log_error("could not restart primary");
 
             // Run the cluster in the background after we referencing it

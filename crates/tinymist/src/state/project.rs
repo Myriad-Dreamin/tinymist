@@ -48,24 +48,24 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 /// LSP project compiler.
 pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectInsStateExt>;
 
-/// Getters and the main loop.
+/// Project access and mutations.
 impl ServerState {
     /// Changes the export configuration.
     pub fn change_export_config(&mut self, config: ExportUserConfig) {
         self.project.export.change_config(config);
     }
 
-    /// Snapshot the compiler thread for tasks
+    /// Snapshots the project for tasks
     pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
         self.project.snapshot()
     }
 
-    /// Snapshot the compiler thread for language queries
+    /// Snapshots the project for language queries
     pub fn query_snapshot(&mut self) -> Result<LspQuerySnapshot> {
         self.project.query_snapshot(None)
     }
 
-    /// Snapshot the compiler thread for language queries
+    /// Snapshots the project for language queries
     pub fn query_snapshot_with_stat(
         &mut self,
         q: &CompilerQueryRequest,
@@ -77,8 +77,8 @@ impl ServerState {
         Ok((snap, stat))
     }
 
-    /// Restart the primary server.
-    pub fn restart_primary(&mut self) -> Result<ProjectInsId> {
+    /// Reload the projects.
+    pub fn reload_projects(&mut self) -> Result<()> {
         // todo: hot replacement
         #[cfg(feature = "preview")]
         self.preview.stop_all();
@@ -89,6 +89,8 @@ impl ServerState {
         let new_project = Self::project(&self.config, editor_tx, self.client.clone(), watchers);
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
+
+        // todo: the old dedicate projects should be transferred.
 
         let snapshot = FileChangeSet::new_inserts(
             self.memory_changes
@@ -107,10 +109,10 @@ impl ServerState {
             old_project.stop();
         });
 
-        Ok(self.project.primary_id().clone())
+        Ok(())
     }
 
-    /// Restart the server with the given group.
+    /// Restarts a dedicate projects and returns corresponding instance id.
     pub fn restart_dedicate(
         &mut self,
         dedicate: &str,
@@ -120,22 +122,10 @@ impl ServerState {
         self.project.restart_dedicate(dedicate, entry)
     }
 
-    // pub async fn settle(&mut self) {
-    //     let _ = self.change_entry(None);
-    //     log::info!("TypstActor({}): settle requested", self.handle.diag_group);
-    //     match self.handle.settle().await {
-    //         Ok(()) => log::info!("TypstActor({}): settled",
-    // self.handle.diag_group),         Err(err) => error!(
-    //             "TypstActor({}): failed to settle: {err:#}",
-    //             self.handle.diag_group
-    //         ),
-    //     }
-    // }
-
     /// Create a fresh [`ProjectState`].
     pub fn project(
         config: &Config,
-        editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
+        editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
         preview: ProjectPreviewState,
     ) -> ProjectState {
@@ -195,7 +185,7 @@ impl ServerState {
         let verse = LspUniverseBuilder::build(entry, inputs, embedded_fonts, package_registry);
 
         // todo: unify filesystem watcher
-        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (dep_tx, dep_rx) = mpsc::unbounded_channel();
         let fs_client = client.clone().to_untyped();
         let async_handle = client.handle.clone();
         async_handle.spawn(watch_deps(dep_rx, move |event| {
@@ -363,7 +353,7 @@ impl ProjectClient for LspClient {
     }
 }
 
-impl ProjectClient for tokio::sync::mpsc::UnboundedSender<LspInterrupt> {
+impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
     fn send_event(&self, event: LspInterrupt) {
         self.send(event).log_error("failed to send interrupt");
     }
