@@ -138,7 +138,7 @@ impl ServerState {
 
         if old_config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
-            self.restart_primary()
+            self.reload_projects()
                 .log_error("could not restart primary");
         }
 
