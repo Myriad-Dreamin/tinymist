@@ -108,33 +108,36 @@ impl ServerState {
     ) -> LspResult<()> {
         // For some clients, we don't get the actual changed configuration and need to
         // poll for it https://github.com/microsoft/language-server-protocol/issues/676
-        match params.settings {
-            JsonValue::Object(settings) => self.on_changed_configuration(settings)?,
-            _ => {
-                self.client.send_request::<WorkspaceConfiguration>(
-                    ConfigurationParams {
-                        items: Config::get_items(),
-                    },
-                    |this, resp| {
-                        if let Some(err) = resp.error {
-                            log::error!("failed to request configuration: {err:?}");
-                            return;
-                        }
-                        // .map(Config::values_to_map),
-
-                        let Some(result) = resp.result else {
-                            log::error!("no configuration returned");
-                            return;
-                        };
-
-                        let resp: Vec<JsonValue> = serde_json::from_value(result).unwrap();
-                        let _ = this.on_changed_configuration(Config::values_to_map(resp));
-                    },
-                );
-            }
+        if let JsonValue::Object(settings) = params.settings {
+            return self.on_changed_configuration(settings);
         };
 
+        self.client.send_request::<WorkspaceConfiguration>(
+            ConfigurationParams {
+                items: Config::get_items(),
+            },
+            Self::workspace_configuration_callback,
+        );
         Ok(())
+    }
+
+    fn workspace_configuration_callback(this: &mut ServerState, resp: lsp_server::Response) {
+        if let Some(err) = resp.error {
+            log::error!("failed to request configuration: {err:?}");
+            return;
+        }
+
+        let Some(result) = resp.result else {
+            log::error!("no configuration returned");
+            return;
+        };
+
+        let Some(resp) = serde_json::from_value::<Vec<JsonValue>>(result)
+            .log_error("could not parse configuration")
+        else {
+            return;
+        };
+        let _ = this.on_changed_configuration(Config::values_to_map(resp));
     }
 }
 
