@@ -310,7 +310,7 @@ impl ServerState {
 impl ServerState {
     /// Get the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
-        let dg = self.project.state.primary.id.to_string();
+        let dg = self.project.primary_id().to_string();
         let api_stats = self.project.stats.report();
         let query_stats = self.project.analysis.report_query_stats();
         let alloc_stats = self.project.analysis.report_alloc_stats();
@@ -365,7 +365,7 @@ impl ServerState {
             old_project.stop();
         });
 
-        Ok(self.project.state.primary.id.clone())
+        Ok(self.project.primary_id().clone())
     }
 
     /// Restart the server with the given group.
@@ -462,7 +462,7 @@ impl ServerState {
 
         // Create the actor
         let compile_handle = handle.clone();
-        let server = ProjectCompiler::new(
+        let compiler = ProjectCompiler::new(
             verse,
             dep_tx,
             CompileServerOpts {
@@ -481,7 +481,7 @@ impl ServerState {
         });
 
         ProjectState {
-            state: server,
+            compiler,
             preview: Default::default(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),

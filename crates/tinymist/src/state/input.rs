@@ -156,7 +156,7 @@ impl ServerState {
 
         log::info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
 
-        let id = self.project.state.primary.id.clone();
+        let id = self.project.primary_id().clone();
         let task = TaskInputs {
             entry: Some(next_entry.clone()),
             ..Default::default()
