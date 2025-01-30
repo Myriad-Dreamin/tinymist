@@ -320,7 +320,7 @@ impl LspClient {
     }
 
     /// Sends a typed notification to the client.
-    pub fn send_notification<N: Notif>(&self, params: N::Params) {
+    pub fn send_notification<N: Notif>(&self, params: &N::Params) {
         self.send_notification_(lsp_server::Notification::new(N::METHOD.to_owned(), params));
     }
 

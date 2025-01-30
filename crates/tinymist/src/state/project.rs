@@ -38,7 +38,7 @@ use tinymist_std::{
 };
 use tokio::sync::mpsc;
 
-use crate::actor::editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum};
+use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
@@ -170,7 +170,7 @@ impl ProjectClient for tokio::sync::mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
-    fn push_diagnostics(&self, dv: DocVersion, diagnostics: Option<DiagnosticsMap>) {
+    fn push_diagnostics(&self, dv: ProjVersion, diagnostics: Option<DiagnosticsMap>) {
         self.editor_tx
             .send(EditorRequest::Diag(dv, diagnostics))
             .log_error("failed to send diagnostics");
@@ -178,7 +178,7 @@ impl CompileHandlerImpl {
 
     fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
         let world = &snap.world;
-        let dv = DocVersion {
+        let dv = ProjVersion {
             id: snap.id.clone(),
             revision: world.revision().get(),
         };
@@ -252,17 +252,17 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         // todo: seems to duplicate with CompileStatus
         let status = match rep {
             CompileReport::Suspend => {
-                let dv = DocVersion {
+                let dv = ProjVersion {
                     id: id.clone(),
                     revision,
                 };
                 self.push_diagnostics(dv, None);
-                TinymistCompileStatusEnum::CompileSuccess
+                CompileStatusEnum::CompileSuccess
             }
-            CompileReport::Stage(_, _, _) => TinymistCompileStatusEnum::Compiling,
-            CompileReport::CompileSuccess(_, _, _) => TinymistCompileStatusEnum::CompileSuccess,
+            CompileReport::Stage(_, _, _) => CompileStatusEnum::Compiling,
+            CompileReport::CompileSuccess(_, _, _) => CompileStatusEnum::CompileSuccess,
             CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                TinymistCompileStatusEnum::CompileError
+                CompileStatusEnum::CompileError
             }
         };
 
@@ -328,9 +328,9 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                     .map(|s| unix_slash(s.vpath().as_rooted_path()))
                     .unwrap_or_default(),
                 status: if snap.doc.is_ok() {
-                    TinymistCompileStatusEnum::CompileSuccess
+                    CompileStatusEnum::CompileSuccess
                 } else {
-                    TinymistCompileStatusEnum::CompileError
+                    CompileStatusEnum::CompileError
                 },
             }))
             .unwrap();

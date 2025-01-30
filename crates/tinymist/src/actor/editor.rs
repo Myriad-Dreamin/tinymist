@@ -1,5 +1,5 @@
-//! The actor maintain output to the editor, including diagnostics and compile
-//! status.
+//! The actor maintaining output to the editor, including diagnostics and
+//! compile status.
 
 use std::collections::HashMap;
 
@@ -10,35 +10,37 @@ use tokio::sync::mpsc;
 
 use crate::{tool::word_count::WordsCount, LspClient};
 
-#[derive(Debug, Clone)]
-pub struct DocVersion {
-    pub id: ProjectInsId,
-    pub revision: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct CompileStatus {
-    pub id: ProjectInsId,
-    pub path: String,
-    pub status: TinymistCompileStatusEnum,
-}
-
+/// The request to the editor actor.
 pub enum EditorRequest {
-    Diag(DocVersion, Option<DiagnosticsMap>),
+    /// Publishes diagnostics to the editor.
+    Diag(ProjVersion, Option<DiagnosticsMap>),
+    /// Updates compile status to the editor.
     Status(CompileStatus),
+    /// Updastes words count status to the editor.
     WordCount(ProjectInsId, WordsCount),
 }
 
+/// The actor maintaining output to the editor, including diagnostics and
+/// compile status.
 pub struct EditorActor {
+    /// The connection to the lsp client.
     client: LspClient,
+    /// The channel receiving the [`EditorRequest`].
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
-
-    diagnostics: HashMap<Url, HashMap<ProjectInsId, Vec<Diagnostic>>>,
-    affect_map: HashMap<ProjectInsId, Vec<Url>>,
+    /// Whether to notify compile status to the editor.
     notify_compile_status: bool,
+
+    /// Accumulated diagnostics per file.
+    /// The outer `HashMap` is indexed by the file's URL.
+    /// The inner `HashMap` is indexed by the project ID, allowing multiple
+    /// projects publishing diagnostics to the same file independently.
+    diagnostics: HashMap<Url, HashMap<ProjectInsId, Vec<Diagnostic>>>,
+    /// The map from project ID to the affected files.
+    affect_map: HashMap<ProjectInsId, Vec<Url>>,
 }
 
 impl EditorActor {
+    /// Creates a new editor actor.
     pub fn new(
         client: LspClient,
         editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
@@ -53,55 +55,48 @@ impl EditorActor {
         }
     }
 
+    /// Runs the editor actor in background. It exits when the editor channel
+    /// is closed.
     pub async fn run(mut self) {
-        let mut compile_status = CompileStatus {
-            id: ProjectInsId::PRIMARY.clone(),
-            status: TinymistCompileStatusEnum::Compiling,
+        // The local state.
+        let mut compile_status = StatusAll {
+            status: CompileStatusEnum::Compiling,
             path: "".to_owned(),
+            words_count: None,
         };
-        let mut words_count = None;
+
         while let Some(req) = self.editor_rx.recv().await {
             match req {
                 EditorRequest::Diag(dv, diagnostics) => {
-                    let DocVersion { id, revision } = dv;
                     log::debug!(
-                        "received diagnostics from {id:?}:{revision}: diag({:?})",
+                        "received diagnostics from {dv:?}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
                     );
 
-                    self.publish(id, diagnostics).await;
+                    self.publish(dv.id, diagnostics).await;
                 }
                 EditorRequest::Status(status) => {
                     log::debug!("received status request({status:?})");
                     if self.notify_compile_status && status.id == ProjectInsId::PRIMARY {
-                        compile_status = status;
-                        self.client.send_notification::<TinymistCompileStatus>(
-                            TinymistCompileStatus {
-                                status: compile_status.status.clone(),
-                                path: compile_status.path.clone(),
-                                words_count: words_count.clone(),
-                            },
-                        );
+                        compile_status.status = status.status;
+                        compile_status.path = status.path;
+                        self.client.send_notification::<StatusAll>(&compile_status);
                     }
                 }
-                EditorRequest::WordCount(group, wc) => {
+                EditorRequest::WordCount(id, count) => {
                     log::debug!("received word count request");
-                    if self.notify_compile_status && group == ProjectInsId::PRIMARY {
-                        words_count = Some(wc);
-                        self.client.send_notification::<TinymistCompileStatus>(
-                            TinymistCompileStatus {
-                                status: compile_status.status.clone(),
-                                path: compile_status.path.clone(),
-                                words_count: words_count.clone(),
-                            },
-                        );
+                    if self.notify_compile_status && id == ProjectInsId::PRIMARY {
+                        compile_status.words_count = Some(count);
+                        self.client.send_notification::<StatusAll>(&compile_status);
                     }
                 }
             }
         }
+
         log::info!("editor actor is stopped");
     }
 
+    /// Publishes diagnostics of a project to the editor.
     pub async fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
         let affected = match next_diag.as_ref() {
             Some(e) => self
@@ -110,39 +105,41 @@ impl EditorActor {
             None => self.affect_map.remove(&id),
         };
 
-        // Get sources which had some diagnostic published last time, but not this time.
+        // Gets sources which had some diagnostic published last time, but not this
+        // time.
         //
         // The LSP specifies that files will not have diagnostics updated, including
         // removed, without an explicit update, so we need to send an empty `Vec` of
         // diagnostics to these sources.
 
-        // Get sources that affected by this group in last round but not this time
+        // Gets sources that affected by this group in last round but not this time
         for url in affected.into_iter().flatten() {
             if !next_diag.as_ref().is_some_and(|e| e.contains_key(&url)) {
-                self.publish_inner(&id, url, None)
+                self.publish_file(&id, url, None)
             }
         }
 
-        // Get touched updates
+        // Gets touched updates
         for (url, next) in next_diag.into_iter().flatten() {
-            self.publish_inner(&id, url, Some(next))
+            self.publish_file(&id, url, Some(next))
         }
     }
 
-    fn publish_inner(&mut self, group: &ProjectInsId, url: Url, next: Option<Vec<Diagnostic>>) {
-        let mut to_publish = Vec::new();
+    /// Publishes diagnostics of a file to the editor.
+    fn publish_file(&mut self, group: &ProjectInsId, uri: Url, next: Option<Vec<Diagnostic>>) {
+        let mut diagnostics = Vec::new();
 
-        // Get the diagnostics from other groups
-        let path_diags = self.diagnostics.entry(url.clone()).or_default();
-        for (g, diags) in &*path_diags {
+        // Gets the diagnostics from other groups
+        let path_diags = self.diagnostics.entry(uri.clone()).or_default();
+        for (g, diags) in path_diags.iter() {
             if g != group {
-                to_publish.extend(diags.iter().cloned());
+                diagnostics.extend(diags.iter().cloned());
             }
         }
 
-        // Get the diagnostics from this group
+        // Gets the diagnostics from this group
         if let Some(diags) = &next {
-            to_publish.extend(diags.iter().cloned())
+            diagnostics.extend(diags.iter().cloned())
         }
 
         match next {
@@ -151,32 +148,60 @@ impl EditorActor {
         };
 
         self.client
-            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri: url,
-                diagnostics: to_publish,
+            .send_notification::<PublishDiagnostics>(&PublishDiagnosticsParams {
+                uri,
+                diagnostics,
                 version: None,
             });
     }
 }
-// Notification
 
+/// The compilation revision of a project.
+#[derive(Debug, Clone)]
+pub struct ProjVersion {
+    /// The project ID.
+    pub id: ProjectInsId,
+    /// The revision of the project (compilation).
+    pub revision: usize,
+}
+
+/// The compilation status of a project.
+#[derive(Debug, Clone)]
+pub struct CompileStatus {
+    /// The project ID.
+    pub id: ProjectInsId,
+    /// The file getting compiled.
+    // todo: eco string
+    pub path: String,
+    /// The status of the compilation.
+    pub status: CompileStatusEnum,
+}
+
+/// The compilation status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum TinymistCompileStatusEnum {
+pub enum CompileStatusEnum {
+    /// The project is compiling.
     Compiling,
+    /// The project compiled successfully.
     CompileSuccess,
+    /// The project failed to compile.
     CompileError,
 }
 
+/// All the status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct TinymistCompileStatus {
-    pub status: TinymistCompileStatusEnum,
+struct StatusAll {
+    /// The status of the project.
+    pub status: CompileStatusEnum,
+    /// The file getting compiled.
     pub path: String,
+    /// The word count of the project.
     pub words_count: Option<WordsCount>,
 }
 
-impl lsp_types::notification::Notification for TinymistCompileStatus {
+impl lsp_types::notification::Notification for StatusAll {
     type Params = Self;
     const METHOD: &'static str = "tinymist/compileStatus";
 }
