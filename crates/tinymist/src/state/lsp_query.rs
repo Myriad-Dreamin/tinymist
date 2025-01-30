@@ -50,7 +50,7 @@ macro_rules! run_query {
 }
 pub(crate) use run_query;
 
-/// Standard Language Features
+/// LSP Standard Language Features
 impl ServerState {
     pub(crate) fn goto_definition(
         &mut self,

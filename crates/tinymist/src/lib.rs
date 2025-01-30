@@ -38,7 +38,7 @@ pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
 use lsp_server::ResponseError;
 use serde_json::from_value;
-use state::query::QueryFuture;
+use state::lsp_query::QueryFuture;
 use sync_lsp::*;
 use tinymist_std::error::Result;
 use utils::*;

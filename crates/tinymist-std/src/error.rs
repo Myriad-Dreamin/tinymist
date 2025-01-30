@@ -330,7 +330,7 @@ pub mod prelude {
     use crate::Error;
 
     pub use super::{IgnoreLogging, WithContext, WithContextUntyped};
-    pub use crate::Result;
+    pub use crate::{bail, Result};
 
     pub fn map_string_err<T: ToString>(loc: &'static str) -> impl Fn(T) -> Error {
         move |e| Error::new(loc, e.to_string().to_error_kind(), None)
