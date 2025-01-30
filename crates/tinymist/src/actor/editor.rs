@@ -62,7 +62,7 @@ impl EditorActor {
     /// is closed.
     pub async fn run(mut self) {
         // The local state.
-        let mut compile_status = StatusAll {
+        let mut status = StatusAll {
             status: CompileStatusEnum::Compiling,
             path: "".to_owned(),
             words_count: None,
@@ -70,27 +70,27 @@ impl EditorActor {
 
         while let Some(req) = self.editor_rx.recv().await {
             match req {
-                EditorRequest::Diag(dv, diagnostics) => {
+                EditorRequest::Diag(version, diagnostics) => {
                     log::debug!(
-                        "received diagnostics from {dv:?}: diag({:?})",
-                        diagnostics.as_ref().map(|e| e.len())
+                        "received diagnostics from {version:?}: diag({:?})",
+                        diagnostics.as_ref().map(|files| files.len())
                     );
 
-                    self.publish(dv.id, diagnostics).await;
+                    self.publish(version.id, diagnostics).await;
                 }
-                EditorRequest::Status(status) => {
-                    log::debug!("received status request({status:?})");
-                    if self.notify_compile_status && status.id == ProjectInsId::PRIMARY {
-                        compile_status.status = status.status;
-                        compile_status.path = status.path;
-                        self.client.send_notification::<StatusAll>(&compile_status);
+                EditorRequest::Status(compile_status) => {
+                    log::debug!("received status request: {compile_status:?}");
+                    if self.notify_compile_status && compile_status.id == ProjectInsId::PRIMARY {
+                        status.status = compile_status.status;
+                        status.path = compile_status.path;
+                        self.client.send_notification::<StatusAll>(&status);
                     }
                 }
                 EditorRequest::WordCount(id, count) => {
                     log::debug!("received word count request");
                     if self.notify_compile_status && id == ProjectInsId::PRIMARY {
-                        compile_status.words_count = Some(count);
-                        self.client.send_notification::<StatusAll>(&compile_status);
+                        status.words_count = Some(count);
+                        self.client.send_notification::<StatusAll>(&status);
                     }
                 }
             }
@@ -102,9 +102,9 @@ impl EditorActor {
     /// Publishes diagnostics of a project to the editor.
     pub async fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
         let affected = match next_diag.as_ref() {
-            Some(e) => self
+            Some(next_diag) => self
                 .affect_map
-                .insert(id.clone(), e.keys().cloned().collect()),
+                .insert(id.clone(), next_diag.keys().cloned().collect()),
             None => self.affect_map.remove(&id),
         };
 
@@ -116,26 +116,26 @@ impl EditorActor {
         // diagnostics to these sources.
 
         // Gets sources that affected by this group in last round but not this time
-        for url in affected.into_iter().flatten() {
-            if !next_diag.as_ref().is_some_and(|e| e.contains_key(&url)) {
-                self.publish_file(&id, url, None)
+        for uri in affected.into_iter().flatten() {
+            if !next_diag.as_ref().is_some_and(|e| e.contains_key(&uri)) {
+                self.publish_file(&id, uri, None)
             }
         }
 
         // Gets touched updates
-        for (url, next) in next_diag.into_iter().flatten() {
-            self.publish_file(&id, url, Some(next))
+        for (uri, next) in next_diag.into_iter().flatten() {
+            self.publish_file(&id, uri, Some(next))
         }
     }
 
     /// Publishes diagnostics of a file to the editor.
-    fn publish_file(&mut self, group: &ProjectInsId, uri: Url, next: Option<EcoVec<Diagnostic>>) {
+    fn publish_file(&mut self, id: &ProjectInsId, uri: Url, next: Option<EcoVec<Diagnostic>>) {
         let mut diagnostics = EcoVec::new();
 
         // Gets the diagnostics from other groups
         let path_diags = self.diagnostics.entry(uri.clone()).or_default();
-        for (g, diags) in path_diags.iter() {
-            if g != group {
+        for (existing_id, diags) in path_diags.iter() {
+            if existing_id != id {
                 diagnostics.push(diags.clone());
             }
         }
@@ -147,8 +147,8 @@ impl EditorActor {
 
         // Updates the diagnostics for this group
         match next {
-            Some(next) => path_diags.insert(group.clone(), next),
-            None => path_diags.remove(group),
+            Some(next) => path_diags.insert(id.clone(), next),
+            None => path_diags.remove(id),
         };
 
         // Publishes the diagnostics
