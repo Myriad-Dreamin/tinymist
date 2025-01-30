@@ -4,7 +4,7 @@ use typst::syntax::Span;
 use crate::{prelude::*, LspWorldExt};
 
 /// Stores diagnostics for files.
-pub type DiagnosticsMap = HashMap<Url, Vec<Diagnostic>>;
+pub type DiagnosticsMap = HashMap<Url, EcoVec<Diagnostic>>;
 
 type TypstDiagnostic = typst::diag::SourceDiagnostic;
 type TypstSeverity = typst::diag::Severity;
@@ -36,17 +36,21 @@ pub fn convert_diagnostics<'a>(
         position_encoding,
     };
 
-    errors
+    let kvs = errors
         .into_iter()
         .flat_map(|error| {
             convert_diagnostic(&ctx, error)
                 .map_err(move |conversion_err| {
                     log::error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
                 })
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .into_group_map()
+        });
+
+    let mut lookup = HashMap::new();
+    for (key, val) in kvs {
+        lookup.entry(key).or_insert_with(EcoVec::new).push(val);
+    }
+
+    lookup
 }
 
 fn convert_diagnostic(

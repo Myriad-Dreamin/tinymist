@@ -3,7 +3,10 @@
 
 use std::collections::HashMap;
 
-use lsp_types::{notification::PublishDiagnostics, Diagnostic, PublishDiagnosticsParams, Url};
+use lsp_types::notification::{Notification, PublishDiagnostics as PublishDiagnosticsBase};
+use lsp_types::{Diagnostic, Url};
+use reflexo_typst::typst::prelude::{eco_vec, EcoVec};
+use serde::{Deserialize, Serialize};
 use tinymist_project::ProjectInsId;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
@@ -34,7 +37,7 @@ pub struct EditorActor {
     /// The outer `HashMap` is indexed by the file's URL.
     /// The inner `HashMap` is indexed by the project ID, allowing multiple
     /// projects publishing diagnostics to the same file independently.
-    diagnostics: HashMap<Url, HashMap<ProjectInsId, Vec<Diagnostic>>>,
+    diagnostics: HashMap<Url, HashMap<ProjectInsId, EcoVec<Diagnostic>>>,
     /// The map from project ID to the affected files.
     affect_map: HashMap<ProjectInsId, Vec<Url>>,
 }
@@ -126,31 +129,33 @@ impl EditorActor {
     }
 
     /// Publishes diagnostics of a file to the editor.
-    fn publish_file(&mut self, group: &ProjectInsId, uri: Url, next: Option<Vec<Diagnostic>>) {
-        let mut diagnostics = Vec::new();
+    fn publish_file(&mut self, group: &ProjectInsId, uri: Url, next: Option<EcoVec<Diagnostic>>) {
+        let mut diagnostics = EcoVec::new();
 
         // Gets the diagnostics from other groups
         let path_diags = self.diagnostics.entry(uri.clone()).or_default();
         for (g, diags) in path_diags.iter() {
             if g != group {
-                diagnostics.extend(diags.iter().cloned());
+                diagnostics.push(diags.clone());
             }
         }
 
         // Gets the diagnostics from this group
         if let Some(diags) = &next {
-            diagnostics.extend(diags.iter().cloned())
+            diagnostics.push(diags.clone())
         }
 
+        // Updates the diagnostics for this group
         match next {
             Some(next) => path_diags.insert(group.clone(), next),
             None => path_diags.remove(group),
         };
 
+        // Publishes the diagnostics
         self.client
             .send_notification::<PublishDiagnostics>(&PublishDiagnosticsParams {
                 uri,
-                diagnostics,
+                diagnostics: ScatterVec(diagnostics),
                 version: None,
             });
     }
@@ -204,4 +209,49 @@ struct StatusAll {
 impl lsp_types::notification::Notification for StatusAll {
     type Params = Self;
     const METHOD: &'static str = "tinymist/compileStatus";
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+pub struct PublishDiagnosticsParams {
+    /// The URI for which diagnostic information is reported.
+    pub uri: Url,
+
+    /// An array of diagnostic information items.
+    pub diagnostics: ScatterVec<Diagnostic>,
+
+    /// Optional the version number of the document the diagnostics are
+    /// published for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<i32>,
+}
+
+/// Diagnostics notification are sent from the server to the client to signal
+/// results of validation runs.
+#[derive(Debug)]
+pub enum PublishDiagnostics {}
+
+impl Notification for PublishDiagnostics {
+    type Params = PublishDiagnosticsParams;
+    const METHOD: &'static str = PublishDiagnosticsBase::METHOD;
+}
+
+/// A scatter vector that is serialized as a flatten representation.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct ScatterVec<T>(EcoVec<EcoVec<T>>);
+
+impl serde::Serialize for ScatterVec<Diagnostic> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut vec = Vec::new();
+        for e in &self.0 {
+            vec.extend(e.iter().cloned())
+        }
+        vec.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ScatterVec<Diagnostic> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let vec = EcoVec::<Diagnostic>::deserialize(deserializer)?;
+        Ok(ScatterVec(eco_vec![vec]))
+    }
 }
