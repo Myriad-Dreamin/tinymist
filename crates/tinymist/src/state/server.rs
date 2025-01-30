@@ -3,7 +3,6 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use log::{error, info};
 use lsp_types::*;
 use parking_lot::Mutex;
 use sync_lsp::*;
@@ -129,7 +128,7 @@ impl ServerState {
 
     /// The entry point for the language server.
     pub fn main(client: TypedLspClient<Self>, config: Config, start: bool) -> Self {
-        info!("LanguageState: initialized with config {config:?}");
+        log::info!("LanguageState: initialized with config {config:?}");
 
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
@@ -145,7 +144,7 @@ impl ServerState {
 
             let err = service.restart_primary();
             if let Err(err) = err {
-                error!("could not restart primary: {err}");
+                log::error!("could not restart primary: {err}");
             }
 
             // Run the cluster in the background after we referencing it
@@ -380,10 +379,10 @@ impl ServerState {
 
     // pub async fn settle(&mut self) {
     //     let _ = self.change_entry(None);
-    //     info!("TypstActor({}): settle requested", self.handle.diag_group);
+    //     log::info!("TypstActor({}): settle requested", self.handle.diag_group);
     //     match self.handle.settle().await {
-    //         Ok(()) => info!("TypstActor({}): settled", self.handle.diag_group),
-    //         Err(err) => error!(
+    //         Ok(()) => log::info!("TypstActor({}): settled",
+    // self.handle.diag_group),         Err(err) => error!(
     //             "TypstActor({}): failed to settle: {err:#}",
     //             self.handle.diag_group
     //         ),

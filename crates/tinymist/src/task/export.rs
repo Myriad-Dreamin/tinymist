@@ -149,13 +149,13 @@ impl ExportTask {
             return Ok(None);
         };
         if to.is_relative() {
-            bail!("RenderActor({task:?}): output path is relative: {to:?}");
+            bail!("ExportTask({task:?}): output path is relative: {to:?}");
         }
         if to.is_dir() {
-            bail!("RenderActor({task:?}): output path is a directory: {to:?}");
+            bail!("ExportTask({task:?}): output path is a directory: {to:?}");
         }
         let to = to.with_extension(task.extension());
-        log::info!("RenderActor({task:?}): exporting {entry:?} to {to:?}");
+        log::info!("ExportTask({task:?}): exporting {entry:?} to {to:?}");
         if let Some(e) = to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
@@ -295,7 +295,7 @@ impl ExportTask {
             .await
             .context("failed to export")?;
 
-        log::info!("RenderActor({task:?}): export complete");
+        log::info!("ExportTask({task:?}): export complete");
         Ok(Some(to))
     }
 }

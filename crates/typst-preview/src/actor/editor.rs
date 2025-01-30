@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use log::{debug, info, trace, warn};
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -94,7 +93,7 @@ impl ControlPlaneTx {
     async fn resp_ctl_plane(&mut self, loc: &str, resp: ControlPlaneResponse) -> bool {
         let sent = self.resp_tx.send(resp).is_ok();
         if !sent {
-            warn!("failed to send {loc} response to editor");
+            log::warn!("failed to send {loc} response to editor");
         }
 
         sent
@@ -176,10 +175,10 @@ impl<T: EditorServer> EditorActor<T> {
         loop {
             tokio::select! {
                 Some(msg) = self.mailbox.recv() => {
-                    trace!("EditorActor: received message from mailbox: {:?}", msg);
+                    log::trace!("EditorActor: received message from mailbox: {:?}", msg);
                    let sent = match msg {
                         EditorActorRequest::Shutdown => {
-                            info!("EditorActor: received exit message");
+                            log::info!("EditorActor: received exit message");
                             break;
                         },
                         EditorActorRequest::DocToSrcJump(jump_info) => {
@@ -206,25 +205,25 @@ impl<T: EditorServer> EditorActor<T> {
                 Some(msg) = self.editor_conn.next() => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
-                            debug!("EditorActor: received message from editor: {:?}", cursor_info);
+                            log::debug!("EditorActor: received message from editor: {:?}", cursor_info);
                             self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
                         }
                         ControlPlaneMessage::ResolveSourceLoc(jump_info) => {
-                            debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
                             self.renderer_sender.send(RenderActorRequest::ResolveSourceLoc(jump_info)).unwrap();
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
-                            debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
                             self.webview_sender.send(WebviewActorRequest::ViewportPosition(jump_info.position)).unwrap();
                         }
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
-                            debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
 
                             self.source_scroll_by_span(jump_info.span)
                                 .await;
                         }
                         ControlPlaneMessage::SyncMemoryFiles(req) => {
-                            debug!(
+                            log::debug!(
                                 "EditorActor: processing SYNC memory files: {:?}",
                                 req.files.keys().collect::<Vec<_>>()
                             );
@@ -234,7 +233,7 @@ impl<T: EditorServer> EditorActor<T> {
                             );
                         }
                         ControlPlaneMessage::UpdateMemoryFiles(req) => {
-                            debug!(
+                            log::debug!(
                                 "EditorActor: processing UPDATE memory files: {:?}",
                                 req.files.keys().collect::<Vec<_>>()
                             );
@@ -244,7 +243,7 @@ impl<T: EditorServer> EditorActor<T> {
                             );
                         }
                         ControlPlaneMessage::RemoveMemoryFiles(req) => {
-                            debug!("EditorActor: processing REMOVE memory files: {:?}", req.files);
+                            log::debug!("EditorActor: processing REMOVE memory files: {:?}", req.files);
                             handle_error(
                                 "RemoveMemoryFiles",
                                 self.client.remove_shadow_files(req).await,
@@ -255,10 +254,10 @@ impl<T: EditorServer> EditorActor<T> {
             }
         }
 
-        info!("EditorActor: editor disconnected");
+        log::info!("EditorActor: editor disconnected");
 
         if self.editor_conn.is_standalone {
-            info!("EditorActor: shutting down whole program");
+            log::info!("EditorActor: shutting down whole program");
             std::process::exit(0);
         }
     }
@@ -268,7 +267,7 @@ impl<T: EditorServer> EditorActor<T> {
             match self.span_interner.span_by_str(&span).await {
                 InternQuery::Ok(s) => s,
                 InternQuery::UseAfterFree => {
-                    warn!("EditorActor: out of date span id: {}", span);
+                    log::warn!("EditorActor: out of date span id: {}", span);
                     return;
                 }
             }
