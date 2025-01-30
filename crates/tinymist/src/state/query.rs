@@ -339,7 +339,7 @@ impl ServerState {
         let (mut snap, stat) = self.query_snapshot_with_stat(&query)?;
         let input = query
             .associated_path()
-            .map(|path| self.resolve_task_with_state(path.into()))
+            .map(|path| self.resolve_task(path.into()))
             .or_else(|| {
                 let root = self.entry_resolver().root(None)?;
                 Some(TaskInputs {

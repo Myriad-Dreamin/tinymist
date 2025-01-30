@@ -406,7 +406,7 @@ impl<F: CompilerFeat> Clone for CompilerWorld<F> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TaskInputs {
     pub entry: Option<EntryState>,
     pub inputs: Option<Arc<LazyHash<Dict>>>,
