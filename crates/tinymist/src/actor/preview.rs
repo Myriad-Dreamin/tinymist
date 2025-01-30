@@ -4,6 +4,7 @@ use lsp_types::notification::Notification;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{internal_error, LspClient, LspResult};
+use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
@@ -65,10 +66,9 @@ impl PreviewActor {
                         let h = tab.compile_handler.clone();
                         let task_id = tab.task_id.clone();
                         self.client.handle.spawn(async move {
-                            let res = h.settle().await;
-                            if let Err(e) = res {
-                                log::error!("PreviewTask({task_id}): failed to settle: {:?}", e);
-                            }
+                            h.settle().await.log_error_with(|| {
+                                format!("PreviewTask({task_id}): failed to settle")
+                            });
                         });
                     }
 

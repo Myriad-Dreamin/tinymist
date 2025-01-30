@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use tinymist_std::ImmutPath;
+use tinymist_std::{error::IgnoreLogging, ImmutPath};
 use tinymist_world::vfs::notify::NotifyDeps;
 use tokio::sync::mpsc;
 use typst::diag::FileError;
@@ -110,14 +110,11 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
     /// Create a new actor.
     pub fn new(interrupted_by_events: F) -> Self {
         let (undetermined_send, undetermined_recv) = mpsc::unbounded_channel();
-        let (watcher_sender, watcher_receiver) = mpsc::unbounded_channel();
+        let (watcher_tx, watcher_rx) = mpsc::unbounded_channel();
         let watcher = log_notify_error(
             RecommendedWatcher::new(
                 move |event| {
-                    let res = watcher_sender.send(event);
-                    if let Err(err) = res {
-                        log::warn!("error to send event: {err}");
-                    }
+                    watcher_tx.send(event).log_error("failed to send fs notify");
                 },
                 Config::default(),
             ),
@@ -136,7 +133,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             undetermined_recv,
 
             watched_entries: HashMap::new(),
-            watcher: watcher.map(|it| (it, watcher_receiver)),
+            watcher: watcher.map(|it| (it, watcher_rx)),
         }
     }
 

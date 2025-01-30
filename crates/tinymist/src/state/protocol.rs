@@ -1,7 +1,7 @@
 use lsp_types::*;
 use request::{RegisterCapability, UnregisterCapability};
 use sync_lsp::*;
-use tinymist_std::error::prelude::*;
+use tinymist_std::error::{prelude::*, IgnoreLogging};
 
 use crate::{init::*, *};
 
@@ -143,19 +143,15 @@ impl ServerState {
         if self.const_config().tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
-            let err = self.enable_sema_token_caps(true);
-            if let Err(err) = err {
-                log::error!("could not register semantic tokens for initialization: {err}");
-            }
+            self.enable_sema_token_caps(true)
+                .log_error("could not register semantic tokens for initialization");
         }
 
         if self.const_config().doc_fmt_dynamic_registration
             && self.config.formatter_mode != FormatterMode::Disable
         {
-            let err = self.enable_formatter_caps(true);
-            if let Err(err) = err {
-                log::error!("could not register formatter for initialization: {err}");
-            }
+            self.enable_formatter_caps(true)
+                .log_error("could not register formatter for initialization");
         }
 
         if self.const_config().cfg_change_registration {
@@ -164,16 +160,12 @@ impl ServerState {
             const CONFIG_REGISTRATION_ID: &str = "config";
             const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
 
-            let err = self
-                .register_capability(vec![Registration {
-                    id: CONFIG_REGISTRATION_ID.to_owned(),
-                    method: CONFIG_METHOD_ID.to_owned(),
-                    register_options: None,
-                }])
-                .err();
-            if let Some(err) = err {
-                log::error!("could not register to watch config changes: {err}");
-            }
+            self.register_capability(vec![Registration {
+                id: CONFIG_REGISTRATION_ID.to_owned(),
+                method: CONFIG_METHOD_ID.to_owned(),
+                register_options: None,
+            }])
+            .log_error("could not register to watch config changes");
         }
 
         log::info!("server initialized");

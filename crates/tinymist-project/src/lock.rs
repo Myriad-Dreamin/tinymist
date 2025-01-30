@@ -304,7 +304,7 @@ impl LockFileUpdate {
     }
 
     pub fn commit(self) {
-        let err = super::LockFile::update(&self.root, |l| {
+        super::LockFile::update(&self.root, |l| {
             let root: EcoString = unix_slash(&self.root).into();
             let root_hash = tinymist_std::hash::hash128(&root);
             for update in self.updates {
@@ -334,10 +334,8 @@ impl LockFileUpdate {
 
                             let data = serde_json::to_string(&mat).unwrap();
                             let path = cache_dir.join("path-material.json");
-                            let result = tinymist_std::fs::paths::write_atomic(path, data);
-                            if let Err(err) = result {
-                                log::error!("ProjectCompiler: write material error: {err}");
-                            }
+                            tinymist_std::fs::paths::write_atomic(path, data)
+                                .log_error("ProjectCompiler: write material error");
 
                             // todo: clean up old cache
                         }
@@ -350,10 +348,8 @@ impl LockFileUpdate {
             }
 
             Ok(())
-        });
-        if let Err(err) = err {
-            log::error!("ProjectCompiler: lock file error: {err}");
-        }
+        })
+        .log_error("ProjectCompiler: lock file error");
     }
 }
 

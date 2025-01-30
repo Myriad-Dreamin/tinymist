@@ -142,10 +142,9 @@ impl ServerState {
                 service.config.compile.notify_status,
             );
 
-            let err = service.restart_primary();
-            if let Err(err) = err {
-                log::error!("could not restart primary: {err}");
-            }
+            service
+                .restart_primary()
+                .log_error("could not restart primary");
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
@@ -539,9 +538,7 @@ impl ServerState {
 
             if let Some(Some(path)) = open.then_some(res.as_ref()) {
                 log::info!("open with system default apps: {path:?}");
-                if let Err(e) = do_open(path) {
-                    log::error!("failed to open with system default apps: {e}");
-                };
+                do_open(path).log_error("failed to open with system default apps");
             }
 
             log::info!("CompileActor: on export end: {path:?} as {res:?}");

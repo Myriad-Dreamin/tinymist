@@ -8,7 +8,7 @@ use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
 use tinymist_project::{Interrupt, ProjectResolutionKind};
 use tinymist_query::{to_typst_range, PositionEncoding};
-use tinymist_std::error::prelude::*;
+use tinymist_std::error::{prelude::*, IgnoreLogging};
 use tinymist_std::ImmutPath;
 use typst::{diag::FileResult, syntax::Source};
 
@@ -77,27 +77,20 @@ impl ServerState {
 
         if old_config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
-            let err = self.restart_primary();
-            if let Err(err) = err {
-                log::error!("could not restart primary: {err}");
-            }
+            self.restart_primary()
+                .log_error("could not restart primary");
         }
 
         if old_config.semantic_tokens != self.config.semantic_tokens {
-            let err = self
-                .enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable);
-            if let Err(err) = err {
-                log::error!("could not change semantic tokens config: {err}");
-            }
+            self.enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable)
+                .log_error("could not change semantic tokens config");
         }
 
         let new_formatter_config = self.config.formatter();
         if !old_config.formatter().eq(&new_formatter_config) {
             let enabled = !matches!(new_formatter_config.config, FormatterConfig::Disable);
-            let err = self.enable_formatter_caps(enabled);
-            if let Err(err) = err {
-                log::error!("could not change formatter config: {err}");
-            }
+            self.enable_formatter_caps(enabled)
+                .log_error("could not change formatter config");
 
             self.formatter.change_config(new_formatter_config);
         }

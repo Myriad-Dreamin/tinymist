@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
 use tinymist_project::LspWorld;
+use tinymist_std::error::IgnoreLogging;
 use typst::{syntax::Span, World};
 
 use crate::{internal_error, ServerState};
@@ -245,14 +246,15 @@ pub async fn make_http_server(
             let timings = timings.clone();
             let _ = alive_tx.send(());
             async move {
-                // Make sure VSCode can connect to this http server but no malicious website a user
-                // might open in a browser. We recognize VSCode by an `Origin` header that starts
-                // with `vscode-webview://`. Malicious websites can (hopefully) not trick browsers
-                // into sending an `Origin` header that starts with `vscode-webview://`
+                // Make sure VSCode can connect to this http server but no malicious website a
+                // user might open in a browser. We recognize VSCode by an `Origin` header that
+                // starts with `vscode-webview://`. Malicious websites can (hopefully) not trick
+                // browsers into sending an `Origin` header that starts with
+                // `vscode-webview://`.
                 //
-                // See comment in `make_http_server` in `crates/tinymist/src/tool/preview.rs` for more
-                // details. In particular, note that this does _not_ protect against malicious users
-                // that share the same computer as us.
+                // See comment in `make_http_server` in `crates/tinymist/src/tool/preview.rs`
+                // for more details. In particular, note that this does _not_ protect against
+                // malicious users that share the same computer as us.
                 let Some(allowed_origin) = req
                     .headers()
                     .get("Origin")
@@ -309,9 +311,7 @@ pub async fn make_http_server(
         let conn = server.serve_connection(TokioIo::new(stream), make_service());
         let conn = graceful.watch(conn.into_owned());
         tokio::spawn(async move {
-            if let Err(err) = conn.await {
-                log::error!("error serving connection: {err:?}");
-            }
+            conn.await.log_error("cannot serve http");
         });
     };
 
