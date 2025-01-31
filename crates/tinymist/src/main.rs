@@ -93,6 +93,10 @@ fn main() -> Result<()> {
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
+        Commands::AttachPreview(args) => {
+            panic!("implement attach preview {args:?}")
+        }
+        #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
             use tinymist::tool::preview::preview_main;
