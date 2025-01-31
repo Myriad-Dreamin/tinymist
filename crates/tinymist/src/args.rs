@@ -30,6 +30,9 @@ pub enum Commands {
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(TraceLspArgs),
+    /// Attaches a preview task running in the language server.
+    #[cfg(feature = "preview")]
+    AttachPreview(tinymist::tool::preview::AttachPreviewArgs),
     /// Runs preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),

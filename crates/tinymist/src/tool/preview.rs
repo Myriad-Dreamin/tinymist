@@ -132,6 +132,30 @@ impl typst_preview::CompileView for PreviewCompileView {
     }
 }
 
+/// CLI Arguments for attaching a preview in background.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct AttachPreviewArgs {
+    /// The target to attach to.
+    ///
+    /// ## Example
+    ///
+    /// Selects a target interactively. If there is only one target, it will be
+    /// selected automatically.
+    ///
+    /// ```
+    /// tinymist attach-preview
+    /// ```
+    ///
+    /// ## Example
+    ///
+    /// Attach to a preview server running on port 23333.
+    ///
+    /// ```
+    /// tinymist attach-preview port:23333
+    /// ```
+    pub target: Option<String>,
+}
+
 /// CLI Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
