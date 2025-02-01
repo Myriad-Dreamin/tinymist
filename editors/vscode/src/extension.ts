@@ -554,15 +554,20 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   }
 
   async function codeLensMore(): Promise<void> {
+    const kBrowsing = "Browsing Preview Documents" as const;
     const kPreviewIn = "Preview in .." as const;
     const kExportAs = "Export as .." as const;
-    const moreCodeLens = [kPreviewIn, kExportAs] as const;
+    const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs] as const;
 
     const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
       title: "More Actions",
     })) as (typeof moreCodeLens)[number] | undefined;
 
     switch (moreAction) {
+      case kBrowsing: {
+        void vscode.commands.executeCommand(`tinymist.browsing-preview`);
+        return;
+      }
       case kPreviewIn: {
         // prompt for enum (doc, slide) with default
         const mode = await vscode.window.showQuickPick(["doc", "slide"], {

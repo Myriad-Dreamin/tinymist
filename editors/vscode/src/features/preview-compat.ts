@@ -260,6 +260,7 @@ interface LaunchTask {
   bindDocument: vscode.TextDocument;
   mode: "doc" | "slide";
   webviewPanel?: vscode.WebviewPanel;
+  isBrowsing?: boolean;
   isDev?: boolean;
   isNotPrimary?: boolean;
 }
