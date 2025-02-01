@@ -533,30 +533,37 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   switch (args[0]) {
     case "profile": {
       void vscode.commands.executeCommand(`tinymist.profileCurrentFile`);
-      break;
+      return;
     }
     case "preview": {
       void vscode.commands.executeCommand(`typst-preview.preview`);
-      break;
+      return;
     }
     case "preview-in": {
       // prompt for enum (doc, slide) with default
       const mode = await vscode.window.showQuickPick(["doc", "slide"], {
         title: "Preview Mode",
       });
+      if (mode === undefined) {
+        return;
+      }
       const target = await vscode.window.showQuickPick(["tab", "browser"], {
         title: "Target to preview in",
       });
+
+      if (target === undefined) {
+        return;
+      }
 
       const command =
         (target === "tab" ? "preview" : "browser") + (mode === "slide" ? "-slide" : "");
 
       void vscode.commands.executeCommand(`typst-preview.${command}`);
-      break;
+      return;
     }
     case "export-pdf": {
       await commandShow("Pdf");
-      break;
+      return;
     }
     case "export-as": {
       enum FastKind {
@@ -575,24 +582,26 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
       );
 
       switch (fmt) {
+        case undefined:
+          return;
         case FastKind.PDF:
           await commandShow("Pdf");
-          break;
+          return;
         case FastKind.SVG:
           await commandShow("Svg");
-          break;
+          return;
         case FastKind.SVGMerged:
           await commandShow("Svg", { page: { merged: { gap: "0pt" } } });
-          break;
+          return;
         case FastKind.PNG:
           await commandShow("Png");
-          break;
+          return;
         case FastKind.PNGMerged:
           await commandShow("Png", { page: { merged: { gap: "0pt" } } });
-          break;
+          return;
       }
 
-      break;
+      return;
     }
     default: {
       console.error("unknown code lens command", args[0]);
