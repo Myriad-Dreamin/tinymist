@@ -100,6 +100,7 @@ embed-fonts = ["tinymist-project/fonts"]
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = [
+    "tinymist-query/no-content-hint",
     "tinymist-project/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",

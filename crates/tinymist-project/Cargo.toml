@@ -40,8 +40,7 @@ notify.workspace = true
 [features]
 
 fonts = ["typst-assets/fonts"]
-# "reflexo-typst/no-content-hint"
-no-content-hint = []
+no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]
 workspace = true

@@ -6,7 +6,6 @@ use std::{
     io,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::Arc,
 };
 
 use clap::Parser;
@@ -16,7 +15,7 @@ use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
-use reflexo_typst::{package::PackageSpec, TypstDict};
+use reflexo_typst::package::PackageSpec;
 use serde_json::Value as JsonValue;
 use sync_lsp::{
     internal_error,
@@ -32,8 +31,6 @@ use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
-use typst::foundations::IntoValue;
-use typst_shim::utils::LazyHash;
 
 use crate::args::*;
 
@@ -147,11 +144,11 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
 
 /// The main entry point for the compiler.
 pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
+    let inputs = args.compile.resolve_inputs();
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
         None => Err(anyhow::anyhow!("provide a valid path"))?,
     });
-
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
 
     if root_path.is_relative() {
@@ -163,14 +160,6 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
     if !input.starts_with(&root_path) {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
-
-    let inputs = Arc::new(LazyHash::new(if args.compile.inputs.is_empty() {
-        TypstDict::default()
-    } else {
-        let pairs = args.compile.inputs.iter();
-        let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-        pairs.collect()
-    }));
 
     with_stdio_transport(args.mirror.clone(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
@@ -227,7 +216,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         RUNTIMES.tokio_runtime.block_on(async {
             let w = snap.world.task(TaskInputs {
                 entry: Some(entry),
-                inputs: Some(inputs),
+                inputs,
             });
 
             UserActionTask::trace_main(client, state, &w, args.rpc_kind, req_id).await

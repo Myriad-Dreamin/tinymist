@@ -146,3 +146,6 @@ pub mod build_info {
     /// The version of the reflexo-world crate.
     pub static VERSION: &str = env!("CARGO_PKG_VERSION");
 }
+
+#[cfg(test)]
+mod tests;

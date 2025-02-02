@@ -596,20 +596,11 @@ impl CompileConfig {
                 Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
             };
 
-            // Convert the input pairs to a dictionary.
-            let inputs: TypstDict = if command.inputs.is_empty() {
-                TypstDict::default()
-            } else {
-                let pairs = command.inputs.iter();
-                let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-                pairs.collect()
-            };
-
             // todo: the command.root may be not absolute
             self.typst_extra_args = Some(CompileExtraOpts {
+                inputs: command.resolve_inputs().unwrap_or_default(),
                 entry: command.input.map(|e| Path::new(&e).into()),
                 root_dir: command.root.as_ref().map(|r| r.as_path().into()),
-                inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
                 package: command.package,
                 creation_timestamp: command.creation_timestamp,

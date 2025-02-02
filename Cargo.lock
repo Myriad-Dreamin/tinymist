@@ -4061,6 +4061,7 @@ version = "0.12.18"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "reflexo-typst",
  "tinymist-world",
  "vergen",
  "wasm-bindgen",
@@ -4238,7 +4239,6 @@ dependencies = [
  "js-sys",
  "log",
  "parking_lot",
- "reflexo-typst",
  "reqwest",
  "serde",
  "serde-wasm-bindgen",
@@ -4249,6 +4249,7 @@ dependencies = [
  "tar",
  "tinymist-std",
  "tinymist-vfs",
+ "tinymist-world",
  "typst",
  "typst-assets",
  "wasm-bindgen",

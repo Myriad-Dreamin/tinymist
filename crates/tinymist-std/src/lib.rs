@@ -1,7 +1,6 @@
 //! Additional functions wrapping Rust's standard library.
 
 pub mod adt;
-pub use tinymist_analysis::debug_loc;
 pub mod error;
 pub mod fs;
 pub mod hash;
@@ -14,6 +13,8 @@ pub use concepts::*;
 
 pub use error::{ErrKind, Error, Result};
 
+#[cfg(feature = "typst")]
+pub use tinymist_analysis::debug_loc;
 #[cfg(feature = "typst")]
 pub use typst_shim;
 
