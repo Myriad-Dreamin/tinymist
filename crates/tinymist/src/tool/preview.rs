@@ -799,19 +799,24 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
     let mut p = Point::default();
 
     let span = node.span();
-    let mut positions: Vec<Position> = vec![];
-    for (i, page) in document.pages.iter().enumerate() {
-        let mut min_dis = u64::MAX;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            if let Some(page) = NonZeroUsize::new(i + 1) {
-                positions.push(Position { page, point: pos });
+    match document {
+        TypstDocument::Paged(paged_doc) => {
+            let mut positions: Vec<Position> = vec![];
+            for (i, page) in paged_doc.pages.iter().enumerate() {
+                let mut min_dis = u64::MAX;
+                if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+                    if let Some(page) = NonZeroUsize::new(i + 1) {
+                        positions.push(Position { page, point: pos });
+                    }
+                }
             }
+
+            log::info!("jump_from_cursor: {positions:#?}");
+
+            positions
         }
+        _ => vec![],
     }
-
-    log::info!("jump_from_cursor: {positions:#?}");
-
-    positions
 }
 
 /// Find the position of a span in a frame.

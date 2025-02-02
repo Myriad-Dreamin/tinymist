@@ -81,7 +81,7 @@ pub fn definition(
                 _ => return None,
             };
 
-            let introspector = &document?.document.introspector;
+            let introspector = &document?.document.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }

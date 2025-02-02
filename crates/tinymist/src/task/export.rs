@@ -15,6 +15,7 @@ use tinymist_project::{
     ExportTransform, LspCompiledArtifact, Pages, ProjectTask, QueryTask,
 };
 use tinymist_std::error::prelude::*;
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
@@ -76,7 +77,7 @@ impl ExportTask {
                 TaskWhen::Never => false,
                 TaskWhen::OnType => s.by_mem_events,
                 TaskWhen::OnSave => s.by_fs_events,
-                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
+                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
             };
 
         if !need_export {
@@ -186,6 +187,11 @@ impl ExportTask {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
+            let doc = match doc.as_ref() {
+                TypstDocument::Paged(paged_doc) => Some(paged_doc),
+                TypstDocument::Html(_) => None,
+            }
+            .unwrap();
             let first_page = doc.pages.first().unwrap();
             Ok(match kind2 {
                 Preview(..) => vec![],

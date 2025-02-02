@@ -993,7 +993,10 @@ impl ServerState {
                 .map_err(internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
+            Some(trait_symbol_fonts(
+                &TypstDocument::Paged(sym_doc.output),
+                &symbols_ref,
+            ))
         };
 
         let mut glyph_def = String::new();
@@ -1111,9 +1114,14 @@ fn trait_symbol_fonts(
 
     impl Worker<'_> {
         fn work(&mut self, doc: &TypstDocument) {
-            for (pg, s) in doc.pages.iter().zip(self.symbols.iter()) {
-                self.active = s;
-                self.work_frame(&pg.frame);
+            match doc {
+                TypstDocument::Paged(paged_doc) => {
+                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
+                        self.active = s;
+                        self.work_frame(&pg.frame);
+                    }
+                }
+                _ => {}
             }
         }
 

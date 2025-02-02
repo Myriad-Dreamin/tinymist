@@ -2,6 +2,7 @@
 
 use comemo::Track;
 use ecow::*;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::eval::Vm;
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
@@ -103,11 +104,11 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
+pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.
-    for elem in document.introspector.all() {
+    for elem in document.introspector().all() {
         let Some(label) = elem.label() else { continue };
         let (is_derived, details) = {
             let derived = elem

@@ -32,9 +32,14 @@ impl FullTextDigest {
 
 impl fmt::Display for FullTextDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for page in self.0.pages.iter() {
-            Self::export_frame(f, &page.frame)?;
+        match self.0.as_ref() {
+            TypstDocument::Paged(paged_doc) => {
+                for page in paged_doc.pages.iter() {
+                    Self::export_frame(f, &page.frame)?;
+                }
+                Ok(())
+            }
+            _ => Err(fmt::Error),
         }
-        Ok(())
     }
 }

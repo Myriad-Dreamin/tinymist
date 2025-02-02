@@ -7,9 +7,9 @@ use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_vec, EcoString, EcoVec};
 use reflexo_typst::features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE};
-use reflexo_typst::{CompileEnv, CompileReport, Compiler, TypstDocument};
+use reflexo_typst::{CompileEnv, CompileReport, Compiler};
 use tinymist_std::error::prelude::Result;
-use tinymist_std::ImmutPath;
+use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
 };
@@ -118,7 +118,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
         snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(doc.output), doc.warnings),
+            Ok(doc) => (Ok(Arc::new(TypstDocument::Paged(doc.output))), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
         CompiledArtifact {

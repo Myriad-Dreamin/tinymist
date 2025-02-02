@@ -17,6 +17,7 @@ mod upstream;
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use completion::PostfixSnippet;
+use tinymist_std::typst::TypstDocument;
 pub use upstream::with_vm;
 
 mod diagnostics;
@@ -83,7 +84,7 @@ mod prelude;
 
 use std::sync::Arc;
 
-use typst::{model::Document as TypstDocument, syntax::Source};
+use typst::syntax::Source;
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
