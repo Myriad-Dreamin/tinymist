@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
-use reflexo_typst::{vector::font::GlyphId, TypstDocument, TypstFont};
+use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
+use tinymist_std::typst::TypstDocument;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
