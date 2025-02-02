@@ -39,7 +39,7 @@ insta.workspace = true
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint"]
-cli = ["clap"]
+cli = ["clap", "clap/wrap_help"]
 
 # Embeds Typst's default fonts for
 # - text (Linux Libertine),

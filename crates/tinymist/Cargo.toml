@@ -85,7 +85,7 @@ walkdir.workspace = true
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]
 
-cli = ["sync-lsp/clap"]
+cli = ["sync-lsp/clap", "clap/wrap_help"]
 
 dhat-heap = ["dhat"]
 
