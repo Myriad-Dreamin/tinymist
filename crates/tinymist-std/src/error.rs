@@ -244,6 +244,24 @@ impl From<&Error> for wasm_bindgen::JsValue {
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 /// A trait to add context to a result.
+pub trait IgnoreLogging<T>: Sized {
+    /// Log an error message and return `None`.
+    fn log_error(self, msg: &str) -> Option<T>;
+    /// Log an error message and return `None`.
+    fn log_error_with(self, f: impl FnOnce() -> String) -> Option<T>;
+}
+
+impl<T, E: std::fmt::Display> IgnoreLogging<T> for Result<T, E> {
+    fn log_error(self, msg: &str) -> Option<T> {
+        self.inspect_err(|e| log::error!("{msg}: {e}")).ok()
+    }
+
+    fn log_error_with(self, f: impl FnOnce() -> String) -> Option<T> {
+        self.inspect_err(|e| log::error!("{}: {e}", f())).ok()
+    }
+}
+
+/// A trait to add context to a result.
 pub trait WithContext<T>: Sized {
     /// Add a context to the result.
     fn context(self, loc: &'static str) -> Result<T>;
@@ -311,7 +329,7 @@ pub mod prelude {
     use super::ErrKindExt;
     use crate::Error;
 
-    pub use super::{WithContext, WithContextUntyped};
+    pub use super::{IgnoreLogging, WithContext, WithContextUntyped};
     pub use crate::Result;
 
     pub fn map_string_err<T: ToString>(loc: &'static str) -> impl Fn(T) -> Error {

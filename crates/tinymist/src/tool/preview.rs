@@ -21,6 +21,7 @@ use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::ProjectInsId;
+use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
@@ -220,13 +221,12 @@ impl PreviewState {
     pub(crate) fn stop_all(&mut self) {
         let watchers = std::mem::take(self.watchers.inner.lock().deref_mut());
         for (_, watcher) in watchers {
-            let res = self.preview_tx.send(PreviewRequest::Kill(
-                watcher.task_id().to_owned(),
-                oneshot::channel().0,
-            ));
-            if let Err(e) = res {
-                log::error!("failed to send kill request({:?}): {e}", watcher.task_id());
-            }
+            self.preview_tx
+                .send(PreviewRequest::Kill(
+                    watcher.task_id().to_owned(),
+                    oneshot::channel().0,
+                ))
+                .log_error_with(|| format!("failed to send kill request({:?})", watcher.task_id()));
         }
     }
 }
@@ -555,9 +555,7 @@ pub async fn make_http_server(
         let conn = server.serve_connection_with_upgrades(TokioIo::new(stream), make_service());
         let conn = graceful.watch(conn.into_owned());
         tokio::spawn(async move {
-            if let Err(err) = conn.await {
-                log::error!("Error serving connection: {err:?}");
-            }
+            conn.await.log_error("cannot serve http");
         });
     };
 
@@ -764,9 +762,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Static file server listening on: {static_server_addr}");
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
-            log::error!("failed to open browser: {e}");
-        };
+        open::that_detached(format!("http://{static_server_addr}"))
+            .log_error("failed to open browser for preview");
     }
 
     let _ = tokio::join!(previewer.join(), srv.join, control_plane_server_handle);

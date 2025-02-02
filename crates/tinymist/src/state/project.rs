@@ -32,7 +32,10 @@ use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, SemanticRequest, StatefulRequest,
     VersionedDocument,
 };
-use tinymist_std::{bail, error::prelude::*};
+use tinymist_std::{
+    bail,
+    error::{prelude::*, IgnoreLogging},
+};
 use tokio::sync::mpsc;
 
 use crate::actor::editor::{CompileStatus, DocVersion, EditorRequest, TinymistCompileStatusEnum};
@@ -162,18 +165,15 @@ impl ProjectClient for LspClient {
 
 impl ProjectClient for tokio::sync::mpsc::UnboundedSender<LspInterrupt> {
     fn send_event(&self, event: LspInterrupt) {
-        if let Err(err) = self.send(event) {
-            log::error!("failed to send interrupt: {err}");
-        }
+        self.send(event).log_error("failed to send interrupt");
     }
 }
 
 impl CompileHandlerImpl {
     fn push_diagnostics(&self, dv: DocVersion, diagnostics: Option<DiagnosticsMap>) {
-        let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
-        if let Err(err) = res {
-            log::error!("failed to send diagnostics: {err:#}");
-        }
+        self.editor_tx
+            .send(EditorRequest::Diag(dv, diagnostics))
+            .log_error("failed to send diagnostics");
     }
 
     fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
