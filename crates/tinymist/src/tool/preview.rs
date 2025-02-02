@@ -15,13 +15,14 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::{error::prelude::*, Error, TypstDocument};
+use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::ProjectInsId;
 use tinymist_std::error::IgnoreLogging;
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
@@ -50,7 +51,7 @@ pub struct PreviewCompileView {
 }
 
 impl typst_preview::CompileView for PreviewCompileView {
-    fn doc(&self) -> Option<Arc<TypstDocument>> {
+    fn doc(&self) -> TypstDocument {
         self.snap.doc.clone().ok()
     }
     fn status(&self) -> typst_preview::CompileStatus {
