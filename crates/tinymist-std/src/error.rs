@@ -42,7 +42,7 @@ pub struct DiagMessage {
     /// The file path relative to the root of the workspace or the package.
     pub path: String,
     /// The diagnostic message.
-    pub message: String,
+    pub message: EcoString,
     /// The severity of the diagnostic message.
     pub severity: DiagSeverity,
     /// The char range in the file. The position encoding must be negotiated.
@@ -410,30 +410,30 @@ pub mod prelude {
     #[macro_export]
     macro_rules! error_once {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
-            _error_once($loc, Box::new([$((stringify!($arg_key), $arg.to_string())),+]))
+            $crate::error::prelude::_error_once($loc, Box::new([$((stringify!($arg_key), $arg.to_string())),+]))
         };
         ($loc:expr $(,)?) => {
-            _error_once($loc, Box::new([]))
+            $crate::error::prelude::_error_once($loc, Box::new([]))
         };
     }
 
     #[macro_export]
     macro_rules! error_once_map {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
-            map_err_with_args($loc, [$((stringify!($arg_key), $arg.to_string())),+])
+            $crate::error::prelude::map_err_with_args($loc, [$((stringify!($arg_key), $arg.to_string())),+])
         };
         ($loc:expr $(,)?) => {
-            map_err($loc)
+            $crate::error::prelude::map_err($loc)
         };
     }
 
     #[macro_export]
     macro_rules! error_once_map_string {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
-            map_string_err_with_args($loc, [$((stringify!($arg_key), $arg.to_string())),+])
+            $crate::error::prelude::map_string_err_with_args($loc, [$((stringify!($arg_key), $arg.to_string())),+])
         };
         ($loc:expr $(,)?) => {
-            map_string_err($loc)
+            $crate::error::prelude::map_string_err($loc)
         };
     }
 
