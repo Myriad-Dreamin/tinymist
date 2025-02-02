@@ -22,7 +22,7 @@ use world::TaskInputs;
 
 use super::state::*;
 use super::*;
-use crate::state::query::{run_query, LspClientExt};
+use crate::state::lsp_query::{run_query, LspClientExt};
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].

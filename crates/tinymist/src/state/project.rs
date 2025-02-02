@@ -26,25 +26,211 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
 use reflexo_typst::CompileReport;
-use sync_lsp::LspClient;
+use sync_lsp::{LspClient, TypedLspClient};
+use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::{
-    analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, SemanticRequest, StatefulRequest,
-    VersionedDocument,
+    analysis::{Analysis, AnalysisRevLock, LocalContextGuard, PeriscopeProvider},
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LocalContext, SemanticRequest,
+    StatefulRequest, VersionedDocument,
 };
-use tinymist_std::{
-    bail,
-    error::{prelude::*, IgnoreLogging},
-};
+use tinymist_render::PeriscopeRenderer;
+use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
+use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
+use super::ServerState;
 use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
+use crate::{task::ExportUserConfig, Config};
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 /// LSP project compiler.
 pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectInsStateExt>;
+
+/// Getters and the main loop.
+impl ServerState {
+    /// Changes the export configuration.
+    pub fn change_export_config(&mut self, config: ExportUserConfig) {
+        self.project.export.change_config(config);
+    }
+
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+        self.project.snapshot()
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&mut self) -> Result<LspQuerySnapshot> {
+        self.project.query_snapshot(None)
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot_with_stat(
+        &mut self,
+        q: &CompilerQueryRequest,
+    ) -> Result<QuerySnapWithStat> {
+        let name: &'static str = q.into();
+        let path = q.associated_path();
+        let stat = self.project.stats.query_stat(path, name);
+        let snap = self.project.query_snapshot(Some(q))?;
+        Ok((snap, stat))
+    }
+
+    /// Restart the primary server.
+    pub fn restart_primary(&mut self) -> Result<ProjectInsId> {
+        // todo: hot replacement
+        #[cfg(feature = "preview")]
+        self.preview.stop_all();
+
+        let watchers = self.preview.watchers.clone();
+        let editor_tx = self.editor_tx.clone();
+
+        let new_project = Self::project(&self.config, editor_tx, self.client.clone(), watchers);
+
+        let mut old_project = std::mem::replace(&mut self.project, new_project);
+
+        let snapshot = FileChangeSet::new_inserts(
+            self.memory_changes
+                .iter()
+                .map(|(path, content)| {
+                    let content = Bytes::from(content.clone().text().as_bytes());
+                    (path.clone(), FileResult::Ok(content).into())
+                })
+                .collect(),
+        );
+
+        self.project
+            .interrupt(Interrupt::Memory(MemoryEvent::Update(snapshot)));
+
+        rayon::spawn(move || {
+            old_project.stop();
+        });
+
+        Ok(self.project.primary_id().clone())
+    }
+
+    /// Restart the server with the given group.
+    pub fn restart_dedicate(
+        &mut self,
+        dedicate: &str,
+        entry: Option<ImmutPath>,
+    ) -> Result<ProjectInsId> {
+        let entry = self.config.compile.entry_resolver.resolve(entry);
+        self.project.restart_dedicate(dedicate, entry)
+    }
+
+    // pub async fn settle(&mut self) {
+    //     let _ = self.change_entry(None);
+    //     log::info!("TypstActor({}): settle requested", self.handle.diag_group);
+    //     match self.handle.settle().await {
+    //         Ok(()) => log::info!("TypstActor({}): settled",
+    // self.handle.diag_group),         Err(err) => error!(
+    //             "TypstActor({}): failed to settle: {err:#}",
+    //             self.handle.diag_group
+    //         ),
+    //     }
+    // }
+
+    /// Create a fresh [`ProjectState`].
+    pub fn project(
+        config: &Config,
+        editor_tx: tokio::sync::mpsc::UnboundedSender<EditorRequest>,
+        client: TypedLspClient<ServerState>,
+        preview: ProjectPreviewState,
+    ) -> ProjectState {
+        let const_config = &config.const_config;
+
+        // Run Export actors before preparing cluster to avoid loss of events
+        let export = crate::task::ExportTask::new(
+            client.handle.clone(),
+            Some(editor_tx.clone()),
+            config.export(),
+        );
+
+        // Create the compile handler for client consuming results.
+        let periscope_args = config.compile.periscope_args.clone();
+        let handle = Arc::new(CompileHandlerImpl {
+            #[cfg(feature = "preview")]
+            preview,
+            export: export.clone(),
+            editor_tx: editor_tx.clone(),
+            client: Box::new(client.clone().to_untyped()),
+            analysis: Arc::new(Analysis {
+                position_encoding: const_config.position_encoding,
+                allow_overlapping_token: const_config.tokens_overlapping_token_support,
+                allow_multiline_token: const_config.tokens_multiline_token_support,
+                remove_html: !config.support_html_in_markdown,
+                completion_feat: config.completion.clone(),
+                color_theme: match config.compile.color_theme.as_deref() {
+                    Some("dark") => tinymist_query::ColorTheme::Dark,
+                    _ => tinymist_query::ColorTheme::Light,
+                },
+                periscope: periscope_args.map(|args| {
+                    let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
+                    Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
+                }),
+                tokens_caches: Arc::default(),
+                workers: Default::default(),
+                caches: Default::default(),
+                analysis_rev_cache: Arc::default(),
+                stats: Arc::default(),
+            }),
+
+            notified_revision: Mutex::default(),
+        });
+
+        let default_path = config.compile.entry_resolver.resolve_default();
+        let entry = config.compile.entry_resolver.resolve(default_path);
+        let inputs = config.compile.determine_inputs();
+        let cert_path = config.compile.determine_certification_path();
+        let package = config.compile.determine_package_opts();
+
+        log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
+
+        // todo: never fail?
+        let embedded_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let package_registry =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let verse = LspUniverseBuilder::build(entry, inputs, embedded_fonts, package_registry);
+
+        // todo: unify filesystem watcher
+        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        let fs_client = client.clone().to_untyped();
+        let async_handle = client.handle.clone();
+        async_handle.spawn(watch_deps(dep_rx, move |event| {
+            fs_client.send_event(LspInterrupt::Fs(event));
+        }));
+
+        // Create the actor
+        let compile_handle = handle.clone();
+        let compiler = ProjectCompiler::new(
+            verse,
+            dep_tx,
+            CompileServerOpts {
+                handler: compile_handle,
+                enable_watch: true,
+                ..Default::default()
+            },
+        );
+
+        // Delayed Loads fonts
+        let font_client = client.clone();
+        let font_resolver = config.compile.determine_fonts();
+        client.handle.spawn_blocking(move || {
+            // Refresh fonts
+            font_client.send_event(LspInterrupt::Font(font_resolver.wait().clone()));
+        });
+
+        ProjectState {
+            compiler,
+            preview: Default::default(),
+            analysis: handle.analysis.clone(),
+            stats: CompilerQueryStats::default(),
+            export: handle.export.clone(),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct ProjectInsStateExt {
@@ -106,6 +292,20 @@ impl ProjectState {
         entry: EntryState,
     ) -> Result<ProjectInsId> {
         self.compiler.restart_dedicate(group, entry)
+    }
+}
+
+struct TypstPeriscopeProvider(PeriscopeRenderer);
+
+impl PeriscopeProvider for TypstPeriscopeProvider {
+    /// Resolve periscope image at the given position.
+    fn periscope_at(
+        &self,
+        ctx: &mut LocalContext,
+        doc: VersionedDocument,
+        pos: TypstPosition,
+    ) -> Option<String> {
+        self.0.render_marked(ctx, doc, pos)
     }
 }
 
