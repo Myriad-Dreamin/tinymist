@@ -1,8 +1,16 @@
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use serde::{Deserialize, Serialize};
+use tinymist_std::{bail, error::prelude::*};
+use tinymist_vfs::ImmutDict;
+use typst::{foundations::IntoValue, utils::LazyHash};
+
+use crate::EntryOpts;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -86,6 +94,84 @@ pub struct CompileOnceArgs {
     /// downloading typst packages.
     #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
     pub cert: Option<PathBuf>,
+}
+
+impl CompileOnceArgs {
+    pub fn resolve_inputs(&self) -> Option<ImmutDict> {
+        if self.inputs.is_empty() {
+            return None;
+        }
+
+        let pairs = self.inputs.iter();
+        let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
+        Some(Arc::new(LazyHash::new(pairs.collect())))
+    }
+
+    /// Resolves the entry options.
+    pub fn resolve_sys_entry_opts(&self) -> Result<EntryOpts> {
+        let mut cwd = None;
+        let mut cwd = move || {
+            cwd.get_or_insert_with(|| {
+                std::env::current_dir().context("failed to get current directory")
+            })
+            .clone()
+        };
+
+        let main = {
+            let input = self.input.as_ref().context("entry file must be provided")?;
+            let input = Path::new(&input);
+            if input.is_absolute() {
+                input.to_owned()
+            } else {
+                cwd()?.join(input)
+            }
+        };
+
+        let root = if let Some(root) = &self.root {
+            if root.is_absolute() {
+                root.clone()
+            } else {
+                cwd()?.join(root)
+            }
+        } else {
+            main.parent()
+                .context("entry file don't have a valid parent as root")?
+                .to_owned()
+        };
+
+        let relative_main = match main.strip_prefix(&root) {
+            Ok(relative_main) => relative_main,
+            Err(_) => {
+                log::error!("entry file must be inside the root, file: {main:?}, root: {root:?}");
+                bail!("entry file must be inside the root, file: {main:?}, root: {root:?}");
+            }
+        };
+
+        Ok(EntryOpts::new_rooted(
+            root.clone(),
+            Some(relative_main.to_owned()),
+        ))
+    }
+}
+
+#[cfg(feature = "system")]
+impl CompileOnceArgs {
+    /// Resolves the arguments into a system universe. This is also a sample
+    /// implementation of how to resolve the arguments (user inputs) into a
+    /// universe.
+    pub fn resolve_system(&self) -> Result<crate::TypstSystemUniverse> {
+        use crate::system::SystemUniverseBuilder;
+
+        let entry = self.resolve_sys_entry_opts()?.try_into()?;
+        let inputs = self.resolve_inputs().unwrap_or_default();
+        let fonts = Arc::new(SystemUniverseBuilder::resolve_fonts(self.font.clone())?);
+        let package = SystemUniverseBuilder::resolve_package(
+            self.cert.as_deref().map(From::from),
+            Some(&self.package),
+        );
+
+        Ok(SystemUniverseBuilder::build(entry, inputs, fonts, package))
+    }
 }
 
 /// Parses key/value pairs split by the first equal sign.

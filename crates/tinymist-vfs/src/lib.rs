@@ -41,28 +41,31 @@ mod utils;
 mod path_mapper;
 pub use path_mapper::{PathResolution, RootResolver, WorkspaceResolution, WorkspaceResolver};
 
-use rpds::RedBlackTreeMapSync;
-pub use typst::foundations::Bytes;
-pub use typst::syntax::FileId as TypstFileId;
-
-pub use tinymist_std::time::Time;
-pub use tinymist_std::ImmutPath;
-use typst::syntax::Source;
-
 use core::fmt;
 use std::num::NonZeroUsize;
 use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
 use parking_lot::{Mutex, RwLock};
+use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
+use typst::foundations::Dict;
+use typst::syntax::Source;
+use typst::utils::LazyHash;
 
 use crate::notify::NotifyAccessModel;
 use crate::overlay::OverlayAccessModel;
 use crate::resolve::ResolveAccessModel;
 
+pub use tinymist_std::time::Time;
+pub use tinymist_std::ImmutPath;
+pub use typst::foundations::Bytes;
+pub use typst::syntax::FileId as TypstFileId;
+
 /// Handle to a file in [`Vfs`]
 pub type FileId = TypstFileId;
+/// Immutable prehashed reference to dictionary.
+pub type ImmutDict = Arc<LazyHash<Dict>>;
 
 /// A trait for accessing underlying file system.
 ///

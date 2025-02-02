@@ -1,3 +1,3 @@
 # tinymist-vfs
 
-Vfs for [tinymist.](https://github.com/Myriad-Dreamin/tinymist)
+Virtual file system for [tinymist.](https://github.com/Myriad-Dreamin/tinymist)

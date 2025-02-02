@@ -56,23 +56,14 @@ pub trait WorldProvider {
 impl WorldProvider for CompileOnceArgs {
     fn resolve(&self) -> Result<LspUniverse> {
         let entry = self.entry()?.try_into()?;
-        let inputs = self
-            .inputs
-            .iter()
-            .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
-            .collect();
-        let fonts = LspUniverseBuilder::resolve_fonts(self.font.clone())?;
+        let inputs = self.resolve_inputs().unwrap_or_default();
+        let fonts = Arc::new(LspUniverseBuilder::resolve_fonts(self.font.clone())?);
         let package = LspUniverseBuilder::resolve_package(
             self.cert.as_deref().map(From::from),
             Some(&self.package),
         );
 
-        Ok(LspUniverseBuilder::build(
-            entry,
-            Arc::new(LazyHash::new(inputs)),
-            Arc::new(fonts),
-            package,
-        ))
+        Ok(LspUniverseBuilder::build(entry, inputs, fonts, package))
     }
 
     fn entry(&self) -> Result<EntryOpts> {

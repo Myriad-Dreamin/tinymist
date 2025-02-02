@@ -26,7 +26,6 @@ hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
-reflexo-typst = { workspace = true, default-features = false }
 reqwest = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
@@ -54,7 +53,6 @@ web = [
     "serde-wasm-bindgen",
     "tinymist-std/web",
     "tinymist-vfs/web",
-    "reflexo-typst/web",
 ]
 browser = ["tinymist-vfs/browser", "web"]
 system = [
@@ -63,23 +61,10 @@ system = [
     "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",
-    "reflexo-typst/system",
 ]
 
-# todo: remove me
-no-content-hint = ["reflexo-typst/no-content-hint"]
+[dev-dependencies]
+tinymist-world = { path = ".", features = ["system"] }
 
 [lints]
 workspace = true
-
-# ====
-
-# [dependencies]
-
-
-# [features]
-# fonts = ["typst-assets/fonts"]
-# no-content-hint = ["reflexo-typst/no-content-hint"]
-
-# [lints]
-# workspace = true

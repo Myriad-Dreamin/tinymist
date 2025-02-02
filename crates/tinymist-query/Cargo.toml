@@ -11,10 +11,6 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[features]
-default = ["no-content-hint"]
-no-content-hint = []
-
 [dependencies]
 
 anyhow.workspace = true
@@ -59,7 +55,7 @@ hashbrown.workspace = true
 triomphe.workspace = true
 base64.workspace = true
 typlite.workspace = true
-tinymist-world = { workspace = true, features = ["no-content-hint"] }
+tinymist-world = { workspace = true }
 tinymist-project.workspace = true
 tinymist-analysis.workspace = true
 tinymist-derive.workspace = true
@@ -73,6 +69,9 @@ serde_json.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 sha2 = { version = "0.10" }
 hex = { version = "0.4" }
+
+[features]
+no-content-hint = ["tinymist-project/no-content-hint"]
 
 [lints]
 workspace = true

@@ -1,13 +1,15 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
-use tinymist_std::error::prelude::*;
-use tinymist_vfs::{system::SystemAccessModel, Vfs};
+use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist_vfs::{system::SystemAccessModel, ImmutDict, Vfs};
 use typst::utils::LazyHash;
 
 use crate::{
-    config::CompileOpts,
+    args::{CompileFontArgs, CompilePackageArgs},
+    config::{CompileFontOpts, CompileOpts},
     font::{system::SystemFontSearcher, FontResolverImpl},
     package::{http::HttpRegistry, RegistryPathMapper},
+    EntryState,
 };
 
 /// type trait of [`TypstSystemWorld`].
@@ -50,5 +52,54 @@ impl TypstSystemUniverse {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(opts.into())?;
         Ok(searcher.into())
+    }
+}
+
+/// Builders for Typst universe.
+pub struct SystemUniverseBuilder;
+
+impl SystemUniverseBuilder {
+    /// Create [`TypstSystemUniverse`] with the given options.
+    /// See [`LspCompilerFeat`] for instantiation details.
+    pub fn build(
+        entry: EntryState,
+        inputs: ImmutDict,
+        font_resolver: Arc<FontResolverImpl>,
+        package_registry: HttpRegistry,
+    ) -> TypstSystemUniverse {
+        let registry = Arc::new(package_registry);
+        let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
+
+        TypstSystemUniverse::new_raw(
+            entry,
+            Some(inputs),
+            Vfs::new(resolver, SystemAccessModel {}),
+            registry,
+            font_resolver,
+        )
+    }
+
+    /// Resolve fonts from given options.
+    pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
+        let mut searcher = SystemFontSearcher::new();
+        searcher.resolve_opts(CompileFontOpts {
+            font_profile_cache_path: Default::default(),
+            font_paths: args.font_paths,
+            no_system_fonts: args.ignore_system_fonts,
+            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+        })?;
+        Ok(searcher.into())
+    }
+
+    /// Resolve package registry from given options.
+    pub fn resolve_package(
+        cert_path: Option<ImmutPath>,
+        args: Option<&CompilePackageArgs>,
+    ) -> HttpRegistry {
+        HttpRegistry::new(
+            cert_path,
+            args.and_then(|args| Some(args.package_path.clone()?.into())),
+            args.and_then(|args| Some(args.package_cache_path.clone()?.into())),
+        )
     }
 }
