@@ -56,7 +56,7 @@ web = [
     "tinymist-vfs/web",
     "reflexo-typst/web",
 ]
-browser = ["web"]
+browser = ["tinymist-vfs/browser", "web"]
 system = [
     "dep:dirs",
     "dep:fontdb",

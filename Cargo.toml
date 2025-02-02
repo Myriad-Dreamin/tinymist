@@ -218,6 +218,12 @@ broken_intra_doc_links = "warn"
 missing_docs = "warn"
 # missing_crate_level_docs = "warn"
 
+unexpected_cfgs = { level = "allow", check-cfg = [
+    'cfg(wasm_bindgen_unstable_test_coverage)',
+    'cfg(noop)',
+    'cfg(used_linker)',
+] }
+
 [workspace.lints.clippy]
 uninlined_format_args = "warn"
 # missing_errors_doc = "warn"
