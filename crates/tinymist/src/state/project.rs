@@ -2,7 +2,7 @@
 //!
 //! ```ascii
 //! ┌────────────────────────────────┐         ┌────────────┐
-//! │      main::compile_actor       │◄───────►│notify_actor│
+//! │        main::main_loop         │◄───────►│notify_actor│
 //! └─────┬────────────────────▲─────┘         └────────────┘
 //!       │                    │
 //! ┌─────▼────────────────────┴─────┐ handler ┌────────────┐
@@ -23,7 +23,6 @@ pub use tinymist_project::*;
 
 use std::sync::Arc;
 
-use log::{error, trace};
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
 use reflexo_typst::CompileReport;
@@ -164,7 +163,7 @@ impl ProjectClient for LspClient {
 impl ProjectClient for tokio::sync::mpsc::UnboundedSender<LspInterrupt> {
     fn send_event(&self, event: LspInterrupt) {
         if let Err(err) = self.send(event) {
-            error!("failed to send interrupt: {err}");
+            log::error!("failed to send interrupt: {err}");
         }
     }
 }
@@ -173,7 +172,7 @@ impl CompileHandlerImpl {
     fn push_diagnostics(&self, dv: DocVersion, diagnostics: Option<DiagnosticsMap>) {
         let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
         if let Err(err) = res {
-            error!("failed to send diagnostics: {err:#}");
+            log::error!("failed to send diagnostics: {err:#}");
         }
     }
 
@@ -196,7 +195,7 @@ impl CompileHandlerImpl {
                 self.analysis.position_encoding,
             );
 
-            trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+            log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
             diagnostics
         });
 
@@ -390,7 +389,7 @@ impl LspQuerySnapshot {
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
         let world = self.snap.world;
         let Some(..) = world.main_id() else {
-            error!("Project: main file is not set");
+            log::error!("Project: main file is not set");
             bail!("main file is not set");
         };
 

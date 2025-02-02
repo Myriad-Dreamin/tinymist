@@ -1,6 +1,4 @@
 use futures::{SinkExt, StreamExt};
-// use hyper_tungstenite::tungstenite::Message;
-use log::{info, trace};
 use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
 use tokio::sync::{broadcast, mpsc};
 
@@ -90,7 +88,7 @@ impl<
         loop {
             tokio::select! {
                 Ok(msg) = self.mailbox.recv() => {
-                    trace!("WebviewActor: received message from mailbox: {:?}", msg);
+                    log::trace!("WebviewActor: received message from mailbox: {:?}", msg);
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let msg = positions_req("jump", jump_info);
@@ -115,18 +113,18 @@ impl<
                     }
                 }
                 Some(svg) = self.svg_receiver.recv() => {
-                    trace!("WebviewActor: received svg from renderer");
+                    log::trace!("WebviewActor: received svg from renderer");
                     self.webview_websocket_conn.send(Message::Binary(svg))
                     .await.unwrap();
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {
-                    trace!("WebviewActor: received message from websocket: {:?}", msg);
+                    log::trace!("WebviewActor: received message from websocket: {:?}", msg);
                     let Ok(msg) = msg else {
-                        info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
+                        log::info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
                     let Message::Text(msg) = msg else {
-                        info!("WebviewActor: received non-text message from websocket: {:?}", msg);
+                        log::info!("WebviewActor: received non-text message from websocket: {:?}", msg);
                         let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
                         .await;
                         break;
@@ -159,7 +157,7 @@ impl<
                         };
                     } else {
                         let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await;
-                        info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
+                        log::info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }
                 }
@@ -168,6 +166,6 @@ impl<
                 }
             }
         }
-        info!("WebviewActor: exiting");
+        log::info!("WebviewActor: exiting");
     }
 }
