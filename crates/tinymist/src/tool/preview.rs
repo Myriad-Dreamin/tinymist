@@ -345,8 +345,8 @@ impl PreviewState {
                     SyncEditorChanges(..) => {
                         log::warn!("PreviewTask({tid}): is sending SyncEditorChanges in lsp mode");
                     }
-                    EditorScrollTo(s) => client.send_notification::<ScrollSource>(s),
-                    Outline(s) => client.send_notification::<NotifDocumentOutline>(s),
+                    EditorScrollTo(s) => client.send_notification::<ScrollSource>(&s),
+                    Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
                 }
             }
 

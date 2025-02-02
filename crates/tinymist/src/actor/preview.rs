@@ -87,7 +87,7 @@ impl PreviewActor {
                         // Send response
                         let _ = tx.send(Ok(JsonValue::Null));
                         // Send global notification
-                        client.send_notification::<DisposePreview>(DisposePreview { task_id });
+                        client.send_notification::<DisposePreview>(&DisposePreview { task_id });
                     });
                 }
                 PreviewRequest::Scroll(task_id, req) => {
