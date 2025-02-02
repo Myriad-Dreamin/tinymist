@@ -18,7 +18,7 @@ use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;
 use crate::{init::*, *};
 
-/// Document Synchronization
+/// LSP Document Synchronization
 impl ServerState {
     pub(crate) fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         log::info!("did open {:?}", params.text_document.uri);
@@ -53,7 +53,10 @@ impl ServerState {
     pub(crate) fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
         Ok(())
     }
+}
 
+/// LSP Configuration Synchronization
+impl ServerState {
     pub(crate) fn on_changed_configuration(
         &mut self,
         values: Map<String, JsonValue>,
@@ -135,9 +138,98 @@ impl ServerState {
     }
 }
 
+/// In memory source file management.
 impl ServerState {
-    /// Focus main file to some path.
-    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool> {
+    /// Updates a set of source files.
+    fn update_sources(&mut self, files: FileChangeSet) -> Result<()> {
+        let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
+        self.project.interrupt(intr);
+
+        Ok(())
+    }
+
+    /// Creates a new source file.
+    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<()> {
+        let path: ImmutPath = path.into();
+
+        log::info!("create source: {path:?}");
+        self.memory_changes
+            .insert(path.clone(), Source::detached(content.clone()));
+
+        let content: Bytes = content.as_bytes().into();
+
+        // todo: is it safe to believe that the path is normalized?
+        let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok(content).into())]);
+
+        self.update_sources(files)
+    }
+
+    /// Removes a source file.
+    pub fn remove_source(&mut self, path: PathBuf) -> Result<()> {
+        let path: ImmutPath = path.into();
+
+        self.memory_changes.remove(&path);
+        log::info!("remove source: {path:?}");
+
+        // todo: is it safe to believe that the path is normalized?
+        let files = FileChangeSet::new_removes(vec![path]);
+
+        self.update_sources(files)
+    }
+
+    /// Edits a source file.
+    pub fn edit_source(
+        &mut self,
+        path: PathBuf,
+        content: Vec<TextDocumentContentChangeEvent>,
+        position_encoding: PositionEncoding,
+    ) -> Result<()> {
+        let path: ImmutPath = path.into();
+
+        let source = self
+            .memory_changes
+            .get_mut(&path)
+            .ok_or_else(|| error_once!("file missing", path: path.display()))?;
+
+        for change in content {
+            let replacement = change.text;
+            match change.range {
+                Some(lsp_range) => {
+                    let range = to_typst_range(lsp_range, position_encoding, source)
+                        .expect("invalid range");
+                    source.edit(range, &replacement);
+                }
+                None => {
+                    source.replace(&replacement);
+                }
+            }
+        }
+
+        let snapshot = FileResult::Ok(source.text().as_bytes().into()).into();
+
+        let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
+
+        self.update_sources(files)
+    }
+
+    /// Queries a source file that must be in memory.
+    pub fn query_source<T>(
+        &self,
+        path: ImmutPath,
+        f: impl FnOnce(Source) -> Result<T>,
+    ) -> Result<T> {
+        let snapshot = self.memory_changes.get(&path);
+        let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
+        let source = snapshot.clone();
+        f(source)
+    }
+}
+
+/// Main file mutations on the primary project (which is used for the language
+/// queries.)
+impl ServerState {
+    /// Changes main file to the given path.
+    pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
         if path
             .as_deref()
             .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
@@ -145,37 +237,34 @@ impl ServerState {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
-        let next_entry = self.entry_resolver().resolve(path);
+        let task = self.resolve_task_or(path);
 
-        log::info!("the entry file of TypstActor(primary) is changing to {next_entry:?}");
+        log::info!("the task of the primary is changing to {task:?}");
 
         let id = self.project.primary_id().clone();
-        let task = TaskInputs {
-            entry: Some(next_entry.clone()),
-            ..Default::default()
-        };
         self.project.interrupt(Interrupt::ChangeTask(id, task));
 
         Ok(true)
     }
 
-    /// Pin the entry to the given path
-    pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<()> {
+    /// Pins the main file to the given path
+    pub fn pin_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<()> {
         self.pinning = new_entry.is_some();
         let entry = new_entry
             .or_else(|| self.entry_resolver().resolve_default())
             .or_else(|| self.focusing.clone());
-        self.change_entry(entry).map(|_| ())
+
+        self.change_main_file(entry).map(|_| ())
     }
 
-    /// Updates the primary (focusing) entry
-    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
+    /// Focuses main file to the given path.
+    pub fn focus_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
         if self.pinning || self.config.compile.has_default_entry_path {
             self.focusing = new_entry;
             return Ok(false);
         }
 
-        self.change_entry(new_entry.clone())
+        self.change_main_file(new_entry.clone())
     }
 
     /// This is used for tracking activating document status if a client is not
@@ -210,7 +299,7 @@ impl ServerState {
 
         let new_entry = new_entry();
 
-        let update_result = self.focus_entry(new_entry.clone());
+        let update_result = self.focus_main_file(new_entry.clone());
         match update_result {
             Ok(true) => {
                 log::info!("file focused[implicit,{site}]: {new_entry:?}");
@@ -221,17 +310,24 @@ impl ServerState {
             Ok(false) => {}
         }
     }
+}
 
-    fn resolve_task(&self, path: ImmutPath) -> TaskInputs {
-        let entry = self.entry_resolver().resolve(Some(path));
-
+/// Task input resolution.
+impl ServerState {
+    fn resolve_task_without_lock(&self, path: Option<ImmutPath>) -> TaskInputs {
         TaskInputs {
-            entry: Some(entry),
+            entry: Some(self.entry_resolver().resolve(path)),
             ..Default::default()
         }
     }
 
-    pub(crate) fn resolve_task_with_state(&mut self, path: ImmutPath) -> TaskInputs {
+    pub(crate) fn resolve_task_or(&mut self, path: Option<ImmutPath>) -> TaskInputs {
+        path.clone()
+            .map(|path| self.resolve_task(path))
+            .unwrap_or_else(|| self.resolve_task_without_lock(path))
+    }
+
+    pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
         let proj_input = matches!(
             self.config.project_resolution,
             ProjectResolutionKind::LockDatabase
@@ -269,89 +365,6 @@ impl ServerState {
 
         proj_input
             .flatten()
-            .unwrap_or_else(|| self.resolve_task(path))
-    }
-
-    fn update_source(&mut self, files: FileChangeSet) -> Result<()> {
-        let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
-        self.project.interrupt(intr);
-
-        Ok(())
-    }
-
-    /// Create a new source file.
-    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<()> {
-        let path: ImmutPath = path.into();
-
-        log::info!("create source: {path:?}");
-        self.memory_changes
-            .insert(path.clone(), Source::detached(content.clone()));
-
-        let content: Bytes = content.as_bytes().into();
-
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok(content).into())]);
-
-        self.update_source(files)
-    }
-
-    /// Remove a source file.
-    pub fn remove_source(&mut self, path: PathBuf) -> Result<()> {
-        let path: ImmutPath = path.into();
-
-        self.memory_changes.remove(&path);
-        log::info!("remove source: {path:?}");
-
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(vec![path]);
-
-        self.update_source(files)
-    }
-
-    /// Edit a source file.
-    pub fn edit_source(
-        &mut self,
-        path: PathBuf,
-        content: Vec<TextDocumentContentChangeEvent>,
-        position_encoding: PositionEncoding,
-    ) -> Result<()> {
-        let path: ImmutPath = path.into();
-
-        let source = self
-            .memory_changes
-            .get_mut(&path)
-            .ok_or_else(|| error_once!("file missing", path: path.display()))?;
-
-        for change in content {
-            let replacement = change.text;
-            match change.range {
-                Some(lsp_range) => {
-                    let range = to_typst_range(lsp_range, position_encoding, source)
-                        .expect("invalid range");
-                    source.edit(range, &replacement);
-                }
-                None => {
-                    source.replace(&replacement);
-                }
-            }
-        }
-
-        let snapshot = FileResult::Ok(source.text().as_bytes().into()).into();
-
-        let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
-
-        self.update_source(files)
-    }
-
-    /// Query a source file.
-    pub fn query_source<T>(
-        &self,
-        path: ImmutPath,
-        f: impl FnOnce(Source) -> Result<T>,
-    ) -> Result<T> {
-        let snapshot = self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
-        let source = snapshot.clone();
-        f(source)
+            .unwrap_or_else(|| self.resolve_task_without_lock(Some(path)))
     }
 }

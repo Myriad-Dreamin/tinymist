@@ -255,7 +255,7 @@ impl ServerState {
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
 
-        let update_result = self.pin_entry(entry.clone());
+        let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         log::info!("file pinned: {entry:?}");
@@ -271,7 +271,7 @@ impl ServerState {
             log::info!("first manual focusing is coming");
         }
 
-        let ok = self.focus_entry(entry.clone());
+        let ok = self.focus_main_file(entry.clone());
         let ok = ok.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         if ok {
@@ -325,7 +325,7 @@ impl ServerState {
         if !cli_args.not_as_primary && self.preview.watchers.register(&primary.id, watcher) {
             let id = primary.id.clone();
             // todo: recover pin status reliably
-            self.pin_entry(Some(entry))
+            self.pin_main_file(Some(entry))
                 .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
 
             self.preview.start(cli_args, previewer, id, true)
