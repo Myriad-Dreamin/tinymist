@@ -445,7 +445,7 @@ impl TypliteWorker {
             #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
             {code}"##
         );
-        let main = Bytes::from(code.as_bytes().to_owned());
+        let main = Bytes::new(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
         let path = Path::new("__render__.typ");

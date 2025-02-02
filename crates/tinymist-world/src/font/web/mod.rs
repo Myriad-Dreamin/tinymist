@@ -368,7 +368,7 @@ impl FontLoader for WebFontLoader {
         );
         // let blob = pollster::block_on(JsFuture::from(blob.array_buffer())).unwrap();
         let blob = font.load()?;
-        let blob = Bytes::from(js_sys::Uint8Array::new(&blob).to_vec());
+        let blob = Bytes::new(js_sys::Uint8Array::new(&blob).to_vec());
 
         Font::new(blob, self.index)
     }
@@ -406,7 +406,7 @@ impl BrowserFontSearcher {
     /// Add fonts that are embedded in the binary.
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
-            let buffer = Bytes::from_static(font_data);
+            let buffer = Bytes::new(font_data);
             for font in Font::iter(buffer) {
                 self.book.push(font.info().clone());
                 self.fonts.push(FontSlot::with_value(Some(font)));

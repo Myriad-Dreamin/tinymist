@@ -29,7 +29,7 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
     );
     let main_id = universe.main_id().unwrap();
     universe
-        .map_shadow_by_id(main_id, Bytes::from(main.text().as_bytes().to_owned()))
+        .map_shadow_by_id(main_id, Bytes::from(main.text()))
         .unwrap();
     let world = universe.snapshot();
 
