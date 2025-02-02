@@ -189,7 +189,6 @@ impl ExportTask {
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
             let doc = match doc.as_ref() {
                 TypstDocument::Paged(paged_doc) => Some(paged_doc),
-                TypstDocument::Html(_) => None,
             }
             .unwrap();
             let first_page = doc.pages.first().unwrap();
