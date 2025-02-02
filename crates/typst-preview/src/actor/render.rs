@@ -138,6 +138,9 @@ impl RenderActor {
                 log::info!("RenderActor: document is not ready");
                 continue;
             };
+
+            let TypstDocument::Paged(document) = document;
+
             let data = if has_full_render {
                 if let Some(data) = self.renderer.pack_current() {
                     data
