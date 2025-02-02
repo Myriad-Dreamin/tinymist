@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.12.18",
+  "version": "0.12.19-rc4",
   "description": "An integrated language service for Typst",
   "keywords": [
     "typst",
