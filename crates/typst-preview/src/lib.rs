@@ -15,8 +15,8 @@ use futures::sink::SinkExt;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Error;
-use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
@@ -355,7 +355,7 @@ pub struct MemoryFilesShort {
 
 pub trait CompileView: Send + Sync {
     /// Get the compiled document.
-    fn doc(&self) -> Option<Arc<Document>>;
+    fn doc(&self) -> Option<TypstDocument>;
     /// Get the compile status.
     fn status(&self) -> CompileStatus;
 
