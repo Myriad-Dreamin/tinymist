@@ -15,11 +15,12 @@ use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
-use typst::eval::Eval;
 use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{Span, VirtualPath};
+use typst_eval::Eval;
+use typst_shim::eval::eval_compat;
 
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
@@ -401,7 +402,7 @@ impl LocalContext {
         self.shared_().preload_package(entry_point);
     }
 
-    pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+    pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst_eval::Vm) -> T) -> T {
         crate::upstream::with_vm((self.world() as &dyn World).track(), f)
     }
 
@@ -671,17 +672,7 @@ impl SharedContext {
 
     /// Get (Create) a module by source.
     pub fn module_by_src(&self, source: Source) -> SourceResult<Module> {
-        let route = Route::default();
-        let traced = Traced::default();
-        let mut sink = Sink::default();
-
-        typst::eval::eval(
-            ((&self.world) as &dyn World).track(),
-            traced.track(),
-            sink.track_mut(),
-            route.track(),
-            &source,
-        )
+        eval_compat(&self.world, &source)
     }
 
     /// Try to load a module from the current source file.
