@@ -13,12 +13,12 @@ use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
+use crate::lsp_query::OnEnter;
 use crate::project::{
     update_lock, LspInterrupt, ProjectPreviewState, ProjectState,
     PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
 use crate::route::ProjectRouteState;
-use crate::state::lsp_query::OnEnter;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
 use crate::{init::*, *};
