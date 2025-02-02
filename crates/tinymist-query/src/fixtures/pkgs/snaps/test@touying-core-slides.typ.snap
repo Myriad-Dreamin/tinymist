@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (57..58)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
-snapshot_kind: text
 ---
 [
  {
@@ -57,7 +56,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, gap: length, justify: bool) => repeat"
     },
-    "sortText": "159",
+    "sortText": "161",
     "textEdit": {
      "newText": "repeat(${1:})",
      "range": {
