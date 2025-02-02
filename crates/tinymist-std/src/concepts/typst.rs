@@ -1,6 +1,6 @@
 //! Re-export of the typst crate.
 pub(crate) mod well_known {
-    pub type Bytes = typst::foundations::Bytes;
+    pub use typst::foundations::Bytes;
 
     pub use typst::utils::LazyHash;
 
@@ -57,6 +57,7 @@ use std::sync::Arc;
 
 pub use well_known::*;
 
+/// The prelude of the Typst module.
 pub mod prelude {
     pub use comemo::Prehashed;
     pub use ecow::{eco_format, eco_vec, EcoString, EcoVec};
