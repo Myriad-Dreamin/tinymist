@@ -157,7 +157,7 @@ lsp-types = { version = "=0.95.0", features = ["proposed"] }
 sync-lsp = { path = "./crates/sync-lsp", features = ["clap"] }
 
 # CLI
-clap = { version = "4.5", features = ["derive", "env", "unicode", "wrap_help"] }
+clap = { version = "4.5", features = ["derive", "env", "unicode"] }
 clap_builder = { version = "4.5", features = ["string"] }
 clap_complete = "4.5"
 clap_complete_fig = "4.5"
