@@ -13,8 +13,7 @@ mod prelude {
     pub use serde_json::Value as JsonValue;
     pub use sync_lsp::*;
     pub use tinymist_std::error::prelude::*;
-    pub use typst::foundations::{Scope, Value};
-    pub use typst::symbols::Symbol;
+    pub use typst::foundations::{Scope, Symbol, Value};
 
     pub(crate) use crate::ServerState;
 
