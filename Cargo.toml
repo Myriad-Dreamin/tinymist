@@ -134,7 +134,6 @@ reflexo = { version = "=0.5.4", default-features = false, features = [
 ] }
 reflexo-typst = { version = "=0.5.4", default-features = false }
 reflexo-vec2svg = { version = "=0.5.4" }
-reflexo-typst-shim = { version = "=0.5.4", features = ["nightly"] }
 
 
 typst = "0.12.0"
@@ -148,7 +147,7 @@ typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1"
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.14", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim" }
+typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -274,16 +273,12 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-# reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
-# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.12.19-rc2" }
+# reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.12.19-rc2" }
+# reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.12.19-rc2" }
 
 # These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-# reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
-# typstyle = { path = "../typstyle" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.19-rc2" }
