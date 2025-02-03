@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on t (63..64)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
-snapshot_kind: text
 ---
 [
  {
@@ -15,7 +14,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
-    "sortText": "180",
+    "sortText": "182",
     "textEdit": {
      "newText": "strong(${1:})",
      "range": {
@@ -36,7 +35,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
-    "sortText": "181",
+    "sortText": "183",
     "textEdit": {
      "newText": "strong[${1:}]",
      "range": {

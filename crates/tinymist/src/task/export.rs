@@ -15,12 +15,13 @@ use tinymist_project::{
     ExportTransform, LspCompiledArtifact, Pages, ProjectTask, QueryTask,
 };
 use tinymist_std::error::prelude::*;
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::syntax::{ast, SyntaxNode};
 use typst::visualize::Color;
-use typst_pdf::PdfOptions;
+use typst_pdf::{PdfOptions, Timestamp};
 
 use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
@@ -76,7 +77,7 @@ impl ExportTask {
                 TaskWhen::Never => false,
                 TaskWhen::OnType => s.by_mem_events,
                 TaskWhen::OnSave => s.by_fs_events,
-                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
+                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
             };
 
         if !need_export {
@@ -186,7 +187,11 @@ impl ExportTask {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let first_page = doc.pages.first().unwrap();
+            let paged_doc = match &doc {
+                TypstDocument::Paged(paged_doc) => paged_doc,
+                TypstDocument::Html(_) => bail!("expected paged document, found HTML"),
+            };
+            let first_page = paged_doc.pages.first().unwrap();
             Ok(match kind2 {
                 Preview(..) => vec![],
                 // todo: more pdf flags
@@ -202,7 +207,7 @@ impl ExportTask {
 
                     // todo: Some(pdf_uri.as_str())
                     typst_pdf::pdf(
-                        doc,
+                        paged_doc,
                         &PdfOptions {
                             timestamp: convert_datetime(creation_timestamp),
                             ..Default::default()
@@ -243,7 +248,7 @@ impl ExportTask {
                     }
                 }
                 ExportHtml(ExportHtmlTask { export: _ }) => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(doc).into_bytes()
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc).into_bytes()
                 }
                 ExportText(ExportTextTask { export: _ }) => {
                     format!("{}", FullTextDigest(doc.clone())).into_bytes()
@@ -261,7 +266,7 @@ impl ExportTask {
                     if is_first {
                         typst_svg::svg(first_page).into_bytes()
                     } else {
-                        typst_svg::svg_merged(doc, merged_gap).into_bytes()
+                        typst_svg::svg_merged(paged_doc, merged_gap).into_bytes()
                     }
                 }
                 ExportPng(ExportPngTask { export, ppi, fill }) => {
@@ -281,7 +286,7 @@ impl ExportTask {
                     let pixmap = if is_first {
                         typst_render::render(first_page, ppi / 72.)
                     } else {
-                        typst_render::render_merged(doc, ppi / 72., merged_gap, Some(fill))
+                        typst_render::render_merged(paged_doc, ppi / 72., merged_gap, Some(fill))
                     };
 
                     pixmap
@@ -348,17 +353,19 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
     }
 }
 
-/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
+/// Convert [`chrono::DateTime`] to [`Timestamp`]
+fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
     use chrono::{Datelike, Timelike};
-    TypstDatetime::from_ymd_hms(
+    let datetime = TypstDatetime::from_ymd_hms(
         date_time.year(),
         date_time.month().try_into().ok()?,
         date_time.day().try_into().ok()?,
         date_time.hour().try_into().ok()?,
         date_time.minute().try_into().ok()?,
         date_time.second().try_into().ok()?,
-    )
+    );
+
+    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 /// Serialize data to the output format.

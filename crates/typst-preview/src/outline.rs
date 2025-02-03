@@ -1,8 +1,8 @@
 use std::num::NonZeroUsize;
 
 use reflexo_typst::debug_loc::DocumentPosition;
-use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
+use tinymist_std::typst::TypstDocument;
 use typst::foundations::{Content, NativeElement, Packed, StyleChain};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
@@ -140,7 +140,7 @@ struct OutlineItem {
 }
 
 pub fn outline(interner: &mut SpanInternerImpl, document: &TypstDocument) -> Outline {
-    let outline = get_outline(&document.introspector);
+    let outline = get_outline(document.introspector());
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));
 
     for heading in outline.iter().flatten() {

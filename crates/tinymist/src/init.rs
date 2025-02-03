@@ -406,7 +406,7 @@ impl Config {
         FormatUserConfig {
             config: match self.formatter_mode {
                 FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
-                    typstyle_core::PrinterConfig::new_with_width(formatter_print_width),
+                    typstyle_core::Config::default().with_width(formatter_print_width),
                 )),
                 FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
                     max_line_length: formatter_print_width,

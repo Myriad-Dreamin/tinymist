@@ -25,7 +25,6 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
-use reflexo_typst::CompileReport;
 use sync_lsp::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::{
@@ -82,11 +81,15 @@ impl ServerState {
         // todo: hot replacement
         #[cfg(feature = "preview")]
         self.preview.stop_all();
-
-        let watchers = self.preview.watchers.clone();
         let editor_tx = self.editor_tx.clone();
 
-        let new_project = Self::project(&self.config, editor_tx, self.client.clone(), watchers);
+        let new_project = Self::project(
+            &self.config,
+            editor_tx,
+            self.client.clone(),
+            #[cfg(feature = "preview")]
+            self.preview.watchers.clone(),
+        );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
 
@@ -96,7 +99,7 @@ impl ServerState {
             self.memory_changes
                 .iter()
                 .map(|(path, content)| {
-                    let content = Bytes::from(content.clone().text().as_bytes());
+                    let content = Bytes::from_string(content.clone().text().to_owned());
                     (path.clone(), FileResult::Ok(content).into())
                 })
                 .collect(),
@@ -127,7 +130,7 @@ impl ServerState {
         config: &Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
-        preview: ProjectPreviewState,
+        #[cfg(feature = "preview")] preview: ProjectPreviewState,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -200,7 +203,6 @@ impl ServerState {
             CompileServerOpts {
                 handler: compile_handle,
                 enable_watch: true,
-                ..Default::default()
             },
         );
 
@@ -334,6 +336,7 @@ impl ProjectPreviewState {
 pub struct CompileHandlerImpl {
     pub(crate) analysis: Arc<Analysis>,
 
+    #[cfg(feature = "preview")]
     pub(crate) preview: ProjectPreviewState,
 
     pub(crate) export: crate::task::ExportTask,

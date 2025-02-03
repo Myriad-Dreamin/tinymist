@@ -17,6 +17,8 @@ pub use world::*;
 pub mod font;
 pub mod package;
 pub mod parser;
+mod snapshot;
+pub use snapshot::*;
 
 pub use tinymist_vfs as vfs;
 

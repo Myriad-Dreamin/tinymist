@@ -6,6 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.12.19 - [2025-01-31]
+
+Nightly Release at [feat: generate declarative project lock file (#1133)](https://github.com/Myriad-Dreamin/tinymist/commit/bdfc1ed648f040b1c552d43f8ee7c9e9c882544e), using [ParaN3xus/typst tinymist-nightly-v0.12.19-rc2-content-hint](https://github.com/ParaN3xus/typst/tree/tinymist-nightly-v0.12.19-rc2-content-hint), a.k.a. [typst/typst Support first-line-indent for every paragraph (#5768)](https://github.com/typst/typst/commit/85d177897468165b93056947a80086b2f84d815d).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.19
+
 ## v0.12.18 - [2025-01-09]
 
 We have added maintainers to GitHub since 2025-01-09:

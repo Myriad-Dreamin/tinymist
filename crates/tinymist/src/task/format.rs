@@ -9,41 +9,17 @@ use typst::syntax::Source;
 
 use super::SyncTaskFactory;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FormatterConfig {
-    Typstyle(Box<typstyle_core::PrinterConfig>),
+    Typstyle(Box<typstyle_core::Config>),
     Typstfmt(Box<typstfmt::Config>),
     Disable,
 }
 
-impl FormatterConfig {
-    /// The configuration structs doesn't implement `PartialEq`, so bad.
-    pub fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Typstyle(a), Self::Typstyle(b)) => {
-                a.tab_spaces == b.tab_spaces
-                    && a.max_width == b.max_width
-                    && a.chain_width_ratio == b.chain_width_ratio
-                    && a.blank_lines_upper_bound == b.blank_lines_upper_bound
-            }
-            (Self::Typstfmt(a), Self::Typstfmt(b)) => a == b,
-            (Self::Disable, Self::Disable) => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormatUserConfig {
     pub config: FormatterConfig,
     pub position_encoding: PositionEncoding,
-}
-
-impl FormatUserConfig {
-    /// The configuration structs doesn't implement `PartialEq`, so bad.
-    pub fn eq(&self, other: &Self) -> bool {
-        self.config.eq(&other.config) && self.position_encoding == other.position_encoding
-    }
 }
 
 #[derive(Clone)]
@@ -67,8 +43,8 @@ impl FormatTask {
         just_future(async move {
             let formatted = match &c.config {
                 FormatterConfig::Typstyle(config) => {
-                    typstyle_core::Typstyle::new_with_src(src.clone(), config.as_ref().clone())
-                        .pretty_print()
+                    typstyle_core::Typstyle::new(config.as_ref().clone())
+                        .format_source(&src)
                         .ok()
                 }
                 FormatterConfig::Typstfmt(config) => Some(typstfmt::format(src.text(), **config)),

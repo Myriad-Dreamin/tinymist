@@ -55,7 +55,7 @@ impl PathAccessModel for ProxyAccessModel {
             })?;
 
         let data = if let Some(data) = data.dyn_ref::<js_sys::Uint8Array>() {
-            Bytes::from(data.to_vec())
+            Bytes::new(data.to_vec())
         } else {
             return Err(FileError::AccessDenied);
         };

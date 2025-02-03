@@ -45,6 +45,5 @@ use lsp_query::QueryFuture;
 use lsp_server::ResponseError;
 use serde_json::from_value;
 use sync_lsp::*;
-use tinymist_std::error::Result;
 use utils::*;
 use world::*;

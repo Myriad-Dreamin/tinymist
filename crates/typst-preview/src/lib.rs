@@ -15,8 +15,8 @@ use futures::sink::SinkExt;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Error;
-use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
@@ -321,24 +321,24 @@ pub struct DocToSrcJumpInfo {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
     filepath: PathBuf,
-    line: usize,
+    line: u32,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: usize,
+    character: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolveSourceLocRequest {
     filepath: PathBuf,
-    line: usize,
+    line: u32,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: usize,
+    character: u32,
 }
 
 impl ResolveSourceLocRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line, self.character)
+        src.line_column_to_byte(self.line as usize, self.character as usize)
     }
 }
 
@@ -355,7 +355,7 @@ pub struct MemoryFilesShort {
 
 pub trait CompileView: Send + Sync {
     /// Get the compiled document.
-    fn doc(&self) -> Option<Arc<Document>>;
+    fn doc(&self) -> Option<TypstDocument>;
     /// Get the compile status.
     fn status(&self) -> CompileStatus;
 

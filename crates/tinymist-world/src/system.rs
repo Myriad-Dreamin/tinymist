@@ -103,3 +103,38 @@ impl SystemUniverseBuilder {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{args::CompileOnceArgs, CompileSnapshot, WorldComputable, WorldComputeGraph};
+
+    use super::*;
+
+    #[test]
+    fn compute_system_fonts() {
+        pub struct LspFonts {
+            fonts: Arc<FontResolverImpl>,
+        }
+
+        impl WorldComputable<SystemCompilerFeat> for LspFonts {
+            fn compute(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) -> Result<Self> {
+                Ok(Self {
+                    fonts: graph.snap.world.font_resolver.clone(),
+                })
+            }
+        }
+
+        let args = CompileOnceArgs {
+            input: Some("main.typ".to_owned()),
+            ..Default::default()
+        };
+        let verse = args.resolve_system().expect("default it");
+
+        let snap = CompileSnapshot::from_world(verse.snapshot());
+
+        let graph = WorldComputeGraph::new(snap);
+
+        let font = graph.compute::<LspFonts>().expect("font").fonts.clone();
+        let _ = font;
+    }
+}

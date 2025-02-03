@@ -13,6 +13,7 @@ rust-version.workspace = true
 [dependencies]
 typst.workspace = true
 tinymist-assets.workspace = true
+tinymist-std.workspace = true
 typst-assets.workspace = true
 comemo.workspace = true
 

@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on ( (71..72)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/builtin_shadow.typ
-snapshot_kind: text
 ---
 [
  {
@@ -15,7 +14,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "(fill-rest: false) => none"
     },
-    "sortText": "126",
+    "sortText": "127",
     "textEdit": {
      "newText": "pagebreak()${1:}",
      "range": {

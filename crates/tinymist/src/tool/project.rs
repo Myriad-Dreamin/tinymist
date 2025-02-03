@@ -40,10 +40,12 @@ pub struct GenerateScriptArgs {
     pub output: Option<String>,
 }
 
+#[cfg(feature = "preview")]
 trait LockFileExt {
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
 }
 
+#[cfg(feature = "preview")]
 impl LockFileExt for LockFile {
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
         let task_id = args
@@ -96,7 +98,7 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     let snap = CompileSnapshot::from_world(world);
 
     // Compiles the project
-    let compiled = snap.compile();
+    let compiled = CompiledArtifact::from_snapshot(snap);
 
     // Exports the compiled project
     let lock_dir = save_lock.then_some(lock_dir);
@@ -328,15 +330,17 @@ pub fn project_main(args: DocCommands) -> Result<()> {
 /// Project task commands' main
 pub fn task_main(args: TaskCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
+        let _ = state;
         match args {
+            #[cfg(feature = "preview")]
             TaskCommands::Preview(args) => {
                 let input = args.declare.to_input();
                 let id = input.id.clone();
                 state.replace_document(input);
                 let _ = state.preview(id, &args);
+
+                Ok(())
             }
         }
-
-        Ok(())
     })
 }

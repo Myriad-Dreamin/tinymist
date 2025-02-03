@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (71..72)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.typ
-snapshot_kind: text
 ---
 [
  {
@@ -69,7 +68,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "180",
+    "sortText": "182",
     "textEdit": {
      "newText": "str(${1:})",
      "range": {

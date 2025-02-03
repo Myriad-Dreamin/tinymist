@@ -15,13 +15,15 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::{error::prelude::*, Error, TypstDocument};
+use reflexo_typst::Bytes;
+use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::ProjectInsId;
 use tinymist_std::error::IgnoreLogging;
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
@@ -50,9 +52,10 @@ pub struct PreviewCompileView {
 }
 
 impl typst_preview::CompileView for PreviewCompileView {
-    fn doc(&self) -> Option<Arc<TypstDocument>> {
+    fn doc(&self) -> Option<TypstDocument> {
         self.snap.doc.clone().ok()
     }
+
     fn status(&self) -> typst_preview::CompileStatus {
         match self.snap.doc {
             Ok(_) => typst_preview::CompileStatus::CompileSuccess,
@@ -74,7 +77,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
+        let cursor =
+            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if node.kind() != SyntaxKind::Text {
@@ -91,11 +95,11 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
+        let line = src_loc.pos.line as usize;
+        let column = src_loc.pos.character as usize;
 
         let doc = self.snap.success_doc();
-        let Some(doc) = doc.as_deref() else {
+        let Some(doc) = doc.as_ref() else {
             return vec![];
         };
 
@@ -273,7 +277,7 @@ impl EditorServer for PreviewProjectHandler {
                 .into_iter()
                 .map(|(path, content)| {
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(content.as_bytes().into()).into())
+                    (path.into(), Ok(Bytes::from_string(content)).into())
                 })
                 .collect(),
         );
@@ -654,7 +658,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             CompileServerOpts {
                 handler: compile_handle,
                 enable_watch: true,
-                ..Default::default()
             },
         );
         let registered = preview_state.register(&server.primary.id, previewer.compile_watcher());
@@ -799,19 +802,24 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
     let mut p = Point::default();
 
     let span = node.span();
-    let mut positions: Vec<Position> = vec![];
-    for (i, page) in document.pages.iter().enumerate() {
-        let mut min_dis = u64::MAX;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            if let Some(page) = NonZeroUsize::new(i + 1) {
-                positions.push(Position { page, point: pos });
+    match document {
+        TypstDocument::Paged(paged_doc) => {
+            let mut positions: Vec<Position> = vec![];
+            for (i, page) in paged_doc.pages.iter().enumerate() {
+                let mut min_dis = u64::MAX;
+                if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+                    if let Some(page) = NonZeroUsize::new(i + 1) {
+                        positions.push(Position { page, point: pos });
+                    }
+                }
             }
+
+            log::info!("jump_from_cursor: {positions:#?}");
+
+            positions
         }
+        _ => vec![],
     }
-
-    log::info!("jump_from_cursor: {positions:#?}");
-
-    positions
 }
 
 /// Find the position of a span in a frame.
@@ -830,7 +838,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                     return Some(pos);
                 }
                 if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    let dis = glyph
+                        .span
+                        .0
+                        .into_raw()
+                        .get()
+                        .abs_diff(span.into_raw().get());
                     if dis < *min_dis {
                         *min_dis = dis;
                         *p = pos;

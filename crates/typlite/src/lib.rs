@@ -150,7 +150,7 @@ impl TypliteWorker {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
             Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
-            | MathFrac | MathRoot | MathShorthand => Err("converting math node")?,
+            | MathFrac | MathRoot | MathShorthand | MathText => Err("converting math node")?,
 
             // Error nodes
             Error => Err(node.clone().into_text().to_string())?,
@@ -307,6 +307,7 @@ impl TypliteWorker {
             // Ignored comments
             LineComment => Ok(Value::None),
             BlockComment => Ok(Value::None),
+            Shebang => Ok(Value::None),
         }
     }
 
@@ -445,7 +446,7 @@ impl TypliteWorker {
             #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
             {code}"##
         );
-        let main = Bytes::from(code.as_bytes().to_owned());
+        let main = Bytes::new(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
         let path = Path::new("__render__.typ");

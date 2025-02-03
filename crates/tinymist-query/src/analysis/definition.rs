@@ -81,7 +81,7 @@ pub fn definition(
                 _ => return None,
             };
 
-            let introspector = &document?.document.introspector;
+            let introspector = &document?.document.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }
@@ -144,7 +144,7 @@ fn bib_definition(
     key: &str,
 ) -> Option<Definition> {
     let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.path().clone().into_value() else {
+    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
         return None;
     };
 
@@ -164,7 +164,7 @@ fn ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::new(name);
+    let label = Label::construct(name.into());
     let sel = Selector::Label(label);
 
     // if it is a label, we put the selection range to itself

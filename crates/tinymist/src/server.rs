@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use lsp_types::*;
 use sync_lsp::*;
-use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
+use tinymist_project::{CompiledArtifact, EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -14,10 +14,7 @@ use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp_query::OnEnter;
-use crate::project::{
-    update_lock, LspInterrupt, ProjectPreviewState, ProjectState,
-    PROJECT_ROUTE_USER_ACTION_PRIORITY,
-};
+use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
@@ -90,8 +87,15 @@ impl ServerState {
     ) -> Self {
         let formatter = FormatTask::new(config.formatter());
 
-        let watchers = ProjectPreviewState::default();
-        let handle = Self::project(&config, editor_tx.clone(), client.clone(), watchers.clone());
+        #[cfg(feature = "preview")]
+        let watchers = crate::project::ProjectPreviewState::default();
+        let handle = Self::project(
+            &config,
+            editor_tx.clone(),
+            client.clone(),
+            #[cfg(feature = "preview")]
+            watchers.clone(),
+        );
 
         Self {
             client: client.clone(),
@@ -328,7 +332,7 @@ impl ServerState {
                 ..Default::default()
             });
 
-            let artifact = snap.clone().compile();
+            let artifact = CompiledArtifact::from_snapshot(snap.clone());
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
