@@ -1,0 +1,14 @@
+{
+  "$schema": "vscode://schemas/vscode-extensions",
+  "contributes": {
+    "configuration": {
+      "properties": {
+        "tinymist.preview.background": {
+          "markdownDescription": "This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server is started in the background with a random port. You can discover the background previewers by running `tinymist preview`.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}
