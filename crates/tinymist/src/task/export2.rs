@@ -4,7 +4,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use reflexo_typst::{Bytes, EntryReader, TypstDatetime};
-use tinymist_project::{convert_source_date_epoch, ExportSvgTask, LspCompilerFeat};
+use tinymist_project::{
+    convert_source_date_epoch, CompileSnapshot, ExportSvgTask, LspCompilerFeat, TaskWhen,
+};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
 use typlite::Typlite;
@@ -75,6 +77,12 @@ pub trait ExportComputation<D> {
     type Output;
     type Config: Send + Sync + 'static;
 
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&D>,
+        config: &Self::Config,
+    ) -> bool;
+
     fn run(doc: &Arc<D>, config: &Self::Config) -> Result<Self::Output>;
 }
 
@@ -82,9 +90,25 @@ impl<D> OptionDocument<D>
 where
     D: typst::Document + Send + Sync + 'static,
 {
+    fn needs_run<C: Send + Sync + 'static>(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        f: impl FnOnce(&Arc<WorldComputeGraph<LspCompilerFeat>>, Option<&D>, &C) -> bool,
+    ) -> Result<bool> {
+        let Some(config) = graph.get::<TaskConfig<C>>().transpose()? else {
+            return Ok(false);
+        };
+
+        let doc = graph.compute::<OptionDocument<D>>()?;
+        Ok(f(graph, doc.0.as_deref(), &config.0))
+    }
+
     pub fn run_export<T: ExportComputation<D>>(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
     ) -> Result<Option<T::Output>> {
+        if !OptionDocument::needs_run(graph, T::needs_run)? {
+            return Ok(None);
+        }
+
         let doc = graph.compute::<OptionDocument<D>>()?.0.clone();
         let config = graph.get::<TaskConfig<T::Config>>().transpose()?;
 
@@ -228,6 +252,95 @@ impl ProjectExport {
     }
 }
 
+pub struct ProjectCompilation;
+
+impl ProjectCompilation {
+    fn needs_run<D: typst::Document>(
+        snap: &CompileSnapshot<LspCompilerFeat>,
+        timing: Option<TaskWhen>,
+        docs: Option<&D>,
+    ) -> Option<bool> {
+        let s = snap.signal;
+        let when = timing.unwrap_or(TaskWhen::Never);
+        if !matches!(when, TaskWhen::Never) && s.by_entry_update {
+            return Some(true);
+        }
+
+        match when {
+            TaskWhen::Never => Some(false),
+            TaskWhen::OnType => Some(s.by_mem_events),
+            TaskWhen::OnSave => Some(s.by_fs_events),
+            TaskWhen::OnDocumentHasTitle if s.by_fs_events => {
+                docs.map(|doc| doc.info().title.is_some())
+            }
+            TaskWhen::OnDocumentHasTitle => Some(false),
+        }
+    }
+
+    pub fn preconfig_timings(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<bool> {
+        // todo: configure run_diagnostics!
+        let run_paged_diagnostics = Some(TaskWhen::OnType);
+        let run_html_diagnostics = Some(TaskWhen::Never);
+
+        let pdf_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<<PdfExport as ExportComputation<_>>::Config>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+        let svg_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<<SvgExport as ExportComputation<_>>::Config>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+        let png_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<<PngExport as ExportComputation<_>>::Config>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+        let html_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<<HtmlExport as ExportComputation<_>>::Config>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+        let markdown_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<ExportMarkdownTask>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+        let text_timing: Option<TaskWhen> = graph
+            .get::<TaskConfig<<TextExport as ExportComputation<_>>::Config>>()
+            .transpose()?
+            .map(|config| config.0.export.when);
+
+        let doc = None::<TypstPagedDocument>.as_ref();
+        let check_timing = |timing| Self::needs_run(&graph.snap, timing, doc).unwrap_or(true);
+
+        let compile_paged = check_timing(run_paged_diagnostics)
+            || check_timing(pdf_timing)
+            || check_timing(svg_timing)
+            || check_timing(png_timing)
+            || check_timing(text_timing)
+            || check_timing(markdown_timing);
+        let compile_html = check_timing(run_html_diagnostics) || check_timing(html_timing);
+
+        let _ =
+            graph.provide::<TaskFlag<PagedCompilation>>(Ok(Arc::new(TaskConfig(TaskFlagBase {
+                enabled: compile_paged,
+                _phantom: Default::default(),
+            }))));
+        let _ =
+            graph.provide::<TaskFlag<HtmlCompilation>>(Ok(Arc::new(TaskConfig(TaskFlagBase {
+                enabled: compile_html,
+                _phantom: Default::default(),
+            }))));
+
+        Ok(compile_paged || compile_html)
+    }
+}
+
+impl WorldComputable<LspCompilerFeat> for ProjectCompilation {
+    fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
+        Self::preconfig_timings(graph)?;
+        Diagnostics::compute(graph)?;
+        Ok(Self)
+    }
+}
+
 impl WorldComputable<LspCompilerFeat> for ProjectExport {
     fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
         let config = graph.must_get::<TaskConfig<ProjectTask>>()?;
@@ -280,6 +393,15 @@ impl ExportComputation<TypstPagedDocument> for PdfExport {
     type Output = SourceResult<Bytes>;
     type Config = ExportPdfTask;
 
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstPagedDocument>,
+        config: &Self::Config,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
+
     fn run(doc: &Arc<TypstPagedDocument>, config: &ExportPdfTask) -> Result<SourceResult<Bytes>> {
         // todo: timestamp world.now()
         let creation_timestamp = config
@@ -315,6 +437,15 @@ impl ExportComputation<TypstPagedDocument> for SvgExport {
     type Output = SourceResult<String>;
     type Config = ExportSvgTask;
 
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstPagedDocument>,
+        config: &Self::Config,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
+
     fn run(doc: &Arc<TypstPagedDocument>, config: &ExportSvgTask) -> Result<SourceResult<String>> {
         let (is_first, merged_gap) = get_page_selection(&config.export)?;
 
@@ -343,6 +474,15 @@ pub struct PngExport(pub Option<SourceResult<Bytes>>);
 impl ExportComputation<TypstPagedDocument> for PngExport {
     type Output = SourceResult<Bytes>;
     type Config = ExportPngTask;
+
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstPagedDocument>,
+        config: &Self::Config,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
 
     fn run(doc: &Arc<TypstPagedDocument>, config: &ExportPngTask) -> Result<SourceResult<Bytes>> {
         let ppi = config.ppi.to_f32();
@@ -389,6 +529,15 @@ impl ExportComputation<TypstHtmlDocument> for HtmlExport {
     type Output = SourceResult<String>;
     type Config = ExportHtmlTask;
 
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstHtmlDocument>,
+        config: &Self::Config,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
+
     fn run(doc: &Arc<TypstHtmlDocument>, _config: &ExportHtmlTask) -> Result<SourceResult<String>> {
         Ok(typst_html::html(doc))
     }
@@ -403,11 +552,19 @@ impl WorldComputable<LspCompilerFeat> for HtmlExport {
 pub struct TypliteMarkdownExport(pub Option<SourceResult<String>>);
 
 impl TypliteMarkdownExport {
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstPagedDocument>,
+        config: &ExportMarkdownTask,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
+
     fn run(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
     ) -> Result<Option<SourceResult<String>>> {
-        let config = graph.get::<TaskConfig<ExportMarkdownTask>>().transpose()?;
-        if config.is_none() {
+        if !OptionDocument::needs_run(graph, Self::needs_run)? {
             return Ok(None);
         }
 
@@ -430,6 +587,15 @@ pub struct TextExport(pub Option<SourceResult<String>>);
 impl ExportComputation<TypstPagedDocument> for TextExport {
     type Output = SourceResult<String>;
     type Config = ExportTextTask;
+
+    fn needs_run(
+        graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
+        doc: Option<&TypstPagedDocument>,
+        config: &Self::Config,
+    ) -> bool {
+        let timing = config.export.when;
+        ProjectCompilation::needs_run(&graph.snap, Some(timing), doc).unwrap_or_default()
+    }
 
     fn run(
         doc: &Arc<TypstPagedDocument>,
