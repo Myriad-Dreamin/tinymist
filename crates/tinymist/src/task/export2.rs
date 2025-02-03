@@ -37,6 +37,15 @@ struct TaskFlagBase<T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
+impl<T> TaskFlag<T> {
+    pub fn flag(flag: bool) -> Arc<Self> {
+        Arc::new(TaskConfig(TaskFlagBase {
+            enabled: flag,
+            _phantom: Default::default(),
+        }))
+    }
+}
+
 type PagedCompilation = Compilation<TypstPagedDocument>;
 type HtmlCompilation = Compilation<TypstHtmlDocument>;
 
@@ -288,55 +297,42 @@ impl ProjectCompilation {
 
     pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
-        let run_paged_diagnostics = Some(TaskWhen::OnType);
-        let run_html_diagnostics = Some(TaskWhen::Never);
+        let paged_diag = Some(TaskWhen::OnType);
+        let html_diag = Some(TaskWhen::Never);
 
-        let pdf_timing: Option<TaskWhen> = graph
+        let pdf: Option<TaskWhen> = graph
             .get::<TaskConfig<<PdfExport as ExportComputation<_>>::Config>>()
             .transpose()?
             .map(|config| config.0.export.when);
-        let svg_timing: Option<TaskWhen> = graph
+        let svg: Option<TaskWhen> = graph
             .get::<TaskConfig<<SvgExport as ExportComputation<_>>::Config>>()
             .transpose()?
             .map(|config| config.0.export.when);
-        let png_timing: Option<TaskWhen> = graph
+        let png: Option<TaskWhen> = graph
             .get::<TaskConfig<<PngExport as ExportComputation<_>>::Config>>()
             .transpose()?
             .map(|config| config.0.export.when);
-        let html_timing: Option<TaskWhen> = graph
+        let html: Option<TaskWhen> = graph
             .get::<TaskConfig<<HtmlExport as ExportComputation<_>>::Config>>()
             .transpose()?
             .map(|config| config.0.export.when);
-        let markdown_timing: Option<TaskWhen> = graph
+        let md: Option<TaskWhen> = graph
             .get::<TaskConfig<ExportMarkdownTask>>()
             .transpose()?
             .map(|config| config.0.export.when);
-        let text_timing: Option<TaskWhen> = graph
+        let text: Option<TaskWhen> = graph
             .get::<TaskConfig<<TextExport as ExportComputation<_>>::Config>>()
             .transpose()?
             .map(|config| config.0.export.when);
 
         let doc = None::<TypstPagedDocument>.as_ref();
-        let check_timing = |timing| Self::needs_run(&graph.snap, timing, doc).unwrap_or(true);
+        let check = |timing| Self::needs_run(&graph.snap, timing, doc).unwrap_or(true);
 
-        let compile_paged = check_timing(run_paged_diagnostics)
-            || check_timing(pdf_timing)
-            || check_timing(svg_timing)
-            || check_timing(png_timing)
-            || check_timing(text_timing)
-            || check_timing(markdown_timing);
-        let compile_html = check_timing(run_html_diagnostics) || check_timing(html_timing);
+        let compile_paged = [paged_diag, pdf, svg, png, text, md].into_iter().any(check);
+        let compile_html = [html_diag, html].into_iter().any(check);
 
-        let _ =
-            graph.provide::<TaskFlag<PagedCompilation>>(Ok(Arc::new(TaskConfig(TaskFlagBase {
-                enabled: compile_paged,
-                _phantom: Default::default(),
-            }))));
-        let _ =
-            graph.provide::<TaskFlag<HtmlCompilation>>(Ok(Arc::new(TaskConfig(TaskFlagBase {
-                enabled: compile_html,
-                _phantom: Default::default(),
-            }))));
+        let _ = graph.provide(Ok(TaskFlag::<PagedCompilation>::flag(compile_paged)));
+        let _ = graph.provide(Ok(TaskFlag::<HtmlCompilation>::flag(compile_html)));
 
         Ok(compile_paged || compile_html)
     }
