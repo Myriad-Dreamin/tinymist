@@ -213,7 +213,8 @@ impl SpanMapper {
                     self.frame(&page.frame);
                 }
             }
-            _ => {}
+            // todo: handle html
+            TypstDocument::Html(..) => {}
         }
     }
 

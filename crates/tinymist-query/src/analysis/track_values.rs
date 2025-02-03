@@ -2,7 +2,7 @@
 
 use comemo::Track;
 use ecow::*;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
 use typst::introspection::Introspector;
@@ -142,9 +142,9 @@ pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let split = output.len();
 
     // Bibliography keys.
-    for (key, detail) in BibliographyElem::keys(document.introspector().track()) {
+    for (label, detail) in BibliographyElem::keys(document.introspector().track()) {
         output.push(DynLabel {
-            label: Label::from(key),
+            label,
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,

@@ -15,6 +15,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
+use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -76,7 +77,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
+        let cursor =
+            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if node.kind() != SyntaxKind::Text {
@@ -93,8 +95,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
+        let line = src_loc.pos.line as usize;
+        let column = src_loc.pos.character as usize;
 
         let doc = self.snap.success_doc();
         let Some(doc) = doc.as_ref() else {
@@ -275,7 +277,7 @@ impl EditorServer for PreviewProjectHandler {
                 .into_iter()
                 .map(|(path, content)| {
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(content.as_bytes().into()).into())
+                    (path.into(), Ok(Bytes::from_string(content)).into())
                 })
                 .collect(),
         );

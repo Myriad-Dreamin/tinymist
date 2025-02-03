@@ -1135,7 +1135,8 @@ fn trait_symbol_fonts(
                         self.work_frame(&pg.frame);
                     }
                 }
-                _ => {}
+                // todo: handle html
+                TypstDocument::Html(..) => {}
             }
         }
 
