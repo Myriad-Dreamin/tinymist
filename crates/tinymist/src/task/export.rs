@@ -187,9 +187,7 @@ impl ExportTask {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let paged_doc = match &doc {
-                TypstDocument::Paged(paged_doc) => paged_doc,
-            };
+            let TypstDocument::Paged(paged_doc) = &doc;
             let first_page = paged_doc.pages.first().unwrap();
             Ok(match kind2 {
                 Preview(..) => vec![],
