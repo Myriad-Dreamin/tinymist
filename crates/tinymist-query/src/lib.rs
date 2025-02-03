@@ -81,8 +81,6 @@ pub use lsp_typst_boundary::*;
 
 mod prelude;
 
-use std::sync::Arc;
-
 use tinymist_std::typst::TypstDocument;
 use typst::syntax::Source;
 
