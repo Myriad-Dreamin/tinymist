@@ -98,7 +98,7 @@ impl PeriscopeRenderer {
         doc: VersionedDocument,
         pos: FramePosition,
     ) -> Option<(String, f32, f32)> {
-        match doc.document.as_ref() {
+        match &doc.document {
             TypstDocument::Paged(paged_doc) => {
                 // todo: svg viewer compatibility
                 type UsingExporter = SvgExporter<PeriscopeExportFeature>;

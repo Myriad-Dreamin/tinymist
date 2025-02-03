@@ -187,11 +187,10 @@ impl ExportTask {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let doc = match doc.as_ref() {
-                TypstDocument::Paged(paged_doc) => Some(paged_doc),
-            }
-            .unwrap();
-            let first_page = doc.pages.first().unwrap();
+            let paged_doc = match &doc {
+                TypstDocument::Paged(paged_doc) => paged_doc,
+            };
+            let first_page = paged_doc.pages.first().unwrap();
             Ok(match kind2 {
                 Preview(..) => vec![],
                 // todo: more pdf flags
@@ -207,7 +206,7 @@ impl ExportTask {
 
                     // todo: Some(pdf_uri.as_str())
                     typst_pdf::pdf(
-                        doc,
+                        paged_doc,
                         &PdfOptions {
                             timestamp: convert_datetime(creation_timestamp),
                             ..Default::default()
@@ -224,8 +223,9 @@ impl ExportTask {
                     one,
                 }) => {
                     let pretty = false;
-                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
-                        .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    let elements =
+                        reflexo_typst::query::retrieve(&snap.world, &selector, paged_doc)
+                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
                     }
@@ -248,7 +248,7 @@ impl ExportTask {
                     }
                 }
                 ExportHtml(ExportHtmlTask { export: _ }) => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(doc).into_bytes()
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc).into_bytes()
                 }
                 ExportText(ExportTextTask { export: _ }) => {
                     format!("{}", FullTextDigest(doc.clone())).into_bytes()
@@ -266,7 +266,7 @@ impl ExportTask {
                     if is_first {
                         typst_svg::svg(first_page).into_bytes()
                     } else {
-                        typst_svg::svg_merged(doc, merged_gap).into_bytes()
+                        typst_svg::svg_merged(paged_doc, merged_gap).into_bytes()
                     }
                 }
                 ExportPng(ExportPngTask { export, ppi, fill }) => {
@@ -286,7 +286,7 @@ impl ExportTask {
                     let pixmap = if is_first {
                         typst_render::render(first_page, ppi / 72.)
                     } else {
-                        typst_render::render_merged(doc, ppi / 72., merged_gap, Some(fill))
+                        typst_render::render_merged(paged_doc, ppi / 72., merged_gap, Some(fill))
                     };
 
                     pixmap

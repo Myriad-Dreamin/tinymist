@@ -1,11 +1,10 @@
 //! Text export utilities.
 
 use core::fmt;
-use reflexo_typst::TypstDocument;
-use std::sync::Arc;
+use tinymist_std::typst::TypstDocument;
 
 /// A full text digest of a document.
-pub struct FullTextDigest(pub Arc<TypstDocument>);
+pub struct FullTextDigest(pub TypstDocument);
 
 impl FullTextDigest {
     fn export_frame(f: &mut fmt::Formatter<'_>, doc: &typst::layout::Frame) -> fmt::Result {
@@ -32,7 +31,7 @@ impl FullTextDigest {
 
 impl fmt::Display for FullTextDigest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0.as_ref() {
+        match &self.0 {
             TypstDocument::Paged(paged_doc) => {
                 for page in paged_doc.pages.iter() {
                     Self::export_frame(f, &page.frame)?;

@@ -143,7 +143,7 @@ pub fn compile_doc_for_test(
     let doc = typst::compile(&world).output.unwrap();
     Some(VersionedDocument {
         version: 0,
-        document: Arc::new(TypstDocument::Paged(Arc::new(doc))),
+        document: TypstDocument::Paged(Arc::new(doc)),
     })
 }
 

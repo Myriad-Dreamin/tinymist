@@ -17,7 +17,6 @@ mod upstream;
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use completion::PostfixSnippet;
-use tinymist_std::typst::TypstDocument;
 pub use upstream::with_vm;
 
 mod diagnostics;
@@ -84,6 +83,7 @@ mod prelude;
 
 use std::sync::Arc;
 
+use tinymist_std::typst::TypstDocument;
 use typst::syntax::Source;
 
 /// The physical position in a document.
@@ -97,7 +97,7 @@ pub struct VersionedDocument {
     /// The version of the document.
     pub version: usize,
     /// The compiled document.
-    pub document: Arc<TypstDocument>,
+    pub document: TypstDocument,
 }
 
 /// A request handler with given syntax information.

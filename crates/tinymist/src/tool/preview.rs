@@ -51,9 +51,10 @@ pub struct PreviewCompileView {
 }
 
 impl typst_preview::CompileView for PreviewCompileView {
-    fn doc(&self) -> TypstDocument {
+    fn doc(&self) -> Option<TypstDocument> {
         self.snap.doc.clone().ok()
     }
+
     fn status(&self) -> typst_preview::CompileStatus {
         match self.snap.doc {
             Ok(_) => typst_preview::CompileStatus::CompileSuccess,
@@ -96,7 +97,7 @@ impl typst_preview::CompileView for PreviewCompileView {
         let column = src_loc.pos.column;
 
         let doc = self.snap.success_doc();
-        let Some(doc) = doc.as_deref() else {
+        let Some(doc) = doc.as_ref() else {
             return vec![];
         };
 
