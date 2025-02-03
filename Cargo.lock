@@ -3582,7 +3582,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "clap",
@@ -3705,7 +3705,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3828,7 +3828,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3900,7 +3900,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "base64",
  "comemo",
@@ -3923,11 +3923,11 @@ checksum = "113ad2320d45ebcc66c96dd51f4cfb3fbcc642828390acba6f48547eb76d7188"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.19-rc4"
+version = "0.12.19"
 
 [[package]]
 name = "tinymist-core"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -3937,7 +3937,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "quote",
  "syn 2.0.96",
@@ -3945,7 +3945,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-fs"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "core-foundation",
@@ -3958,7 +3958,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "base64",
@@ -4013,7 +4013,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "base64",
  "log",
@@ -4025,7 +4025,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4293,7 +4293,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "base64",
  "clap",
@@ -4509,7 +4509,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "clap",
  "comemo",
@@ -4564,7 +4564,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.12.19-rc4"
+version = "0.12.19"
 dependencies = [
  "cfg-if",
  "typst",
