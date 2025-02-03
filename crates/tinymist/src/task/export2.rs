@@ -3,7 +3,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use reflexo_typst::{Bytes, EntryReader, TypstDatetime};
+use reflexo_typst::{Bytes, CompilerFeat, EntryReader, TypstDatetime};
 use tinymist_project::{
     convert_source_date_epoch, CompileSnapshot, ExportSvgTask, LspCompilerFeat, TaskWhen,
 };
@@ -24,8 +24,8 @@ use crate::world::base::{WorldComputable, WorldComputeGraph};
 
 pub struct TaskConfig<T>(T);
 
-impl<T: Send + Sync + 'static> WorldComputable<LspCompilerFeat> for TaskConfig<T> {
-    fn compute(_graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
+impl<F: CompilerFeat, T: Send + Sync + 'static> WorldComputable<F> for TaskConfig<T> {
+    fn compute(_graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let id = std::any::type_name::<T>();
         panic!("{id:?} must be provided before computation");
     }
@@ -42,11 +42,11 @@ type HtmlCompilation = Compilation<TypstHtmlDocument>;
 
 pub struct Compilation<D>(Option<Warned<SourceResult<Arc<D>>>>);
 
-impl<D> WorldComputable<LspCompilerFeat> for Compilation<D>
+impl<F: CompilerFeat, D> WorldComputable<F> for Compilation<D>
 where
     D: typst::Document + Send + Sync + 'static,
 {
-    fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
+    fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let enabled = graph.must_get::<TaskFlag<Compilation<D>>>()?.0.enabled;
 
         Ok(Self(enabled.then(|| {
@@ -142,8 +142,8 @@ pub struct Diagnostics {
     html: CompilationDiagnostics,
 }
 
-impl WorldComputable<LspCompilerFeat> for Diagnostics {
-    fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
+impl<F: CompilerFeat> WorldComputable<F> for Diagnostics {
+    fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let paged = graph.compute::<PagedCompilation>()?.0.clone();
         let html = graph.compute::<HtmlCompilation>()?.0.clone();
 
@@ -252,11 +252,12 @@ impl ProjectExport {
     }
 }
 
+#[derive(Clone, Copy, Default)]
 pub struct ProjectCompilation;
 
 impl ProjectCompilation {
-    fn needs_run<D: typst::Document>(
-        snap: &CompileSnapshot<LspCompilerFeat>,
+    fn needs_run<F: CompilerFeat, D: typst::Document>(
+        snap: &CompileSnapshot<F>,
         timing: Option<TaskWhen>,
         docs: Option<&D>,
     ) -> Option<bool> {
@@ -277,7 +278,7 @@ impl ProjectCompilation {
         }
     }
 
-    pub fn preconfig_timings(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<bool> {
+    pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
         let run_paged_diagnostics = Some(TaskWhen::OnType);
         let run_html_diagnostics = Some(TaskWhen::Never);
@@ -333,8 +334,8 @@ impl ProjectCompilation {
     }
 }
 
-impl WorldComputable<LspCompilerFeat> for ProjectCompilation {
-    fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self> {
+impl<F: CompilerFeat> WorldComputable<F> for ProjectCompilation {
+    fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         Self::preconfig_timings(graph)?;
         Diagnostics::compute(graph)?;
         Ok(Self)

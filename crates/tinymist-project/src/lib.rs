@@ -18,4 +18,4 @@ pub use watch::*;
 #[cfg(feature = "system")]
 pub use world::*;
 
-pub use tinymist_world::{CompileSnapshot, ProjectInsId};
+pub use tinymist_world::{CompileSnapshot, ExportSignal, ProjectInsId};

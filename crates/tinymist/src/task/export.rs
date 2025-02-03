@@ -458,7 +458,8 @@ mod tests {
     use clap::Parser;
 
     use super::*;
-    use crate::project::CompileOnceArgs;
+    use crate::export::ProjectCompilation;
+    use crate::project::{CompileOnceArgs, ExportSignal};
     use crate::world::base::{CompileSnapshot, WorldComputeGraph};
 
     #[test]
@@ -501,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    fn compute_graph() {
+    fn compilation_default_never() {
         let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
         let verse = args
             .resolve_system()
@@ -511,12 +512,33 @@ mod tests {
 
         let graph = WorldComputeGraph::new(snap);
 
-        // let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
-        // let _ = font;
+        let needs_run =
+            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
 
-        // let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
-        // let _ = font;
+        assert!(!needs_run);
+    }
 
-        // assert!(FONT_COMPUTED.load(std::sync::atomic::Ordering::SeqCst));
+    // todo: on demand compilation
+    #[test]
+    fn compilation_run_paged_diagnostics() {
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let mut snap = CompileSnapshot::from_world(verse.snapshot());
+
+        snap.signal = ExportSignal {
+            by_entry_update: true,
+            by_fs_events: false,
+            by_mem_events: false,
+        };
+
+        let graph = WorldComputeGraph::new(snap);
+
+        let needs_run =
+            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
+
+        assert!(needs_run);
     }
 }
