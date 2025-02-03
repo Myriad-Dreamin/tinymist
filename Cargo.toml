@@ -288,8 +288,8 @@ reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch 
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.19-rc2" }
 
-# [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
-# typst-shim = { path = "crates/typst-shim" }
-# tinymist-analysis = { path = "crates/tinymist-analysis" }
-# tinymist-std = { path = "crates/tinymist-std" }
-# tinymist-world = { path = "crates/tinymist-world" }
+[patch."https://github.com/Myriad-Dreamin/tinymist.git"]
+typst-shim = { path = "crates/typst-shim" }
+tinymist-analysis = { path = "crates/tinymist-analysis" }
+tinymist-std = { path = "crates/tinymist-std" }
+tinymist-world = { path = "crates/tinymist-world" }
