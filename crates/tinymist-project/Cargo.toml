@@ -28,19 +28,22 @@ rpds.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tinymist-world = { workspace = true, features = ["system"] }
-tinymist-std = { workspace = true, features = ["system"] }
+tinymist-world = { workspace = true }
+tinymist-std = { workspace = true }
 tinymist-derive.workspace = true
 toml.workspace = true
 typst.workspace = true
 typst-assets.workspace = true
-typst-preview.workspace = true
+typst-preview = { workspace = true, optional = true }
 notify.workspace = true
 
 [features]
 
 fonts = ["typst-assets/fonts"]
 no-content-hint = ["reflexo-typst/no-content-hint"]
+preview = ["typst-preview"]
+
+system = ["tinymist-std/system", "tinymist-world/system"]
 
 [lints]
 workspace = true
