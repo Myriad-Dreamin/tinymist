@@ -293,3 +293,4 @@ typst-shim = { path = "crates/typst-shim" }
 tinymist-analysis = { path = "crates/tinymist-analysis" }
 tinymist-std = { path = "crates/tinymist-std" }
 tinymist-world = { path = "crates/tinymist-world" }
+tinymist-project = { path = "crates/tinymist-project" }

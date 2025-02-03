@@ -29,22 +29,22 @@ dhat = { workspace = true, optional = true }
 dirs.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-hyper = { workspace = true, optional = true }
-hyper-util = { workspace = true, optional = true, features = [
+hyper.workspace = true
+hyper-util = { workspace = true, features = [
     "server",
     "http1",
     "http2",
     "server-graceful",
     "server-auto",
 ] }
-http-body-util = { version = "0.1.2", optional = true }
+http-body-util = "0.1.2"
 hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
 lsp-server.workspace = true
 lsp-types.workspace = true
 log.workspace = true
 once_cell.workspace = true
-open = { workspace = true, optional = true }
+open.workspace = true
 pathdiff.workspace = true
 parking_lot.workspace = true
 paste.workspace = true
@@ -62,7 +62,7 @@ tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-std.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
-tinymist-project.workspace = true
+tinymist-project = { workspace = true, features = ["system"] }
 tinymist-render.workspace = true
 tokio = { workspace = true, features = ["fs"] }
 tokio-util.workspace = true
@@ -83,7 +83,7 @@ unicode-script.workspace = true
 walkdir.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "preview"]
+default = ["cli", "preview", "embed-fonts", "no-content-hint"]
 
 cli = ["sync-lsp/clap", "clap/wrap_help"]
 
@@ -110,11 +110,8 @@ preview = [
     "typst-preview",
     "typst-preview/clap",
     "tinymist-assets/typst-preview",
-    "hyper",
-    "hyper-util",
+    "tinymist-project/preview",
     "hyper-tungstenite",
-    "http-body-util",
-    "open",
 ]
 
 [build-dependencies]
