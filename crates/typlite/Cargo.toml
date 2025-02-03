@@ -27,7 +27,7 @@ comemo.workspace = true
 ecow.workspace = true
 tinymist-analysis.workspace = true
 tinymist-std.workspace = true
-tinymist-project.workspace = true
+tinymist-project = { workspace = true, features = ["system"] }
 typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
