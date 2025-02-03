@@ -1115,14 +1115,10 @@ fn trait_symbol_fonts(
 
     impl Worker<'_> {
         fn work(&mut self, doc: &TypstDocument) {
-            match doc {
-                TypstDocument::Paged(paged_doc) => {
-                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
-                        self.active = s;
-                        self.work_frame(&pg.frame);
-                    }
-                }
-                _ => {}
+            let TypstDocument::Paged(paged_doc) = doc;
+            for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
+                self.active = s;
+                self.work_frame(&pg.frame);
             }
         }
 

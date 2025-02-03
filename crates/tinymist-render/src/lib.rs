@@ -127,7 +127,6 @@ impl PeriscopeRenderer {
 
                 Some((SvgText::join(svg_text), width, height))
             }
-            _ => None,
         }
     }
 }
