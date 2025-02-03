@@ -2846,7 +2846,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly-v0.5.5#7f5580050d048236fce6134bb1e30ea6311b9553"
 dependencies = [
  "base64",
  "bitvec",
@@ -2872,7 +2871,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly-v0.5.5#7f5580050d048236fce6134bb1e30ea6311b9553"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2902,7 +2900,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly-v0.5.5#7f5580050d048236fce6134bb1e30ea6311b9553"
 dependencies = [
  "bitvec",
  "comemo",
@@ -2927,7 +2924,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?branch=nightly-v0.5.5#7f5580050d048236fce6134bb1e30ea6311b9553"
 dependencies = [
  "base64",
  "comemo",
@@ -4022,7 +4018,6 @@ dependencies = [
  "parking_lot",
  "pathdiff",
  "rayon",
- "reflexo-typst",
  "rpds",
  "semver",
  "serde",

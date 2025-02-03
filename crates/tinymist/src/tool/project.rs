@@ -98,7 +98,7 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     let snap = CompileSnapshot::from_world(world);
 
     // Compiles the project
-    let compiled = snap.compile();
+    let compiled = CompiledArtifact::from_snapshot(snap);
 
     // Exports the compiled project
     let lock_dir = save_lock.then_some(lock_dir);

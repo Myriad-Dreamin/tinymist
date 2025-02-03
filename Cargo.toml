@@ -278,14 +278,14 @@ typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9",
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", branch = "nightly-v0.5.5" }
 
 # These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.19-rc2" }
 
 [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
