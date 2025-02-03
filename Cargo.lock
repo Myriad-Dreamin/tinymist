@@ -4165,9 +4165,11 @@ version = "0.12.18"
 dependencies = [
  "base64",
  "log",
+ "reflexo-typst",
  "reflexo-vec2svg",
  "serde",
  "tinymist-query",
+ "tinymist-std",
 ]
 
 [[package]]
@@ -4651,6 +4653,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-assets 0.12.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-std",
  "tokio",
  "typst",
  "typst-assets",

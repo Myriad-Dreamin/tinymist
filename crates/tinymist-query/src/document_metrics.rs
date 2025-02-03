@@ -3,10 +3,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tinymist_std::debug_loc::DataSource;
+use tinymist_std::typst::TypstDocument;
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
-    model::Document,
     syntax::Span,
     text::TextItem,
 };
@@ -142,12 +142,16 @@ struct DocumentMetricsWorker<'a> {
 }
 
 impl DocumentMetricsWorker<'_> {
-    fn work(&mut self, doc: &Document) -> Option<()> {
-        for page in &doc.pages {
-            self.work_frame(&page.frame)?;
-        }
+    fn work(&mut self, doc: &TypstDocument) -> Option<()> {
+        match doc {
+            TypstDocument::Paged(paged_doc) => {
+                for page in &paged_doc.pages {
+                    self.work_frame(&page.frame)?;
+                }
 
-        Some(())
+                Some(())
+            }
+        }
     }
 
     fn work_frame(&mut self, frame: &Frame) -> Option<()> {

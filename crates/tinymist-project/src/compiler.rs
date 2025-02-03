@@ -7,9 +7,9 @@ use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_vec, EcoString, EcoVec};
 use reflexo_typst::features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE};
-use reflexo_typst::{CompileEnv, CompileReport, Compiler, TypstDocument};
+use reflexo_typst::{CompileEnv, CompileReport, Compiler};
 use tinymist_std::error::prelude::Result;
-use tinymist_std::ImmutPath;
+use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
 };
@@ -70,7 +70,7 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     /// Using world
     pub world: CompilerWorld<F>,
     /// The last successfully compiled document.
-    pub success_doc: Option<Arc<TypstDocument>>,
+    pub success_doc: Option<TypstDocument>,
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
@@ -118,7 +118,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
         snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(doc.output), doc.warnings),
+            Ok(doc) => (Ok(TypstDocument::Paged(doc.output)), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
         CompiledArtifact {
@@ -149,7 +149,7 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     /// The diagnostics of the document.
     pub warnings: EcoVec<SourceDiagnostic>,
     /// The compiled document.
-    pub doc: SourceResult<Arc<TypstDocument>>,
+    pub doc: SourceResult<TypstDocument>,
     /// The depended files.
     pub deps: OnceLock<EcoVec<FileId>>,
 }
@@ -182,7 +182,7 @@ impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
 
 impl<F: CompilerFeat> CompiledArtifact<F> {
     /// Returns the last successfully compiled document.
-    pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
+    pub fn success_doc(&self) -> Option<TypstDocument> {
         self.doc
             .as_ref()
             .ok()
@@ -736,9 +736,9 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     deps: EcoVec<ImmutPath>,
 
     /// The latest compiled document.
-    pub(crate) latest_doc: Option<Arc<TypstDocument>>,
+    pub(crate) latest_doc: Option<TypstDocument>,
     /// The latest successly compiled document.
-    latest_success_doc: Option<Arc<TypstDocument>>,
+    latest_success_doc: Option<TypstDocument>,
     /// feature set for compile_once mode.
     once_feature_set: Arc<FeatureSet>,
     /// Shared feature set for watch mode.

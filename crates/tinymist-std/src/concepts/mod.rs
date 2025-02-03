@@ -14,6 +14,9 @@ pub use read::*;
 mod marker;
 pub use marker::*;
 
+#[cfg(feature = "typst")]
+pub mod typst;
+
 /// An immutable string.
 pub type ImmutStr = Arc<str>;
 /// An immutable byte slice.

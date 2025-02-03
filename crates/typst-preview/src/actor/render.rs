@@ -4,8 +4,8 @@ use std::sync::Arc;
 use reflexo_typst::debug_loc::{
     CharPosition, DocumentPosition, ElementPoint, SourceLocation, SourceSpanOffset,
 };
-use reflexo_typst::TypstDocument;
 use reflexo_vec2svg::IncrSvgDocServer;
+use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
@@ -138,6 +138,9 @@ impl RenderActor {
                 log::info!("RenderActor: document is not ready");
                 continue;
             };
+
+            let TypstDocument::Paged(document) = document;
+
             let data = if has_full_render {
                 if let Some(data) = self.renderer.pack_current() {
                     data

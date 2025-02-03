@@ -11,6 +11,7 @@ use std::{
 use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::CompileFontArgs;
+use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::EntryState;
@@ -142,7 +143,7 @@ pub fn compile_doc_for_test(
     let doc = typst::compile(&world).output.unwrap();
     Some(VersionedDocument {
         version: 0,
-        document: Arc::new(doc),
+        document: TypstDocument::Paged(Arc::new(doc)),
     })
 }
 

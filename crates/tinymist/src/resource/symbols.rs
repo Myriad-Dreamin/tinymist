@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
-use reflexo_typst::{vector::font::GlyphId, TypstDocument, TypstFont};
+use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
+use tinymist_std::typst::TypstDocument;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
@@ -993,7 +994,10 @@ impl ServerState {
                 .map_err(internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
+            Some(trait_symbol_fonts(
+                &TypstDocument::Paged(sym_doc.output),
+                &symbols_ref,
+            ))
         };
 
         let mut glyph_def = String::new();
@@ -1111,7 +1115,8 @@ fn trait_symbol_fonts(
 
     impl Worker<'_> {
         fn work(&mut self, doc: &TypstDocument) {
-            for (pg, s) in doc.pages.iter().zip(self.symbols.iter()) {
+            let TypstDocument::Paged(paged_doc) = doc;
+            for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
                 self.active = s;
                 self.work_frame(&pg.frame);
             }

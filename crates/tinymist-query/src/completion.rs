@@ -70,7 +70,7 @@ impl StatefulRequest for CompletionRequest {
         // assume that the completion is not explicit.
         let explicit = false;
 
-        let document = doc.as_ref().map(|doc| doc.document.as_ref());
+        let document = doc.as_ref().map(|doc| &doc.document);
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;

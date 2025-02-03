@@ -2,7 +2,7 @@
 
 use std::num::NonZeroUsize;
 
-use typst::model::Document;
+use tinymist_std::typst::TypstDocument;
 use typst::{
     layout::{Frame, FrameItem, Point, Position},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
@@ -10,38 +10,46 @@ use typst::{
 use typst_shim::syntax::LinkedNodeExt;
 
 /// Find the output location in the document for a cursor position.
-pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    if node.kind() != SyntaxKind::Text {
-        return None;
-    }
+pub fn jump_from_cursor(
+    document: &TypstDocument,
+    source: &Source,
+    cursor: usize,
+) -> Option<Position> {
+    match document {
+        TypstDocument::Paged(paged_doc) => {
+            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+            if node.kind() != SyntaxKind::Text {
+                return None;
+            }
 
-    let mut min_dis = u64::MAX;
-    let mut point = Point::default();
-    let mut ppage = 0usize;
+            let mut min_dis = u64::MAX;
+            let mut point = Point::default();
+            let mut ppage = 0usize;
 
-    let span = node.span();
-    for (idx, page) in document.pages.iter().enumerate() {
-        let t_dis = min_dis;
-        if let Some(point) = find_in_frame(&page.frame, span, &mut min_dis, &mut point) {
-            return Some(Position {
-                page: NonZeroUsize::new(idx + 1)?,
+            let span = node.span();
+            for (idx, page) in paged_doc.pages.iter().enumerate() {
+                let t_dis = min_dis;
+                if let Some(point) = find_in_frame(&page.frame, span, &mut min_dis, &mut point) {
+                    return Some(Position {
+                        page: NonZeroUsize::new(idx + 1)?,
+                        point,
+                    });
+                }
+                if t_dis != min_dis {
+                    ppage = idx;
+                }
+            }
+
+            if min_dis == u64::MAX {
+                return None;
+            }
+
+            Some(Position {
+                page: NonZeroUsize::new(ppage + 1)?,
                 point,
-            });
-        }
-        if t_dis != min_dis {
-            ppage = idx;
+            })
         }
     }
-
-    if min_dis == u64::MAX {
-        return None;
-    }
-
-    Some(Position {
-        page: NonZeroUsize::new(ppage + 1)?,
-        point,
-    })
 }
 
 /// Find the position of a span in a frame.

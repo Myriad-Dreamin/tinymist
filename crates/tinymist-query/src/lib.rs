@@ -81,9 +81,8 @@ pub use lsp_typst_boundary::*;
 
 mod prelude;
 
-use std::sync::Arc;
-
-use typst::{model::Document as TypstDocument, syntax::Source};
+use tinymist_std::typst::TypstDocument;
+use typst::syntax::Source;
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
@@ -96,7 +95,7 @@ pub struct VersionedDocument {
     /// The version of the document.
     pub version: usize,
     /// The compiled document.
-    pub document: Arc<TypstDocument>,
+    pub document: TypstDocument,
 }
 
 /// A request handler with given syntax information.
