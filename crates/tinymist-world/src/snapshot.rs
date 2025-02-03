@@ -186,7 +186,17 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         computed.get().cloned().map(WorldComputeEntry::cast)
     }
 
+    pub fn exact_provide<T: WorldComputable<F>>(&self, ins: Result<Arc<T>>) {
+        if self.provide(ins).is_err() {
+            panic!(
+                "failed to provide computed instance: {:?}",
+                std::any::type_name::<T>()
+            );
+        }
+    }
+
     /// Provides some precomputed instance.
+    #[must_use = "the result must be checked"]
     pub fn provide<T: WorldComputable<F>>(
         &self,
         ins: Result<Arc<T>>,

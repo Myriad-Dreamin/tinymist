@@ -198,6 +198,7 @@ struct ErasedExportImpl<T, E> {
 }
 
 impl<T: Send + Sync + 'static, E: Send + Sync + 'static> ErasedExport<T, E> {
+    #[must_use = "the result must be checked"]
     pub fn provide_raw(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
         f: impl Fn(&Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Option<T>>
@@ -205,7 +206,7 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> ErasedExport<T, E> {
             + Sync
             + 'static,
     ) -> Result<()> {
-        let _ = graph.provide::<TaskConfig<ErasedExportImpl<T, E>>>(Ok(Arc::new({
+        let provided = graph.provide::<TaskConfig<ErasedExportImpl<T, E>>>(Ok(Arc::new({
             TaskConfig(ErasedExportImpl {
                 f: Arc::new(move |graph| {
                     let result = f(graph)?;
@@ -217,9 +218,15 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> ErasedExport<T, E> {
                 _phantom: std::marker::PhantomData,
             })
         })));
+
+        if provided.is_err() {
+            tinymist_std::bail!("already provided")
+        }
+
         Ok(())
     }
 
+    #[must_use = "the result must be checked"]
     pub fn provide<D, C>(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<()>
     where
         D: typst::Document + Send + Sync + 'static,
@@ -241,6 +248,7 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> WorldComputable<LspComp
 pub struct ProjectExport;
 
 impl ProjectExport {
+    #[must_use = "the result must be checked"]
     pub fn provide(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<()> {
         ErasedExport::<_, PdfFlag>::provide::<TypstPagedDocument, PdfExport>(graph)?;
         ErasedExport::<_, SvgFlag>::provide::<TypstPagedDocument, SvgExport>(graph)?;
