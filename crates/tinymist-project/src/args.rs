@@ -4,6 +4,8 @@ use clap::ValueHint;
 use tinymist_std::{bail, error::prelude::Result};
 
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
+
+#[cfg(feature = "preview")]
 pub use typst_preview::{PreviewArgs, PreviewMode};
 
 use crate::model::*;
@@ -24,6 +26,7 @@ pub enum DocCommands {
 #[clap(rename_all = "kebab-case")]
 pub enum TaskCommands {
     /// Declare a preview task.
+    #[cfg(feature = "preview")]
     Preview(TaskPreviewArgs),
 }
 
@@ -252,6 +255,7 @@ impl TaskCompileArgs {
 
 /// Declare an lsp task.
 #[derive(Debug, Clone, clap::Parser)]
+#[cfg(feature = "preview")]
 pub struct TaskPreviewArgs {
     /// Argument to identify a project.
     #[clap(flatten)]

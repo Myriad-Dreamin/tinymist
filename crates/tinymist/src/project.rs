@@ -82,11 +82,15 @@ impl ServerState {
         // todo: hot replacement
         #[cfg(feature = "preview")]
         self.preview.stop_all();
-
-        let watchers = self.preview.watchers.clone();
         let editor_tx = self.editor_tx.clone();
 
-        let new_project = Self::project(&self.config, editor_tx, self.client.clone(), watchers);
+        let new_project = Self::project(
+            &self.config,
+            editor_tx,
+            self.client.clone(),
+            #[cfg(feature = "preview")]
+            self.preview.watchers.clone(),
+        );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
 
@@ -127,7 +131,7 @@ impl ServerState {
         config: &Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
-        preview: ProjectPreviewState,
+        #[cfg(feature = "preview")] preview: ProjectPreviewState,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -334,6 +338,7 @@ impl ProjectPreviewState {
 pub struct CompileHandlerImpl {
     pub(crate) analysis: Arc<Analysis>,
 
+    #[cfg(feature = "preview")]
     pub(crate) preview: ProjectPreviewState,
 
     pub(crate) export: crate::task::ExportTask,

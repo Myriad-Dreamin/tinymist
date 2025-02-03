@@ -14,10 +14,7 @@ use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp_query::OnEnter;
-use crate::project::{
-    update_lock, LspInterrupt, ProjectPreviewState, ProjectState,
-    PROJECT_ROUTE_USER_ACTION_PRIORITY,
-};
+use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
@@ -90,8 +87,15 @@ impl ServerState {
     ) -> Self {
         let formatter = FormatTask::new(config.formatter());
 
-        let watchers = ProjectPreviewState::default();
-        let handle = Self::project(&config, editor_tx.clone(), client.clone(), watchers.clone());
+        #[cfg(feature = "preview")]
+        let watchers = crate::project::ProjectPreviewState::default();
+        let handle = Self::project(
+            &config,
+            editor_tx.clone(),
+            client.clone(),
+            #[cfg(feature = "preview")]
+            watchers.clone(),
+        );
 
         Self {
             client: client.clone(),
