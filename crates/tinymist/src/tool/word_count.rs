@@ -122,6 +122,10 @@ impl TextExportWorker {
                 }
                 Ok(())
             }
+            _ => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "unsupported document type",
+            )),
         }
     }
 
@@ -209,6 +213,7 @@ impl SpanMapper {
                     self.frame(&page.frame);
                 }
             }
+            _ => {}
         }
     }
 
