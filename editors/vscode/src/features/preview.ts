@@ -99,13 +99,16 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }),
   );
 
+  const launchBrowsingPreview = launch("webview", "doc", { isBrowsing: true });
+  const launchDevPreview = launch("webview", "doc", { isDev: true });
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
+    vscode.commands.registerCommand("tinymist.browsing-preview", launchBrowsingPreview),
     vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-    vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true)),
+    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
     vscode.commands.registerCommand(
       "typst-preview.revealDocument",
       isCompat ? revealDocumentCompat : revealDocumentLsp,
@@ -143,15 +146,27 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
 
   /**
+   * Options to launch the preview.
+   *
+   * @param isBrowsing Whether to launch the preview in browsing mode. It switches the previewing
+   * document on focus change.
+   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
+   * to help the `vite dev` server connect the language server via WebSocket.
+   */
+  interface LaunchOpts {
+    isBrowsing?: boolean;
+    isDev?: boolean;
+    // isDev = false
+  }
+
+  /**
    * Gets current active editor and launches the preview.
    *
    * @param kind Which kind of preview to launch, either in external browser or in builtin vscode
    * webview.
    * @param mode The preview mode, either viewing as a document or as a slide.
-   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
-   * to help the `vite dev` server connect the language server via WebSocket.
    */
-  function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
+  function launch(kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
     return async () => {
       activeEditor = activeEditor || vscode.window.activeTextEditor;
       if (!activeEditor) {
@@ -165,7 +180,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         editor: activeEditor,
         bindDocument,
         mode,
-        isDev,
+        isBrowsing: opts?.isBrowsing || false,
+        isDev: opts?.isDev || false,
       }).catch((e) => {
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
@@ -305,7 +321,13 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-  const { kind, context, editor, bindDocument, webviewPanel, isDev, isNotPrimary } = task;
+  const { kind, context, editor, bindDocument, webviewPanel, isBrowsing, isDev, isNotPrimary } =
+    task;
+
+  if (isBrowsing) {
+    vscode.window.showInformationMessage("Please implement browsing mode");
+    return;
+  }
 
   /**
    * Can only open one preview for one document.
