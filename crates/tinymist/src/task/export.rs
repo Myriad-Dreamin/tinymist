@@ -455,7 +455,11 @@ fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ 
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::*;
+    use crate::project::CompileOnceArgs;
+    use crate::world::base::{CompileSnapshot, WorldComputeGraph};
 
     #[test]
     fn test_default_never() {
@@ -494,5 +498,25 @@ mod tests {
         assert_eq!(parse_length("1in").unwrap(), Abs::inches(1.));
         assert!(parse_length("1").is_err());
         assert!(parse_length("1px").is_err());
+    }
+
+    #[test]
+    fn compute_graph() {
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let snap = CompileSnapshot::from_world(verse.snapshot());
+
+        let graph = WorldComputeGraph::new(snap);
+
+        // let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
+        // let _ = font;
+
+        // let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
+        // let _ = font;
+
+        // assert!(FONT_COMPUTED.load(std::sync::atomic::Ordering::SeqCst));
     }
 }

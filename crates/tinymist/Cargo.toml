@@ -74,6 +74,7 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
+typst-html = { workspace = true, optional = true }
 typst-shim.workspace = true
 typst-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
@@ -83,7 +84,7 @@ unicode-script.workspace = true
 walkdir.workspace = true
 
 [features]
-default = ["cli", "preview", "embed-fonts", "no-content-hint"]
+default = ["cli", "html", "preview", "embed-fonts", "no-content-hint"]
 
 cli = ["sync-lsp/clap", "clap/wrap_help"]
 
@@ -96,6 +97,9 @@ dhat-heap = ["dhat"]
 # and additionally New Computer Modern for text
 # into the binary.
 embed-fonts = ["tinymist-project/fonts"]
+
+# Enable the experimental HTML backend.
+html = ["dep:typst-html"]
 
 # Disable the default content hint.
 # This requires modifying typst.
