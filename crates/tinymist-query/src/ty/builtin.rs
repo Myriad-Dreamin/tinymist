@@ -117,7 +117,7 @@ impl Ty {
     pub(crate) fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
         use typst::foundations::func::Repr;
         match func.inner() {
-            Repr::Element(..) | Repr::Native(..) => {
+            Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
                 if let Some(ty) = param_mapping(func, param) {
                     return ty;
                 }
@@ -133,7 +133,7 @@ impl Ty {
         use typst::foundations::func::Repr;
         match func.inner() {
             Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Element(*elem)),
-            Repr::Closure(_) => {}
+            Repr::Closure(_) | Repr::Plugin(_) => {}
             Repr::With(w) => return Ty::from_return_site(&w.0, ty),
             Repr::Native(_) => {}
         };

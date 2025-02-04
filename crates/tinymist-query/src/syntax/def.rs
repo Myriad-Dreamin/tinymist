@@ -137,7 +137,11 @@ impl ExprScope {
         // ref_expr.of = of.clone();
         // ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         // return ref_expr;
-        (of, val.cloned().map(|val| Ty::Value(InsTy::new(val))))
+        (
+            of,
+            val.cloned()
+                .map(|val| Ty::Value(InsTy::new(val.read().to_owned()))),
+        )
     }
 
     pub fn merge_into(&self, exports: &mut LexicalScope) {
@@ -150,7 +154,7 @@ impl ExprScope {
             ExprScope::Module(module) => {
                 crate::log_debug_ct!("imported: {module:?}");
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
-                for (name, _, _) in module.scope().iter() {
+                for (name, _) in module.scope().iter() {
                     let name: Interned<str> = name.into();
                     exports.insert_mut(name.clone(), select_of(v.clone(), name));
                 }
@@ -158,7 +162,7 @@ impl ExprScope {
             ExprScope::Func(func) => {
                 if let Some(scope) = func.scope() {
                     let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
-                    for (name, _, _) in scope.iter() {
+                    for (name, _) in scope.iter() {
                         let name: Interned<str> = name.into();
                         exports.insert_mut(name.clone(), select_of(v.clone(), name));
                     }
@@ -166,7 +170,7 @@ impl ExprScope {
             }
             ExprScope::Type(ty) => {
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Type(*ty))));
-                for (name, _, _) in ty.scope().iter() {
+                for (name, _) in ty.scope().iter() {
                     let name: Interned<str> = name.into();
                     exports.insert_mut(name.clone(), select_of(v.clone(), name));
                 }

@@ -287,7 +287,7 @@ impl DocsChecker<'_> {
 
         let val = module.scope().get(name)?;
         crate::log_debug_ct!("check doc type annotation: {name:?}");
-        if let Value::Content(raw) = val {
+        if let Value::Content(raw) = val.read() {
             let annotated = raw.clone().unpack::<typst::text::RawElem>().ok()?;
             let annotated = annotated.text.clone().into_value().cast::<Str>().ok()?;
             let code = typst::syntax::parse_code(&annotated.as_str().replace('\'', "θ"));

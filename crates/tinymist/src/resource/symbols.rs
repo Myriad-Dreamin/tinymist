@@ -955,13 +955,14 @@ impl ServerState {
             .world
             .library
             .std
+            .read()
             .scope()
             .ok_or_else(|| internal_error("cannot get std scope"))?;
         let sym = std
             .get("sym")
             .ok_or_else(|| internal_error("cannot get sym"))?;
 
-        if let Some(scope) = sym.scope() {
+        if let Some(scope) = sym.read().scope() {
             populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
         }
         // todo: disabling emoji module, as there is performant issue on emojis
@@ -1223,8 +1224,8 @@ fn populate_scope(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (k, v, _) in sym.iter() {
-        let Value::Symbol(sym) = v else {
+    for (k, b) in sym.iter() {
+        let Value::Symbol(sym) = b.read() else {
             continue;
         };
 

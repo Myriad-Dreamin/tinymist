@@ -56,8 +56,8 @@ impl Iface<'_> {
 fn select_scope(scope: Option<&Scope>, key: &str) -> Option<Ty> {
     let scope = scope?;
     let sub = scope.get(key)?;
-    let sub_span = scope.get_span(key).unwrap_or_else(Span::detached);
-    Some(Ty::Value(InsTy::new_at(sub.clone(), sub_span)))
+    let sub_span = sub.span();
+    Some(Ty::Value(InsTy::new_at(sub.read().clone(), sub_span)))
 }
 
 pub trait IfaceChecker: TyCtx {
