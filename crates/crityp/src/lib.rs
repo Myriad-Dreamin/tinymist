@@ -40,13 +40,13 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
 
     // Collects all benchmarks.
     let mut goals: Vec<(EcoString, &Func)> = vec![];
-    for (name, value, _) in module.scope().iter() {
+    for (name, bind) in module.scope().iter() {
         if !name.starts_with("bench") {
             continue;
         }
 
-        if let Value::Func(func) = value {
-            goals.push((eco_format!("{main_path}@{name}"), func));
+        if let Value::Func(func) = bind.read() {
+            goals.push((eco_format!("{main_path}@{name}"), &func));
         }
     }
 
