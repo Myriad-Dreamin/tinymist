@@ -3,13 +3,12 @@ use std::sync::Arc;
 
 use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint, SourceLocation, SourceSpanOffset};
 use reflexo_vec2svg::IncrSvgDocServer;
-use tinymist_std::debug_loc::LspPosition;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::{debug_loc::LspPosition, typst::TypstDocument};
 use tokio::sync::{broadcast, mpsc};
 
-use crate::{debug_loc::SpanInterner, outline::Outline};
-
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
+use crate::debug_loc::SpanInterner;
+use crate::outline::Outline;
 use crate::{ChangeCursorPositionRequest, CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
 
 #[derive(Debug, Clone)]
@@ -40,7 +39,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+    view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     renderer: IncrSvgDocServer,
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -50,8 +49,8 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
-        resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
+        view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
+        editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
@@ -137,7 +136,6 @@ impl RenderActor {
                 log::info!("RenderActor: document is not ready");
                 continue;
             };
-            let document = document.as_ref().clone();
 
             let data = if has_full_render {
                 if let Some(data) = self.renderer.pack_current() {
@@ -287,7 +285,7 @@ impl RenderActor {
 
 pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
-    document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+    document: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 
     span_interner: SpanInterner,
@@ -296,7 +294,7 @@ pub struct OutlineRenderActor {
 impl OutlineRenderActor {
     pub fn new(
         signal: broadcast::Receiver<RenderActorRequest>,
-        document: Arc<std::sync::RwLock<Option<Arc<TypstDocument>>>>,
+        document: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {

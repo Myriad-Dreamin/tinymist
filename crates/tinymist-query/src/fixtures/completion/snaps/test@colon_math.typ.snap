@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/colon_math.typ
     "labelDetails": {
      "description": "(content, b: content | none, bl: content | none, br: content | none, t: content | none, tl: content | none, tr: content | none) => attach"
     },
-    "sortText": "075",
+    "sortText": "076",
     "textEdit": {
      "newText": " attach(${1:})",
      "range": {
