@@ -7,7 +7,7 @@ use base64::Engine;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use lsp_server::RequestId;
-use reflexo_typst::TypstDict;
+use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
@@ -165,7 +165,7 @@ async fn trace_main(
     req_id: RequestId,
 ) -> ! {
     typst_timing::enable();
-    let res = typst::compile(w);
+    let res = typst::compile::<TypstPagedDocument>(w);
     let diags = match &res.output {
         Ok(_res) => res.warnings,
         Err(errors) => errors.clone(),
