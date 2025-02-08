@@ -16,6 +16,7 @@ use criterion::Criterion;
 use ecow::{eco_format, EcoString};
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
+use tinymist_std::typst_shim::eval::eval_compat;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Value};
 use typst::introspection::Introspector;
@@ -28,19 +29,11 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
     let main_source = world.source(world.main())?;
     let main_path = unix_slash(world.main().vpath().as_rooted_path());
 
-    let route = Route::default();
-    let mut sink = Sink::default();
     let traced = Traced::default();
     let introspector = Introspector::default();
 
     // Evaluates the main source file.
-    let module = typst::eval::eval(
-        ((world) as &dyn World).track(),
-        traced.track(),
-        sink.track_mut(),
-        route.track(),
-        &main_source,
-    );
+    let module = eval_compat(world, &main_source);
     let module = module
         .map_err(|e| anyhow::anyhow!("{e:?}"))
         .context("evaluation error")?;
