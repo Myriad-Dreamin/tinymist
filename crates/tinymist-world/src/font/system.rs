@@ -136,8 +136,8 @@ impl SystemFontSearcher {
         // Source3: add the fonts in memory.
         for font_data in opts.with_embedded_fonts {
             self.add_memory_font(match font_data {
-                Cow::Borrowed(data) => Bytes::from_static(data),
-                Cow::Owned(data) => Bytes::from(data),
+                Cow::Borrowed(data) => Bytes::new(data),
+                Cow::Owned(data) => Bytes::new(data),
             });
         }
 

@@ -104,7 +104,7 @@ impl SemanticRequest for InteractCodeContextRequest {
 
                     let _ = world.map_shadow_by_id(
                         mapped_source.id(),
-                        Bytes::from(mapped_source.text().as_bytes()),
+                        Bytes::new(mapped_source.text().as_bytes().to_vec()),
                     );
                     world.take_db();
 
@@ -130,7 +130,7 @@ impl SemanticRequest for InteractCodeContextRequest {
                         .collect();
                     let _ = world.map_shadow_by_id(
                         mapped_source.id(),
-                        Bytes::from(source.text().as_bytes()),
+                        Bytes::new(source.text().as_bytes().to_vec()),
                     );
 
                     Some(InteractCodeContextResponse::StyleAt { style })
