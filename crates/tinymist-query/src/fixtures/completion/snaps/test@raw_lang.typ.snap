@@ -11,7 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/raw_lang.typ
    {
     "kind": 21,
     "label": "Typst",
-    "sortText": "145",
+    "sortText": "142",
     "textEdit": {
      "newText": "typ",
      "range": {
