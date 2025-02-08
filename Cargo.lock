@@ -4188,6 +4188,7 @@ dependencies = [
  "js-sys",
  "libc",
  "log",
+ "lsp-types",
  "parking_lot",
  "path-clean",
  "rkyv",
