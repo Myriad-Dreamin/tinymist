@@ -224,9 +224,8 @@ impl ExportTask {
                     one,
                 }) => {
                     let pretty = false;
-                    let elements =
-                        reflexo_typst::query::retrieve(&snap.world, &selector, paged_doc)
-                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
+                        .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
                     }
