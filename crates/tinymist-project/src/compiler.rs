@@ -110,7 +110,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub fn compile(self) -> CompiledArtifact<F> {
         let mut snap = self;
         snap.world.set_is_compiling(true);
-        let res = ::typst::compile::<tinymist_std::typst::TypstPagedDocument>(&snap.world);
+        let res = ::typst::compile(&snap.world);
         let warned = match res.output {
             Ok(doc) => Ok(Warned {
                 output: Arc::new(doc),
