@@ -3,11 +3,11 @@
 use std::any::TypeId;
 use std::sync::{Arc, OnceLock};
 
-use ecow::EcoVec;
 use parking_lot::Mutex;
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::TypstPagedDocument;
+use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use typst::diag::{SourceResult, Warned};
+use typst::ecow::EcoVec;
 
 use crate::snapshot::CompileSnapshot;
 use crate::CompilerFeat;
@@ -136,9 +136,6 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 }
 
-pub trait Document {}
-impl Document for TypstPagedDocument {}
-
 pub trait ExportComputation<F: CompilerFeat, D> {
     type Output;
     type Config: Send + Sync + 'static;
@@ -174,18 +171,19 @@ impl<T> FlagTask<T> {
 }
 
 pub type PagedCompilationTask = CompilationTask<TypstPagedDocument>;
+pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 
 pub struct CompilationTask<D>(Option<Warned<SourceResult<Arc<D>>>>);
 
-impl<F: CompilerFeat> WorldComputable<F> for CompilationTask<TypstPagedDocument> {
+impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
+where
+    D: typst::Document + Send + Sync + 'static,
+{
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
-        let enabled = graph
-            .must_get::<FlagTask<CompilationTask<TypstPagedDocument>>>()?
-            .0
-            .enabled;
+        let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.0.enabled;
 
         Ok(Self(enabled.then(|| {
-            let compiled = typst::compile(&graph.snap.world);
+            let compiled = typst::compile::<D>(&graph.snap.world);
             Warned {
                 output: compiled.output.map(Arc::new),
                 warnings: compiled.warnings,
@@ -196,39 +194,42 @@ impl<F: CompilerFeat> WorldComputable<F> for CompilationTask<TypstPagedDocument>
 
 pub struct OptionDocumentTask<D>(pub Option<Arc<D>>);
 
-impl<F: CompilerFeat> WorldComputable<F> for OptionDocumentTask<TypstPagedDocument> {
+impl<F: CompilerFeat, D> WorldComputable<F> for OptionDocumentTask<D>
+where
+    D: typst::Document + Send + Sync + 'static,
+{
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
-        let doc = graph.compute::<CompilationTask<TypstPagedDocument>>()?;
+        let doc = graph.compute::<CompilationTask<D>>()?;
         let compiled = doc.0.as_ref().and_then(|warned| warned.output.clone().ok());
 
         Ok(Self(compiled))
     }
 }
 
-impl OptionDocumentTask<TypstPagedDocument> {
+impl<D> OptionDocumentTask<D>
+where
+    D: typst::Document + Send + Sync + 'static,
+{
     pub fn needs_run<F: CompilerFeat, C: Send + Sync + 'static>(
         graph: &Arc<WorldComputeGraph<F>>,
-        f: impl FnOnce(&Arc<WorldComputeGraph<F>>, Option<&TypstPagedDocument>, &C) -> bool,
+        f: impl FnOnce(&Arc<WorldComputeGraph<F>>, Option<&D>, &C) -> bool,
     ) -> Result<bool> {
         let Some(config) = graph.get::<ConfigTask<C>>().transpose()? else {
             return Ok(false);
         };
 
-        let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
+        let doc = graph.compute::<OptionDocumentTask<D>>()?;
         Ok(f(graph, doc.0.as_deref(), &config.0))
     }
 
-    pub fn run_export<F: CompilerFeat, T: ExportComputation<F, TypstPagedDocument>>(
+    pub fn run_export<F: CompilerFeat, T: ExportComputation<F, D>>(
         graph: &Arc<WorldComputeGraph<F>>,
     ) -> Result<Option<T::Output>> {
         if !OptionDocumentTask::needs_run(graph, T::needs_run)? {
             return Ok(None);
         }
 
-        let doc = graph
-            .compute::<OptionDocumentTask<TypstPagedDocument>>()?
-            .0
-            .clone();
+        let doc = graph.compute::<OptionDocumentTask<D>>()?.0.clone();
         let config = graph.get::<ConfigTask<T::Config>>().transpose()?;
 
         let result = doc
@@ -258,14 +259,17 @@ impl CompilationDiagnostics {
 
 pub struct DiagnosticsTask {
     paged: CompilationDiagnostics,
+    html: CompilationDiagnostics,
 }
 
 impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let paged = graph.compute::<PagedCompilationTask>()?.0.clone();
+        let html = graph.compute::<HtmlCompilationTask>()?.0.clone();
 
         Ok(Self {
             paged: CompilationDiagnostics::from_result(paged),
+            html: CompilationDiagnostics::from_result(html),
         })
     }
 }
@@ -276,6 +280,8 @@ impl DiagnosticsTask {
             .errors
             .iter()
             .chain(self.paged.warnings.iter())
+            .chain(self.html.errors.iter())
+            .chain(self.html.warnings.iter())
             .flatten()
     }
 }
@@ -319,9 +325,10 @@ impl<T: Send + Sync + 'static, E: Send + Sync + 'static> ErasedExportTask<T, E> 
     }
 
     #[must_use = "the result must be checked"]
-    pub fn provide<F: CompilerFeat, C>(graph: &Arc<WorldComputeGraph<F>>) -> Result<()>
+    pub fn provide<F: CompilerFeat, D, C>(graph: &Arc<WorldComputeGraph<F>>) -> Result<()>
     where
-        C: WorldComputable<F> + ExportComputation<F, TypstPagedDocument, Output = T>,
+        D: typst::Document + Send + Sync + 'static,
+        C: WorldComputable<F> + ExportComputation<F, D, Output = T>,
     {
         Self::provide_raw(graph, OptionDocumentTask::run_export::<F, C>)
     }
