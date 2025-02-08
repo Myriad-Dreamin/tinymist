@@ -2836,7 +2836,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "base64",
  "bitvec",
@@ -2844,10 +2844,8 @@ dependencies = [
  "dashmap",
  "ecow",
  "fxhash",
- "js-sys",
  "parking_lot",
  "path-clean",
- "reflexo-typst-shim",
  "rkyv",
  "rustc-hash 2.1.0",
  "serde",
@@ -2856,16 +2854,15 @@ dependencies = [
  "serde_with",
  "siphasher 1.0.1",
  "tiny-skia-path",
+ "tinymist-std",
  "typst",
- "typst-pdf",
- "wasm-bindgen",
  "web-time",
 ]
 
 [[package]]
 name = "reflexo-typst"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2882,11 +2879,10 @@ dependencies = [
  "rayon",
  "reflexo",
  "reflexo-typst2vec",
- "reflexo-vfs",
- "reflexo-world",
  "serde",
  "serde_json",
  "tar",
+ "tinymist-world",
  "tokio",
  "typst",
  "typst-eval",
@@ -2894,19 +2890,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "reflexo-typst-shim"
-version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
-dependencies = [
- "cfg-if",
- "typst",
- "typst-syntax 0.13.0",
-]
-
-[[package]]
 name = "reflexo-typst2vec"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "bitvec",
  "comemo",
@@ -2931,7 +2917,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "base64",
  "comemo",
@@ -2939,55 +2925,6 @@ dependencies = [
  "reflexo",
  "reflexo-typst2vec",
  "typst",
-]
-
-[[package]]
-name = "reflexo-vfs"
-version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
-dependencies = [
- "indexmap 2.7.0",
- "js-sys",
- "log",
- "nohash-hasher",
- "parking_lot",
- "reflexo",
- "rpds",
- "typst",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "reflexo-world"
-version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?tag=tinymist-nightly-v0.12.19-rc2#00b7c6049b1c979153631a147bc654469545dcc1"
-dependencies = [
- "chrono",
- "codespan-reporting",
- "comemo",
- "dirs",
- "ecow",
- "flate2",
- "fontdb",
- "hex",
- "js-sys",
- "log",
- "parking_lot",
- "reflexo",
- "reflexo-typst-shim",
- "reflexo-vfs",
- "reqwest",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "serde_with",
- "sha2",
- "strum",
- "tar",
- "typst",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4009,6 +3946,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-ansi-hl",
+ "typst-html",
  "typst-pdf",
  "typst-preview",
  "typst-render",
@@ -4201,7 +4139,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.12.18"
+version = "0.12.19-rc4"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4226,8 +4164,11 @@ dependencies = [
  "toml",
  "typst",
  "typst-assets",
+ "typst-eval",
+ "typst-html",
  "typst-pdf",
  "typst-render",
+ "typst-shim",
  "typst-svg",
 ]
 
