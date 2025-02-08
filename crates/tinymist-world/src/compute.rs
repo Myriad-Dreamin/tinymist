@@ -45,6 +45,14 @@ pub trait WorldComputable<F: CompilerFeat>: std::any::Any + Send + Sync + Sized 
     /// system world.
     ///
     /// ```rust
+    /// use std::sync::Arc;
+    ///
+    /// use tinymist_std::error::prelude::*;
+    /// use tinymist_world::{WorldComputeGraph, WorldComputable};
+    /// use tinymist_world::font::FontResolverImpl;
+    /// use tinymist_world::system::SystemCompilerFeat;
+    ///
+    ///
     /// pub struct SystemFontsOnce {
     ///     fonts: Arc<FontResolverImpl>,
     /// }
@@ -60,7 +68,7 @@ pub trait WorldComputable<F: CompilerFeat>: std::any::Any + Send + Sync + Sized 
     ///
     /// /// Computes the system fonts.
     /// fn compute_system_fonts(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) {
-    ///    let _fonts = graph.compute::<FontsOnce>().expect("font").fonts.clone();
+    ///    let _fonts = graph.compute::<SystemFontsOnce>().expect("font").fonts.clone();
     /// }
     /// ```
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self>;
