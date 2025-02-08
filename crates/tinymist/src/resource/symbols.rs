@@ -5,6 +5,7 @@ use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
 use tinymist_std::typst::TypstDocument;
+use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
@@ -985,7 +986,7 @@ impl ServerState {
                 ..Default::default()
             });
             forked
-                .map_shadow_by_id(forked.main(), math_shaping_text.into_bytes().into())
+                .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
                 .map_err(|e| error_once!("cannot map shadow", err: e))
                 .map_err(internal_error)?;
 
