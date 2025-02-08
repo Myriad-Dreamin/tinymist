@@ -66,7 +66,6 @@ impl fmt::Display for FullTextDigest {
                 }
                 Ok(())
             }
-            _ => Err(fmt::Error),
         }
     }
 }

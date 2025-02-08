@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use reflexo_typst::{Bytes, CompilerFeat, EntryReader};
-use tinymist_project::{HtmlExport, LspCompilerFeat, PdfExport, PngExport, SvgExport, TaskWhen};
+use reflexo_typst::Bytes;
+use tinymist_project::{EntryReader, LspCompilerFeat, PdfExport, PngExport, SvgExport, TaskWhen};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tinymist_task::ExportTimings;
@@ -13,8 +13,8 @@ use typst::diag::SourceResult;
 use crate::project::{ExportMarkdownTask, ExportTextTask, ProjectTask};
 use crate::tool::text::FullTextDigest;
 use crate::world::base::{
-    ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, HtmlCompilationTask,
-    OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
+    CompilerFeat, ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, OptionDocumentTask,
+    PagedCompilationTask, WorldComputable, WorldComputeGraph,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -24,7 +24,6 @@ impl ProjectCompilation {
     pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
         let paged_diag = Some(TaskWhen::OnType);
-        let html_diag = Some(TaskWhen::Never);
 
         let pdf: Option<TaskWhen> = graph
             .get::<ConfigTask<<PdfExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
@@ -36,10 +35,6 @@ impl ProjectCompilation {
             .map(|config| config.export.when);
         let png: Option<TaskWhen> = graph
             .get::<ConfigTask<<PngExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
-            .transpose()?
-            .map(|config| config.export.when);
-        let html: Option<TaskWhen> = graph
-            .get::<ConfigTask<<HtmlExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
             .map(|config| config.export.when);
         let md: Option<TaskWhen> = graph
@@ -55,12 +50,10 @@ impl ProjectCompilation {
         let check = |timing| ExportTimings::needs_run(&graph.snap, timing, doc).unwrap_or(true);
 
         let compile_paged = [paged_diag, pdf, svg, png, text, md].into_iter().any(check);
-        let compile_html = [html_diag, html].into_iter().any(check);
 
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(compile_paged)));
-        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(compile_html)));
 
-        Ok(compile_paged || compile_html)
+        Ok(compile_paged)
     }
 }
 
@@ -77,15 +70,12 @@ impl<F: CompilerFeat> WorldComputable<F> for ProjectCompilation {
 pub struct ProjectExport;
 
 impl ProjectExport {
-    fn export_bytes<
-        D: typst::Document + Send + Sync + 'static,
-        T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
-    >(
+    fn export_bytes<T: ExportComputation<LspCompilerFeat, TypstPagedDocument, Output = Bytes>>(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
         when: Option<TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
-        let doc = graph.compute::<OptionDocumentTask<D>>()?;
+        let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
         let doc = doc.as_ref();
         let n = ExportTimings::needs_run(&graph.snap, when, doc.as_deref()).unwrap_or(true);
         if !n {
@@ -96,15 +86,12 @@ impl ProjectExport {
         res.transpose()
     }
 
-    fn export_string<
-        D: typst::Document + Send + Sync + 'static,
-        T: ExportComputation<LspCompilerFeat, D, Output = String>,
-    >(
+    fn export_string<T: ExportComputation<LspCompilerFeat, TypstPagedDocument, Output = String>>(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
         when: Option<TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
-        let doc = graph.compute::<OptionDocumentTask<D>>()?;
+        let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
         let doc = doc.as_ref();
         let n = ExportTimings::needs_run(&graph.snap, when, doc.as_deref()).unwrap_or(true);
         if !n {
@@ -112,7 +99,11 @@ impl ProjectExport {
         }
 
         let doc = doc.as_ref();
-        let res = doc.map(|doc| T::run(graph, doc, config).map(Bytes::from_string));
+        let res = doc.map(|doc| {
+            T::run(graph, doc, config)
+                .map(String::into_bytes)
+                .map(Bytes::from)
+        });
         res.transpose()
     }
 }
@@ -133,10 +124,10 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
             use ProjectTask::*;
             match config.as_ref() {
                 Preview(..) => todo!(),
-                ExportPdf(config) => Self::export_bytes::<_, PdfExport>(graph, when, config),
-                ExportPng(config) => Self::export_bytes::<_, PngExport>(graph, when, config),
-                ExportSvg(config) => Self::export_string::<_, SvgExport>(graph, when, config),
-                ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
+                ExportPdf(config) => Self::export_bytes::<PdfExport>(graph, when, config),
+                ExportPng(config) => Self::export_bytes::<PngExport>(graph, when, config),
+                ExportSvg(config) => Self::export_string::<SvgExport>(graph, when, config),
+                ExportHtml(_config) => todo!(),
                 ExportMd(_config) => {
                     let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
                     let doc = doc.as_ref();
@@ -146,9 +137,11 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                         return Ok(None);
                     }
 
-                    Ok(TypliteMdExport::run(graph)?.map(Bytes::from_string))
+                    Ok(TypliteMdExport::run(graph)?
+                        .map(String::into_bytes)
+                        .map(Bytes::from))
                 }
-                ExportText(config) => Self::export_string::<_, TextExport>(graph, when, config),
+                ExportText(config) => Self::export_string::<TextExport>(graph, when, config),
                 Query(..) => todo!(),
             }
         };
