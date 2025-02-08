@@ -61,6 +61,8 @@ pub trait WorldComputable<F: CompilerFeat>: std::any::Any + Send + Sync + Sized 
     /// }
     ///
     /// impl WorldComputable<SystemCompilerFeat> for SystemFontsOnce {
+    ///     type Output = Self;
+    ///
     ///     fn compute(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) -> Result<Self> {
     ///
     ///         Ok(Self {
