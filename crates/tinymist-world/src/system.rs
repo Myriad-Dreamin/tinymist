@@ -116,15 +116,13 @@ mod tests {
 
     #[test]
     fn test_args() {
-        use tinymist_std::typst::TypstPagedDocument;
-
         let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
         let verse = args
             .resolve_system()
             .expect("failed to resolve system universe");
 
         let world = verse.snapshot();
-        let _res = typst::compile::<TypstPagedDocument>(&world);
+        let _res = typst::compile(&world);
     }
 
     static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);
