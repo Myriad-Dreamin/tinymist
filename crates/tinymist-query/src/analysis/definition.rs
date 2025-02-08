@@ -164,7 +164,7 @@ fn ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::new(name);
+    let label = Label::construct(name.into());
     let sel = Selector::Label(label);
 
     // if it is a label, we put the selection range to itself
