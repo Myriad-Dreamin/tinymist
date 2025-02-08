@@ -106,7 +106,7 @@ impl ServerState {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(
             req_id,
-            ProjectTask::ExportMarkdown(ExportMarkdownTask {
+            ProjectTask::ExportMd(ExportMarkdownTask {
                 export: ExportTask::default(),
             }),
             opts.open.unwrap_or_default(),

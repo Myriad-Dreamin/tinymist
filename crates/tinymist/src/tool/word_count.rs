@@ -1,12 +1,12 @@
 //! Word count tool for documents.
 
-use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
-use reflexo_typst::{debug_loc::SourceSpanOffset, exporter_utils::map_err};
+use reflexo_typst::debug_loc::SourceSpanOffset;
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
+use tinymist_task::TextExport;
 use typst::{syntax::Span, text::TextItem};
 use unicode_script::{Script, UnicodeScript};
 
@@ -36,8 +36,7 @@ pub fn word_count(doc: &TypstDocument) -> WordsCount {
     let mut spaces = 0;
 
     // First, get text representation of the document.
-    let w = TextExporter::default();
-    let content = w.collect(doc).unwrap();
+    let content = TextExport::run_on_doc(doc).unwrap_or_default();
 
     /// A automaton to count words.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,60 +88,6 @@ pub fn word_count(doc: &TypstDocument) -> WordsCount {
         chars,
         spaces,
         cjk_chars,
-    }
-}
-
-/// Export text content from a document.
-#[derive(Debug, Clone, Default)]
-pub struct TextExporter {}
-
-impl TextExporter {
-    /// Collect text content from a document.
-    pub fn collect(&self, output: &TypstDocument) -> typst::diag::SourceResult<String> {
-        let w = std::io::BufWriter::new(Vec::new());
-
-        let mut d = TextExportWorker { w };
-        d.doc(output).map_err(map_err)?;
-
-        d.w.flush().unwrap();
-        Ok(String::from_utf8(d.w.into_inner().unwrap()).unwrap())
-    }
-}
-
-struct TextExportWorker {
-    w: std::io::BufWriter<Vec<u8>>,
-}
-
-impl TextExportWorker {
-    fn doc(&mut self, doc: &TypstDocument) -> io::Result<()> {
-        match doc {
-            TypstDocument::Paged(paged_doc) => {
-                for page in paged_doc.pages.iter() {
-                    self.frame(&page.frame)?;
-                }
-                Ok(())
-            }
-        }
-    }
-
-    fn frame(&mut self, doc: &typst::layout::Frame) -> io::Result<()> {
-        for (_, item) in doc.items() {
-            self.item(item)?;
-        }
-
-        Ok(())
-    }
-
-    fn item(&mut self, item: &typst::layout::FrameItem) -> io::Result<()> {
-        use typst::layout::FrameItem::*;
-        match item {
-            Group(g) => self.frame(&g.frame),
-            Text(t) => {
-                write!(self.w, " {}", t.text.as_str())
-            }
-            Link(..) | Shape(..) | Image(..) => self.w.write_all(b"object"),
-            Tag(..) => Ok(()),
-        }
     }
 }
 

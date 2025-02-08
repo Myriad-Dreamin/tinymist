@@ -36,6 +36,7 @@ mod utils;
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
+pub use task::export2 as export;
 pub use task::UserActionTask;
 pub use tinymist_project::world;
 pub use tinymist_query as query;

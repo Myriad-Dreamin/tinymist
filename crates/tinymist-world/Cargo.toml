@@ -64,8 +64,5 @@ system = [
     "tinymist-vfs/system",
 ]
 
-[dev-dependencies]
-tinymist-world = { path = ".", features = ["system"] }
-
 [lints]
 workspace = true

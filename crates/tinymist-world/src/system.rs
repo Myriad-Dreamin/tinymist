@@ -29,6 +29,8 @@ impl crate::CompilerFeat for SystemCompilerFeat {
 pub type TypstSystemUniverse = crate::world::CompilerUniverse<SystemCompilerFeat>;
 /// The compiler world in system environment.
 pub type TypstSystemWorld = crate::world::CompilerWorld<SystemCompilerFeat>;
+/// The compute graph in system environment.
+pub type SystemWorldComputeGraph = crate::WorldComputeGraph<SystemCompilerFeat>;
 
 impl TypstSystemUniverse {
     /// Create [`TypstSystemWorld`] with the given options.
@@ -116,13 +118,15 @@ mod tests {
 
     #[test]
     fn test_args() {
+        use tinymist_std::typst::TypstPagedDocument;
+
         let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
         let verse = args
             .resolve_system()
             .expect("failed to resolve system universe");
 
         let world = verse.snapshot();
-        let _res = typst::compile(&world);
+        let _res = typst::compile::<TypstPagedDocument>(&world);
     }
 
     static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);
@@ -132,6 +136,8 @@ mod tests {
     }
 
     impl WorldComputable<SystemCompilerFeat> for FontsOnce {
+        type Output = Self;
+
         fn compute(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) -> Result<Self> {
             // Ensure that this function is only called once.
             if FONT_COMPUTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
