@@ -126,7 +126,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         ins: Result<Arc<T::Output>>,
     ) -> Result<(), Result<Arc<T::Output>>> {
         let entry = self.computed(TypeId::of::<T>()).computed;
-        let initialized = entry.set(ins.map(|e| Arc::new(e) as AnyArc));
+        let initialized = entry.set(ins.map(|e| e as AnyArc));
         initialized.map_err(WorldComputeEntry::cast)
     }
 
