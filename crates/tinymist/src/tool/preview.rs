@@ -77,7 +77,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
+        let cursor =
+            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if node.kind() != SyntaxKind::Text {
@@ -94,8 +95,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
+        let line = src_loc.pos.line as usize;
+        let column = src_loc.pos.character as usize;
 
         let doc = self.snap.success_doc();
         let Some(doc) = doc.as_ref() else {

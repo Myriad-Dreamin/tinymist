@@ -322,24 +322,24 @@ pub struct DocToSrcJumpInfo {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
     filepath: PathBuf,
-    line: usize,
+    line: u32,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: usize,
+    character: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolveSourceLocRequest {
     filepath: PathBuf,
-    line: usize,
+    line: u32,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: usize,
+    character: u32,
 }
 
 impl ResolveSourceLocRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line, self.character)
+        src.line_column_to_byte(self.line as usize, self.character as usize)
     }
 }
 
