@@ -1,0 +1,30 @@
+{
+	"$schema": "vscode://schemas/workspaceConfig",
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"tinymist.fontPaths": [
+			"assets/fonts"
+		],
+		"[javascript]":{
+			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+		},
+		"[json]": {
+			"editor.formatOnSave": true,
+			"editor.defaultFormatter": "esbenp.prettier-vscode"
+		},
+		"eslint.format.enable": true,
+		"eslint.workingDirectories": [
+			"editors/vscode"
+		],
+		"rust-analyzer.check.command": "clippy",
+		"rust-analyzer.rustfmt.extraArgs": ["--config=wrap_comments=true"],
+		"files.watcherExclude": {
+			"**/target": true
+		},
+	},
+}
