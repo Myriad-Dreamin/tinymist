@@ -90,7 +90,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     /// Runs the compiler and returns the compiled document.
     pub fn from_snapshot(mut snap: CompileSnapshot<F>) -> CompiledArtifact<F> {
         snap.world.set_is_compiling(true);
-        let res = ::typst::compile(&snap.world);
+        let res = ::typst::compile::<tinymist_std::typst::TypstPagedDocument>(&snap.world);
         let warned = match res.output {
             Ok(doc) => Ok(Warned {
                 output: Arc::new(doc),

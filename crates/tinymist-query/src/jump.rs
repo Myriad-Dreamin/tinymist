@@ -49,6 +49,7 @@ pub fn jump_from_cursor(
                 point,
             })
         }
+        _ => None,
     }
 }
 
