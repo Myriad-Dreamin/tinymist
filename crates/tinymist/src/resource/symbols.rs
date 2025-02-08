@@ -1153,8 +1153,6 @@ fn trait_symbol_fonts(
                     | FrameItem::Image(_, _, _)
                     | FrameItem::Link(_, _)
                     | FrameItem::Tag(_) => continue,
-                    #[cfg(not(feature = "no-content-hint"))]
-                    FrameItem::ContentHint(_) => continue,
                 };
 
                 let font = text.font.clone();

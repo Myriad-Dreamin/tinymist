@@ -37,7 +37,7 @@ insta.workspace = true
 regex.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint"]
+default = ["cli", "embed-fonts"]
 clap = ["dep:clap"]
 cli = ["clap", "clap/wrap_help"]
 
@@ -48,10 +48,6 @@ cli = ["clap", "clap/wrap_help"]
 # and additionally New Computer Modern for text
 # into the binary.
 embed-fonts = ["tinymist-project/fonts"]
-
-# Disable the default content hint.
-# This requires modifying typst.
-no-content-hint = ["tinymist-project/no-content-hint"]
 
 # [lints]
 # workspace = true
