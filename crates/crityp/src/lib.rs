@@ -55,6 +55,7 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
         let route = Route::default();
         let mut sink = Sink::default();
         let engine = &mut Engine {
+            routines: &typst::ROUTINES,
             world: ((world) as &dyn World).track(),
             introspector: introspector.track(),
             traced: traced.track(),
