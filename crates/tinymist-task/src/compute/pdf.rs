@@ -2,6 +2,7 @@ use super::*;
 
 pub use typst_pdf::pdf;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
+pub use typst_pdf::Timestamp as TypstTimestamp;
 pub struct PdfExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
@@ -23,7 +24,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
 
         // todo: Some(pdf_uri.as_str())
 
-        Ok(Bytes::from(typst_pdf::pdf(
+        Ok(Bytes::new(typst_pdf::pdf(
             doc,
             &PdfOptions {
                 timestamp: convert_datetime(creation_timestamp),
