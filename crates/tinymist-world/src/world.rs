@@ -40,7 +40,9 @@ type CodespanError = codespan_reporting::files::Error;
 
 /// A universe that provides access to the operating system.
 ///
-/// Use [`CompilerUniverse::new`] to create a new universe.
+/// Use [`CompilerUniverse::new_raw`] to create a new universe. The concrete
+/// implementation usually wraps this function with a more user-friendly `new`
+/// function.
 /// Use [`CompilerUniverse::snapshot`] to create a new world.
 #[derive(Debug)]
 pub struct CompilerUniverse<F: CompilerFeat> {
