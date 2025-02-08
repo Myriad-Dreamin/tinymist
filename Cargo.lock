@@ -4090,7 +4090,6 @@ dependencies = [
  "parking_lot",
  "pathdiff",
  "rayon",
- "reflexo-typst",
  "rpds",
  "semver",
  "serde",
