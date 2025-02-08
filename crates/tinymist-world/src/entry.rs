@@ -104,8 +104,8 @@ impl EntryState {
         }
     }
 
-    pub fn select_in_workspace(&self, id: &Path) -> EntryState {
-        let id = WorkspaceResolver::workspace_file(self.root.as_ref(), VirtualPath::new(id));
+    pub fn select_in_workspace(&self, path: &Path) -> EntryState {
+        let id = WorkspaceResolver::workspace_file(self.root.as_ref(), VirtualPath::new(path));
 
         Self {
             root: self.root.clone(),
@@ -113,20 +113,20 @@ impl EntryState {
         }
     }
 
-    pub fn try_select_path_in_workspace(&self, p: &Path) -> Result<Option<EntryState>> {
+    pub fn try_select_path_in_workspace(&self, path: &Path) -> Result<Option<EntryState>> {
         Ok(match self.workspace_root() {
-            Some(root) => match p.strip_prefix(&root) {
-                Ok(p) => Some(EntryState::new_rooted(
+            Some(root) => match path.strip_prefix(&root) {
+                Ok(path) => Some(EntryState::new_rooted(
                     root.clone(),
-                    Some(VirtualPath::new(p)),
+                    Some(VirtualPath::new(path)),
                 )),
-                Err(e) => {
+                Err(err) => {
                     return Err(
-                        error_once!("entry file is not in workspace", err: e, entry: p.display(), root: root.display()),
+                        error_once!("entry file is not in workspace", err: err, entry: path.display(), root: root.display()),
                     )
                 }
             },
-            None => EntryState::new_rooted_by_parent(p.into()),
+            None => EntryState::new_rooted_by_parent(path.into()),
         })
     }
 
