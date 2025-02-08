@@ -239,7 +239,7 @@ impl DocsChecker<'_> {
                 .chain([
                     Type::of::<typst::visualize::Color>(),
                     Type::of::<typst::visualize::Gradient>(),
-                    Type::of::<typst::visualize::Pattern>(),
+                    Type::of::<typst::visualize::Tiling>(),
                     Type::of::<typst::foundations::Symbol>(),
                     Type::of::<typst::foundations::Version>(),
                     Type::of::<typst::foundations::Bytes>(),
