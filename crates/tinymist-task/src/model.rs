@@ -69,7 +69,7 @@ pub enum ProjectTask {
     /// An export HTML task.
     ExportHtml(ExportHtmlTask),
     /// An export Markdown task.
-    ExportMarkdown(ExportMarkdownTask),
+    ExportMd(ExportMarkdownTask),
     /// An export Text task.
     ExportText(ExportTextTask),
     /// An query task.
@@ -88,7 +88,7 @@ impl ProjectTask {
             | Self::ExportPng(..)
             | Self::ExportSvg(..)
             | Self::ExportHtml(..)
-            | Self::ExportMarkdown(..)
+            | Self::ExportMd(..)
             | Self::ExportText(..)
             | Self::Query(..) => self.as_export()?.when,
         })
@@ -102,7 +102,7 @@ impl ProjectTask {
             Self::ExportPng(task) => &task.export,
             Self::ExportSvg(task) => &task.export,
             Self::ExportHtml(task) => &task.export,
-            Self::ExportMarkdown(task) => &task.export,
+            Self::ExportMd(task) => &task.export,
             Self::ExportText(task) => &task.export,
             Self::Query(task) => &task.export,
         })
@@ -113,7 +113,7 @@ impl ProjectTask {
         match self {
             Self::ExportPdf { .. } => "pdf",
             Self::Preview(..) | Self::ExportHtml { .. } => "html",
-            Self::ExportMarkdown { .. } => "md",
+            Self::ExportMd { .. } => "md",
             Self::ExportText { .. } => "txt",
             Self::ExportSvg { .. } => "svg",
             Self::ExportPng { .. } => "png",
@@ -211,7 +211,7 @@ pub enum ExportTransform {
 }
 
 /// An export pdf task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportPdfTask {
     /// The shared export arguments.
@@ -247,7 +247,7 @@ pub struct ExportPngTask {
 }
 
 /// An export svg task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportSvgTask {
     /// The shared export arguments.
@@ -256,7 +256,7 @@ pub struct ExportSvgTask {
 }
 
 /// An export html task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportHtmlTask {
     /// The shared export arguments.
@@ -265,7 +265,7 @@ pub struct ExportHtmlTask {
 }
 
 /// An export markdown task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportMarkdownTask {
     /// The shared export arguments.
@@ -274,7 +274,7 @@ pub struct ExportMarkdownTask {
 }
 
 /// An export text task specifier.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportTextTask {
     /// The shared export arguments.

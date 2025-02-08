@@ -77,6 +77,7 @@ typst-timing.workspace = true
 typst-shim.workspace = true
 typst-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
+tinymist-task.workspace = true
 typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
@@ -101,6 +102,7 @@ embed-fonts = ["tinymist-project/fonts"]
 # This requires modifying typst.
 no-content-hint = [
     "tinymist-query/no-content-hint",
+    "tinymist-task/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",
 ]

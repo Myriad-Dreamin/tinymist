@@ -1,7 +1,31 @@
-//! Text export utilities.
-
 use core::fmt;
-use tinymist_std::typst::TypstDocument;
+use std::sync::Arc;
+
+use crate::ExportTextTask;
+use tinymist_std::error::prelude::*;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
+
+pub struct TextExport;
+
+impl TextExport {
+    pub fn run_on_doc(doc: &TypstDocument) -> Result<String> {
+        Ok(format!("{}", FullTextDigest(doc.clone())))
+    }
+}
+
+impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for TextExport {
+    type Output = String;
+    type Config = ExportTextTask;
+
+    fn run(
+        _g: &Arc<WorldComputeGraph<F>>,
+        doc: &Arc<TypstPagedDocument>,
+        _config: &ExportTextTask,
+    ) -> Result<String> {
+        Self::run_on_doc(&TypstDocument::Paged(doc.clone()))
+    }
+}
 
 /// A full text digest of a document.
 pub struct FullTextDigest(pub TypstDocument);

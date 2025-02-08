@@ -104,12 +104,6 @@ pub struct DocIdArgs {
     pub input: String,
 }
 
-impl From<&ResourcePath> for Id {
-    fn from(value: &ResourcePath) -> Self {
-        Id::new(value.to_string())
-    }
-}
-
 impl From<&DocIdArgs> for Id {
     fn from(args: &DocIdArgs) -> Self {
         if let Some(id) = &args.name {

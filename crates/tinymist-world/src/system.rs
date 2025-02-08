@@ -29,6 +29,8 @@ impl crate::CompilerFeat for SystemCompilerFeat {
 pub type TypstSystemUniverse = crate::world::CompilerUniverse<SystemCompilerFeat>;
 /// The compiler world in system environment.
 pub type TypstSystemWorld = crate::world::CompilerWorld<SystemCompilerFeat>;
+/// The compute graph in system environment.
+pub type SystemWorldComputeGraph = crate::WorldComputeGraph<SystemCompilerFeat>;
 
 impl TypstSystemUniverse {
     /// Create [`TypstSystemWorld`] with the given options.
@@ -132,6 +134,8 @@ mod tests {
     }
 
     impl WorldComputable<SystemCompilerFeat> for FontsOnce {
+        type Output = Self;
+
         fn compute(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) -> Result<Self> {
             // Ensure that this function is only called once.
             if FONT_COMPUTED.swap(true, std::sync::atomic::Ordering::SeqCst) {

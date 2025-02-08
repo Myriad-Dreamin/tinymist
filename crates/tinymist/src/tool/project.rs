@@ -278,7 +278,7 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             ProjectTask::ExportSvg(..) => {
                 cmd.push("--format=svg");
             }
-            ProjectTask::ExportMarkdown(..) => {
+            ProjectTask::ExportMd(..) => {
                 cmd.push("--format=md");
             }
             ProjectTask::ExportPng(..) => {

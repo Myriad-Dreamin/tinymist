@@ -4011,6 +4011,7 @@ dependencies = [
  "tinymist-query",
  "tinymist-render",
  "tinymist-std",
+ "tinymist-task",
  "tokio",
  "tokio-util",
  "toml",
@@ -4096,6 +4097,7 @@ dependencies = [
  "serde_json",
  "tinymist-derive",
  "tinymist-std",
+ "tinymist-task",
  "tinymist-world",
  "tokio",
  "toml",
@@ -4208,6 +4210,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymist-task"
+version = "0.12.18"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "comemo",
+ "dirs",
+ "ecow",
+ "log",
+ "notify",
+ "parking_lot",
+ "pathdiff",
+ "rayon",
+ "rpds",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tinymist-derive",
+ "tinymist-std",
+ "tinymist-world",
+ "tokio",
+ "toml",
+ "typst",
+ "typst-assets",
+ "typst-pdf",
+ "typst-render",
+ "typst-shim",
+ "typst-svg",
+]
+
+[[package]]
 name = "tinymist-vfs"
 version = "0.12.18"
 dependencies = [
@@ -4252,7 +4287,6 @@ dependencies = [
  "tar",
  "tinymist-std",
  "tinymist-vfs",
- "tinymist-world",
  "typst",
  "typst-assets",
  "wasm-bindgen",

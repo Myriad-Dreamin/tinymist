@@ -9,24 +9,24 @@ use crate::project::{
 };
 use anyhow::bail;
 use reflexo::ImmutPath;
-use reflexo_typst::{TypstAbs as Abs, TypstDatetime};
+use reflexo_typst::TypstDatetime;
 use tinymist_project::{
     convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
-    ExportTransform, LspCompiledArtifact, Pages, ProjectTask, QueryTask,
+    LspCompiledArtifact, ProjectTask, QueryTask,
 };
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
+use tinymist_task::get_page_selection;
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
-use typst::syntax::{ast, SyntaxNode};
 use typst::visualize::Color;
 use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
-use super::*;
+use super::{FutureFolder, SyncTaskFactory};
 
 #[derive(Clone)]
 pub struct ExportTask {
@@ -251,7 +251,7 @@ impl ExportTask {
                 ExportText(ExportTextTask { export: _ }) => {
                     format!("{}", FullTextDigest(doc.clone())).into_bytes()
                 }
-                ExportMarkdown(ExportMarkdownTask { export: _ }) => {
+                ExportMd(ExportMarkdownTask { export: _ }) => {
                     let conv = Typlite::new(Arc::new(snap.world))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
@@ -392,66 +392,14 @@ fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> anyhow
     })
 }
 
-/// Gets legacy page selection
-pub fn get_page_selection(task: &tinymist_project::ExportTask) -> Result<(bool, Abs)> {
-    let is_first = task
-        .transform
-        .iter()
-        .any(|t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]));
-
-    let mut gap_res = Abs::default();
-    if !is_first {
-        for trans in &task.transform {
-            if let ExportTransform::Merge { gap } = trans {
-                let gap = gap
-                    .as_deref()
-                    .map(parse_length)
-                    .transpose()
-                    .context_ut("failed to parse gap")?;
-                gap_res = gap.unwrap_or_default();
-            }
-        }
-    }
-
-    Ok((is_first, gap_res))
-}
-
-fn parse_length(gap: &str) -> anyhow::Result<Abs> {
-    let length = typst::syntax::parse_code(gap);
-    if length.erroneous() {
-        bail!("invalid length: {gap}, errors: {:?}", length.errors());
-    }
-
-    let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);
-
-    let Some(length) = length else {
-        bail!("not a length: {gap}");
-    };
-
-    let (value, unit) = length.get();
-    match unit {
-        ast::Unit::Pt => Ok(Abs::pt(value)),
-        ast::Unit::Mm => Ok(Abs::mm(value)),
-        ast::Unit::Cm => Ok(Abs::cm(value)),
-        ast::Unit::In => Ok(Abs::inches(value)),
-        _ => bail!("invalid unit: {unit:?} in {gap}"),
-    }
-}
-
-/// Low performance but simple recursive iterator.
-fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ {
-    let mut res = vec![];
-    for child in node.children() {
-        res.push(child);
-        res.extend(descendants(child));
-    }
-
-    res
-}
-
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::*;
+    use crate::export::ProjectCompilation;
+    use crate::project::{CompileOnceArgs, ExportSignal};
+    use crate::world::base::{CompileSnapshot, WorldComputeGraph};
 
     #[test]
     fn test_default_never() {
@@ -483,12 +431,43 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_length() {
-        assert_eq!(parse_length("1pt").unwrap(), Abs::pt(1.));
-        assert_eq!(parse_length("1mm").unwrap(), Abs::mm(1.));
-        assert_eq!(parse_length("1cm").unwrap(), Abs::cm(1.));
-        assert_eq!(parse_length("1in").unwrap(), Abs::inches(1.));
-        assert!(parse_length("1").is_err());
-        assert!(parse_length("1px").is_err());
+    fn compilation_default_never() {
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let snap = CompileSnapshot::from_world(verse.snapshot());
+
+        let graph = WorldComputeGraph::new(snap);
+
+        let needs_run =
+            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
+
+        assert!(!needs_run);
+    }
+
+    // todo: on demand compilation
+    #[test]
+    fn compilation_run_paged_diagnostics() {
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let mut snap = CompileSnapshot::from_world(verse.snapshot());
+
+        snap.signal = ExportSignal {
+            by_entry_update: true,
+            by_fs_events: false,
+            by_mem_events: false,
+        };
+
+        let graph = WorldComputeGraph::new(snap);
+
+        let needs_run =
+            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
+
+        assert!(needs_run);
     }
 }
