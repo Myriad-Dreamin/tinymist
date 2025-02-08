@@ -423,12 +423,15 @@ pub fn truncated_repr(value: &Value) -> EcoString {
 }
 
 /// Run a function with a VM instance in the world
-pub fn with_vm<T>(world: Tracked<dyn World + '_>, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+pub fn with_vm<T>(
+    world: Tracked<dyn World + '_>,
+    f: impl FnOnce(&mut typst_shim::eval::Vm) -> T,
+) -> T {
     use comemo::Track;
     use typst::engine::*;
-    use typst::eval::*;
     use typst::foundations::*;
     use typst::introspection::*;
+    use typst_shim::eval::*;
 
     let introspector = Introspector::default();
     let traced = Traced::default();
