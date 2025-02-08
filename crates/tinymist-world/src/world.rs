@@ -567,6 +567,16 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             .clone_source_cache()
             .evict(self.vfs.revision(), threshold);
     }
+
+    /// A list of all available packages and optionally descriptions for them.
+    ///
+    /// This function is optional to implement. It enhances the user experience
+    /// by enabling autocompletion for packages. Details about packages from the
+    /// `@preview` namespace are available from
+    /// `https://packages.typst.org/preview/index.json`.
+    pub fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+        self.registry.packages()
+    }
 }
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
@@ -686,16 +696,6 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             naive.month().try_into().ok()?,
             naive.day().try_into().ok()?,
         )
-    }
-
-    /// A list of all available packages and optionally descriptions for them.
-    ///
-    /// This function is optional to implement. It enhances the user experience
-    /// by enabling autocompletion for packages. Details about packages from the
-    /// `@preview` namespace are available from
-    /// `https://packages.typst.org/preview/index.json`.
-    fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
-        self.registry.packages()
     }
 }
 
