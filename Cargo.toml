@@ -266,9 +266,7 @@ typst-render = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist
 typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
 typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.19-rc2-content-hint" }
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9", features = [
-    "fonts",
-] }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
