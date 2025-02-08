@@ -4242,7 +4242,6 @@ dependencies = [
  "typst-assets",
  "typst-pdf",
  "typst-render",
- "typst-shim",
  "typst-svg",
 ]
 

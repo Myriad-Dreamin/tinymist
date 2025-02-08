@@ -844,6 +844,7 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
 
             positions
         }
+        _ => vec![],
     }
 }
 

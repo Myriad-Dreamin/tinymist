@@ -151,6 +151,7 @@ impl DocumentMetricsWorker<'_> {
 
                 Some(())
             }
+            _ => None,
         }
     }
 
