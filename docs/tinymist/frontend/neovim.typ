@@ -79,7 +79,7 @@ formatterMode = "typstyle"
 == Live Preview
 <live-preview>
 
-Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading (#link("https://pwmt.org/projects/zathura/")[zatuhra] is good).
+Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading (#link("https://pwmt.org/projects/zathura/")[zathura] is good).
 
 *Web Preview*
 
