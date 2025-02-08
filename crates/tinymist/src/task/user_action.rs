@@ -172,7 +172,7 @@ async fn trace_main(
     };
     let mut writer = std::io::BufWriter::new(Vec::new());
     let _ = typst_timing::export_json(&mut writer, |span| {
-        resolve_span(w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+        resolve_span(w, Span::from_raw(span)).unwrap_or_else(|| ("unknown".to_string(), 0))
     });
 
     let timings = writer.into_inner().unwrap();
