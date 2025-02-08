@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
@@ -988,14 +989,14 @@ impl ServerState {
                 .map_err(|e| error_once!("cannot map shadow", err: e))
                 .map_err(internal_error)?;
 
-            let sym_doc = std::marker::PhantomData
-                .compile(&forked, &mut Default::default())
+            let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
+                .output
                 .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
                 .map_err(internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
             Some(trait_symbol_fonts(
-                &TypstDocument::Paged(sym_doc.output),
+                &TypstDocument::Paged(Arc::new(sym_doc)),
                 &symbols_ref,
             ))
         };

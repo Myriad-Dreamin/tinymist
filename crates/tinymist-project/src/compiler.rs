@@ -6,19 +6,17 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_vec, EcoString, EcoVec};
-use reflexo_typst::features::{CompileFeature, FeatureSet, WITH_COMPILING_STATUS_FEATURE};
-use reflexo_typst::{CompileEnv, CompileReport, Compiler};
 use tinymist_std::error::prelude::Result;
 use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
 };
-use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs};
+use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
     CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
 };
 use tokio::sync::mpsc;
-use typst::diag::{SourceDiagnostic, SourceResult};
+use typst::diag::{SourceDiagnostic, SourceResult, Warned};
 
 use crate::LspCompilerFeat;
 
@@ -65,8 +63,6 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     pub id: ProjectInsId,
     /// The export signal for the document.
     pub signal: ExportSignal,
-    /// Using env
-    pub env: CompileEnv,
     /// Using world
     pub world: CompilerWorld<F>,
     /// The last successfully compiled document.
@@ -79,7 +75,6 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         Self {
             id: ProjectInsId("primary".into()),
             signal: ExportSignal::default(),
-            env: CompileEnv::default(),
             world,
             success_doc: None,
         }
@@ -115,7 +110,23 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub fn compile(self) -> CompiledArtifact<F> {
         let mut snap = self;
         snap.world.set_is_compiling(true);
-        let warned = std::marker::PhantomData.compile(&snap.world, &mut snap.env);
+        let res = ::typst::compile::<tinymist_std::typst::TypstPagedDocument>(&snap.world);
+        let warned = match res.output {
+            Ok(doc) => Ok(Warned {
+                output: Arc::new(doc),
+                warnings: res.warnings,
+            }),
+            Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
+                (true, true) => Err(diags),
+                (true, false) => Err(diags),
+                (false, true) => Err(res.warnings),
+                (false, false) => {
+                    let mut warnings = res.warnings;
+                    warnings.extend(diags);
+                    Err(warnings)
+                }
+            },
+        };
         snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
             Ok(doc) => (Ok(TypstDocument::Paged(doc.output)), doc.warnings),
@@ -135,7 +146,6 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
         Self {
             id: self.id.clone(),
             signal: self.signal,
-            env: self.env.clone(),
             world: self.world.clone(),
             success_doc: self.success_doc.clone(),
         }
@@ -200,6 +210,95 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 
             deps
         })
+    }
+}
+
+// todo: remove me
+#[allow(missing_docs)]
+#[derive(Clone, Debug)]
+pub enum CompileReport {
+    Suspend,
+    Stage(FileId, &'static str, tinymist_std::time::Time),
+    CompileError(
+        FileId,
+        EcoVec<SourceDiagnostic>,
+        tinymist_std::time::Duration,
+    ),
+    ExportError(
+        FileId,
+        EcoVec<SourceDiagnostic>,
+        tinymist_std::time::Duration,
+    ),
+    CompileSuccess(
+        FileId,
+        // warnings, if not empty
+        EcoVec<SourceDiagnostic>,
+        tinymist_std::time::Duration,
+    ),
+}
+
+#[allow(missing_docs)]
+impl CompileReport {
+    pub fn compiling_id(&self) -> Option<FileId> {
+        Some(match self {
+            Self::Suspend => return None,
+            Self::Stage(id, ..)
+            | Self::CompileError(id, ..)
+            | Self::ExportError(id, ..)
+            | Self::CompileSuccess(id, ..) => *id,
+        })
+    }
+
+    pub fn duration(&self) -> Option<std::time::Duration> {
+        match self {
+            Self::Suspend | Self::Stage(..) => None,
+            Self::CompileError(_, _, dur)
+            | Self::ExportError(_, _, dur)
+            | Self::CompileSuccess(_, _, dur) => Some(*dur),
+        }
+    }
+
+    pub fn diagnostics(self) -> Option<EcoVec<SourceDiagnostic>> {
+        match self {
+            Self::Suspend | Self::Stage(..) => None,
+            Self::CompileError(_, diagnostics, ..)
+            | Self::ExportError(_, diagnostics, ..)
+            | Self::CompileSuccess(_, diagnostics, ..) => Some(diagnostics),
+        }
+    }
+
+    /// Get the status message.
+    pub fn message(&self) -> CompileReportMsg<'_> {
+        CompileReportMsg(self)
+    }
+}
+
+#[allow(missing_docs)]
+pub struct CompileReportMsg<'a>(&'a CompileReport);
+
+impl fmt::Display for CompileReportMsg<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use CompileReport::*;
+
+        let input = WorkspaceResolver::display(self.0.compiling_id());
+        match self.0 {
+            Suspend => write!(f, "suspended"),
+            Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
+            CompileSuccess(_, warnings, duration) => {
+                if warnings.is_empty() {
+                    write!(f, "{input:?}: compilation succeeded in {duration:?}")
+                } else {
+                    write!(
+                        f,
+                        "{input:?}: compilation succeeded with {} warnings in {duration:?}",
+                        warnings.len()
+                    )
+                }
+            }
+            CompileError(_, _, duration) | ExportError(_, _, duration) => {
+                write!(f, "{input:?}: compilation failed after {duration:?}")
+            }
+        }
     }
 }
 
@@ -333,8 +432,6 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat, Ext> {
     /// The compilation handler.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
-    /// The feature set.
-    pub feature_set: FeatureSet,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 }
@@ -343,7 +440,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
     fn default() -> Self {
         Self {
             handler: Arc::new(std::marker::PhantomData),
-            feature_set: Default::default(),
             enable_watch: false,
         }
     }
@@ -380,16 +476,10 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         CompileServerOpts {
             handler,
-            feature_set,
             enable_watch,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
-        let primary = Self::create_project(
-            ProjectInsId("primary".into()),
-            verse,
-            handler.clone(),
-            feature_set.clone(),
-        );
+        let primary = Self::create_project(ProjectInsId("primary".into()), verse, handler.clone());
         Self {
             handler,
             dep_tx,
@@ -413,7 +503,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
     /// Compiles the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
-        let snap = self.primary.make_snapshot(true);
+        let snap = self.primary.make_snapshot();
         ProjectInsState::run_compile(self.handler.clone(), snap)()
     }
 
@@ -426,7 +516,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         id: ProjectInsId,
         verse: CompilerUniverse<F>,
         handler: Arc<dyn CompileHandler<F, Ext>>,
-        feature_set: FeatureSet,
     ) -> ProjectInsState<F, Ext> {
         ProjectInsState {
             id,
@@ -438,12 +527,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             compilation: OnceLock::default(),
             latest_doc: None,
             latest_success_doc: None,
-            once_feature_set: Arc::new(feature_set.clone()),
-            watch_feature_set: Arc::new(
-                feature_set
-                    .clone()
-                    .configure(&WITH_COMPILING_STATUS_FEATURE, true),
-            ),
             deps: Default::default(),
             committed_revision: 0,
         }
@@ -474,12 +557,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             self.primary.verse.font_resolver.clone(),
         );
 
-        let proj = Self::create_project(
-            id.clone(),
-            verse,
-            self.handler.clone(),
-            self.primary.once_feature_set.as_ref().to_owned(),
-        );
+        let proj = Self::create_project(id.clone(), verse, self.handler.clone());
 
         self.remove_dedicates(&id);
         self.dedicates.push(proj);
@@ -739,43 +817,28 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub(crate) latest_doc: Option<TypstDocument>,
     /// The latest successly compiled document.
     latest_success_doc: Option<TypstDocument>,
-    /// feature set for compile_once mode.
-    once_feature_set: Arc<FeatureSet>,
-    /// Shared feature set for watch mode.
-    watch_feature_set: Arc<FeatureSet>,
 
     committed_revision: usize,
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
-    /// Creates a new compile environment.
-    pub fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
-        CompileEnv::default().configure_shared(feature_set)
-    }
-
     /// Creates a snapshot of the project.
     pub fn snapshot(&mut self) -> CompileSnapshot<F> {
         match self.snapshot.as_ref() {
             Some(snap) if snap.world.revision() == self.verse.revision => snap.clone(),
             _ => {
-                let snap = self.make_snapshot(false);
+                let snap = self.make_snapshot();
                 self.snapshot = Some(snap.clone());
                 snap
             }
         }
     }
 
-    fn make_snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
+    fn make_snapshot(&self) -> CompileSnapshot<F> {
         let world = self.verse.snapshot();
-        let env = self.make_env(if is_once {
-            self.once_feature_set.clone()
-        } else {
-            self.watch_feature_set.clone()
-        });
         CompileSnapshot {
             id: self.id.clone(),
             world,
-            env: env.clone(),
             signal: ExportSignal {
                 by_entry_update: self.reason.by_entry_update,
                 by_mem_events: self.reason.by_memory_events,
@@ -829,7 +892,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             };
 
             // todo: we need to check revision for really concurrent compilation
-            log_compile_report(&compiled.env, &rep);
+            log_compile_report(&rep);
             h.notify_compile(&compiled, rep);
 
             compiled
@@ -884,10 +947,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     }
 }
 
-fn log_compile_report(env: &CompileEnv, rep: &CompileReport) {
-    if WITH_COMPILING_STATUS_FEATURE.retrieve(&env.features) {
-        log::info!("{}", rep.message());
-    }
+fn log_compile_report(rep: &CompileReport) {
+    log::info!("{}", rep.message());
 }
 
 #[inline]

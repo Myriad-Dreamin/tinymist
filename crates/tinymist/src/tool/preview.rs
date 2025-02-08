@@ -656,7 +656,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             CompileServerOpts {
                 handler: compile_handle,
                 enable_watch: true,
-                ..Default::default()
             },
         );
         let registered = preview_state.register(&server.primary.id, previewer.compile_watcher());
