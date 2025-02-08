@@ -137,9 +137,9 @@ pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let split = output.len();
 
     // Bibliography keys.
-    for (key, detail) in BibliographyElem::keys(document.introspector().track()) {
+    for (label, detail) in BibliographyElem::keys(document.introspector().track()) {
         output.push(DynLabel {
-            label: Label::new(key.as_str()),
+            label,
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,
