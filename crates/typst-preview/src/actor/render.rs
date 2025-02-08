@@ -139,16 +139,14 @@ impl RenderActor {
                 continue;
             };
 
-            let TypstDocument::Paged(document) = document;
-
             let data = if has_full_render {
                 if let Some(data) = self.renderer.pack_current() {
                     data
                 } else {
-                    self.renderer.pack_delta(document)
+                    self.renderer.pack_delta(&document)
                 }
             } else {
-                self.renderer.pack_delta(document)
+                self.renderer.pack_delta(&document)
             };
             let Ok(_) = self.svg_sender.send(data) else {
                 log::info!("RenderActor: svg_sender is dropped");
