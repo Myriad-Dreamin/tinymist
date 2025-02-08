@@ -13,5 +13,9 @@ pub use compiler::*;
 pub use entry::*;
 pub use lock::*;
 pub use model::*;
+#[cfg(feature = "system")]
 pub use watch::*;
+#[cfg(feature = "system")]
 pub use world::*;
+
+pub use tinymist_world::{CompileSnapshot, ExportSignal, ProjectInsId};

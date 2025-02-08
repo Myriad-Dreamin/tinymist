@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::Result;
 use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
@@ -13,7 +13,8 @@ use tinymist_world::vfs::notify::{
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
-    CompilerFeat, CompilerUniverse, CompilerWorld, EntryReader, EntryState, TaskInputs, WorldDeps,
+    CompileSnapshot, CompilerFeat, CompilerUniverse, EntryReader, EntryState, ExportSignal,
+    ProjectInsId, TaskInputs, WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult, Warned};
@@ -26,132 +27,6 @@ pub type LspCompileSnapshot = CompileSnapshot<LspCompilerFeat>;
 pub type LspCompiledArtifact = CompiledArtifact<LspCompilerFeat>;
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;
-
-/// Project instance id. This is slightly different from the project ids that
-/// persist in disk.
-#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ProjectInsId(EcoString);
-
-impl fmt::Display for ProjectInsId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.0)
-    }
-}
-
-impl ProjectInsId {
-    /// The primary project id.
-    pub const PRIMARY: ProjectInsId = ProjectInsId(EcoString::inline("primary"));
-}
-
-/// A signal that possibly triggers an export.
-///
-/// Whether to export depends on the current state of the document and the user
-/// settings.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ExportSignal {
-    /// Whether the revision is annotated by memory events.
-    pub by_mem_events: bool,
-    /// Whether the revision is annotated by file system events.
-    pub by_fs_events: bool,
-    /// Whether the revision is annotated by entry update.
-    pub by_entry_update: bool,
-}
-
-/// A snapshot of the project and compilation state.
-pub struct CompileSnapshot<F: CompilerFeat> {
-    /// The project id.
-    pub id: ProjectInsId,
-    /// The export signal for the document.
-    pub signal: ExportSignal,
-    /// Using world
-    pub world: CompilerWorld<F>,
-    /// The last successfully compiled document.
-    pub success_doc: Option<TypstDocument>,
-}
-
-impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
-    /// Creates a snapshot from the world.
-    pub fn from_world(world: CompilerWorld<F>) -> Self {
-        Self {
-            id: ProjectInsId("primary".into()),
-            signal: ExportSignal::default(),
-            world,
-            success_doc: None,
-        }
-    }
-
-    /// Forks a new snapshot that compiles a different document.
-    ///
-    /// Note: the resulting document should not be shared in system, because we
-    /// generally believe that the document is revisioned, but temporary
-    /// tasks break this assumption.
-    pub fn task(mut self, inputs: TaskInputs) -> Self {
-        'check_changed: {
-            if let Some(entry) = &inputs.entry {
-                if *entry != self.world.entry_state() {
-                    break 'check_changed;
-                }
-            }
-            if let Some(inputs) = &inputs.inputs {
-                if inputs.clone() != self.world.inputs() {
-                    break 'check_changed;
-                }
-            }
-
-            return self;
-        };
-
-        self.world = self.world.task(inputs);
-
-        self
-    }
-
-    /// Runs the compiler and returns the compiled document.
-    pub fn compile(self) -> CompiledArtifact<F> {
-        let mut snap = self;
-        snap.world.set_is_compiling(true);
-        let res = ::typst::compile(&snap.world);
-        let warned = match res.output {
-            Ok(doc) => Ok(Warned {
-                output: Arc::new(doc),
-                warnings: res.warnings,
-            }),
-            Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
-                (true, true) => Err(diags),
-                (true, false) => Err(diags),
-                (false, true) => Err(res.warnings),
-                (false, false) => {
-                    let mut warnings = res.warnings;
-                    warnings.extend(diags);
-                    Err(warnings)
-                }
-            },
-        };
-        snap.world.set_is_compiling(false);
-        let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(TypstDocument::Paged(doc.output)), doc.warnings),
-            Err(err) => (Err(err), EcoVec::default()),
-        };
-        CompiledArtifact {
-            snap,
-            doc,
-            warnings,
-            deps: OnceLock::default(),
-        }
-    }
-}
-
-impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            signal: self.signal,
-            world: self.world.clone(),
-            success_doc: self.success_doc.clone(),
-        }
-    }
-}
-
 /// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
     /// The used snapshot.
@@ -210,6 +85,39 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 
             deps
         })
+    }
+
+    /// Runs the compiler and returns the compiled document.
+    pub fn from_snapshot(mut snap: CompileSnapshot<F>) -> CompiledArtifact<F> {
+        snap.world.set_is_compiling(true);
+        let res = ::typst::compile::<tinymist_std::typst::TypstPagedDocument>(&snap.world);
+        let warned = match res.output {
+            Ok(doc) => Ok(Warned {
+                output: Arc::new(doc),
+                warnings: res.warnings,
+            }),
+            Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
+                (true, true) => Err(diags),
+                (true, false) => Err(diags),
+                (false, true) => Err(res.warnings),
+                (false, false) => {
+                    let mut warnings = res.warnings;
+                    warnings.extend(diags);
+                    Err(warnings)
+                }
+            },
+        };
+        snap.world.set_is_compiling(false);
+        let (doc, warnings) = match warned {
+            Ok(doc) => (Ok(TypstDocument::Paged(doc.output)), doc.warnings),
+            Err(err) => (Err(err), EcoVec::default()),
+        };
+        CompiledArtifact {
+            snap,
+            doc,
+            warnings,
+            deps: OnceLock::default(),
+        }
     }
 }
 
@@ -883,7 +791,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         );
 
         move || {
-            let compiled = snap.compile();
+            let compiled = CompiledArtifact::from_snapshot(snap);
 
             let elapsed = start.elapsed().unwrap_or_default();
             let rep = match &compiled.doc {

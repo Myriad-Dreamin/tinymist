@@ -103,3 +103,66 @@ impl SystemUniverseBuilder {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::AtomicBool;
+
+    use super::*;
+    use clap::Parser;
+
+    use crate::args::CompileOnceArgs;
+    use crate::{CompileSnapshot, WorldComputable, WorldComputeGraph};
+
+    #[test]
+    fn test_args() {
+        use tinymist_std::typst::TypstPagedDocument;
+
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let world = verse.snapshot();
+        let _res = typst::compile::<TypstPagedDocument>(&world);
+    }
+
+    static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);
+
+    pub struct FontsOnce {
+        fonts: Arc<FontResolverImpl>,
+    }
+
+    impl WorldComputable<SystemCompilerFeat> for FontsOnce {
+        fn compute(graph: &Arc<WorldComputeGraph<SystemCompilerFeat>>) -> Result<Self> {
+            // Ensure that this function is only called once.
+            if FONT_COMPUTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                bail!("font already computed");
+            }
+
+            Ok(Self {
+                fonts: graph.snap.world.font_resolver.clone(),
+            })
+        }
+    }
+
+    #[test]
+    fn compute_system_fonts() {
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let snap = CompileSnapshot::from_world(verse.snapshot());
+
+        let graph = WorldComputeGraph::new(snap);
+
+        let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
+        let _ = font;
+
+        let font = graph.compute::<FontsOnce>().expect("font").fonts.clone();
+        let _ = font;
+
+        assert!(FONT_COMPUTED.load(std::sync::atomic::Ordering::SeqCst));
+    }
+}

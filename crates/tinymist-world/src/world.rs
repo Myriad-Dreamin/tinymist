@@ -19,13 +19,17 @@ use typst::{
     Library, World,
 };
 
-use crate::parser::{
-    get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
-    SemanticTokensLegend,
-};
 use crate::{
     package::{PackageRegistry, PackageSpec},
     source::SourceDb,
+    CompileSnapshot, MEMORY_MAIN_ENTRY,
+};
+use crate::{
+    parser::{
+        get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
+        SemanticTokensLegend,
+    },
+    WorldComputeGraph,
 };
 // use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
@@ -90,12 +94,56 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         self
     }
 
+    pub fn entry_file(&self) -> Option<PathResolution> {
+        self.path_for_id(self.main_id()?).ok()
+    }
+
     pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
         self.inputs.clone()
     }
 
     pub fn snapshot(&self) -> CompilerWorld<F> {
         self.snapshot_with(None)
+    }
+
+    // todo: remove me.
+    pub fn computation(&self) -> Arc<WorldComputeGraph<F>> {
+        let world = self.snapshot();
+        let snap = CompileSnapshot::from_world(world);
+        WorldComputeGraph::new(snap)
+    }
+
+    pub fn computation_with(&self, mutant: TaskInputs) -> Arc<WorldComputeGraph<F>> {
+        let world = self.snapshot_with(Some(mutant));
+        let snap = CompileSnapshot::from_world(world);
+        WorldComputeGraph::new(snap)
+    }
+
+    pub fn snapshot_with_entry_content(
+        &self,
+        content: Bytes,
+        inputs: Option<TaskInputs>,
+    ) -> Arc<WorldComputeGraph<F>> {
+        // checkout the entry file
+
+        let mut world = if self.main_id().is_some() {
+            self.snapshot_with(inputs)
+        } else {
+            let world = self.snapshot_with(Some(TaskInputs {
+                entry: Some(
+                    self.entry_state()
+                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path()),
+                ),
+                inputs: inputs.and_then(|i| i.inputs),
+            }));
+
+            world
+        };
+
+        world.map_shadow_by_id(world.main(), content).unwrap();
+
+        let snap = CompileSnapshot::from_world(world);
+        WorldComputeGraph::new(snap)
     }
 
     pub fn snapshot_with(&self, mutant: Option<TaskInputs>) -> CompilerWorld<F> {
