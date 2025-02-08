@@ -2,7 +2,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use reflexo_typst::debug_loc::{
-    CharPosition, DocumentPosition, ElementPoint, SourceLocation, SourceSpanOffset,
+    DocumentPosition, ElementPoint, LspPosition, SourceLocation, SourceSpanOffset,
 };
 use reflexo_vec2svg::IncrSvgDocServer;
 use tinymist_std::typst::TypstDocument;
@@ -241,9 +241,9 @@ impl RenderActor {
             .view()?
             .resolve_source_span(crate::Location::Src(SourceLocation {
                 filepath: req.filepath.to_string_lossy().to_string(),
-                pos: CharPosition {
+                pos: LspPosition {
                     line: req.line,
-                    column: req.character,
+                    character: req.character,
                 },
             }))?;
         log::info!("RenderActor: changing cursor position: {span:?}");
@@ -263,9 +263,9 @@ impl RenderActor {
             .view()?
             .resolve_document_position(crate::Location::Src(SourceLocation {
                 filepath: req.filepath.to_string_lossy().to_string(),
-                pos: CharPosition {
+                pos: LspPosition {
                     line: req.line,
-                    column: req.character,
+                    character: req.character,
                 },
             }));
 
