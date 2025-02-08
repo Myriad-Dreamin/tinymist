@@ -21,7 +21,7 @@ use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
-use typst_pdf::PdfOptions;
+use typst_pdf::{PdfOptions, Timestamp};
 
 use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
@@ -353,17 +353,19 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
     }
 }
 
-/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
+/// Convert [`chrono::DateTime`] to [`Timestamp`]
+fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
     use chrono::{Datelike, Timelike};
-    TypstDatetime::from_ymd_hms(
+    let datetime = TypstDatetime::from_ymd_hms(
         date_time.year(),
         date_time.month().try_into().ok()?,
         date_time.day().try_into().ok()?,
         date_time.hour().try_into().ok()?,
         date_time.minute().try_into().ok()?,
         date_time.second().try_into().ok()?,
-    )
+    );
+
+    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 /// Serialize data to the output format.
