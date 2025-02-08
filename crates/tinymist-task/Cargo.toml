@@ -35,10 +35,9 @@ toml.workspace = true
 typst.workspace = true
 typst-assets.workspace = true
 typst-pdf.workspace = true
-typst-html.workspace = true
+typst-shim.workspace = true
 typst-svg.workspace = true
 typst-render.workspace = true
-typst-eval.workspace = true
 notify.workspace = true
 
 [features]
