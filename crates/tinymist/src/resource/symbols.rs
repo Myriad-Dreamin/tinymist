@@ -951,10 +951,22 @@ impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();
-        use typst::symbols::{emoji, sym};
-        populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
+
+        let std = snap
+            .world
+            .library
+            .std
+            .scope()
+            .ok_or_else(|| internal_error("cannot get std scope"))?;
+        let sym = std
+            .get("sym")
+            .ok_or_else(|| internal_error("cannot get sym"))?;
+
+        if let Some(scope) = sym.scope() {
+            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
+        }
         // todo: disabling emoji module, as there is performant issue on emojis
-        let _ = emoji;
+        // let _ = emoji;
         // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
         const PRELUDE: &str = r#"#show math.equation: set text(font: (
@@ -1199,7 +1211,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch.char() as u32,
+                unicode: ch as u32,
                 glyphs: vec![],
             },
         );
