@@ -4,8 +4,10 @@ use core::fmt;
 
 use ecow::EcoString;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "typst")]
+use typst::diag::SourceDiagnostic;
 
-use crate::debug_loc::LspRange;
+use lsp_types::Range as LspRange;
 
 /// The severity of a diagnostic message, following the LSP specification.
 #[derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr, Debug, Clone)]
@@ -59,6 +61,9 @@ pub enum ErrKind {
     None,
     /// A string message.
     Msg(EcoString),
+    /// A source diagnostic message.
+    #[cfg(feature = "typst")]
+    RawDiag(ecow::EcoVec<SourceDiagnostic>),
     /// A source diagnostic message.
     Diag(Box<DiagMessage>),
     /// An inner error.
@@ -192,6 +197,10 @@ impl fmt::Display for Error {
         if err.loc.is_empty() {
             match &err.kind {
                 ErrKind::Msg(msg) => write!(f, "{msg} with {:?}", err.args),
+                #[cfg(feature = "typst")]
+                ErrKind::RawDiag(diag) => {
+                    write!(f, "{diag:?} with {:?}", err.args)
+                }
                 ErrKind::Diag(diag) => {
                     write!(f, "{} with {:?}", diag.message, err.args)
                 }
@@ -201,6 +210,10 @@ impl fmt::Display for Error {
         } else {
             match &err.kind {
                 ErrKind::Msg(msg) => write!(f, "{}: {} with {:?}", err.loc, msg, err.args),
+                #[cfg(feature = "typst")]
+                ErrKind::RawDiag(diag) => {
+                    write!(f, "{}: {diag:?} with {:?}", err.loc, err.args)
+                }
                 ErrKind::Diag(diag) => {
                     write!(f, "{}: {} with {:?}", err.loc, diag.message, err.args)
                 }
@@ -214,6 +227,13 @@ impl fmt::Display for Error {
 impl From<anyhow::Error> for Error {
     fn from(e: anyhow::Error) -> Self {
         Error::new("", e.to_string().to_error_kind(), None)
+    }
+}
+
+#[cfg(feature = "typst")]
+impl From<ecow::EcoVec<SourceDiagnostic>> for Error {
+    fn from(e: ecow::EcoVec<SourceDiagnostic>) -> Self {
+        Error::new("", ErrKind::RawDiag(e), None)
     }
 }
 

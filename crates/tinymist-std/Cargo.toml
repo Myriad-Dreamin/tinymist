@@ -28,6 +28,7 @@ serde_json.workspace = true
 serde_with.workspace = true
 siphasher.workspace = true
 web-time.workspace = true
+lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
 same-file = { workspace = true, optional = true }
 
