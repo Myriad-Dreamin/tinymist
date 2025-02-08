@@ -4683,6 +4683,7 @@ name = "typst-shim"
 version = "0.12.18"
 dependencies = [
  "cfg-if",
+ "comemo",
  "typst",
  "typst-syntax",
 ]
