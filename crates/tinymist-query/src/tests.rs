@@ -187,7 +187,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
 
         let pw = root.join(Path::new(&path));
         verse
-            .map_shadow(&pw, Bytes::from(source.as_bytes()))
+            .map_shadow(&pw, Bytes::from_string(source.to_owned()))
             .unwrap();
         last_pw = Some(pw);
     }

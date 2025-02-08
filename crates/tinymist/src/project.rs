@@ -99,7 +99,7 @@ impl ServerState {
             self.memory_changes
                 .iter()
                 .map(|(path, content)| {
-                    let content = Bytes::from(content.clone().text().as_bytes());
+                    let content = Bytes::from_string(content.clone().text().to_owned());
                     (path.clone(), FileResult::Ok(content).into())
                 })
                 .collect(),

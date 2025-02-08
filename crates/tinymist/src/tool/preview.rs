@@ -15,6 +15,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
+use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -276,7 +277,7 @@ impl EditorServer for PreviewProjectHandler {
                 .into_iter()
                 .map(|(path, content)| {
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(content.as_bytes().into()).into())
+                    (path.into(), Ok(Bytes::from_string(content)).into())
                 })
                 .collect(),
         );
