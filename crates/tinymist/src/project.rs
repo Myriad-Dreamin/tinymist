@@ -25,7 +25,6 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
-use reflexo_typst::CompileReport;
 use sync_lsp::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::{
@@ -204,7 +203,6 @@ impl ServerState {
             CompileServerOpts {
                 handler: compile_handle,
                 enable_watch: true,
-                ..Default::default()
             },
         );
 

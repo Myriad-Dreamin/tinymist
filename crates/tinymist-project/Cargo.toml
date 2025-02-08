@@ -23,7 +23,6 @@ parking_lot.workspace = true
 pathdiff.workspace = true
 tokio.workspace = true
 rayon.workspace = true
-reflexo-typst.workspace = true
 rpds.workspace = true
 semver.workspace = true
 serde.workspace = true
@@ -40,7 +39,8 @@ notify.workspace = true
 [features]
 
 fonts = ["typst-assets/fonts"]
-no-content-hint = ["reflexo-typst/no-content-hint"]
+no-content-hint = []
+# no-content-hint = ["reflexo-typst/no-content-hint"]
 preview = ["typst-preview"]
 
 system = ["tinymist-std/system", "tinymist-world/system"]

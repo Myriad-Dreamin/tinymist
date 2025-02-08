@@ -101,7 +101,6 @@ embed-fonts = ["tinymist-project/fonts"]
 # This requires modifying typst.
 no-content-hint = [
     "tinymist-query/no-content-hint",
-    "tinymist-project/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",
 ]
