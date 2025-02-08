@@ -4242,6 +4242,7 @@ dependencies = [
  "log",
  "parking_lot",
  "reqwest",
+ "rpds",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",

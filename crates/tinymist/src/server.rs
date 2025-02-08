@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use lsp_types::*;
 use sync_lsp::*;
-use tinymist_project::{EntryResolver, LspCompileSnapshot, ProjectInsId};
+use tinymist_project::{CompiledArtifact, EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -332,7 +332,7 @@ impl ServerState {
                 ..Default::default()
             });
 
-            let artifact = snap.clone().compile();
+            let artifact = CompiledArtifact::from_snapshot(snap.clone());
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));

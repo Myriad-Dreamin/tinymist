@@ -17,6 +17,10 @@ pub use world::*;
 pub mod font;
 pub mod package;
 pub mod parser;
+mod snapshot;
+pub use snapshot::*;
+mod compute;
+pub use compute::*;
 
 pub use tinymist_vfs as vfs;
 
@@ -146,6 +150,3 @@ pub mod build_info {
     /// The version of the reflexo-world crate.
     pub static VERSION: &str = env!("CARGO_PKG_VERSION");
 }
-
-#[cfg(test)]
-mod tests;

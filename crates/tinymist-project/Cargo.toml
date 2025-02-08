@@ -21,7 +21,7 @@ ecow.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 pathdiff.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync"] }
 rayon.workspace = true
 rpds.workspace = true
 semver.workspace = true
@@ -38,6 +38,7 @@ notify.workspace = true
 
 [features]
 
+default = ["system"]
 fonts = ["typst-assets/fonts"]
 no-content-hint = []
 # no-content-hint = ["reflexo-typst/no-content-hint"]

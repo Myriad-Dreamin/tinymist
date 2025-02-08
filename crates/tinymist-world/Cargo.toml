@@ -27,6 +27,7 @@ js-sys = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
 reqwest = { workspace = true, optional = true }
+rpds.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
