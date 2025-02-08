@@ -18,6 +18,7 @@ nightly = []
 typst-syntax.workspace = true
 typst.workspace = true
 cfg-if.workspace = true
+comemo.workspace = true
 
 [lints]
 workspace = true

@@ -78,7 +78,7 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
-    let module = typst::eval::import(&mut vm, source.clone(), source_span, true)
+    let module = typst_shim::eval::import(&mut vm, source.clone(), source_span, true)
         .ok()
         .map(Value::Module);
 

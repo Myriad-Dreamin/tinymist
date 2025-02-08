@@ -3,7 +3,7 @@
 //! Note, this is used for the completion of parameters on a function's
 //! *definition* instead of the completion of arguments of some *function call*.
 
-use typst::eval::CapturesVisitor;
+use typst_shim::eval::CapturesVisitor;
 
 use super::*;
 impl CompletionPair<'_, '_, '_> {
