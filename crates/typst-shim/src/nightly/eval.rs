@@ -5,6 +5,8 @@ use typst::engine::{Route, Sink, Traced};
 use typst::foundations::Module;
 use typst::World;
 
+pub use typst_eval::*;
+
 /// Evaluates a source file and return the resulting module.
 pub fn eval_compat(
     world: &dyn World,

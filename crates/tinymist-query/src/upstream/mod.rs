@@ -437,6 +437,7 @@ pub fn with_vm<T>(
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
+        routines: &typst::ROUTINES,
         world,
         route: Route::default(),
         introspector: introspector.track(),

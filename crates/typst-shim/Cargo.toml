@@ -16,6 +16,7 @@ nightly = []
 
 [dependencies]
 typst-syntax.workspace = true
+typst-eval.workspace = true
 typst.workspace = true
 cfg-if.workspace = true
 comemo.workspace = true
