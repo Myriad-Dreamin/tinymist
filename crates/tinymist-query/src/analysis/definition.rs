@@ -144,7 +144,7 @@ fn bib_definition(
     key: &str,
 ) -> Option<Definition> {
     let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.path().clone().into_value() else {
+    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
         return None;
     };
 
