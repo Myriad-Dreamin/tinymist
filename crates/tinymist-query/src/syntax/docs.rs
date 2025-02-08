@@ -240,7 +240,7 @@ impl DocsChecker<'_> {
                     Type::of::<typst::visualize::Color>(),
                     Type::of::<typst::visualize::Gradient>(),
                     Type::of::<typst::visualize::Pattern>(),
-                    Type::of::<typst::symbols::Symbol>(),
+                    Type::of::<typst::foundations::Symbol>(),
                     Type::of::<typst::foundations::Version>(),
                     Type::of::<typst::foundations::Bytes>(),
                     Type::of::<typst::foundations::Label>(),
