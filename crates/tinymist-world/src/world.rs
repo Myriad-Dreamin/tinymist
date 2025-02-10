@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     num::NonZeroUsize,
     ops::Deref,
     path::{Path, PathBuf},
@@ -577,6 +578,19 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     pub fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
         self.registry.packages()
     }
+
+    pub(crate) fn html_task(&self) -> Cow<'_, CompilerWorld<F>> {
+        let enabled_html = self.library.features.is_enabled(typst::Feature::Html);
+
+        if enabled_html {
+            return Cow::Borrowed(self);
+        }
+
+        let mut world = self.clone();
+        world.library = create_library_inner(world.inputs.clone(), true);
+
+        Cow::Owned(world)
+    }
 }
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
@@ -773,10 +787,21 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
     }
 }
 
-#[comemo::memoize]
 fn create_library(inputs: Arc<LazyHash<Dict>>) -> Arc<LazyHash<Library>> {
+    create_library_inner(inputs, false)
+}
+
+#[comemo::memoize]
+fn create_library_inner(inputs: Arc<LazyHash<Dict>>, enable_html: bool) -> Arc<LazyHash<Library>> {
+    let features = if enable_html {
+        typst::Features::from_iter([typst::Feature::Html])
+    } else {
+        typst::Features::default()
+    };
+
     let lib = typst::Library::builder()
         .with_inputs(inputs.deref().deref().clone())
+        .with_features(features)
         .build();
 
     Arc::new(LazyHash::new(lib))

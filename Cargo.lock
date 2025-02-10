@@ -2850,7 +2850,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=870e7c7b7f3df516482545b972f37dd0cee51800#870e7c7b7f3df516482545b972f37dd0cee51800"
 dependencies = [
  "base64",
  "bitvec",
@@ -2876,7 +2875,6 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=870e7c7b7f3df516482545b972f37dd0cee51800#870e7c7b7f3df516482545b972f37dd0cee51800"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2907,14 +2905,12 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=870e7c7b7f3df516482545b972f37dd0cee51800#870e7c7b7f3df516482545b972f37dd0cee51800"
 dependencies = [
  "bitvec",
  "comemo",
  "crossbeam-queue",
  "dashmap",
  "flate2",
- "image",
  "log",
  "parking_lot",
  "rayon",
@@ -2933,7 +2929,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.4"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=870e7c7b7f3df516482545b972f37dd0cee51800#870e7c7b7f3df516482545b972f37dd0cee51800"
 dependencies = [
  "base64",
  "comemo",
@@ -4883,7 +4878,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.12.14"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=a0f7aa658f13267c23aa9745b2c77ec114c0c3d0#a0f7aa658f13267c23aa9745b2c77ec114c0c3d0"
+source = "git+https://github.com/ParaN3xus/typstyle/?tag=tinymist-nightly-v0.12.19-rc2#caa3eff9f76f08965ce991f26c3ad34e2451e010"
 dependencies = [
  "ecow",
  "itertools 0.13.0",
