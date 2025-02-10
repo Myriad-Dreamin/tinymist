@@ -33,9 +33,8 @@ impl SemanticRequest for CodeLensRequest {
 
         res.push(doc_lens("Profile", vec!["profile".into()]));
         res.push(doc_lens("Preview", vec!["preview".into()]));
-        res.push(doc_lens("Preview in ..", vec!["preview-in".into()]));
         res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));
-        res.push(doc_lens("Export as ..", vec!["export-as".into()]));
+        res.push(doc_lens("More ..", vec!["more".into()]));
 
         Some(res)
     }

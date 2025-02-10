@@ -528,73 +528,105 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   if (args.length === 0) {
     return;
   }
+  // res.push(doc_lens("Preview in ..", vec!["preview-in".into()]));
+  // res.push(doc_lens("Export as ..", vec!["export-as".into()]));
 
   switch (args[0]) {
     case "profile": {
       void vscode.commands.executeCommand(`tinymist.profileCurrentFile`);
-      break;
+      return;
     }
     case "preview": {
       void vscode.commands.executeCommand(`typst-preview.preview`);
-      break;
-    }
-    case "preview-in": {
-      // prompt for enum (doc, slide) with default
-      const mode = await vscode.window.showQuickPick(["doc", "slide"], {
-        title: "Preview Mode",
-      });
-      const target = await vscode.window.showQuickPick(["tab", "browser"], {
-        title: "Target to preview in",
-      });
-
-      const command =
-        (target === "tab" ? "preview" : "browser") + (mode === "slide" ? "-slide" : "");
-
-      void vscode.commands.executeCommand(`typst-preview.${command}`);
-      break;
+      return;
     }
     case "export-pdf": {
       await commandShow("Pdf");
-      break;
+      return;
     }
-    case "export-as": {
-      enum FastKind {
-        PDF = "PDF",
-        SVG = "SVG (First Page)",
-        SVGMerged = "SVG (Merged)",
-        PNG = "PNG (First Page)",
-        PNGMerged = "PNG (Merged)",
-      }
-
-      const fmt = await vscode.window.showQuickPick(
-        [FastKind.PDF, FastKind.SVG, FastKind.SVGMerged, FastKind.PNG, FastKind.PNGMerged],
-        {
-          title: "Format to export as",
-        },
-      );
-
-      switch (fmt) {
-        case FastKind.PDF:
-          await commandShow("Pdf");
-          break;
-        case FastKind.SVG:
-          await commandShow("Svg");
-          break;
-        case FastKind.SVGMerged:
-          await commandShow("Svg", { page: { merged: { gap: "0pt" } } });
-          break;
-        case FastKind.PNG:
-          await commandShow("Png");
-          break;
-        case FastKind.PNGMerged:
-          await commandShow("Png", { page: { merged: { gap: "0pt" } } });
-          break;
-      }
-
-      break;
+    case "more": {
+      return codeLensMore();
     }
     default: {
       console.error("unknown code lens command", args[0]);
+    }
+  }
+
+  async function codeLensMore(): Promise<void> {
+    const kBrowsing = "Browsing Preview Documents" as const;
+    const kPreviewIn = "Preview in .." as const;
+    const kExportAs = "Export as .." as const;
+    const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs] as const;
+
+    const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
+      title: "More Actions",
+    })) as (typeof moreCodeLens)[number] | undefined;
+
+    switch (moreAction) {
+      case kBrowsing: {
+        void vscode.commands.executeCommand(`tinymist.browsing-preview`);
+        return;
+      }
+      case kPreviewIn: {
+        // prompt for enum (doc, slide) with default
+        const mode = await vscode.window.showQuickPick(["doc", "slide"], {
+          title: "Preview Mode",
+        });
+        if (mode === undefined) {
+          return;
+        }
+        const target = await vscode.window.showQuickPick(["tab", "browser"], {
+          title: "Target to preview in",
+        });
+
+        if (target === undefined) {
+          return;
+        }
+
+        const command =
+          (target === "tab" ? "preview" : "browser") + (mode === "slide" ? "-slide" : "");
+
+        void vscode.commands.executeCommand(`typst-preview.${command}`);
+        return;
+      }
+      case kExportAs: {
+        enum FastKind {
+          PDF = "PDF",
+          SVG = "SVG (First Page)",
+          SVGMerged = "SVG (Merged)",
+          PNG = "PNG (First Page)",
+          PNGMerged = "PNG (Merged)",
+        }
+
+        const fmt = await vscode.window.showQuickPick(
+          [FastKind.PDF, FastKind.SVG, FastKind.SVGMerged, FastKind.PNG, FastKind.PNGMerged],
+          {
+            title: "Format to export as",
+          },
+        );
+
+        switch (fmt) {
+          case undefined:
+            return;
+          case FastKind.PDF:
+            await commandShow("Pdf");
+            return;
+          case FastKind.SVG:
+            await commandShow("Svg");
+            return;
+          case FastKind.SVGMerged:
+            await commandShow("Svg", { page: { merged: { gap: "0pt" } } });
+            return;
+          case FastKind.PNG:
+            await commandShow("Png");
+            return;
+          case FastKind.PNGMerged:
+            await commandShow("Png", { page: { merged: { gap: "0pt" } } });
+            return;
+        }
+
+        return;
+      }
     }
   }
 }
