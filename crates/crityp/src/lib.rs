@@ -46,7 +46,7 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
         }
 
         if let Value::Func(func) = bind.read() {
-            goals.push((eco_format!("{main_path}@{name}"), &func));
+            goals.push((eco_format!("{main_path}@{name}"), func));
         }
     }
 

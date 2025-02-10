@@ -288,9 +288,7 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 
 static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let Some(bind) = fn_ty.scope().get("with") else {
-        return None;
-    };
+    let bind = fn_ty.scope().get("with")?;
     let Value::Func(func) = bind.read() else {
         return None;
     };
@@ -299,9 +297,7 @@ static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
 
 static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let Some(bind) = fn_ty.scope().get("where") else {
-        return None;
-    };
+    let bind = fn_ty.scope().get("where")?;
     let Value::Func(func) = bind.read() else {
         return None;
     };
