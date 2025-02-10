@@ -174,7 +174,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             // function entries to handle some event
             match event {
                 ActorEvent::Message(None) => {
-                    log::info!("failed to get event, exiting...");
+                    log::info!("NotifyActor: failed to get event, exiting...");
                     break 'event_loop;
                 }
                 ActorEvent::Message(Some(Settle)) => {
@@ -520,7 +520,7 @@ pub async fn watch_deps(
     inbox: mpsc::UnboundedReceiver<NotifyMessage>,
     interrupted_by_events: impl FnMut(FilesystemEvent) + Send + Sync + 'static,
 ) {
-    log::debug!("start watching files...");
+    log::info!("NotifyActor: start watching files...");
     // Watch messages to notify
     tokio::spawn(NotifyActor::new(interrupted_by_events).run(inbox));
 }

@@ -532,6 +532,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         if let Some(inner) = self.preview.get(&snap.id) {
             let snap = snap.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
+        } else {
+            log::info!("Project: no preview for {:?}", snap.id);
         }
     }
 }
