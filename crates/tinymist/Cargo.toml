@@ -50,7 +50,7 @@ parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
 reflexo.workspace = true
-reflexo-typst = { workspace = true, features = ["system"] }
+reflexo-typst = { workspace = true, features = ["system", "svg"] }
 reflexo-vec2svg.workspace = true
 rpds.workspace = true
 serde.workspace = true
