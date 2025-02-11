@@ -1,8 +1,12 @@
 use super::*;
 
+use crate::model::ExportPdfTask;
+use tinymist_world::args::convert_source_date_epoch;
+use typst::foundations::Datetime;
 pub use typst_pdf::pdf;
+use typst_pdf::PdfOptions;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
-pub use typst_pdf::Timestamp as TypstTimestamp;
+use typst_pdf::Timestamp;
 pub struct PdfExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
@@ -32,6 +36,21 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
             },
         )?))
     }
+}
+
+/// Convert [`chrono::DateTime`] to [`Timestamp`]
+pub fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
+    use chrono::{Datelike, Timelike};
+    let datetime = Datetime::from_ymd_hms(
+        date_time.year(),
+        date_time.month().try_into().ok()?,
+        date_time.day().try_into().ok()?,
+        date_time.hour().try_into().ok()?,
+        date_time.minute().try_into().ok()?,
+        date_time.second().try_into().ok()?,
+    );
+
+    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 // impl<F: CompilerFeat> WorldComputable<F> for PdfExport {
