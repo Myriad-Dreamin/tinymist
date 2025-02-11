@@ -295,6 +295,20 @@
           "type": "string",
           "default": ""
         },
+        "tinymist.exportTarget": {
+          "title": "Export target",
+          "description": "The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.",
+          "type": "string",
+          "default": "paged",
+          "enum": [
+            "paged",
+            "html"
+          ],
+          "enumDescriptions": [
+            "The current export target is for PDF, PNG, and SVG export.",
+            "The current export target is for HTML export."
+          ]
+        },
         "tinymist.exportPdf": {
           "title": "Export PDF",
           "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",

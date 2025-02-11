@@ -15,7 +15,7 @@ use tinymist_project::{
 };
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{convert_datetime, get_page_selection};
+use tinymist_task::{convert_datetime, get_page_selection, ExportTarget};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
@@ -307,6 +307,8 @@ impl ExportTask {
 /// User configuration for export.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ExportUserConfig {
+    /// Tinymist's default export target.
+    pub export_target: ExportTarget,
     pub task: ProjectTask,
     pub count_words: bool,
 }
@@ -314,6 +316,7 @@ pub struct ExportUserConfig {
 impl Default for ExportUserConfig {
     fn default() -> Self {
         Self {
+            export_target: ExportTarget::default(),
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export: ProjectExportTask {
                     when: TaskWhen::Never,

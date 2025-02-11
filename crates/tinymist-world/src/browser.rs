@@ -45,8 +45,10 @@ impl TypstBrowserUniverse {
 
         let vfs = tinymist_vfs::Vfs::new(resolver, access_model);
 
+        // todo: enable html
         Self::new_raw(
             EntryState::new_rooted(root_dir.into(), None),
+            false,
             inputs,
             vfs,
             registry,
