@@ -9,19 +9,18 @@ use crate::project::{
 };
 use anyhow::bail;
 use reflexo::ImmutPath;
-use reflexo_typst::TypstDatetime;
 use tinymist_project::{
     convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
     LspCompiledArtifact, ProjectTask, QueryTask,
 };
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::get_page_selection;
+use tinymist_task::{convert_datetime, get_page_selection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
-use typst_pdf::{PdfOptions, Timestamp};
+use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
@@ -351,21 +350,6 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
             None
         }
     }
-}
-
-/// Convert [`chrono::DateTime`] to [`Timestamp`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
-    use chrono::{Datelike, Timelike};
-    let datetime = TypstDatetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    );
-
-    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 /// Serialize data to the output format.
