@@ -183,7 +183,7 @@ impl Ty {
             Ty::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
             ty => ty
                 .value()
-                .and_then(|v| Some(Interned::new_str(v.name()?)))
+                .map(|_| Interned::new_str(&self.name()))
                 .unwrap_or_default(),
         }
     }
