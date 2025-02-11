@@ -1,5 +1,6 @@
 //! World implementation of typst for tinymist.
 
+use tinymist_task::ExportTarget;
 pub use tinymist_world as base;
 pub use tinymist_world::args::*;
 pub use tinymist_world::config::CompileFontOpts;
@@ -63,7 +64,14 @@ impl WorldProvider for CompileOnceArgs {
             Some(&self.package),
         );
 
-        Ok(LspUniverseBuilder::build(entry, inputs, fonts, package))
+        // todo: more export targets
+        Ok(LspUniverseBuilder::build(
+            entry,
+            ExportTarget::Paged,
+            inputs,
+            fonts,
+            package,
+        ))
     }
 
     fn entry(&self) -> Result<EntryOpts> {
@@ -146,8 +154,10 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             }),
         );
 
+        // todo: more export targets
         Ok(LspUniverseBuilder::build(
             entry,
+            ExportTarget::Paged,
             Arc::new(LazyHash::new(inputs)),
             Arc::new(fonts),
             package,
@@ -193,6 +203,7 @@ impl LspUniverseBuilder {
     /// See [`LspCompilerFeat`] for instantiation details.
     pub fn build(
         entry: EntryState,
+        export_target: ExportTarget,
         inputs: ImmutDict,
         font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
@@ -202,6 +213,7 @@ impl LspUniverseBuilder {
 
         LspUniverse::new_raw(
             entry,
+            matches!(export_target, ExportTarget::Html),
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,

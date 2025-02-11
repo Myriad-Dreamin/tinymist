@@ -1,12 +1,14 @@
 //! Project compiler for tinymist.
 
 use core::fmt;
+use std::any::TypeId;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::Result;
+use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
@@ -88,9 +90,26 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Runs the compiler and returns the compiled document.
-    pub fn from_snapshot(mut snap: CompileSnapshot<F>) -> CompiledArtifact<F> {
+    pub fn from_snapshot(snap: CompileSnapshot<F>) -> CompiledArtifact<F> {
+        let is_html = snap.world.library.features.is_enabled(typst::Feature::Html);
+
+        if is_html {
+            Self::from_snapshot_inner::<TypstHtmlDocument>(snap)
+        } else {
+            Self::from_snapshot_inner::<TypstPagedDocument>(snap)
+        }
+    }
+
+    /// Runs the compiler and returns the compiled document.
+    fn from_snapshot_inner<D>(mut snap: CompileSnapshot<F>) -> CompiledArtifact<F>
+    where
+        D: typst::Document + 'static,
+        Arc<D>: Into<TypstDocument>,
+    {
+        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
+
         snap.world.set_is_compiling(true);
-        let res = ::typst::compile::<tinymist_std::typst::TypstPagedDocument>(&snap.world);
+        let res = ::typst::compile::<D>(&snap.world);
         let warned = match res.output {
             Ok(doc) => Ok(Warned {
                 output: Arc::new(doc),
@@ -109,13 +128,26 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
         };
         snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(TypstDocument::Paged(doc.output)), doc.warnings),
+            Ok(doc) => (Ok(doc.output.into()), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
         };
+
+        let exclude_html_warnings = if !is_html_compilation {
+            warnings
+        } else if warnings.len() == 1
+            && warnings[0]
+                .message
+                .starts_with("html export is under active development")
+        {
+            EcoVec::new()
+        } else {
+            warnings
+        };
+
         CompiledArtifact {
             snap,
             doc,
-            warnings,
+            warnings: exclude_html_warnings,
             deps: OnceLock::default(),
         }
     }
@@ -454,11 +486,17 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     /// Restart a dedicate project.
-    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> Result<ProjectInsId> {
+    pub fn restart_dedicate(
+        &mut self,
+        group: &str,
+        entry: EntryState,
+        enable_html: bool,
+    ) -> Result<ProjectInsId> {
         let id = ProjectInsId(group.into());
 
         let verse = CompilerUniverse::<F>::new_raw(
             entry,
+            enable_html,
             Some(self.primary.verse.inputs().clone()),
             self.primary.verse.vfs().fork(),
             self.primary.verse.registry.clone(),
