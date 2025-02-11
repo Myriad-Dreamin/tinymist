@@ -2850,6 +2850,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "base64",
  "bitvec",
@@ -2875,6 +2876,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2894,7 +2896,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-task",
  "tinymist-world",
  "tokio",
  "typst",
@@ -2905,6 +2906,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "bitvec",
  "comemo",
@@ -2929,6 +2931,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c#cd9e2cab2acbee6e64dd1d91eecf6d98fb6b375c"
 dependencies = [
  "base64",
  "comemo",

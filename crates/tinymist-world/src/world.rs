@@ -579,7 +579,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.registry.packages()
     }
 
-    pub(crate) fn html_task(&self) -> Cow<'_, CompilerWorld<F>> {
+    pub fn html_task(&self) -> Cow<'_, CompilerWorld<F>> {
         let enabled_html = self.library.features.is_enabled(typst::Feature::Html);
 
         if enabled_html {
