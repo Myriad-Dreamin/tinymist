@@ -68,6 +68,8 @@ pub enum ProjectTask {
     ExportSvg(ExportSvgTask),
     /// An export HTML task.
     ExportHtml(ExportHtmlTask),
+    /// An export HTML task.
+    ExportSvgHtml(ExportHtmlTask),
     /// An export Markdown task.
     ExportMd(ExportMarkdownTask),
     /// An export Text task.
@@ -88,6 +90,7 @@ impl ProjectTask {
             | Self::ExportPng(..)
             | Self::ExportSvg(..)
             | Self::ExportHtml(..)
+            | Self::ExportSvgHtml(..)
             | Self::ExportMd(..)
             | Self::ExportText(..)
             | Self::Query(..) => self.as_export()?.when,
@@ -102,6 +105,7 @@ impl ProjectTask {
             Self::ExportPng(task) => &task.export,
             Self::ExportSvg(task) => &task.export,
             Self::ExportHtml(task) => &task.export,
+            Self::ExportSvgHtml(task) => &task.export,
             Self::ExportMd(task) => &task.export,
             Self::ExportText(task) => &task.export,
             Self::Query(task) => &task.export,
@@ -112,7 +116,7 @@ impl ProjectTask {
     pub fn extension(&self) -> &str {
         match self {
             Self::ExportPdf { .. } => "pdf",
-            Self::Preview(..) | Self::ExportHtml { .. } => "html",
+            Self::Preview(..) | Self::ExportSvgHtml { .. } | Self::ExportHtml { .. } => "html",
             Self::ExportMd { .. } => "md",
             Self::ExportText { .. } => "txt",
             Self::ExportSvg { .. } => "svg",

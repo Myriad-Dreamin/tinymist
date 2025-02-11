@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use reflexo_typst::{Bytes, CompilerFeat, EntryReader};
+use reflexo_typst::{Bytes, CompilerFeat, EntryReader, ExportWebSvgHtmlTask, WebSvgHtmlExport};
+use reflexo_vec2svg::DefaultExportFeature;
 use tinymist_project::{HtmlExport, LspCompilerFeat, PdfExport, PngExport, SvgExport, TaskWhen};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
@@ -137,6 +138,13 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                 ExportPng(config) => Self::export_bytes::<_, PngExport>(graph, when, config),
                 ExportSvg(config) => Self::export_string::<_, SvgExport>(graph, when, config),
                 ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
+                // todo: configuration
+                ExportSvgHtml(_config) => Self::export_string::<
+                    _,
+                    WebSvgHtmlExport<DefaultExportFeature>,
+                >(
+                    graph, when, &ExportWebSvgHtmlTask::default()
+                ),
                 ExportMd(_config) => {
                     let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
                     let doc = doc.as_ref();

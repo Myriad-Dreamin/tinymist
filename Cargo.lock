@@ -2879,6 +2879,7 @@ dependencies = [
  "rayon",
  "reflexo",
  "reflexo-typst2vec",
+ "reflexo-vec2svg",
  "serde",
  "serde_json",
  "tar",
