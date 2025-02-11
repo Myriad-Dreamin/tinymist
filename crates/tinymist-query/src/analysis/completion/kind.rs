@@ -129,7 +129,6 @@ impl FnCompletionFeat {
                 | Value::Dict(..)
                 | Value::Args(..)
                 | Value::Module(..)
-                | Value::Plugin(..)
                 | Value::Dyn(..) => {}
             },
             Ty::Func(sig) => self.check_sig(sig, pos),
@@ -263,7 +262,7 @@ fn fold_ty_kind<'a>(tys: impl Iterator<Item = &'a Ty>) -> CompletionKind {
 pub(crate) fn value_to_completion_kind(value: &Value) -> CompletionKind {
     match value {
         Value::Func(..) => CompletionKind::Func,
-        Value::Plugin(..) | Value::Module(..) => CompletionKind::Module,
+        Value::Module(..) => CompletionKind::Module,
         Value::Type(..) => CompletionKind::Type,
         Value::Symbol(s) => CompletionKind::Symbol(s.get()),
         Value::None
