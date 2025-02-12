@@ -21,14 +21,6 @@ use tinymist_world::{
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult, Warned};
 
-use crate::LspCompilerFeat;
-
-/// LSP compile snapshot.
-pub type LspCompileSnapshot = CompileSnapshot<LspCompilerFeat>;
-/// LSP compiled artifact.
-pub type LspCompiledArtifact = CompiledArtifact<LspCompilerFeat>;
-/// LSP interrupt.
-pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 /// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
     /// The used snapshot.
@@ -41,7 +33,7 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     pub deps: OnceLock<EcoVec<FileId>>,
 }
 
-impl fmt::Display for CompiledArtifact<LspCompilerFeat> {
+impl<F: CompilerFeat> fmt::Display for CompiledArtifact<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let rev = self.world.revision();
         write!(f, "CompiledArtifact({:?}, rev={rev:?})", self.id)
@@ -285,7 +277,7 @@ pub enum Interrupt<F: CompilerFeat> {
     Fs(FilesystemEvent),
 }
 
-impl fmt::Debug for Interrupt<LspCompilerFeat> {
+impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Interrupt::Compile(id) => write!(f, "Compile({id:?})"),

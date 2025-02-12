@@ -17,7 +17,7 @@ use tinymist_world::vfs::notify::NotifyDeps;
 use tokio::sync::mpsc;
 use typst::diag::FileError;
 
-use crate::vfs::{
+use tinymist_world::vfs::{
     notify::{FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
     FileChangeSet, FileSnapshot, PathAccessModel,

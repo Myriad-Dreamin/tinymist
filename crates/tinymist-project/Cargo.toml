@@ -38,8 +38,8 @@ notify.workspace = true
 
 [features]
 
-default = ["system"]
 fonts = ["typst-assets/fonts"]
+lsp = ["system"]
 
 system = ["tinymist-std/system", "tinymist-world/system"]
 
