@@ -39,9 +39,9 @@ notify.workspace = true
 
 [features]
 
-default = ["system"]
 fonts = ["typst-assets/fonts"]
 preview = ["typst-preview"]
+lsp = ["system"]
 
 system = ["tinymist-std/system", "tinymist-world/system"]
 

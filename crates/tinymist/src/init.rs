@@ -28,7 +28,7 @@ use typst_shim::utils::{Deferred, LazyHash};
 // textDocument.definition.linkSupport capability.
 
 use super::*;
-use crate::world::ImmutDict;
+use crate::project::ImmutDict;
 
 /// Capability to add valid commands to the arguments.
 pub trait AddCommands {
@@ -711,7 +711,7 @@ impl CompileConfig {
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
-                crate::world::LspUniverseBuilder::resolve_fonts(opts)
+                crate::project::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
                     .expect("failed to create font book")
             }))
