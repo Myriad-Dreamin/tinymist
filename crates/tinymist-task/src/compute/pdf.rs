@@ -41,16 +41,14 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
 /// Convert [`chrono::DateTime`] to [`Timestamp`]
 pub fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
     use chrono::{Datelike, Timelike};
-    let datetime = Datetime::from_ymd_hms(
+    Some(Timestamp::new_utc(Datetime::from_ymd_hms(
         date_time.year(),
         date_time.month().try_into().ok()?,
         date_time.day().try_into().ok()?,
         date_time.hour().try_into().ok()?,
         date_time.minute().try_into().ok()?,
         date_time.second().try_into().ok()?,
-    );
-
-    Some(Timestamp::new_utc(datetime.unwrap()))
+    )?))
 }
 
 // impl<F: CompilerFeat> WorldComputable<F> for PdfExport {
