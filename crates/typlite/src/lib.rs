@@ -114,6 +114,7 @@ impl Typlite {
             current,
             feat: self.feat,
             list_depth: 0,
+            pref: EcoString::new(),
             scopes: self
                 .library
                 .as_ref()
@@ -133,6 +134,7 @@ pub struct TypliteWorker {
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
     list_depth: usize,
+    pref: EcoString,
     /// Features for the conversion.
     pub feat: TypliteFeat,
 }
@@ -146,7 +148,7 @@ impl TypliteWorker {
     /// Eval the content
     pub fn eval(&mut self, node: &SyntaxNode) -> Result<Value> {
         use SyntaxKind::*;
-        match node.kind() {
+        let res = match node.kind() {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
             Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
@@ -307,7 +309,12 @@ impl TypliteWorker {
             // Ignored comments
             LineComment => Ok(Value::None),
             BlockComment => Ok(Value::None),
+        };
+        if res.clone()? == Value::None && !matches!(node.kind(), Hash | Ident) {
+            self.pref += node.clone().into_text();
+            self.pref += "\n";
         }
+        res
     }
 
     fn reduce(&mut self, node: &SyntaxNode) -> Result<Value> {
@@ -714,7 +721,10 @@ impl TypliteWorker {
         if self.feat.remove_html {
             return self.to_raw_block(node, false);
         }
-        self.render(node, false)
+        self.render(
+            &SyntaxNode::leaf(node.kind(), self.pref.clone() + node.clone().into_text()),
+            false,
+        )
     }
 
     fn include(&self, node: &SyntaxNode) -> Result<Value> {
