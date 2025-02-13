@@ -2,7 +2,6 @@
 
 pub mod package;
 pub mod project;
-pub mod text;
 pub mod word_count;
 
 #[cfg(feature = "preview")]
