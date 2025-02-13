@@ -14,14 +14,13 @@ use tinymist_project::{
 };
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{convert_datetime, get_page_selection, ExportTarget};
+use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
 use typst_pdf::PdfOptions;
 
-use crate::tool::text::FullTextDigest;
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
 use super::{FutureFolder, SyncTaskFactory};
@@ -267,7 +266,7 @@ impl ExportTask {
                         .into_bytes()
                 }
                 ExportText(ExportTextTask { export: _ }) => {
-                    format!("{}", FullTextDigest(doc.clone())).into_bytes()
+                    TextExport::run_on_doc(doc)?.into_bytes()
                 }
                 ExportMd(ExportMarkdownTask { export: _ }) => {
                     let conv = Typlite::new(Arc::new(snap.world))
