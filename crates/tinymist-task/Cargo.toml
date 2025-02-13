@@ -42,7 +42,7 @@ notify.workspace = true
 
 [features]
 
-default = ["pdf", "text"]
+default = ["pdf", "text", "no-content-hint"]
 no-content-hint = []
 
 pdf = []
