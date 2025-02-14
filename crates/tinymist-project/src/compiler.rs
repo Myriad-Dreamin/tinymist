@@ -16,7 +16,7 @@ use tinymist_world::vfs::notify::{
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, EntryReader, EntryState, ExportSignal,
-    ProjectInsId, TaskInputs, WorldDeps,
+    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult, Warned};
@@ -98,13 +98,33 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
         D: typst::Document + 'static,
         Arc<D>: Into<TypstDocument>,
     {
-        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
-
         snap.world.set_is_compiling(true);
         let res = ::typst::compile::<D>(&snap.world);
+        snap.world.set_is_compiling(false);
+
+        Self::from_snapshot_result(
+            snap,
+            Warned {
+                output: res.output.map(Arc::new),
+                warnings: res.warnings,
+            },
+        )
+    }
+
+    /// Runs the compiler and returns the compiled document.
+    pub fn from_snapshot_result<D>(
+        snap: CompileSnapshot<F>,
+        res: Warned<SourceResult<Arc<D>>>,
+    ) -> CompiledArtifact<F>
+    where
+        D: typst::Document + 'static,
+        Arc<D>: Into<TypstDocument>,
+    {
+        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
+
         let warned = match res.output {
             Ok(doc) => Ok(Warned {
-                output: Arc::new(doc),
+                output: doc,
                 warnings: res.warnings,
             }),
             Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
@@ -118,7 +138,6 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
                 }
             },
         };
-        snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
             Ok(doc) => (Ok(doc.output.into()), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
