@@ -310,7 +310,12 @@ impl TypliteWorker {
             LineComment => Ok(Value::None),
             BlockComment => Ok(Value::None),
         };
-        if res.clone()? == Value::None && !matches!(node.kind(), Hash | Ident) {
+        if res.clone()? == Value::None
+            && !matches!(
+                node.kind(),
+                Hash | Ident | Bool | Int | Float | Numeric | Str | Array | Dict
+            )
+        {
             self.pref += node.clone().into_text();
             self.pref += "\n";
         }
