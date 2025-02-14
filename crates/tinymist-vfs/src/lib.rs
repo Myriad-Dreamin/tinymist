@@ -540,6 +540,14 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_changes(&mut self, event: FileChangeSet) {
         self.view_changed = true;
+
+        for path in &event.removes {
+            self.invalidate_path(path);
+        }
+        for (path, _) in &event.inserts {
+            self.invalidate_path(path);
+        }
+
         self.am().inner.inner.inner.notify(event);
     }
 }
