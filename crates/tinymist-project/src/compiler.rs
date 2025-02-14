@@ -519,7 +519,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             self.primary.verse.font_resolver.clone(),
         );
 
-        let proj = Self::create_project(id.clone(), verse, self.handler.clone());
+        let mut proj = Self::create_project(id.clone(), verse, self.handler.clone());
+        proj.reason.see(reason_by_entry_change());
 
         self.remove_dedicates(&id);
         self.dedicates.push(proj);
@@ -808,6 +809,26 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             },
             success_doc: self.latest_success_doc.clone(),
         }
+    }
+
+    /// Compile the document once if there is any reason and the entry is
+    /// active. (this is used for experimenting typst.node compilations)
+    #[must_use]
+    pub fn may_compile2(
+        &mut self,
+        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>),
+    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>>> {
+        if !self.reason.any() || self.verse.entry_state().is_inactive() {
+            return None;
+        }
+
+        let snap = self.snapshot();
+        self.reason = Default::default();
+        Some(move || {
+            let compiled = WorldComputeGraph::new(snap);
+            compute(&compiled);
+            compiled
+        })
     }
 
     /// Compile the document once if there is any reason and the entry is
