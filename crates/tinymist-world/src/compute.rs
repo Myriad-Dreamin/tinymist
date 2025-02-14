@@ -169,6 +169,17 @@ pub trait ExportComputation<F: CompilerFeat, D> {
         Self::run(g, doc, config)
     }
 
+    fn cast_run<'a>(
+        g: &Arc<WorldComputeGraph<F>>,
+        doc: impl TryInto<&'a Arc<D>, Error = tinymist_std::Error>,
+        config: &Self::Config,
+    ) -> Result<Self::Output>
+    where
+        D: 'a,
+    {
+        Self::run(g, doc.try_into()?, config)
+    }
+
     fn run(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<D>,
