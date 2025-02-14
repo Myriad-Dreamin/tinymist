@@ -6,7 +6,7 @@ pub mod scopes;
 pub mod value;
 
 use core::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt::Write, sync::LazyLock};
 
@@ -50,8 +50,12 @@ pub enum ColorTheme {
 
 #[derive(Debug, Default, Clone)]
 pub struct TypliteFeat {
-    /// The preferred color theme
+    /// The preferred color theme.
     pub color_theme: Option<ColorTheme>,
+    /// The path of external assets directory.
+    pub assets_path: Option<PathBuf>,
+    /// The path of external assets' source code directory.
+    pub assets_src_path: Option<PathBuf>,
     /// Allows GFM (GitHub Flavored Markdown) markups.
     pub gfm: bool,
     /// Annotate the elements for identification.
@@ -115,6 +119,7 @@ impl Typlite {
             feat: self.feat,
             list_depth: 0,
             pref: EcoString::new(),
+            assets_numbering: 0,
             scopes: self
                 .library
                 .as_ref()
@@ -135,6 +140,7 @@ pub struct TypliteWorker {
     world: Arc<LspWorld>,
     list_depth: usize,
     pref: EcoString,
+    assets_numbering: usize,
     /// Features for the conversion.
     pub feat: TypliteFeat,
 }
@@ -361,9 +367,27 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
-    pub fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+    pub fn render(
+        &mut self,
+        pref_node: &SyntaxNode,
+        node: &SyntaxNode,
+        inline: bool,
+    ) -> Result<Value> {
+        self.assets_numbering += 1;
+        let pref_code = pref_node.clone().into_text();
         let code = node.clone().into_text();
-        self.render_code(&code, false, "center", "", inline)
+        if let Some(assets_src_path) = &self.feat.assets_src_path {
+            let file_name = format!(
+                "{}/{}.typ",
+                assets_src_path.display(),
+                self.assets_numbering,
+            );
+            if let Err(e) = std::fs::write(&file_name, format!("#{{\n// render_code\n{}\n}}", code))
+            {
+                return Err(format!("Failed to write code to file: {}", e).into());
+            }
+        }
+        self.render_code(&(pref_code + code), false, "center", "", inline)
     }
 
     pub fn render_code(
@@ -375,6 +399,17 @@ impl TypliteWorker {
         inline: bool,
     ) -> Result<Value> {
         let theme = self.feat.color_theme;
+
+        let code_file_name = if let Some(assets_src_path) = &self.feat.assets_src_path {
+            Some(format!(
+                "{}/{}.typ",
+                assets_src_path.display(),
+                self.assets_numbering,
+            ))
+        } else {
+            None
+        };
+
         let mut render = |theme| self.render_inner(code, is_markup, theme);
 
         let mut content = EcoString::new();
@@ -384,20 +419,58 @@ impl TypliteWorker {
         } else {
             ""
         };
+
         match theme {
             Some(theme) => {
                 let data = render(theme);
                 match data {
                     Ok(data) => {
-                        if !inline {
-                            let _ = write!(content, r#"<p align="{align}">"#);
-                        }
-                        let _ = write!(
-                            content,
-                            r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
-                        );
-                        if !inline {
-                            content.push_str("</p>");
+                        if let Some(assets_path) = &self.feat.assets_path {
+                            let file_name = format!(
+                                "{}/{}_{:?}.svg",
+                                assets_path.display(),
+                                self.assets_numbering,
+                                theme
+                            );
+                            if let Err(e) = std::fs::write(&file_name, &data) {
+                                return Err(format!("Failed to write SVG to file: {}", e).into());
+                            }
+
+                            if let Some(code_file_name) = &code_file_name {
+                                if !inline {
+                                    let _ = write!(content, r#"<p align="{align}">"#);
+                                }
+                                let _ = write!(
+                                    content,
+                                    r#"<a href="{code_file_name}"><img{inline_attrs} alt="typst-block" src="{file_name}" {extra_attrs}/></a>"#,
+                                );
+                                if !inline {
+                                    content.push_str("</p>");
+                                }
+                            } else {
+                                if !inline {
+                                    let _ = write!(content, r#"<p align="{align}">"#);
+                                }
+                                let _ = write!(
+                                    content,
+                                    r#"<img{inline_attrs} alt="typst-block" src="{file_name}" {extra_attrs}/>"#,
+                                );
+                                if !inline {
+                                    content.push_str("</p>");
+                                }
+                            }
+                        } else {
+                            // Fallback to Base64-encoded data URL if assets_path is None
+                            if !inline {
+                                let _ = write!(content, r#"<p align="{align}">"#);
+                            }
+                            let _ = write!(
+                                content,
+                                r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
+                            );
+                            if !inline {
+                                content.push_str("</p>");
+                            }
                         }
                     }
                     Err(err) if self.feat.soft_error => {
@@ -414,15 +487,54 @@ impl TypliteWorker {
 
                 match (dark, light) {
                     (Ok(dark), Ok(light)) => {
-                        if !inline {
-                            let _ = write!(content, r#"<p align="{align}">"#);
-                        }
-                        let _ = write!(
-                            content,
-                            r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
-                        );
-                        if !inline {
-                            content.push_str("</p>");
+                        if let Some(assets_path) = &self.feat.assets_path {
+                            let dark_file_name = format!(
+                                "{}/{}_{:?}.svg",
+                                assets_path.display(),
+                                self.assets_numbering,
+                                ColorTheme::Dark
+                            );
+                            let light_file_name = format!(
+                                "{}/{}_{:?}.svg",
+                                assets_path.display(),
+                                self.assets_numbering,
+                                ColorTheme::Light
+                            );
+
+                            if let Some(code_file_name) = &code_file_name {
+                                if !inline {
+                                    let _ = write!(content, r#"<p align="{align}">"#);
+                                }
+                                let _ = write!(
+                                    content,
+                                    r#"<a href="{code_file_name}"><picture><source media="(prefers-color-scheme: dark)" srcset="{dark_file_name}"><img{inline_attrs} alt="typst-block" src="{light_file_name}" {extra_attrs}/></picture></a>"#,
+                                );
+                                if !inline {
+                                    content.push_str("</p>");
+                                }
+                            } else {
+                                if !inline {
+                                    let _ = write!(content, r#"<p align="{align}">"#);
+                                }
+                                let _ = write!(
+                                    content,
+                                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="{dark_file_name}"><img{inline_attrs} alt="typst-block" src="{light_file_name}" {extra_attrs}/></picture>"#,
+                                );
+                                if !inline {
+                                    content.push_str("</p>");
+                                }
+                            }
+                        } else {
+                            if !inline {
+                                let _ = write!(content, r#"<p align="{align}">"#);
+                            }
+                            let _ = write!(
+                                content,
+                                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
+                            );
+                            if !inline {
+                                content.push_str("</p>");
+                            }
                         }
                     }
                     (Err(err), _) | (_, Err(err)) if self.feat.soft_error => {
@@ -528,7 +640,21 @@ impl TypliteWorker {
         })?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
-        Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
+
+        if let Some(assets_path) = &self.feat.assets_path {
+            let file_name = format!(
+                "{}/{}_{:?}.svg",
+                assets_path.display(),
+                self.assets_numbering,
+                theme
+            );
+            if let Err(e) = std::fs::write(&file_name, &svg_payload) {
+                return Err(format!("Failed to write SVG to file: {}", e).into());
+            }
+            Ok(file_name)
+        } else {
+            Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
+        }
     }
 
     fn char(arg: char) -> Result<Value> {
@@ -691,7 +817,7 @@ impl TypliteWorker {
             return self.to_raw_block(node, !equation.block());
         }
 
-        self.render(node, !equation.block())
+        self.render(&SyntaxNode::default(), node, !equation.block())
     }
 
     fn let_binding(&self, node: &SyntaxNode) -> Result<Value> {
@@ -727,7 +853,8 @@ impl TypliteWorker {
             return self.to_raw_block(node, false);
         }
         self.render(
-            &SyntaxNode::leaf(node.kind(), self.pref.clone() + node.clone().into_text()),
+            &SyntaxNode::leaf(node.kind(), self.pref.clone()),
+            node,
             false,
         )
     }
