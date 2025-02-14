@@ -12,6 +12,8 @@ pub(crate) mod well_known {
 
     pub use typst::layout::Abs as TypstAbs;
 
+    pub use typst::Document as TypstDocumentTrait;
+
     pub use typst::layout::PagedDocument as TypstPagedDocument;
 
     pub use typst::html::HtmlDocument as TypstHtmlDocument;
@@ -70,6 +72,32 @@ impl From<Arc<well_known::TypstPagedDocument>> for TypstDocument {
 impl From<Arc<well_known::TypstHtmlDocument>> for TypstDocument {
     fn from(doc: Arc<well_known::TypstHtmlDocument>) -> Self {
         Self::Html(doc)
+    }
+}
+
+impl<'a> TryFrom<&'a TypstDocument> for &'a Arc<well_known::TypstPagedDocument> {
+    type Error = crate::Error;
+
+    fn try_from(doc: &'a TypstDocument) -> Result<Self, Self::Error> {
+        match doc {
+            TypstDocument::Paged(doc) => Ok(doc),
+            TypstDocument::Html(_doc) => {
+                crate::bail!("The document is compiled with `html` target, not `paged`.")
+            }
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a TypstDocument> for &'a Arc<well_known::TypstHtmlDocument> {
+    type Error = crate::Error;
+
+    fn try_from(doc: &'a TypstDocument) -> Result<Self, Self::Error> {
+        match doc {
+            TypstDocument::Paged(_doc) => {
+                crate::bail!("The document is compiled with `paged` target, not `html`.")
+            }
+            TypstDocument::Html(doc) => Ok(doc),
+        }
     }
 }
 
