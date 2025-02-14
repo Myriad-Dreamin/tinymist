@@ -35,6 +35,14 @@ pub enum TypstDocument {
 }
 
 impl TypstDocument {
+    /// Gets the number of pages in the document.
+    pub fn num_of_pages(&self) -> u32 {
+        match self {
+            Self::Paged(doc) => doc.pages.len() as u32,
+            Self::Html(_doc) => 1u32,
+        }
+    }
+
     /// Gets details about the document.
     pub fn info(&self) -> &typst::model::DocumentInfo {
         match self {
