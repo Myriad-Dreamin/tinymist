@@ -77,8 +77,8 @@ fn main() -> typlite::Result<()> {
     let converter = Typlite::new(Arc::new(world))
         .with_library(lib())
         .with_feature(TypliteFeat {
-            assets_path: assets_path,
-            assets_src_path: assets_src_path,
+            assets_path,
+            assets_src_path,
             ..Default::default()
         });
     let conv = converter.convert();
