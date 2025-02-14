@@ -234,6 +234,10 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
                 log::info!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
                 return false;
             }
+            log::info!(
+                "Vfs(clean, {id:?}, rev={rev}, changed_at={})",
+                entry.changed_at
+            );
         }
         true
     }
@@ -561,7 +565,7 @@ struct VfsEntry {
     source: Arc<OnceLock<FileResult<Source>>>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct EntryMap {
     entries: RedBlackTreeMapSync<TypstFileId, VfsEntry>,
 }
@@ -581,7 +585,7 @@ impl EntryMap {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct PathMap {
     paths: FxHashMap<ImmutPath, Vec<TypstFileId>>,
 }
