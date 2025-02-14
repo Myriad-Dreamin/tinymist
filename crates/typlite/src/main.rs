@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 use ecow::{eco_format, EcoString};
 use tinymist_project::WorldProvider;
-use typlite::value::*;
+use typlite::{value::*, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 
 /// Common arguments of compile, watch, and query.
@@ -20,6 +20,14 @@ pub struct CompileArgs {
     /// Path to output file
     #[clap(value_name = "OUTPUT")]
     pub output: Option<String>,
+
+    /// Configures the path of assets directory
+    #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
+    pub assets_path: Option<String>,
+
+    /// Configures the path of assets' source code directory
+    #[clap(long, default_value = None, value_name = "ASSETS_SRC_PATH")]
+    pub assets_src_path: Option<String>,
 }
 
 fn main() -> typlite::Result<()> {
@@ -36,11 +44,43 @@ fn main() -> typlite::Result<()> {
         Some(output_path) => Some(PathBuf::from(output_path)),
         None => Some(Path::new(input).with_extension("md")),
     };
+    let assets_path = match args.assets_path {
+        Some(assets_path) => {
+            let path = PathBuf::from(assets_path);
+            if !path.exists() {
+                if let Err(e) = std::fs::create_dir_all(&path) {
+                    eprintln!("Failed to create assets directory: {}", e);
+                    return Err(format!("Failed to create assets directory: {}", e).into());
+                }
+            }
+            Some(path)
+        }
+        None => None,
+    };
+    let assets_src_path = match args.assets_src_path {
+        Some(assets_src_path) => {
+            let path = PathBuf::from(assets_src_path);
+            if !path.exists() {
+                if let Err(e) = std::fs::create_dir_all(&path) {
+                    eprintln!("Failed to create assets' src directory: {}", e);
+                    return Err(format!("Failed to create assets' src directory: {}", e).into());
+                }
+            }
+            Some(path)
+        }
+        None => None,
+    };
 
     let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
     let world = universe.snapshot();
 
-    let converter = Typlite::new(Arc::new(world)).with_library(lib());
+    let converter = Typlite::new(Arc::new(world))
+        .with_library(lib())
+        .with_feature(TypliteFeat {
+            assets_path: assets_path,
+            assets_src_path: assets_src_path,
+            ..Default::default()
+        });
     let conv = converter.convert();
 
     match (conv, output) {
