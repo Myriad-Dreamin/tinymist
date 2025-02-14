@@ -496,6 +496,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dedicates.iter_mut().find(|e| e.id == *id).unwrap()
     }
 
+    /// Clear all dedicate projects.
+    pub fn clear_dedicates(&mut self) {
+        self.dedicates.clear();
+    }
+
     /// Restart a dedicate project.
     pub fn restart_dedicate(
         &mut self,
