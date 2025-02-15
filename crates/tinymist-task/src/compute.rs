@@ -1,30 +1,25 @@
 #![allow(missing_docs)]
+
 use std::str::FromStr;
 use std::sync::Arc;
 
-#[allow(unused_imports)]
-use crate::model::{ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask};
-use crate::primitives::TaskWhen;
-use crate::{ExportTransform, Pages, QueryTask};
 use comemo::Track;
 use ecow::EcoString;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
-#[allow(unused_imports)]
-use tinymist_world::{
-    args::convert_source_date_epoch, CompileSnapshot, CompilerFeat, ExportComputation,
-    WorldComputeGraph,
-};
+use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::diag::{SourceResult, StrResult};
-use typst::foundations::{Bytes, Content, Datetime, IntoValue, LocatableSelector, Scope, Value};
+use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
 use typst::layout::Abs;
 use typst::routines::EvalMode;
 use typst::syntax::{ast, Span, SyntaxNode};
 use typst::visualize::Color;
 use typst::World;
 use typst_eval::eval_string;
-#[allow(unused_imports)]
-use typst_pdf::{PdfOptions, Timestamp};
+
+use crate::model::{ExportHtmlTask, ExportPngTask, ExportSvgTask};
+use crate::primitives::TaskWhen;
+use crate::{ExportTransform, Pages, QueryTask};
 
 #[cfg(feature = "pdf")]
 pub mod pdf;
@@ -372,22 +367,6 @@ fn parse_color(fill: String) -> anyhow::Result<Color> {
         }
         _ => anyhow::bail!("invalid color: {fill}"),
     }
-}
-
-/// Convert [`chrono::DateTime`] to [`Timestamp`]
-#[allow(dead_code)]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
-    use chrono::{Datelike, Timelike};
-    let datetime = Datetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    );
-
-    Some(Timestamp::new_utc(datetime.unwrap()))
 }
 
 #[cfg(test)]
