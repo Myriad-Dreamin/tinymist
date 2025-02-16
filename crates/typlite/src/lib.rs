@@ -421,15 +421,9 @@ impl TypliteWorker {
             ""
         };
 
-        let write_error = |content: &mut EcoString, align: &str, err: &str, inline: bool| {
-            if !inline {
-                let _ = write!(content, r#"<p align="{align}">"#);
-            }
+        let write_error = |content: &mut EcoString, err: &str| {
             let err = err.replace("`", r#"\`"#);
             let _ = write!(content, "```\nRender Error\n{err}\n```");
-            if !inline {
-                content.push_str("</p>");
-            }
         };
 
         let write_image = |content: &mut EcoString,
@@ -480,7 +474,7 @@ impl TypliteWorker {
                 let data = match render(theme) {
                     Ok(data) => data,
                     Err(err) if self.feat.soft_error => {
-                        write_error(&mut content, align, &err.to_string(), inline);
+                        write_error(&mut content, &err.to_string());
                         return Ok(Value::Content(content));
                     }
                     Err(err) => return Err(err),
@@ -516,7 +510,7 @@ impl TypliteWorker {
                 let dark = match render(ColorTheme::Dark) {
                     Ok(d) => d,
                     Err(err) if self.feat.soft_error => {
-                        write_error(&mut content, align, &err.to_string(), inline);
+                        write_error(&mut content, &err.to_string());
                         return Ok(Value::Content(content));
                     }
                     Err(err) => return Err(err),
@@ -524,7 +518,7 @@ impl TypliteWorker {
                 let light = match render(ColorTheme::Light) {
                     Ok(l) => l,
                     Err(err) if self.feat.soft_error => {
-                        write_error(&mut content, align, &err.to_string(), inline);
+                        write_error(&mut content, &err.to_string());
                         return Ok(Value::Content(content));
                     }
                     Err(err) => return Err(err),
