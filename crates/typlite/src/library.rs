@@ -177,9 +177,9 @@ pub fn table(mut args: Args) -> Result<Value> {
             cells.push(TypliteWorker::value(evaluated));
         } else {
             let func_call: ast::FuncCall = pos_arg.cast().unwrap();
-            let first_child = pos_arg.children().into_iter().next().unwrap();
+            let first_child = pos_arg.children().next().unwrap();
 
-            if header_field.spanless_eq(&first_child) {
+            if header_field.spanless_eq(first_child) {
                 let mut header_args = Args::new(args.vm, func_call.args());
                 while let Some(arg) = header_args.pos.pop() {
                     let evaluated = header_args.vm.eval(arg)?;
@@ -189,7 +189,7 @@ pub fn table(mut args: Args) -> Result<Value> {
                 let evaluated = args.vm.eval(pos_arg)?;
                 cells.push(TypliteWorker::value(evaluated));
             }
-            if footer_field.spanless_eq(&first_child) {
+            if footer_field.spanless_eq(first_child) {
                 let mut footer_args = Args::new(args.vm, func_call.args());
                 while let Some(arg) = footer_args.pos.pop() {
                     let evaluated = footer_args.vm.eval(arg)?;
@@ -270,9 +270,9 @@ pub fn grid(mut args: Args) -> Result<Value> {
             cells.push(TypliteWorker::value(evaluated));
         } else {
             let func_call: ast::FuncCall = pos_arg.cast().unwrap();
-            let first_child = pos_arg.children().into_iter().next().unwrap();
+            let first_child = pos_arg.children().next().unwrap();
 
-            if header_field.spanless_eq(&first_child) {
+            if header_field.spanless_eq(first_child) {
                 let mut header_args = Args::new(args.vm, func_call.args());
                 while let Some(arg) = header_args.pos.pop() {
                     let evaluated = header_args.vm.eval(arg)?;
@@ -282,7 +282,7 @@ pub fn grid(mut args: Args) -> Result<Value> {
                 let evaluated = args.vm.eval(pos_arg)?;
                 cells.push(TypliteWorker::value(evaluated));
             }
-            if footer_field.spanless_eq(&first_child) {
+            if footer_field.spanless_eq(first_child) {
                 let mut footer_args = Args::new(args.vm, func_call.args());
                 while let Some(arg) = footer_args.pos.pop() {
                     let evaluated = footer_args.vm.eval(arg)?;
