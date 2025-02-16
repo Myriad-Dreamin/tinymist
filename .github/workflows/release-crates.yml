@@ -58,6 +58,8 @@ jobs:
           cargo publish --no-verify -p tinymist-analysis || true
           cargo publish --no-verify -p tinymist-std || true
           cargo publish --no-verify -p tinymist-vfs || true
+          echo "Sleeping for 60 seconds to avoid rate limit"
+          sleep 60
           cargo publish --no-verify -p tinymist-world || true
           cargo publish --no-verify -p tinymist-task || true
           cargo publish --no-verify -p tinymist-project || true
