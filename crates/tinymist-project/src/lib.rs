@@ -6,7 +6,9 @@ mod entry;
 pub mod font;
 mod lock;
 mod model;
+#[cfg(feature = "system")]
 mod watch;
+#[cfg(feature = "system")]
 pub mod world;
 pub use args::*;
 pub use compiler::*;
