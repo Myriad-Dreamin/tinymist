@@ -6,13 +6,12 @@ use reflexo_typst::{Bytes, CompilerFeat, EntryReader, ExportWebSvgHtmlTask, WebS
 use reflexo_vec2svg::DefaultExportFeature;
 use tinymist_project::{HtmlExport, LspCompilerFeat, PdfExport, PngExport, SvgExport, TaskWhen};
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
-use tinymist_task::ExportTimings;
+use tinymist_std::typst::TypstPagedDocument;
+use tinymist_task::{ExportTimings, TextExport};
 use typlite::Typlite;
 use typst::diag::SourceResult;
 
-use crate::project::{ExportMarkdownTask, ExportTextTask, ProjectTask};
-use crate::tool::text::FullTextDigest;
+use crate::project::{ExportMarkdownTask, ProjectTask};
 use crate::world::base::{
     ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, HtmlCompilationTask,
     OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
@@ -190,23 +189,5 @@ impl WorldComputable<LspCompilerFeat> for TypliteMdExport {
 
     fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self::Output> {
         Self::run(graph)
-    }
-}
-
-pub struct TextExport;
-
-impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for TextExport {
-    type Output = String;
-    type Config = ExportTextTask;
-
-    fn run(
-        _g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
-        _config: &ExportTextTask,
-    ) -> Result<String> {
-        Ok(format!(
-            "{}",
-            FullTextDigest(TypstDocument::Paged(doc.clone()))
-        ))
     }
 }
