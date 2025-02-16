@@ -232,7 +232,7 @@ where
             let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
             let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
 
-            let world = if is_paged_compilation {
+            let mut world = if is_paged_compilation {
                 graph.snap.world.paged_task()
             } else if is_html_compilation {
                 graph.snap.world.html_task()
@@ -240,7 +240,9 @@ where
                 Cow::Borrowed(&graph.snap.world)
             };
 
+            world.to_mut().set_is_compiling(true);
             let compiled = typst::compile::<D>(world.as_ref());
+            world.to_mut().set_is_compiling(false);
 
             let exclude_html_warnings = if !is_html_compilation {
                 compiled.warnings
