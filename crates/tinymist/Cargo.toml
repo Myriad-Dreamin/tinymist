@@ -114,7 +114,6 @@ preview = [
     "typst-preview",
     "typst-preview/clap",
     "tinymist-assets/typst-preview",
-    "tinymist-project/preview",
     "hyper-tungstenite",
 ]
 

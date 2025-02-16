@@ -2850,7 +2850,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=827a4fecb76cd88482642734b1349df570a19336#827a4fecb76cd88482642734b1349df570a19336"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=d2ad2bc40f670dec30af44db1ae86807bb42ac95#d2ad2bc40f670dec30af44db1ae86807bb42ac95"
 dependencies = [
  "base64",
  "bitvec",
@@ -2876,7 +2876,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=827a4fecb76cd88482642734b1349df570a19336#827a4fecb76cd88482642734b1349df570a19336"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=d2ad2bc40f670dec30af44db1ae86807bb42ac95#d2ad2bc40f670dec30af44db1ae86807bb42ac95"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -2887,7 +2887,6 @@ dependencies = [
  "js-sys",
  "log",
  "nohash-hasher",
- "notify",
  "parking_lot",
  "pathdiff",
  "rayon",
@@ -2897,6 +2896,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
+ "tinymist-project",
  "tinymist-task",
  "tinymist-world",
  "tokio",
@@ -2908,13 +2908,14 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=827a4fecb76cd88482642734b1349df570a19336#827a4fecb76cd88482642734b1349df570a19336"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=d2ad2bc40f670dec30af44db1ae86807bb42ac95#d2ad2bc40f670dec30af44db1ae86807bb42ac95"
 dependencies = [
  "bitvec",
  "comemo",
  "crossbeam-queue",
  "dashmap",
  "flate2",
+ "image",
  "log",
  "parking_lot",
  "rayon",
@@ -2933,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=827a4fecb76cd88482642734b1349df570a19336#827a4fecb76cd88482642734b1349df570a19336"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=d2ad2bc40f670dec30af44db1ae86807bb42ac95#d2ad2bc40f670dec30af44db1ae86807bb42ac95"
 dependencies = [
  "base64",
  "comemo",
@@ -4041,7 +4042,6 @@ dependencies = [
  "toml",
  "typst",
  "typst-assets",
- "typst-preview",
 ]
 
 [[package]]
