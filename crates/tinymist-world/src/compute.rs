@@ -217,7 +217,10 @@ impl<F: CompilerFeat> WorldComputable<F> for CompilationTask<TypstPagedDocument>
             .enabled;
 
         Ok(enabled.then(|| {
-            let compiled = typst::compile(&graph.snap.world);
+            let mut world = graph.snap.world.clone();
+            world.set_is_compiling(true);
+            let compiled = typst::compile(&world);
+            world.set_is_compiling(false);
             Warned {
                 output: compiled.output.map(Arc::new),
                 warnings: compiled.warnings,
