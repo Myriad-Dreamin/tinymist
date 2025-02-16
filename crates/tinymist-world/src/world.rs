@@ -648,7 +648,7 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     ///
     /// The returned `Source` file's [id](Source::id) does not have to match the
     /// given `id`. Due to symlinks, two different file id's can point to the
-    /// same on-disk file. Implementors can deduplicate and return the same
+    /// same on-disk file. Implementers can deduplicate and return the same
     /// `Source` if they want to, but do not have to.
     fn source(&self, id: FileId) -> FileResult<Source> {
         static DETACH_SOURCE: LazyLock<Source> =

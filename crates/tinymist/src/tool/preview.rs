@@ -651,6 +651,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             client: Box::new(intr_tx.clone()),
             analysis: Arc::default(),
 
+            status_revision: Mutex::default(),
             notified_revision: Mutex::default(),
         });
 
