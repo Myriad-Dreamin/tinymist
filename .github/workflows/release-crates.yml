@@ -53,25 +53,25 @@ jobs:
       #   if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Publish crates
         run: |
-          cargo publish --no-verify -p typst-shim
-          cargo publish --no-verify -p tinymist-derive
-          cargo publish --no-verify -p tinymist-analysis
-          cargo publish --no-verify -p tinymist-std
-          cargo publish --no-verify -p tinymist-vfs
-          cargo publish --no-verify -p tinymist-world
-          cargo publish --no-verify -p tinymist-task
-          cargo publish --no-verify -p tinymist-project
-          cargo publish --no-verify -p typlite
-          cargo publish --no-verify -p crityp
+          cargo publish --no-verify -p typst-shim || true
+          cargo publish --no-verify -p tinymist-derive || true
+          cargo publish --no-verify -p tinymist-analysis || true
+          cargo publish --no-verify -p tinymist-std || true
+          cargo publish --no-verify -p tinymist-vfs || true
+          cargo publish --no-verify -p tinymist-world || true
+          cargo publish --no-verify -p tinymist-task || true
+          cargo publish --no-verify -p tinymist-project || true
+          cargo publish --no-verify -p typlite || true
+          cargo publish --no-verify -p crityp || true
       - name: Verifies crate health (Optional)
         run: |
-          cargo publish -p typst-shim
-          cargo publish -p tinymist-derive
-          cargo publish -p tinymist-analysis
-          cargo publish -p tinymist-std
-          cargo publish -p tinymist-vfs
-          cargo publish -p tinymist-world
-          cargo publish -p tinymist-task
-          cargo publish -p tinymist-project
-          cargo publish -p typlite
-          cargo publish -p crityp
+          cargo publish --dry-run -p typst-shim
+          cargo publish --dry-run -p tinymist-derive
+          cargo publish --dry-run -p tinymist-analysis
+          cargo publish --dry-run -p tinymist-std
+          cargo publish --dry-run -p tinymist-vfs
+          cargo publish --dry-run -p tinymist-world
+          cargo publish --dry-run -p tinymist-task
+          cargo publish --dry-run -p tinymist-project
+          cargo publish --dry-run -p typlite
+          cargo publish --dry-run -p crityp
