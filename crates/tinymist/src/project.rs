@@ -251,9 +251,11 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
         compilation: &LspCompiledArtifact,
     ) {
-        if self.notified_revision >= compilation.world.revision().get() {
+        let rev = compilation.world.revision().get();
+        if self.notified_revision >= rev {
             return;
         }
+        self.notified_revision = rev;
 
         self.is_compiling = false;
         self.last_compilation = Some(compilation.clone());
