@@ -145,7 +145,6 @@ typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1"
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.14", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -176,6 +175,9 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { version = "0.12.21-pre-rc1", path = "./crates/typst-preview" }
+typst-shim = { version = "0.12.21-pre-rc1", path = "./crates/typst-shim", features = [
+    "nightly",
+] }
 tinymist-assets = { version = "=0.12.21-pre-rc1" }
 tinymist = { version = "0.12.21-pre-rc1", path = "./crates/tinymist/" }
 tinymist-std = { version = "0.12.21-pre-rc1", path = "./crates/tinymist-std/", default-features = false }
