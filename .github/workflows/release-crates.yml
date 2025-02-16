@@ -48,16 +48,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install llvm
-      - name: Install AArch64 target toolchain
-        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-aarch64-linux-gnu
-      - name: Install ARM target toolchain
-        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-arm-linux-gnueabihf
       # - name: Run rust-cache
       #   uses: Swatinem/rust-cache@v2
       #   if: (fromJson(env.isRelease) || fromJson(env.isNightly))
