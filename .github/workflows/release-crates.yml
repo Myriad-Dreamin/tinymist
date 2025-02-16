@@ -1,0 +1,89 @@
+name: tinymist::crates::publish
+on:
+  workflow_dispatch:
+
+env:
+  RUSTFLAGS: '-Dwarnings'
+
+jobs:
+
+  publish-crates:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            rust-target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+            regular_build: 'true'
+    name: build 
+    runs-on: ${{ matrix.os }}
+    env:
+      target: ${{ matrix.platform }}-${{ matrix.arch }}
+      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
+      isTest: ${{ matrix.rust-target == 'x86_64-unknown-linux-gnu' || matrix.rust-target == 'x86_64-pc-windows-msvc' }}
+      isUniversal: ${{ matrix.rust-target == 'x86_64-unknown-linux-gnu' }}
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+    steps:
+      - name: "Print Env"
+        run: |
+          echo "Running on ${{ matrix.os }}"
+          echo "Target: ${{ env.target }}"
+          echo "Is Release: ${{ fromJson(env.isRelease) }}"
+          echo "Is Nightly: ${{ fromJson(env.isNightly) }}"
+          echo "Is Test: ${{ fromJson(env.isTest) }}"
+          echo "Is Universal (No Server): ${{ fromJson(env.isUniversal) }}"
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Install llvm
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
+      - name: Install AArch64 target toolchain
+        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-aarch64-linux-gnu
+      - name: Install ARM target toolchain
+        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-arm-linux-gnueabihf
+      # - name: Run rust-cache
+      #   uses: Swatinem/rust-cache@v2
+      #   if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Publish crates
+        run: |
+          cargo publish --no-verify -p typst-shim
+          cargo publish --no-verify -p sync-lsp
+          cargo publish --no-verify -p tinymist-derive
+          cargo publish --no-verify -p tinymist-analysis
+          cargo publish --no-verify -p tinymist-std
+          cargo publish --no-verify -p tinymist-vfs
+          cargo publish --no-verify -p tinymist-world
+          cargo publish --no-verify -p tinymist-task
+          cargo publish --no-verify -p tinymist-project
+          cargo publish --no-verify -p typlite
+          cargo publish --no-verify -p crityp
+      - name: Verifies crate health (Optional)
+        run: |
+          cargo publish -p typst-shim
+          cargo publish -p sync-lsp
+          cargo publish -p tinymist-derive
+          cargo publish -p tinymist-analysis
+          cargo publish -p tinymist-std
+          cargo publish -p tinymist-vfs
+          cargo publish -p tinymist-world
+          cargo publish -p tinymist-task
+          cargo publish -p tinymist-project
+          cargo publish -p typlite
+          cargo publish -p crityp
