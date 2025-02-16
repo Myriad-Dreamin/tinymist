@@ -6,7 +6,7 @@ use std::sync::Arc;
 use comemo::Track;
 use ecow::EcoString;
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
+use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
 use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::diag::{SourceResult, StrResult};
 use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
@@ -223,6 +223,17 @@ impl DocumentQuery {
                 _ => Some(c.into_value()),
             })
             .collect())
+    }
+
+    pub fn doc_get_as_value<F: CompilerFeat>(
+        g: &Arc<WorldComputeGraph<F>>,
+        doc: &TypstDocument,
+        config: &QueryTask,
+    ) -> Result<serde_json::Value> {
+        match doc {
+            TypstDocument::Paged(doc) => Self::get_as_value(g, doc, config),
+            TypstDocument::Html(doc) => Self::get_as_value(g, doc, config),
+        }
     }
 
     pub fn get_as_value<F: CompilerFeat, D: typst::Document>(
