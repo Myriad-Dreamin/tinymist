@@ -27,6 +27,7 @@ use typst::{
 };
 use value::{Args, Value};
 
+use crate::SyntaxKind::Text;
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
@@ -401,7 +402,7 @@ impl TypliteWorker {
         let theme = self.feat.color_theme;
 
         let code_file_name = if let Some(assets_src_path) = &self.feat.assets_src_path {
-            Some(format!(
+            Some(eco_format!(
                 "{}/{}.typ",
                 assets_src_path.display(),
                 self.assets_numbering,
@@ -420,136 +421,148 @@ impl TypliteWorker {
             ""
         };
 
+        let write_error = |content: &mut EcoString, align: &str, err: &str, inline: bool| {
+            if !inline {
+                let _ = write!(content, r#"<p align="{align}">"#);
+            }
+            let err = err.replace("`", r#"\`"#);
+            let _ = write!(content, "```\nRender Error\n{err}\n```");
+            if !inline {
+                content.push_str("</p>");
+            }
+        };
+
+        let write_image = |content: &mut EcoString,
+                           file_name: &std::path::Path,
+                           code_file_name: Option<&EcoString>,
+                           inline_attrs: &str,
+                           extra_attrs: &str| {
+            if let Some(code_file_name) = code_file_name {
+                let _ = write!(
+                    content,
+                    r#"<a href="{code_file_name}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></a>"#,
+                    file_name.display()
+                );
+            } else {
+                let _ = write!(
+                    content,
+                    r#"<img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/>"#,
+                    file_name.display()
+                );
+            }
+        };
+
+        let write_picture = |content: &mut EcoString,
+                             dark_file_name: &std::path::Path,
+                             light_file_name: &std::path::Path,
+                             code_file_name: Option<&EcoString>,
+                             inline_attrs: &str,
+                             extra_attrs: &str| {
+            if let Some(code_file_name) = code_file_name {
+                let _ = write!(
+                    content,
+                    r#"<a href="{code_file_name}"><picture><source media="(prefers-color-scheme: dark)" srcset="{}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></picture></a>"#,
+                    dark_file_name.display(),
+                    light_file_name.display()
+                );
+            } else {
+                let _ = write!(
+                    content,
+                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="{}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></picture>"#,
+                    dark_file_name.display(),
+                    light_file_name.display()
+                );
+            }
+        };
+
+        if !inline {
+            let _ = write!(content, r#"<p align="{align}">"#);
+        }
+
         match theme {
             Some(theme) => {
-                let data = render(theme);
-                match data {
-                    Ok(data) => {
-                        if let Some(assets_path) = &self.feat.assets_path {
-                            let file_name = format!(
-                                "{}/{}_{:?}.svg",
-                                assets_path.display(),
-                                self.assets_numbering,
-                                theme
-                            );
-                            if let Err(e) = std::fs::write(&file_name, &data) {
-                                return Err(format!("Failed to write SVG to file: {}", e).into());
-                            }
-
-                            if let Some(code_file_name) = &code_file_name {
-                                if !inline {
-                                    let _ = write!(content, r#"<p align="{align}">"#);
-                                }
-                                let _ = write!(
-                                    content,
-                                    r#"<a href="{code_file_name}"><img{inline_attrs} alt="typst-block" src="{file_name}" {extra_attrs}/></a>"#,
-                                );
-                                if !inline {
-                                    content.push_str("</p>");
-                                }
-                            } else {
-                                if !inline {
-                                    let _ = write!(content, r#"<p align="{align}">"#);
-                                }
-                                let _ = write!(
-                                    content,
-                                    r#"<img{inline_attrs} alt="typst-block" src="{file_name}" {extra_attrs}/>"#,
-                                );
-                                if !inline {
-                                    content.push_str("</p>");
-                                }
-                            }
-                        } else {
-                            // Fallback to Base64-encoded data URL if assets_path is None
-                            if !inline {
-                                let _ = write!(content, r#"<p align="{align}">"#);
-                            }
-                            let _ = write!(
-                                content,
-                                r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
-                            );
-                            if !inline {
-                                content.push_str("</p>");
-                            }
-                        }
-                    }
+                let data = match render(theme) {
+                    Ok(data) => data,
                     Err(err) if self.feat.soft_error => {
-                        // wrap the error in a fenced code block
-                        let err = err.to_string().replace("`", r#"\`"#);
-                        let _ = write!(content, "```\nRender Error\n{err}\n```");
+                        write_error(&mut content, align, &err.to_string(), inline);
+                        return Ok(Value::Content(content));
                     }
                     Err(err) => return Err(err),
+                };
+
+                if let Some(assets_path) = &self.feat.assets_path {
+                    let file_name =
+                        assets_path.join(format!("{}_{:?}.svg", self.assets_numbering, theme));
+                    std::fs::write(&file_name, &data)
+                        .map_err(|e| format!("failed to write SVG to file: {}", e))?;
+
+                    write_image(
+                        &mut content,
+                        &file_name,
+                        code_file_name.as_ref(),
+                        inline_attrs,
+                        extra_attrs,
+                    );
+                } else {
+                    let _ = write!(
+                        content,
+                        r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#
+                    );
                 }
             }
             None => {
-                let dark = render(ColorTheme::Dark);
-                let light = render(ColorTheme::Light);
-
-                match (dark, light) {
-                    (Ok(dark), Ok(light)) => {
-                        if let Some(assets_path) = &self.feat.assets_path {
-                            let dark_file_name = format!(
-                                "{}/{}_{:?}.svg",
-                                assets_path.display(),
-                                self.assets_numbering,
-                                ColorTheme::Dark
-                            );
-                            let light_file_name = format!(
-                                "{}/{}_{:?}.svg",
-                                assets_path.display(),
-                                self.assets_numbering,
-                                ColorTheme::Light
-                            );
-
-                            if let Some(code_file_name) = &code_file_name {
-                                if !inline {
-                                    let _ = write!(content, r#"<p align="{align}">"#);
-                                }
-                                let _ = write!(
-                                    content,
-                                    r#"<a href="{code_file_name}"><picture><source media="(prefers-color-scheme: dark)" srcset="{dark_file_name}"><img{inline_attrs} alt="typst-block" src="{light_file_name}" {extra_attrs}/></picture></a>"#,
-                                );
-                                if !inline {
-                                    content.push_str("</p>");
-                                }
-                            } else {
-                                if !inline {
-                                    let _ = write!(content, r#"<p align="{align}">"#);
-                                }
-                                let _ = write!(
-                                    content,
-                                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="{dark_file_name}"><img{inline_attrs} alt="typst-block" src="{light_file_name}" {extra_attrs}/></picture>"#,
-                                );
-                                if !inline {
-                                    content.push_str("</p>");
-                                }
-                            }
-                        } else {
-                            if !inline {
-                                let _ = write!(content, r#"<p align="{align}">"#);
-                            }
-                            let _ = write!(
-                                content,
-                                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
-                            );
-                            if !inline {
-                                content.push_str("</p>");
-                            }
-                        }
+                let dark = match render(ColorTheme::Dark) {
+                    Ok(d) => d,
+                    Err(err) if self.feat.soft_error => {
+                        write_error(&mut content, align, &err.to_string(), inline);
+                        return Ok(Value::Content(content));
                     }
-                    (Err(err), _) | (_, Err(err)) if self.feat.soft_error => {
-                        // wrap the error in a fenced code block
-                        let err = err.to_string().replace("`", r#"\`"#);
-                        let _ = write!(content, "```\nRendering Error\n{err}\n```");
+                    Err(err) => return Err(err),
+                };
+                let light = match render(ColorTheme::Light) {
+                    Ok(l) => l,
+                    Err(err) if self.feat.soft_error => {
+                        write_error(&mut content, align, &err.to_string(), inline);
+                        return Ok(Value::Content(content));
                     }
-                    (Err(err), _) | (_, Err(err)) => return Err(err),
+                    Err(err) => return Err(err),
+                };
+
+                if let Some(assets_path) = &self.feat.assets_path {
+                    let dark_file_name = assets_path.join(format!(
+                        "{}_{:?}.svg",
+                        self.assets_numbering,
+                        ColorTheme::Dark
+                    ));
+                    let light_file_name = assets_path.join(format!(
+                        "{}_{:?}.svg",
+                        self.assets_numbering,
+                        ColorTheme::Light
+                    ));
+
+                    write_picture(
+                        &mut content,
+                        &dark_file_name,
+                        &light_file_name,
+                        code_file_name.as_ref(),
+                        inline_attrs,
+                        extra_attrs,
+                    );
+                } else {
+                    let _ = write!(
+                        content,
+                        r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#
+                    );
                 }
             }
         }
 
+        if !inline {
+            content.push_str("</p>");
+        }
+
         Ok(Value::Content(content))
     }
-
     fn render_inner(&mut self, code: &str, is_markup: bool, theme: ColorTheme) -> Result<String> {
         static DARK_THEME_INPUT: LazyLock<Arc<LazyHash<Dict>>> = LazyLock::new(|| {
             Arc::new(LazyHash::new(Dict::from_iter(std::iter::once((
@@ -817,7 +830,7 @@ impl TypliteWorker {
             return self.to_raw_block(node, !equation.block());
         }
 
-        self.render(&SyntaxNode::default(), node, !equation.block())
+        self.render(&SyntaxNode::leaf(Text, ""), node, !equation.block())
     }
 
     fn let_binding(&self, node: &SyntaxNode) -> Result<Value> {

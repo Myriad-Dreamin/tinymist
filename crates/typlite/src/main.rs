@@ -25,7 +25,7 @@ pub struct CompileArgs {
     #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
     pub assets_path: Option<String>,
 
-    /// Configures the path of assets' source code directory
+    /// Configure the path to the assets' corresponding source code directory. When the path is specified, typlite adds a href to jump to the source code in the exported asset.
     #[clap(long, default_value = None, value_name = "ASSETS_SRC_PATH")]
     pub assets_src_path: Option<String>,
 }
@@ -49,8 +49,7 @@ fn main() -> typlite::Result<()> {
             let path = PathBuf::from(assets_path);
             if !path.exists() {
                 if let Err(e) = std::fs::create_dir_all(&path) {
-                    eprintln!("Failed to create assets directory: {}", e);
-                    return Err(format!("Failed to create assets directory: {}", e).into());
+                    return Err(format!("failed to create assets directory: {}", e).into());
                 }
             }
             Some(path)
@@ -62,8 +61,7 @@ fn main() -> typlite::Result<()> {
             let path = PathBuf::from(assets_src_path);
             if !path.exists() {
                 if let Err(e) = std::fs::create_dir_all(&path) {
-                    eprintln!("Failed to create assets' src directory: {}", e);
-                    return Err(format!("Failed to create assets' src directory: {}", e).into());
+                    return Err(format!("failed to create assets' src directory: {}", e).into());
                 }
             }
             Some(path)
