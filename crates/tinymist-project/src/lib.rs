@@ -3,6 +3,7 @@
 mod args;
 mod compiler;
 mod entry;
+#[cfg(feature = "system")]
 pub mod font;
 mod lock;
 mod model;
