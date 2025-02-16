@@ -64,7 +64,6 @@ jobs:
       - name: Publish crates
         run: |
           cargo publish --no-verify -p typst-shim
-          cargo publish --no-verify -p sync-lsp
           cargo publish --no-verify -p tinymist-derive
           cargo publish --no-verify -p tinymist-analysis
           cargo publish --no-verify -p tinymist-std
@@ -77,7 +76,6 @@ jobs:
       - name: Verifies crate health (Optional)
         run: |
           cargo publish -p typst-shim
-          cargo publish -p sync-lsp
           cargo publish -p tinymist-derive
           cargo publish -p tinymist-analysis
           cargo publish -p tinymist-std
