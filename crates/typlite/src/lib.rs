@@ -475,10 +475,6 @@ impl TypliteWorker {
             }
         };
 
-        if !inline {
-            let _ = write!(content, r#"<p align="{align}">"#);
-        }
-
         match theme {
             Some(theme) => {
                 let data = match render(theme) {
@@ -490,6 +486,9 @@ impl TypliteWorker {
                     Err(err) => return Err(err),
                 };
 
+                if !inline {
+                    let _ = write!(content, r#"<p align="{align}">"#);
+                }
                 if let Some(assets_path) = &self.feat.assets_path {
                     let file_name =
                         assets_path.join(format!("{}_{:?}.svg", self.assets_numbering, theme));
@@ -508,6 +507,9 @@ impl TypliteWorker {
                         content,
                         r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#
                     );
+                }
+                if !inline {
+                    content.push_str("</p>");
                 }
             }
             None => {
@@ -528,6 +530,9 @@ impl TypliteWorker {
                     Err(err) => return Err(err),
                 };
 
+                if !inline {
+                    let _ = write!(content, r#"<p align="{align}">"#);
+                }
                 if let Some(assets_path) = &self.feat.assets_path {
                     let dark_file_name = assets_path.join(format!(
                         "{}_{:?}.svg",
@@ -554,15 +559,15 @@ impl TypliteWorker {
                         r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#
                     );
                 }
+                if !inline {
+                    content.push_str("</p>");
+                }
             }
-        }
-
-        if !inline {
-            content.push_str("</p>");
         }
 
         Ok(Value::Content(content))
     }
+
     fn render_inner(&mut self, code: &str, is_markup: bool, theme: ColorTheme) -> Result<String> {
         static DARK_THEME_INPUT: LazyLock<Arc<LazyHash<Dict>>> = LazyLock::new(|| {
             Arc::new(LazyHash::new(Dict::from_iter(std::iter::once((
