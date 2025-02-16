@@ -78,6 +78,7 @@ fn main() -> Result<()> {
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
             .filter_module("sync_lsp", base_level)
+            .filter_module("reflexo_typst2vec::pass::span2vec", Error)
             .filter_module("reflexo_typst::diag::console", Info)
             .try_init()
     };
