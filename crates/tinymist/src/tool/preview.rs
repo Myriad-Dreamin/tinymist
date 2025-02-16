@@ -13,6 +13,7 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
+use lsp_types::Url;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Bytes;
@@ -449,6 +450,13 @@ pub async fn make_http_server(
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
+    let listener = tokio::net::TcpListener::bind(&static_file_addr)
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    log::info!("preview server listening on http://{addr}");
+    let expected_port = addr.port();
+
     let frontend_html = hyper::body::Bytes::from(frontend_html);
     let expected_origin = format!("http://{static_file_addr}");
     let make_service = move || {
@@ -472,9 +480,11 @@ pub async fn make_http_server(
                     // think that's okay from a security point of view, because
                     // I think malicious websites can't trick browsers into sending
                     // `vscode-webview://...` as `Origin`.
-                    if req.headers().get("Origin").is_some_and(|h| {
-                        *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://")
-                    }) {
+                    if req
+                        .headers()
+                        .get("Origin")
+                        .is_some_and(|h| is_valid_origin(h, &expected_origin, expected_port))
+                    {
                         let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
                             .map_err(|e| {
                                 log::error!("Error in websocket upgrade: {e}");
@@ -535,12 +545,6 @@ pub async fn make_http_server(
         })
     };
 
-    let listener = tokio::net::TcpListener::bind(&static_file_addr)
-        .await
-        .unwrap();
-    let addr = listener.local_addr().unwrap();
-    log::info!("preview server listening on http://{addr}");
-
     let (shutdown_tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
 
@@ -599,6 +603,24 @@ pub async fn make_http_server(
         addr,
         shutdown_tx,
         join,
+    }
+}
+
+fn is_valid_origin(h: &HeaderValue, expected_origin: &str, expected_port: u16) -> bool {
+    *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://") || {
+        // Matches the origin of the local listening port.
+        let matched = std::str::from_utf8(h.as_bytes()).ok().and_then(|h| {
+            let url = Url::parse(h).ok()?;
+            (url.port() == Some(expected_port)
+                && matches!(url.scheme(), "http" | "https" | "ws" | "wss")
+                && matches!(
+                    // todo: allocate memory here.
+                    url.host().as_ref().map(ToString::to_string).as_deref(),
+                    Some("localhost" | "127.0.0.1")
+                ))
+            .then_some(())
+        });
+        matched.is_some()
     }
 }
 
