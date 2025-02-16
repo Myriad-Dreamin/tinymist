@@ -401,6 +401,13 @@ impl CompileWatcher {
     }
 
     pub fn notify_compile(&self, view: Arc<dyn CompileView>) {
+        log::info!(
+            "Preview({:?}): received notification: signal({:?}, {:?}), refresh style {:?}",
+            self.task_id,
+            view.is_by_entry_update(),
+            view.is_on_saved(),
+            self.refresh_style
+        );
         if !view.is_by_entry_update()
             && (self.refresh_style == RefreshStyle::OnSave && !view.is_on_saved())
         {

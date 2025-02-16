@@ -53,6 +53,18 @@ impl TypstDocument {
     }
 }
 
+impl From<Arc<well_known::TypstPagedDocument>> for TypstDocument {
+    fn from(doc: Arc<well_known::TypstPagedDocument>) -> Self {
+        Self::Paged(doc)
+    }
+}
+
+impl From<Arc<well_known::TypstHtmlDocument>> for TypstDocument {
+    fn from(doc: Arc<well_known::TypstHtmlDocument>) -> Self {
+        Self::Html(doc)
+    }
+}
+
 use std::sync::Arc;
 
 pub use well_known::*;
