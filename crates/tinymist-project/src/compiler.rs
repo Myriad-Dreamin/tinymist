@@ -170,20 +170,12 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 pub enum CompileReport {
     Suspend,
     Stage(FileId, &'static str, tinymist_std::time::Time),
-    CompileError(
-        FileId,
-        EcoVec<SourceDiagnostic>,
-        tinymist_std::time::Duration,
-    ),
-    ExportError(
-        FileId,
-        EcoVec<SourceDiagnostic>,
-        tinymist_std::time::Duration,
-    ),
+    CompileError(FileId, usize, tinymist_std::time::Duration),
+    ExportError(FileId, usize, tinymist_std::time::Duration),
     CompileSuccess(
         FileId,
         // warnings, if not empty
-        EcoVec<SourceDiagnostic>,
+        usize,
         tinymist_std::time::Duration,
     ),
 }
@@ -209,7 +201,7 @@ impl CompileReport {
         }
     }
 
-    pub fn diagnostics(self) -> Option<EcoVec<SourceDiagnostic>> {
+    pub fn diagnostics_size(self) -> Option<usize> {
         match self {
             Self::Suspend | Self::Stage(..) => None,
             Self::CompileError(_, diagnostics, ..)
@@ -236,13 +228,12 @@ impl fmt::Display for CompileReportMsg<'_> {
             Suspend => write!(f, "suspended"),
             Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
             CompileSuccess(_, warnings, duration) => {
-                if warnings.is_empty() {
+                if *warnings == 0 {
                     write!(f, "{input:?}: compilation succeeded in {duration:?}")
                 } else {
                     write!(
                         f,
-                        "{input:?}: compilation succeeded with {} warnings in {duration:?}",
-                        warnings.len()
+                        "{input:?}: compilation succeeded with {warnings} warnings in {duration:?}",
                     )
                 }
             }
@@ -260,7 +251,7 @@ pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
     fn on_any_compile_reason(&self, state: &mut ProjectCompiler<F, Ext>);
     // todo: notify project specific compile
     /// Called when a compilation is done.
-    fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
+    fn notify_compile(&self, res: &CompiledArtifact<F>);
     /// Called when a project is removed.
     fn notify_removed(&self, _id: &ProjectInsId) {}
     /// Called when the compilation status is changed.
@@ -274,7 +265,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
     fn on_any_compile_reason(&self, _state: &mut ProjectCompiler<F, Ext>) {
         log::info!("ProjectHandle: no need to compile");
     }
-    fn notify_compile(&self, _res: &CompiledArtifact<F>, _rep: CompileReport) {}
+    fn notify_compile(&self, _res: &CompiledArtifact<F>) {}
     fn status(&self, _revision: usize, _id: &ProjectInsId, _rep: CompileReport) {}
 }
 
@@ -321,6 +312,16 @@ pub struct CompileReasons {
     pub by_fs_events: bool,
     /// The snapshot is taken by the entry change.
     pub by_entry_update: bool,
+}
+
+impl From<CompileReasons> for ExportSignal {
+    fn from(value: CompileReasons) -> Self {
+        Self {
+            by_mem_events: value.by_memory_events,
+            by_fs_events: value.by_fs_events,
+            by_entry_update: value.by_entry_update,
+        }
+    }
 }
 
 impl CompileReasons {
@@ -870,13 +871,15 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
 
             let elapsed = start.elapsed().unwrap_or_default();
             let rep = match &compiled.doc {
-                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.clone(), elapsed),
-                Err(err) => CompileReport::CompileError(id, err.clone(), elapsed),
+                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.len(), elapsed),
+                Err(err) => CompileReport::CompileError(id, err.len(), elapsed),
             };
 
             // todo: we need to check revision for really concurrent compilation
             log_compile_report(&rep);
-            h.notify_compile(&compiled, rep);
+
+            h.status(revision, &compiled.id, rep);
+            h.notify_compile(&compiled);
 
             compiled
         }

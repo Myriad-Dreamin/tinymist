@@ -36,6 +36,15 @@ pub struct ExportSignal {
     pub by_entry_update: bool,
 }
 
+impl ExportSignal {
+    /// Merge two signals.
+    pub fn merge(&mut self, other: ExportSignal) {
+        self.by_mem_events |= other.by_mem_events;
+        self.by_fs_events |= other.by_fs_events;
+        self.by_entry_update |= other.by_entry_update;
+    }
+}
+
 /// A snapshot of the project and compilation state.
 pub struct CompileSnapshot<F: CompilerFeat> {
     /// The project id.
