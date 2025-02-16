@@ -16,7 +16,7 @@ use tinymist_world::vfs::notify::{
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, EntryReader, EntryState, ExportSignal,
-    ProjectInsId, TaskInputs, WorldDeps,
+    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::diag::{SourceDiagnostic, SourceResult, Warned};
@@ -98,13 +98,33 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
         D: typst::Document + 'static,
         Arc<D>: Into<TypstDocument>,
     {
-        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
-
         snap.world.set_is_compiling(true);
         let res = ::typst::compile::<D>(&snap.world);
+        snap.world.set_is_compiling(false);
+
+        Self::from_snapshot_result(
+            snap,
+            Warned {
+                output: res.output.map(Arc::new),
+                warnings: res.warnings,
+            },
+        )
+    }
+
+    /// Runs the compiler and returns the compiled document.
+    pub fn from_snapshot_result<D>(
+        snap: CompileSnapshot<F>,
+        res: Warned<SourceResult<Arc<D>>>,
+    ) -> CompiledArtifact<F>
+    where
+        D: typst::Document + 'static,
+        Arc<D>: Into<TypstDocument>,
+    {
+        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
+
         let warned = match res.output {
             Ok(doc) => Ok(Warned {
-                output: Arc::new(doc),
+                output: doc,
                 warnings: res.warnings,
             }),
             Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
@@ -118,7 +138,6 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
                 }
             },
         };
-        snap.world.set_is_compiling(false);
         let (doc, warnings) = match warned {
             Ok(doc) => (Ok(doc.output.into()), doc.warnings),
             Err(err) => (Err(err), EcoVec::default()),
@@ -478,6 +497,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dedicates.iter_mut().find(|e| e.id == *id).unwrap()
     }
 
+    /// Clear all dedicate projects.
+    pub fn clear_dedicates(&mut self) {
+        self.dedicates.clear();
+    }
+
     /// Restart a dedicate project.
     pub fn restart_dedicate(
         &mut self,
@@ -496,7 +520,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             self.primary.verse.font_resolver.clone(),
         );
 
-        let proj = Self::create_project(id.clone(), verse, self.handler.clone());
+        let mut proj = Self::create_project(id.clone(), verse, self.handler.clone());
+        proj.reason.see(reason_by_entry_change());
 
         self.remove_dedicates(&id);
         self.dedicates.push(proj);
@@ -789,6 +814,26 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             },
             success_doc: self.latest_success_doc.clone(),
         }
+    }
+
+    /// Compile the document once if there is any reason and the entry is
+    /// active. (this is used for experimenting typst.node compilations)
+    #[must_use]
+    pub fn may_compile2(
+        &mut self,
+        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>),
+    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>>> {
+        if !self.reason.any() || self.verse.entry_state().is_inactive() {
+            return None;
+        }
+
+        let snap = self.snapshot();
+        self.reason = Default::default();
+        Some(move || {
+            let compiled = WorldComputeGraph::new(snap);
+            compute(&compiled);
+            compiled
+        })
     }
 
     /// Compile the document once if there is any reason and the entry is
