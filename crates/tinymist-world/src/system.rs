@@ -40,8 +40,11 @@ impl TypstSystemUniverse {
         let registry: Arc<HttpRegistry> = Arc::default();
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
         let inputs = std::mem::take(&mut opts.inputs);
+
+        // todo: enable html
         Ok(Self::new_raw(
             opts.entry.clone().try_into()?,
+            false,
             Some(Arc::new(LazyHash::new(inputs))),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -72,8 +75,10 @@ impl SystemUniverseBuilder {
         let registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
 
+        // todo: enable html
         TypstSystemUniverse::new_raw(
             entry,
+            false,
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,

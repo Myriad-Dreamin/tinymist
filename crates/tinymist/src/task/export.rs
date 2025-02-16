@@ -7,7 +7,6 @@ use crate::project::{
     ApplyProjectTask, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
     ExportPngTask, ExportTextTask, TaskWhen,
 };
-use anyhow::bail;
 use reflexo::ImmutPath;
 use tinymist_project::{
     convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
@@ -15,7 +14,7 @@ use tinymist_project::{
 };
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{convert_datetime, get_page_selection};
+use tinymist_task::{convert_datetime, get_page_selection, ExportTarget};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
@@ -135,7 +134,7 @@ impl ExportTask {
         task: ProjectTask,
         artifact: LspCompiledArtifact,
         lock_dir: Option<ImmutPath>,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    ) -> Result<Option<PathBuf>> {
         use reflexo_vec2svg::DefaultExportFeature;
         use ProjectTask::*;
 
@@ -178,19 +177,32 @@ impl ExportTask {
         });
 
         // Prepare the document.
-        let doc = doc.map_err(|_| anyhow::anyhow!("no document"))?;
+        let doc = doc.ok().context("no document")?;
 
         // Prepare data.
         let kind2 = task.clone();
-        let data = FutureFolder::compute(move |_| -> anyhow::Result<Vec<u8>> {
+        let data = FutureFolder::compute(move |_| -> Result<Vec<u8>> {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let paged_doc = match &doc {
-                TypstDocument::Paged(paged_doc) => paged_doc,
-                TypstDocument::Html(_) => bail!("expected paged document, found HTML"),
+            let html_doc = || {
+                Ok(match &doc {
+                    TypstDocument::Html(html_doc) => html_doc,
+                    TypstDocument::Paged(_) => bail!("expected html document, found Paged"),
+                })
             };
-            let first_page = paged_doc.pages.first().unwrap();
+            let paged_doc = || {
+                Ok(match &doc {
+                    TypstDocument::Paged(paged_doc) => paged_doc,
+                    TypstDocument::Html(_) => bail!("expected paged document, found HTML"),
+                })
+            };
+            let first_page = || {
+                paged_doc()?
+                    .pages
+                    .first()
+                    .context("no first page to export")
+            };
             Ok(match kind2 {
                 Preview(..) => vec![],
                 // todo: more pdf flags
@@ -206,7 +218,7 @@ impl ExportTask {
 
                     // todo: Some(pdf_uri.as_str())
                     typst_pdf::pdf(
-                        paged_doc,
+                        paged_doc()?,
                         &PdfOptions {
                             timestamp: convert_datetime(creation_timestamp),
                             ..Default::default()
@@ -246,8 +258,13 @@ impl ExportTask {
                         serialize(&mapped, &format, pretty).map(String::into_bytes)?
                     }
                 }
-                ExportHtml(ExportHtmlTask { export: _ }) => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc).into_bytes()
+                ExportHtml(ExportHtmlTask { export: _ }) => typst_html::html(html_doc()?)
+                    .map_err(|e| format!("export error: {e:?}"))
+                    .context_ut("failed to export to html")?
+                    .into_bytes(),
+                ExportSvgHtml(ExportHtmlTask { export: _ }) => {
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?)
+                        .into_bytes()
                 }
                 ExportText(ExportTextTask { export: _ }) => {
                     format!("{}", FullTextDigest(doc.clone())).into_bytes()
@@ -263,9 +280,9 @@ impl ExportTask {
                     let (is_first, merged_gap) = get_page_selection(&export)?;
 
                     if is_first {
-                        typst_svg::svg(first_page).into_bytes()
+                        typst_svg::svg(first_page()?).into_bytes()
                     } else {
-                        typst_svg::svg_merged(paged_doc, merged_gap).into_bytes()
+                        typst_svg::svg_merged(paged_doc()?, merged_gap).into_bytes()
                     }
                 }
                 ExportPng(ExportPngTask { export, ppi, fill }) => {
@@ -283,9 +300,9 @@ impl ExportTask {
                     let (is_first, merged_gap) = get_page_selection(&export)?;
 
                     let pixmap = if is_first {
-                        typst_render::render(first_page, ppi / 72.)
+                        typst_render::render(first_page()?, ppi / 72.)
                     } else {
-                        typst_render::render_merged(paged_doc, ppi / 72., merged_gap, Some(fill))
+                        typst_render::render_merged(paged_doc()?, ppi / 72., merged_gap, Some(fill))
                     };
 
                     pixmap
@@ -307,6 +324,8 @@ impl ExportTask {
 /// User configuration for export.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ExportUserConfig {
+    /// Tinymist's default export target.
+    pub export_target: ExportTarget,
     pub task: ProjectTask,
     pub count_words: bool,
 }
@@ -314,6 +333,7 @@ pub struct ExportUserConfig {
 impl Default for ExportUserConfig {
     fn default() -> Self {
         Self {
+            export_target: ExportTarget::default(),
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export: ProjectExportTask {
                     when: TaskWhen::Never,
@@ -328,7 +348,7 @@ impl Default for ExportUserConfig {
     }
 }
 
-fn parse_color(fill: String) -> anyhow::Result<Color> {
+fn parse_color(fill: String) -> Result<Color> {
     match fill.as_str() {
         "black" => Ok(Color::BLACK),
         "white" => Ok(Color::WHITE),
@@ -336,13 +356,13 @@ fn parse_color(fill: String) -> anyhow::Result<Color> {
         "green" => Ok(Color::GREEN),
         "blue" => Ok(Color::BLUE),
         hex if hex.starts_with('#') => {
-            Color::from_str(&hex[1..]).map_err(|e| anyhow::anyhow!("failed to parse color: {e}"))
+            Color::from_str(&hex[1..]).context_ut("failed to parse color")
         }
         _ => bail!("invalid color: {fill}"),
     }
 }
 
-fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
+fn log_err<T>(artifact: Result<T>) -> Option<T> {
     match artifact {
         Ok(v) => Some(v),
         Err(err) => {
@@ -353,14 +373,14 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
 }
 
 /// Serialize data to the output format.
-fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> anyhow::Result<String> {
+fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> Result<String> {
     Ok(match format {
-        "json" if pretty => serde_json::to_string_pretty(data)?,
-        "json" => serde_json::to_string(data)?,
-        "yaml" => serde_yaml::to_string(&data)?,
+        "json" if pretty => serde_json::to_string_pretty(data).context("serialize to json")?,
+        "json" => serde_json::to_string(data).context("serialize to json")?,
+        "yaml" => serde_yaml::to_string(&data).context_ut("serialize to yaml")?,
         "txt" => {
             use serde_json::Value::*;
-            let value = serde_json::to_value(data)?;
+            let value = serde_json::to_value(data).context("serialize to json value")?;
             match value {
                 String(s) => s,
                 _ => {

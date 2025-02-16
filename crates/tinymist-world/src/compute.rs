@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use std::any::TypeId;
+use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
@@ -216,10 +217,35 @@ where
         let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
 
         Ok(enabled.then(|| {
-            let compiled = typst::compile::<D>(&graph.snap.world);
+            // todo: create html world once
+            let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
+            let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
+
+            let world = if is_paged_compilation {
+                graph.snap.world.paged_task()
+            } else if is_html_compilation {
+                graph.snap.world.html_task()
+            } else {
+                Cow::Borrowed(&graph.snap.world)
+            };
+
+            let compiled = typst::compile::<D>(world.as_ref());
+
+            let exclude_html_warnings = if !is_html_compilation {
+                compiled.warnings
+            } else if compiled.warnings.len() == 1
+                && compiled.warnings[0]
+                    .message
+                    .starts_with("html export is under active development")
+            {
+                EcoVec::new()
+            } else {
+                compiled.warnings
+            };
+
             Warned {
                 output: compiled.output.map(Arc::new),
-                warnings: compiled.warnings,
+                warnings: exclude_html_warnings,
             }
         }))
     }
@@ -282,6 +308,16 @@ impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
 }
 
 impl DiagnosticsTask {
+    pub fn error_cnt(&self) -> usize {
+        self.paged.errors.as_ref().map_or(0, |e| e.len())
+            + self.html.errors.as_ref().map_or(0, |e| e.len())
+    }
+
+    pub fn warning_cnt(&self) -> usize {
+        self.paged.warnings.as_ref().map_or(0, |e| e.len())
+            + self.html.warnings.as_ref().map_or(0, |e| e.len())
+    }
+
     pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
         self.paged
             .errors

@@ -50,7 +50,7 @@ parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
 reflexo.workspace = true
-reflexo-typst = { workspace = true, features = ["system"] }
+reflexo-typst = { workspace = true, features = ["system", "svg"] }
 reflexo-vec2svg.workspace = true
 rpds.workspace = true
 serde.workspace = true
@@ -62,7 +62,7 @@ tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-std.workspace = true
 tinymist-core = { workspace = true, default-features = false, features = [] }
-tinymist-project = { workspace = true, features = ["system"] }
+tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-render.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "io-std"] }
 tokio-util.workspace = true
@@ -85,7 +85,7 @@ unicode-script.workspace = true
 walkdir.workspace = true
 
 [features]
-default = ["cli", "html", "preview", "embed-fonts", "no-content-hint"]
+default = ["cli", "html", "pdf", "preview", "embed-fonts", "no-content-hint"]
 
 cli = ["sync-lsp/clap", "clap/wrap_help"]
 
@@ -102,6 +102,8 @@ embed-fonts = ["tinymist-project/fonts"]
 # Enable the experimental HTML backend.
 html = ["dep:typst-html"]
 
+pdf = ["tinymist-task/pdf"]
+
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = [
@@ -114,7 +116,6 @@ preview = [
     "typst-preview",
     "typst-preview/clap",
     "tinymist-assets/typst-preview",
-    "tinymist-project/preview",
     "hyper-tungstenite",
 ]
 
