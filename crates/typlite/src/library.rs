@@ -148,16 +148,20 @@ pub fn grid(args: Args) -> Result<Value> {
 }
 
 fn table_eval(mut args: Args, kind: &EcoString) -> Result<Value> {
-    let columns = match args.get_named_("columns").unwrap().kind() {
-        SyntaxKind::Array => {
-            let array: ast::Array = args.get_named_("columns").unwrap().cast().unwrap();
-            array.items().count()
+    let columns = if let Some(columns) = args.get_named_("columns") {
+        match columns.kind() {
+            SyntaxKind::Array => {
+                let array: ast::Array = args.get_named_("columns").unwrap().cast().unwrap();
+                array.items().count()
+            }
+            SyntaxKind::Int => {
+                let int_val: ast::Int = args.get_named_("columns").unwrap().cast().unwrap();
+                int_val.get().try_into().unwrap()
+            }
+            other => return Err(format!("invalid columns argument of type {:?}", other).into()),
         }
-        SyntaxKind::Int => {
-            let int_val: ast::Int = args.get_named_("columns").unwrap().cast().unwrap();
-            int_val.get().try_into().unwrap()
-        }
-        other => return Err(format!("invalid columns argument of type {:?}", other).into()),
+    } else {
+        1
     };
 
     let header_field = SyntaxNode::inner(
@@ -208,19 +212,14 @@ fn table_eval(mut args: Args, kind: &EcoString) -> Result<Value> {
         }
     }
 
-    if header.is_empty() {
-        if cells.len() < columns {
-            return Err("not enough cells to form header".into());
-        }
-        header = cells.drain(0..columns).collect();
-    }
-
     let mut res = EcoString::from("<table>\n");
-    res.push_str("  <thead>\n    <tr>\n");
-    for cell in &header {
-        res.push_str(&eco_format!("      <th>{}</th>\n", cell));
+    if !header.is_empty() {
+        res.push_str("  <thead>\n    <tr>\n");
+        for cell in &header {
+            res.push_str(&eco_format!("      <th>{}</th>\n", cell));
+        }
+        res.push_str("    </tr>\n  </thead>\n");
     }
-    res.push_str("    </tr>\n  </thead>\n");
     res.push_str("  <tbody>\n");
     for row in cells.chunks(columns) {
         res.push_str("    <tr>\n");
