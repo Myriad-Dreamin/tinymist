@@ -41,7 +41,7 @@ notify.workspace = true
 
 default = ["system"]
 fonts = ["typst-assets/fonts"]
-no-content-hint = []
+no-content-hint = ["tinymist-task/no-content-hint"]
 # no-content-hint = ["reflexo-typst/no-content-hint"]
 preview = ["typst-preview"]
 
