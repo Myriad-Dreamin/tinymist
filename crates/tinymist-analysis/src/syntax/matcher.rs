@@ -681,7 +681,7 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
             return false;
         }
 
-        // Get the trivia text before the cursor.
+        // Gets the trivia text before the cursor.
         let previous_text = node.text().as_bytes();
         let previous_text = if node.range().contains(&cursor) {
             &previous_text[..cursor - node.offset()]
@@ -696,10 +696,32 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         !previous_text.contains(&b'\n')
     }
 
-    // Move to the first non-trivia node before the cursor.
+    // Moves to the first non-trivia node before the cursor.
     let mut node = node;
     if can_skip_trivia(&node, cursor) {
         node = node.prev_sibling()?;
+    }
+
+    /// Matches complete or incomplete dot accesses in code, math, and markup
+    /// mode.
+    ///
+    /// When in markup mode, the dot access is valid if the dot is after a hash
+    /// expression.
+    fn classify_dot_access<'a>(node: &LinkedNode<'a>) -> Option<SyntaxClass<'a>> {
+        let dot_target = node.prev_leaf().and_then(first_ancestor_expr)?;
+        let mode = interpret_mode_at(Some(node));
+
+        if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
+            matches!(mode, InterpretMode::Markup)
+                && matches!(
+                    dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
+                    Some(SyntaxKind::Hash)
+                )
+        } {
+            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
+        }
+
+        None
     }
 
     if node.offset() + 1 == cursor && {
@@ -708,21 +730,17 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
             || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
                 && node.text().starts_with("."))
     } {
-        let dot_target = node.clone().prev_leaf().and_then(first_ancestor_expr);
-
-        if let Some(dot_target) = dot_target {
-            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
+        if let Some(dot_access) = classify_dot_access(&node) {
+            return Some(dot_access);
         }
     }
 
-    if node.offset() + 1 == cursor && matches!(node.kind(), SyntaxKind::Dots) {
-        let dot_target = node.parent()?;
-        if dot_target.kind() == SyntaxKind::Spread {
-            let dot_target = dot_target.prev_leaf().and_then(first_ancestor_expr);
-
-            if let Some(dot_target) = dot_target {
-                return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
-            }
+    if node.offset() + 1 == cursor
+        && matches!(node.kind(), SyntaxKind::Dots)
+        && matches!(node.parent_kind(), Some(SyntaxKind::Spread))
+    {
+        if let Some(dot_access) = classify_dot_access(&node) {
+            return Some(dot_access);
         }
     }
 
@@ -1412,26 +1430,22 @@ Text
         ");
     }
 
-    #[test]
-    fn test_access_field() {
-        fn test_fn(s: &str, cursor: i32) -> String {
-            test_fn_(s, cursor).unwrap_or_default()
-        }
+    fn access_node(s: &str, cursor: i32) -> String {
+        access_node_(s, cursor).unwrap_or_default()
+    }
 
-        fn test_fn_(s: &str, cursor: i32) -> Option<String> {
-            let cursor = if cursor < 0 {
-                s.len() as i32 + cursor
-            } else {
-                cursor
-            };
-            let source = Source::detached(s.to_owned());
-            let root = LinkedNode::new(source.root());
-            let node = root.leaf_at(cursor as usize, Side::Before)?;
-            let syntax = classify_syntax(node, cursor as usize)?;
-            let SyntaxClass::VarAccess(var) = syntax else {
-                return None;
-            };
+    fn access_node_(s: &str, cursor: i32) -> Option<String> {
+        access_var(s, cursor, |_source, var| {
+            Some(var.accessed_node()?.get().clone().into_text().into())
+        })
+    }
 
+    fn access_field(s: &str, cursor: i32) -> String {
+        access_field_(s, cursor).unwrap_or_default()
+    }
+
+    fn access_field_(s: &str, cursor: i32) -> Option<String> {
+        access_var(s, cursor, |source, var| {
             let field = var.accessing_field()?;
             Some(match field {
                 FieldClass::Field(ident) => format!("Field: {}", ident.text()),
@@ -1440,13 +1454,75 @@ Text
                     format!("DotSuffix: {offset:?}")
                 }
             })
-        }
+        })
+    }
 
-        assert_snapshot!(test_fn("#(a.b)", 5), @r"Field: b");
-        assert_snapshot!(test_fn("#a.", 3), @"DotSuffix: 3");
-        assert_snapshot!(test_fn("$a.$", 3), @"DotSuffix: 3");
-        assert_snapshot!(test_fn("#(a.)", 4), @"DotSuffix: 4");
-        assert_snapshot!(test_fn("#(a..b)", 4), @"DotSuffix: 4");
-        assert_snapshot!(test_fn("#(a..b())", 4), @"DotSuffix: 4");
+    fn access_var(
+        s: &str,
+        cursor: i32,
+        f: impl FnOnce(&Source, VarClass) -> Option<String>,
+    ) -> Option<String> {
+        let cursor = if cursor < 0 {
+            s.len() as i32 + cursor
+        } else {
+            cursor
+        };
+        let source = Source::detached(s.to_owned());
+        let root = LinkedNode::new(source.root());
+        let node = root.leaf_at(cursor as usize, Side::Before)?;
+        let syntax = classify_syntax(node, cursor as usize)?;
+        let SyntaxClass::VarAccess(var) = syntax else {
+            return None;
+        };
+        f(&source, var)
+    }
+
+    #[test]
+    fn test_access_field() {
+        assert_snapshot!(access_field("#(a.b)", 5), @r"Field: b");
+        assert_snapshot!(access_field("#a.", 3), @"DotSuffix: 3");
+        assert_snapshot!(access_field("$a.$", 3), @"DotSuffix: 3");
+        assert_snapshot!(access_field("#(a.)", 4), @"DotSuffix: 4");
+        assert_snapshot!(access_node("#(a..b)", 4), @"a");
+        assert_snapshot!(access_field("#(a..b)", 4), @"DotSuffix: 4");
+        assert_snapshot!(access_node("#(a..b())", 4), @"a");
+        assert_snapshot!(access_field("#(a..b())", 4), @"DotSuffix: 4");
+    }
+
+    #[test]
+    fn test_code_access() {
+        assert_snapshot!(access_node("#{`a`.}", 6), @"`a`");
+        assert_snapshot!(access_field("#{`a`.}", 6), @"DotSuffix: 6");
+        assert_snapshot!(access_node("#{$a$.}", 6), @"$a$");
+        assert_snapshot!(access_field("#{$a$.}", 6), @"DotSuffix: 6");
+        assert_snapshot!(access_node("#{\"a\".}", 6), @"\"a\"");
+        assert_snapshot!(access_field("#{\"a\".}", 6), @"DotSuffix: 6");
+        assert_snapshot!(access_node("#{<a>.}", 6), @"<a>");
+        assert_snapshot!(access_field("#{<a>.}", 6), @"DotSuffix: 6");
+    }
+
+    #[test]
+    fn test_markup_access() {
+        assert_snapshot!(access_field("_a_.", 4), @"");
+        assert_snapshot!(access_field("*a*.", 4), @"");
+        assert_snapshot!(access_field("`a`.", 4), @"");
+        assert_snapshot!(access_field("$a$.", 4), @"");
+        assert_snapshot!(access_field("\"a\".", 4), @"");
+        assert_snapshot!(access_field("@a.", 3), @"");
+        assert_snapshot!(access_field("<a>.", 4), @"");
+    }
+
+    #[test]
+    fn test_hash_access() {
+        assert_snapshot!(access_node("#a.", 3), @"a");
+        assert_snapshot!(access_field("#a.", 3), @"DotSuffix: 3");
+        assert_snapshot!(access_node("#(a).", 5), @"(a)");
+        assert_snapshot!(access_field("#(a).", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_node("#`a`.", 5), @"`a`");
+        assert_snapshot!(access_field("#`a`.", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_node("#$a$.", 5), @"$a$");
+        assert_snapshot!(access_field("#$a$.", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_node("#(a,).", 6), @"(a,)");
+        assert_snapshot!(access_field("#(a,).", 6), @"DotSuffix: 6");
     }
 }
