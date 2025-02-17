@@ -24,13 +24,19 @@ enum ResourceKind {
 }
 
 const resourceKinds: Record<string, ResourceKind> = {
+  ".avif": ResourceKind.BuiltinImage,
+  ".bmp": ResourceKind.BuiltinImage,
+  ".gif": ResourceKind.BuiltinImage,
+  ".ico": ResourceKind.BuiltinImage,
+  ".jpe": ResourceKind.BuiltinImage,
   ".jpg": ResourceKind.BuiltinImage,
   ".jpeg": ResourceKind.BuiltinImage,
   ".png": ResourceKind.BuiltinImage,
-  ".gif": ResourceKind.BuiltinImage,
-  ".bmp": ResourceKind.BuiltinImage,
-  ".ico": ResourceKind.BuiltinImage,
+  ".psd": ResourceKind.BuiltinImage,
   ".svg": ResourceKind.BuiltinImage,
+  ".tga": ResourceKind.BuiltinImage,
+  ".tif": ResourceKind.BuiltinImage,
+  ".tiff": ResourceKind.BuiltinImage,
   ".webp": ResourceKind.Webp,
   ".typst": ResourceKind.Source,
   ".typ": ResourceKind.Source,
@@ -95,7 +101,7 @@ export class TextProvider implements vscode.DocumentDropEditProvider {
         additionalPkgs.push(["@preview/spreet", "0.1.0", undefined]);
         additionalPkgs.push(["@preview/rexllent", "0.3.0", "spreet-parser"]);
         codeSnippet = `spreet-parser(spreet.decode(read(${strPath}, encoding: none)))`;
-        break
+        break;
       case ResourceKind.Source:
         codeSnippet = `include ${strPath}`;
         break;
