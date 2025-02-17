@@ -43,6 +43,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
   extensionState.features.dragAndDrop = !isWeb && config.dragAndDrop === "enable";
+  extensionState.features.copyAndPaste = !isWeb && config.copyAndPaste === "enable";
   extensionState.features.onEnter = !isWeb && !!config.onEnterEvent;
   extensionState.features.renderDocs = !isWeb && config.renderDocs === "enable";
 

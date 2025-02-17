@@ -26,7 +26,7 @@ import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
 import { toolFeatureActivate } from "./features/tool";
-import { dragAndDropActivate } from "./features/drop-paste";
+import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { LanguageClient } from "vscode-languageclient/node";
 
@@ -37,6 +37,7 @@ const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.package, packageFeatureActivate],
   [extensionState.features.tool, toolFeatureActivate],
   [extensionState.features.dragAndDrop, dragAndDropActivate],
+  [extensionState.features.copyAndPaste, copyAndPasteActivate],
   [extensionState.features.task, taskActivate],
   [extensionState.features.devKit, devKitFeatureActivate],
   [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],

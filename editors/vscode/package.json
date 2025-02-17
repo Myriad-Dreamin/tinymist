@@ -466,8 +466,18 @@
           ]
         },
         "tinymist.dragAndDrop": {
-          "title": "Drag and drop",
+          "title": "Drag and Drop",
           "description": "Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.",
+          "type": "string",
+          "default": "enable",
+          "enum": [
+            "enable",
+            "disable"
+          ]
+        },
+        "tinymist.copyAndPaste": {
+          "title": "Copy and Paste",
+          "description": "Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.",
           "type": "string",
           "default": "enable",
           "enum": [
