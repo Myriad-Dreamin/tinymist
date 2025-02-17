@@ -10,6 +10,7 @@ interface ExtensionState {
     devKit: boolean;
     wordSeparator: boolean;
     dragAndDrop: boolean;
+    copyAndPaste: boolean;
     label: boolean;
     package: boolean;
     tool: boolean;
@@ -37,6 +38,7 @@ export const extensionState: ExtensionState = {
     tool: true,
     devKit: false,
     dragAndDrop: false,
+    copyAndPaste: false,
     onEnter: false,
     preview: false,
     language: true,

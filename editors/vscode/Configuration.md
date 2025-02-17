@@ -161,6 +161,16 @@ Whether to handle drag-and-drop of resources into the editing typst document. No
   - `disable`
 - **Default**: `"enable"`
 
+## `tinymist.copyAndPaste`
+
+Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
 ## `tinymist.renderDocs`
 
 (Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs.
