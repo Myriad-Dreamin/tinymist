@@ -708,19 +708,17 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     /// When in markup mode, the dot access is valid if the dot is after a hash
     /// expression.
     fn classify_dot_access<'a>(node: &LinkedNode<'a>) -> Option<SyntaxClass<'a>> {
-        let dot_target = node.prev_leaf().and_then(first_ancestor_expr);
+        let dot_target = node.prev_leaf().and_then(first_ancestor_expr)?;
+        let mode = interpret_mode_at(Some(node));
 
-        if let Some(dot_target) = dot_target {
-            let mode = interpret_mode_at(Some(node));
-            if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
-                matches!(mode, InterpretMode::Markup)
-                    && matches!(
-                        dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
-                        Some(SyntaxKind::Hash)
-                    )
-            } {
-                return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
-            }
+        if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
+            matches!(mode, InterpretMode::Markup)
+                && matches!(
+                    dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
+                    Some(SyntaxKind::Hash)
+                )
+        } {
+            return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
         }
 
         None
