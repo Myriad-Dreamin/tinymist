@@ -1495,6 +1495,8 @@ Text
         assert_snapshot!(access_field("#{`a`.}", 6), @"DotSuffix: 6");
         assert_snapshot!(access_node("#{$a$.}", 6), @"$a$");
         assert_snapshot!(access_field("#{$a$.}", 6), @"DotSuffix: 6");
+        assert_snapshot!(access_node("#{\"a\".}", 6), @"\"a\"");
+        assert_snapshot!(access_field("#{\"a\".}", 6), @"DotSuffix: 6");
         assert_snapshot!(access_node("#{<a>.}", 6), @"<a>");
         assert_snapshot!(access_field("#{<a>.}", 6), @"DotSuffix: 6");
     }
@@ -1505,6 +1507,7 @@ Text
         assert_snapshot!(access_field("*a*.", 4), @"");
         assert_snapshot!(access_field("`a`.", 4), @"");
         assert_snapshot!(access_field("$a$.", 4), @"");
+        assert_snapshot!(access_field("\"a\".", 4), @"");
         assert_snapshot!(access_field("@a.", 3), @"");
         assert_snapshot!(access_field("<a>.", 4), @"");
     }
