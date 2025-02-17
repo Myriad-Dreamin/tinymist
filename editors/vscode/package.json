@@ -24,7 +24,7 @@
   "publisher": "myriad-dreamin",
   "license": "Apache-2.0",
   "engines": {
-    "vscode": "^1.82.0"
+    "vscode": "^1.97.0"
   },
   "main": "./out/extension.js",
   "browser": "./out/extension.web.js",
@@ -1146,22 +1146,22 @@
     "ws": "^8.13.0"
   },
   "devDependencies": {
-    "@types/chai": "^4.3.16",
+    "@types/chai": "^5.0.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^20.8.10",
-    "@types/vscode": "^1.82.0",
+    "@types/node": "^22.13.4",
+    "@types/vscode": "^1.97.0",
     "@types/ws": "^8.5.5",
-    "@typescript-eslint/eslint-plugin": "^6.9.1",
-    "@typescript-eslint/parser": "^6.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.2.4",
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.22.0",
-    "chai": "^5.1.1",
-    "esbuild": "^0.19.5",
-    "eslint": "^8.52.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-import": "^2.29.0",
-    "eslint-plugin-n": "^16.2.0",
-    "eslint-plugin-promise": "^6.1.1",
+    "chai": "^5.2.0",
+    "esbuild": "^0.24.2",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-n": "^17.15.1",
+    "eslint-plugin-promise": "^7.2.1",
     "mocha": "^10.2.0",
     "ovsx": "^0.8.3",
     "typescript": "^5.2.2"
