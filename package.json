@@ -31,11 +31,11 @@
   "devDependencies": {
     "cpr": "^3.0.1",
     "prettier": "^3.0.3",
-    "rimraf": "^5.0.1",
+    "rimraf": "^6.0.1",
     "typescript": "^5.3.3",
-    "vite": "^4.3.9",
-    "vite-plugin-singlefile": "^0.13.5",
+    "vite": "^6.1.0",
+    "vite-plugin-singlefile": "^2.1.0",
     "vite-plugin-wasm": "^3.2.2",
-    "vitest": "^0.32.2"
+    "vitest": "^3.0.5"
   }
 }
