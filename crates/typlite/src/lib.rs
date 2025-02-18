@@ -119,7 +119,7 @@ impl Typlite {
             current,
             feat: self.feat,
             list_depth: 0,
-            pref: EcoString::new(),
+            prepend_code: EcoString::new(),
             assets_numbering: 0,
             scopes: self
                 .library
@@ -140,7 +140,7 @@ pub struct TypliteWorker {
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
     list_depth: usize,
-    pref: EcoString,
+    prepend_code: EcoString,
     assets_numbering: usize,
     /// Features for the conversion.
     pub feat: TypliteFeat,
@@ -323,8 +323,8 @@ impl TypliteWorker {
                 Hash | Ident | Bool | Int | Float | Numeric | Str | Array | Dict
             )
         {
-            self.pref += node.clone().into_text();
-            self.pref += "\n";
+            self.prepend_code += node.clone().into_text();
+            self.prepend_code += "\n";
         }
         res
     }
@@ -370,12 +370,12 @@ impl TypliteWorker {
 
     pub fn render(
         &mut self,
-        pref_node: &SyntaxNode,
+        prepend_node: &SyntaxNode,
         node: &SyntaxNode,
         inline: bool,
     ) -> Result<Value> {
         self.assets_numbering += 1;
-        let pref_code = pref_node.clone().into_text();
+        let prepend_code = prepend_node.clone().into_text();
         let code = node.clone().into_text();
         if let Some(assets_src_path) = &self.feat.assets_src_path {
             let file_name = format!(
@@ -388,11 +388,12 @@ impl TypliteWorker {
                 return Err(format!("Failed to write code to file: {}", e).into());
             }
         }
-        self.render_code(&(pref_code + code), false, "center", "", inline)
+        self.render_code(&prepend_code, &code, false, "center", "", inline)
     }
 
     pub fn render_code(
         &mut self,
+        prepend_code: &str,
         code: &str,
         is_markup: bool,
         align: &str,
@@ -411,7 +412,7 @@ impl TypliteWorker {
             None
         };
 
-        let mut render = |theme| self.render_inner(code, is_markup, theme);
+        let mut render = |theme| self.render_inner(prepend_code, code, is_markup, theme);
 
         let mut content = EcoString::new();
 
@@ -562,7 +563,13 @@ impl TypliteWorker {
         Ok(Value::Content(content))
     }
 
-    fn render_inner(&mut self, code: &str, is_markup: bool, theme: ColorTheme) -> Result<String> {
+    fn render_inner(
+        &mut self,
+        prepend_code: &str,
+        code: &str,
+        is_markup: bool,
+        theme: ColorTheme,
+    ) -> Result<String> {
         static DARK_THEME_INPUT: LazyLock<Arc<LazyHash<Dict>>> = LazyLock::new(|| {
             Arc::new(LazyHash::new(Dict::from_iter(std::iter::once((
                 "x-color-theme".into(),
@@ -570,17 +577,18 @@ impl TypliteWorker {
             )))))
         });
 
-        let code = WrapCode(code, is_markup);
         // let inputs = is_dark.then(|| DARK_THEME_INPUT.clone());
         let inputs = match theme {
             ColorTheme::Dark => Some(DARK_THEME_INPUT.clone()),
             ColorTheme::Light => None,
         };
         let code = eco_format!(
-            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
-            #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
+            r##"{prepend_code}
+            set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
+            set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
             {code}"##
         );
+        let code = WrapCode(&code, is_markup).to_string();
         let main = Bytes::from(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
@@ -865,7 +873,7 @@ impl TypliteWorker {
             return self.to_raw_block(node, false);
         }
         self.render(
-            &SyntaxNode::leaf(node.kind(), self.pref.clone()),
+            &SyntaxNode::leaf(node.kind(), self.prepend_code.clone()),
             node,
             false,
         )

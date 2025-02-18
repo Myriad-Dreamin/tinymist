@@ -51,7 +51,7 @@ pub fn example(mut args: Args) -> Result<Value> {
         let is_code = lang == "typc";
         let rendered =
             args.vm
-                .render_code(&compile, !is_code, "left", r#"width="500px""#, false)?;
+                .render_code("", &compile, !is_code, "left", r#"width="500px""#, false)?;
         s.push_str(&TypliteWorker::value(rendered));
     }
 
