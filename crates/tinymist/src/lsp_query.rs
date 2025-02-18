@@ -317,7 +317,6 @@ impl ServerState {
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        let is_pinning = self.pinning;
         just_ok(match query {
             FoldingRange(req) => query_source!(self, FoldingRange, req)?,
             SelectionRange(req) => query_source!(self, SelectionRange, req)?,
@@ -327,34 +326,35 @@ impl ServerState {
             OnExport(req) => return self.on_export(req),
             ServerInfo(_) => return self.collect_server_info(),
             // todo: query on dedicate projects
-            _ => return self.query_on(is_pinning, query),
+            _ => return self.query_on(query),
         })
     }
 
-    fn query_on(&mut self, is_pinning: bool, query: CompilerQueryRequest) -> QueryFuture {
+    fn query_on(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         let (mut snap, stat) = self.query_snapshot_with_stat(&query)?;
-        let input = query
-            .associated_path()
-            .map(|path| self.resolve_task(path.into()))
-            .or_else(|| {
-                let root = self.entry_resolver().root(None)?;
-                Some(TaskInputs {
-                    entry: Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY)),
-                    ..Default::default()
-                })
-            });
+        // todo: whether it is safe to inherit success_doc with changed entry
+        if !self.is_pinning() {
+            let input = query
+                .associated_path()
+                .map(|path| self.resolve_task(path.into()))
+                .or_else(|| {
+                    let root = self.entry_resolver().root(None)?;
+                    Some(TaskInputs {
+                        entry: Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY)),
+                        ..Default::default()
+                    })
+                });
+
+            if let Some(input) = input {
+                snap = snap.task(input);
+            }
+        }
 
         just_future(async move {
-            // todo: whether it is safe to inherit success_doc with changed entry
-            if !is_pinning {
-                if let Some(input) = input {
-                    snap = snap.task(input);
-                }
-            }
             stat.snap();
 
             if matches!(query, Completion(..)) {

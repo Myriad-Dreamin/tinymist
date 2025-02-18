@@ -38,8 +38,11 @@ use tokio::sync::mpsc;
 use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
 use super::ServerState;
-use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
+use crate::{
+    actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion},
+    ServerEvent,
+};
 use crate::{task::ExportUserConfig, Config};
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
@@ -347,18 +350,27 @@ pub struct CompileHandlerImpl {
 }
 
 pub trait ProjectClient: Send + Sync + 'static {
-    fn send_event(&self, event: LspInterrupt);
+    fn interrupt(&self, event: LspInterrupt);
+    fn server_event(&self, event: ServerEvent);
 }
 
 impl ProjectClient for LspClient {
-    fn send_event(&self, event: LspInterrupt) {
+    fn interrupt(&self, event: LspInterrupt) {
+        self.send_event(event);
+    }
+
+    fn server_event(&self, event: ServerEvent) {
         self.send_event(event);
     }
 }
 
 impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
-    fn send_event(&self, event: LspInterrupt) {
+    fn interrupt(&self, event: LspInterrupt) {
         self.send(event).log_error("failed to send interrupt");
+    }
+
+    fn server_event(&self, _event: ServerEvent) {
+        log::warn!("ProjectClient: server_event is not implemented for mpsc::UnboundedSender<LspInterrupt>");
     }
 }
 
@@ -510,7 +522,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         self.notify_diagnostics(snap);
 
-        self.client.send_event(LspInterrupt::Compiled(snap.clone()));
+        self.client.interrupt(LspInterrupt::Compiled(snap.clone()));
         self.export.signal(snap);
 
         self.editor_tx

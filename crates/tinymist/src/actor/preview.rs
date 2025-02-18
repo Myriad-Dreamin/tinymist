@@ -62,13 +62,11 @@ impl PreviewActor {
                         log::warn!("PreviewTask({task_id}): failed to unregister preview");
                     }
 
-                    if !tab.is_primary {
-                        let h = tab.compile_handler.clone();
-                        let task_id = tab.task_id.clone();
-                        self.client.handle.spawn(async move {
-                            h.settle().await.log_error_with(|| {
-                                format!("PreviewTask({task_id}): failed to settle")
-                            });
+                    if tab.is_primary {
+                        tab.compile_handler.unpin_primary();
+                    } else {
+                        tab.compile_handler.settle().log_error_with(|| {
+                            format!("PreviewTask({}): failed to settle", tab.task_id)
                         });
                     }
 

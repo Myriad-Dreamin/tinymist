@@ -1024,6 +1024,12 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.browsing-preview",
+        "title": "Tinymist: Browsing Preview",
+        "description": "Open a preview panel to browsing through documents. The preview panel will pick a main file when switching between files. By default, every single file is a document. This doesn't work well with multiple-files projects. To allow tinymist learn the structure of your projects, please configure `tinymist.projectResolution` as `lockDatabase`.",
+        "icon": "$(open-preview)"
+      },
+      {
         "command": "typst-preview.preview",
         "title": "Typst Preview: Preview Opened File",
         "description": "Launch typst-preview server",

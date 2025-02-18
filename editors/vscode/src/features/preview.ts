@@ -99,13 +99,16 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }),
   );
 
+  const launchBrowsingPreview = launch("webview", "doc", { isBrowsing: true });
+  const launchDevPreview = launch("webview", "doc", { isDev: true });
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
+    vscode.commands.registerCommand("tinymist.browsing-preview", launchBrowsingPreview),
     vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-    vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true)),
+    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
     vscode.commands.registerCommand(
       "typst-preview.revealDocument",
       isCompat ? revealDocumentCompat : revealDocumentLsp,
@@ -143,15 +146,27 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
 
   /**
+   * Options to launch the preview.
+   *
+   * @param isBrowsing Whether to launch the preview in browsing mode. It switches the previewing
+   * document on focus change.
+   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
+   * to help the `vite dev` server connect the language server via WebSocket.
+   */
+  interface LaunchOpts {
+    isBrowsing?: boolean;
+    isDev?: boolean;
+    // isDev = false
+  }
+
+  /**
    * Gets current active editor and launches the preview.
    *
    * @param kind Which kind of preview to launch, either in external browser or in builtin vscode
    * webview.
    * @param mode The preview mode, either viewing as a document or as a slide.
-   * @param isDev Whether to launch the preview in development mode. It fixes some random arguments
-   * to help the `vite dev` server connect the language server via WebSocket.
    */
-  function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
+  function launch(kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
     return async () => {
       activeEditor = activeEditor || vscode.window.activeTextEditor;
       if (!activeEditor) {
@@ -165,7 +180,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         editor: activeEditor,
         bindDocument,
         mode,
-        isDev,
+        isBrowsing: opts?.isBrowsing || false,
+        isDev: opts?.isDev || false,
       }).catch((e) => {
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
@@ -259,9 +275,10 @@ export async function openPreviewInWebView({
 
   // Determines arguments for the preview HTML.
   const previewMode = task.mode === "doc" ? "Doc" : "Slide";
-  const previewState = {
+  const previewState: PersistPreviewState = {
     mode: task.mode,
-    asPrimary: task.isNotPrimary,
+    isNotPrimary: !!task.isNotPrimary,
+    isBrowsing: !!task.isBrowsing,
     uri: activeEditor.document.uri.toString(),
   };
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
@@ -305,7 +322,8 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-  const { kind, context, editor, bindDocument, webviewPanel, isDev, isNotPrimary } = task;
+  const { kind, context, editor, bindDocument, webviewPanel, isBrowsing, isDev, isNotPrimary } =
+    task;
 
   /**
    * Can only open one preview for one document.
@@ -378,11 +396,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     if (activeTask.get(bindDocument)?.taskId === taskId) {
       activeTask.delete(bindDocument);
     }
-
-    // todo: better way to unpin main
-    if (isPrimary) {
-      vscode.commands.executeCommand("tinymist.unpinMain");
-    }
   });
   return { message: "ok", taskId };
 
@@ -395,7 +408,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
-    const { dataPlanePort, staticServerPort, isPrimary } = await tinymist.startPreview([
+
+    const previewArgs = [
       "--task-id",
       taskId,
       "--refresh-style",
@@ -406,9 +420,13 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       ...previewInSlideModeArgs,
       ...(isNotPrimary ? ["--not-primary"] : []),
       filePath,
-    ]);
+    ];
+
+    const { dataPlanePort, staticServerPort, isPrimary } = await (isBrowsing
+      ? tinymist.startPreview(previewArgs)
+      : tinymist.startBrowsingPreview(previewArgs));
     console.log(
-      `Launched preview, data plane port:${dataPlanePort}, static server port:${staticServerPort}`,
+      `Launched preview, browsing:${isBrowsing}, data plane port:${dataPlanePort}, static server port:${staticServerPort}`,
     );
 
     if (enableCursor) {
@@ -740,30 +758,38 @@ export class OutlineItem extends vscode.TreeItem {
   contextValue = "outline-item";
 }
 
-class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
+interface PersistPreviewState {
+  mode: "doc" | "slide";
+  isNotPrimary: boolean;
+  isBrowsing: boolean;
+  uri: string;
+}
+
+class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPreviewState> {
   context: vscode.ExtensionContext;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
   }
 
-  async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+  async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: PersistPreviewState) {
     console.log("deserializeWebviewPanel", state);
     if (!state) {
       return;
     }
 
-    state.uri = vscode.Uri.parse(state.uri);
+    const uri = vscode.Uri.parse(state.uri);
 
     // open this file and show in editor
     const doc =
-      vscode.workspace.textDocuments.find((doc) => doc.uri === state.uri) ||
+      vscode.workspace.textDocuments.find((doc) => doc.uri === uri) ||
       (await vscode.workspace.openTextDocument(state.uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
 
     const bindDocument = editor.document;
     const mode = state.mode;
     const isNotPrimary = state.isNotPrimary;
+    const isBrowsing = state.isBrowsing;
 
     await launchImpl({
       kind: "webview",
@@ -772,6 +798,7 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
       bindDocument,
       mode,
       webviewPanel,
+      isBrowsing,
       isNotPrimary,
     });
   }

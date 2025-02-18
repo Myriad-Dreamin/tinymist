@@ -103,6 +103,11 @@ impl ServerState {
 /// Main file mutations on the primary project (which is used for the language
 /// queries.)
 impl ServerState {
+    /// Updates the `pinning_by_preview` status.
+    pub fn set_pin_by_preview(&mut self, pin: bool) {
+        self.pinning_by_preview = pin;
+    }
+
     /// Changes main file to the given path.
     pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
         if path
@@ -124,7 +129,7 @@ impl ServerState {
 
     /// Pins the main file to the given path
     pub fn pin_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<()> {
-        self.pinning = new_entry.is_some();
+        self.pinning_by_user = new_entry.is_some();
         let entry = new_entry
             .or_else(|| self.entry_resolver().resolve_default())
             .or_else(|| self.focusing.clone());
@@ -134,7 +139,7 @@ impl ServerState {
 
     /// Focuses main file to the given path.
     pub fn focus_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
-        if self.pinning || self.config.compile.has_default_entry_path {
+        if self.pinning_by_user || self.config.compile.has_default_entry_path {
             self.focusing = new_entry;
             return Ok(false);
         }

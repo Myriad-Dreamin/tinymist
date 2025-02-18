@@ -60,7 +60,10 @@ pub struct ServerState {
     /// Whether the server has registered document formatter capabilities.
     pub formatter_registered: bool,
     /// Whether client is pinning a file.
-    pub pinning: bool,
+    pub pinning_by_user: bool,
+    /// Whether client is pinning caused by preview, which has lower priority
+    /// than pinning.
+    pub pinning_by_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
     /// The client ever focused implicitly by activities.
@@ -111,7 +114,8 @@ impl ServerState {
             formatter_registered: false,
             config,
 
-            pinning: false,
+            pinning_by_user: false,
+            pinning_by_preview: false,
             focusing: None,
             formatter,
             user_action: Default::default(),
@@ -131,6 +135,15 @@ impl ServerState {
     /// Gets the entry resolver.
     pub fn entry_resolver(&self) -> &EntryResolver {
         &self.compile_config().entry_resolver
+    }
+
+    /// Whether the main file is pinning.
+    pub fn is_pinning(&self) -> bool {
+        self.pinning_by_user
+            || (self.pinning_by_preview && {
+                let primary_verse = &self.project.compiler.primary.verse;
+                !primary_verse.entry_state().is_inactive()
+            })
     }
 
     /// The entry point for the language server.
@@ -171,6 +184,7 @@ impl ServerState {
         #[cfg(feature = "preview")]
         let provider = provider
             .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview);
 
@@ -181,6 +195,10 @@ impl ServerState {
             .with_event(
                 &LspInterrupt::Compile(ProjectInsId::default()),
                 State::compile_interrupt::<T>,
+            )
+            .with_event(
+                &ServerEvent::UnpinPrimaryByPreview,
+                State::server_event::<T>,
             )
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
@@ -274,6 +292,33 @@ impl ServerState {
         // log::info!("interrupted in {:?}", _start.elapsed());
         Ok(())
     }
+
+    /// Handles the server events.
+    fn server_event<T: Initializer<S = Self>>(
+        mut state: ServiceState<T, T::S>,
+        params: ServerEvent,
+    ) -> anyhow::Result<()> {
+        let _start = std::time::Instant::now();
+        // log::info!("incoming interrupt: {params:?}");
+        let Some(ready) = state.ready() else {
+            log::info!("server event sent to not ready server");
+            return Ok(());
+        };
+
+        match params {
+            ServerEvent::UnpinPrimaryByPreview => {
+                ready.set_pin_by_preview(false);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// An event sent to the language server.
+pub enum ServerEvent {
+    /// Updates the `pinning_by_preview` status to false.
+    UnpinPrimaryByPreview,
 }
 
 impl ServerState {
