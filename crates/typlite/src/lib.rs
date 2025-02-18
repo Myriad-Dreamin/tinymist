@@ -579,7 +579,7 @@ impl TypliteWorker {
             )))))
         });
 
-        let code = WrapCode(&code, is_markup);
+        let code = WrapCode(code, is_markup);
         // let inputs = is_dark.then(|| DARK_THEME_INPUT.clone());
         let inputs = match theme {
             ColorTheme::Dark => Some(DARK_THEME_INPUT.clone()),
