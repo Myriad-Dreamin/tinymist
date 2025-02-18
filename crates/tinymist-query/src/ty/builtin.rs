@@ -18,6 +18,7 @@ use crate::ty::*;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum PathPreference {
     Source { allow_package: bool },
+    Wasm,
     Csv,
     Image,
     Json,
@@ -36,6 +37,7 @@ impl PathPreference {
     pub fn ext_matcher(&self) -> &'static RegexSet {
         static SOURCE_REGSET: Lazy<RegexSet> =
             Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
+        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^wasm$"]).unwrap());
         static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new([
                 r"^ico$", r"^bmp$", r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^jfif$", r"^tiff$",
@@ -61,7 +63,8 @@ impl PathPreference {
         static ALL_SPECIAL_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new({
                 let patterns = SOURCE_REGSET.patterns();
-                let patterns = patterns.iter().chain(IMAGE_REGSET.patterns());
+                let patterns = patterns.iter().chain(WASM_REGSET.patterns());
+                let patterns = patterns.chain(IMAGE_REGSET.patterns());
                 let patterns = patterns.chain(JSON_REGSET.patterns());
                 let patterns = patterns.chain(YAML_REGSET.patterns());
                 let patterns = patterns.chain(XML_REGSET.patterns());
@@ -77,6 +80,7 @@ impl PathPreference {
 
         match self {
             PathPreference::Source { .. } => &SOURCE_REGSET,
+            PathPreference::Wasm => &WASM_REGSET,
             PathPreference::Csv => &CSV_REGSET,
             PathPreference::Image => &IMAGE_REGSET,
             PathPreference::Json => &JSON_REGSET,
@@ -370,6 +374,7 @@ impl BuiltinTy {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
                 PathPreference::Source { .. } => "[source]",
+                PathPreference::Wasm => "[wasm]",
                 PathPreference::Csv => "[csv]",
                 PathPreference::Image => "[image]",
                 PathPreference::Json => "[json]",
@@ -449,15 +454,18 @@ macro_rules! flow_record {
 }
 
 pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
+    // todo: remove path params which is compatible with 0.12.0
     match (func.name()?, param.name) {
-        ("cbor", "path") => Some(literally(Path(PathPreference::None))),
-        ("csv", "path") => Some(literally(Path(PathPreference::Csv))),
-        ("image", "path") => Some(literally(Path(PathPreference::Image))),
-        ("read", "path") => Some(literally(Path(PathPreference::None))),
-        ("json", "path") => Some(literally(Path(PathPreference::Json))),
-        ("yaml", "path") => Some(literally(Path(PathPreference::Yaml))),
-        ("xml", "path") => Some(literally(Path(PathPreference::Xml))),
-        ("toml", "path") => Some(literally(Path(PathPreference::Toml))),
+        ("embed", "path") => Some(literally(Path(PathPreference::None))),
+        ("cbor", "path" | "source") => Some(literally(Path(PathPreference::None))),
+        ("plugin", "source") => Some(literally(Path(PathPreference::Wasm))),
+        ("csv", "path" | "source") => Some(literally(Path(PathPreference::Csv))),
+        ("image", "path" | "source") => Some(literally(Path(PathPreference::Image))),
+        ("read", "path" | "source") => Some(literally(Path(PathPreference::None))),
+        ("json", "path" | "source") => Some(literally(Path(PathPreference::Json))),
+        ("yaml", "path" | "source") => Some(literally(Path(PathPreference::Yaml))),
+        ("xml", "path" | "source") => Some(literally(Path(PathPreference::Xml))),
+        ("toml", "path" | "source") => Some(literally(Path(PathPreference::Toml))),
         ("raw", "theme") => Some(literally(Path(PathPreference::RawTheme))),
         ("raw", "syntaxes") => Some(literally(Path(PathPreference::RawSyntax))),
         ("bibliography" | "cite", "style") => Some(Ty::iter_union([
@@ -470,7 +478,13 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             literally(RefLabel),
             Ty::from_cast_info(&param.input),
         ])),
-        ("bibliography", "path") => Some(literally(Path(PathPreference::Bibliography))),
+        ("bibliography", "path" | "sources") => {
+            static BIB_PATH_TYPE: Lazy<Ty> = Lazy::new(|| {
+                let bib_path_ty = literally(Path(PathPreference::Bibliography));
+                Ty::iter_union([bib_path_ty.clone(), Ty::Array(bib_path_ty.into())])
+            });
+            Some(BIB_PATH_TYPE.clone())
+        }
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
             static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
