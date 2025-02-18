@@ -582,6 +582,18 @@ impl TypliteWorker {
     fn raw(node: &SyntaxNode) -> Result<Value> {
         let mut s = EcoString::new();
         let raw = node.cast::<ast::Raw>().unwrap();
+
+        // Raw codes with typlite language will not be treated as a code block but directly output into the Markdown result.
+        if let Some(lang) = raw.lang() {
+            if &EcoString::from("typlite") == lang.get() {
+                for line in raw.lines() {
+                    s.push_str(&Self::value(Self::str(line.to_untyped())?));
+                    s.push('\n');
+                }
+                return Ok(Value::Content(s));
+            }
+        }
+
         if raw.block() {
             s.push_str(&Self::value(Self::str(node)?));
             return Ok(Value::Content(s));
