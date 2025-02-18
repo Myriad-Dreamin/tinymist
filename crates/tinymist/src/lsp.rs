@@ -1,6 +1,7 @@
 use lsp_types::request::WorkspaceConfiguration;
 use lsp_types::*;
 use once_cell::sync::OnceCell;
+use reflexo::ImmutPath;
 use request::{RegisterCapability, UnregisterCapability};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
@@ -80,31 +81,30 @@ impl ServerState {
 impl ServerState {
     pub(crate) fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         log::info!("did open {:?}", params.text_document.uri);
-        let path = as_path_(params.text_document.uri);
+        let path: ImmutPath = as_path_(params.text_document.uri).as_path().into();
         let text = params.text_document.text;
 
         self.create_source(path.clone(), text)
-            .map_err(|e| invalid_params(e.to_string()))?;
+            .map_err(invalid_params)?;
 
         // Focus after opening
-        self.implicit_focus_entry(|| Some(path.as_path().into()), 'o');
+        self.implicit_focus_entry(|| Some(path), 'o');
         Ok(())
     }
 
     pub(crate) fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri);
+        let path = as_path_(params.text_document.uri).as_path().into();
 
-        self.remove_source(path.clone())
-            .map_err(|e| invalid_params(e.to_string()))?;
+        self.remove_source(path).map_err(invalid_params)?;
         Ok(())
     }
 
     pub(crate) fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri);
+        let path = as_path_(params.text_document.uri).as_path().into();
         let changes = params.content_changes;
 
-        self.edit_source(path.clone(), changes, self.const_config().position_encoding)
-            .map_err(|e| invalid_params(e.to_string()))?;
+        self.edit_source(path, changes, self.const_config().position_encoding)
+            .map_err(invalid_params)?;
         Ok(())
     }
 

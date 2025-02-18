@@ -531,10 +531,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let mut n_revs = self.status_revision.lock();
             let n_rev = n_revs.entry(id.clone()).or_default();
             if *n_rev > revision {
-                log::info!(
-                    "Project: outdated status for revision {} <= {n_rev}",
-                    revision,
-                );
+                log::info!("Project: outdated status for revision {revision} <= {n_rev}");
                 return;
             }
             *n_rev = revision;
