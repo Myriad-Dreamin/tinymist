@@ -378,11 +378,9 @@ impl TypliteWorker {
         let prepend_code = prepend_node.clone().into_text();
         let code = node.clone().into_text();
         if let Some(assets_src_path) = &self.feat.assets_src_path {
-            let file_name = format!(
-                "{}/{}.typ",
-                assets_src_path.display(),
-                self.assets_numbering,
-            );
+            let file_name = assets_src_path
+                .join(self.assets_numbering.to_string())
+                .with_extension(".typ");
             if let Err(e) = std::fs::write(&file_name, format!("#{{\n// render_code\n{}\n}}", code))
             {
                 return Err(format!("Failed to write code to file: {}", e).into());
@@ -403,11 +401,11 @@ impl TypliteWorker {
         let theme = self.feat.color_theme;
 
         let code_file_name = if let Some(assets_src_path) = &self.feat.assets_src_path {
-            Some(eco_format!(
-                "{}/{}.typ",
-                assets_src_path.display(),
-                self.assets_numbering,
-            ))
+            Some(
+                assets_src_path
+                    .join(self.assets_numbering.to_string())
+                    .with_extension(".typ"),
+            )
         } else {
             None
         };
@@ -662,14 +660,13 @@ impl TypliteWorker {
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
 
         if let Some(assets_path) = &self.feat.assets_path {
-            let file_name = format!(
-                "{}/{}_{:?}.svg",
-                assets_path.display(),
-                self.assets_numbering,
-                theme
-            );
+            let file_name = assets_path
+                .join(self.assets_numbering.to_string())
+                .with_extension("svg")
+                .to_string_lossy()
+                .to_string();
             if let Err(e) = std::fs::write(&file_name, &svg_payload) {
-                return Err(format!("Failed to write SVG to file: {}", e).into());
+                return Err(format!("failed to write SVG to file: {}", e).into());
             }
             Ok(file_name)
         } else {
