@@ -542,7 +542,7 @@
           "title": "The Way to complete symbols",
           "markdownDescription": "Whether to make symbol completion stepless. For example, `$ar|$` will be completed to `$arrow.r$`. Hint: Restarting the editor is required to change this setting.",
           "type": "string",
-          "default": "enable",
+          "default": "step",
           "enum": [
             "step",
             "stepless"
