@@ -400,11 +400,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     if (activeTask.get(bindDocument)?.taskId === taskId) {
       activeTask.delete(bindDocument);
     }
-
-    // todo: better way to unpin main
-    if (isPrimary) {
-      vscode.commands.executeCommand("tinymist.unpinMain");
-    }
   });
   return { message: "ok", taskId };
 

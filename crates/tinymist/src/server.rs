@@ -195,6 +195,10 @@ impl ServerState {
                 &LspInterrupt::Compile(ProjectInsId::default()),
                 State::compile_interrupt::<T>,
             )
+            .with_event(
+                &ServerEvent::UnpinPrimaryByPreview,
+                State::server_event::<T>,
+            )
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
             .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
@@ -287,6 +291,33 @@ impl ServerState {
         // log::info!("interrupted in {:?}", _start.elapsed());
         Ok(())
     }
+
+    /// Handles the server events.
+    fn server_event<T: Initializer<S = Self>>(
+        mut state: ServiceState<T, T::S>,
+        params: ServerEvent,
+    ) -> anyhow::Result<()> {
+        let _start = std::time::Instant::now();
+        // log::info!("incoming interrupt: {params:?}");
+        let Some(ready) = state.ready() else {
+            log::info!("server event sent to not ready server");
+            return Ok(());
+        };
+
+        match params {
+            ServerEvent::UnpinPrimaryByPreview => {
+                ready.set_pin_by_preview(false);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// An event sent to the language server.
+pub enum ServerEvent {
+    /// Updates the `pinning_by_preview` status to false.
+    UnpinPrimaryByPreview,
 }
 
 impl ServerState {

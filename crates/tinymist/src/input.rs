@@ -103,6 +103,11 @@ impl ServerState {
 /// Main file mutations on the primary project (which is used for the language
 /// queries.)
 impl ServerState {
+    /// Updates the `pinning_by_preview` status.
+    pub fn set_pin_by_preview(&mut self, pin: bool) {
+        self.pinning_by_preview = pin;
+    }
+
     /// Changes main file to the given path.
     pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
         if path

@@ -299,18 +299,18 @@ impl ServerState {
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
         // todo: preview specific arguments are not used
-        let input = cli_args
-            .compile
-            .input
-            .clone()
-            .ok_or_else(|| internal_error("entry file must be provided"))?;
-        let input = Path::new(&input);
-        let entry = if input.is_absolute() {
-            input.into()
-        } else {
-            // std::env::current_dir().unwrap().join(input)
-            return Err(invalid_params("entry file must be absolute path"));
-        };
+        let entry = cli_args.compile.input.as_ref();
+        let entry = entry
+            .map(|input| {
+                let input = Path::new(&input);
+                if !input.is_absolute() {
+                    // std::env::current_dir().unwrap().join(input)
+                    return Err(invalid_params("entry file must be absolute path"));
+                };
+
+                Ok(input.into())
+            })
+            .transpose()?;
 
         let task_id = cli_args.preview.task_id.clone();
         if task_id == "primary" {
@@ -323,12 +323,15 @@ impl ServerState {
         let primary = &mut self.project.compiler.primary;
         if !cli_args.not_as_primary && self.preview.watchers.register(&primary.id, watcher) {
             let id = primary.id.clone();
+
+            if let Some(entry) = entry {
+                self.change_main_file(Some(entry)).map_err(internal_error)?;
+            }
             // todo: recover pin status reliably
-            self.pin_main_file(Some(entry))
-                .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
+            self.set_pin_by_preview(true);
 
             self.preview.start(cli_args, previewer, id, true)
-        } else {
+        } else if let Some(entry) = entry {
             let id = self
                 .restart_dedicate(&task_id, Some(entry))
                 .map_err(internal_error)?;
@@ -348,6 +351,8 @@ impl ServerState {
             }
 
             self.preview.start(cli_args, previewer, id, false)
+        } else {
+            return Err(internal_error("entry file must be provided"));
         }
     }
 

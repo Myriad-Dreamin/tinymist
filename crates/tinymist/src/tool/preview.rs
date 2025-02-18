@@ -252,13 +252,17 @@ impl PreviewProjectHandler {
     pub fn flush_compile(&self) {
         let _ = self.project_id;
         self.client
-            .send_event(LspInterrupt::Compile(self.project_id.clone()));
+            .interrupt(LspInterrupt::Compile(self.project_id.clone()));
     }
 
-    pub async fn settle(&self) -> Result<(), Error> {
+    pub fn settle(&self) -> Result<(), Error> {
         self.client
-            .send_event(LspInterrupt::Settle(self.project_id.clone()));
+            .interrupt(LspInterrupt::Settle(self.project_id.clone()));
         Ok(())
+    }
+
+    pub fn unpin_primary(&self) {
+        self.client.server_event(ServerEvent::UnpinPrimaryByPreview);
     }
 }
 
@@ -285,7 +289,7 @@ impl EditorServer for PreviewProjectHandler {
         } else {
             MemoryEvent::Update(files)
         });
-        self.client.send_event(intr);
+        self.client.interrupt(intr);
 
         Ok(())
     }
@@ -294,7 +298,7 @@ impl EditorServer for PreviewProjectHandler {
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
         self.client
-            .send_event(LspInterrupt::Memory(MemoryEvent::Update(files)));
+            .interrupt(LspInterrupt::Memory(MemoryEvent::Update(files)));
 
         Ok(())
     }
@@ -630,7 +634,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
         let fs_intr_tx = intr_tx.clone();
         tokio::spawn(watch_deps(dep_rx, move |event| {
-            fs_intr_tx.send_event(LspInterrupt::Fs(event));
+            fs_intr_tx.interrupt(LspInterrupt::Fs(event));
         }));
 
         // Consume editor_rx
