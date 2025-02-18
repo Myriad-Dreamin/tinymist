@@ -132,14 +132,14 @@ reflexo-typst = { version = "=0.5.5-rc3", default-features = false }
 reflexo-vec2svg = { version = "=0.5.5-rc3" }
 
 
-typst = "0.13.0"
-typst-html = "0.13.0"
-typst-timing = "0.13.0"
-typst-svg = "0.13.0"
-typst-render = "0.13.0"
-typst-pdf = "0.13.0"
-typst-syntax = "0.13.0"
-typst-eval = "0.13.0"
+typst = "0.13.0-rc1"
+typst-html = "0.13.0-rc1"
+typst-timing = "0.13.0-rc1"
+typst-svg = "0.13.0-rc1"
+typst-render = "0.13.0-rc1"
+typst-pdf = "0.13.0-rc1"
+typst-syntax = "0.13.0-rc1"
+typst-eval = "0.13.0-rc1"
 typst-assets = "0.12.0"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
 typst-ansi-hl = "0.3.0"
