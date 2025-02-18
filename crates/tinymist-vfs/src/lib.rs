@@ -623,13 +623,13 @@ impl fmt::Debug for DisplayEntryMap<'_> {
 #[derive(Debug, Clone, Default)]
 struct PathMap {
     paths: FxHashMap<ImmutPath, EcoVec<TypstFileId>>,
-    rev_paths: FxHashMap<TypstFileId, (ImmutPath, NonZeroUsize)>,
+    file_ids: FxHashMap<TypstFileId, (ImmutPath, NonZeroUsize)>,
 }
 
 impl PathMap {
     fn insert(&mut self, next: &ImmutPath, fid: TypstFileId, rev: NonZeroUsize) {
         use std::collections::hash_map::Entry;
-        let rev_entry = self.rev_paths.entry(fid);
+        let rev_entry = self.file_ids.entry(fid);
 
         match rev_entry {
             Entry::Occupied(mut entry) => {
