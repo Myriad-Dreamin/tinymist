@@ -304,10 +304,10 @@ export class LanguageState {
    * The commands group for the *Document Preview* feature. This feature is used to preview multiple
    * documents at the same time.
    *
-   * A preview task is started by calling {@link startPreview} with the *CLI arguments* to pass to
-   * the preview task like you would do in the terminal. Although language server will stop a
-   * preview task when no connection is active for a while, it can be killed by calling
-   * {@link killPreview} with a task id of the preview task.
+   * A preview task is started by calling {@link startPreview} or {@link startBrowsingPreview} with
+   * the *CLI arguments* to pass to the preview task like you would do in the terminal. Although
+   * language server will stop a preview task when no connection is active for a while, it can be
+   * killed by calling {@link killPreview} with a task id of the preview task.
    *
    * The task id of a preview task is determined by the client. If no task id is provided, you
    * cannot force kill a preview task from client. You also cannot have multiple preview tasks at
@@ -331,6 +331,22 @@ export class LanguageState {
    */
   async startPreview(previewArgs: string[]): Promise<PreviewResult> {
     const res = await tinymist.executeCommand<PreviewResult>(`tinymist.doStartPreview`, [
+      previewArgs,
+    ]);
+    return res || {};
+  }
+
+  /**
+   * Starts a browsing preview task. See {@link _GroupDocumentPreviewFeatureCommands} for more information.
+   * The difference between this and {@link startPreview} is that the main file will change according to the requests
+   * sent to the language server.
+   *
+   * @param previewArgs - The *CLI arguments* to pass to the preview task. See help of the preview
+   * CLI command for more information.
+   * @returns The result of the preview task.
+   */
+  async startBrowsingPreview(previewArgs: string[]): Promise<PreviewResult> {
+    const res = await tinymist.executeCommand<PreviewResult>(`tinymist.doStartBrowsingPreview`, [
       previewArgs,
     ]);
     return res || {};

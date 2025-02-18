@@ -184,6 +184,7 @@ impl ServerState {
         #[cfg(feature = "preview")]
         let provider = provider
             .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview);
 

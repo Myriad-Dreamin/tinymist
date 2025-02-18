@@ -283,7 +283,26 @@ impl ServerState {
     #[cfg(feature = "preview")]
     pub fn start_preview(
         &mut self,
+        args: Vec<JsonValue>,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
+        self.start_preview_inner(args, false)
+    }
+
+    /// Start a preview instance for browsing.
+    #[cfg(feature = "preview")]
+    pub fn browse_preview(
+        &mut self,
+        args: Vec<JsonValue>,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
+        self.start_preview_inner(args, true)
+    }
+
+    /// Start a preview instance.
+    #[cfg(feature = "preview")]
+    pub fn start_preview_inner(
+        &mut self,
         mut args: Vec<JsonValue>,
+        browsing_preview: bool,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
@@ -321,13 +340,16 @@ impl ServerState {
         let watcher = previewer.compile_watcher();
 
         let primary = &mut self.project.compiler.primary;
-        if !cli_args.not_as_primary && self.preview.watchers.register(&primary.id, watcher) {
+        // todo: recover pin status reliably
+        if !cli_args.not_as_primary
+            && (browsing_preview || entry.is_some())
+            && self.preview.watchers.register(&primary.id, watcher)
+        {
             let id = primary.id.clone();
 
             if let Some(entry) = entry {
                 self.change_main_file(Some(entry)).map_err(internal_error)?;
             }
-            // todo: recover pin status reliably
             self.set_pin_by_preview(true);
 
             self.preview.start(cli_args, previewer, id, true)
