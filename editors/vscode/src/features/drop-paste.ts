@@ -15,6 +15,7 @@ import {
   typstPasteUriEditKind,
   Schemes,
 } from "./drop-paste.def";
+import { convertHtmlToTypst } from "./html-table-converter";
 
 export function dragAndDropActivate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -58,7 +59,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     private context: vscode.DocumentPasteEditContext | undefined,
     private document: vscode.TextDocument,
     private token: vscode.CancellationToken,
-  ) {}
+  ) { }
 
   private readonly _yieldTo = [
     vscode.DocumentDropOrPasteEditKind.Text,
@@ -90,6 +91,19 @@ class DropOrPasteContext<A extends DropPasteAction> {
     dataTransfer: vscode.DataTransfer,
   ): Promise<boolean> {
     {
+      const htmlData = await dataTransfer.get("text/html")?.asString();
+      if (htmlData) {
+        const snippet = await convertHtmlToTypst(htmlData);
+        const additionalEdits = new vscode.WorkspaceEdit();
+        additionalEdits.replace(this.document.uri, ranges[0], snippet);
+        this.resolved.push({
+          snippet: new vscode.SnippetString(""),
+          additionalEdits,
+          yieldTo: [],
+        });
+        return this.wrapRangeAsLinkContent();
+      }
+
       const mediaFiles = await this.takeMediaFiles(dataTransfer);
       if (mediaFiles) {
         const edit = await this.handleMediaFiles(ranges, mediaFiles);
@@ -595,7 +609,7 @@ export class UriList {
 
   constructor(
     public readonly entries: ReadonlyArray<{ readonly uri: vscode.Uri; readonly str: string }>,
-  ) {}
+  ) { }
 }
 
 function coalesce<T>(array: ReadonlyArray<T | undefined | null>): T[] {

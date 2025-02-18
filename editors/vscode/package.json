@@ -1172,6 +1172,7 @@
     "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
+    "cheerio": "^1.0.0",
     "cpr": "^3.0.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
