@@ -49,6 +49,7 @@ use std::{path::Path, sync::Arc};
 use parking_lot::{Mutex, RwLock};
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
+use typst::ecow::{eco_vec, EcoVec};
 use typst::foundations::Dict;
 use typst::syntax::Source;
 use typst::utils::LazyHash;
@@ -426,7 +427,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
             .get_or_init(|| {
                 let (path, content) = self.access_model.content(fid);
                 if let Some(path) = path.as_ref() {
-                    self.paths.lock().insert(path, fid);
+                    self.paths.lock().insert(path, fid, self.revision);
                 }
 
                 (path, self.revision.get(), content)
@@ -478,9 +479,13 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     }
 
     fn invalidate_path(&mut self, path: &Path) {
-        if let Some(fids) = self.paths.remove(path) {
+        if let Some(fids) = self.paths.get(path) {
+            if fids.is_empty() {
+                return;
+            }
+
             self.view_changed = true;
-            for fid in fids {
+            for fid in fids.clone() {
                 self.invalidate_file_id(fid);
             }
         }
@@ -617,20 +622,48 @@ impl fmt::Debug for DisplayEntryMap<'_> {
 
 #[derive(Debug, Clone, Default)]
 struct PathMap {
-    paths: FxHashMap<ImmutPath, Vec<TypstFileId>>,
+    paths: FxHashMap<ImmutPath, EcoVec<TypstFileId>>,
+    rev_paths: FxHashMap<TypstFileId, (ImmutPath, NonZeroUsize)>,
 }
 
 impl PathMap {
-    fn insert(&mut self, path: &ImmutPath, fid: TypstFileId) {
-        if let Some(fids) = self.paths.get_mut(path) {
+    fn insert(&mut self, next: &ImmutPath, fid: TypstFileId, rev: NonZeroUsize) {
+        use std::collections::hash_map::Entry;
+        let rev_entry = self.rev_paths.entry(fid);
+
+        match rev_entry {
+            Entry::Occupied(mut entry) => {
+                let (prev, prev_rev) = entry.get_mut();
+                if prev != next {
+                    if *prev_rev == rev {
+                        log::warn!("Vfs: {fid:?} is changed in rev({rev:?}), {prev:?} -> {next:?}");
+                    }
+
+                    if let Some(fids) = self.paths.get_mut(prev) {
+                        fids.retain(|f| *f != fid);
+                    }
+
+                    *prev = next.clone();
+                    *prev_rev = rev;
+
+                    self.paths.entry(next.clone()).or_default().push(fid);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((next.clone(), rev));
+                self.paths.entry(next.clone()).or_default().push(fid);
+            }
+        }
+
+        if let Some(fids) = self.paths.get_mut(next) {
             fids.push(fid);
         } else {
-            self.paths.insert(path.clone(), vec![fid]);
+            self.paths.insert(next.clone(), eco_vec![fid]);
         }
     }
 
-    fn remove(&mut self, path: &Path) -> Option<Vec<TypstFileId>> {
-        self.paths.remove(path)
+    fn get(&mut self, path: &Path) -> Option<&EcoVec<TypstFileId>> {
+        self.paths.get(path)
     }
 
     fn display(&self) -> DisplayPathMap {
