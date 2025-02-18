@@ -49,7 +49,7 @@ use std::{path::Path, sync::Arc};
 use parking_lot::{Mutex, RwLock};
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
-use typst::ecow::{eco_vec, EcoVec};
+use typst::ecow::EcoVec;
 use typst::foundations::Dict;
 use typst::syntax::Source;
 use typst::utils::LazyHash;
@@ -653,12 +653,6 @@ impl PathMap {
                 entry.insert((next.clone(), rev));
                 self.paths.entry(next.clone()).or_default().push(fid);
             }
-        }
-
-        if let Some(fids) = self.paths.get_mut(next) {
-            fids.push(fid);
-        } else {
-            self.paths.insert(next.clone(), eco_vec![fid]);
         }
     }
 
