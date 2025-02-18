@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use lsp_types::*;
 use reflexo_typst::Bytes;
 use tinymist_project::{Interrupt, ProjectResolutionKind};
@@ -17,6 +15,8 @@ use crate::*;
 impl ServerState {
     /// Updates a set of source files.
     fn update_sources(&mut self, files: FileChangeSet) -> Result<()> {
+        log::info!("update source: {files:?}");
+
         let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
         self.project.interrupt(intr);
 
@@ -24,9 +24,7 @@ impl ServerState {
     }
 
     /// Creates a new source file.
-    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<()> {
-        let path: ImmutPath = path.into();
-
+    pub fn create_source(&mut self, path: ImmutPath, content: String) -> Result<()> {
         log::info!("create source: {path:?}");
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
@@ -40,9 +38,7 @@ impl ServerState {
     }
 
     /// Removes a source file.
-    pub fn remove_source(&mut self, path: PathBuf) -> Result<()> {
-        let path: ImmutPath = path.into();
-
+    pub fn remove_source(&mut self, path: ImmutPath) -> Result<()> {
         self.memory_changes.remove(&path);
         log::info!("remove source: {path:?}");
 
@@ -55,12 +51,10 @@ impl ServerState {
     /// Edits a source file.
     pub fn edit_source(
         &mut self,
-        path: PathBuf,
+        path: ImmutPath,
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
     ) -> Result<()> {
-        let path: ImmutPath = path.into();
-
         let source = self
             .memory_changes
             .get_mut(&path)

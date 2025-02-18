@@ -352,6 +352,10 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         }
     }
 
+    pub fn display(&self) -> DisplayVfs<M> {
+        DisplayVfs { inner: self }
+    }
+
     /// Reads a file.
     pub fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
         let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
@@ -428,6 +432,20 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
                 (path, self.revision.get(), content)
             })
             .2
+    }
+}
+
+pub struct DisplayVfs<'a, M: PathAccessModel + Sized> {
+    inner: &'a Vfs<M>,
+}
+
+impl<M: PathAccessModel + Sized> fmt::Debug for DisplayVfs<'_, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Vfs")
+            .field("revision", &self.inner.revision)
+            .field("managed", &self.inner.managed.lock().display())
+            .field("paths", &self.inner.paths.lock().display())
+            .finish()
     }
 }
 
@@ -581,6 +599,20 @@ impl EntryMap {
             res
         }
     }
+
+    fn display(&self) -> DisplayEntryMap {
+        DisplayEntryMap { map: self }
+    }
+}
+
+pub struct DisplayEntryMap<'a> {
+    map: &'a EntryMap,
+}
+
+impl fmt::Debug for DisplayEntryMap<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.map.entries.iter()).finish()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -599,6 +631,20 @@ impl PathMap {
 
     fn remove(&mut self, path: &Path) -> Option<Vec<TypstFileId>> {
         self.paths.remove(path)
+    }
+
+    fn display(&self) -> DisplayPathMap {
+        DisplayPathMap { map: self }
+    }
+}
+
+pub struct DisplayPathMap<'a> {
+    map: &'a PathMap,
+}
+
+impl fmt::Debug for DisplayPathMap<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.map.paths.iter()).finish()
     }
 }
 
