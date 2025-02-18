@@ -427,13 +427,14 @@ impl TypliteWorker {
 
         let write_image = |content: &mut EcoString,
                            file_name: &std::path::Path,
-                           code_file_name: Option<&EcoString>,
+                           code_file_name: Option<&PathBuf>,
                            inline_attrs: &str,
                            extra_attrs: &str| {
             if let Some(code_file_name) = code_file_name {
                 let _ = write!(
                     content,
-                    r#"<a href="{code_file_name}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></a>"#,
+                    r#"<a href="{}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></a>"#,
+                    code_file_name.display(),
                     file_name.display()
                 );
             } else {
@@ -448,13 +449,14 @@ impl TypliteWorker {
         let write_picture = |content: &mut EcoString,
                              dark_file_name: &std::path::Path,
                              light_file_name: &std::path::Path,
-                             code_file_name: Option<&EcoString>,
+                             code_file_name: Option<&PathBuf>,
                              inline_attrs: &str,
                              extra_attrs: &str| {
             if let Some(code_file_name) = code_file_name {
                 let _ = write!(
                     content,
-                    r#"<a href="{code_file_name}"><picture><source media="(prefers-color-scheme: dark)" srcset="{}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></picture></a>"#,
+                    r#"<a href="{}"><picture><source media="(prefers-color-scheme: dark)" srcset="{}"><img{inline_attrs} alt="typst-block" src="{}" {extra_attrs}/></picture></a>"#,
+                    code_file_name.display(),
                     dark_file_name.display(),
                     light_file_name.display()
                 );
