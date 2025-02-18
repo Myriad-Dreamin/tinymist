@@ -320,11 +320,13 @@ impl TypliteWorker {
         if res.clone()? == Value::None
             && !matches!(
                 node.kind(),
-                Hash | Ident | Bool | Int | Float | Numeric | Str | Array | Dict
+                Ident | Bool | Int | Float | Numeric | Str | Array | Dict
             )
         {
             self.prepend_code += node.clone().into_text();
-            self.prepend_code += "\n";
+            if node.kind() != Hash {
+                self.prepend_code += "\n"
+            };
         }
         res
     }
@@ -577,6 +579,7 @@ impl TypliteWorker {
             )))))
         });
 
+        let code = WrapCode(&code, is_markup);
         // let inputs = is_dark.then(|| DARK_THEME_INPUT.clone());
         let inputs = match theme {
             ColorTheme::Dark => Some(DARK_THEME_INPUT.clone()),
@@ -584,11 +587,10 @@ impl TypliteWorker {
         };
         let code = eco_format!(
             r##"{prepend_code}
-            set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
-            set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
+            #set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
+            #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
             {code}"##
         );
-        let code = WrapCode(&code, is_markup).to_string();
         let main = Bytes::from(code.as_bytes().to_owned());
 
         // let world = LiteWorld::new(main);
@@ -871,6 +873,8 @@ impl TypliteWorker {
         if self.feat.remove_html {
             return self.to_raw_block(node, false);
         }
+        // Trim the last `#` in the prepend code. (#context)
+        self.prepend_code = self.prepend_code.trim_end_matches('#').into();
         self.render(
             &SyntaxNode::leaf(node.kind(), self.prepend_code.clone()),
             node,
