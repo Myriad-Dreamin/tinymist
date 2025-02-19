@@ -278,6 +278,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "semanticTokens",
     "formatterMode",
     "formatterPrintWidth",
+    "formatterTabSpaces",
     "completion",
     "fontPaths",
     "systemFonts",
@@ -305,6 +306,8 @@ pub struct Config {
     pub formatter_mode: FormatterMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter_print_width: Option<u32>,
+    /// Dynamic configuration for the experimental formatter.
+    pub formatter_tab_spaces: Option<u32>,
     /// Whether to remove html from markup content in responses.
     pub support_html_in_markdown: bool,
     /// Tinymist's completion features.
@@ -390,6 +393,7 @@ impl Config {
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
+        assign_config!(formatter_tab_spaces := "formatterTabSpaces"?: Option<u32>);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
@@ -402,14 +406,18 @@ impl Config {
     /// Gets the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
         let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
+        let formatter_tab_spaces = self.formatter_tab_spaces.unwrap_or(2) as usize;
 
         FormatUserConfig {
             config: match self.formatter_mode {
                 FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
-                    typstyle_core::Config::default().with_width(formatter_print_width),
+                    typstyle_core::Config::default()
+                        .with_width(formatter_print_width)
+                        .with_tab_spaces(formatter_tab_spaces),
                 )),
                 FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
                     max_line_length: formatter_print_width,
+                    indent_space: formatter_tab_spaces,
                     ..typstfmt::Config::default()
                 })),
                 FormatterMode::Disable => FormatterConfig::Disable,
@@ -1091,5 +1099,23 @@ mod tests {
         };
 
         assert_eq!(typstyle_config.max_width, 240);
+    }
+
+    #[test]
+    fn test_typstyle_formatting_config_set_tab_spaces() {
+        let config = Config {
+            formatter_mode: FormatterMode::Typstyle,
+            formatter_tab_spaces: Some(8),
+            ..Config::default()
+        };
+        let config = config.formatter();
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
+
+        let typstyle_config = match config.config {
+            FormatterConfig::Typstyle(e) => e,
+            _ => panic!("unexpected configuration of formatter"),
+        };
+
+        assert_eq!(typstyle_config.tab_spaces, 8);
     }
 }
