@@ -146,6 +146,13 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
+## `formatterTabSpaces`
+
+Set the tab spaces for the formatter.
+
+- **Type**: `number`
+- **Default**: `2`
+
 ## `tinymist.showExportFileIn`
 
 Configures way of opening exported files, e.g. inside of editor tabs or using system application.

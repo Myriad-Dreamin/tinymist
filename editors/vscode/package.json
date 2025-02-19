@@ -446,6 +446,12 @@
           "type": "number",
           "default": 120
         },
+        "tinymist.formatterTabSpaces": {
+          "title": "Set formatter's (unsigned) tab spaces",
+          "description": "Set the tab spaces for the formatter.",
+          "type": "number",
+          "default": 2
+        },
         "tinymist.showExportFileIn": {
           "title": "(Experimental) Show Exported Files in Some Place",
           "description": "Configures way of opening exported files, e.g. inside of editor tabs or using system application.",
