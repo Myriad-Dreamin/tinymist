@@ -6,6 +6,6 @@ input_file: crates/tinymist-query/src/fixtures/document_link/read_path.typ
 [
  {
   "range": "0:28:0:36",
-  "target": "file:///base.typ"
+  "target": "base.typ"
  }
 ]

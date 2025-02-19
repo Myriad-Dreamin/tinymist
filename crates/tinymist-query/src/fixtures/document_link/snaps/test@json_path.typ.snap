@@ -6,6 +6,6 @@ input_file: crates/tinymist-query/src/fixtures/document_link/json_path.typ
 [
  {
   "range": "0:28:0:37",
-  "target": "file:///base.json"
+  "target": "base.json"
  }
 ]
