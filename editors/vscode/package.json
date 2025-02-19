@@ -442,9 +442,15 @@
         },
         "tinymist.formatterPrintWidth": {
           "title": "Set formatter's (unsigned) print width",
-          "description": "Set the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.",
+          "description": "Sets the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.",
           "type": "number",
           "default": 120
+        },
+        "tinymist.formatterIndentSize": {
+          "title": "Set formatter's (unsigned) tab spaces",
+          "description": "Sets the indent size (using space) for the formatter.",
+          "type": "number",
+          "default": 2
         },
         "tinymist.showExportFileIn": {
           "title": "(Experimental) Show Exported Files in Some Place",
