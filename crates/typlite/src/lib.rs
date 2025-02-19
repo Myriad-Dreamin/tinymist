@@ -526,7 +526,7 @@ impl TypliteWorker {
                     }
                     Err(err) => return Err(err),
                 };
-                
+
                 if !inline {
                     let _ = write!(content, r#"<p align="{align}">"#);
                 }
