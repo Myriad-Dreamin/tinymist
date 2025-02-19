@@ -21,7 +21,7 @@
 
 pub use tinymist_project::*;
 
-use std::sync::Arc;
+use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
@@ -173,6 +173,7 @@ impl ServerState {
                 stats: Arc::default(),
             }),
 
+            status_revision: Mutex::default(),
             notified_revision: Mutex::default(),
         });
 
@@ -229,8 +230,62 @@ impl ServerState {
 
 #[derive(Default)]
 pub struct ProjectInsStateExt {
+    pub notified_revision: usize,
+    pub pending_reasons: CompileReasons,
+    pub emitted_reasons: CompileReasons,
     pub is_compiling: bool,
     pub last_compilation: Option<LspCompiledArtifact>,
+}
+
+impl ProjectInsStateExt {
+    /// Remembers the last compilation. Emits the pending reasons during
+    /// compilation if any.
+    pub fn compiled(
+        &mut self,
+        revision: &NonZeroUsize,
+        handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
+        compilation: &LspCompiledArtifact,
+    ) {
+        let rev = compilation.world.revision().get();
+        if self.notified_revision >= rev {
+            return;
+        }
+        self.notified_revision = rev;
+
+        self.is_compiling = false;
+        self.last_compilation = Some(compilation.clone());
+
+        self.emit_pending_reasons(revision, handler);
+    }
+
+    /// Emits the pending reasons if the latest compiled revision matches.
+    pub fn emit_pending_reasons(
+        &mut self,
+        revision: &NonZeroUsize,
+        handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
+    ) -> bool {
+        let Some(last_compilation) = self.last_compilation.as_ref() else {
+            return false;
+        };
+
+        let last_rev = last_compilation.world.revision();
+        if last_rev != *revision {
+            return false;
+        }
+
+        let pending_reasons = self.pending_reasons.exclude(self.emitted_reasons);
+        if !pending_reasons.any() {
+            return false;
+        }
+        self.emitted_reasons.see(self.pending_reasons);
+        let mut last_compilation = last_compilation.clone();
+        last_compilation.snap.signal = pending_reasons.into();
+
+        handler.notify_compile(&last_compilation);
+        self.pending_reasons = CompileReasons::default();
+
+        true
+    }
 }
 
 pub struct ProjectState {
@@ -269,8 +324,8 @@ impl ProjectState {
         if let Interrupt::Compiled(compiled) = &intr {
             let proj = self.compiler.projects().find(|p| p.id == compiled.id);
             if let Some(proj) = proj {
-                proj.ext.is_compiling = false;
-                proj.ext.last_compilation = Some(compiled.clone());
+                proj.ext
+                    .compiled(&proj.verse.revision, proj.handler.as_ref(), compiled);
             }
         }
 
@@ -346,6 +401,7 @@ pub struct CompileHandlerImpl {
     pub(crate) editor_tx: EditorSender,
     pub(crate) client: Box<dyn ProjectClient>,
 
+    pub(crate) status_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
 }
 
@@ -438,11 +494,27 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                     s.verse.vfs().is_clean_compile(last_rev.get(), &deps)
                 }
             {
-                log::info!("Project: skip compilation for {id:?} due to harmless vfs changes");
+                s.ext.pending_reasons.see(reason);
                 s.reason = CompileReasons::default();
+
+                let pending_reasons = s.ext.pending_reasons.exclude(s.ext.emitted_reasons);
+                let emitted = s
+                    .ext
+                    .emit_pending_reasons(&s.verse.revision, s.handler.as_ref());
+
+                if !emitted {
+                    log::info!("Project: skip compilation for {id:?} due to harmless vfs changes");
+                } else {
+                    log::info!(
+                        "Project: emit compilation again for {id:?}, reason: {pending_reasons:?}"
+                    );
+                }
+
                 continue;
             }
 
+            s.ext.pending_reasons = CompileReasons::default();
+            s.ext.emitted_reasons = reason;
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
@@ -454,6 +526,20 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     }
 
     fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport) {
+        // todo: we need to manage the revision for fn status() as well
+        {
+            let mut n_revs = self.status_revision.lock();
+            let n_rev = n_revs.entry(id.clone()).or_default();
+            if *n_rev > revision {
+                log::info!(
+                    "Project: outdated status for revision {} <= {n_rev}",
+                    revision,
+                );
+                return;
+            }
+            *n_rev = revision;
+        }
+
         // todo: seems to duplicate with CompileStatus
         let status = match rep {
             CompileReport::Suspend => {
@@ -505,8 +591,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         n_revs.remove(id);
     }
 
-    fn notify_compile(&self, snap: &LspCompiledArtifact, rep: CompileReport) {
-        // todo: we need to manage the revision for fn status() as well
+    fn notify_compile(&self, snap: &LspCompiledArtifact) {
         {
             let mut n_revs = self.notified_revision.lock();
             let n_rev = n_revs.entry(snap.id.clone()).or_default();
@@ -524,21 +609,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         self.client.interrupt(LspInterrupt::Compiled(snap.clone()));
         self.export.signal(snap);
-
-        self.editor_tx
-            .send(EditorRequest::Status(CompileStatus {
-                id: snap.id.clone(),
-                path: rep
-                    .compiling_id()
-                    .map(|s| unix_slash(s.vpath().as_rooted_path()))
-                    .unwrap_or_default(),
-                status: if snap.doc.is_ok() {
-                    CompileStatusEnum::CompileSuccess
-                } else {
-                    CompileStatusEnum::CompileError
-                },
-            }))
-            .unwrap();
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.preview.get(&snap.id) {
