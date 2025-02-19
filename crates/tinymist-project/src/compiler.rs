@@ -655,17 +655,17 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 if files.is_empty() && self.dirty_shadow_logical_tick == 0 {
                     let changes = std::iter::repeat_n(event, 1 + self.dedicates.len());
                     for (proj, event) in std::iter::once(&mut self.primary).zip(changes) {
-                        log::info!("memory update: vfs {:#?}", proj.verse.vfs().display());
+                        log::debug!("memory update: vfs {:#?}", proj.verse.vfs().display());
                         let vfs_changed = proj.verse.increment_revision(|verse| {
-                            log::info!("memory update: {:?}", proj.id);
+                            log::debug!("memory update: {:?}", proj.id);
                             Self::apply_memory_changes(&mut verse.vfs(), event.clone());
-                            log::info!("memory update: changed {}", verse.vfs_changed());
+                            log::debug!("memory update: changed {}", verse.vfs_changed());
                             verse.vfs_changed()
                         });
                         if vfs_changed {
                             proj.reason.see(reason_by_mem());
                         }
-                        log::info!("memory update: vfs after {:#?}", proj.verse.vfs().display());
+                        log::debug!("memory update: vfs after {:#?}", proj.verse.vfs().display());
                     }
                     return;
                 }
