@@ -1,6 +1,6 @@
 {
     "name": "tinymist-web",
-    "version": "0.12.20-rc1",
+    "version": "0.12.20-rc2",
     "description": "WASM module for running tinymist analyzers in JavaScript environment.",
     "author": "Myriad-Dreamin",
     "license": "Apache-2.0",
