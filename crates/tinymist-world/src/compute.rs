@@ -345,6 +345,14 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
 
     /// Compile once from scratch.
     pub fn pure_compile(&self) -> Warned<SourceResult<Arc<TypstPagedDocument>>> {
+        let res = self.ensure_main();
+        if let Err(err) = res {
+            return Warned {
+                output: Err(err),
+                warnings: EcoVec::new(),
+            };
+        }
+
         let res = ::typst::compile(&self.snap.world);
         // compile document
         Warned {
