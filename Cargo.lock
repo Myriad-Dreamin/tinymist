@@ -2001,6 +2001,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4883,14 +4892,13 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.12.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e221e78ecf6aedf3fc0efc883cace3dce79b4b1416caedce06409ba866b4dcd"
+source = "git+https://github.com/ParaN3xus/typstyle/?rev=86e8c3a66cb829c14b1945efed263450a90af606#86e8c3a66cb829c14b1945efed263450a90af606"
 dependencies = [
  "ecow",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "pretty",
  "rustc-hash 2.1.1",
- "typst-syntax 0.12.0",
+ "typst-syntax 0.13.0",
 ]
 
 [[package]]
@@ -5704,8 +5712,3 @@ checksum = "99a5bab8d7dedf81405c4bb1f2b83ea057643d9cb28778cea9eecddeedd2e028"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "typstyle-core"
-version = "0.12.14"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=a0f7aa658f13267c23aa9745b2c77ec114c0c3d0#a0f7aa658f13267c23aa9745b2c77ec114c0c3d0"

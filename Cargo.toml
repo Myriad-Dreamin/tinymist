@@ -283,8 +283,7 @@ reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "870e7
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "a0f7aa658f13267c23aa9745b2c77ec114c0c3d0" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "86e8c3a66cb829c14b1945efed263450a90af606" }
 
 [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
 typst-shim = { path = "crates/typst-shim" }
