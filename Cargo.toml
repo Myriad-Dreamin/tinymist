@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.12.21-pre-rc1"
+version = "0.12.21-rc1"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -143,7 +143,7 @@ typst-eval = "0.13.0-rc1"
 typst-assets = "0.12.0"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
 typst-ansi-hl = "0.3.0"
-typstyle-core = { version = "=0.12.14", default-features = false }
+typstyle-core = { version = "=0.12.15", default-features = false }
 typlite = { path = "./crates/typlite" }
 
 # LSP
@@ -285,7 +285,7 @@ reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.19-rc2" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "86e8c3a66cb829c14b1945efed263450a90af606" }
 
 [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
 typst-shim = { path = "crates/typst-shim" }
