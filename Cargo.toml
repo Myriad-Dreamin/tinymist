@@ -145,7 +145,6 @@ typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1"
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.15", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -175,19 +174,20 @@ insta = { version = "1.39", features = ["glob"] }
 
 
 # Our Own Crates
-typst-preview = { path = "./crates/typst-preview" }
+typst-preview = { version = "0.12.20", path = "./crates/typst-preview" }
+typst-shim = { version = "0.12.20", path = "./crates/typst-shim" }
 tinymist-assets = { version = "=0.12.20" }
-tinymist = { path = "./crates/tinymist/" }
-tinymist-std = { path = "./crates/tinymist-std/", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", default-features = false }
-tinymist-core = { path = "./crates/tinymist-core/", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/" }
-tinymist-task = { path = "./crates/tinymist-task/" }
-tinymist-derive = { path = "./crates/tinymist-derive/" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/" }
-tinymist-query = { path = "./crates/tinymist-query/" }
-tinymist-render = { path = "./crates/tinymist-render/" }
+tinymist = { version = "0.12.20", path = "./crates/tinymist/" }
+tinymist-std = { version = "0.12.20", path = "./crates/tinymist-std/", default-features = false }
+tinymist-vfs = { version = "0.12.20", path = "./crates/tinymist-vfs/", default-features = false }
+tinymist-core = { version = "0.12.20", path = "./crates/tinymist-core/", default-features = false }
+tinymist-world = { version = "0.12.20", path = "./crates/tinymist-world/", default-features = false }
+tinymist-project = { version = "0.12.20", path = "./crates/tinymist-project/" }
+tinymist-task = { version = "0.12.20", path = "./crates/tinymist-task/" }
+tinymist-derive = { version = "0.12.20", path = "./crates/tinymist-derive/" }
+tinymist-analysis = { version = "0.12.20", path = "./crates/tinymist-analysis/" }
+tinymist-query = { version = "0.12.20", path = "./crates/tinymist-query/" }
+tinymist-render = { version = "0.12.20", path = "./crates/tinymist-render/" }
 
 [profile.dev.package.insta]
 opt-level = 3
