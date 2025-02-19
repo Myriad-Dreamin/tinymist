@@ -277,9 +277,9 @@ typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9" 
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
@@ -294,10 +294,11 @@ tinymist-world = { path = "crates/tinymist-world" }
 tinymist-project = { path = "crates/tinymist-project" }
 tinymist-task = { path = "crates/tinymist-task" }
 
-[patch."https://github.com/Myriad-Dreamin/tinymist.git"]
-typst-shim = { path = "crates/typst-shim" }
-tinymist-analysis = { path = "crates/tinymist-analysis" }
-tinymist-std = { path = "crates/tinymist-std" }
-tinymist-world = { path = "crates/tinymist-world" }
-tinymist-project = { path = "crates/tinymist-project" }
-tinymist-task = { path = "crates/tinymist-task" }
+# If reflexo use the tinymist from git, you should use the following patch.
+# [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
+# typst-shim = { path = "crates/typst-shim" }
+# tinymist-analysis = { path = "crates/tinymist-analysis" }
+# tinymist-std = { path = "crates/tinymist-std" }
+# tinymist-world = { path = "crates/tinymist-world" }
+# tinymist-project = { path = "crates/tinymist-project" }
+# tinymist-task = { path = "crates/tinymist-task" }
