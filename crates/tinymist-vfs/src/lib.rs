@@ -46,10 +46,10 @@ use std::num::NonZeroUsize;
 use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
+use ecow::EcoVec;
 use parking_lot::{Mutex, RwLock};
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
-use typst::ecow::EcoVec;
 use typst::foundations::Dict;
 use typst::syntax::Source;
 use typst::utils::LazyHash;
