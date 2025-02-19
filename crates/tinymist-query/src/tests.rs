@@ -345,6 +345,7 @@ pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
         "targetRange",
         "targetSelectionRange",
         "originSelectionRange",
+        "target",
         "targetUri",
     ])
 });
@@ -417,7 +418,7 @@ impl Redact for RedactFields {
                                 ),
                             );
                         }
-                        "uri" | "oldUri" | "newUri" | "targetUri" => {
+                        "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
                             map.insert(key.to_owned(), file_name(t.as_str().unwrap()).into());
                         }
                         "range"

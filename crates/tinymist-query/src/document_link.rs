@@ -37,3 +37,19 @@ impl SemanticRequest for DocumentLinkRequest {
         Some(links.collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("document_link", &|ctx, path| {
+            let request = DocumentLinkRequest { path: path.clone() };
+
+            let result = request.request(ctx);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}

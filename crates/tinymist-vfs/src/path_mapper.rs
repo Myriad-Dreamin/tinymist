@@ -17,6 +17,7 @@ use typst::syntax::VirtualPath;
 
 use super::TypstFileId;
 
+#[derive(Debug)]
 pub enum PathResolution {
     Resolved(PathBuf),
     Rootless(Cow<'static, VirtualPath>),
@@ -39,7 +40,7 @@ impl PathResolution {
 
     pub fn join(&self, path: &str) -> FileResult<PathResolution> {
         match self {
-            PathResolution::Resolved(path) => Ok(PathResolution::Resolved(path.join(path))),
+            PathResolution::Resolved(root) => Ok(PathResolution::Resolved(root.join(path))),
             PathResolution::Rootless(root) => {
                 Ok(PathResolution::Rootless(Cow::Owned(root.join(path))))
             }
