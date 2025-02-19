@@ -7,7 +7,6 @@ use std::ops::DerefMut;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hyper::header::HeaderValue;
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
 use hyper_util::rt::TokioIo;
@@ -458,74 +457,18 @@ pub async fn make_http_server(
     let expected_port = addr.port();
 
     let frontend_html = hyper::body::Bytes::from(frontend_html);
-    let expected_origin = format!("http://{static_file_addr}");
     let make_service = move || {
         let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
-        let expected_origin = expected_origin.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let frontend_html = frontend_html.clone();
             let websocket_tx = websocket_tx.clone();
-            let expected_origin = expected_origin.clone();
             async move {
-                // Check if the request is a websocket upgrade request.
-                let response = if hyper_tungstenite::is_upgrade_request(&req) {
-                    // Any website a user visits in a browser can connect to our websocket server on
-                    // 127.0.0.1 because CORS does not work for websockets. Thus, check the `Origin`
-                    // header ourselves. See the comment on CORS below for more details.
-                    //
-                    // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
-                    // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
-                    // `Origin` starting with `vscode-webview://` as well. I
-                    // think that's okay from a security point of view, because
-                    // I think malicious websites can't trick browsers into sending
-                    // `vscode-webview://...` as `Origin`.
-                    if req
-                        .headers()
-                        .get("Origin")
-                        .is_some_and(|h| is_valid_origin(h, &expected_origin, expected_port))
-                    {
-                        let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
-                            .map_err(|e| {
-                                log::error!("Error in websocket upgrade: {e}");
-                                // let e = Error::new(e);
-                            })
-                            .unwrap();
-
-                        let _ = websocket_tx.send(websocket);
-
-                        // Return the response so the spawned future can continue.
-                        Ok(response)
-                    } else {
-                        anyhow::bail!("Websocket connection with unexpected `Origin` header. Closing connection");
-                    }
-                } else if req.uri().path() == "/" {
-                    // log::debug!("Serve frontend: {mode:?}");
-                    let res = hyper::Response::builder()
-                        .header(hyper::header::CONTENT_TYPE, "text/html")
-                        .body(Full::<Bytes>::from(frontend_html))
-                        .unwrap();
-                    Ok::<_, anyhow::Error>(res)
-                } else {
-                    // jump to /
-                    let res = hyper::Response::builder()
-                        .status(hyper::StatusCode::FOUND)
-                        .header(hyper::header::LOCATION, "/")
-                        .body(Full::<Bytes>::default())
-                        .unwrap();
-                    Ok(res)
-                };
-
                 // When a user visits a website in a browser, that website can try to connect to
-                // our http / websocket server on `127.0.0.1` which may leak
-                // sensitive information. Thus, use CORS to explicitly disallow this.
-                //
-                // However, for Websockets, CORS does not work. Thus, we have additional checks
-                // of the `Origin` header above in the websocket upgrade path.
-                //
-                // Strictly speaking, setting the `Access-Control-Allow-Origin` header is not
-                // required here since browsers disallow cross origin access
-                // also when that header is missing. But I think it's better to be explicit.
+                // our http / websocket server on `127.0.0.1` which may leak sensitive information.
+                // We could use CORS headers to explicitly disallow this. However, for Websockets,
+                // this does not work. Thus, we manually check the `Origin` header. Browsers
+                // always send this header for cross-origin requests.
                 //
                 // Important: This does _not_ protect against malicious users that share the
                 // same computer as us (i.e. multi- user systems where the users
@@ -534,13 +477,57 @@ pub async fn make_http_server(
                 // otherwise). And additionally they can impersonate a tinymist
                 // http / websocket server towards a legitimate frontend/html client.
                 // This requires additional protection that may be added in the future.
-                response.map(|mut response| {
-                    response.headers_mut().insert(
-                        hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-                        HeaderValue::from_str(&expected_origin).unwrap(),
-                    );
-                    response
-                })
+                //
+                // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
+                // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
+                // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
+                // point of view, because I think malicious websites can't trick browsers into sending
+                // `vscode-webview://...` as `Origin`.
+                if let Some(origin) = req.headers().get("Origin") {
+                    let Ok(Ok(origin)) = origin.to_str().map(Url::parse) else {
+                        anyhow::bail!("Origin must be a valid URL");
+                    };
+
+                    if !(origin.scheme() == "vscode-webview"
+                        || (origin.port() == Some(expected_port)
+                            && matches!(origin.scheme(), "http" | "https") // TODO: why allow `https`?
+                            && matches!(origin.host_str(), Some("localhost" | "127.0.0.1"))))
+                    {
+                        anyhow::bail!(
+                            "Connection with unexpected `Origin` header. Closing connection."
+                        );
+                    }
+                }
+
+                // Check if the request is a websocket upgrade request.
+                if hyper_tungstenite::is_upgrade_request(&req) {
+                    let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
+                        .map_err(|e| {
+                            log::error!("Error in websocket upgrade: {e}");
+                            // let e = Error::new(e);
+                        })
+                        .unwrap();
+
+                    let _ = websocket_tx.send(websocket);
+
+                    // Return the response so the spawned future can continue.
+                    Ok(response)
+                } else if req.uri().path() == "/" {
+                    // log::debug!("Serve frontend: {mode:?}");
+                    let res = hyper::Response::builder()
+                        .header(hyper::header::CONTENT_TYPE, "text/html")
+                        .body(Full::<Bytes>::from(frontend_html))
+                        .unwrap();
+                    Ok(res)
+                } else {
+                    // jump to /
+                    let res = hyper::Response::builder()
+                        .status(hyper::StatusCode::FOUND)
+                        .header(hyper::header::LOCATION, "/")
+                        .body(Full::<Bytes>::default())
+                        .unwrap();
+                    Ok(res)
+                }
             }
         })
     };
@@ -603,24 +590,6 @@ pub async fn make_http_server(
         addr,
         shutdown_tx,
         join,
-    }
-}
-
-fn is_valid_origin(h: &HeaderValue, expected_origin: &str, expected_port: u16) -> bool {
-    *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://") || {
-        // Matches the origin of the local listening port.
-        let matched = std::str::from_utf8(h.as_bytes()).ok().and_then(|h| {
-            let url = Url::parse(h).ok()?;
-            (url.port() == Some(expected_port)
-                && matches!(url.scheme(), "http" | "https" | "ws" | "wss")
-                && matches!(
-                    // todo: allocate memory here.
-                    url.host().as_ref().map(ToString::to_string).as_deref(),
-                    Some("localhost" | "127.0.0.1")
-                ))
-            .then_some(())
-        });
-        matched.is_some()
     }
 }
 
