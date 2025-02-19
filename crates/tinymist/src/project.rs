@@ -523,7 +523,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     }
 
     fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport) {
-        // todo: we need to manage the revision for fn status() as well
         {
             let mut n_revs = self.status_revision.lock();
             let n_rev = n_revs.entry(id.clone()).or_default();
