@@ -382,10 +382,10 @@ impl TypliteWorker {
         if let Some(assets_src_path) = &self.feat.assets_src_path {
             let file_name = assets_src_path
                 .join(self.assets_numbering.to_string())
-                .with_extension(".typ");
+                .with_extension("typ");
             if let Err(e) = std::fs::write(&file_name, format!("#{{\n// render_code\n{}\n}}", code))
             {
-                return Err(format!("Failed to write code to file: {}", e).into());
+                return Err(format!("failed to write code to file: {}", e).into());
             }
         }
         self.render_code(&prepend_code, &code, false, "center", "", inline)
@@ -406,7 +406,7 @@ impl TypliteWorker {
             Some(
                 assets_src_path
                     .join(self.assets_numbering.to_string())
-                    .with_extension(".typ"),
+                    .with_extension("typ"),
             )
         } else {
             None
@@ -526,7 +526,7 @@ impl TypliteWorker {
                     }
                     Err(err) => return Err(err),
                 };
-
+                
                 if !inline {
                     let _ = write!(content, r#"<p align="{align}">"#);
                 }
@@ -664,15 +664,11 @@ impl TypliteWorker {
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
 
         if let Some(assets_path) = &self.feat.assets_path {
-            let file_name = assets_path
-                .join(self.assets_numbering.to_string())
-                .with_extension("svg")
-                .to_string_lossy()
-                .to_string();
+            let file_name = assets_path.join(format!("{}_{:?}.svg", self.assets_numbering, theme));
             if let Err(e) = std::fs::write(&file_name, &svg_payload) {
                 return Err(format!("failed to write SVG to file: {}", e).into());
             }
-            Ok(file_name)
+            Ok(file_name.to_string_lossy().to_string())
         } else {
             Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
         }
