@@ -1204,7 +1204,7 @@ impl AnalysisRevCache {
     ) -> Arc<RevisionSlot<AnalysisRevSlot>> {
         lg.inner.access(revision);
         self.manager.find_revision(revision, |slot_base| {
-            log::info!("analysis revision {} is created", revision.get());
+            log::debug!("analysis revision {} is created", revision.get());
             slot_base
                 .map(|slot| AnalysisRevSlot {
                     revision: slot.revision,
@@ -1246,7 +1246,7 @@ struct AnalysisRevSlot {
 
 impl Drop for AnalysisRevSlot {
     fn drop(&mut self) {
-        log::info!("analysis revision {} is dropped", self.revision);
+        log::debug!("analysis revision {} is dropped", self.revision);
     }
 }
 

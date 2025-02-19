@@ -235,7 +235,7 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
                 log::info!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
                 return false;
             }
-            log::info!(
+            log::debug!(
                 "Vfs(clean, {id:?}, rev={rev}, changed_at={})",
                 entry.changed_at
             );
