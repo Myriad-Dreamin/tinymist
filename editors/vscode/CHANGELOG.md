@@ -111,7 +111,7 @@ We massively changed the internal world implementation. This unblocks many new f
 * docs: fix typo by @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1276
 * feat: add release crates action in https://github.com/Myriad-Dreamin/tinymist/pull/1298
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.20-rc1
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.20
 
 ## v0.12.18 - [2025-01-09]
 
