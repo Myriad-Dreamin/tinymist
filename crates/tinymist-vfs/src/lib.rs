@@ -230,10 +230,14 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
                 log::info!("Vfs(dirty, {id:?}): file id not found");
                 return false;
             };
-            if entry.changed_at == 0 || entry.changed_at >= rev {
+            if entry.changed_at > rev {
                 log::info!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
                 return false;
             }
+            log::info!(
+                "Vfs(clean, {id:?}, rev={rev}, changed_at={})",
+                entry.changed_at
+            );
         }
         true
     }
@@ -337,31 +341,30 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     pub fn revise(&mut self) -> RevisingVfs<M> {
         let managed = self.managed.lock().clone();
         let paths = self.paths.lock().clone();
+        let goal_revision = self.revision.checked_add(1).expect("revision overflowed");
 
         RevisingVfs {
             managed,
             paths,
             inner: self,
+            goal_revision,
             view_changed: false,
         }
     }
 
     /// Reads a file.
     pub fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
-        let bytes = self.managed.lock().slot(fid, |entry| {
-            entry.changed_at = entry.changed_at.max(1);
-            entry.bytes.clone()
-        });
+        let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
 
         self.read_content(&bytes, fid).clone()
     }
 
     /// Reads a source.
     pub fn source(&self, file_id: TypstFileId) -> FileResult<Source> {
-        let (bytes, source) = self.managed.lock().slot(file_id, |entry| {
-            entry.changed_at = entry.changed_at.max(1);
-            (entry.bytes.clone(), entry.source.clone())
-        });
+        let (bytes, source) = self
+            .managed
+            .lock()
+            .slot(file_id, |entry| (entry.bytes.clone(), entry.source.clone()));
 
         let source = source.get_or_init(|| {
             let content = self
@@ -432,6 +435,7 @@ pub struct RevisingVfs<'a, M: PathAccessModel + Sized> {
     inner: &'a mut Vfs<M>,
     managed: EntryMap,
     paths: PathMap,
+    goal_revision: NonZeroUsize,
     view_changed: bool,
 }
 
@@ -441,7 +445,7 @@ impl<M: PathAccessModel + Sized> Drop for RevisingVfs<'_, M> {
             self.inner.managed = Arc::new(Mutex::new(std::mem::take(&mut self.managed)));
             self.inner.paths = Arc::new(Mutex::new(std::mem::take(&mut self.paths)));
             let revision = &mut self.inner.revision;
-            *revision = revision.checked_add(1).expect("revision overflowed");
+            *revision = self.goal_revision;
         }
     }
 }
@@ -467,7 +471,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     fn invalidate_file_id(&mut self, file_id: TypstFileId) {
         self.view_changed = true;
         self.managed.slot(file_id, |e| {
-            e.changed_at = self.inner.revision.get();
+            e.changed_at = self.goal_revision.get();
             e.bytes = Arc::default();
             e.source = Arc::default();
         });
@@ -539,7 +543,13 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     ///
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_changes(&mut self, event: FileChangeSet) {
-        self.view_changed = true;
+        for path in &event.removes {
+            self.invalidate_path(path);
+        }
+        for (path, _) in &event.inserts {
+            self.invalidate_path(path);
+        }
+
         self.am().inner.inner.inner.notify(event);
     }
 }
@@ -553,7 +563,7 @@ struct VfsEntry {
     source: Arc<OnceLock<FileResult<Source>>>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct EntryMap {
     entries: RedBlackTreeMapSync<TypstFileId, VfsEntry>,
 }
@@ -573,7 +583,7 @@ impl EntryMap {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 struct PathMap {
     paths: FxHashMap<ImmutPath, Vec<TypstFileId>>,
 }
