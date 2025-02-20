@@ -449,28 +449,28 @@ pub async fn make_http_server(
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
-    let expected_host = Url::parse(&format!("http://{static_file_addr}"))
-        .unwrap()
-        .host_str()
-        .unwrap()
-        .to_string();
     let listener = tokio::net::TcpListener::bind(&static_file_addr)
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
     log::info!("preview server listening on http://{addr}");
-    // Don't take the port from `static_file_addr` (it may have a dummy port e.g. `127.0.0.1:0`)
-    let expected_port = addr.port();
+    let expected_origin = {
+        let expected_host = Url::parse(&format!("http://{static_file_addr}")).unwrap();
+        let expected_host = expected_host.host_str().unwrap();
+        // Don't take the port from `static_file_addr` (it may have a dummy port e.g. `127.0.0.1:0`)
+        let expected_port = addr.port();
+        format!("http://{expected_host}:{expected_port}")
+    };
 
     let frontend_html = hyper::body::Bytes::from(frontend_html);
     let make_service = move || {
         let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
-        let expected_host = expected_host.clone();
+        let expected_origin = expected_origin.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let frontend_html = frontend_html.clone();
             let websocket_tx = websocket_tx.clone();
-            let expected_host = expected_host.clone();
+            let expected_origin = expected_origin.clone();
             async move {
                 // When a user visits a website in a browser, that website can try to connect to
                 // our http / websocket server on `127.0.0.1` which may leak sensitive information.
@@ -491,20 +491,14 @@ pub async fn make_http_server(
                 // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
                 // point of view, because I think malicious websites can't trick browsers into sending
                 // `vscode-webview://...` as `Origin`.
-                if let Some(origin) = req.headers().get("Origin") {
-                    let Ok(Ok(origin)) = origin.to_str().map(Url::parse) else {
-                        anyhow::bail!("Origin must be a valid URL");
-                    };
-
-                    if !(origin.scheme() == "vscode-webview"
-                        || (origin.port() == Some(expected_port)
-                            && origin.scheme() == "http"
-                            && origin.host_str() == Some(expected_host.as_str())))
-                    {
-                        anyhow::bail!(
-                            "Connection with unexpected `Origin` header. Closing connection."
-                        );
-                    }
+                if req
+                    .headers()
+                    .get("Origin")
+                    .is_some_and(|h| *h != expected_origin)
+                {
+                    anyhow::bail!(
+                        "Connection with unexpected `Origin` header. Closing connection."
+                    );
                 }
 
                 // Check if the request is a websocket upgrade request.
