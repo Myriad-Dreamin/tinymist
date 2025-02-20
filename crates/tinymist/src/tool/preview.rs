@@ -491,11 +491,9 @@ pub async fn make_http_server(
                 // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
                 // point of view, because I think malicious websites can't trick browsers into sending
                 // `vscode-webview://...` as `Origin`.
-                if req
-                    .headers()
-                    .get("Origin")
-                    .is_some_and(|h| *h != expected_origin)
-                {
+                if req.headers().get("Origin").is_some_and(|h| {
+                    *h != expected_origin && !h.as_bytes().starts_with(b"vscode-webview://")
+                }) {
                     anyhow::bail!(
                         "Connection with unexpected `Origin` header. Closing connection."
                     );
