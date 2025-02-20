@@ -449,20 +449,28 @@ pub async fn make_http_server(
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
+    let expected_host = Url::parse(&format!("http://{static_file_addr}"))
+        .unwrap()
+        .host_str()
+        .unwrap()
+        .to_string();
     let listener = tokio::net::TcpListener::bind(&static_file_addr)
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
     log::info!("preview server listening on http://{addr}");
+    // Don't take the port from `static_file_addr` (it may have a dummy port e.g. `127.0.0.1:0`)
     let expected_port = addr.port();
 
     let frontend_html = hyper::body::Bytes::from(frontend_html);
     let make_service = move || {
         let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
+        let expected_host = expected_host.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let frontend_html = frontend_html.clone();
             let websocket_tx = websocket_tx.clone();
+            let expected_host = expected_host.clone();
             async move {
                 // When a user visits a website in a browser, that website can try to connect to
                 // our http / websocket server on `127.0.0.1` which may leak sensitive information.
@@ -490,8 +498,8 @@ pub async fn make_http_server(
 
                     if !(origin.scheme() == "vscode-webview"
                         || (origin.port() == Some(expected_port)
-                            && matches!(origin.scheme(), "http" | "https") // TODO: why allow `https`?
-                            && matches!(origin.host_str(), Some("localhost" | "127.0.0.1"))))
+                            && origin.scheme() == "http"
+                            && origin.host_str() == Some(expected_host.as_str())))
                     {
                         anyhow::bail!(
                             "Connection with unexpected `Origin` header. Closing connection."
