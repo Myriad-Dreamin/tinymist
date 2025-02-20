@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.12.20",
+  "version": "0.12.21",
   "description": "An integrated language service for Typst",
   "keywords": [
     "typst",
@@ -294,6 +294,20 @@
           "description": "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.",
           "type": "string",
           "default": ""
+        },
+        "tinymist.exportTarget": {
+          "title": "Export target",
+          "description": "The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.",
+          "type": "string",
+          "default": "paged",
+          "enum": [
+            "paged",
+            "html"
+          ],
+          "enumDescriptions": [
+            "The current export target is for PDF, PNG, and SVG export.",
+            "The current export target is for HTML export."
+          ]
         },
         "tinymist.exportPdf": {
           "title": "Export PDF",

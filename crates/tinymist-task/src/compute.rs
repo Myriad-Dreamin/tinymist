@@ -6,21 +6,18 @@ use std::sync::Arc;
 use comemo::Track;
 use ecow::EcoString;
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::TypstPagedDocument;
-use tinymist_world::{
-    args::convert_source_date_epoch, CompileSnapshot, CompilerFeat, ExportComputation,
-    WorldComputeGraph,
-};
+use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
+use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::diag::{SourceResult, StrResult};
-use typst::foundations::{Bytes, Content, Datetime, IntoValue, LocatableSelector, Scope, Value};
+use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
 use typst::layout::Abs;
+use typst::routines::EvalMode;
 use typst::syntax::{ast, Span, SyntaxNode};
 use typst::visualize::Color;
 use typst::World;
-use typst_pdf::PdfOptions;
-use typst_shim::eval::EvalMode;
+use typst_eval::eval_string;
 
-use crate::model::{ExportPdfTask, ExportPngTask, ExportSvgTask};
+use crate::model::{ExportHtmlTask, ExportPngTask, ExportSvgTask};
 use crate::primitives::TaskWhen;
 use crate::{ExportTransform, Pages, QueryTask};
 
@@ -40,10 +37,10 @@ pub struct HtmlFlag;
 pub struct ExportTimings;
 
 impl ExportTimings {
-    pub fn needs_run<F: CompilerFeat>(
+    pub fn needs_run<F: CompilerFeat, D: typst::Document>(
         snap: &CompileSnapshot<F>,
         timing: Option<TaskWhen>,
-        docs: Option<&TypstPagedDocument>,
+        docs: Option<&D>,
     ) -> Option<bool> {
         let s = snap.signal;
         let when = timing.unwrap_or(TaskWhen::Never);
@@ -56,7 +53,7 @@ impl ExportTimings {
             TaskWhen::OnType => Some(s.by_mem_events),
             TaskWhen::OnSave => Some(s.by_fs_events),
             TaskWhen::OnDocumentHasTitle if s.by_fs_events => {
-                docs.map(|doc| doc.info.title.is_some())
+                docs.map(|doc| doc.info().title.is_some())
             }
             TaskWhen::OnDocumentHasTitle => Some(false),
         }
@@ -135,7 +132,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
 
         pixmap
             .encode_png()
-            .map(Bytes::from)
+            .map(Bytes::new)
             .context_ut("failed to encode PNG")
     }
 }
@@ -147,6 +144,21 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
 //         OptionDocumentTask::run_export::<F, Self>(graph)
 //     }
 // }
+
+pub struct HtmlExport;
+
+impl<F: CompilerFeat> ExportComputation<F, TypstHtmlDocument> for HtmlExport {
+    type Output = String;
+    type Config = ExportHtmlTask;
+
+    fn run(
+        _graph: &Arc<WorldComputeGraph<F>>,
+        doc: &Arc<TypstHtmlDocument>,
+        _config: &ExportHtmlTask,
+    ) -> Result<String> {
+        Ok(typst_html::html(doc)?)
+    }
+}
 
 // impl<F: CompilerFeat> WorldComputable<F> for HtmlExport {
 //     type Output = Option<String>;
@@ -161,12 +173,13 @@ pub struct DocumentQuery;
 impl DocumentQuery {
     // todo: query exporter
     /// Retrieve the matches for the selector.
-    pub fn retrieve(
+    pub fn retrieve<D: typst::Document>(
         world: &dyn World,
         selector: &str,
-        document: &TypstPagedDocument,
+        document: &D,
     ) -> StrResult<Vec<Content>> {
-        let selector = typst_shim::eval::eval_string(
+        let selector = eval_string(
+            &typst::ROUTINES,
             world.track(),
             selector,
             Span::detached(),
@@ -185,15 +198,15 @@ impl DocumentQuery {
         .map_err(|e| EcoString::from(format!("failed to cast: {}", e.message())))?;
 
         Ok(document
-            .introspector
+            .introspector()
             .query(&selector.0)
             .into_iter()
             .collect::<Vec<_>>())
     }
 
-    fn run_inner<F: CompilerFeat>(
+    fn run_inner<F: CompilerFeat, D: typst::Document>(
         g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
+        doc: &Arc<D>,
         config: &QueryTask,
     ) -> Result<Vec<Value>> {
         let selector = &config.selector;
@@ -212,9 +225,20 @@ impl DocumentQuery {
             .collect())
     }
 
-    pub fn get_as_value<F: CompilerFeat>(
+    pub fn doc_get_as_value<F: CompilerFeat>(
         g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
+        doc: &TypstDocument,
+        config: &QueryTask,
+    ) -> Result<serde_json::Value> {
+        match doc {
+            TypstDocument::Paged(doc) => Self::get_as_value(g, doc, config),
+            TypstDocument::Html(doc) => Self::get_as_value(g, doc, config),
+        }
+    }
+
+    pub fn get_as_value<F: CompilerFeat, D: typst::Document>(
+        g: &Arc<WorldComputeGraph<F>>,
+        doc: &Arc<D>,
         config: &QueryTask,
     ) -> Result<serde_json::Value> {
         let mapped = Self::run_inner(g, doc, config)?;
@@ -232,13 +256,13 @@ impl DocumentQuery {
     }
 }
 
-impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for DocumentQuery {
+impl<F: CompilerFeat, D: typst::Document> ExportComputation<F, D> for DocumentQuery {
     type Output = SourceResult<String>;
     type Config = QueryTask;
 
     fn run(
         g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
+        doc: &Arc<D>,
         config: &QueryTask,
     ) -> Result<SourceResult<String>> {
         let pretty = false;
@@ -354,19 +378,6 @@ fn parse_color(fill: String) -> anyhow::Result<Color> {
         }
         _ => anyhow::bail!("invalid color: {fill}"),
     }
-}
-
-/// Convert [`chrono::DateTime`] to [`Datetime`]
-fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Datetime> {
-    use chrono::{Datelike, Timelike};
-    Datetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    )
 }
 
 #[cfg(test)]

@@ -122,7 +122,7 @@ fn validate_fn_renaming(def: &Definition) -> Option<()> {
         match func.inner() {
             // todo: rename with site
             Repr::With(w) => func = &w.0,
-            Repr::Closure(..) => return Some(()),
+            Repr::Closure(..) | Repr::Plugin(..) => return Some(()),
             // native functions can't be renamed
             Repr::Native(..) | Repr::Element(..) => return None,
         }

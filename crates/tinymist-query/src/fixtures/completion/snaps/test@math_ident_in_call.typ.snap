@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (27..28)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/math_ident_in_call.typ
-snapshot_kind: text
 ---
 [
  {
@@ -13,9 +12,9 @@ snapshot_kind: text
     "kind": 3,
     "label": "norm",
     "labelDetails": {
-     "description": "(content, size: auto | relative) => content"
+     "description": "(content, size: relative) => content"
     },
-    "sortText": "221",
+    "sortText": "229",
     "textEdit": {
      "newText": "norm(${1:})",
      "range": {

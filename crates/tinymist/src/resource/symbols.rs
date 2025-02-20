@@ -1,9 +1,11 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_lsp::LspResult;
 use tinymist_project::LspCompileSnapshot;
 use tinymist_std::typst::TypstDocument;
+use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
@@ -949,10 +951,23 @@ impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();
-        use typst::symbols::{emoji, sym};
-        populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
+
+        let std = snap
+            .world
+            .library
+            .std
+            .read()
+            .scope()
+            .ok_or_else(|| internal_error("cannot get std scope"))?;
+        let sym = std
+            .get("sym")
+            .ok_or_else(|| internal_error("cannot get sym"))?;
+
+        if let Some(scope) = sym.read().scope() {
+            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
+        }
         // todo: disabling emoji module, as there is performant issue on emojis
-        let _ = emoji;
+        // let _ = emoji;
         // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
         const PRELUDE: &str = r#"#show math.equation: set text(font: (
@@ -984,11 +999,11 @@ impl ServerState {
                 ..Default::default()
             });
             forked
-                .map_shadow_by_id(forked.main(), math_shaping_text.into_bytes().into())
+                .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
                 .map_err(|e| error_once!("cannot map shadow", err: e))
                 .map_err(internal_error)?;
 
-            let sym_doc = typst::compile(&forked)
+            let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
                 .output
                 .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
                 .map_err(internal_error)?;
@@ -1115,10 +1130,15 @@ fn trait_symbol_fonts(
 
     impl Worker<'_> {
         fn work(&mut self, doc: &TypstDocument) {
-            let TypstDocument::Paged(paged_doc) = doc;
-            for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
-                self.active = s;
-                self.work_frame(&pg.frame);
+            match doc {
+                TypstDocument::Paged(paged_doc) => {
+                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
+                        self.active = s;
+                        self.work_frame(&pg.frame);
+                    }
+                }
+                // todo: handle html
+                TypstDocument::Html(..) => {}
             }
         }
 
@@ -1134,8 +1154,6 @@ fn trait_symbol_fonts(
                     | FrameItem::Image(_, _, _)
                     | FrameItem::Link(_, _)
                     | FrameItem::Tag(_) => continue,
-                    #[cfg(not(feature = "no-content-hint"))]
-                    FrameItem::ContentHint(_) => continue,
                 };
 
                 let font = text.font.clone();
@@ -1192,7 +1210,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch.char() as u32,
+                unicode: ch as u32,
                 glyphs: vec![],
             },
         );
@@ -1205,8 +1223,8 @@ fn populate_scope(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (k, v, _) in sym.iter() {
-        let Value::Symbol(sym) = v else {
+    for (k, b) in sym.iter() {
+        let Value::Symbol(sym) = b.read() else {
             continue;
         };
 

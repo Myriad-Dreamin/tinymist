@@ -237,7 +237,7 @@ async function openExternal(target: string): Promise<void> {
 }
 
 async function commandExport(
-  mode: "Pdf" | "Svg" | "Png",
+  mode: "Pdf" | "Html" | "Svg" | "Png",
   extraOpts?: any,
 ): Promise<string | undefined> {
   const activeEditor = window.activeTextEditor;
@@ -298,7 +298,7 @@ async function commandCopyAnsiHighlight(): Promise<void> {
  * Implements the functionality for the 'Show PDF' button shown in the editor title
  * if a `.typ` file is opened.
  */
-async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promise<void> {
+async function commandShow(kind: "Pdf" | "Html" | "Svg" | "Png", extraOpts?: any): Promise<void> {
   const activeEditor = window.activeTextEditor;
   if (activeEditor === undefined) {
     return;
@@ -540,6 +540,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
     case "preview": {
       void vscode.commands.executeCommand(`typst-preview.preview`);
       return;
+    }
+    case "export-html": {
+      await commandShow("Html");
+      break;
     }
     case "export-pdf": {
       await commandShow("Pdf");

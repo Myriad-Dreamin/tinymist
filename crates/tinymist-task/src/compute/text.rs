@@ -10,7 +10,7 @@ pub struct TextExport;
 
 impl TextExport {
     pub fn run_on_doc(doc: &TypstDocument) -> Result<String> {
-        Ok(format!("{}", FullTextDigest(doc.clone())))
+        Ok(format!("{}", FullTextDigest(doc)))
     }
 }
 
@@ -28,9 +28,9 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for TextExport {
 }
 
 /// A full text digest of a document.
-pub struct FullTextDigest(pub TypstDocument);
+struct FullTextDigest<'a>(&'a TypstDocument);
 
-impl FullTextDigest {
+impl FullTextDigest<'_> {
     fn export_frame(f: &mut fmt::Formatter<'_>, doc: &typst::layout::Frame) -> fmt::Result {
         for (_, item) in doc.items() {
             Self::export_item(f, item)?;
@@ -55,15 +55,36 @@ impl FullTextDigest {
             Link(..) | Tag(..) | Shape(..) | Image(..) => Ok(()),
         }
     }
+
+    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst::html::HtmlElement) -> fmt::Result {
+        for child in elem.children.iter() {
+            Self::export_html_node(f, child)?;
+        }
+        Ok(())
+    }
+
+    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst::html::HtmlNode) -> fmt::Result {
+        use typst::html::HtmlNode::*;
+        match node {
+            Tag(_) => Ok(()),
+            Element(elem) => Self::export_element(f, elem),
+            Text(t, _) => f.write_str(t.as_str()),
+            Frame(frame) => Self::export_frame(f, frame),
+        }
+    }
 }
 
-impl fmt::Display for FullTextDigest {
+impl fmt::Display for FullTextDigest<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             TypstDocument::Paged(paged_doc) => {
                 for page in paged_doc.pages.iter() {
                     Self::export_frame(f, &page.frame)?;
                 }
+                Ok(())
+            }
+            TypstDocument::Html(html_doc) => {
+                Self::export_element(f, &html_doc.root)?;
                 Ok(())
             }
         }

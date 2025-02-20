@@ -10,7 +10,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_project::CompileFontArgs;
+use tinymist_project::{CompileFontArgs, ExportTarget};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
@@ -155,6 +155,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     };
     let mut verse = LspUniverseBuilder::build(
         EntryState::new_rooted(root.as_path().into(), None),
+        ExportTarget::Paged,
         Default::default(),
         Arc::new(
             LspUniverseBuilder::resolve_fonts(CompileFontArgs {
@@ -187,7 +188,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
 
         let pw = root.join(Path::new(&path));
         verse
-            .map_shadow(&pw, Bytes::from(source.as_bytes()))
+            .map_shadow(&pw, Bytes::from_string(source.to_owned()))
             .unwrap();
         last_pw = Some(pw);
     }

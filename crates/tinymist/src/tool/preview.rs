@@ -16,12 +16,13 @@ use lsp_types::notification::Notification;
 use lsp_types::Url;
 use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
+use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::ProjectInsId;
+use tinymist_project::{ProjectInsId, WorldProvider};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
@@ -77,7 +78,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
+        let cursor =
+            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if node.kind() != SyntaxKind::Text {
@@ -94,8 +96,8 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = &self.snap.world;
         let Location::Src(src_loc) = loc;
 
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
+        let line = src_loc.pos.line as usize;
+        let column = src_loc.pos.character as usize;
 
         let doc = self.snap.success_doc();
         let Some(doc) = doc.as_ref() else {
@@ -280,7 +282,7 @@ impl EditorServer for PreviewProjectHandler {
                 .into_iter()
                 .map(|(path, content)| {
                     // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(content.as_bytes().into()).into())
+                    (path.into(), Ok(Bytes::from_string(content)).into())
                 })
                 .collect(),
         );
@@ -843,6 +845,7 @@ fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) ->
 
             positions
         }
+        _ => vec![],
     }
 }
 
@@ -862,7 +865,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
                     return Some(pos);
                 }
                 if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    let dis = glyph
+                        .span
+                        .0
+                        .into_raw()
+                        .get()
+                        .abs_diff(span.into_raw().get());
                     if dis < *min_dis {
                         *min_dis = dis;
                         *p = pos;

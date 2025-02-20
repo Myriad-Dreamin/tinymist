@@ -102,7 +102,7 @@ impl ServerState {
             self.memory_changes
                 .iter()
                 .map(|(path, content)| {
-                    let content = Bytes::from(content.clone().text().as_bytes());
+                    let content = Bytes::from_string(content.clone().text().to_owned());
                     (path.clone(), FileResult::Ok(content).into())
                 })
                 .collect(),
@@ -125,7 +125,8 @@ impl ServerState {
         entry: Option<ImmutPath>,
     ) -> Result<ProjectInsId> {
         let entry = self.config.compile.entry_resolver.resolve(entry);
-        self.project.restart_dedicate(dedicate, entry)
+        let enable_html = matches!(self.config.export_target, ExportTarget::Html);
+        self.project.restart_dedicate(dedicate, entry, enable_html)
     }
 
     /// Create a fresh [`ProjectState`].
@@ -177,6 +178,7 @@ impl ServerState {
             notified_revision: Mutex::default(),
         });
 
+        let export_target = config.export_target;
         let default_path = config.compile.entry_resolver.resolve_default();
         let entry = config.compile.entry_resolver.resolve(default_path);
         let inputs = config.compile.determine_inputs();
@@ -189,7 +191,13 @@ impl ServerState {
         let embedded_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
         let package_registry =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-        let verse = LspUniverseBuilder::build(entry, inputs, embedded_fonts, package_registry);
+        let verse = LspUniverseBuilder::build(
+            entry,
+            export_target,
+            inputs,
+            embedded_fonts,
+            package_registry,
+        );
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
@@ -340,8 +348,9 @@ impl ProjectState {
         &mut self,
         group: &str,
         entry: EntryState,
+        enable_html: bool,
     ) -> Result<ProjectInsId> {
-        self.compiler.restart_dedicate(group, entry)
+        self.compiler.restart_dedicate(group, entry, enable_html)
     }
 }
 
@@ -610,6 +619,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         if let Some(inner) = self.preview.get(&snap.id) {
             let snap = snap.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
+        } else {
+            log::info!("Project: no preview for {:?}", snap.id);
         }
     }
 }

@@ -19,7 +19,7 @@ pub fn is_plain_value(value: &Value) -> bool {
             | Value::Fraction(..)
             | Value::Color(..)
             | Value::Gradient(..)
-            | Value::Pattern(..)
+            | Value::Tiling(..)
             | Value::Symbol(..)
             | Value::Version(..)
             | Value::Str(..)
@@ -44,14 +44,6 @@ pub fn term_value(value: &Value) -> Ty {
         }
         // todo: term arguments
         Value::Args(..) => Ty::Builtin(BuiltinTy::Args),
-        Value::Plugin(plugin) => {
-            // todo: create infer variables for plugin functions
-            let values = plugin
-                .iter()
-                .map(|method| (method.as_str().into(), Ty::Func(SigTy::any())))
-                .collect();
-            Ty::Dict(RecordTy::new(values))
-        }
         Value::Dict(dict) => {
             let values = dict
                 .iter()
@@ -63,7 +55,7 @@ pub fn term_value(value: &Value) -> Ty {
             let values = module
                 .scope()
                 .iter()
-                .map(|(k, v, s)| (k.into(), term_value_rec(v, s)))
+                .map(|(k, b)| (k.into(), term_value_rec(b.read(), b.span())))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
@@ -83,7 +75,6 @@ pub fn term_value_rec(value: &Value, s: Span) -> Ty {
         | Value::Auto
         | Value::Array(..)
         | Value::Args(..)
-        | Value::Plugin(..)
         | Value::Dict(..)
         | Value::Module(..)
         | Value::Func(..)
@@ -99,7 +90,7 @@ pub fn term_value_rec(value: &Value, s: Span) -> Ty {
         | Value::Fraction(..)
         | Value::Color(..)
         | Value::Gradient(..)
-        | Value::Pattern(..)
+        | Value::Tiling(..)
         | Value::Symbol(..)
         | Value::Version(..)
         | Value::Str(..)

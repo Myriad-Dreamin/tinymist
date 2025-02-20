@@ -49,6 +49,7 @@ pub fn jump_from_cursor(
                 point,
             })
         }
+        _ => None,
     }
 }
 
@@ -68,7 +69,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) 
                     return Some(pos);
                 }
                 if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    let dis = glyph
+                        .span
+                        .0
+                        .into_raw()
+                        .get()
+                        .abs_diff(span.into_raw().get());
                     if dis < *min_dis {
                         *min_dis = dis;
                         *res = pos;
