@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
+use tinymist_std::error::IgnoreLogging;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
@@ -206,15 +207,15 @@ impl<T: EditorServer> EditorActor<T> {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             log::debug!("EditorActor: received message from editor: {:?}", cursor_info);
-                            self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).unwrap();
+                            self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::ResolveSourceLoc(jump_info) => {
                             log::debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.renderer_sender.send(RenderActorRequest::ResolveSourceLoc(jump_info)).unwrap();
+                            self.renderer_sender.send(RenderActorRequest::ResolveSourceLoc(jump_info)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
                             log::debug!("EditorActor: received message from editor: {:?}", jump_info);
-                            self.webview_sender.send(WebviewActorRequest::ViewportPosition(jump_info.position)).unwrap();
+                            self.webview_sender.send(WebviewActorRequest::ViewportPosition(jump_info.position)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
                             log::debug!("EditorActor: received message from editor: {:?}", jump_info);
@@ -278,7 +279,7 @@ impl<T: EditorServer> EditorActor<T> {
                 .send(RenderActorRequest::EditorResolveSpanRange(
                     span_and_offset..span_and_offset,
                 ))
-                .unwrap();
+                .log_error("EditorActor");
         };
     }
 }

@@ -8,6 +8,7 @@ pub use actor::editor::{
 };
 pub use args::*;
 pub use outline::Outline;
+use tinymist_std::error::IgnoreLogging;
 
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
@@ -101,14 +102,14 @@ impl Previewer {
                 if h.enable_partial_rendering {
                     conn.send(WsMessage::Binary("partial-rendering,true".into()))
                         .await
-                        .unwrap();
+                        .log_error("SendPartialRendering");
                 }
                 if !h.invert_colors.is_empty() {
                     conn.send(WsMessage::Binary(
                         format!("invert-colors,{}", h.invert_colors).into(),
                     ))
                     .await
-                    .unwrap();
+                    .log_error("SendInvertColor");
                 }
                 let actor::webview::Channels { svg } =
                     actor::webview::WebviewActor::<'_, C>::set_up_channels();
