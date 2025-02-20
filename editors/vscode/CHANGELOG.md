@@ -14,102 +14,110 @@ We massively changed the internal world implementation. This unblocks many new f
 - It now adds new project model with a `tinymist.lock` to help manage documents and their dependencies on large multiple-files projects. This is still experimental and disabled by default.
 - The `tinymist.lock` along with the browsing preview is expected to greatly help people work on large and complex projects using any of their faviorite editors.
 
-* build: update `cc` version (#1162) in https://github.com/Myriad-Dreamin/tinymist/pull/1258
-* build: downgrade `tempfile` to 3.15.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1259
-* build: upgrade typstyle to v0.12.15 by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1260 and https://github.com/Myriad-Dreamin/tinymist/pull/1324
+For `tinymist.lock` feature, please check the [tinymist.projectResolution = "lockDatabase"](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md#tinymistprojectresolution). This is still experimental for multiple-files projects.
+
+* Bumped `cc` to v1.2.11 (#1162) in https://github.com/Myriad-Dreamin/tinymist/pull/1258
+* Downgraded `tempfile` to v3.15.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1259
+* Bumped typstyle to v0.12.15 by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/1260 and https://github.com/Myriad-Dreamin/tinymist/pull/1324
 
 ### CLI
 
-* feat: add CLI compile command and bench script in https://github.com/Myriad-Dreamin/tinymist/pull/1193
+* Added CLI compile command in https://github.com/Myriad-Dreamin/tinymist/pull/1193 and https://github.com/Myriad-Dreamin/tinymist/pull/1218
+  * The compile command is mainly used for compiling documents with updating lock file. Using:
+
+  ```
+  tinymist compile --save-lock tinymist.lock
+  ```
+  * This could also be used for comparing the coompile performance of `tinymist-cli` and `typst-cli`.
+* Generating shell build script according to the lock file in https://github.com/Myriad-Dreamin/tinymist/pull/1219
 
 ### Compiler
 
-* dev: move package to reflexo_world part in https://github.com/Myriad-Dreamin/tinymist/pull/1177
-* feat: move world implementation in https://github.com/Myriad-Dreamin/tinymist/pull/1183, https://github.com/Myriad-Dreamin/tinymist/pull/1185, https://github.com/Myriad-Dreamin/tinymist/pull/1186, https://github.com/Myriad-Dreamin/tinymist/pull/1187
-* perf: reduce size of the watch entry in https://github.com/Myriad-Dreamin/tinymist/pull/1190
-* perf: remove meta watch in https://github.com/Myriad-Dreamin/tinymist/pull/1191
-* feat: track fine-grained revisions of `font`, `registry`, `entry`, and `vfs` in https://github.com/Myriad-Dreamin/tinymist/pull/1192
-* feat: trigger project compilations on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/1197
-* feat: detect compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
-* fix: try getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
-* perf: scatter-gather the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
-* fix: invalidate and increment revision in vfs correctly (#1292) in https://github.com/Myriad-Dreamin/tinymist/pull/1329
-* fix: emit latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
-* fix: the path to join is shadowed by a local variable (#1322) in https://github.com/Myriad-Dreamin/tinymist/pull/1335
-* fix: don't remove path mapping when invalidating vfs cache (#1316) in https://github.com/Myriad-Dreamin/tinymist/pull/1333
+* Moved world implementation to tinymist in https://github.com/Myriad-Dreamin/tinymist/pull/1177, https://github.com/Myriad-Dreamin/tinymist/pull/1183, https://github.com/Myriad-Dreamin/tinymist/pull/1185, https://github.com/Myriad-Dreamin/tinymist/pull/1186, and https://github.com/Myriad-Dreamin/tinymist/pull/1187
+* Reduced size of the watch entry in https://github.com/Myriad-Dreamin/tinymist/pull/1190 and https://github.com/Myriad-Dreamin/tinymist/pull/1191
+* Tracking fine-grained revisions of `font`, `registry`, `entry`, and `vfs` in https://github.com/Myriad-Dreamin/tinymist/pull/1192
+  * This prepares for better configuration hot reloading in future.
+* Triggering project compilations on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/1197
+  * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unreleated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
+* (Perf) Detecting compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
+* (Perf) Scatter-gathering the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
+* (Fix) Fixed a panic when getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
+  * This could be true when the fonts are hot reloaded.
+* (Fix) Emiting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
+  * Because of this, the compile status bar was not updated correctly.
 
 ### Editor
 
-* feat: show name of the compiling file in the status bar in https://github.com/Myriad-Dreamin/tinymist/pull/1147
-* feat: support convert to typst table from xlsx file by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1100
-* fix: update xlsx-parser package version to 0.2.3 by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1166
-* feat: support drag-and-drop feature for .ods format by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1217
-* feat: add more known image extensions to the drop provider in https://github.com/Myriad-Dreamin/tinymist/pull/1308
-* refactor: rename source file name of the drop feature in https://github.com/Myriad-Dreamin/tinymist/pull/1309
-* feat: add support to paste image into typst documents in https://github.com/Myriad-Dreamin/tinymist/pull/1306
-* feat: cancel codelens if the any picker is cancelled in https://github.com/Myriad-Dreamin/tinymist/pull/1314
+* Showing name of the compiling file in the status bar in https://github.com/Myriad-Dreamin/tinymist/pull/1147
+  * You can customize it by setting `tinymist.statusBarFormat` in the settings.
 
-### Code Analysis
+### Drop and Paste
 
-* feat: add `depended_{paths,{source_,}files}` methods in https://github.com/Myriad-Dreamin/tinymist/pull/1150
-* feat: prefer to select the previous token when cursor is before a marker in https://github.com/Myriad-Dreamin/tinymist/pull/1175
-* fix: capture docs before check init in https://github.com/Myriad-Dreamin/tinymist/pull/1195
-* fix: consider interpret mode when classifying dot accesses in https://github.com/Myriad-Dreamin/tinymist/pull/1302
-* feat: support more path types and add path parameters (#1312) in https://github.com/Myriad-Dreamin/tinymist/pull/1331
+* Added support to drag and drop `.xlsx` files by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1100 and https://github.com/Myriad-Dreamin/tinymist/pull/1166
+* Added support to drag and drop `.ods` files by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1217
+* Added more known image extensions to the drop provider in https://github.com/Myriad-Dreamin/tinymist/pull/1308
+  * Added `.avif`, `.jpe`, `.psd`, `.tga`, `.tif`, and `.tiff`, which are copied from the markdown extension. 
+* Added support to paste media files (images, audios, and videos) into typst documents in https://github.com/Myriad-Dreamin/tinymist/pull/1306
+* Canceling codelens if any picker is cancelled in https://github.com/Myriad-Dreamin/tinymist/pull/1314
 
 ### Label View
 
-* fix(vscode): make label view work when there's exactly one label by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1158
-
-### Crityp (New)
-
-* feat: micro benchmark support in https://github.com/Myriad-Dreamin/tinymist/pull/1160
+* (Fix) Making label view work when there's exactly one label by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1158
 
 ### Typlite
 
-* feat: evaluate table and grid by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1300
-* feat: embed Markdown codes by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1296
-* feat(typlite): render context block contextually by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1305
-* fix(typlite): correct the wrong path by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1323
+* Evaluating table and grid by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1300
+* Embedding Markdown codes by `typlite` raw block by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1296 and https://github.com/Myriad-Dreamin/tinymist/pull/1323
+* Rendering context block contextually by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1305
 
 ### Preview
 
-* feat: Rescaling with Ctrl+=/- in browser (in addition to ctrl+wheel) by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1110
-* fix: Prevent malicious websites from connecting to http / websocket server by @tmistele and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1157
-* fix: respect that the port of the `expected_origin` can be zero (#1295) in https://github.com/Myriad-Dreamin/tinymist/pull/1337
-* feat: browsing preview in https://github.com/Myriad-Dreamin/tinymist/pull/1234
+* Rescaling with Ctrl+=/- in browser (in addition to ctrl+wheel) by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1110
+* Prevented malicious websites from connecting to http / websocket server by @tmistele and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1157 and https://github.com/Myriad-Dreamin/tinymist/pull/1337
+* Browsing preview in https://github.com/Myriad-Dreamin/tinymist/pull/1234
+
+### Code Analysis
+
+* Added `depended_{paths,{source_,}files}` methods in https://github.com/Myriad-Dreamin/tinymist/pull/1150
+* Preferring to select the previous token when cursor is before a marker in https://github.com/Myriad-Dreamin/tinymist/pull/1175
+* Support more path types and add path parameters (#1312) in https://github.com/Myriad-Dreamin/tinymist/pull/1331
+  * Completes mutiple paths on `bibliography` and completes wasm files on `plugin`.
+* (Fix) Capturing docs before check init in https://github.com/Myriad-Dreamin/tinymist/pull/1195
+* (Fix) Considering interpret mode when classifying dot accesses in https://github.com/Myriad-Dreamin/tinymist/pull/1302
+
+### Crityp (New)
+
+* Added micro benchmark support in https://github.com/Myriad-Dreamin/tinymist/pull/1160
+  * For example, the benchmark shows that `fib(20)` on rust (16us) is 40 times faster than that on typst (940us).
+  * Check [crityp](https://github.com/Myriad-Dreamin/tinymist/blob/main/crates/crityp/README.md) for usage.
 
 ### Codelens
 
-* feat: move less used codelens into a single "more" codelens in https://github.com/Myriad-Dreamin/tinymist/pull/1315
+* Moved less used codelens into a single "more" codelens in https://github.com/Myriad-Dreamin/tinymist/pull/1315
 
 ### Wasm
 
-* feat: build tinymist-world on web in https://github.com/Myriad-Dreamin/tinymist/pull/1184
-* feat: adapts build meta for wasm target in https://github.com/Myriad-Dreamin/tinymist/pull/1243
+* Building tinymist-world on web in https://github.com/Myriad-Dreamin/tinymist/pull/1184 and https://github.com/Myriad-Dreamin/tinymist/pull/1243
 
 ### tinymist.lock
 
-* feat: copy flock implementation from cargo in https://github.com/Myriad-Dreamin/tinymist/pull/1140
+* Copied flock implementation from cargo in https://github.com/Myriad-Dreamin/tinymist/pull/1140
 * Generating and updating declarative project lock file in https://github.com/Myriad-Dreamin/tinymist/pull/1133, https://github.com/Myriad-Dreamin/tinymist/pull/1149, https://github.com/Myriad-Dreamin/tinymist/pull/1151, https://github.com/Myriad-Dreamin/tinymist/pull/1152, https://github.com/Myriad-Dreamin/tinymist/pull/1153, https://github.com/Myriad-Dreamin/tinymist/pull/1154
-* feat: model and document project tasks in https://github.com/Myriad-Dreamin/tinymist/pull/1202
-* feat: associate lock file with toml language in https://github.com/Myriad-Dreamin/tinymist/pull/1143
-* feat: initiate `lockDatabase` project resolution in https://github.com/Myriad-Dreamin/tinymist/pull/1201
-* feat: resolve projects by `lockDatabase` in https://github.com/Myriad-Dreamin/tinymist/pull/1142
-* feat: execute export and query on the task model in https://github.com/Myriad-Dreamin/tinymist/pull/1214
-* feat: CLI compile documents with lock updates in https://github.com/Myriad-Dreamin/tinymist/pull/1218
-* feat: CLI generate shell build script in https://github.com/Myriad-Dreamin/tinymist/pull/1219
+* Modeling project tasks in https://github.com/Myriad-Dreamin/tinymist/pull/1202
+* Associating `tinymist.lock` with toml language in https://github.com/Myriad-Dreamin/tinymist/pull/1143
+* Initiating `lockDatabase` project resolution in https://github.com/Myriad-Dreamin/tinymist/pull/1201
+* Resolving projects by `lockDatabase` in https://github.com/Myriad-Dreamin/tinymist/pull/1142
+* Executing export and query on the task model in https://github.com/Myriad-Dreamin/tinymist/pull/1214
 
 ### Misc
 
-* docs: revise neovim's install section by @SylvanFranklin in https://github.com/Myriad-Dreamin/tinymist/pull/1090
-* docs: add release instruction by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1163, https://github.com/Myriad-Dreamin/tinymist/pull/1169, https://github.com/Myriad-Dreamin/tinymist/pull/1173, and https://github.com/Myriad-Dreamin/tinymist/pull/1212
-* docs: documenting `sync-lsp` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
-* fix(ci): use deploy-pages v4 in https://github.com/Myriad-Dreamin/tinymist/pull/1249
-* fix(ci): use upload-pages-artifact and configure-pages in https://github.com/Myriad-Dreamin/tinymist/pull/1251
-* docs: documenting Myriad-Dreamin's workspace setting in https://github.com/Myriad-Dreamin/tinymist/pull/1264
-* docs: fix typo by @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1276
-* feat: add release crates action in https://github.com/Myriad-Dreamin/tinymist/pull/1298
+* Revised neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
+* Added release instruction by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1163, https://github.com/Myriad-Dreamin/tinymist/pull/1169, https://github.com/Myriad-Dreamin/tinymist/pull/1173, and https://github.com/Myriad-Dreamin/tinymist/pull/1212
+* Documenting `sync-lsp` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
+* CI used newest deploy-pages, upload-pages-artifact, and configure-pages actions in https://github.com/Myriad-Dreamin/tinymist/pull/1249 and https://github.com/Myriad-Dreamin/tinymist/pull/1251
+* Documenting Myriad-Dreamin's workspace setting in https://github.com/Myriad-Dreamin/tinymist/pull/1264
+* CI Added release crates action in https://github.com/Myriad-Dreamin/tinymist/pull/1298
+ * Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates in https://github.com/Myriad-Dreamin/tinymist/pull/1310
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.20
 
