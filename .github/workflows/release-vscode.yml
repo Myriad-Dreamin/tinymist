@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.84.0
         with:
           components: clippy, rustfmt
       - name: Install Node.js
@@ -150,7 +150,7 @@ jobs:
         working-directory: ./editors/vscode
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.84.0
         with:
           targets: ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
