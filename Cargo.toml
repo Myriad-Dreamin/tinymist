@@ -174,20 +174,20 @@ insta = { version = "1.39", features = ["glob"] }
 
 
 # Our Own Crates
-typst-preview = { version = "0.12.20", path = "./crates/typst-preview" }
-typst-shim = { version = "0.12.20", path = "./crates/typst-shim" }
+typst-preview = { path = "./crates/typst-preview", version = "0.12.20" }
+typst-shim = { path = "./crates/typst-shim", version = "0.12.20" }
 tinymist-assets = { version = "=0.12.20" }
-tinymist = { version = "0.12.20", path = "./crates/tinymist/" }
-tinymist-std = { version = "0.12.20", path = "./crates/tinymist-std/", default-features = false }
-tinymist-vfs = { version = "0.12.20", path = "./crates/tinymist-vfs/", default-features = false }
-tinymist-core = { version = "0.12.20", path = "./crates/tinymist-core/", default-features = false }
-tinymist-world = { version = "0.12.20", path = "./crates/tinymist-world/", default-features = false }
-tinymist-project = { version = "0.12.20", path = "./crates/tinymist-project/" }
-tinymist-task = { version = "0.12.20", path = "./crates/tinymist-task/" }
-tinymist-derive = { version = "0.12.20", path = "./crates/tinymist-derive/" }
-tinymist-analysis = { version = "0.12.20", path = "./crates/tinymist-analysis/" }
-tinymist-query = { version = "0.12.20", path = "./crates/tinymist-query/" }
-tinymist-render = { version = "0.12.20", path = "./crates/tinymist-render/" }
+tinymist = { path = "./crates/tinymist/", version = "0.12.20" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.12.20", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.12.20", default-features = false }
+tinymist-core = { path = "./crates/tinymist-core/", version = "0.12.20", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.12.20", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.12.20" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.12.20" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.12.20" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.12.20" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.12.20" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.12.20" }
 
 [profile.dev.package.insta]
 opt-level = 3
