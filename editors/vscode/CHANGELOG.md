@@ -33,19 +33,18 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 ### Compiler
 
+* (Fix) Fixed a panic when getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
+  * This could be true when the fonts are hot reloaded.
+* (Fix) Emiting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
+  * Because of this, the compile status bar was not updated correctly.
+* (Perf) Detecting compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
+* (Perf) Scatter-gathering the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
 * Moved world implementation to tinymist in https://github.com/Myriad-Dreamin/tinymist/pull/1177, https://github.com/Myriad-Dreamin/tinymist/pull/1183, https://github.com/Myriad-Dreamin/tinymist/pull/1185, https://github.com/Myriad-Dreamin/tinymist/pull/1186, and https://github.com/Myriad-Dreamin/tinymist/pull/1187
 * Reduced size of the watch entry in https://github.com/Myriad-Dreamin/tinymist/pull/1190 and https://github.com/Myriad-Dreamin/tinymist/pull/1191
 * Tracking fine-grained revisions of `font`, `registry`, `entry`, and `vfs` in https://github.com/Myriad-Dreamin/tinymist/pull/1192
   * This prepares for better configuration hot reloading in future.
 * Triggering project compilations on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/1197
   * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unreleated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
-* (Perf) Detecting compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
-* (Perf) Scatter-gathering the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
-* (Fix) Fixed a panic when getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
-  * This could be true when the fonts are hot reloaded.
-* (Fix) Emiting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
-  * Because of this, the compile status bar was not updated correctly.
-
 ### Editor
 
 * Showing name of the compiling file in the status bar in https://github.com/Myriad-Dreamin/tinymist/pull/1147
@@ -72,18 +71,20 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 ### Preview
 
+* (Fix) Logging error on channel closed instead of panicking in https://github.com/Myriad-Dreamin/tinymist/pull/1347
+  * This may happen when the preview is broadcasting and the clients hasn't connected to the server.
 * Rescaling with Ctrl+=/- in browser (in addition to ctrl+wheel) by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1110
 * Prevented malicious websites from connecting to http / websocket server by @tmistele and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1157 and https://github.com/Myriad-Dreamin/tinymist/pull/1337
 * Browsing preview in https://github.com/Myriad-Dreamin/tinymist/pull/1234
 
 ### Code Analysis
 
+* (Fix) Capturing docs before check init in https://github.com/Myriad-Dreamin/tinymist/pull/1195
+* (Fix) Considering interpret mode when classifying dot accesses in https://github.com/Myriad-Dreamin/tinymist/pull/1302
 * Added `depended_{paths,{source_,}files}` methods in https://github.com/Myriad-Dreamin/tinymist/pull/1150
 * Preferring to select the previous token when cursor is before a marker in https://github.com/Myriad-Dreamin/tinymist/pull/1175
 * Support more path types and add path parameters (#1312) in https://github.com/Myriad-Dreamin/tinymist/pull/1331
   * Completes mutiple paths on `bibliography` and completes wasm files on `plugin`.
-* (Fix) Capturing docs before check init in https://github.com/Myriad-Dreamin/tinymist/pull/1195
-* (Fix) Considering interpret mode when classifying dot accesses in https://github.com/Myriad-Dreamin/tinymist/pull/1302
 
 ### Crityp (New)
 
