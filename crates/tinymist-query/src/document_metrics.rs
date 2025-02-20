@@ -170,8 +170,6 @@ impl DocumentMetricsWorker<'_> {
             | FrameItem::Image(..)
             | FrameItem::Tag(..)
             | FrameItem::Link(..) => Some(()),
-            #[cfg(not(feature = "no-content-hint"))]
-            FrameItem::ContentHint(..) => Some(()),
         }
     }
 
