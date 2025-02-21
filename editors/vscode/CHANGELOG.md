@@ -6,6 +6,17 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.12.22 - [2025-02-21]
+
+### Preview
+
+* (Fix) Handling compile events in standalone preview server in https://github.com/Myriad-Dreamin/tinymist/pull/1349
+* (Fix) Loosing `origin` HTTP header checking of the preview server in https://github.com/Myriad-Dreamin/tinymist/pull/1353
+* (Fix) Added console diagnostics printing back for `tinymist preview` in https://github.com/Myriad-Dreamin/tinymist/pull/1359
+* (Fix) Fixed broken regular preview affected by the browsing preview feature in https://github.com/Myriad-Dreamin/tinymist/pull/1357 and https://github.com/Myriad-Dreamin/tinymist/pull/1358
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.12.22
+
 ## v0.12.20 - [2025-02-21]
 
 We massively changed the internal world implementation. This unblocks many new features:
