@@ -35,10 +35,10 @@ export default [
     )
     .map((config) => ({
       ...config,
-      files: ["**/*.ts"],
+      files: ["editors/vscode/**/*.ts"],
     })),
   {
-    files: ["**/*.ts"],
+    files: ["editors/vscode/**/*.ts"],
 
     plugins: {
       "@typescript-eslint": typescriptEslint,
@@ -50,7 +50,7 @@ export default [
       sourceType: "module",
 
       parserOptions: {
-        project: ["./tsconfig.json"],
+        project: ["./editors/vscode/tsconfig.json"],
 
         ecmaFeatures: {
           modules: true,
@@ -59,20 +59,20 @@ export default [
     },
 
     rules: {
-      "@typescript-eslint/member-delimiter-style": [
-        "error",
-        {
-          multiline: {
-            delimiter: "semi",
-            requireLast: true,
-          },
+      // "@typescript-eslint/member-delimiter-style": [
+      //   "error",
+      //   {
+      //     multiline: {
+      //       delimiter: "semi",
+      //       requireLast: true,
+      //     },
 
-          singleline: {
-            delimiter: "semi",
-            requireLast: false,
-          },
-        },
-      ],
+      //     singleline: {
+      //       delimiter: "semi",
+      //       requireLast: false,
+      //     },
+      //   },
+      // ],
 
       semi: [2, "always"],
 

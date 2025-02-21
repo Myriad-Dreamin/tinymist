@@ -1168,8 +1168,6 @@
     "compile": "yarn run compile:system",
     "watch": "yarn run build-system-base -- --sourcemap --watch",
     "check": "tsc --noEmit",
-    "lint": "eslint ./src",
-    "lint-fix": "eslint ./src --fix",
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
