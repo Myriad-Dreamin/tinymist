@@ -29,7 +29,7 @@ impl ServerState {
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
 
-        let content = Bytes::from_string(content);
+        let content: Bytes = content.as_bytes().into();
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok(content).into())]);
@@ -74,7 +74,7 @@ impl ServerState {
             }
         }
 
-        let snapshot = FileResult::Ok(Bytes::from_string(source.text().to_owned())).into();
+        let snapshot = FileResult::Ok(source.text().as_bytes().into()).into();
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
 

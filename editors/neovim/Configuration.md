@@ -16,16 +16,6 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 
 - **Type**: `string`
 
-## `exportTarget`
-
-The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.
-
-- **Type**: `string`
-- **Enum**:
-  - `paged`: The current export target is for PDF, PNG, and SVG export.
-  - `html`: The current export target is for HTML export.
-- **Default**: `"paged"`
-
 ## `exportPdf`
 
 The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.

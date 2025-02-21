@@ -241,7 +241,6 @@ impl ServerState {
             // commands
             .with_command_("tinymist.exportPdf", State::export_pdf)
             .with_command_("tinymist.exportSvg", State::export_svg)
-            // .with_command_("tinymist.exportSvgHtml", State::export_html)
             .with_command_("tinymist.exportPng", State::export_png)
             .with_command_("tinymist.exportText", State::export_text)
             .with_command_("tinymist.exportHtml", State::export_html)

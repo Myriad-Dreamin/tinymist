@@ -4,18 +4,18 @@ description = "A compatibility layer for Typst release and mainline versions."
 authors = ["The Typst Project Developers"]
 version.workspace = true
 edition.workspace = true
+readme.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["nightly"]
+default = []
 nightly = []
 
 [dependencies]
 typst-syntax.workspace = true
-typst-eval.workspace = true
 typst.workspace = true
 cfg-if.workspace = true
 comemo.workspace = true

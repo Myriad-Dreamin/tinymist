@@ -2,7 +2,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use reflexo_typst::debug_loc::{
-    DocumentPosition, ElementPoint, LspPosition, SourceLocation, SourceSpanOffset,
+    CharPosition, DocumentPosition, ElementPoint, SourceLocation, SourceSpanOffset,
 };
 use reflexo_vec2svg::IncrSvgDocServer;
 use tinymist_std::typst::TypstDocument;
@@ -139,14 +139,16 @@ impl RenderActor {
                 continue;
             };
 
+            let TypstDocument::Paged(document) = document;
+
             let data = if has_full_render {
                 if let Some(data) = self.renderer.pack_current() {
                     data
                 } else {
-                    self.renderer.pack_delta(&document)
+                    self.renderer.pack_delta(document)
                 }
             } else {
-                self.renderer.pack_delta(&document)
+                self.renderer.pack_delta(document)
             };
             let Ok(_) = self.svg_sender.send(data) else {
                 log::info!("RenderActor: svg_sender is dropped");
@@ -239,9 +241,9 @@ impl RenderActor {
             .view()?
             .resolve_source_span(crate::Location::Src(SourceLocation {
                 filepath: req.filepath.to_string_lossy().to_string(),
-                pos: LspPosition {
+                pos: CharPosition {
                     line: req.line,
-                    character: req.character,
+                    column: req.character,
                 },
             }))?;
         log::info!("RenderActor: changing cursor position: {span:?}");
@@ -261,9 +263,9 @@ impl RenderActor {
             .view()?
             .resolve_document_position(crate::Location::Src(SourceLocation {
                 filepath: req.filepath.to_string_lossy().to_string(),
-                pos: LspPosition {
+                pos: CharPosition {
                     line: req.line,
-                    character: req.character,
+                    column: req.character,
                 },
             }));
 

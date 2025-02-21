@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
     diag::{bail, StrResult},
-    foundations::{Binding, Content, Func, Module, Type, Value},
+    foundations::{Content, Func, Module, Type, Value},
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
@@ -113,8 +113,8 @@ static GROUPS: Lazy<Vec<GroupData>> = Lazy::new(|| {
                 .module()
                 .scope()
                 .iter()
-                .filter(|(_, v)| matches!(v.read(), Value::Func(_)))
-                .map(|(k, _)| k.clone())
+                .filter(|(_, v, _)| matches!(v, Value::Func(_)))
+                .map(|(k, _, _)| k.clone())
                 .collect();
         }
     }
@@ -175,7 +175,7 @@ static LIBRARY: Lazy<Library> = Lazy::new(Library::default);
 /// Extract a module from another module.
 #[track_caller]
 fn get_module<'a>(parent: &'a Module, name: &str) -> StrResult<&'a Module> {
-    match parent.scope().get(name).map(|x| x.read()) {
+    match parent.scope().get(name) {
         Some(Value::Module(module)) => Ok(module),
         _ => bail!("module doesn't contain module `{name}`"),
     }
@@ -189,7 +189,7 @@ fn resolve_definition(head: &str, base: &str) -> StrResult<String> {
 
     while let Some(name) = parts.peek() {
         if category.is_none() {
-            category = focus.scope().get(name).and_then(Binding::category);
+            category = focus.scope().get_category(name);
         }
         let Ok(module) = get_module(focus, name) else {
             break;
@@ -203,7 +203,7 @@ fn resolve_definition(head: &str, base: &str) -> StrResult<String> {
     };
 
     let name = parts.next().ok_or("link is missing first part")?;
-    let value = focus.field(name, ())?;
+    let value = focus.field(name)?;
 
     // Handle grouped functions.
     if let Some(group) = GROUPS.iter().find(|group| {
@@ -222,7 +222,7 @@ fn resolve_definition(head: &str, base: &str) -> StrResult<String> {
 
     let mut route = format!("{}reference/{}/{name}", base, category.name());
     if let Some(next) = parts.next() {
-        if let Ok(field) = value.field(next, ()) {
+        if let Ok(field) = value.field(next) {
             route.push_str("/#definitions-");
             route.push_str(next);
             if let Some(next) = parts.next() {
@@ -283,10 +283,10 @@ static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
         (LIBRARY.math.scope(), None, None),
     ];
     while let Some((scope, parent_name, cat)) = scope_to_finds.pop() {
-        for (name, bind) in scope.iter() {
-            let cat = cat.or_else(|| bind.category());
+        for (name, value, _) in scope.iter() {
+            let cat = cat.or_else(|| scope.get_category(name));
             let name = urlify(name);
-            match bind.read() {
+            match value {
                 Value::Func(func) => {
                     if let Some(cat) = cat {
                         let Some(name) = func.name() else {
@@ -437,7 +437,6 @@ pub fn with_vm<T>(
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
-        routines: &typst::ROUTINES,
         world,
         route: Route::default(),
         introspector: introspector.track(),

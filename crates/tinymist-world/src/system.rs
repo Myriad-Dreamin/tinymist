@@ -40,11 +40,8 @@ impl TypstSystemUniverse {
         let registry: Arc<HttpRegistry> = Arc::default();
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
         let inputs = std::mem::take(&mut opts.inputs);
-
-        // todo: enable html
         Ok(Self::new_raw(
             opts.entry.clone().try_into()?,
-            false,
             Some(Arc::new(LazyHash::new(inputs))),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -75,10 +72,8 @@ impl SystemUniverseBuilder {
         let registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
 
-        // todo: enable html
         TypstSystemUniverse::new_raw(
             entry,
-            false,
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -123,15 +118,13 @@ mod tests {
 
     #[test]
     fn test_args() {
-        use tinymist_std::typst::TypstPagedDocument;
-
         let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
         let verse = args
             .resolve_system()
             .expect("failed to resolve system universe");
 
         let world = verse.snapshot();
-        let _res = typst::compile::<TypstPagedDocument>(&world);
+        let _res = typst::compile(&world);
     }
 
     static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);

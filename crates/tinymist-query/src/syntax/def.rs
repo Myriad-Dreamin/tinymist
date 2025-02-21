@@ -137,11 +137,7 @@ impl ExprScope {
         // ref_expr.of = of.clone();
         // ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         // return ref_expr;
-        (
-            of,
-            val.cloned()
-                .map(|val| Ty::Value(InsTy::new(val.read().to_owned()))),
-        )
+        (of, val.cloned().map(|val| Ty::Value(InsTy::new(val))))
     }
 
     pub fn merge_into(&self, exports: &mut LexicalScope) {
@@ -154,7 +150,7 @@ impl ExprScope {
             ExprScope::Module(module) => {
                 crate::log_debug_ct!("imported: {module:?}");
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
-                for (name, _) in module.scope().iter() {
+                for (name, _, _) in module.scope().iter() {
                     let name: Interned<str> = name.into();
                     exports.insert_mut(name.clone(), select_of(v.clone(), name));
                 }
@@ -162,7 +158,7 @@ impl ExprScope {
             ExprScope::Func(func) => {
                 if let Some(scope) = func.scope() {
                     let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
-                    for (name, _) in scope.iter() {
+                    for (name, _, _) in scope.iter() {
                         let name: Interned<str> = name.into();
                         exports.insert_mut(name.clone(), select_of(v.clone(), name));
                     }
@@ -170,7 +166,7 @@ impl ExprScope {
             }
             ExprScope::Type(ty) => {
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Type(*ty))));
-                for (name, _) in ty.scope().iter() {
+                for (name, _, _) in ty.scope().iter() {
                     let name: Interned<str> = name.into();
                     exports.insert_mut(name.clone(), select_of(v.clone(), name));
                 }
@@ -464,59 +460,10 @@ impl Ord for Decl {
             (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
             (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
             (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
-            _ => self.span().into_raw().cmp(&other.span().into_raw()),
+            _ => self.span().number().cmp(&other.span().number()),
         };
 
         base.then_with(|| self.name().cmp(other.name()))
-    }
-}
-
-trait StrictCmp {
-    /// Low-performance comparison but it is free from the concurrency issue.
-    /// This is only used for making stable test snapshots.
-    fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering;
-}
-
-impl Decl {
-    pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let base = match (self, other) {
-            (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
-            (Self::Module(l), Self::Module(r)) => l.fid.strict_cmp(&r.fid),
-            (Self::Docs(l), Self::Docs(r)) => l
-                .var
-                .strict_cmp(&r.var)
-                .then_with(|| l.base.strict_cmp(&r.base)),
-            _ => self.span().strict_cmp(&other.span()),
-        };
-
-        base.then_with(|| self.name().cmp(other.name()))
-    }
-}
-
-impl StrictCmp for TypstFileId {
-    fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.package()
-            .map(ToString::to_string)
-            .cmp(&other.package().map(ToString::to_string))
-            .then_with(|| self.vpath().cmp(other.vpath()))
-    }
-}
-impl<T: StrictCmp> StrictCmp for Option<T> {
-    fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (Some(l), Some(r)) => l.strict_cmp(r),
-            (Some(_), None) => std::cmp::Ordering::Greater,
-            (None, Some(_)) => std::cmp::Ordering::Less,
-            (None, None) => std::cmp::Ordering::Equal,
-        }
-    }
-}
-
-impl StrictCmp for Span {
-    fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.id()
-            .strict_cmp(&other.id())
-            .then_with(|| self.into_raw().cmp(&other.into_raw()))
     }
 }
 

@@ -28,9 +28,9 @@ impl Defines {
 
     pub fn insert_scope(&mut self, scope: &Scope) {
         // filter(Some(value)) &&
-        for (name, bind) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             if !self.defines.contains_key(name) {
-                self.insert(name.clone(), Ty::Value(InsTy::new(bind.read().clone())));
+                self.insert(name.clone(), Ty::Value(InsTy::new(value.clone())));
             }
         }
     }
@@ -301,8 +301,8 @@ impl CompletionScopeChecker<'_> {
         for name in fields_on(ty) {
             self.defines.insert((*name).into(), Ty::Any);
         }
-        for (name, bind) in ty.scope().iter() {
-            let ty = Ty::Value(InsTy::new(bind.read().clone()));
+        for (name, value, _) in ty.scope().iter() {
+            let ty = Ty::Value(InsTy::new(value.clone()));
             self.defines.insert(name.into(), ty);
         }
     }

@@ -5,7 +5,7 @@ use typst::engine::{Route, Sink, Traced};
 use typst::foundations::Module;
 use typst::World;
 
-pub use typst_eval::*;
+pub use typst::eval::*;
 
 /// Evaluates a source file and return the resulting module.
 pub fn eval_compat(
@@ -16,8 +16,7 @@ pub fn eval_compat(
     let traced = Traced::default();
     let mut sink = Sink::default();
 
-    typst_eval::eval(
-        &typst::ROUTINES,
+    typst::eval::eval(
         world.track(),
         traced.track(),
         sink.track_mut(),

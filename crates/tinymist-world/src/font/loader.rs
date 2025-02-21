@@ -38,6 +38,6 @@ impl<R: ReadAllOnce + Sized> FontLoader for LazyBufferFontLoader<R> {
     fn load(&mut self) -> Option<Font> {
         let mut buf = vec![];
         self.read.take().unwrap().read_all(&mut buf).ok()?;
-        Font::new(Bytes::new(buf), self.index)
+        Font::new(buf.into(), self.index)
     }
 }

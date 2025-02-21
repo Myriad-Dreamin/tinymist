@@ -3,8 +3,8 @@ use std::path::Path;
 use sync_lsp::transport::MirrorArgs;
 
 use tinymist::{
-    project::DocCommands,
-    tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands},
+    project::{DocCommands, TaskCommands},
+    tool::project::{CompileArgs, GenerateScriptArgs},
     CompileFontArgs, CompileOnceArgs,
 };
 use tinymist_core::LONG_VERSION;

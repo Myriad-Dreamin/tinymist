@@ -12,11 +12,7 @@ pub(crate) mod well_known {
 
     pub use typst::layout::Abs as TypstAbs;
 
-    pub use typst::Document as TypstDocumentTrait;
-
-    pub use typst::layout::PagedDocument as TypstPagedDocument;
-
-    pub use typst::html::HtmlDocument as TypstHtmlDocument;
+    pub use typst::model::Document as TypstPagedDocument;
 
     pub use typst::text::Font as TypstFont;
 
@@ -32,24 +28,13 @@ pub(crate) mod well_known {
 pub enum TypstDocument {
     /// The document compiled with `paged` target.
     Paged(Arc<well_known::TypstPagedDocument>),
-    /// The document compiled with `html` target.
-    Html(Arc<well_known::TypstHtmlDocument>),
 }
 
 impl TypstDocument {
-    /// Gets the number of pages in the document.
-    pub fn num_of_pages(&self) -> u32 {
-        match self {
-            Self::Paged(doc) => doc.pages.len() as u32,
-            Self::Html(_doc) => 1u32,
-        }
-    }
-
     /// Gets details about the document.
     pub fn info(&self) -> &typst::model::DocumentInfo {
         match self {
             Self::Paged(doc) => &doc.info,
-            Self::Html(doc) => &doc.info,
         }
     }
 
@@ -58,45 +43,6 @@ impl TypstDocument {
     pub fn introspector(&self) -> &typst::introspection::Introspector {
         match self {
             Self::Paged(doc) => &doc.introspector,
-            Self::Html(doc) => &doc.introspector,
-        }
-    }
-}
-
-impl From<Arc<well_known::TypstPagedDocument>> for TypstDocument {
-    fn from(doc: Arc<well_known::TypstPagedDocument>) -> Self {
-        Self::Paged(doc)
-    }
-}
-
-impl From<Arc<well_known::TypstHtmlDocument>> for TypstDocument {
-    fn from(doc: Arc<well_known::TypstHtmlDocument>) -> Self {
-        Self::Html(doc)
-    }
-}
-
-impl<'a> TryFrom<&'a TypstDocument> for &'a Arc<well_known::TypstPagedDocument> {
-    type Error = crate::Error;
-
-    fn try_from(doc: &'a TypstDocument) -> Result<Self, Self::Error> {
-        match doc {
-            TypstDocument::Paged(doc) => Ok(doc),
-            TypstDocument::Html(_doc) => {
-                crate::bail!("The document is compiled with `html` target, not `paged`.")
-            }
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a TypstDocument> for &'a Arc<well_known::TypstHtmlDocument> {
-    type Error = crate::Error;
-
-    fn try_from(doc: &'a TypstDocument) -> Result<Self, Self::Error> {
-        match doc {
-            TypstDocument::Paged(_doc) => {
-                crate::bail!("The document is compiled with `paged` target, not `html`.")
-            }
-            TypstDocument::Html(doc) => Ok(doc),
         }
     }
 }

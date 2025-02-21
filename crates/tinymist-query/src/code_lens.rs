@@ -33,15 +33,7 @@ impl SemanticRequest for CodeLensRequest {
 
         res.push(doc_lens("Profile", vec!["profile".into()]));
         res.push(doc_lens("Preview", vec!["preview".into()]));
-
-        let is_html = ctx.world.library.features.is_enabled(typst::Feature::Html);
-
-        if is_html {
-            res.push(doc_lens("Export HTML", vec!["export-html".into()]));
-        } else {
-            res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));
-        }
-
+        res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));
         res.push(doc_lens("More ..", vec!["more".into()]));
 
         Some(res)

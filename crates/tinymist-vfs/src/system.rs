@@ -34,7 +34,7 @@ impl PathAccessModel for SystemAccessModel {
             .map_err(f)?
             .read_to_end(&mut buf)
             .map_err(f)?;
-        Ok(Bytes::new(buf))
+        Ok(buf.into())
     }
 }
 

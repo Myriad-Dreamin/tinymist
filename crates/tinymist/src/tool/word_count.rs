@@ -154,8 +154,6 @@ impl SpanMapper {
                     self.frame(&page.frame);
                 }
             }
-            // todo: handle html
-            TypstDocument::Html(..) => {}
         }
     }
 

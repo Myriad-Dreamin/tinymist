@@ -23,7 +23,7 @@ pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoS
         entry: Some(entry),
         inputs: None,
     });
-    w.map_shadow_by_id(w.main(), Bytes::from_string(content.to_owned()))?;
+    w.map_shadow_by_id(w.main(), Bytes::from(content.as_bytes().to_owned()))?;
     // todo: bad performance
     w.take_db();
 

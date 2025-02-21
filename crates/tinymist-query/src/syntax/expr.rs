@@ -8,7 +8,7 @@ use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
-    syntax::{ast::MathTextKind, Span, SyntaxNode},
+    syntax::{Span, SyntaxNode},
     utils::LazyHash,
 };
 
@@ -424,12 +424,6 @@ impl ExprWorker<'_> {
                 self.check_math([num, denom].iter())
             }
             MathRoot(root) => self.check(root.radicand()),
-            MathText(mathtext) => {
-                Expr::Type(Ty::Value(InsTy::new(Value::Str(match mathtext.get() {
-                    MathTextKind::Character(c) => c.into(),
-                    MathTextKind::Number(n) => n.to_string().into(),
-                }))))
-            }
         }
     }
 
@@ -748,9 +742,7 @@ impl ExprWorker<'_> {
             (_, Some(Value::Module(m))) => {
                 // todo: dyn resolve src_expr
                 match m.file_id() {
-                    Some(fid) => Some(Expr::Decl(
-                        Decl::module(m.name().unwrap().into(), fid).into(),
-                    )),
+                    Some(fid) => Some(Expr::Decl(Decl::module(m.name().into(), fid).into())),
                     None => Some(Expr::Type(Ty::Value(InsTy::new(Value::Module(m))))),
                 }
             }
@@ -1170,7 +1162,7 @@ impl ExprWorker<'_> {
                     // v.select(field.name()).ok()
                     match v {
                         Ty::Value(val) => {
-                            Some(Ty::Value(InsTy::new(val.val.field(field.name(), ()).ok()?)))
+                            Some(Ty::Value(InsTy::new(val.val.field(field.name()).ok()?)))
                         }
                         _ => None,
                     }
@@ -1210,7 +1202,7 @@ impl ExprWorker<'_> {
         let val = scope
             .get(name)
             .cloned()
-            .map(|val| Ty::Value(InsTy::new(val.read().clone())));
+            .map(|val| Ty::Value(InsTy::new(val)));
         (None, val)
     }
 

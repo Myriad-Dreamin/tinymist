@@ -538,7 +538,7 @@ pub fn func_signature(func: Func) -> Signature {
             analyze_closure_signature(closure.clone(), &mut add_param);
             None
         }
-        Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
+        Repr::Element(..) | Repr::Native(..) => {
             for param in func.params().unwrap() {
                 add_param(Interned::new(ParamTy {
                     name: param.name.into(),
