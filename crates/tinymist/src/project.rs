@@ -19,6 +19,7 @@
 
 #![allow(missing_docs)]
 
+use reflexo_typst::diag::print_diagnostics;
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -150,6 +151,7 @@ impl ServerState {
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             preview,
+            is_standalone: false,
             export: export.clone(),
             editor_tx: editor_tx.clone(),
             client: Box::new(client.clone().to_untyped()),
@@ -409,6 +411,9 @@ pub struct CompileHandlerImpl {
 
     #[cfg(feature = "preview")]
     pub(crate) preview: ProjectPreviewState,
+    /// Whether the compile server is running in standalone CLI (not as a
+    /// language server).
+    pub is_standalone: bool,
 
     pub(crate) export: crate::task::ExportTask,
     pub(crate) editor_tx: EditorSender,
@@ -612,6 +617,23 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 return;
             }
             *n_rev = snap.world.revision().get();
+        }
+
+        // Prints the diagnostics when we are running the compilation in standalone
+        // CLI.
+        if self.is_standalone {
+            print_diagnostics(
+                &snap.world,
+                snap.doc
+                    .as_ref()
+                    .err()
+                    .cloned()
+                    .iter()
+                    .flatten()
+                    .chain(snap.warnings.iter()),
+                reflexo_typst::DiagnosticFormat::Human,
+            )
+            .log_error("failed to print diagnostics");
         }
 
         self.notify_diagnostics(snap);
