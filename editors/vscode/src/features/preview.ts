@@ -423,8 +423,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     ];
 
     const { dataPlanePort, staticServerPort, isPrimary } = await (isBrowsing
-      ? tinymist.startPreview(previewArgs)
-      : tinymist.startBrowsingPreview(previewArgs));
+      ? tinymist.startBrowsingPreview(previewArgs)
+      : tinymist.startPreview(previewArgs));
     console.log(
       `Launched preview, browsing:${isBrowsing}, data plane port:${dataPlanePort}, static server port:${staticServerPort}`,
     );
