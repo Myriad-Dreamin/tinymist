@@ -350,7 +350,7 @@ impl ServerState {
             if let Some(entry) = entry {
                 self.change_main_file(Some(entry)).map_err(internal_error)?;
             }
-            self.set_pin_by_preview(true);
+            self.set_pin_by_preview(true, browsing_preview);
 
             self.preview.start(cli_args, previewer, id, true)
         } else if let Some(entry) = entry {

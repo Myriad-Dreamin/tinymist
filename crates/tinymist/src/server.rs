@@ -64,6 +64,9 @@ pub struct ServerState {
     /// Whether client is pinning caused by preview, which has lower priority
     /// than pinning.
     pub pinning_by_preview: bool,
+    /// Whether client is pinning caused by preview, which has lower priority
+    /// than pinning.
+    pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
     /// The client ever focused implicitly by activities.
@@ -116,6 +119,7 @@ impl ServerState {
 
             pinning_by_user: false,
             pinning_by_preview: false,
+            pinning_by_browsing_preview: false,
             focusing: None,
             formatter,
             user_action: Default::default(),
@@ -308,7 +312,7 @@ impl ServerState {
 
         match params {
             ServerEvent::UnpinPrimaryByPreview => {
-                ready.set_pin_by_preview(false);
+                ready.set_pin_by_preview(false, false);
             }
         }
 
