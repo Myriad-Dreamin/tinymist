@@ -97,14 +97,14 @@ The extension can format Typst files using typstfmt or typstyle.
 
 ## `formatterPrintWidth`
 
-Set the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.
+Sets the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.
 
 - **Type**: `number`
 - **Default**: `120`
 
 ## `formatterIndentSize`
 
-Set the indent size (using space) for the formatter.
+Sets the indent size (using space) for the formatter.
 
 - **Type**: `number`
 - **Default**: `2`
