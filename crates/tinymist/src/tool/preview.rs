@@ -40,7 +40,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
     CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, ProjectClient,
-    ProjectCompiler,
+    ProjectCompiler, ProjectState,
 };
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -712,7 +712,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             notified_revision: Mutex::default(),
         });
 
-        let mut server = ProjectCompiler::new(
+        let mut compiler = ProjectCompiler::new(
             verse,
             dep_tx,
             CompileServerOpts {
@@ -720,21 +720,28 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
                 enable_watch: true,
             },
         );
-        let registered = preview_state.register(&server.primary.id, previewer.compile_watcher());
+        let registered = preview_state.register(&compiler.primary.id, previewer.compile_watcher());
         if !registered {
             tinymist_std::bail!("failed to register preview");
         }
 
-        let handle = Arc::new(PreviewProjectHandler {
-            project_id: server.primary.id.clone(),
+        let handle: Arc<PreviewProjectHandler> = Arc::new(PreviewProjectHandler {
+            project_id: compiler.primary.id.clone(),
             client: Box::new(intr_tx),
         });
 
+        compiler.primary.reason.by_entry_update = true;
         let service = async move {
+            let handler = compiler.handler.clone();
+            handler.on_any_compile_reason(&mut compiler);
+
             let mut intr_rx = intr_rx;
             while let Some(intr) = intr_rx.recv().await {
-                server.process(intr);
+                log::debug!("Project compiler received: {intr:?}");
+                ProjectState::do_interrupt(&mut compiler, intr);
             }
+
+            log::info!("Project compiler exited");
         };
 
         (service, handle)
