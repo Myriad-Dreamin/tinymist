@@ -56,13 +56,16 @@
     "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
+    "css": "^3.0.0",
     "esbuild-plugin-polyfill-node": "^0.3.0",
+    "lodash.flow": "^3.5.0",
+    "vscode-languageclient": "^9.0.0",
     "vscode-languageserver": "^9.0.0",
-    "vscode-languageclient": "^9.0.0"
+    "xxhashjs": "^0.2.2"
   },
   "devDependencies": {
-    "vscode-html-languageservice": "^5.3.1",
     "@types/chai": "^5.0.1",
+    "@types/css": "^0.0.38",
     "@types/mocha": "^10.0.1",
     "@types/node": "^22.13.4",
     "@types/vscode": "^1.97.0",
@@ -70,6 +73,7 @@
     "@vscode/vsce": "^2.22.0",
     "chai": "^5.1.1",
     "mocha": "^10.2.0",
-    "ovsx": "^0.8.3"
+    "ovsx": "^0.8.3",
+    "vscode-html-languageservice": "^5.3.1"
   }
 }

@@ -13,7 +13,12 @@ import {
   LanguageClient,
   TransportKind,
 } from "vscode-languageclient/node";
-import { getCSSVirtualContent, isInsideStyleRegion } from "./embeddedSupport";
+import {
+  getCSSVirtualContent,
+  isInsideClassAttribute,
+  isInsideStyleRegion,
+} from "./embeddedSupport";
+import { cssActivate } from "./features/css";
 
 let client: LanguageClient;
 
@@ -21,6 +26,8 @@ const htmlLanguageService = getLanguageService();
 
 export function activate(context: ExtensionContext) {
   console.log("start!!!!!!!!!!");
+
+  const provider = cssActivate(context);
 
   // The server is implemented in node
   const serverModule = context.asAbsolutePath(path.join("out", "server.js"));
@@ -39,7 +46,7 @@ export function activate(context: ExtensionContext) {
 
   vscode.workspace.registerTextDocumentContentProvider("embedded-content", {
     provideTextDocumentContent: (uri) => {
-      console.log("provideTextDocumentContent gg", uri.toString(), decodeURIComponent);
+      // console.log("provideTextDocumentContent gg", uri.toString(), decodeURIComponent);
       const originalUri = uri.path.slice(1).slice(0, -4);
       const decodedUri = decodeURIComponent(originalUri);
       return virtualDocumentContents.get(decodedUri);
@@ -50,7 +57,19 @@ export function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: "file", language: "typst" }],
     middleware: {
       provideCompletionItem: async (document, position, context, token, next) => {
-        console.log("provideCompletionItem", document.uri.toString(), position);
+        // console.log("provideCompletionItem", document.uri.toString(), position);
+
+        // If in `<class>`, completes class
+        if (
+          isInsideClassAttribute(
+            htmlLanguageService,
+            document.getText(),
+            document.offsetAt(position),
+          )
+        ) {
+          // console.log("isInsideClassAttribute", await provider.completionItems);
+          return provider.completionItems;
+        }
 
         // If not in `<style>`, do not perform request forwarding
         const virtualContent = isInsideStyleRegion(
@@ -100,9 +119,7 @@ export function activate(context: ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  console.log("deactivate!!!!!!!!!!");
   if (!client) {
-    console.log("client!!!!!!!!!!");
     return undefined;
   }
   return client.stop();

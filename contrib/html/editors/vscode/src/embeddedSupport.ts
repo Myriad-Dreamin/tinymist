@@ -31,12 +31,132 @@ interface EmbeddedRegion {
   attributeValue?: boolean;
 }
 
+enum TokenKind {
+  Unknown,
+  Colon,
+  String,
+  Identifier,
+}
+
+class BackScanner {
+  currentToken: TokenKind = TokenKind.Unknown;
+  tokenContent: string = "";
+
+  constructor(
+    private documentText: string,
+    private offset: number,
+  ) {
+    this.scanBack();
+  }
+
+  getCurrentToken() {
+    return this.currentToken;
+  }
+
+  scanBack() {
+    let i = this.offset;
+    this.currentToken = TokenKind.Unknown;
+    while (i >= 0) {
+      const ch = this.documentText[i];
+      i--;
+      //   console.log("scanBack", ch, this.currentToken, this.tokenContent);
+      if (this.currentToken === TokenKind.Unknown) {
+        if (ch === ":") {
+          this.currentToken = TokenKind.Colon;
+          this.tokenContent = ch;
+          break;
+        } else if (ch === '"') {
+          this.currentToken = TokenKind.String;
+          this.tokenContent = ch;
+        } else if (/[a-zA-Z0-9\-]/.test(ch)) {
+          this.currentToken = TokenKind.Identifier;
+          this.tokenContent = ch;
+        } else if (/\s/.test(ch)) {
+          // ignore
+        } else {
+          break;
+        }
+      } else if (this.currentToken === TokenKind.String) {
+        this.tokenContent = ch + this.tokenContent;
+        if (ch === '"') {
+          break;
+        }
+      } else if (this.currentToken === TokenKind.Identifier) {
+        if (/[a-zA-Z0-9\-]/.test(ch)) {
+          this.tokenContent = ch + this.tokenContent;
+        } else {
+          break;
+        }
+      }
+    }
+    this.offset = i;
+  }
+}
+
+export function isInsideClassAttribute(
+  languageService: LanguageService,
+  documentText: string,
+  offset: number,
+) {
+  console.log("isInsideClassAttribute", offset);
+
+  // string start
+  let start = offset - 1;
+  while (start >= 0) {
+    if (documentText[start] === '"') {
+      //   console.log("next", documentText[start]);
+
+      let shashCount = 0;
+      while (start > 0) {
+        if (documentText[start - 1] === "\\") {
+          //   console.log("next slash", documentText[start - 1]);
+          shashCount++;
+          start--;
+        } else {
+          break;
+        }
+      }
+
+      if (shashCount % 2 === 0) {
+        // console.log("break slash", documentText[start]);
+        break;
+      }
+
+      start--;
+    } else {
+      start--;
+    }
+  }
+
+  if (start >= 0 && documentText[start] === '"') {
+    // console.log("skip string content to start", start, documentText.slice(start, offset));
+    start -= 1;
+
+    // find class attribute
+    const reverseScanner = new BackScanner(documentText, start);
+    if (reverseScanner.getCurrentToken() !== TokenKind.Colon) {
+      return false;
+    }
+    reverseScanner.scanBack();
+    if (reverseScanner.getCurrentToken() === TokenKind.Identifier) {
+      console.log("found class attribute", reverseScanner.tokenContent);
+      return reverseScanner.tokenContent === "class";
+    }
+    if (reverseScanner.getCurrentToken() === TokenKind.String) {
+      console.log("found class attribute", reverseScanner.tokenContent);
+      return reverseScanner.tokenContent === '"class"';
+    }
+  }
+
+  return false;
+}
+
 export function isInsideStyleRegion(
   languageService: LanguageService,
   documentText: string,
   offset: number,
 ) {
-  console.log("isInsideStyleRegion", documentText, offset);
+  //   console.log("isInsideStyleRegion", documentText, offset);
   return false;
 }
 
