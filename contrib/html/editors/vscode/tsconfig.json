@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "types": ["mocha", "chai", "node"],
+    "target": "es2020",
+    "lib": ["es2020"],
+    "outDir": "out",
+    "rootDir": "src",
+    "sourceMap": true,
+    "strict": true
+  },
+  "include": ["src", "scripts"],
+  "exclude": ["node_modules/*", "../../node_modules/*", "../../tools/*"]
+}

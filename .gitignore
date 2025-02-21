@@ -5,8 +5,8 @@ result*
 .envrc
 node_modules/
 /local/
-/editors/vscode/out/
-/editors/lapce/out/
+editors/vscode/out/
+editors/lapce/out/
 /external/typst-preview
 /dist
 

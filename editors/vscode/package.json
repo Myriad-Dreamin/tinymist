@@ -1164,7 +1164,7 @@
     "compile-shared": "yarn run build:syntax && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
     "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
     "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
-    "package": "vsce package --yarn",
+    "package": "npx @vscode/vsce package --yarn",
     "compile": "yarn run compile:system",
     "watch": "yarn run build-system-base -- --sourcemap --watch",
     "check": "tsc --noEmit",

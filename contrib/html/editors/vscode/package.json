@@ -1,0 +1,62 @@
+{
+  "name": "tinymist-html-ext",
+  "version": "0.13.0-rc1",
+  "description": "HTML for Typst",
+  "keywords": [
+    "typst",
+    "language-server"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
+  "displayName": "Tinymist Typst with HTML",
+  "author": "Myriad-Dreamin",
+  "contributors": [
+    "Myriad-Dreamin"
+  ],
+  "publisher": "myriad-dreamin",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "activationEvents": [
+    "onLanguage:typst"
+  ],
+  "main": "./out/extension.js",
+  "browser": "./out/extension.web.js",
+  "icon": "./icons/ti-white.png",
+  "contributes": {},
+  "scripts": {
+    "build-web-base": "node esbuild.web.mjs",
+    "build-system-base": "node esbuild.system.mjs",
+    "build-base": "yarn run build-web-base && yarn run build-system-base",
+    "compile-shared": "node scripts/check-version.mjs && node scripts/postinstall.cjs",
+    "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
+    "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
+    "package": "npx @vscode/vsce package --yarn",
+    "compile": "yarn run compile:system",
+    "watch": "yarn run build-system-base -- --sourcemap --watch",
+    "check": "tsc --noEmit",
+    "format-check": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+  },
+  "dependencies": {
+    "esbuild-plugin-polyfill-node": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^5.0.1",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^22.13.4",
+    "@types/vscode": "^1.97.0",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.22.0",
+    "chai": "^5.1.1",
+    "mocha": "^10.2.0",
+    "ovsx": "^0.8.3"
+  }
+}
