@@ -98,8 +98,9 @@ impl ServerState {
 /// queries.)
 impl ServerState {
     /// Updates the `pinning_by_preview` status.
-    pub fn set_pin_by_preview(&mut self, pin: bool) {
+    pub fn set_pin_by_preview(&mut self, pin: bool, browsing: bool) {
         self.pinning_by_preview = pin;
+        self.pinning_by_browsing_preview = browsing;
     }
 
     /// Changes main file to the given path.
@@ -133,7 +134,10 @@ impl ServerState {
 
     /// Focuses main file to the given path.
     pub fn focus_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
-        if self.pinning_by_user || self.config.compile.has_default_entry_path {
+        if self.pinning_by_user
+            || (self.pinning_by_preview && !self.pinning_by_browsing_preview)
+            || self.config.compile.has_default_entry_path
+        {
             self.focusing = new_entry;
             return Ok(false);
         }
