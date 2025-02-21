@@ -641,19 +641,23 @@ fn is_valid_origin_impl(
     expected_port: u16,
     context: &impl ValidOriginContext,
 ) -> bool {
-    *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://") || {
+    h.as_bytes().starts_with(b"vscode-webview://") || {
         // Matches the origin of the local listening port.
         let matched = std::str::from_utf8(h.as_bytes()).ok().and_then(|h| {
             let url = Url::parse(h).ok()?;
-            // todo: allocate memory here.
-            let host = url.host().as_ref().map(ToString::to_string);
             let valid = (matches!(url.scheme(), "http" | "https")
-                && (matches!(host.as_deref(), Some("localhost" | "127.0.0.1"))
-                    || (host.as_deref().zip(context.gitpod_suffix())).is_some_and(
-                        |(host, (workspace_id, cluster_host))| {
-                            *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
-                        },
-                    )));
+                && url.host_str().is_some_and(|host| {
+                    // todo: allocate memory here.
+                    (matches!(host, "localhost" | "127.0.0.1")
+                        || Url::parse(&format!("http://{expected_origin}"))
+                            .ok()
+                            .is_some_and(|expected| Some(host) == expected.host_str())
+                        || context
+                            .gitpod_suffix()
+                            .is_some_and(|(workspace_id, cluster_host)| {
+                                *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
+                            }))
+                }));
 
             valid.then_some(())
         });
@@ -960,22 +964,35 @@ mod tests {
     }
 
     #[test]
-    fn test_valid_origin() {
+    fn test_valid_origin_localhost() {
         assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
         assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
         assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:0", 42));
         assert!(check_origin("http://localhost:42", "127.0.0.1:42", 42));
         assert!(check_origin("http://localhost:42", "127.0.0.1:0", 42));
+
+        assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "localhost:0", 42));
+        assert!(check_origin("http://localhost:42", "localhost:42", 42));
+        assert!(check_origin("http://localhost:42", "localhost:0", 42));
     }
 
     #[test]
-    fn test_invalid_origin() {
+    fn test_invalid_origin_localhost() {
         assert!(!check_origin("https://huh.io:8080", "127.0.0.1:42", 42));
         assert!(!check_origin("http://huh.io:8080", "127.0.0.1:42", 42));
         assert!(!check_origin("https://huh.io:443", "127.0.0.1:42", 42));
         assert!(!check_origin("http://huh.io:42", "127.0.0.1:0", 42));
         assert!(!check_origin("http://huh.io", "127.0.0.1:42", 42));
         assert!(!check_origin("https://huh.io", "127.0.0.1:42", 42));
+
+        assert!(!check_origin("https://huh.io:8080", "localhost:42", 42));
+        assert!(!check_origin("http://huh.io:8080", "localhost:42", 42));
+        assert!(!check_origin("https://huh.io:443", "localhost:42", 42));
+        assert!(!check_origin("http://huh.io:42", "localhost:0", 42));
+        assert!(!check_origin("http://huh.io", "localhost:42", 42));
+        assert!(!check_origin("https://huh.io", "localhost:42", 42));
     }
 
     #[test]
@@ -984,6 +1001,12 @@ mod tests {
         assert!(!check_origin("ftp://localhost:42", "127.0.0.1:42", 42));
         assert!(!check_origin("ftp://127.0.0.1:42", "127.0.0.1:0", 42));
         assert!(!check_origin("ftp://localhost:42", "127.0.0.1:0", 42));
+
+        // The scheme must be specified.
+        assert!(!check_origin("127.0.0.1:42", "127.0.0.1:0", 42));
+        assert!(!check_origin("localhost:42", "127.0.0.1:0", 42));
+        assert!(!check_origin("localhost:42", "127.0.0.1:42", 42));
+        assert!(!check_origin("127.0.0.1:42", "127.0.0.1:42", 42));
     }
 
     #[test]
@@ -992,10 +1015,38 @@ mod tests {
         assert!(check_origin("vscode-webview://it", "127.0.0.1:0", 42));
     }
 
+    #[test]
+    fn test_origin_manually_binding() {
+        assert!(check_origin("https://huh.io:8080", "huh.io:42", 42));
+        assert!(check_origin("http://huh.io:8080", "huh.io:42", 42));
+        assert!(check_origin("https://huh.io:443", "huh.io:42", 42));
+        assert!(check_origin("http://huh.io:42", "huh.io:0", 42));
+        assert!(check_origin("http://huh.io", "huh.io:42", 42));
+        assert!(check_origin("https://huh.io", "huh.io:42", 42));
+
+        assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "huh.io:0", 42));
+        assert!(check_origin("http://localhost:42", "huh.io:42", 42));
+        assert!(check_origin("http://localhost:42", "huh.io:0", 42));
+
+        assert!(!check_origin("https://huh2.io:8080", "huh.io:42", 42));
+        assert!(!check_origin("http://huh2.io:8080", "huh.io:42", 42));
+        assert!(!check_origin("https://huh2.io:443", "huh.io:42", 42));
+        assert!(!check_origin("http://huh2.io:42", "huh.io:0", 42));
+        assert!(!check_origin("http://huh2.io", "huh.io:42", 42));
+        assert!(!check_origin("https://huh2.io", "huh.io:42", 42));
+    }
+
     // https://github.com/Myriad-Dreamin/tinymist/issues/1350
     // the origin of code-server's proxy
     #[test]
     fn test_valid_origin_code_server_proxy() {
+        assert!(check_origin(
+            "http://localhost:8080/proxy/45411",
+            "127.0.0.1:42",
+            42
+        ));
         assert!(check_origin(
             "http://localhost/proxy/42",
             "127.0.0.1:42",
