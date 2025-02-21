@@ -647,13 +647,15 @@ fn is_valid_origin_impl(
             let url = Url::parse(h).ok()?;
             // todo: allocate memory here.
             let host = url.host().as_ref().map(ToString::to_string);
-            (matches!(host.as_deref(), Some("localhost" | "127.0.0.1"))
-                || (host.as_deref().zip(context.gitpod_suffix())).is_some_and(
-                    |(host, (workspace_id, cluster_host))| {
-                        *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
-                    },
-                ))
-            .then_some(())
+            let valid = (matches!(url.scheme(), "http" | "https")
+                && (matches!(host.as_deref(), Some("localhost" | "127.0.0.1"))
+                    || (host.as_deref().zip(context.gitpod_suffix())).is_some_and(
+                        |(host, (workspace_id, cluster_host))| {
+                            *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
+                        },
+                    )));
+
+            valid.then_some(())
         });
         matched.is_some()
     }
@@ -974,6 +976,20 @@ mod tests {
         assert!(!check_origin("http://huh.io:42", "127.0.0.1:0", 42));
         assert!(!check_origin("http://huh.io", "127.0.0.1:42", 42));
         assert!(!check_origin("https://huh.io", "127.0.0.1:42", 42));
+    }
+
+    #[test]
+    fn test_invalid_origin_scheme() {
+        assert!(!check_origin("ftp://127.0.0.1:42", "127.0.0.1:42", 42));
+        assert!(!check_origin("ftp://localhost:42", "127.0.0.1:42", 42));
+        assert!(!check_origin("ftp://127.0.0.1:42", "127.0.0.1:0", 42));
+        assert!(!check_origin("ftp://localhost:42", "127.0.0.1:0", 42));
+    }
+
+    #[test]
+    fn test_valid_origin_vscode() {
+        assert!(check_origin("vscode-webview://it", "127.0.0.1:42", 42));
+        assert!(check_origin("vscode-webview://it", "127.0.0.1:0", 42));
     }
 
     // https://github.com/Myriad-Dreamin/tinymist/issues/1350
