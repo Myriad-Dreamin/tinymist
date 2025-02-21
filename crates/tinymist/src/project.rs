@@ -19,6 +19,7 @@
 
 #![allow(missing_docs)]
 
+use reflexo_typst::diag::print_diagnostics;
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -613,6 +614,19 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             }
             *n_rev = snap.world.revision().get();
         }
+
+        print_diagnostics(
+            &snap.world,
+            snap.doc
+                .as_ref()
+                .err()
+                .cloned()
+                .iter()
+                .flatten()
+                .chain(snap.warnings.iter()),
+            reflexo_typst::DiagnosticFormat::Human,
+        )
+        .log_error("failed to print diagnostics");
 
         self.notify_diagnostics(snap);
 
