@@ -707,6 +707,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         // Create the actor
         let compile_handle = Arc::new(CompileHandlerImpl {
             preview: preview_state.clone(),
+            is_standalone: true,
             export: crate::task::ExportTask::new(handle, None, config.export()),
             editor_tx,
             client: Box::new(intr_tx.clone()),
