@@ -4,6 +4,7 @@
 
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
+use std::sync::LazyLock;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use futures::{SinkExt, StreamExt, TryStreamExt};
@@ -611,16 +612,46 @@ pub async fn make_http_server(
 }
 
 fn is_valid_origin(h: &HeaderValue, expected_origin: &str, expected_port: u16) -> bool {
+    struct SystemValidOriginContext;
+    impl ValidOriginContext for SystemValidOriginContext {
+        fn gitpod_suffix(&self) -> Option<&(String, String)> {
+            // A bit of hack, this is the copy code from the `editors/vscode/src/gitpod.ts`
+            // to ensure no regression is made. We should receive more reports from
+            // users to check if we can have a way to check valid origins sensibly.
+            static GITPOD_URL_SUFFIX: LazyLock<Option<(String, String)>> = LazyLock::new(|| {
+                let workspace_id = std::env::var("GITPOD_WORKSPACE_ID").ok();
+                let cluster_host = std::env::var("GITPOD_WORKSPACE_CLUSTER_HOST").ok();
+                workspace_id.zip(cluster_host)
+            });
+
+            GITPOD_URL_SUFFIX.as_ref()
+        }
+    }
+
+    is_valid_origin_impl(h, expected_origin, expected_port, &SystemValidOriginContext)
+}
+
+trait ValidOriginContext {
+    fn gitpod_suffix(&self) -> Option<&(String, String)>;
+}
+
+fn is_valid_origin_impl(
+    h: &HeaderValue,
+    expected_origin: &str,
+    expected_port: u16,
+    context: &impl ValidOriginContext,
+) -> bool {
     *h == expected_origin || h.as_bytes().starts_with(b"vscode-webview://") || {
         // Matches the origin of the local listening port.
         let matched = std::str::from_utf8(h.as_bytes()).ok().and_then(|h| {
             let url = Url::parse(h).ok()?;
-            (url.port() == Some(expected_port)
-                && matches!(url.scheme(), "http" | "https" | "ws" | "wss")
-                && matches!(
-                    // todo: allocate memory here.
-                    url.host().as_ref().map(ToString::to_string).as_deref(),
-                    Some("localhost" | "127.0.0.1")
+            // todo: allocate memory here.
+            let host = url.host().as_ref().map(ToString::to_string);
+            (matches!(host.as_deref(), Some("localhost" | "127.0.0.1"))
+                || (host.as_deref().zip(context.gitpod_suffix())).is_some_and(
+                    |(host, (workspace_id, cluster_host))| {
+                        *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
+                    },
                 ))
             .then_some(())
         });
@@ -916,4 +947,93 @@ fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver
                 }))
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn check_origin(origin: &'static str, expected: &str, port: u16) -> bool {
+        is_valid_origin(&HeaderValue::from_static(origin), expected, port)
+    }
+
+    #[test]
+    fn test_valid_origin() {
+        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
+        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:0", 42));
+        assert!(check_origin("http://localhost:42", "127.0.0.1:42", 42));
+        assert!(check_origin("http://localhost:42", "127.0.0.1:0", 42));
+    }
+
+    #[test]
+    fn test_invalid_origin() {
+        assert!(!check_origin("https://huh.io:8080", "127.0.0.1:42", 42));
+        assert!(!check_origin("http://huh.io:8080", "127.0.0.1:42", 42));
+        assert!(!check_origin("https://huh.io:443", "127.0.0.1:42", 42));
+        assert!(!check_origin("http://huh.io:42", "127.0.0.1:0", 42));
+        assert!(!check_origin("http://huh.io", "127.0.0.1:42", 42));
+        assert!(!check_origin("https://huh.io", "127.0.0.1:42", 42));
+    }
+
+    // https://github.com/Myriad-Dreamin/tinymist/issues/1350
+    // the origin of code-server's proxy
+    #[test]
+    fn test_valid_origin_code_server_proxy() {
+        assert!(check_origin(
+            "http://localhost/proxy/42",
+            "127.0.0.1:42",
+            42
+        ));
+    }
+
+    // the origin of gitpod
+    #[test]
+    fn test_valid_origin_gitpod_proxy() {
+        fn check_gitpod_origin(
+            origin: &'static str,
+            expected: &str,
+            port: u16,
+            workspace: &str,
+            cluster_host: &str,
+        ) -> bool {
+            struct MockValidOriginContext((String, String));
+            impl ValidOriginContext for MockValidOriginContext {
+                fn gitpod_suffix(&self) -> Option<&(String, String)> {
+                    Some(&self.0)
+                }
+            }
+
+            is_valid_origin_impl(
+                &HeaderValue::from_static(origin),
+                expected,
+                port,
+                &MockValidOriginContext((workspace.to_owned(), cluster_host.to_owned())),
+            )
+        }
+
+        let check_gitpod_origin1 = |origin: &'static str| {
+            let explicit =
+                check_gitpod_origin(origin, "127.0.0.1:42", 42, "workspace_id", "gitpod.typ");
+            let implicit =
+                check_gitpod_origin(origin, "127.0.0.1:0", 42, "workspace_id", "gitpod.typ");
+
+            assert_eq!(explicit, implicit, "failed port binding");
+            explicit
+        };
+
+        assert!(check_gitpod_origin1("http://127.0.0.1:42"));
+        assert!(check_gitpod_origin1("http://127.0.0.1:42"));
+        assert!(check_gitpod_origin1("http://42-workspace_id.gitpod.typ"));
+        assert!(check_gitpod_origin1(
+            "http://42-workspace_id.gitpod.typ/path"
+        ));
+        assert!(check_gitpod_origin1("http://42-workspace_id.gitpod.typ:42"));
+
+        assert!(!check_gitpod_origin1(
+            "http://42-workspace_id2.gitpod.typ:42"
+        ));
+        assert!(!check_gitpod_origin1("http://huh.io"));
+        assert!(!check_gitpod_origin1("https://huh.io"));
+    }
 }
