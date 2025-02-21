@@ -1,10 +1,10 @@
 import { build } from "esbuild";
 import { polyfillNode } from "esbuild-plugin-polyfill-node";
-import * as fs from 'fs';
+import * as fs from "fs";
 
-if (!fs.existsSync('./out/extension.js')) {
-  fs.mkdirSync('./out', { recursive: true });
-  fs.writeFileSync('./out/extension.js', '');
+if (!fs.existsSync("./out/extension.js")) {
+  fs.mkdirSync("./out", { recursive: true });
+  fs.writeFileSync("./out/extension.js", "");
 }
 
 build({
@@ -16,7 +16,7 @@ build({
   target: ["es2020", "chrome61", "edge18", "firefox60"],
   // Node.js global to browser globalThis
   define: {
-    global: 'globalThis'
+    global: "globalThis",
   },
   plugins: [
     polyfillNode({

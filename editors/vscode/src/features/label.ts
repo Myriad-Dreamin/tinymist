@@ -104,7 +104,7 @@ function makeLabelTree(labels: LabelViewItem[]): LabelViewItem[] {
     (currentTrie.refs ||= []).push(label);
   }
 
-  const merged  = mergeLabelTree(trie);
+  const merged = mergeLabelTree(trie);
   // If there's only one label in the document, the result of `mergeLabelTree` is that label
   // and has no children. So make make a list out of that by hand here.
   const items = merged.children ?? [merged];

@@ -1,9 +1,9 @@
 import { build } from "esbuild";
-import * as fs from 'fs';
+import * as fs from "fs";
 
-if (!fs.existsSync('./out/extension.web.js')) {
-  fs.mkdirSync('./out', { recursive: true });
-  fs.writeFileSync('./out/extension.web.js', '');
+if (!fs.existsSync("./out/extension.web.js")) {
+  fs.mkdirSync("./out", { recursive: true });
+  fs.writeFileSync("./out/extension.web.js", "");
 }
 
 build({
