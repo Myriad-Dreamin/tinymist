@@ -325,16 +325,20 @@ impl ProjectState {
         })
     }
 
-    pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
+    pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
         if let Interrupt::Compiled(compiled) = &intr {
-            let proj = self.compiler.projects().find(|p| p.id == compiled.id);
+            let proj = compiler.projects().find(|p| p.id == compiled.id);
             if let Some(proj) = proj {
                 proj.ext
                     .compiled(&proj.verse.revision, proj.handler.as_ref(), compiled);
             }
         }
 
-        self.compiler.process(intr);
+        compiler.process(intr);
+    }
+
+    pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
+        Self::do_interrupt(&mut self.compiler, intr);
     }
 
     pub(crate) fn stop(&mut self) {
