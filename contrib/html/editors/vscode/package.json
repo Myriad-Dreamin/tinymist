@@ -29,7 +29,17 @@
   "main": "./out/extension.js",
   "browser": "./out/extension.web.js",
   "icon": "./icons/ti-white.png",
-  "contributes": {},
+  "contributes": {
+    "commands": [
+      {
+        "command": "tinymist-html-ext.showLog",
+        "title": "TinymistHTML: Show Log",
+        "description": "Show log of the tinymist extension",
+        "category": "Typst",
+        "icon": "$(list-flat)"
+      }
+    ]
+  },
   "scripts": {
     "build-web-base": "node esbuild.web.mjs",
     "build-system-base": "node esbuild.system.mjs",
@@ -46,9 +56,12 @@
     "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
-    "esbuild-plugin-polyfill-node": "^0.3.0"
+    "esbuild-plugin-polyfill-node": "^0.3.0",
+    "vscode-languageserver": "^9.0.0",
+    "vscode-languageclient": "^9.0.0"
   },
   "devDependencies": {
+    "vscode-html-languageservice": "^5.3.1",
     "@types/chai": "^5.0.1",
     "@types/mocha": "^10.0.1",
     "@types/node": "^22.13.4",

@@ -10,5 +10,5 @@
     "strict": true
   },
   "include": ["src", "scripts"],
-  "exclude": ["node_modules/*", "../../node_modules/*", "../../tools/*"]
+  "exclude": ["node_modules/*", "../../node_modules/*"]
 }
