@@ -6,6 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.0 - [2025-02-22]
+
+Todo: add changelog
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.13.0
+
 ## v0.12.21 - [2025-02-20]
 
 Nightly Release at [feat: split tinymist-task (#1277)](https://github.com/Myriad-Dreamin/tinymist/commit/3799db6dd4b3a6504fe295ff74d6e82cc57d16bf), using [ParaN3xus/typst tinymist-nightly-v0.12.21-content-hint](https://github.com/ParaN3xus/typst/tree/tinymist-nightly-v0.12.21-content-hint), a.k.a. [typst/typst 0.13 changelog (#5801)](https://github.com/typst/typst/commit/4a9a5d2716fc91f60734769eb001aef32fe15403).
