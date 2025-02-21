@@ -39,7 +39,7 @@ jobs:
           submodules: recursive
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.84.0
         with:
           targets: ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
