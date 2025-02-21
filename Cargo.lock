@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.95"
+version = "1.0.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+checksum = "6b964d184e89d9b6b67dd2715bc8e74cf3107fb2b529990c90cf517326150bf4"
 
 [[package]]
 name = "approx"
@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "base64",
@@ -3340,9 +3340,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.138"
+version = "1.0.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d434192e7da787e94a6ea7e9670b26a036d0ca41e0b7efb2676dd32bae872949"
+checksum = "44f86c3acccc9c65b153fe1b85a3be07fe5515274ec9f0653b4a0875731c72a6"
 dependencies = [
  "itoa",
  "memchr",
@@ -3667,7 +3667,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "clap",
@@ -3789,7 +3789,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3912,7 +3912,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3985,7 +3985,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "ecow",
  "insta",
@@ -4005,11 +4005,11 @@ checksum = "00faa0c489391055b045b78f2ece81a641a18577f4ed8606d2dbc2bd7f21d1a1"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.21-rc1"
+version = "0.12.21"
 
 [[package]]
 name = "tinymist-core"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4021,7 +4021,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "quote",
  "syn 2.0.98",
@@ -4029,7 +4029,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4058,7 +4058,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "base64",
@@ -4112,7 +4112,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "base64",
  "log",
@@ -4125,7 +4125,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "base64",
@@ -4161,7 +4161,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4196,7 +4196,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "comemo",
  "indexmap 2.7.1",
@@ -4213,7 +4213,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4502,7 +4502,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "base64",
  "clap",
@@ -4719,7 +4719,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "clap",
  "comemo",
@@ -4776,7 +4776,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.12.21-rc1"
+version = "0.12.21"
 dependencies = [
  "cfg-if",
  "comemo",
@@ -5517,9 +5517,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winnow"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59690dea168f2198d1a3b0cac23b8063efcd11012f10ae4698f284808c8ef603"
+checksum = "0e7f4ea97f6f78012141bcdb6a216b2609f0979ada50b20ca5b52dde2eac2bb1"
 dependencies = [
  "memchr",
 ]
