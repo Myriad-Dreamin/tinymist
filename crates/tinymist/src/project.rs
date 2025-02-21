@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::diag::print_diagnostics;
+use reflexo_typst::{ConsoleDiagReporter, GenericExporter};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -36,7 +36,7 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
-use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
+use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition, World};
 
 use super::ServerState;
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
@@ -613,18 +613,24 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
         if self.is_standalone {
-            print_diagnostics(
-                &snap.world,
-                snap.doc
-                    .as_ref()
-                    .err()
-                    .cloned()
-                    .iter()
-                    .flatten()
-                    .chain(snap.warnings.iter()),
-                reflexo_typst::DiagnosticFormat::Human,
-            )
-            .log_error("failed to print diagnostics");
+            let diag = snap
+                .doc
+                .as_ref()
+                .err()
+                .cloned()
+                .iter()
+                .flatten()
+                .chain(snap.warnings.iter())
+                .cloned()
+                .collect();
+
+            let rep = reflexo_typst::CompileReport::CompileSuccess(
+                snap.world.main(),
+                diag,
+                Default::default(),
+            );
+
+            let _ = ConsoleDiagReporter::default().export(&snap.world, Arc::new(rep));
         }
 
         self.notify_diagnostics(snap);
