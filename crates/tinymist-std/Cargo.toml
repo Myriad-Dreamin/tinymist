@@ -70,12 +70,12 @@ full = ["web", "rkyv", "typst"]
 
 typst = ["dep:typst", "dep:typst-shim"]
 
-rkyv = ["dep:rkyv", "rkyv/alloc", "rkyv/archive_le"]
-rkyv-validation = ["dep:rkyv", "rkyv/validation"]
+rkyv = ["rkyv/alloc", "rkyv/archive_le"]
+rkyv-validation = ["rkyv/validation"]
 
-__web = ["dep:wasm-bindgen", "dep:js-sys"]
+__web = ["wasm-bindgen", "js-sys"]
 web = ["__web"]
-system = ["dep:tempfile", "dep:same-file"]
+system = ["tempfile", "same-file"]
 bi-hash = []
 
 [lints]
