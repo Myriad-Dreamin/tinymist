@@ -322,24 +322,24 @@ pub struct DocToSrcJumpInfo {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
     filepath: PathBuf,
-    line: u32,
+    line: usize,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: u32,
+    character: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolveSourceLocRequest {
     filepath: PathBuf,
-    line: u32,
+    line: usize,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: u32,
+    character: usize,
 }
 
 impl ResolveSourceLocRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line as usize, self.character as usize)
+        src.line_column_to_byte(self.line, self.character)
     }
 }
 
@@ -401,13 +401,6 @@ impl CompileWatcher {
     }
 
     pub fn notify_compile(&self, view: Arc<dyn CompileView>) {
-        log::info!(
-            "Preview({:?}): received notification: signal({:?}, {:?}), refresh style {:?}",
-            self.task_id,
-            view.is_by_entry_update(),
-            view.is_on_saved(),
-            self.refresh_style
-        );
         if !view.is_by_entry_update()
             && (self.refresh_style == RefreshStyle::OnSave && !view.is_on_saved())
         {

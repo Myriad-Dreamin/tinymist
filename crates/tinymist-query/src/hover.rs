@@ -325,7 +325,7 @@ impl ExternalDocLink {
                 Repr::With(w) => {
                     func = &w.0;
                 }
-                Repr::Closure(..) | Repr::Plugin(..) => {
+                Repr::Closure(..) => {
                     return None;
                 }
             }

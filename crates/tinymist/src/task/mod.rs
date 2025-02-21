@@ -16,7 +16,6 @@ use futures::Future;
 use parking_lot::Mutex;
 use rayon::Scope;
 use reflexo::TakeAs;
-use tinymist_std::error::prelude::*;
 
 /// Please uses this if you believe all mutations are fast
 #[derive(Clone, Default)]
@@ -55,13 +54,13 @@ struct FutureFolder {
 }
 
 impl FutureFolder {
-    async fn compute<'scope, OP, R: Send + 'static>(op: OP) -> Result<R>
+    async fn compute<'scope, OP, R: Send + 'static>(op: OP) -> anyhow::Result<R>
     where
         OP: FnOnce(&Scope<'scope>) -> R + Send + 'static,
     {
         tokio::task::spawn_blocking(move || -> R { rayon::in_place_scope(op) })
             .await
-            .context_ut("compute error")
+            .map_err(|e| anyhow::anyhow!("compute error: {e:?}"))
     }
 
     #[must_use]

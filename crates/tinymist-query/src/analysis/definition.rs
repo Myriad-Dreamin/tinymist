@@ -144,7 +144,7 @@ fn bib_definition(
     key: &str,
 ) -> Option<Definition> {
     let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
+    let Value::Array(paths) = bib_elem.path().clone().into_value() else {
         return None;
     };
 
@@ -164,7 +164,7 @@ fn ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::construct(name.into());
+    let label = Label::new(name);
     let sel = Selector::Label(label);
 
     // if it is a label, we put the selection range to itself
@@ -243,7 +243,7 @@ pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Optio
             let field = access.field().get();
             let values = ctx.analyze_expr(target.to_untyped());
             if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
-                if let Some(Value::Func(func)) = this.ty().scope().get(field).map(|b| b.read()) {
+                if let Some(Value::Func(func)) = this.ty().scope().get(field) {
                     return Some((this, func.clone()));
                 }
 
@@ -288,8 +288,7 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 
 static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let bind = fn_ty.scope().get("with")?;
-    let Value::Func(func) = bind.read() else {
+    let Some(Value::Func(func)) = fn_ty.scope().get("with") else {
         return None;
     };
     Some(func)
@@ -297,8 +296,7 @@ static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
 
 static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     let fn_ty = Type::of::<Func>();
-    let bind = fn_ty.scope().get("where")?;
-    let Value::Func(func) = bind.read() else {
+    let Some(Value::Func(func)) = fn_ty.scope().get("where") else {
         return None;
     };
     Some(func)
@@ -315,9 +313,7 @@ fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> O
             let decl = Decl::func(s.cast().unwrap());
             Definition::new(decl.into(), Some(val))
         }
-        Value::Module(module) => {
-            Definition::new_var(Interned::new_str(module.name().unwrap()), val)
-        }
+        Value::Module(module) => Definition::new_var(module.name().into(), val),
         _v => Definition::new_var(name()?, val),
     })
 }

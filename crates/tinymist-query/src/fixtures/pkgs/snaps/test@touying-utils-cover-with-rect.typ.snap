@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (71..72)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rect.typ
+snapshot_kind: text
 ---
 [
  {
@@ -35,7 +36,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rec
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "188",
+    "sortText": "186",
     "textEdit": {
      "newText": "stroke(${1:})",
      "range": {

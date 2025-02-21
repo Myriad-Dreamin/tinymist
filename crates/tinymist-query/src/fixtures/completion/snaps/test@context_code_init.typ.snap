@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (36..37)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/context_code_init.typ
+snapshot_kind: text
 ---
 [
  {
@@ -14,7 +15,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/context_code_init.typ
     "labelDetails": {
      "description": "(to: \"even\" | \"odd\" | none, weak: bool) => pagebreak"
     },
-    "sortText": "128",
+    "sortText": "127",
     "textEdit": {
      "newText": "pagebreak()${1:}",
      "range": {

@@ -148,7 +148,7 @@ fn closure_tooltip(leaf: &LinkedNode) -> Option<Tooltip> {
     let captures = visitor.finish();
     let mut names: Vec<_> = captures
         .iter()
-        .map(|(name, _)| eco_format!("`{name}`"))
+        .map(|(name, _, _)| eco_format!("`{name}`"))
         .collect();
     if names.is_empty() {
         return None;
@@ -193,7 +193,7 @@ fn named_param_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> 
         };
 
         // Find metadata about the function.
-        if let Some(Value::Func(func)) = world.library().global.scope().get(&callee).map(|x| x.read());
+        if let Some(Value::Func(func)) = world.library().global.scope().get(&callee);
         then { (func, named) }
         else { return None; }
     };

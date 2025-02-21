@@ -49,10 +49,10 @@ impl CompletionPair<'_, '_, '_> {
         let captures = visitor.finish();
 
         // Converts the captures into completions.
-        for (name, bind) in captures.iter() {
+        for (name, value, _) in captures.iter() {
             if !bindings.contains(name) {
                 let docs = "Parametrizes the captured variable.";
-                self.value_completion(Some(name.clone()), bind.read(), false, Some(docs));
+                self.value_completion(Some(name.clone()), value, false, Some(docs));
             }
         }
 

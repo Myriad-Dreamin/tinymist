@@ -16,6 +16,8 @@ use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_VERSIO
 
 pub const LOCK_FILENAME: &str = "tinymist.lock";
 
+pub const PROJECT_ROUTE_USER_ACTION_PRIORITY: u32 = 256;
+
 impl LockFile {
     pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {
         self.document.iter().find(|i| &i.id == id)

@@ -1,14 +1,13 @@
 #![allow(missing_docs)]
 
 use std::any::TypeId;
-use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
 
+use ecow::EcoVec;
 use parking_lot::Mutex;
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
+use tinymist_std::typst::TypstPagedDocument;
 use typst::diag::{At, SourceResult, Warned};
-use typst::ecow::EcoVec;
 use typst::syntax::Span;
 
 use crate::snapshot::CompileSnapshot;
@@ -127,7 +126,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         ins: Result<Arc<T::Output>>,
     ) -> Result<(), Result<Arc<T::Output>>> {
         let entry = self.computed(TypeId::of::<T>()).computed;
-        let initialized = entry.set(ins.map(|e| e as AnyArc));
+        let initialized = entry.set(ins.map(|e| Arc::new(e) as AnyArc));
         initialized.map_err(WorldComputeEntry::cast)
     }
 
@@ -150,6 +149,9 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 }
 
+pub trait Document {}
+impl Document for TypstPagedDocument {}
+
 pub trait ExportDetection<F: CompilerFeat, D> {
     type Config: Send + Sync + 'static;
 
@@ -167,17 +169,6 @@ pub trait ExportComputation<F: CompilerFeat, D> {
         let doc = g.compute::<C>()?;
         let doc = doc.as_ref().as_ref().context("document not found")?;
         Self::run(g, doc, config)
-    }
-
-    fn cast_run<'a>(
-        g: &Arc<WorldComputeGraph<F>>,
-        doc: impl TryInto<&'a Arc<D>, Error = tinymist_std::Error>,
-        config: &Self::Config,
-    ) -> Result<Self::Output>
-    where
-        D: 'a,
-    {
-        Self::run(g, doc.try_into()?, config)
     }
 
     fn run(
@@ -214,51 +205,25 @@ impl<T> FlagTask<T> {
 }
 
 pub type PagedCompilationTask = CompilationTask<TypstPagedDocument>;
-pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
-impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
-where
-    D: typst::Document + Send + Sync + 'static,
-{
-    type Output = Option<Warned<SourceResult<Arc<D>>>>;
+impl<F: CompilerFeat> WorldComputable<F> for CompilationTask<TypstPagedDocument> {
+    type Output = Option<Warned<SourceResult<Arc<TypstPagedDocument>>>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-        let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
+        let enabled = graph
+            .must_get::<FlagTask<CompilationTask<TypstPagedDocument>>>()?
+            .enabled;
 
         Ok(enabled.then(|| {
-            // todo: create html world once
-            let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
-            let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
-
-            let mut world = if is_paged_compilation {
-                graph.snap.world.paged_task()
-            } else if is_html_compilation {
-                graph.snap.world.html_task()
-            } else {
-                Cow::Borrowed(&graph.snap.world)
-            };
-
-            world.to_mut().set_is_compiling(true);
-            let compiled = typst::compile::<D>(world.as_ref());
-            world.to_mut().set_is_compiling(false);
-
-            let exclude_html_warnings = if !is_html_compilation {
-                compiled.warnings
-            } else if compiled.warnings.len() == 1
-                && compiled.warnings[0]
-                    .message
-                    .starts_with("html export is under active development")
-            {
-                EcoVec::new()
-            } else {
-                compiled.warnings
-            };
-
+            let mut world = graph.snap.world.clone();
+            world.set_is_compiling(true);
+            let compiled = typst::compile(&world);
+            world.set_is_compiling(false);
             Warned {
                 output: compiled.output.map(Arc::new),
-                warnings: exclude_html_warnings,
+                warnings: compiled.warnings,
             }
         }))
     }
@@ -266,24 +231,17 @@ where
 
 pub struct OptionDocumentTask<D>(std::marker::PhantomData<D>);
 
-impl<F: CompilerFeat, D> WorldComputable<F> for OptionDocumentTask<D>
-where
-    D: typst::Document + Send + Sync + 'static,
-{
-    type Output = Option<Arc<D>>;
+impl<F: CompilerFeat> WorldComputable<F> for OptionDocumentTask<TypstPagedDocument> {
+    type Output = Option<Arc<TypstPagedDocument>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-        let doc = graph.compute::<CompilationTask<D>>()?;
-        let compiled = doc
-            .as_ref()
-            .as_ref()
-            .and_then(|warned| warned.output.clone().ok());
+        let doc = graph.compute::<CompilationTask<TypstPagedDocument>>()?;
+        let doc = doc.as_ref().as_ref();
+        let compiled = doc.and_then(|warned| warned.output.clone().ok());
 
         Ok(compiled)
     }
 }
-
-impl<D> OptionDocumentTask<D> where D: typst::Document + Send + Sync + 'static {}
 
 struct CompilationDiagnostics {
     errors: Option<EcoVec<typst::diag::SourceDiagnostic>>,
@@ -303,7 +261,6 @@ impl CompilationDiagnostics {
 
 pub struct DiagnosticsTask {
     paged: CompilationDiagnostics,
-    html: CompilationDiagnostics,
 }
 
 impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
@@ -311,33 +268,19 @@ impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let paged = graph.compute::<PagedCompilationTask>()?.clone();
-        let html = graph.compute::<HtmlCompilationTask>()?.clone();
 
         Ok(Self {
-            paged: CompilationDiagnostics::from_result(&paged),
-            html: CompilationDiagnostics::from_result(&html),
+            paged: CompilationDiagnostics::from_result(paged.as_ref()),
         })
     }
 }
 
 impl DiagnosticsTask {
-    pub fn error_cnt(&self) -> usize {
-        self.paged.errors.as_ref().map_or(0, |e| e.len())
-            + self.html.errors.as_ref().map_or(0, |e| e.len())
-    }
-
-    pub fn warning_cnt(&self) -> usize {
-        self.paged.warnings.as_ref().map_or(0, |e| e.len())
-            + self.html.warnings.as_ref().map_or(0, |e| e.len())
-    }
-
     pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
         self.paged
             .errors
             .iter()
             .chain(self.paged.warnings.iter())
-            .chain(self.html.errors.iter())
-            .chain(self.html.warnings.iter())
             .flatten()
     }
 }
@@ -404,7 +347,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 
     /// Compile once from scratch.
-    pub fn pure_compile<D: ::typst::Document>(&self) -> Warned<SourceResult<Arc<D>>> {
+    pub fn pure_compile(&self) -> Warned<SourceResult<Arc<TypstPagedDocument>>> {
         let res = self.ensure_main();
         if let Err(err) = res {
             return Warned {
@@ -413,7 +356,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
             };
         }
 
-        let res = ::typst::compile::<D>(&self.snap.world);
+        let res = ::typst::compile(&self.snap.world);
         // compile document
         Warned {
             output: res.output.map(Arc::new),
@@ -425,14 +368,4 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     pub fn compile(&self) -> Warned<SourceResult<Arc<TypstPagedDocument>>> {
         self.pure_compile()
     }
-
-    /// Compile to html once from scratch.
-    pub fn compile_html(&self) -> Warned<SourceResult<Arc<::typst::html::HtmlDocument>>> {
-        self.pure_compile()
-    }
-
-    // With **the compilation state**, query the matches for the selector.
-    // fn query(&mut self, selector: String, document: &TypstDocument) ->
-    // SourceResult<Vec<Content>> {     self.pure_query(world, selector,
-    // document) }
 }

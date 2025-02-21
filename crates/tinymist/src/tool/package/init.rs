@@ -10,7 +10,7 @@ use typst::syntax::package::{PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
 
-use crate::project::LspWorld;
+use crate::world::LspWorld;
 
 /// The source of a template.
 #[derive(Debug, Clone)]

@@ -5,7 +5,7 @@ use std::sync::{LazyLock, OnceLock};
 
 use regex::Regex;
 use tinymist_project::{
-    font::TinymistFontResolver, CompileFontArgs, EntryState, ExportTarget, LspUniverseBuilder,
+    font::TinymistFontResolver, CompileFontArgs, EntryState, LspUniverseBuilder,
 };
 use typst_syntax::Source;
 
@@ -23,14 +23,13 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
     let main = Source::detached(s);
     let mut universe = LspUniverseBuilder::build(
         EntryState::new_rooted_by_id(cwd.as_path().into(), main.id()),
-        ExportTarget::Paged,
         Default::default(),
         FONT_RESOLVER.clone(),
         Default::default(),
     );
     let main_id = universe.main_id().unwrap();
     universe
-        .map_shadow_by_id(main_id, Bytes::from_string(main.text().to_owned()))
+        .map_shadow_by_id(main_id, Bytes::from(main.text().as_bytes().to_owned()))
         .unwrap();
     let world = universe.snapshot();
 

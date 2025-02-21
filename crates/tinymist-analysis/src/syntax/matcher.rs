@@ -325,7 +325,7 @@ pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
 pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> {
     use SyntaxKind::*;
     Some(match kind {
-        LineComment | BlockComment | Shebang => InterpretMode::Comment,
+        LineComment | BlockComment => InterpretMode::Comment,
         Raw => InterpretMode::Raw,
         Str => InterpretMode::String,
         CodeBlock | Code => InterpretMode::Code,
@@ -342,7 +342,7 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
-        | MathRoot | MathShorthand | MathText => InterpretMode::Math,
+        | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
         | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
@@ -727,10 +727,8 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     if node.offset() + 1 == cursor && {
         // Check if the cursor is exactly after single dot.
         matches!(node.kind(), SyntaxKind::Dot)
-            || (matches!(
-                node.kind(),
-                SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
-            ) && node.text().starts_with("."))
+            || (matches!(node.kind(), SyntaxKind::Text | SyntaxKind::Error)
+                && node.text().starts_with("."))
     } {
         if let Some(dot_access) = classify_dot_access(&node) {
             return Some(dot_access);

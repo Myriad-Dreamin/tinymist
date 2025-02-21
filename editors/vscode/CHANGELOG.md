@@ -6,12 +6,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.12.21 - [2025-02-20]
-
-Nightly Release at [feat: split tinymist-task (#1277)](https://github.com/Myriad-Dreamin/tinymist/commit/3799db6dd4b3a6504fe295ff74d6e82cc57d16bf), using [ParaN3xus/typst tinymist-nightly-v0.12.21-content-hint](https://github.com/ParaN3xus/typst/tree/tinymist-nightly-v0.12.21-content-hint), a.k.a. [typst/typst 0.13 changelog (#5801)](https://github.com/typst/typst/commit/4a9a5d2716fc91f60734769eb001aef32fe15403).
-
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.19...v0.12.21
-
 ## v0.12.20 - [2025-02-21]
 
 We massively changed the internal world implementation. This unblocks many new features:
@@ -127,12 +121,6 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
  * Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates in https://github.com/Myriad-Dreamin/tinymist/pull/1310
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.20
-
-## v0.12.19 - [2025-02-03]
-
-Nightly Release at [feat: generate declarative project lock file (#1133)](https://github.com/Myriad-Dreamin/tinymist/commit/bdfc1ed648f040b1c552d43f8ee7c9e9c882544e), using [ParaN3xus/typst tinymist-nightly-v0.12.19-rc2-content-hint](https://github.com/ParaN3xus/typst/tree/tinymist-nightly-v0.12.19-rc2-content-hint), a.k.a. [typst/typst Support first-line-indent for every paragraph (#5768)](https://github.com/typst/typst/commit/85d177897468165b93056947a80086b2f84d815d).
-
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.19
 
 ## v0.12.18 - [2025-01-09]
 

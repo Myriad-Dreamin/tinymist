@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::diag::print_diagnostics;
+use reflexo_typst::{ConsoleDiagReporter, GenericExporter};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -36,7 +36,7 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
-use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
+use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition, World};
 
 use super::ServerState;
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
@@ -103,7 +103,7 @@ impl ServerState {
             self.memory_changes
                 .iter()
                 .map(|(path, content)| {
-                    let content = Bytes::from_string(content.clone().text().to_owned());
+                    let content = Bytes::from(content.clone().text().as_bytes());
                     (path.clone(), FileResult::Ok(content).into())
                 })
                 .collect(),
@@ -126,8 +126,7 @@ impl ServerState {
         entry: Option<ImmutPath>,
     ) -> Result<ProjectInsId> {
         let entry = self.config.compile.entry_resolver.resolve(entry);
-        let enable_html = matches!(self.config.export_target, ExportTarget::Html);
-        self.project.restart_dedicate(dedicate, entry, enable_html)
+        self.project.restart_dedicate(dedicate, entry)
     }
 
     /// Create a fresh [`ProjectState`].
@@ -180,7 +179,6 @@ impl ServerState {
             notified_revision: Mutex::default(),
         });
 
-        let export_target = config.export_target;
         let default_path = config.compile.entry_resolver.resolve_default();
         let entry = config.compile.entry_resolver.resolve(default_path);
         let inputs = config.compile.determine_inputs();
@@ -193,13 +191,7 @@ impl ServerState {
         let embedded_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
         let package_registry =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-        let verse = LspUniverseBuilder::build(
-            entry,
-            export_target,
-            inputs,
-            embedded_fonts,
-            package_registry,
-        );
+        let verse = LspUniverseBuilder::build(entry, inputs, embedded_fonts, package_registry);
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
@@ -354,9 +346,8 @@ impl ProjectState {
         &mut self,
         group: &str,
         entry: EntryState,
-        enable_html: bool,
     ) -> Result<ProjectInsId> {
-        self.compiler.restart_dedicate(group, entry, enable_html)
+        self.compiler.restart_dedicate(group, entry)
     }
 }
 
@@ -622,18 +613,24 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
         if self.is_standalone {
-            print_diagnostics(
-                &snap.world,
-                snap.doc
-                    .as_ref()
-                    .err()
-                    .cloned()
-                    .iter()
-                    .flatten()
-                    .chain(snap.warnings.iter()),
-                reflexo_typst::DiagnosticFormat::Human,
-            )
-            .log_error("failed to print diagnostics");
+            let diag = snap
+                .doc
+                .as_ref()
+                .err()
+                .cloned()
+                .iter()
+                .flatten()
+                .chain(snap.warnings.iter())
+                .cloned()
+                .collect();
+
+            let rep = reflexo_typst::CompileReport::CompileSuccess(
+                snap.world.main(),
+                diag,
+                Default::default(),
+            );
+
+            let _ = ConsoleDiagReporter::default().export(&snap.world, Arc::new(rep));
         }
 
         self.notify_diagnostics(snap);
@@ -645,8 +642,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         if let Some(inner) = self.preview.get(&snap.id) {
             let snap = snap.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
-        } else {
-            log::info!("Project: no preview for {:?}", snap.id);
         }
     }
 }

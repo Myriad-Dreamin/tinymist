@@ -95,9 +95,9 @@ impl CompletionPair<'_, '_, '_> {
     ) {
         // Select the source by `comps`
         let value = self.worker.ctx.module_by_syntax(source);
-        let value = comps.iter().fold(value.as_ref(), |value, comp| {
-            value?.scope()?.get(comp)?.read().into()
-        });
+        let value = comps
+            .iter()
+            .fold(value.as_ref(), |value, comp| value?.scope()?.get(comp));
         let Some(scope) = value.and_then(|v| v.scope()) else {
             return;
         };
@@ -125,9 +125,9 @@ impl CompletionPair<'_, '_, '_> {
             self.snippet_completion("*", "*", "Import everything.");
         }
 
-        for (name, bind) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             if seen.iter().all(|item| item.as_str() != name) {
-                self.value_completion(Some(name.clone()), bind.read(), false, None);
+                self.value_completion(Some(name.clone()), value, false, None);
             }
         }
     }

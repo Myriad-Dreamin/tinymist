@@ -37,13 +37,13 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all fields on a value.
     fn value_field_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
         let (value, styles) = self.worker.ctx.analyze_expr(target).into_iter().next()?;
-        for (name, bind) in value.ty().scope().iter() {
-            self.value_completion(Some(name.clone()), bind.read(), true, None);
+        for (name, value, _) in value.ty().scope().iter() {
+            self.value_completion(Some(name.clone()), value, true, None);
         }
 
         if let Some(scope) = value.scope() {
-            for (name, bind) in scope.iter() {
-                self.value_completion(Some(name.clone()), bind.read(), true, None);
+            for (name, value, _) in scope.iter() {
+                self.value_completion(Some(name.clone()), value, true, None);
             }
         }
 
@@ -55,7 +55,7 @@ impl CompletionPair<'_, '_, '_> {
             // this value's type, so accessing it should not fail.
             self.value_completion(
                 Some(field.into()),
-                &value.field(field, ()).unwrap(),
+                &value.field(field).unwrap(),
                 false,
                 None,
             );
@@ -106,6 +106,15 @@ impl CompletionPair<'_, '_, '_> {
                             );
                         }
                     }
+                }
+            }
+            Value::Plugin(plugin) => {
+                for name in plugin.iter() {
+                    self.push_completion(Completion {
+                        kind: CompletionKind::Func,
+                        label: name.clone(),
+                        ..Completion::default()
+                    })
                 }
             }
             _ => {}

@@ -113,7 +113,7 @@ impl CompletionPair<'_, '_, '_> {
             if !self.worker.seen_casts.insert(hash128(&label)) {
                 continue;
             }
-            let label: EcoString = label.resolve().as_str().into();
+            let label: EcoString = label.as_str().into();
             let completion = Completion {
                 kind: CompletionKind::Reference,
                 apply: Some(eco_format!(

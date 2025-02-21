@@ -5,6 +5,9 @@ use tinymist_std::{bail, error::prelude::Result};
 
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
 
+#[cfg(feature = "preview")]
+pub use typst_preview::{PreviewArgs, PreviewMode};
+
 use crate::model::*;
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
 
@@ -16,6 +19,15 @@ pub enum DocCommands {
     New(DocNewArgs),
     /// Configure document priority in workspace.
     Configure(DocConfigureArgs),
+}
+
+/// Project task commands.
+#[derive(Debug, Clone, clap::Subcommand)]
+#[clap(rename_all = "kebab-case")]
+pub enum TaskCommands {
+    /// Declare a preview task.
+    #[cfg(feature = "preview")]
+    Preview(TaskPreviewArgs),
 }
 
 /// Declare a document (project's input).
@@ -233,4 +245,29 @@ impl TaskCompileArgs {
             task: config,
         })
     }
+}
+
+/// Declare an lsp task.
+#[derive(Debug, Clone, clap::Parser)]
+#[cfg(feature = "preview")]
+pub struct TaskPreviewArgs {
+    /// Argument to identify a project.
+    #[clap(flatten)]
+    pub declare: DocNewArgs,
+
+    /// Name a task.
+    #[clap(long = "task")]
+    pub name: Option<String>,
+
+    /// When to run the task
+    #[arg(long = "when")]
+    pub when: Option<TaskWhen>,
+
+    /// Preview arguments
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
 }

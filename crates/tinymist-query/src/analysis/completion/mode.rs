@@ -120,7 +120,7 @@ impl CompletionPair<'_, '_, '_> {
         if !is_triggered_by_punc(self.worker.trigger_character)
             && matches!(
                 self.cursor.leaf.kind(),
-                SyntaxKind::Text | SyntaxKind::MathIdent | SyntaxKind::MathText
+                SyntaxKind::Text | SyntaxKind::MathIdent
             )
         {
             self.cursor.from = self.cursor.leaf.offset();

@@ -236,21 +236,6 @@ impl PathPattern {
     }
 }
 
-/// Specifies the current export target.
-///
-/// The design of this configuration is not yet finalized and for this reason it
-/// is guarded behind the html feature. Visit the HTML documentation page for
-/// more details.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportTarget {
-    /// The current export target is for PDF, PNG, and SVG export.
-    #[default]
-    Paged,
-    /// The current export target is for Html export.
-    Html,
-}
-
 /// A PDF standard that Typst can enforce conformance with.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]

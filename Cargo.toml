@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.12.21"
+version = "0.12.20"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -32,7 +32,11 @@ triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 async-trait = "0.1.77"
 futures = "0.3"
 rayon = "1.10.0"
-tokio = { version = "1.42.0", features = ["macros"] }
+tokio = { version = "1.42.0", features = [
+    "macros",
+    "rt-multi-thread",
+    "io-std",
+] }
 tokio-util = { version = "0.7.13", features = ["compat"] }
 
 # System
@@ -125,26 +129,26 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.5.5-rc3", default-features = false, features = [
+reflexo = { version = "=0.5.4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.5.5-rc3", default-features = false }
-reflexo-vec2svg = { version = "=0.5.5-rc3" }
+reflexo-typst = { version = "=0.5.4", default-features = false }
+reflexo-vec2svg = { version = "=0.5.4" }
+reflexo-typst-shim = { version = "=0.5.4", features = ["nightly"] }
 
 
-typst = "0.13.0-rc1"
-typst-html = "0.13.0-rc1"
-typst-timing = "0.13.0-rc1"
-typst-svg = "0.13.0-rc1"
-typst-render = "0.13.0-rc1"
-typst-pdf = "0.13.0-rc1"
-typst-syntax = "0.13.0-rc1"
-typst-eval = "0.13.0-rc1"
+typst = "0.12.0"
+typst-timing = "0.12.0"
+typst-svg = "0.12.0"
+typst-render = "0.12.0"
+typst-pdf = "0.12.0"
+typst-syntax = "0.12.0"
 typst-assets = "0.12.0"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
 typst-ansi-hl = "0.3.0"
 typstyle-core = { version = "=0.12.15", default-features = false }
 typlite = { path = "./crates/typlite" }
+typst-shim = { path = "./crates/typst-shim" }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -174,20 +178,19 @@ insta = { version = "1.39", features = ["glob"] }
 
 
 # Our Own Crates
-typst-preview = { path = "./crates/typst-preview", version = "0.12.21" }
-typst-shim = { path = "./crates/typst-shim", version = "0.12.21" }
+typst-preview = { path = "./crates/typst-preview" }
 tinymist-assets = { version = "=0.12.20" }
-tinymist = { path = "./crates/tinymist/", version = "0.12.21" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.12.21", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.12.21", default-features = false }
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.12.21", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.12.21", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.12.21" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.12.21" }
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.12.21" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.12.21" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.12.21" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.12.21" }
+tinymist = { path = "./crates/tinymist/" }
+tinymist-std = { path = "./crates/tinymist-std/", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", default-features = false }
+tinymist-core = { path = "./crates/tinymist-core/", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/" }
+tinymist-task = { path = "./crates/tinymist-task/" }
+tinymist-derive = { path = "./crates/tinymist-derive/" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/" }
+tinymist-query = { path = "./crates/tinymist-query/" }
+tinymist-render = { path = "./crates/tinymist-render/" }
 
 [profile.dev.package.insta]
 opt-level = 3
@@ -254,15 +257,12 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.12.21-content-hint" }
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
@@ -275,29 +275,16 @@ typst-assets = { git = "https://github.com/typst/typst-assets", rev = "8cccef9" 
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
-# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
-# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", tag = "v0.5.5-rc3" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
+# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "1b6e29c650ad6d3095e5ea18d93a2428c1ae77b9" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+# reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.21-rc1" }
-
-typst-shim = { path = "crates/typst-shim" }
-tinymist-analysis = { path = "crates/tinymist-analysis" }
-tinymist-std = { path = "crates/tinymist-std" }
-tinymist-vfs = { path = "crates/tinymist-vfs" }
-tinymist-world = { path = "crates/tinymist-world" }
-tinymist-project = { path = "crates/tinymist-project" }
-tinymist-task = { path = "crates/tinymist-task" }
-
-# If reflexo use the tinymist from git, you should use the following patch.
-# [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
-# typst-shim = { path = "crates/typst-shim" }
-# tinymist-analysis = { path = "crates/tinymist-analysis" }
-# tinymist-std = { path = "crates/tinymist-std" }
-# tinymist-world = { path = "crates/tinymist-world" }
-# tinymist-project = { path = "crates/tinymist-project" }
-# tinymist-task = { path = "crates/tinymist-task" }
+# reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
+# typstyle = { path = "../typstyle" }

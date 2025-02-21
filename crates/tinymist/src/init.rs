@@ -19,7 +19,6 @@ use tinymist_project::{
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
-use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
 use typst_shim::utils::{Deferred, LazyHash};
 
@@ -28,7 +27,7 @@ use typst_shim::utils::{Deferred, LazyHash};
 // textDocument.definition.linkSupport capability.
 
 use super::*;
-use crate::project::ImmutDict;
+use crate::world::ImmutDict;
 
 /// Capability to add valid commands to the arguments.
 pub trait AddCommands {
@@ -280,7 +279,6 @@ const CONFIG_ITEMS: &[&str] = &[
     "formatterMode",
     "formatterPrintWidth",
     "formatterIndentSize",
-    "exportTarget",
     "completion",
     "fontPaths",
     "systemFonts",
@@ -313,8 +311,6 @@ pub struct Config {
     pub formatter_indent_size: Option<u32>,
     /// Whether to remove html from markup content in responses.
     pub support_html_in_markdown: bool,
-    /// Tinymist's default export target.
-    pub export_target: ExportTarget,
     /// Tinymist's completion features.
     pub completion: CompletionFeat,
 }
@@ -400,7 +396,6 @@ impl Config {
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
-        assign_config!(export_target := "exportTarget"?: ExportTarget);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
@@ -436,25 +431,13 @@ impl Config {
     pub(crate) fn export(&self) -> ExportUserConfig {
         let compile_config = &self.compile;
 
-        let export = ExportTask {
-            output: Some(compile_config.output_path.clone()),
-            when: compile_config.export_pdf,
-            transform: vec![],
-        };
-
         ExportUserConfig {
-            export_target: self.export_target,
-            // todo: we only have `exportPdf` for now
-            // task: match self.export_target {
-            //     ExportTarget::Paged => ProjectTask::ExportPdf(ExportPdfTask {
-            //         export,
-            //         pdf_standards: vec![],
-            //         creation_timestamp: compile_config.determine_creation_timestamp(),
-            //     }),
-            //     ExportTarget::Html => ProjectTask::ExportHtml(ExportHtmlTask { export }),
-            // },
             task: ProjectTask::ExportPdf(ExportPdfTask {
-                export,
+                export: ExportTask {
+                    output: Some(compile_config.output_path.clone()),
+                    when: compile_config.export_pdf,
+                    transform: vec![],
+                },
                 pdf_standards: vec![],
                 creation_timestamp: compile_config.determine_creation_timestamp(),
             }),
@@ -720,7 +703,7 @@ impl CompileConfig {
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
-                crate::project::LspUniverseBuilder::resolve_fonts(opts)
+                crate::world::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
                     .expect("failed to create font book")
             }))

@@ -41,43 +41,6 @@ pub struct GenerateScriptArgs {
 }
 
 #[cfg(feature = "preview")]
-pub use typst_preview::{PreviewArgs, PreviewMode};
-
-/// Project task commands.
-#[derive(Debug, Clone, clap::Subcommand)]
-#[clap(rename_all = "kebab-case")]
-pub enum TaskCommands {
-    /// Declare a preview task.
-    #[cfg(feature = "preview")]
-    Preview(TaskPreviewArgs),
-}
-
-/// Declare an lsp task.
-#[derive(Debug, Clone, clap::Parser)]
-#[cfg(feature = "preview")]
-pub struct TaskPreviewArgs {
-    /// Argument to identify a project.
-    #[clap(flatten)]
-    pub declare: DocNewArgs,
-
-    /// Name a task.
-    #[clap(long = "task")]
-    pub name: Option<String>,
-
-    /// When to run the task
-    #[arg(long = "when")]
-    pub when: Option<TaskWhen>,
-
-    /// Preview arguments
-    #[clap(flatten)]
-    pub preview: PreviewArgs,
-
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
-}
-
-#[cfg(feature = "preview")]
 trait LockFileExt {
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
 }
@@ -314,9 +277,6 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             }
             ProjectTask::ExportSvg(..) => {
                 cmd.push("--format=svg");
-            }
-            ProjectTask::ExportSvgHtml(..) => {
-                cmd.push("--format=svg_html");
             }
             ProjectTask::ExportMd(..) => {
                 cmd.push("--format=md");
