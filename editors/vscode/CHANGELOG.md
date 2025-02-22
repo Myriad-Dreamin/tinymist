@@ -30,6 +30,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Compiler
 
 * (Fix) Removing diagnostics when removing a project in https://github.com/Myriad-Dreamin/tinymist/pull/1372
+* (Fix) Applying memory changes to dedicate instances in https://github.com/Myriad-Dreamin/tinymist/pull/1371
+  * This fixes the issue that the second preview tab is updated.
 
 ### Preview
 
@@ -39,8 +41,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Fix) Fixed broken regular preview affected by the browsing preview feature in https://github.com/Myriad-Dreamin/tinymist/pull/1357 and https://github.com/Myriad-Dreamin/tinymist/pull/1358
 * (Fix) Sharing preview handler among states in https://github.com/Myriad-Dreamin/tinymist/pull/1370
   * This fixes the issue that a user can't open multiple preview tabs at the same time.
-* (Fix) Applying memory changes to dedicate instances in https://github.com/Myriad-Dreamin/tinymist/pull/1371
-  * This fixes the issue that the second preview tab is updated.
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.12.22
 
