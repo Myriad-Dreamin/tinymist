@@ -71,7 +71,7 @@ jobs:
           cargo publish --dry-run -p tinymist-std
           cargo publish --dry-run -p tinymist-vfs
           cargo publish --dry-run -p tinymist-world
-          cargo publish --dry-run -p tinymist-task
-          cargo publish --dry-run -p tinymist-project
+          cargo publish --dry-run -p tinymist-task --features no-content-hint
+          cargo publish --dry-run -p tinymist-project --features no-content-hint
           cargo publish --dry-run -p typlite
           cargo publish --dry-run -p crityp
