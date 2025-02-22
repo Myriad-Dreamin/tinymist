@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.12.22 - [2025-02-21]
+## v0.12.22 - [2025-02-23]
 
 ### Preview
 
