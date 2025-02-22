@@ -358,15 +358,7 @@ impl ServerState {
                 .restart_dedicate(&task_id, Some(entry))
                 .map_err(internal_error)?;
 
-            // Gets the task-dedicated compile server.
-            let mut dedicates = self.project.compiler.dedicates.iter_mut();
-            let Some(dedicate) = dedicates.find(|d| d.id == id) else {
-                return Err(invalid_params(
-                    "just restarted compiler instance for the task is not found",
-                ));
-            };
-
-            if !self.project.preview.register(&dedicate.id, watcher) {
+            if !self.project.preview.register(&id, watcher) {
                 return Err(invalid_params(
                     "cannot register preview to the compiler instance",
                 ));
