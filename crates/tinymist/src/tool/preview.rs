@@ -227,8 +227,8 @@ impl PreviewState {
     }
 
     pub(crate) fn stop_all(&mut self) {
-        let watchers = std::mem::take(self.watchers.inner.lock().deref_mut());
-        for (_, watcher) in watchers {
+        let mut watchers = self.watchers.inner.lock();
+        for (_, watcher) in watchers.iter_mut() {
             self.preview_tx
                 .send(PreviewRequest::Kill(
                     watcher.task_id().to_owned(),
@@ -236,6 +236,7 @@ impl PreviewState {
                 ))
                 .log_error_with(|| format!("failed to send kill request({:?})", watcher.task_id()));
         }
+        watchers.clear();
     }
 }
 
