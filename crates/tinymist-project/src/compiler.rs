@@ -599,7 +599,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 // If there is no invalidation happening, apply memory changes directly.
                 if files.is_empty() && self.dirty_shadow_logical_tick == 0 {
                     let changes = std::iter::repeat_n(event, 1 + self.dedicates.len());
-                    for (proj, event) in std::iter::once(&mut self.primary).zip(changes) {
+                    let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
+                    for (proj, event) in proj.zip(changes) {
                         log::debug!("memory update: vfs {:#?}", proj.verse.vfs().display());
                         let vfs_changed = proj.verse.increment_revision(|verse| {
                             log::debug!("memory update: {:?}", proj.id);
