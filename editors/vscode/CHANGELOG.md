@@ -8,9 +8,41 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.0 - [2025-02-22]
 
-Todo: add changelog
+* Bumped typst to v0.13.0 by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1342 and https://github.com/Myriad-Dreamin/tinymist/pull/1361
+
+### HTML Export
+
+* Providing `tinymist.exportTarget` for running language server targeting html in https://github.com/Myriad-Dreamin/tinymist/pull/1284
+  * `tinymist.exportTarget` is the target to export the document to.
+  * Use `paged` (default): The current export target is for PDF, PNG, and SVG export.
+  * Use `html`: The current export target is for HTML export.
+* Exporting text (`.txt`) over typst's HTML export in https://github.com/Myriad-Dreamin/tinymist/pull/1289
+  * This is used for word count and `tinymist.exportText`.
+
+### Misc
+
+* Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates to crates.io (#1310)
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.13.0
+
+## v0.12.22 - [2025-02-23]
+
+### Compiler
+
+* (Fix) Removing diagnostics when removing a project in https://github.com/Myriad-Dreamin/tinymist/pull/1372
+
+### Preview
+
+* (Fix) Handling compile events in standalone preview server in https://github.com/Myriad-Dreamin/tinymist/pull/1349
+* (Fix) Loosing `origin` HTTP header checking of the preview server in https://github.com/Myriad-Dreamin/tinymist/pull/1353
+* (Fix) Added console diagnostics printing back for `tinymist preview` in https://github.com/Myriad-Dreamin/tinymist/pull/1359
+* (Fix) Fixed broken regular preview affected by the browsing preview feature in https://github.com/Myriad-Dreamin/tinymist/pull/1357 and https://github.com/Myriad-Dreamin/tinymist/pull/1358
+* (Fix) Sharing preview handler among states in https://github.com/Myriad-Dreamin/tinymist/pull/1370
+  * This fixes the issue that a user can't open multiple preview tabs at the same time.
+* (Fix) Applying memory changes to dedicate instances in https://github.com/Myriad-Dreamin/tinymist/pull/1371
+  * This fixes the issue that the second preview tab is updated.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.12.22
 
 ## v0.12.21 - [2025-02-20]
 
