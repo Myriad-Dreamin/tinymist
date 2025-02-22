@@ -602,7 +602,16 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
     fn notify_removed(&self, id: &ProjectInsId) {
         let n_revs = &mut self.notified_revision.lock();
-        n_revs.remove(id);
+        let last_rev = n_revs.remove(id).unwrap_or_default();
+
+        let dv = ProjVersion {
+            id: id.clone(),
+            revision: last_rev,
+        };
+
+        // todo: race condition with notify_compile?
+        // remove diagnostics
+        self.push_diagnostics(dv, None);
     }
 
     fn notify_compile(&self, snap: &LspCompiledArtifact) {
