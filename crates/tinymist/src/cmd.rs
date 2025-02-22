@@ -354,6 +354,7 @@ impl ServerState {
 
             self.preview.start(cli_args, previewer, id, true)
         } else if let Some(entry) = entry {
+            log::info!("start a second preview for the task: {task_id} ({entry:?})");
             let id = self
                 .restart_dedicate(&task_id, Some(entry))
                 .map_err(internal_error)?;
