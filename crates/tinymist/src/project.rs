@@ -222,7 +222,7 @@ impl ServerState {
 
         ProjectState {
             compiler,
-            preview: Default::default(),
+            preview: handle.preview.clone(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
             export: handle.export.clone(),
