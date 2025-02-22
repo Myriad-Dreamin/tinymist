@@ -30,7 +30,6 @@ use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
-pub use typst_preview::CompileStatus;
 use typst_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
     DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
@@ -47,6 +46,8 @@ use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use project::{watch_deps, ProjectPreviewState};
 
+pub use typst_preview::CompileStatus;
+
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
     /// The artifact and snap.
@@ -58,16 +59,17 @@ impl typst_preview::CompileView for PreviewCompileView {
         self.snap.doc.clone().ok()
     }
 
-    fn status(&self) -> typst_preview::CompileStatus {
+    fn status(&self) -> CompileStatus {
         match self.snap.doc {
-            Ok(_) => typst_preview::CompileStatus::CompileSuccess,
-            Err(_) => typst_preview::CompileStatus::CompileError,
+            Ok(_) => CompileStatus::CompileSuccess,
+            Err(_) => CompileStatus::CompileError,
         }
     }
 
     fn is_on_saved(&self) -> bool {
         self.snap.signal.by_fs_events
     }
+
     fn is_by_entry_update(&self) -> bool {
         self.snap.signal.by_entry_update
     }
