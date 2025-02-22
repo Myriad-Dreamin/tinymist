@@ -3,7 +3,6 @@
 #![allow(missing_docs)]
 
 use std::num::NonZeroUsize;
-use std::ops::DerefMut;
 use std::sync::LazyLock;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
@@ -227,6 +226,8 @@ impl PreviewState {
     }
 
     pub(crate) fn stop_all(&mut self) {
+        log::info!("Stopping all preview tasks");
+
         let mut watchers = self.watchers.inner.lock();
         for (_, watcher) in watchers.iter_mut() {
             self.preview_tx
