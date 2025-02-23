@@ -4920,8 +4920,9 @@ dependencies = [
 
 [[package]]
 name = "typstyle-core"
-version = "0.12.15"
-source = "git+https://github.com/ParaN3xus/typstyle/?tag=tinymist-nightly-v0.12.21-rc1#37529defcada013bb4c8342c70968daff8097f24"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdff2f2401154ace9f096686e15bcae7a3c242e3e0af552932b1910004995384"
 dependencies = [
  "ecow",
  "itertools 0.14.0",

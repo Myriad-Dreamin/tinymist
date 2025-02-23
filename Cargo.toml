@@ -142,7 +142,7 @@ typst-eval = "0.13.0"
 typst-assets = "0.13.0"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
 typst-ansi-hl = "0.3.0"
-typstyle-core = { version = "=0.12.15", default-features = false }
+typstyle-core = { version = "=0.13.0", default-features = false }
 typlite = { path = "./crates/typlite" }
 
 # LSP
@@ -281,7 +281,7 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinym
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.21-rc1" }
+# typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.21-rc1" }
 
 typst-shim = { path = "crates/typst-shim" }
 tinymist-analysis = { path = "crates/tinymist-analysis" }
