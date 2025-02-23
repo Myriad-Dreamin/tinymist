@@ -1,10 +1,22 @@
+.DS_Store
 .git/**
 .github/**
 .vscode/**
 assets/**
 src/**
 target/**
+icons/
+node_modules/
+editiors/vscode/out/
 *.toml
 *.txt
 *.lock
 *.md
+
+.env
+.env.*
+
+# Ignore files for PNPM, NPM and YARN
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

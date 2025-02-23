@@ -7,9 +7,9 @@ if (!fs.existsSync("./out/extension.web.js")) {
 }
 
 build({
-  entryPoints: ["./src/extension.ts"],
+  entryPoints: ["./src/extension.mts", "./src/server.mts"],
   bundle: true,
-  outfile: "./out/extension.js",
+  outdir: "./out",
   external: ["vscode"],
   format: "cjs",
   platform: "node",

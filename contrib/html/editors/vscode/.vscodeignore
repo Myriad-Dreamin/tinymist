@@ -1,0 +1,11 @@
+**
+!out/extension.js
+!out/extension.web.js
+!out/server.js
+!package.json
+!package-lock.json
+!icons/**
+!syntaxes/**
+!README.md
+!LICENSE
+!CHANGELOG.md
