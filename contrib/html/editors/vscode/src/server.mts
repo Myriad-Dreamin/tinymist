@@ -31,7 +31,6 @@ connection.onInitialize((_params: InitializeParams) => {
       // Tell the client that the server supports code completion
       completionProvider: {
         triggerCharacters: [
-          '"',
           ..."abcdefghijklmnopqrstuvwxyz".split(""),
           ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
         ],

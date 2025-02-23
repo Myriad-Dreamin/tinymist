@@ -6,23 +6,16 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { commands, CompletionList, ExtensionContext, Uri } from "vscode";
-import { getLanguageService } from "vscode-html-languageservice/lib/esm/htmlLanguageService";
 import {
   type LanguageClientOptions,
   type ServerOptions,
   LanguageClient,
   TransportKind,
 } from "vscode-languageclient/node";
-import {
-  getCSSVirtualContent,
-  isInsideClassAttribute,
-  isInsideStyleRegion,
-} from "./embeddedSupport";
+import { getVirtualContent, isInsideClassAttribute, parseRawBlockRegion } from "./embeddedSupport";
 import { cssActivate } from "./features/css";
 
 let client: LanguageClient;
-
-const htmlLanguageService = getLanguageService();
 
 export function activate(context: ExtensionContext) {
   const tinymistExtension = vscode.extensions.getExtension("myriad-dreamin.tinymist");
@@ -49,11 +42,12 @@ export function activate(context: ExtensionContext) {
 
   const virtualDocumentContents = new Map<string, string>();
 
+  const removeSuffix = (uri: string) => uri.replace(/\.(html|css)$/, "");
   vscode.workspace.registerTextDocumentContentProvider("embedded-content", {
     provideTextDocumentContent: (uri) => {
-      // console.log("provideTextDocumentContent gg", uri.toString(), decodeURIComponent);
-      const originalUri = uri.path.slice(1).slice(0, -4);
+      const originalUri = removeSuffix(uri.path.slice(1));
       const decodedUri = decodeURIComponent(originalUri);
+      console.log("provideTextDocumentContent gg", uri.path, originalUri, decodedUri);
       return virtualDocumentContents.get(decodedUri);
     },
   });
@@ -62,8 +56,6 @@ export function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: "file", language: "typst" }],
     middleware: {
       provideCompletionItem: async (document, position, context, token, next) => {
-        // console.log("provideCompletionItem", document.uri.toString(), position);
-
         const res = await vscode.commands.executeCommand<
           [{ mode: "math" | "markup" | "code" | "comment" | "string" | "raw" }]
         >("tinymist.interactCodeContext", {
@@ -81,19 +73,12 @@ export function activate(context: ExtensionContext) {
           ],
         });
 
-        const inString = res[0].mode === "string";
-        const inRaw = res[0].mode === "raw";
+        const inString = res[0]?.mode === "string";
+        const inRaw = res[0]?.mode === "raw";
 
-        // If in `<class>`, completes class
-        if (
-          inString &&
-          isInsideClassAttribute(
-            htmlLanguageService,
-            document.getText(),
-            document.offsetAt(position),
-          )
-        ) {
-          // console.log("isInsideClassAttribute", await provider.completionItems);
+        // If completes the content of a `class` attribute, completes classes found in the css
+        // files.
+        if (inString && isInsideClassAttribute(document.getText(), document.offsetAt(position))) {
           return provider.completionItems;
         }
 
@@ -103,23 +88,24 @@ export function activate(context: ExtensionContext) {
         }
 
         // If not in `<style>`, do not perform request forwarding
-        const virtualContent = isInsideStyleRegion(
-          htmlLanguageService,
-          document.getText(),
-          document.offsetAt(position),
-        );
+        const virtualContent = parseRawBlockRegion(document.getText(), document.offsetAt(position));
 
         if (!virtualContent) {
+          return await next(document, position, context, token);
+        }
+
+        const langId = virtualContent.languageId;
+        if (langId !== "html" && langId !== "css") {
           return await next(document, position, context, token);
         }
 
         const originalUri = document.uri.toString(true);
         virtualDocumentContents.set(
           originalUri,
-          getCSSVirtualContent(htmlLanguageService, document.getText()),
+          getVirtualContent(document.getText(), [virtualContent], langId!),
         );
 
-        const vdocUriString = `embedded-content://css/${encodeURIComponent(originalUri)}.css`;
+        const vdocUriString = `embedded-content://${langId}/${encodeURIComponent(originalUri)}.${langId}`;
         const vdocUri = Uri.parse(vdocUriString);
         return await commands.executeCommand<CompletionList>(
           "vscode.executeCompletionItemProvider",
