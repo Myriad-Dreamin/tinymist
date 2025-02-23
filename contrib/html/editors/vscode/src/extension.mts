@@ -83,7 +83,6 @@ export function activate(context: ExtensionContext) {
         }
 
         if (!inRaw) {
-          console.log("not in raw");
           return await next(document, position, context, token);
         }
 
