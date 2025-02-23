@@ -6,9 +6,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.0 - [2025-02-22]
+## v0.13.0 - [2025-02-23]
 
 * Bumped typst to v0.13.0 by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1342 and https://github.com/Myriad-Dreamin/tinymist/pull/1361
+* Bumped typstyle to v0.13.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1368
+
+### Editor
+
+* feat: initialize tinymist-vscode-html extension in https://github.com/Myriad-Dreamin/tinymist/pull/1378
 
 ### HTML Export
 
@@ -22,6 +27,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Misc
 
 * Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates to crates.io (#1310)
+* Mentioning script to download nightly prebuilts in https://github.com/Myriad-Dreamin/tinymist/pull/1377
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.20...v0.13.0
 
