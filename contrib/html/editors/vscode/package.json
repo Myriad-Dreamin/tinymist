@@ -1,8 +1,9 @@
 {
-  "name": "tinymist-html-ext",
-  "version": "0.13.0-rc1",
-  "description": "HTML for Typst",
+  "name": "tinymist-vscode-html",
+  "version": "0.13.0",
+  "description": "Extending Typst with HTML features",
   "keywords": [
+    "html",
     "typst",
     "language-server"
   ],
@@ -13,7 +14,7 @@
     "type": "git",
     "url": "https://github.com/Myriad-Dreamin/tinymist.git"
   },
-  "displayName": "Tinymist Typst with HTML",
+  "displayName": "Tinymist Typst HTML",
   "author": "Myriad-Dreamin",
   "contributors": [
     "Myriad-Dreamin"
@@ -32,9 +33,9 @@
   "contributes": {
     "commands": [
       {
-        "command": "tinymist-html-ext.showLog",
-        "title": "TinymistHTML: Show Log",
-        "description": "Show log of the tinymist extension",
+        "command": "tinymist.showHtmlExtensionLog",
+        "title": "Show Log of the HTML extension",
+        "description": "Show log of the tinymist HTML extension",
         "category": "Typst",
         "icon": "$(list-flat)"
       }
