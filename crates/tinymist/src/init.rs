@@ -7,6 +7,7 @@ use clap::Parser;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
+use reflexo::error::IgnoreLogging;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
@@ -86,18 +87,14 @@ impl Initializer for RegularInit {
                 .into_iter()
                 .collect(),
         };
-        let mut config = Config {
-            const_config: ConstConfig::from(&params),
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..Default::default()
-                },
-                font_opts: std::mem::take(&mut self.font_opts),
-                ..CompileConfig::default()
-            },
-            ..Config::default()
-        };
+        let mut config = Config::new(
+            ConstConfig::from(&params),
+            roots,
+            std::mem::take(&mut self.font_opts),
+        )
+        .log_error("cannot assign Config defaults")
+        .unwrap_or_default();
+
         let err = params.initialization_options.and_then(|init| {
             config
                 .update(&init)
@@ -323,8 +320,23 @@ pub struct Config {
 
 impl Config {
     /// Creates a new configuration with system defaults.
-    pub fn new() -> anyhow::Result<Self> {
-        let mut config = Self::default();
+    pub fn new(
+        const_config: ConstConfig,
+        roots: Vec<ImmutPath>,
+        font_opts: CompileFontArgs,
+    ) -> anyhow::Result<Self> {
+        let mut config = Self {
+            const_config,
+            compile: CompileConfig {
+                entry_resolver: EntryResolver {
+                    roots,
+                    ..EntryResolver::default()
+                },
+                font_opts,
+                ..CompileConfig::default()
+            },
+            ..Self::default()
+        };
         config.update_by_map(&Map::default())?;
         Ok(config)
     }
