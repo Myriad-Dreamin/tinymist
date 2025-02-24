@@ -195,7 +195,7 @@ impl ServerState {
     fn resolve_task_without_lock(&self, path: Option<ImmutPath>) -> TaskInputs {
         TaskInputs {
             entry: Some(self.entry_resolver().resolve(path)),
-            ..Default::default()
+            ..TaskInputs::default()
         }
     }
 
@@ -237,7 +237,7 @@ impl ServerState {
 
             Some(TaskInputs {
                 entry: Some(entry),
-                ..Default::default()
+                ..TaskInputs::default()
             })
         });
 

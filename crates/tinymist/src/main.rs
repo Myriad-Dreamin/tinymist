@@ -55,7 +55,7 @@ impl Default for Runtimes {
     }
 }
 
-static RUNTIMES: Lazy<Runtimes> = Lazy::new(Default::default);
+static RUNTIMES: Lazy<Runtimes> = Lazy::new(Runtimes::default);
 
 /// The main entry point.
 fn main() -> Result<()> {
@@ -170,7 +170,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
             compile: CompileConfig {
                 entry_resolver: EntryResolver {
                     roots,
-                    ..Default::default()
+                    ..EntryResolver::default()
                 },
                 font_opts: args.compile.font,
                 ..CompileConfig::default()

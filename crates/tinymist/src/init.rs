@@ -139,7 +139,7 @@ impl Initializer for SuperInit {
                         },
                     }],
                 }),
-                ..Default::default()
+                ..WorkspaceFileOperationsServerCapabilities::default()
             }
         });
 
@@ -175,14 +175,14 @@ impl Initializer for SuperInit {
                         String::from("\""),
                         String::from("@"),
                     ]),
-                    ..Default::default()
+                    ..CompletionOptions::default()
                 }),
                 text_document_sync: Some(TextDocumentSyncCapability::Options(
                     TextDocumentSyncOptions {
                         open_close: Some(true),
                         change: Some(TextDocumentSyncKind::INCREMENTAL),
                         save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                        ..Default::default()
+                        ..TextDocumentSyncOptions::default()
                     },
                 )),
                 semantic_tokens_provider,
@@ -227,9 +227,9 @@ impl Initializer for SuperInit {
                 experimental: Some(json!({
                   "onEnter": true,
                 })),
-                ..Default::default()
+                ..ServerCapabilities::default()
             },
-            ..Default::default()
+            ..InitializeResult::default()
         };
 
         let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
@@ -356,7 +356,7 @@ impl Config {
         sections
             .map(|section| ConfigurationItem {
                 section: Some(section),
-                ..Default::default()
+                ..ConfigurationItem::default()
             })
             .collect()
     }
@@ -854,7 +854,7 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
             token_modifiers: Modifier::iter().map(Into::into).collect(),
         },
         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-        ..Default::default()
+        ..SemanticTokensOptions::default()
     }
 }
 
@@ -930,7 +930,7 @@ mod tests {
             config.compile.typst_extra_args,
             Some(CompileExtraOpts {
                 root_dir: Some(ImmutPath::from(root_path)),
-                ..Default::default()
+                ..CompileExtraOpts::default()
             })
         );
     }

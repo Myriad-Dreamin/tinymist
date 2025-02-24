@@ -996,7 +996,7 @@ impl ServerState {
 
             let mut forked = snap.world.task(TaskInputs {
                 entry: Some(new_entry),
-                ..Default::default()
+                ..TaskInputs::default()
             });
             forked
                 .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))

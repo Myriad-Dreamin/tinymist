@@ -122,7 +122,7 @@ impl ServerState {
             pinning_by_browsing_preview: false,
             focusing: None,
             formatter,
-            user_action: Default::default(),
+            user_action: UserActionTask,
         }
     }
 
@@ -379,7 +379,7 @@ impl ServerState {
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
-                ..Default::default()
+                ..TaskInputs::default()
             });
 
             let artifact = CompiledArtifact::from_snapshot(snap.clone());
