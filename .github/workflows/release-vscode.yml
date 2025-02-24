@@ -35,7 +35,7 @@ jobs:
           cancel_others: "true"
 
   checks:
-    name: Check clippy, formatting, and documentation
+    name: Check clippy, formatting, completion, and documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +55,20 @@ jobs:
       - run: cargo clippy --workspace --all-targets
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
+      - name: Generate completions
+        run: |
+          mkdir -p completions/{zsh,bash,fish/vendor_completions.d,elvish/lib,nushell/vendor/autoload,powershell}/
+          cargo run -p tinymist -- completion zsh        > completions/zsh/_tinymist
+          cargo run -p tinymist -- completion bash       > completions/bash/tinymist
+          cargo run -p tinymist -- completion fish       > completions/fish/vendor_completions.d/tinymist.fish
+          cargo run -p tinymist -- completion elvish     > completions/elvish/lib/tinymist.elv
+          cargo run -p tinymist -- completion nushell    > completions/nushell/vendor/autoload/tinymist.nu
+          cargo run -p tinymist -- completion powershell > completions/powershell/tinymist.ps1
+      - name: upload completions
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-completion-scripts
+          path: completions
 
   # region: check-min-version
   min-version:
