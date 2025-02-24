@@ -70,41 +70,8 @@ impl Initializer for RegularInit {
     ///
     /// # Errors
     /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
-        // Initialize configurations
-        let roots = match params.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
-                .collect(),
-            #[allow(deprecated)] // `params.root_path` is marked as deprecated
-            None => params
-                .root_uri
-                .as_ref()
-                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
-                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
-                .into_iter()
-                .collect(),
-        };
-        let mut config = Config {
-            const_config: ConstConfig::from(&params),
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..Default::default()
-                },
-                font_opts: std::mem::take(&mut self.font_opts),
-                ..CompileConfig::default()
-            },
-            ..Config::default()
-        };
-        let err = params.initialization_options.and_then(|init| {
-            config
-                .update(&init)
-                .map_err(|e| e.to_string())
-                .map_err(invalid_params)
-                .err()
-        });
+    fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
+        let (config, err) = Config::from_params(params, self.font_opts);
 
         let super_init = SuperInit {
             client: self.client,
@@ -320,6 +287,49 @@ pub struct Config {
 }
 
 impl Config {
+    /// Creates a new configuration from the lsp initialization parameters.
+    pub fn from_params(
+        params: InitializeParams,
+        font_opts: CompileFontArgs,
+    ) -> (Self, Option<ResponseError>) {
+        // Initialize configurations
+        let roots = match params.workspace_folders.as_ref() {
+            Some(roots) => roots
+                .iter()
+                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .collect(),
+            #[allow(deprecated)] // `params.root_path` is marked as deprecated
+            None => params
+                .root_uri
+                .as_ref()
+                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
+                .into_iter()
+                .collect(),
+        };
+        let mut config = Config {
+            const_config: ConstConfig::from(&params),
+            compile: CompileConfig {
+                entry_resolver: EntryResolver {
+                    roots,
+                    ..Default::default()
+                },
+                font_opts,
+                ..CompileConfig::default()
+            },
+            ..Config::default()
+        };
+        let err = params.initialization_options.and_then(|init| {
+            config
+                .update(&init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params)
+                .err()
+        });
+
+        (config, err)
+    }
+
     /// Gets items for serialization.
     pub fn get_items() -> Vec<ConfigurationItem> {
         let sections = CONFIG_ITEMS
@@ -1135,5 +1145,28 @@ mod tests {
         };
 
         assert_eq!(typstyle_config.tab_spaces, 8);
+    }
+
+    #[test]
+    fn test_default_config_initialize() {
+        let (_conf, err) =
+            Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn test_config_package_path_from_env() {
+        let pkg_path = Path::new(if cfg!(windows) { "C:\\pkgs" } else { "/pkgs" });
+
+        temp_env::with_var("TYPST_PACKAGE_CACHE_PATH", Some(pkg_path), || {
+            let (conf, err) =
+                Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+            assert!(err.is_none());
+            let applied_cache_path = conf
+                .compile
+                .typst_extra_args
+                .is_some_and(|args| args.package.package_cache_path == Some(pkg_path.into()));
+            assert!(applied_cache_path);
+        });
     }
 }
