@@ -62,7 +62,7 @@ pub struct TaskPreviewArgs {
 
     /// Name a task.
     #[clap(long = "task")]
-    pub name: Option<String>,
+    pub task_name: Option<String>,
 
     /// When to run the task
     #[arg(long = "when")]
@@ -86,7 +86,7 @@ trait LockFileExt {
 impl LockFileExt for LockFile {
     fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
         let task_id = args
-            .name
+            .task_name
             .as_ref()
             .map(|t| Id::new(t.clone()))
             .unwrap_or(doc_id.clone());

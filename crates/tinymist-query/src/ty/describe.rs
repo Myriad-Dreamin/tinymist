@@ -1,5 +1,6 @@
 use ecow::{eco_format, EcoString};
 use tinymist_std::hash::hash128;
+use tinymist_world::vfs::WorkspaceResolver;
 use typst::foundations::Repr;
 
 use crate::{
@@ -196,7 +197,13 @@ impl TypeDescriber {
                 let Value::Module(m) = &v.val else {
                     return "module".into();
                 };
-                return eco_format!("module({})", m.name().unwrap());
+
+                return match (m.name(), m.file_id()) {
+                    (Some(name), ..) => eco_format!("module({name:?})"),
+                    (None, file_id) => {
+                        eco_format!("module({:?})", WorkspaceResolver::display(file_id))
+                    }
+                };
             }
             Ty::Value(v) if !is_plain_value(&v.val) => return self.describe(&term_value(&v.val)),
             Ty::Value(v) if self.value => return truncated_repr_::<181>(&v.val),

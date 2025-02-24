@@ -8,7 +8,7 @@ use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
-    syntax::{ast::MathTextKind, Span, SyntaxNode},
+    syntax::{Span, SyntaxNode},
     utils::LazyHash,
 };
 
@@ -371,6 +371,7 @@ impl ExprWorker<'_> {
             )),
 
             Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            MathText(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             Space(..) => Expr::Type(Ty::Builtin(BuiltinTy::Space)),
@@ -424,12 +425,6 @@ impl ExprWorker<'_> {
                 self.check_math([num, denom].iter())
             }
             MathRoot(root) => self.check(root.radicand()),
-            MathText(mathtext) => {
-                Expr::Type(Ty::Value(InsTy::new(Value::Str(match mathtext.get() {
-                    MathTextKind::Character(c) => c.into(),
-                    MathTextKind::Number(n) => n.to_string().into(),
-                }))))
-            }
         }
     }
 
