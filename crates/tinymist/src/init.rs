@@ -291,9 +291,11 @@ const CONFIG_ITEMS: &[&str] = &[
 ];
 // endregion Configuration Items
 
-// todo: Config::default() doesn't initialize arguments from environment
-// variables
 /// The user configuration read from the editor.
+///
+/// Note: `Config::default` is intentionally to be "pure" and not to be
+/// affected by system environment variables.
+/// To get the configuration with system defaults, use [`Config::new`] intead.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The resolution kind of the project.
@@ -320,6 +322,13 @@ pub struct Config {
 }
 
 impl Config {
+    /// Creates a new configuration with system defaults.
+    pub fn new() -> anyhow::Result<Self> {
+        let mut config = Self::default();
+        config.update_by_map(&Map::default())?;
+        Ok(config)
+    }
+
     /// Gets items for serialization.
     pub fn get_items() -> Vec<ConfigurationItem> {
         let sections = CONFIG_ITEMS
