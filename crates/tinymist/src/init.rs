@@ -91,9 +91,7 @@ impl Initializer for RegularInit {
             ConstConfig::from(&params),
             roots,
             std::mem::take(&mut self.font_opts),
-        )
-        .log_error("cannot assign Config defaults")
-        .unwrap_or_default();
+        );
 
         let err = params.initialization_options.and_then(|init| {
             config
@@ -324,7 +322,7 @@ impl Config {
         const_config: ConstConfig,
         roots: Vec<ImmutPath>,
         font_opts: CompileFontArgs,
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let mut config = Self {
             const_config,
             compile: CompileConfig {
@@ -337,8 +335,10 @@ impl Config {
             },
             ..Self::default()
         };
-        config.update_by_map(&Map::default())?;
-        Ok(config)
+        config
+            .update_by_map(&Map::default())
+            .log_error("failed to assign Config defaults");
+        config
     }
 
     /// Gets items for serialization.
