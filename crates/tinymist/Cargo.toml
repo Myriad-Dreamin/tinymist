@@ -121,6 +121,9 @@ preview = [
     "hyper-tungstenite",
 ]
 
+[dev-dependencies]
+temp-env.workspace = true
+
 [build-dependencies]
 anyhow.workspace = true
 cargo_metadata = "0.18.0"
