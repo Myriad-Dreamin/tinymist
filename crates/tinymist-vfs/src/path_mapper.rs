@@ -262,7 +262,7 @@ impl fmt::Debug for Resolving {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use WorkspaceResolution::*;
         let Some(id) = self.id else {
-            return write!(f, "None");
+            return write!(f, "unresolved-path");
         };
 
         let path = match WorkspaceResolver::resolve(id) {
