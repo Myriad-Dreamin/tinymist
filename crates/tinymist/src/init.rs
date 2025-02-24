@@ -7,6 +7,7 @@ use clap::Parser;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
+use reflexo::error::IgnoreLogging;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
@@ -258,9 +259,11 @@ const CONFIG_ITEMS: &[&str] = &[
 ];
 // endregion Configuration Items
 
-// todo: Config::default() doesn't initialize arguments from environment
-// variables
 /// The user configuration read from the editor.
+///
+/// Note: `Config::default` is intentionally to be "pure" and not to be
+/// affected by system environment variables.
+/// To get the configuration with system defaults, use [`Config::new`] intead.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The resolution kind of the project.
@@ -287,6 +290,30 @@ pub struct Config {
 }
 
 impl Config {
+    /// Creates a new configuration with system defaults.
+    pub fn new(
+        const_config: ConstConfig,
+        roots: Vec<ImmutPath>,
+        font_opts: CompileFontArgs,
+    ) -> Self {
+        let mut config = Self {
+            const_config,
+            compile: CompileConfig {
+                entry_resolver: EntryResolver {
+                    roots,
+                    ..EntryResolver::default()
+                },
+                font_opts,
+                ..CompileConfig::default()
+            },
+            ..Self::default()
+        };
+        config
+            .update_by_map(&Map::default())
+            .log_error("failed to assign Config defaults");
+        config
+    }
+
     /// Creates a new configuration from the lsp initialization parameters.
     pub fn from_params(
         params: InitializeParams,
@@ -307,18 +334,8 @@ impl Config {
                 .into_iter()
                 .collect(),
         };
-        let mut config = Config {
-            const_config: ConstConfig::from(&params),
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..Default::default()
-                },
-                font_opts,
-                ..CompileConfig::default()
-            },
-            ..Config::default()
-        };
+        let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+
         let err = params.initialization_options.and_then(|init| {
             config
                 .update(&init)
