@@ -71,35 +71,8 @@ impl Initializer for RegularInit {
     ///
     /// # Errors
     /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
-        // Initialize configurations
-        let roots = match params.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
-                .collect(),
-            #[allow(deprecated)] // `params.root_path` is marked as deprecated
-            None => params
-                .root_uri
-                .as_ref()
-                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
-                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
-                .into_iter()
-                .collect(),
-        };
-        let mut config = Config::new(
-            ConstConfig::from(&params),
-            roots,
-            std::mem::take(&mut self.font_opts),
-        );
-
-        let err = params.initialization_options.and_then(|init| {
-            config
-                .update(&init)
-                .map_err(|e| e.to_string())
-                .map_err(invalid_params)
-                .err()
-        });
+    fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
+        let (config, err) = Config::from_params(params, self.font_opts);
 
         let super_init = SuperInit {
             client: self.client,
@@ -339,6 +312,39 @@ impl Config {
             .update_by_map(&Map::default())
             .log_error("failed to assign Config defaults");
         config
+    }
+
+    /// Creates a new configuration from the lsp initialization parameters.
+    pub fn from_params(
+        params: InitializeParams,
+        font_opts: CompileFontArgs,
+    ) -> (Self, Option<ResponseError>) {
+        // Initialize configurations
+        let roots = match params.workspace_folders.as_ref() {
+            Some(roots) => roots
+                .iter()
+                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .collect(),
+            #[allow(deprecated)] // `params.root_path` is marked as deprecated
+            None => params
+                .root_uri
+                .as_ref()
+                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
+                .into_iter()
+                .collect(),
+        };
+        let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+
+        let err = params.initialization_options.and_then(|init| {
+            config
+                .update(&init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params)
+                .err()
+        });
+
+        (config, err)
     }
 
     /// Gets items for serialization.
@@ -877,6 +883,10 @@ mod tests {
     use serde_json::json;
     use tinymist_project::PathPattern;
 
+    fn update_config(config: &mut Config, update: &JsonValue) -> anyhow::Result<()> {
+        temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
+    }
+
     #[test]
     fn test_default_encoding() {
         let cc = ConstConfig::default();
@@ -898,7 +908,7 @@ mod tests {
             "typstExtraArgs": ["--root", root_path]
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
 
         // Nix specifies this environment variable when testing.
         let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
@@ -937,7 +947,7 @@ mod tests {
             }
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
 
         assert_eq!(config.compile.export_pdf, TaskWhen::OnType);
     }
@@ -958,7 +968,7 @@ mod tests {
         // assert!(timestamp(|_| {}).is_none());
         // assert!(timestamp(|config| {
         //     let update = json!({});
-        //     config.update(&update).unwrap();
+        //     update_config(&mut config, &update).unwrap();
         // })
         // .is_none());
 
@@ -966,14 +976,14 @@ mod tests {
             let update = json!({
                 "typstExtraArgs": ["--creation-timestamp", "1234"]
             });
-            config.update(&update).unwrap();
+            update_config(config, &update).unwrap();
         });
         assert!(args_timestamp.is_some());
 
         // todo: concurrent get/set env vars is unsafe
         //     std::env::set_var("SOURCE_DATE_EPOCH", "1234");
         //     let env_timestamp = timestamp(|config| {
-        //         config.update(&json!({})).unwrap();
+        //         update_config(&mut config, &json!({})).unwrap();
         //     });
 
         //     assert_eq!(args_timestamp, env_timestamp);
@@ -986,7 +996,7 @@ mod tests {
             "typstExtraArgs": []
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
     }
 
     #[test]
@@ -994,7 +1004,7 @@ mod tests {
         fn opts(update: Option<&JsonValue>) -> CompileFontArgs {
             let mut config = Config::default();
             if let Some(update) = update {
-                config.update(update).unwrap();
+                update_config(&mut config, update).unwrap();
             }
 
             config.compile.determine_font_opts()
@@ -1035,7 +1045,7 @@ mod tests {
             "rootPath": ".",
         });
 
-        let err = format!("{}", config.update(&update).unwrap_err());
+        let err = format!("{}", update_config(&mut config, &update).unwrap_err());
         assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 
@@ -1046,7 +1056,7 @@ mod tests {
             "typstExtraArgs": ["--root", "."]
         });
 
-        let err = format!("{}", config.update(&update).unwrap_err());
+        let err = format!("{}", update_config(&mut config, &update).unwrap_err());
         assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 
@@ -1059,9 +1069,9 @@ mod tests {
             });
 
             // It should be able to resolve the entry file from the extra arguments.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             // Passing it twice doesn't affect the result.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             config
         };
         {
@@ -1070,7 +1080,7 @@ mod tests {
                 "typstExtraArgs": ["main.typ", "main.typ"]
             });
 
-            let err = format!("{}", config.update(&update).unwrap_err());
+            let err = format!("{}", update_config(&mut config, &update).unwrap_err());
             assert!(
                 err.contains("unexpected argument"),
                 "unexpected error: {err}"
@@ -1087,9 +1097,9 @@ mod tests {
             });
 
             // It should be able to resolve the entry file from the extra arguments.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             // Passing it twice doesn't affect the result.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
 
             assert_eq!(
                 config.compile.typst_extra_args,
@@ -1156,5 +1166,28 @@ mod tests {
         };
 
         assert_eq!(typstyle_config.tab_spaces, 8);
+    }
+
+    #[test]
+    fn test_default_config_initialize() {
+        let (_conf, err) =
+            Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn test_config_package_path_from_env() {
+        let pkg_path = Path::new(if cfg!(windows) { "C:\\pkgs" } else { "/pkgs" });
+
+        temp_env::with_var("TYPST_PACKAGE_CACHE_PATH", Some(pkg_path), || {
+            let (conf, err) =
+                Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+            assert!(err.is_none());
+            let applied_cache_path = conf
+                .compile
+                .typst_extra_args
+                .is_some_and(|args| args.package.package_cache_path == Some(pkg_path.into()));
+            assert!(applied_cache_path);
+        });
     }
 }
