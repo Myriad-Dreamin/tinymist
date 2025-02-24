@@ -220,7 +220,7 @@ impl ExportTask {
                         paged_doc()?,
                         &PdfOptions {
                             timestamp: convert_datetime(creation_timestamp),
-                            ..Default::default()
+                            ..PdfOptions::default()
                         },
                     )
                     .map_err(|e| anyhow::anyhow!("failed to convert to pdf: {e:?}"))?

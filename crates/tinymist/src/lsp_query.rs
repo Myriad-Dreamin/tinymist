@@ -345,7 +345,7 @@ impl ServerState {
                     let root = self.entry_resolver().root(None)?;
                     Some(TaskInputs {
                         entry: Some(EntryState::new_rooted_by_id(root, *DETACHED_ENTRY)),
-                        ..Default::default()
+                        ..TaskInputs::default()
                     })
                 });
 

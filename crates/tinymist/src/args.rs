@@ -55,7 +55,7 @@ pub enum Commands {
 
 impl Default for Commands {
     fn default() -> Self {
-        Self::Lsp(Default::default())
+        Self::Lsp(LspArgs::default())
     }
 }
 
