@@ -340,7 +340,7 @@
           "title": "Configure default word separators",
           "description": "Whether to configure default word separators on startup",
           "type": "string",
-          "default": "enable",
+          "default": "disable",
           "enum": [
             "enable",
             "disable"
@@ -688,14 +688,12 @@
     "configurationDefaults": {
       "[typst]": {
         "editor.wordWrap": "on",
-        "editor.wordSeparators": "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
         "editor.inlayHints.enabled": "off"
       },
       "[typst-code]": {
         "editor.wordWrap": "on",
-        "editor.wordSeparators": "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
         "editor.inlayHints.enabled": "off"
