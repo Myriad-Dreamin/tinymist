@@ -866,6 +866,10 @@ mod tests {
     use serde_json::json;
     use tinymist_project::PathPattern;
 
+    fn update_config(config: &mut Config, update: &JsonValue) -> anyhow::Result<()> {
+        temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
+    }
+
     #[test]
     fn test_default_encoding() {
         let cc = ConstConfig::default();
@@ -887,7 +891,7 @@ mod tests {
             "typstExtraArgs": ["--root", root_path]
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
 
         // Nix specifies this environment variable when testing.
         let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
@@ -926,7 +930,7 @@ mod tests {
             }
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
 
         assert_eq!(config.compile.export_pdf, TaskWhen::OnType);
     }
@@ -947,7 +951,7 @@ mod tests {
         // assert!(timestamp(|_| {}).is_none());
         // assert!(timestamp(|config| {
         //     let update = json!({});
-        //     config.update(&update).unwrap();
+        //     update_config(&mut config, &update).unwrap();
         // })
         // .is_none());
 
@@ -955,14 +959,14 @@ mod tests {
             let update = json!({
                 "typstExtraArgs": ["--creation-timestamp", "1234"]
             });
-            config.update(&update).unwrap();
+            update_config(config, &update).unwrap();
         });
         assert!(args_timestamp.is_some());
 
         // todo: concurrent get/set env vars is unsafe
         //     std::env::set_var("SOURCE_DATE_EPOCH", "1234");
         //     let env_timestamp = timestamp(|config| {
-        //         config.update(&json!({})).unwrap();
+        //         update_config(&mut config, &json!({})).unwrap();
         //     });
 
         //     assert_eq!(args_timestamp, env_timestamp);
@@ -975,7 +979,7 @@ mod tests {
             "typstExtraArgs": []
         });
 
-        config.update(&update).unwrap();
+        update_config(&mut config, &update).unwrap();
     }
 
     #[test]
@@ -983,7 +987,7 @@ mod tests {
         fn opts(update: Option<&JsonValue>) -> CompileFontArgs {
             let mut config = Config::default();
             if let Some(update) = update {
-                config.update(update).unwrap();
+                update_config(&mut config, update).unwrap();
             }
 
             config.compile.determine_font_opts()
@@ -1024,7 +1028,7 @@ mod tests {
             "rootPath": ".",
         });
 
-        let err = format!("{}", config.update(&update).unwrap_err());
+        let err = format!("{}", update_config(&mut config, &update).unwrap_err());
         assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 
@@ -1035,7 +1039,7 @@ mod tests {
             "typstExtraArgs": ["--root", "."]
         });
 
-        let err = format!("{}", config.update(&update).unwrap_err());
+        let err = format!("{}", update_config(&mut config, &update).unwrap_err());
         assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 
@@ -1048,9 +1052,9 @@ mod tests {
             });
 
             // It should be able to resolve the entry file from the extra arguments.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             // Passing it twice doesn't affect the result.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             config
         };
         {
@@ -1059,7 +1063,7 @@ mod tests {
                 "typstExtraArgs": ["main.typ", "main.typ"]
             });
 
-            let err = format!("{}", config.update(&update).unwrap_err());
+            let err = format!("{}", update_config(&mut config, &update).unwrap_err());
             assert!(
                 err.contains("unexpected argument"),
                 "unexpected error: {err}"
@@ -1076,9 +1080,9 @@ mod tests {
             });
 
             // It should be able to resolve the entry file from the extra arguments.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
             // Passing it twice doesn't affect the result.
-            config.update(&update).expect("updated");
+            update_config(&mut config, &update).expect("updated");
 
             assert_eq!(
                 config.compile.typst_extra_args,
