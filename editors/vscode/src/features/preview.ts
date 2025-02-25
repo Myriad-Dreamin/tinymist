@@ -773,17 +773,20 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPre
   }
 
   async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: PersistPreviewState) {
-    console.log("deserializeWebviewPanel", state);
+    // console.log("deserializeWebviewPanel", state);
     if (!state) {
       return;
     }
 
     const uri = vscode.Uri.parse(state.uri);
+    // toString again to get the canonical form
+    const uriStr = uri.toString();
 
     // open this file and show in editor
     const doc =
-      vscode.workspace.textDocuments.find((doc) => doc.uri === uri) ||
-      (await vscode.workspace.openTextDocument(state.uri));
+      vscode.workspace.textDocuments.find((doc) => {
+        return doc.uri.toString() === uriStr;
+      }) || (await vscode.workspace.openTextDocument(uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
 
     const bindDocument = editor.document;
