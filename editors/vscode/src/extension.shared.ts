@@ -133,8 +133,8 @@ export async function tinymistActivate(
 export async function tinymistDeactivate(
   trait: Pick<TinymistTrait, "activateTable">,
 ): Promise<void> {
-  for (const [condition, deactivate] of trait.activateTable()) {
-    if (condition) {
+  for (const [condition, _, deactivate] of trait.activateTable()) {
+    if (deactivate && condition) {
       deactivate(tinymist.context);
     }
   }
