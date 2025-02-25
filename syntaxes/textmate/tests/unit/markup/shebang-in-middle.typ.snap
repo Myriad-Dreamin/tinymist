@@ -1,0 +1,20 @@
+>= Test
+#^ source.typst markup.heading.typst punctuation.definition.heading.typst
+# ^ source.typst markup.heading.typst
+#  ^^^^ source.typst markup.heading.typst
+>
+> #! syntax
+#^ source.typst
+# ^ source.typst keyword.control.hash.typst
+#  ^ source.typst
+#   ^^^^^^^^ source.typst
+>
+>#! syntax
+#^^ source.typst comment.line.shebang.typst punctuation.definition.comment.line.shebang.typst
+#  ^^^^^^^ source.typst comment.line.shebang.typst
+>
+># ! syntax
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst
+#  ^^^^^^^^^ source.typst
+>
