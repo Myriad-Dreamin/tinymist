@@ -717,6 +717,7 @@
           "typst",
           "typ"
         ],
+        "firstLine": "^#!/.*\\b(typst)[0-9.-]*\\b",
         "icon": {
           "light": "./icons/typst-small.png",
           "dark": "./icons/typst-small.png"

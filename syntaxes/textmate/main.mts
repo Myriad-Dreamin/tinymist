@@ -10,12 +10,7 @@
  */
 
 import * as textmate from "./textmate.mjs";
-import {
-  blockRaw,
-  blockRawGeneral,
-  blockRawLangs,
-  inlineRaw,
-} from "./fenced.mjs";
+import { blockRaw, blockRawGeneral, blockRawLangs, inlineRaw } from "./fenced.mjs";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -54,14 +49,12 @@ const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 /**
  * A typst identifier in math mode.
  */
-const MATH_IDENTIFIER =
-  /(?:(?<=_)|\b)(?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])+/u;
+const MATH_IDENTIFIER = /(?:(?<=_)|\b)(?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])+/u;
 
 /**
  * A dot (field) access clause in math mode.
  */
-const MATH_DOT_ACCESS =
-  /(\.)((?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])*)/u;
+const MATH_DOT_ACCESS = /(\.)((?:(?!_)[\p{XID_Start}])(?:(?!_)[\p{XID_Continue}])*)/u;
 
 // const MATH_OPENING =
 //   /[\[\(\u{5b}\u{7b}\u{2308}\u{230a}\u{231c}\u{231e}\u{2772}\u{27e6}\u{27e8}\u{27ea}\u{27ec}\u{27ee}\u{2983}\u{2985}\u{2987}\u{2989}\u{298b}\u{298d}\u{298f}\u{2991}\u{2993}\u{2995}\u{2997}\u{29d8}\u{29da}\u{29fc}]/u;
@@ -136,7 +129,7 @@ const exprEndReg = (() => {
       /[\s\S]{3}[=<>\+\-\*\/]\s/,
       /[\s\S]{2}[=<>\+\-\*\/]\s{2}/,
       /[\s\S][=<>\+\-\*\/]\s{3}/,
-      /[=<>\+\-\*\/]\s{4}/
+      /[=<>\+\-\*\/]\s{4}/,
     );
 
     lookBehind = `(?<!${cases.source})` + /(?=[\[\{])/u.source;
@@ -186,8 +179,7 @@ const primitiveFunctions = {
 };
 
 const primitiveTypes: textmate.PatternMatch = {
-  match:
-    /\b(any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-)/,
+  match: /\b(any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-)/,
   name: "entity.name.type.primitive.typst",
 };
 
@@ -205,15 +197,13 @@ const mathIdentifier: textmate.PatternMatch = {
 const FLOAT_OR_INT = /(?:\d+\.(?!\d)|\d*\.?\d+(?:[eE][+-]?\d+)?)/;
 
 const floatUnit = (unit: RegExp, canDotSuff: boolean) =>
-  new RegExp(
-    FLOAT_OR_INT.source + (canDotSuff ? "" : "(?<!\\.)") + unit.source
-  );
+  new RegExp(FLOAT_OR_INT.source + (canDotSuff ? "" : "(?<!\\.)") + unit.source);
 
 const paramOrArgName: textmate.Pattern = {
   match: replaceGroup(
     /(?!(show|import|include)\s*\:)({identifier})\s*(\:)/,
     "{identifier}",
-    IDENTIFIER
+    IDENTIFIER,
   ),
   captures: {
     "2": { name: "variable.other.readwrite.typst" },
@@ -261,8 +251,7 @@ const constants: textmate.Pattern = {
     { name: "constant.numeric.fr.typst", match: floatUnit(/fr/, false) },
     {
       name: "constant.numeric.integer.typst",
-      match:
-        /(?<!\)|\]|\})(^|(?<=\s|#)|\b)\d+\b(?!\.(?:[^\p{XID_Start}_]|$)|[eE])/u,
+      match: /(?<!\)|\]|\})(^|(?<=\s|#)|\b)\d+\b(?!\.(?:[^\p{XID_Start}_]|$)|[eE])/u,
     },
     {
       name: "constant.numeric.hex.typst",
@@ -330,6 +319,15 @@ const lineCommentInner = (strict: boolean): textmate.Pattern => {
 
 const strictLineComment = lineCommentInner(true);
 const lineComment = lineCommentInner(false);
+
+const shebang = {
+  name: "comment.line.shebang.typst",
+  begin: /^(#!)/,
+  beginCaptures: {
+    "1": { name: "punctuation.definition.comment.line.shebang.typst" },
+  },
+  end: /\n/,
+};
 
 /**
  * Defines block patterns.
@@ -505,15 +503,12 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
     begin: lookAhead(
-      new RegExp(
-        `(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` +
-          /(?=\()/.source
-      )
+      new RegExp(`(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` + /(?=\()/.source),
     ),
     end: replaceGroup(
       /(?:(?<=[\)])(?![\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
       "[CallStart]",
-      mathCallStart
+      mathCallStart,
     ),
     patterns: [
       {
@@ -559,11 +554,7 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
 type _CommonPatternPart = never;
 
 const common: textmate.Pattern = {
-  patterns: [
-    { include: "#strictComments" },
-    { include: "#blockRaw" },
-    { include: "#inlineRaw" },
-  ],
+  patterns: [{ include: "#strictComments" }, { include: "#blockRaw" }, { include: "#inlineRaw" }],
 };
 
 /**
@@ -681,15 +672,15 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
       new RegExp(
         /(?<=[\}\]\)])(?![;\(\[\$]|(?:\.method-continue))/.source.replace(
           /method-continue/g,
-          IDENTIFIER.source + /(?=[\(\[])/.source
-        )
+          IDENTIFIER.source + /(?=[\(\[])/.source,
+        ),
       ),
       // The hash starts a string or an identifier.
       /(?<!#)(?=["\_])/,
       // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
       /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
       /(?=[\s,\}\]\)\#\$\*]|$)/,
-      /(;)/
+      /(;)/,
     ).source,
     beginCaptures: {
       "0": { name: kind },
@@ -720,25 +711,19 @@ const markupEnterCode: textmate.Pattern = {
     },
     enterExpression(
       "keyword.control.hash.typst",
-      /(?=(?:break|continue|and|or|not|return|as|in|include|import|let|else|if|for|while|context|set|show)\b(?!-))/
+      /(?=(?:break|continue|and|or|not|return|as|in|include|import|let|else|if|for|while|context|set|show)\b(?!-))/,
     ),
     enterExpression(
       "entity.name.type.primitive.hash.typst",
-      /(?=(?:any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-))/
+      /(?=(?:any|str|int|float|bool|type|length|content|array|dictionary|arguments)\b(?!-))/,
     ),
     enterExpression("keyword.other.none.hash.typst", /(?=(?:none)\b(?!-))/),
-    enterExpression(
-      "constant.language.boolean.hash.typst",
-      /(?=(?:false|true)\b(?!-))/
-    ),
+    enterExpression("constant.language.boolean.hash.typst", /(?=(?:false|true)\b(?!-))/),
     enterExpression(
       "entity.name.function.hash.typst",
-      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*[\(\[])/u
+      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*[\(\[])/u,
     ),
-    enterExpression(
-      "variable.other.readwrite.hash.typst",
-      /(?=[\p{XID_Start}_])/u
-    ),
+    enterExpression("variable.other.readwrite.hash.typst", /(?=[\p{XID_Start}_])/u),
     enterExpression("string.hash.hash.typst", /(?=\")/),
     enterExpression("constant.numeric.hash.typst", /(?=\d|\.\d)/),
     enterExpression("keyword.control.hash.typst", new RegExp("")),
@@ -753,8 +738,7 @@ const markupLink: textmate.Pattern = {
     { include: "#markupLinkParen" },
     { include: "#markupLinkBracket" },
     {
-      match:
-        /(^|\G)(?:[0-9a-zA-Z#$%&*\+\-\/\=\@\_\~]+|(?:[!,.:;?']+(?![\s\]\)]|$)))/,
+      match: /(^|\G)(?:[0-9a-zA-Z#$%&*\+\-\/\=\@\_\~]+|(?:[!,.:;?']+(?![\s\]\)]|$)))/,
     },
   ],
 };
@@ -1347,11 +1331,7 @@ const callArgs: textmate.Pattern = {
 };
 
 const patternOrArgsBody: textmate.Pattern = {
-  patterns: [
-    { include: "#comments" },
-    { include: "#paramOrArgName" },
-    { include: "#expression" },
-  ],
+  patterns: [{ include: "#comments" }, { include: "#paramOrArgName" }, { include: "#expression" }],
 };
 
 const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
@@ -1360,9 +1340,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
     begin: lookAhead(
       strict
         ? new RegExp(/(\.)?/.source + IDENTIFIER.source + /(?=\(|\[)/.source)
-        : new RegExp(
-            /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
-          )
+        : new RegExp(/(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source),
     ),
     end: strict
       ? /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\s;,\}\]\)\#]|$)/
@@ -1374,8 +1352,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
       },
       {
         match: new RegExp(
-          IDENTIFIER.source +
-            (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
+          IDENTIFIER.source + (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source),
         ),
         captures: {
           "0": {
@@ -1418,6 +1395,7 @@ export const typst: textmate.Grammar = {
     common,
     math,
     markup,
+    shebang,
     code,
     comments,
     codeBlock,
@@ -1516,34 +1494,24 @@ function generate() {
   fs.writeFileSync(
     path.join(dirname, "../typst.tmLanguage.json"),
     JSON.stringify({
-      $schema:
-        "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+      $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
       scopeName: "source.typst",
       name: "typst",
-      patterns: [
-        {
-          include: "#markup",
-        },
-      ],
+      patterns: [{ include: "#shebang" }, { include: "#markup" }],
       repository,
-    })
+    }),
   );
 
   // dump to file
   fs.writeFileSync(
     path.join(dirname, "../typst-code.tmLanguage.json"),
     JSON.stringify({
-      $schema:
-        "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+      $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
       scopeName: "source.typst-code",
       name: "typst-code",
-      patterns: [
-        {
-          include: "#code",
-        },
-      ],
+      patterns: [{ include: "#code" }],
       repository,
-    })
+    }),
   );
 }
 

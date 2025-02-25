@@ -1,0 +1,9 @@
+>#! syntax
+#^^ source.typst comment.line.shebang.typst punctuation.definition.comment.line.shebang.typst
+#  ^^^^^^^ source.typst comment.line.shebang.typst
+>
+>= Test
+#^ source.typst markup.heading.typst punctuation.definition.heading.typst
+# ^ source.typst markup.heading.typst
+#  ^^^^ source.typst markup.heading.typst
+>
