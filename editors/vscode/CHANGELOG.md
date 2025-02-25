@@ -6,9 +6,54 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.2 - [2025-02-26]
+
+### Editor
+
+* (Fix) Deactivating features correctly when restarting server in https://github.com/Myriad-Dreamin/tinymist/pull/1397
+* Making `tinymist.configureDefaultWordSeparator` opt in, as discussed, in https://github.com/Myriad-Dreamin/tinymist/pull/1389
+
+### Compiler
+
+* (Fix) Letting `tinymist::Config` pull environment variables on start of server in https://github.com/Myriad-Dreamin/tinymist/pull/1390
+* Tested that `TYPST_PACKAGE_CACHE_PATH` should be applied on server start in https://github.com/Myriad-Dreamin/tinymist/pull/1391
+
+### CLI
+
+* (Fix) Ensured `tinymist-cli`'s argument names unique in https://github.com/Myriad-Dreamin/tinymist/pull/1388
+* Added test about completion script generation in https://github.com/Myriad-Dreamin/tinymist/pull/1387
+
+### Code Analysis
+
+* (Fix) term math text as content instead of string in https://github.com/Myriad-Dreamin/tinymist/pull/1386
+* (Fix) Printing type representation of anonymous modules in https://github.com/Myriad-Dreamin/tinymist/pull/1385
+  * This was causing crashes, introduced in typst v0.13.0
+
+### Preview
+
+* (Fix) Uses new wasm renderer in https://github.com/Myriad-Dreamin/tinymist/pull/1398
+* (Fix) Corrected `vscode.Uri` usages when restoring preview in https://github.com/Myriad-Dreamin/tinymist/pull/1402
+* Using `jump_from_click` from typst-ide in https://github.com/Myriad-Dreamin/tinymist/pull/1399
+
+### Typlite
+
+* (Fix) Exposed and defaulted to no-content-hint in typlite by @selfisekai in https://github.com/Myriad-Dreamin/tinymist/pull/1381
+
+### Syntax Highlighting
+
+* Parsing Shebang syntax in https://github.com/Myriad-Dreamin/tinymist/pull/1400
+* Recognizing typst source files by shebang containing `typst` keyword in https://github.com/Myriad-Dreamin/tinymist/pull/1400
+  * Specifically, it matches by regex `^#!/.*\\b(typst)[0-9.-]*\\b`
+
+### Misc
+
+* Added examples for `--assets-path` and `--assets-src-path` by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1396
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.0...v0.13.2
+
 ## v0.13.0 - [2025-02-23]
 
-* Bumped typst to v0.13.0 by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1342 and https://github.com/Myriad-Dreamin/tinymist/pull/1361
+* Bumped typst to v0.13.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1342 and https://github.com/Myriad-Dreamin/tinymist/pull/1361
 * Bumped typstyle to v0.13.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1368
 
 ### Editor
