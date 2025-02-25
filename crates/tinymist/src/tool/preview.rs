@@ -22,12 +22,13 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{ProjectInsId, WorldProvider};
+use tinymist_project::{LspWorld, ProjectInsId, WorldProvider};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
-use typst::layout::{Frame, FrameItem, Point, Position};
+use typst::layout::{Abs, Frame, FrameItem, Point, Position, Size};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
+use typst::visualize::Geometry;
 use typst::World;
 use typst_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
@@ -92,6 +93,23 @@ impl typst_preview::CompileView for PreviewCompileView {
         let offset = cursor.saturating_sub(node.offset());
 
         Some(SourceSpanOffset { span, offset })
+    }
+
+    // todo: use vec2bbox to handle bbox correctly
+    fn resolve_frame_loc(
+        &self,
+        pos: &reflexo::debug_loc::DocumentPosition,
+    ) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
+        let TypstDocument::Paged(doc) = self.doc()? else {
+            return None;
+        };
+        let world = &self.snap.world;
+
+        let page = pos.page_no.checked_sub(1)?;
+        let page = doc.pages.get(page)?;
+
+        let click = Point::new(Abs::pt(pos.x as f64), Abs::pt(pos.y as f64));
+        jump_from_click(world, &page.frame, click)
     }
 
     fn resolve_document_position(&self, loc: Location) -> Vec<Position> {
@@ -866,6 +884,85 @@ impl Notification for NotifDocumentOutline {
     const METHOD: &'static str = "tinymist/documentOutline";
 }
 
+/// Determine where to jump to based on a click in a frame.
+pub fn jump_from_click(
+    world: &LspWorld,
+    frame: &Frame,
+    click: Point,
+) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
+    // Try to find a link first.
+    for (pos, item) in frame.items() {
+        if let FrameItem::Link(_dest, size) = item {
+            if is_in_rect(*pos, *size, click) {
+                // todo: url reaction
+                return None;
+            }
+        }
+    }
+
+    // If there's no link, search for a jump target.
+    for (mut pos, item) in frame.items().rev() {
+        match item {
+            FrameItem::Group(group) => {
+                // TODO: Handle transformation.
+                if let Some(span) = jump_from_click(world, &group.frame, click - pos) {
+                    return Some(span);
+                }
+            }
+
+            FrameItem::Text(text) => {
+                for glyph in &text.glyphs {
+                    let width = glyph.x_advance.at(text.size);
+                    if is_in_rect(
+                        Point::new(pos.x, pos.y - text.size),
+                        Size::new(width, text.size),
+                        click,
+                    ) {
+                        let (span, span_offset) = glyph.span;
+                        let mut span_offset = span_offset as usize;
+                        let Some(id) = span.id() else { continue };
+                        let source = world.source(id).ok()?;
+                        let node = source.find(span)?;
+                        if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText)
+                            && (click.x - pos.x) > width / 2.0
+                        {
+                            span_offset += glyph.range().len();
+                        }
+
+                        let span_offset = SourceSpanOffset {
+                            span,
+                            offset: span_offset,
+                        };
+
+                        return Some((span_offset, span_offset));
+                    }
+
+                    pos.x += width;
+                }
+            }
+
+            FrameItem::Shape(shape, span) => {
+                let Geometry::Rect(size) = shape.geometry else {
+                    continue;
+                };
+                if is_in_rect(pos, size, click) {
+                    let span = (*span).into();
+                    return Some((span, span));
+                }
+            }
+
+            FrameItem::Image(_, size, span) if is_in_rect(pos, *size, click) => {
+                let span = (*span).into();
+                return Some((span, span));
+            }
+
+            _ => {}
+        }
+    }
+
+    None
+}
+
 /// Find the output location in the document for a cursor position.
 fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Vec<Position> {
     let Some(node) = LinkedNode::new(source.root())
@@ -931,6 +1028,12 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     }
 
     None
+}
+
+/// Whether a rectangle with the given size at the given position contains the
+/// click position.
+fn is_in_rect(pos: Point, size: Size, click: Point) -> bool {
+    pos.x <= click.x && pos.x + size.x >= click.x && pos.y <= click.y && pos.y + size.y >= click.y
 }
 
 fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
