@@ -22,6 +22,7 @@ pub enum RenderActorRequest {
     RenderIncremental,
     EditorResolveSpanRange(Range<SourceSpanOffset>),
     WebviewResolveSpan(ResolveSpanRequest),
+    WebviewResolveFrameLoc(DocumentPosition),
     ResolveSourceLoc(ResolveSourceLocRequest),
     ChangeCursorPosition(ChangeCursorPositionRequest),
 }
@@ -34,6 +35,7 @@ impl RenderActorRequest {
             Self::EditorResolveSpanRange(_) => false,
             Self::WebviewResolveSpan(_) => false,
             Self::ResolveSourceLoc(_) => false,
+            Self::WebviewResolveFrameLoc(_) => false,
             Self::ChangeCursorPosition(_) => false,
         }
     }
@@ -87,6 +89,16 @@ impl RenderActor {
                         return false;
                     }
                 };
+
+                log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
+                // end position is used
+                if let Some(spans) = spans {
+                    self.editor_resolve_span_range(spans.0..spans.1);
+                }
+            }
+            RenderActorRequest::WebviewResolveFrameLoc(frame_loc) => {
+                log::debug!("RenderActor: resolving WebviewResolveFrameLoc: {frame_loc:?}");
+                let spans = self.resolve_span_by_frame_loc(&frame_loc);
 
                 log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
                 // end position is used
@@ -282,6 +294,15 @@ impl RenderActor {
         ));
 
         Some(())
+    }
+
+    /// Gets the span range of the given frame loc.
+    pub fn resolve_span_by_frame_loc(
+        &mut self,
+        pos: &DocumentPosition,
+    ) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
+        let view = self.view.read();
+        view.as_ref()?.resolve_frame_loc(pos)
     }
 }
 

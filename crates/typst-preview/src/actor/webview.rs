@@ -156,8 +156,14 @@ impl<
                             let path = path.into_iter().map(ElementPoint::from).collect::<Vec<_>>();
                             self.render_sender.send(RenderActorRequest::WebviewResolveSpan(ResolveSpanRequest(path))).log_error("WebViewActor");
                         };
+                    } else if msg.starts_with("src-point") {
+                        let path = msg.split(' ').nth(1).unwrap();
+                        let path = serde_json::from_str(path);
+                        if let Ok(path) = path {
+                            self.render_sender.send(RenderActorRequest::WebviewResolveFrameLoc(path)).log_error("WebViewActor");
+                        };
                     } else {
-                        let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await;
+                        let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {msg}"))).await;
                         log::info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }

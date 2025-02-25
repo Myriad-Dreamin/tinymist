@@ -8,6 +8,7 @@ pub use actor::editor::{
 };
 pub use args::*;
 pub use outline::Outline;
+use tinymist_std::debug_loc::DocumentPosition;
 use tinymist_std::error::IgnoreLogging;
 
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
@@ -367,6 +368,14 @@ pub trait CompileView: Send + Sync {
 
     /// Resolve the source span offset.
     fn resolve_source_span(&self, _by: Location) -> Option<SourceSpanOffset> {
+        None
+    }
+
+    /// Resolve a physical location in the document.
+    fn resolve_frame_loc(
+        &self,
+        _pos: &DocumentPosition,
+    ) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
         None
     }
 

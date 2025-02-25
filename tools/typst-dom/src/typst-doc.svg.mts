@@ -11,9 +11,7 @@ export interface TypstSvgDocument {
 }
 
 export function provideSvgDoc<
-  TBase extends GConstructor<
-    TypstDocumentContext & Partial<TypstCanvasDocument>
-  >,
+  TBase extends GConstructor<TypstDocumentContext & Partial<TypstCanvasDocument>>,
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
   return class SvgDocument extends Base {
     /// canvas render ctoken
@@ -55,9 +53,7 @@ export function provideSvgDoc<
       }
 
       const t2 = performance.now();
-      patchSvgToContainer(this.hookedElem, patchStr, (elem) =>
-        this.decorateSvgElement(elem, mode)
-      );
+      patchSvgToContainer(this.hookedElem, patchStr, (elem) => this.decorateSvgElement(elem, mode));
       const t3 = performance.now();
 
       if (this.cursorPaths) {
@@ -101,10 +97,7 @@ export function provideSvgDoc<
             const rectNextBase = foundUseNext?.getBBox();
             const rect = {
               // Some char does not have position so they are resolved to 0
-              right:
-                rectBase.width !== 0
-                  ? rectBase.x + rectBase.width
-                  : rectNextBase?.x || 0,
+              right: rectBase.width !== 0 ? rectBase.x + rectBase.width : rectNextBase?.x || 0,
               // todo: have bug
               // top: textBase.height / 2,
             };
@@ -131,10 +124,7 @@ export function provideSvgDoc<
             ry = Math.abs(ry);
 
             // Creates a circle with 5px radius (but regard vertical and horizontal scale)
-            const t = document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "ellipse"
-            );
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
             t.classList.add("typst-svg-cursor");
             t.setAttribute("cx", `${rect.right}`);
             // t.setAttribute('cy', `${rect.top}`);
@@ -201,16 +191,12 @@ export function provideSvgDoc<
         let topEstimate = top - 1,
           bottomEstimate = top + height + 1;
         if (ch) {
-          const pages = Array.from(ch).filter((x) =>
-            x.classList.contains("typst-page")
-          );
+          const pages = Array.from(ch).filter((x) => x.classList.contains("typst-page"));
           let minTop = 1e33,
             maxBottom = -1e33,
             accumulatedHeight = 0;
           for (const page of pages) {
-            const pageHeight = Number.parseFloat(
-              page.getAttribute("data-page-height")!
-            );
+            const pageHeight = Number.parseFloat(page.getAttribute("data-page-height")!);
             const translateY = Number.parseFloat(page.getAttribute("data-y")!);
             if (translateY + pageHeight > topEstimate) {
               minTop = Math.min(minTop, accumulatedHeight);
@@ -236,7 +222,7 @@ export function provideSvgDoc<
           topEstimate,
           // hi.x, hi.y
           left + width + 1,
-          bottomEstimate
+          bottomEstimate,
         );
         console.log(
           "render_in_window with partial rendering enabled window",
@@ -246,16 +232,10 @@ export function provideSvgDoc<
           width,
           height,
           ", patch scale",
-          patchStr.length
+          patchStr.length,
         );
       } else {
-        console.log(
-          "render_in_window with partial rendering disabled",
-          0,
-          0,
-          1e33,
-          1e33
-        );
+        console.log("render_in_window with partial rendering disabled", 0, 0, 1e33, 1e33);
         patchStr = this.kModule.render_in_window(0, 0, 1e33, 1e33);
       }
 
@@ -333,8 +313,7 @@ export function provideSvgDoc<
 
     private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
       const container = this.cachedDOMState;
-      const kShouldMixinCanvas =
-        this.previewMode === PreviewMode.Doc && this.shouldMixinCanvas();
+      const kShouldMixinCanvas = this.previewMode === PreviewMode.Doc && this.shouldMixinCanvas();
 
       // the <rect> could only have integer width and height
       // so we scale it by 100 to make it more accurate
@@ -354,7 +333,7 @@ export function provideSvgDoc<
       const nextPages: SvgPage[] = (() => {
         /// Retrieve original pages
         const filteredNextPages = Array.from(svg.children).filter((x) =>
-          x.classList.contains("typst-page")
+          x.classList.contains("typst-page"),
         );
 
         if (mode === PreviewMode.Doc) {
@@ -368,9 +347,7 @@ export function provideSvgDoc<
         }
       })().map((elem, index) => {
         const width = Number.parseFloat(elem.getAttribute("data-page-width")!);
-        const height = Number.parseFloat(
-          elem.getAttribute("data-page-height")!
-        );
+        const height = Number.parseFloat(elem.getAttribute("data-page-height")!);
         maxWidth = Math.max(maxWidth, width);
         return {
           index,
@@ -420,7 +397,7 @@ export function provideSvgDoc<
           inserter: (pageInfo) => {
             const foreignObject = document.createElementNS(
               "http://www.w3.org/2000/svg",
-              "foreignObject"
+              "foreignObject",
             );
             elem.appendChild(foreignObject);
             foreignObject.setAttribute("width", `${width}`);
@@ -436,11 +413,7 @@ export function provideSvgDoc<
       for (let i = 0; i < nextPages.length; i++) {
         /// Retrieve page width, height
         const nextPage = nextPages[i];
-        const {
-          width: pageWidth,
-          height: pageHeight,
-          elem: pageElem,
-        } = nextPage;
+        const { width: pageWidth, height: pageHeight, elem: pageElem } = nextPage;
 
         /// Switch a dummy svg page to canvas mode
         if (kShouldMixinCanvas && isDummyPatchElem(pageElem)) {
@@ -459,32 +432,19 @@ export function provideSvgDoc<
 
         /// center the page and add margin
         const calculatedPaddedX = (newWidth - pageWidth) / 2;
-        const calculatedPaddedY =
-          accumulatedHeight + (i == 0 ? 0 : heightMargin);
+        const calculatedPaddedY = accumulatedHeight + (i == 0 ? 0 : heightMargin);
         const translateAttr = `translate(${calculatedPaddedX}, ${calculatedPaddedY})`;
 
         /// Create inner rectangle
-        const innerRect = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "rect"
-        );
+        const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         innerRect.setAttribute("class", "typst-page-inner");
         innerRect.setAttribute("data-page-width", pageWidth.toString());
         innerRect.setAttribute("data-page-height", pageHeight.toString());
-        innerRect.setAttribute(
-          "width",
-          Math.floor(pageWidth * INNER_RECT_UNIT).toString()
-        );
-        innerRect.setAttribute(
-          "height",
-          Math.floor(pageHeight * INNER_RECT_UNIT).toString()
-        );
+        innerRect.setAttribute("width", Math.floor(pageWidth * INNER_RECT_UNIT).toString());
+        innerRect.setAttribute("height", Math.floor(pageHeight * INNER_RECT_UNIT).toString());
         innerRect.setAttribute("x", "0");
         innerRect.setAttribute("y", "0");
-        innerRect.setAttribute(
-          "transform",
-          `${translateAttr} ${INNER_RECT_SCALE}`
-        );
+        innerRect.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
         if (this.pageColor) {
           innerRect.setAttribute("fill", this.pageColor);
         }
@@ -497,6 +457,7 @@ export function provideSvgDoc<
         pageElem.setAttribute("transform", translateAttr);
         pageElem.setAttribute("data-x", `${calculatedPaddedX}`);
         pageElem.setAttribute("data-y", `${calculatedPaddedY}`);
+        pageElem.setAttribute("data-page-number", `${nextPage.index}`);
 
         /// Insert rectangles
         // todo: this is buggy not preserving order?
@@ -505,15 +466,9 @@ export function provideSvgDoc<
           firstRect = innerRect;
         }
 
-        const clipPath = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "clipPath"
-        );
+        const clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
 
-        const clipRect = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "rect"
-        );
+        const clipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
 
         clipRect.setAttribute("x", "0");
         clipRect.setAttribute("y", "0");
@@ -526,8 +481,7 @@ export function provideSvgDoc<
         clipPath.setAttribute("id", clipId);
         pageElem.setAttribute("clip-path", `url(#${clipId})`);
 
-        let pageHeightEnd =
-          pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
+        let pageHeightEnd = pageHeight + (i + 1 === nextPages.length ? 0 : heightMargin);
 
         if (this.isContentPreview) {
           // --typst-preview-toolbar-fg-color
@@ -535,21 +489,14 @@ export function provideSvgDoc<
           // console.log('create page number indicator', scale);
           const pageNumberIndicator = document.createElementNS(
             "http://www.w3.org/2000/svg",
-            "text"
+            "text",
           );
-          pageNumberIndicator.setAttribute(
-            "class",
-            "typst-preview-svg-page-number"
-          );
+          pageNumberIndicator.setAttribute("class", "typst-preview-svg-page-number");
           pageNumberIndicator.setAttribute("x", "0");
           pageNumberIndicator.setAttribute("y", "0");
           const onPaddedX = calculatedPaddedX + pageWidth / 2;
-          const onPaddedY =
-            calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
-          pageNumberIndicator.setAttribute(
-            "transform",
-            `translate(${onPaddedX}, ${onPaddedY})`
-          );
+          const onPaddedY = calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
+          pageNumberIndicator.setAttribute("transform", `translate(${onPaddedX}, ${onPaddedY})`);
           pageNumberIndicator.setAttribute("font-size", fontSize.toString());
           pageNumberIndicator.textContent = `${i + 1}`;
           svg.append(pageNumberIndicator);
@@ -558,18 +505,12 @@ export function provideSvgDoc<
         } else {
           if (this.cursorPosition && this.cursorPosition[0] === i + 1) {
             const [_, x, y] = this.cursorPosition;
-            const cursor = document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "circle"
-            );
+            const cursor = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             cursor.setAttribute("cx", (x * INNER_RECT_UNIT).toString());
             cursor.setAttribute("cy", (y * INNER_RECT_UNIT).toString());
             cursor.setAttribute("r", (5 * scale * INNER_RECT_UNIT).toString());
             cursor.setAttribute("fill", "#86C166CC");
-            cursor.setAttribute(
-              "transform",
-              `${translateAttr} ${INNER_RECT_SCALE}`
-            );
+            cursor.setAttribute("transform", `${translateAttr} ${INNER_RECT_SCALE}`);
             svg.appendChild(cursor);
           }
         }
@@ -593,9 +534,7 @@ export function provideSvgDoc<
           if (ch?.tagName === "foreignObject") {
             const canvasDiv = ch.firstElementChild as HTMLDivElement;
 
-            const pageNumber = Number.parseInt(
-              canvasDiv.getAttribute("data-page-number")!
-            );
+            const pageNumber = Number.parseInt(canvasDiv.getAttribute("data-page-number")!);
             const pageInfo = n2CMapping.get(pageNumber);
             if (pageInfo) {
               pageInfo.container = canvasDiv as HTMLDivElement;
@@ -616,7 +555,7 @@ export function provideSvgDoc<
 
         console.assert(
           this.canvasRenderCToken === undefined,
-          "No!!: canvasRenderCToken should be undefined"
+          "No!!: canvasRenderCToken should be undefined",
         );
 
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
@@ -633,7 +572,7 @@ export function provideSvgDoc<
               }
             });
           },
-          { timeout: 1000 }
+          { timeout: 1000 },
         );
       }
 
@@ -648,10 +587,7 @@ export function provideSvgDoc<
       if (firstPage) {
         const rectHeight = Math.ceil(newHeight).toString();
 
-        const outerRect = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "rect"
-        );
+        const outerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         outerRect.setAttribute("class", "typst-page-outer");
         outerRect.setAttribute("data-page-width", newWidth.toString());
         outerRect.setAttribute("data-page-height", rectHeight);
@@ -680,7 +616,7 @@ export function provideSvgDoc<
 
       if (svg) {
         let svgWidth = Number.parseFloat(
-          svg.getAttribute("data-width")! || svg.getAttribute("width")! || "1"
+          svg.getAttribute("data-width")! || svg.getAttribute("width")! || "1",
         );
         if (svgWidth < 1e-5) {
           svgWidth = 1;
@@ -692,14 +628,11 @@ export function provideSvgDoc<
     }
 
     private statSvgFromDom() {
-      const { width: containerWidth, boundingRect: containerBRect } =
-        this.cachedDOMState;
+      const { width: containerWidth, boundingRect: containerBRect } = this.cachedDOMState;
       // scale derived from svg width and container with.
       // svg.setAttribute("data-width", `${newWidth}`);
 
-      const computedRevScale = containerWidth
-        ? this.docWidth / containerWidth
-        : 1;
+      const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
       // respect current scale ratio
       const revScale = computedRevScale / this.currentScaleRatio;
       const left = (window.screenLeft - containerBRect.left) * revScale;
