@@ -52,7 +52,7 @@ Whether to configure default word separators on startup
 - **Enum**:
   - `enable`: Override the default word separators on startup
   - `disable`: Do not override the default word separators on startup
-- **Default**: `"enable"`
+- **Default**: `"disable"`
 
 ## `tinymist.semanticTokens`
 
