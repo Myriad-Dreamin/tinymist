@@ -106,5 +106,16 @@ export async function getTests(ctx: Context) {
       // close the editor
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     });
+
+    suite.addTest("restart server", async () => {
+      const _mainTyp = await ctx.openDocument(
+        vscode.Uri.joinPath(workspaceUri, "completion-base.typ"),
+      );
+
+      await vscode.commands.executeCommand("tinymist.restartServer");
+
+      // close the editor
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    });
   });
 }
