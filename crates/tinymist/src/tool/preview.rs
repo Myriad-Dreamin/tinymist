@@ -507,31 +507,28 @@ pub async fn make_http_server(
                     // think that's okay from a security point of view, because
                     // I think malicious websites can't trick browsers into sending
                     // `vscode-webview://...` as `Origin`.
-                    // let valid = req.headers().get("Origin").is_some_and(|h| is_valid_origin(h,
-                    // &expected_origin, expected_port));
-                    let valid = true;
-                    let _ = is_valid_origin;
-                    let _ = expected_port;
-                    log::info!(
-                        "the origin is: {:?}",
-                        req.headers().get("Origin").map(|o| o.to_str())
-                    );
-
-                    if valid {
-                        let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
-                            .map_err(|e| {
-                                log::error!("Error in websocket upgrade: {e}");
-                                // let e = Error::new(e);
-                            })
-                            .unwrap();
-
-                        let _ = websocket_tx.send(websocket);
-
-                        // Return the response so the spawned future can continue.
-                        Ok(response)
-                    } else {
-                        anyhow::bail!("Websocket connection with unexpected `Origin` header. Closing connection");
+                    let origin_header = req.headers().get("Origin");
+                    if origin_header
+                        .is_some_and(|h| !is_valid_origin(h, &expected_origin, expected_port))
+                    {
+                        anyhow::bail!("websocket connection with unexpected `Origin` header. Closing connection");
                     }
+
+                    if origin_header.is_none() {
+                        log::error!("websocket connection is not set `Origin` header, which will be a hard error in the future.");
+                    }
+
+                    let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
+                        .map_err(|e| {
+                            log::error!("Error in websocket upgrade: {e}");
+                            // let e = Error::new(e);
+                        })
+                        .unwrap();
+
+                    let _ = websocket_tx.send(websocket);
+
+                    // Return the response so the spawned future can continue.
+                    Ok(response)
                 } else if req.uri().path() == "/" {
                     // log::debug!("Serve frontend: {mode:?}");
                     let res = hyper::Response::builder()
