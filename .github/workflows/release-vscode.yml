@@ -73,7 +73,6 @@ jobs:
           name: tinymist-completion-scripts
           path: completions
 
-  # region: check-min-version
   min-version:
     name: Check Rust version (Minimum and Toolchain)
     runs-on: ubuntu-latest
@@ -85,10 +84,9 @@ jobs:
           node-version: 22
       - name: Check Rust Version
         run: yarn check-rust-version
-      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: dtolnay/rust-toolchain@1.82.0 # check-min-version
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
-  # end-region: check-min-version
 
   build:
     strategy:
@@ -167,7 +165,7 @@ jobs:
         working-directory: ./editors/vscode
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: rust toolchain
-        uses: dtolnay/rust-toolchain@1.84.0
+        uses: dtolnay/rust-toolchain@1.84.0 # build-extension-version
         with:
           targets: ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
