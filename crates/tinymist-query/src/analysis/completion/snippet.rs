@@ -228,7 +228,7 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            let label_details = ty.describe().map(From::from).or_else(|| Some("any".into()));
+            let label_details = ty.describe().or_else(|| Some("any".into()));
             let base = Completion {
                 kind: CompletionKind::Func,
                 label_details,

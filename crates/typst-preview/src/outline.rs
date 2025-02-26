@@ -69,7 +69,7 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
             // (not exceeding whichever is the most restrictive depth limit
             // of those two).
             while children.last().is_some_and(|last| {
-                last_skipped_level.map_or(true, |l| last.level < l) && last.level < leaf.level
+                last_skipped_level.is_none_or(|l| last.level < l) && last.level < leaf.level
             }) {
                 children = &mut children.last_mut().unwrap().children;
             }
@@ -81,7 +81,7 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
             // needed, following the usual rules listed above.
             last_skipped_level = None;
             children.push(leaf);
-        } else if last_skipped_level.map_or(true, |l| leaf.level < l) {
+        } else if last_skipped_level.is_none_or(|l| leaf.level < l) {
             // Only the topmost / lowest-level skipped heading matters when you
             // have consecutive skipped headings (since none of them are being
             // added to the bookmark tree), hence the condition above.

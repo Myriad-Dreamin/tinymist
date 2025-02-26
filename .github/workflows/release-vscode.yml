@@ -85,7 +85,7 @@ jobs:
           node-version: 22
       - name: Check Rust Version
         run: yarn check-msrv
-      - uses: dtolnay/rust-toolchain@1.82.0 # check-min-version
+      - uses: dtolnay/rust-toolchain@1.83.0 # check-min-version
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
 
