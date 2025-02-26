@@ -142,7 +142,7 @@ typst-syntax = "0.13.0"
 typst-eval = "0.13.0"
 typst-assets = "0.13.0"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
-typst-ansi-hl = "0.3.0"
+typst-ansi-hl = "0.4.0"
 typstyle-core = { version = "=0.13.0", default-features = false }
 typlite = { path = "./crates/typlite" }
 
