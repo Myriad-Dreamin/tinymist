@@ -506,9 +506,8 @@ pub async fn make_http_server(
                 // otherwise). And additionally they can impersonate a tinymist
                 // http / websocket server towards a legitimate frontend/html client.
                 // This requires additional protection that may be added in the future.
-                if req
-                    .headers()
-                    .get("Origin")
+                let origin_header = req.headers().get("Origin");
+                if origin_header
                     .is_some_and(|h| !is_valid_origin(h, &static_file_addr, addr.port()))
                 {
                     anyhow::bail!(
@@ -518,6 +517,10 @@ pub async fn make_http_server(
 
                 // Check if the request is a websocket upgrade request.
                 if hyper_tungstenite::is_upgrade_request(&req) {
+                    if origin_header.is_none() {
+                        log::error!("websocket connection is not set `Origin` header, which will be a hard error in the future.");
+                    }
+
                     let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
                         .map_err(|e| {
                             log::error!("Error in websocket upgrade: {e}");
