@@ -1081,12 +1081,14 @@ mod tests {
         assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:0", 42));
         assert!(check_origin("http://localhost:42", "127.0.0.1:42", 42));
         assert!(check_origin("http://localhost:42", "127.0.0.1:0", 42));
+        assert!(check_origin("http://localhost", "127.0.0.1:0", 42));
 
         assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
         assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
         assert!(check_origin("http://127.0.0.1:42", "localhost:0", 42));
         assert!(check_origin("http://localhost:42", "localhost:42", 42));
         assert!(check_origin("http://localhost:42", "localhost:0", 42));
+        assert!(check_origin("http://localhost", "localhost:0", 42));
     }
 
     #[test]
