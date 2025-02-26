@@ -164,6 +164,7 @@ impl FnCompletionFeat {
                 | BuiltinTy::Color
                 | BuiltinTy::TextSize
                 | BuiltinTy::TextFont
+                | BuiltinTy::TextFeature
                 | BuiltinTy::TextLang
                 | BuiltinTy::TextRegion
                 | BuiltinTy::Label

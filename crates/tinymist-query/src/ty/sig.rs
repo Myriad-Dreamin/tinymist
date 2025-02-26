@@ -186,6 +186,10 @@ impl SigCheckDriver<'_> {
                 self.checker
                     .check(Sig::DictCons(&FLOW_RADIUS_DICT), &mut self.ctx, pol);
             }
+            Ty::Builtin(BuiltinTy::TextFont) if self.dict_as_sig() => {
+                self.checker
+                    .check(Sig::DictCons(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
+            }
             // todo: deduplicate checking early
             Ty::Value(ins_ty) => {
                 if self.func_as_sig() {

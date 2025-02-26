@@ -19,6 +19,11 @@ impl CompletionPair<'_, '_, '_> {
         }
     }
 
+    /// Add completions for current font features.
+    pub fn font_feature_completions(&mut self) {
+        // todo: add me
+    }
+
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
