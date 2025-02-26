@@ -18,7 +18,7 @@ pub fn jump_from_cursor(
     match document {
         TypstDocument::Paged(paged_doc) => {
             let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-            if node.kind() != SyntaxKind::Text {
+            if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
                 return None;
             }
 

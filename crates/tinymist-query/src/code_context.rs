@@ -79,7 +79,7 @@ impl SemanticRequest for InteractCodeContextRequest {
                     let mut leaf = root.leaf_at_compat(cursor)?;
                     log::info!("style at leaf {leaf:?} . {style:?}");
 
-                    if leaf.kind() != SyntaxKind::Text {
+                    if !matches!(leaf.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
                         return None;
                     }
 
