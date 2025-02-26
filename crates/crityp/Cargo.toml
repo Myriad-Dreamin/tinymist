@@ -38,8 +38,9 @@ typst-syntax.workspace = true
 insta.workspace = true
 
 [features]
-default = ["cli", "embed-fonts"]
+default = ["cli", "embed-fonts", "no-content-hint"]
 cli = ["clap", "clap/wrap_help"]
+no-content-hint = ["tinymist-project/no-content-hint"]
 
 # Embeds Typst's default fonts for
 # - text (Linux Libertine),
