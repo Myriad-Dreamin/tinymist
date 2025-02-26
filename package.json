@@ -25,7 +25,7 @@
     "test:grammar": "cd syntaxes/textmate && yarn run test",
     "build:typlite": "cargo build --bin typlite",
     "typlite": "target/debug/typlite",
-    "check-rust-version": "node scripts/check-rust-version.mjs",
+    "check-msrv": "node scripts/check-msrv.mjs",
     "generate-ci": "dist generate",
     "project-build-script:ps1": "cargo run --bin tinymist -- generate-script -o ./scripts/project-build.ps1",
     "draft-release": "node scripts/draft-release.mjs"

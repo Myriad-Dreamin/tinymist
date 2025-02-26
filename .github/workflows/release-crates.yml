@@ -29,6 +29,7 @@ jobs:
         with:
           submodules: recursive
       # https://github.com/dtolnay/rust-toolchain/issues/133
+      # https://github.com/rust-lang/rustup/issues/3635
       # Only needed if your action will run two or more rust
       # commands concurrently, otherwise rustup will lazily 
       # install your rust-toolchain.toml when needed:
