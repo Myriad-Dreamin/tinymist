@@ -39,9 +39,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.84.0
-        with:
-          components: clippy, rustfmt
+      # https://github.com/dtolnay/rust-toolchain/issues/133
+      # https://github.com/rust-lang/rustup/issues/3635
+      # Only needed if your action will run two or more rust
+      # commands concurrently, otherwise rustup will lazily 
+      # install your rust-toolchain.toml when needed:
+      - name: 'Install from rust-toolchain.toml'
+        run: rustup show
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -70,9 +74,8 @@ jobs:
           name: tinymist-completion-scripts
           path: completions
 
-  # region: check-min-version
   min-version:
-    name: Check minimum Rust version
+    name: Check Minimum Rust version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,12 +83,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check MSRV
+      - name: Check Rust Version
         run: yarn check-msrv
-      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: dtolnay/rust-toolchain@1.82.0 # check-min-version
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
-  # end-region: check-min-version
 
   build:
     strategy:
@@ -163,10 +165,15 @@ jobs:
           yarn run compile
         working-directory: ./editors/vscode
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: rust toolchain
-        uses: dtolnay/rust-toolchain@1.84.0
-        with:
-          targets: ${{ matrix.rust-target }}
+      # https://github.com/dtolnay/rust-toolchain/issues/133
+      # https://github.com/rust-lang/rustup/issues/3635
+      # Only needed if your action will run two or more rust
+      # commands concurrently, otherwise rustup will lazily 
+      # install your rust-toolchain.toml when needed:
+      - name: 'Install from rust-toolchain.toml'
+        run: |
+          rustup show
+          rustup target add ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Install llvm
         if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
