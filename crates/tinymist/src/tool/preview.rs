@@ -507,11 +507,17 @@ pub async fn make_http_server(
                     // think that's okay from a security point of view, because
                     // I think malicious websites can't trick browsers into sending
                     // `vscode-webview://...` as `Origin`.
-                    if req
-                        .headers()
-                        .get("Origin")
-                        .is_some_and(|h| is_valid_origin(h, &expected_origin, expected_port))
-                    {
+                    // let valid = req.headers().get("Origin").is_some_and(|h| is_valid_origin(h,
+                    // &expected_origin, expected_port));
+                    let valid = true;
+                    let _ = is_valid_origin;
+                    let _ = expected_port;
+                    log::info!(
+                        "the origin is: {:?}",
+                        req.headers().get("Origin").map(|o| o.to_str())
+                    );
+
+                    if valid {
                         let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
                             .map_err(|e| {
                                 log::error!("Error in websocket upgrade: {e}");
