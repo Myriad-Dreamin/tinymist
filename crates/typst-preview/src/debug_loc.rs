@@ -24,7 +24,7 @@ impl InternId {
     }
 
     fn to_u64(&self) -> u64 {
-        (self.lifetime as u64) << 32 | self.id as u64
+        ((self.lifetime as u64) << 32) | self.id as u64
     }
 
     fn from_u64(id: u64) -> Self {

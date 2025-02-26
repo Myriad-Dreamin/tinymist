@@ -166,7 +166,7 @@ impl CompletionPair<'_, '_, '_> {
 
             let docs = default_docs.get(&name).cloned();
 
-            let label_detail = ty.describe().map(From::from).or_else(|| Some("any".into()));
+            let label_detail = ty.describe().or_else(|| Some("any".into()));
 
             crate::log_debug_ct!("scope completions!: {name} {ty:?} {label_detail:?}");
             let detail = docs.or_else(|| label_detail.clone());
