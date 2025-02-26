@@ -39,9 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.84.0
-        with:
-          components: clippy, rustfmt
+      # https://github.com/dtolnay/rust-toolchain/issues/133
+      # Only needed if your action will run two or more rust
+      # commands concurrently, otherwise rustup will lazily 
+      # install your rust-toolchain.toml when needed:
+      - name: 'Install from rust-toolchain.toml'
+        run: rustup show
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -72,7 +75,7 @@ jobs:
 
   # region: check-min-version
   min-version:
-    name: Check minimum Rust version
+    name: Check Rust version (Minimum and Toolchain)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,8 +83,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check MSRV
-        run: yarn check-msrv
+      - name: Check Rust Version
+        run: yarn check-rust-version
       - uses: dtolnay/rust-toolchain@1.82.0
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace
