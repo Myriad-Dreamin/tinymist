@@ -506,6 +506,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         }
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
+            // todo: the dict can be completed, but we have bugs...
             static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
                 Ty::iter_union([literally(TextFont), Ty::Array(literally(TextFont).into())])
             });
