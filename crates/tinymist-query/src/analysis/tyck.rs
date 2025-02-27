@@ -253,6 +253,8 @@ impl TypeChecker<'_> {
             LazyLock::new(|| Ty::Dict(FLOW_OUTSET_DICT.clone()));
         static FLOW_RADIUS_DICT_TYPE: LazyLock<Ty> =
             LazyLock::new(|| Ty::Dict(FLOW_RADIUS_DICT.clone()));
+        static FLOW_TEXT_FONT_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_TEXT_FONT_DICT.clone()));
 
         fn is_ty(ty: &Ty) -> bool {
             match ty {
@@ -360,6 +362,16 @@ impl TypeChecker<'_> {
             (Ty::Builtin(BuiltinTy::Radius), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_RADIUS_DICT_TYPE, rhs);
+                }
+            }
+            (lhs, Ty::Builtin(BuiltinTy::TextFont)) => {
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_TEXT_FONT_DICT_TYPE);
+                }
+            }
+            (Ty::Builtin(BuiltinTy::TextFont), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_TEXT_FONT_DICT_TYPE, rhs);
                 }
             }
             (Ty::Dict(lhs), Ty::Dict(rhs)) => {

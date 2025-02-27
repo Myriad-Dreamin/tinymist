@@ -134,6 +134,10 @@ impl IfaceCheckDriver<'_> {
                 self.checker
                     .check(Iface::Dict(&FLOW_RADIUS_DICT), &mut self.ctx, pol);
             }
+            Ty::Builtin(BuiltinTy::TextFont) if self.dict_as_iface() => {
+                self.checker
+                    .check(Iface::Dict(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
+            }
             // // todo: deduplicate checking early
             Ty::Value(ins_ty) => {
                 if self.value_as_iface() {

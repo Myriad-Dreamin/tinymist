@@ -610,7 +610,9 @@ impl CompletionPair<'_, '_, '_> {
         if let Some(ty) = ty {
             let filter = |ty: &Ty| match surrounding_syntax {
                 SurroundingSyntax::StringContent => match ty {
-                    Ty::Builtin(BuiltinTy::Path(..) | BuiltinTy::TextFont) => true,
+                    Ty::Builtin(
+                        BuiltinTy::Path(..) | BuiltinTy::TextFont | BuiltinTy::TextFeature,
+                    ) => true,
                     Ty::Value(val) => matches!(val.val, Value::Str(..)),
                     Ty::Builtin(BuiltinTy::Type(ty)) => {
                         *ty == Type::of::<typst::foundations::Str>()

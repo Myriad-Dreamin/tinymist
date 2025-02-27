@@ -5,7 +5,8 @@ use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
-use typst::foundations::CastInfo;
+use typst::foundations::{CastInfo, Regex};
+use typst::layout::Ratio;
 use typst::syntax::FileId;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
@@ -221,6 +222,7 @@ pub enum BuiltinTy {
     Color,
     TextSize,
     TextFont,
+    TextFeature,
     TextLang,
     TextRegion,
 
@@ -263,6 +265,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Color => write!(f, "Color"),
             BuiltinTy::TextSize => write!(f, "TextSize"),
             BuiltinTy::TextFont => write!(f, "TextFont"),
+            BuiltinTy::TextFeature => write!(f, "TextFeature"),
             BuiltinTy::TextLang => write!(f, "TextLang"),
             BuiltinTy::TextRegion => write!(f, "TextRegion"),
             BuiltinTy::Dir => write!(f, "Dir"),
@@ -345,6 +348,7 @@ impl BuiltinTy {
             BuiltinTy::Color => "color",
             BuiltinTy::TextSize => "text.size",
             BuiltinTy::TextFont => "text.font",
+            BuiltinTy::TextFeature => "text.feature",
             BuiltinTy::TextLang => "text.lang",
             BuiltinTy::TextRegion => "text.region",
             BuiltinTy::Dir => "dir",
@@ -456,6 +460,7 @@ macro_rules! flow_record {
 pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
     // todo: remove path params which is compatible with 0.12.0
     match (func.name()?, param.name) {
+        // todo: pdf.embed
         ("embed", "path") => Some(literally(Path(PathPreference::None))),
         ("cbor", "path" | "source") => Some(literally(Path(PathPreference::None))),
         ("plugin", "source") => Some(literally(Path(PathPreference::Wasm))),
@@ -474,10 +479,24 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ])),
         ("cite", "key") => Some(Ty::iter_union([literally(CiteLabel)])),
         ("ref", "target") => Some(Ty::iter_union([literally(RefLabel)])),
-        ("link", "dest") | ("footnote", "body") => Some(Ty::iter_union([
+        ("footnote", "body") => Some(Ty::iter_union([
             literally(RefLabel),
             Ty::from_cast_info(&param.input),
         ])),
+        ("link", "dest") => {
+            static LINK_DEST_TYPE: Lazy<Ty> = Lazy::new(|| {
+                flow_union!(
+                    literally(RefLabel),
+                    Ty::Builtin(BuiltinTy::Type(Type::of::<foundations::Str>())),
+                    Ty::Builtin(BuiltinTy::Type(Type::of::<typst::introspection::Location>())),
+                    Ty::Dict(RecordTy::new(vec![
+                        ("x".into(), literally(Length)),
+                        ("y".into(), literally(Length)),
+                    ])),
+                )
+            });
+            Some(LINK_DEST_TYPE.clone())
+        }
         ("bibliography", "path" | "sources") => {
             static BIB_PATH_TYPE: Lazy<Ty> = Lazy::new(|| {
                 let bib_path_ty = literally(Path(PathPreference::Bibliography));
@@ -487,18 +506,52 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         }
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
+            // todo: the dict can be completed, but we have bugs...
             static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
                 Ty::iter_union([literally(TextFont), Ty::Array(literally(TextFont).into())])
+            });
+            Some(FONT_TYPE.clone())
+        }
+        ("text", "feature") => {
+            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+                Ty::iter_union([
+                    // todo: the key can only be the text feature
+                    Ty::Builtin(BuiltinTy::Type(Type::of::<foundations::Dict>())),
+                    Ty::Array(literally(TextFeature).into()),
+                ])
+            });
+            Some(FONT_TYPE.clone())
+        }
+        ("text", "costs") => {
+            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+                Ty::Dict(flow_record!(
+                    "hyphenation" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
+                    "runt" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
+                    "widow" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
+                    "orphan" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
+                ))
             });
             Some(FONT_TYPE.clone())
         }
         ("text", "lang") => Some(literally(TextLang)),
         ("text", "region") => Some(literally(TextRegion)),
         ("text" | "stack", "dir") => Some(literally(Dir)),
+        ("par", "first-line-indent") => {
+            static FIRST_LINE_INDENT: Lazy<Ty> = Lazy::new(|| {
+                Ty::iter_union([
+                    literally(Length),
+                    Ty::Dict(RecordTy::new(vec![
+                        ("amount".into(), literally(Length)),
+                        ("all".into(), Ty::Boolean(Option::None)),
+                    ])),
+                ])
+            });
+            Some(FIRST_LINE_INDENT.clone())
+        }
         (
             // todo: polygon.regular
-            "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
-            | "box" | "block" | "table" | "regular",
+            "page" | "highlight" | "text" | "path" | "curve" | "rect" | "ellipse" | "circle"
+            | "polygon" | "box" | "block" | "table" | "regular",
             "fill",
         ) => Some(literally(Color)),
         (
@@ -509,7 +562,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ("block" | "box" | "circle" | "ellipse" | "rect" | "square", "outset") => {
             Some(literally(Outset))
         }
-        ("block" | "box" | "rect" | "square", "radius") => Some(literally(Radius)),
+        ("block" | "box" | "rect" | "square" | "highlight", "radius") => Some(literally(Radius)),
         ("grid" | "table", "columns" | "rows" | "gutter" | "column-gutter" | "row-gutter") => {
             static COLUMN_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
@@ -521,7 +574,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             });
             Some(COLUMN_TYPE.clone())
         }
-        ("pattern", "size") => {
+        ("pattern" | "tiling", "size") => {
             static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
@@ -533,9 +586,9 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ("stroke", "dash") => Some(FLOW_STROKE_DASH_TYPE.clone()),
         (
             //todo: table.cell, table.hline, table.vline, math.cancel, grid.cell, polygon.regular
-            "cancel" | "highlight" | "overline" | "strike" | "underline" | "text" | "path" | "rect"
-            | "ellipse" | "circle" | "polygon" | "box" | "block" | "table" | "line" | "cell"
-            | "hline" | "vline" | "regular",
+            "cancel" | "highlight" | "overline" | "strike" | "underline" | "text" | "path"
+            | "curve" | "rect" | "ellipse" | "circle" | "polygon" | "box" | "block" | "table"
+            | "line" | "cell" | "hline" | "vline" | "regular",
             "stroke",
         ) => Some(Ty::Builtin(Stroke)),
         ("page", "margin") => Some(Ty::Builtin(Margin)),
@@ -626,6 +679,13 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
+pub static FLOW_TEXT_FONT_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+    flow_record!(
+        "name" => literally(TextFont),
+        "covers" => flow_union!("latin-in-cjk", BuiltinTy::Type(Type::of::<Regex>())),
+    )
+});
+
 // todo bad case: array.fold
 // todo bad case: datetime
 // todo bad case: selector
@@ -634,9 +694,13 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 // todo: numbering/supplement
 // todo: grid/table.fill/align/stroke/inset can be a function
 // todo: math.cancel.angle can be a function
-// todo: text.features array/dictionary
 // todo: math.mat.augment
 // todo: csv.row-type can be an array or a dictionary
+// todo: text.stylistic-set is an array of integer
+// todo: raw.lang can be completed
+// todo: smartquote.quotes can be an array or a dictionary
+// todo: mat.augment can be a dictionary
+// todo: pdf.embed mime-type can be special
 
 // ISO 639
 

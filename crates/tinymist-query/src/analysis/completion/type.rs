@@ -237,6 +237,9 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::TextFont => {
                 self.base.font_completions();
             }
+            BuiltinTy::TextFeature => {
+                self.base.font_feature_completions();
+            }
             BuiltinTy::Margin => {
                 self.snippet_completion("()", "(${})", "Margin dictionary.");
                 self.type_completion(&Ty::Builtin(BuiltinTy::Length), docs);
