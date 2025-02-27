@@ -614,9 +614,6 @@ impl CompletionPair<'_, '_, '_> {
                         BuiltinTy::Path(..) | BuiltinTy::TextFont | BuiltinTy::TextFeature,
                     ) => true,
                     Ty::Value(val) => matches!(val.val, Value::Str(..)),
-                    Ty::Builtin(BuiltinTy::Type(ty)) => {
-                        *ty == Type::of::<typst::foundations::Str>()
-                    }
                     _ => false,
                 },
                 _ => true,
