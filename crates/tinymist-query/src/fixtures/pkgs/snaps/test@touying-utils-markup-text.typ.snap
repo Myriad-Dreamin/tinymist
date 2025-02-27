@@ -45,11 +45,11 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     }
    },
    {
-    "kind": 15,
+    "kind": 3,
     "label": "str",
     "sortText": "002",
     "textEdit": {
-     "newText": "${1:string}",
+     "newText": "str(${1:})",
      "range": {
       "end": {
        "character": 19,

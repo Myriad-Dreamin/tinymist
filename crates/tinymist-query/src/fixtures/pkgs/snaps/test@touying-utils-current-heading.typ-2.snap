@@ -9,11 +9,11 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
   "isIncomplete": false,
   "items": [
    {
-    "kind": 15,
+    "kind": 3,
     "label": "int",
     "sortText": "001",
     "textEdit": {
-     "newText": "${1:integer}",
+     "newText": "int(${1:})",
      "range": {
       "end": {
        "character": 24,
