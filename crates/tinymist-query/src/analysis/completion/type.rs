@@ -300,12 +300,21 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                         "(${params}) => ${output}",
                         "A custom function.",
                     );
+                } else if let Ok(cons) = ty.constructor() {
+                    let docs = docs.or(cons.docs()).unwrap_or(ty.docs());
+                    self.base.value_completion(
+                        Some(ty.short_name().into()),
+                        &Value::Func(cons),
+                        true,
+                        Some(docs),
+                    );
                 } else {
+                    let docs = docs.unwrap_or(ty.docs());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
                         label: ty.short_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
-                        detail: Some(eco_format!("A value of type {ty}.")),
+                        detail: Some(docs.into()),
                         ..Completion::default()
                     });
                 }
