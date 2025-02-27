@@ -3,6 +3,5 @@ source: crates/tinymist-query/src/analysis.rs
 description: "Check on \"(\" (85)"
 expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/user_func_pos2.typ
-snapshot_kind: text
 ---
-( ⪰ "cap": Any | "dash": Any | "join": Any | "miter-limit": Any | "paint": Any | "thickness": Any)
+( ⪰ "cap": ("butt" | "round" | "square") | "dash": ("dash-dotted" | "dashed" | "densely-dash-dotted" | "densely-dashed" | "densely-dotted" | "dotted" | "loosely-dash-dotted" | "loosely-dashed" | "loosely-dotted" | "solid" | {"array": Array<(Float | "dot")>, "phase": Length} | Array<(Float | "dot")>) | "join": ("bevel" | "miter" | "round") | "miter-limit": Float | "paint": Color | "thickness": Length)

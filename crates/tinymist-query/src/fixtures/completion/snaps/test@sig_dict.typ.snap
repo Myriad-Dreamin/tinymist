@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on ) (63..64)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/sig_dict.typ
-snapshot_kind: text
 ---
 [
  {
@@ -12,6 +11,9 @@ snapshot_kind: text
    {
     "kind": 5,
     "label": "cap",
+    "labelDetails": {
+     "description": "\"butt\" | \"round\" | \"square\""
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "cap: ${1:}",
@@ -30,6 +32,9 @@ snapshot_kind: text
    {
     "kind": 5,
     "label": "paint",
+    "labelDetails": {
+     "description": "color"
+    },
     "sortText": "004",
     "textEdit": {
      "newText": "paint: ${1:}",

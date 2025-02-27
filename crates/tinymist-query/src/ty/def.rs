@@ -620,9 +620,14 @@ pub struct ParamTy {
 impl ParamTy {
     /// Create an untyped field type
     pub fn new_untyped(name: StrRef, attrs: ParamAttrs) -> Interned<Self> {
+        Self::new(Ty::Any, name, attrs)
+    }
+
+    /// Create a typed field type
+    pub fn new(ty: Ty, name: StrRef, attrs: ParamAttrs) -> Interned<Self> {
         Interned::new(Self {
             name,
-            ty: Ty::Any,
+            ty,
             docs: None,
             default: None,
             attrs,
