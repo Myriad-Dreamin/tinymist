@@ -8,6 +8,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.2 - [2025-02-26]
 
+* Bumped MSRV to v1.83 and Rust to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1407
+* Bumped typst-ansi-hl to v0.4.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1412
+* Bumped reflexo to v0.5.5-rc7 in https://github.com/Myriad-Dreamin/tinymist/pull/1414
+
 ### Editor
 
 * (Fix) Deactivating features correctly when restarting server in https://github.com/Myriad-Dreamin/tinymist/pull/1397
@@ -28,11 +32,21 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Fix) term math text as content instead of string in https://github.com/Myriad-Dreamin/tinymist/pull/1386
 * (Fix) Printing type representation of anonymous modules in https://github.com/Myriad-Dreamin/tinymist/pull/1385
   * This was causing crashes, introduced in typst v0.13.0
+* (Fix) Added more kind checking about `MathText` in https://github.com/Myriad-Dreamin/tinymist/pull/1415
+* (Fix) Completing type of type having constructors in https://github.com/Myriad-Dreamin/tinymist/pull/1419
+* (Fix) Forbidden type completion in string content in https://github.com/Myriad-Dreamin/tinymist/pull/1420
+* Adjusted builtin types for typst v0.13.0 in https://github.com/Myriad-Dreamin/tinymist/pull/1416
+  * For example, `par.first-line-indent` can be a dictionary since v0.13.0.
+* Post checking element types of array and dictionary in https://github.com/Myriad-Dreamin/tinymist/pull/1417
+* Matched named argument parent first when the cursor is in the literal in https://github.com/Myriad-Dreamin/tinymist/pull/1418
 
 ### Preview
 
 * (Fix) Uses new wasm renderer in https://github.com/Myriad-Dreamin/tinymist/pull/1398
 * (Fix) Corrected `vscode.Uri` usages when restoring preview in https://github.com/Myriad-Dreamin/tinymist/pull/1402
+* (Fix) Passing origin checking anyway in https://github.com/Myriad-Dreamin/tinymist/pull/1411
+  * typst-preview.nvim uses a websocket client without setting Origin correctly.
+  * This will become a hard error in the future.
 * Using `jump_from_click` from typst-ide in https://github.com/Myriad-Dreamin/tinymist/pull/1399
 
 ### Typlite

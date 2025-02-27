@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.2-rc1"
+version = "0.13.2-rc2"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -174,20 +174,20 @@ insta = { version = "1.39", features = ["glob"] }
 
 
 # Our Own Crates
-typst-preview = { path = "./crates/typst-preview", version = "0.13.2-rc1" }
-typst-shim = { path = "./crates/typst-shim", version = "0.13.2-rc1" }
+typst-preview = { path = "./crates/typst-preview", version = "0.13.2-rc2" }
+typst-shim = { path = "./crates/typst-shim", version = "0.13.2-rc2" }
 tinymist-assets = { version = "=0.13.2-rc1" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.2-rc1" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.2-rc1", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.2-rc1", default-features = false }
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.2-rc1", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.2-rc1", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.2-rc1" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.2-rc1" }
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.2-rc1" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.2-rc1" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.2-rc1" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.2-rc1" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.2-rc2" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.2-rc2", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.2-rc2", default-features = false }
+tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.2-rc2", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.2-rc2", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.2-rc2" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.2-rc2" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.2-rc2" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.2-rc2" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.2-rc2" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.2-rc2" }
 
 [profile.dev.package.insta]
 opt-level = 3
@@ -254,14 +254,14 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.0-rc1.2" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.2" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
