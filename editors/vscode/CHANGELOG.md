@@ -52,16 +52,13 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Typlite
 
 * (Fix) Exposed and defaulted to no-content-hint in typlite by @selfisekai in https://github.com/Myriad-Dreamin/tinymist/pull/1381
+* Added examples for `--assets-path` and `--assets-src-path` by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1396
 
 ### Syntax Highlighting
 
 * Parsing Shebang syntax in https://github.com/Myriad-Dreamin/tinymist/pull/1400
 * Recognizing typst source files by shebang containing `typst` keyword in https://github.com/Myriad-Dreamin/tinymist/pull/1400
   * Specifically, it matches by regex `^#!/.*\\b(typst)[0-9.-]*\\b`
-
-### Misc
-
-* Added examples for `--assets-path` and `--assets-src-path` by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1396
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.0...v0.13.2
 
