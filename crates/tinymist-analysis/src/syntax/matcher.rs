@@ -746,7 +746,8 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         }
     }
 
-    if matches!(node.kind(), SyntaxKind::Text) {
+    // todo: check if we can remove Text here
+    if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
         let mode = interpret_mode_at(Some(&node));
         if matches!(mode, InterpretMode::Math) && is_ident_like(&node) {
             return Some(SyntaxClass::VarAccess(VarClass::Ident(node)));

@@ -85,7 +85,7 @@ impl typst_preview::CompileView for PreviewCompileView {
             source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        if node.kind() != SyntaxKind::Text {
+        if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
             return None;
         }
         let span = node.span();
