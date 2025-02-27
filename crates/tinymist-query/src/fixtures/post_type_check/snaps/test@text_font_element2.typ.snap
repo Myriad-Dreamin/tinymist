@@ -4,4 +4,4 @@ description: "Check on \"\\\"Test\\\"\" (31)"
 expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_font_element2.typ
 ---
-( ⪰ ( ⪰ "Test" ⪯ (TextFont | Array<TextFont>)) ⪯ TextFont & "covers": Any & "name": Any)
+( ⪰ ( ⪰ "Test" ⪯ (TextFont | Array<TextFont>)) ⪯ TextFont & "covers": (Type(regex) | "latin-in-cjk") & "name": TextFont)

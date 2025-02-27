@@ -87,9 +87,8 @@ fn check_signature<'a>(
                 }
 
                 // names
-                for (name, _) in sig_ins.named_params() {
-                    // todo: reduce fields, fields ty
-                    let field = ParamTy::new_untyped(name.clone(), ParamAttrs::named());
+                for (name, ty) in sig_ins.named_params() {
+                    let field = ParamTy::new(ty.clone(), name.clone(), ParamAttrs::named());
                     receiver.insert(Ty::Param(field), !pol);
                 }
 
