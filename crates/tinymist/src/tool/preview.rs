@@ -521,12 +521,11 @@ pub async fn make_http_server(
                         log::error!("websocket connection is not set `Origin` header, which will be a hard error in the future.");
                     }
 
-                    let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
-                        .map_err(|e| {
-                            log::error!("Error in websocket upgrade: {e}");
-                            // let e = Error::new(e);
-                        })
-                        .unwrap();
+                    let Some((response, websocket)) = hyper_tungstenite::upgrade(&mut req, None)
+                        .log_error("Error in websocket upgrade")
+                    else {
+                        anyhow::bail!("cannot upgrade as websocket connection");
+                    };
 
                     let _ = websocket_tx.send(websocket);
 
