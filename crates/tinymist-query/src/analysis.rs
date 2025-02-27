@@ -356,15 +356,13 @@ mod module_tests {
 
 #[cfg(test)]
 mod type_check_tests {
-
     use core::fmt;
 
+    use tinymist_analysis::ty::{Ty, TypeInfo};
     use typst::syntax::Source;
 
     use crate::tests::*;
     use typst_shim::syntax::source_range;
-
-    use super::{Ty, TypeInfo};
 
     #[test]
     fn test() {
@@ -378,7 +376,7 @@ mod type_check_tests {
         });
     }
 
-    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeInfo);
+    struct TypeCheckSnapshot<'a>(pub &'a Source, pub &'a TypeInfo);
 
     impl fmt::Debug for TypeCheckSnapshot<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
