@@ -438,6 +438,7 @@ export function provideSvgDoc<
         /// Create inner rectangle
         const innerRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         innerRect.setAttribute("class", "typst-page-inner");
+        innerRect.setAttribute("data-page-number", `${nextPage.index}`);
         innerRect.setAttribute("data-page-width", pageWidth.toString());
         innerRect.setAttribute("data-page-height", pageHeight.toString());
         innerRect.setAttribute("width", Math.floor(pageWidth * INNER_RECT_UNIT).toString());
