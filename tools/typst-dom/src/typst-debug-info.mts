@@ -106,6 +106,21 @@ export function resolveSourceLeaf(
 }
 
 export function installEditorJumpToHandler(docRoot: HTMLElement) {
+  const getNthBackgroundRect = (elem: Element, pageNumber: string) => {
+    let curElem: Element | null = elem;
+    while (curElem) {
+      if (
+        curElem.classList.contains("typst-page-inner") &&
+        curElem.getAttribute("data-page-number") === pageNumber
+      ) {
+        return curElem;
+      }
+      curElem = curElem.previousElementSibling;
+    }
+
+    return elem;
+  };
+
   const resolveFrameLoc = async (event: MouseEvent, elem: Element) => {
     const x = event.clientX;
     const y = event.clientY;
@@ -128,15 +143,19 @@ export function installEditorJumpToHandler(docRoot: HTMLElement) {
     }
 
     const pageElem = mayPageElem[1];
-    console.log(mayPageElem, pageElem);
+    const pageNumber = pageElem.getAttribute("data-page-number")!;
+    const backgroundRect = getNthBackgroundRect(pageElem, pageNumber);
+    if (!backgroundRect) {
+      return undefined;
+    }
+    console.log(mayPageElem, pageElem, backgroundRect);
 
-    const pageRect = pageElem.getBoundingClientRect();
+    const pageRect = backgroundRect.getBoundingClientRect();
     const pageX = x - pageRect.left;
     const pageY = y - pageRect.top;
 
     const xPercent = pageX / pageRect.width;
     const yPercent = pageY / pageRect.height;
-    const pageNumber = pageElem.getAttribute("data-page-number")!;
     const dataWidthS = pageElem.getAttribute("data-page-width")!;
     const dataHeightS = pageElem.getAttribute("data-page-height")!;
 
