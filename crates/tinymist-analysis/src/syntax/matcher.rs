@@ -1240,6 +1240,20 @@ fn arg_context<'a>(
             Some(ArgClass::Named(args_node.find(param_ident.span())?))
         }
         _ => {
+            let parent = node.parent();
+            if let Some(parent) = parent {
+                if parent.kind() == SyntaxKind::Named {
+                    let param_ident = parent.cast::<ast::Named>()?;
+                    let name = param_ident.name();
+                    let init = param_ident.expr();
+                    let init = parent.find(init.span())?;
+                    if init.range().contains(&node.offset()) {
+                        let name = args_node.find(name.span())?;
+                        return Some(ArgClass::Named(name));
+                    }
+                }
+            }
+
             let mut spreads = EcoVec::new();
             let mut positional = 0;
             let is_spread = node.kind() == SyntaxKind::Spread;
