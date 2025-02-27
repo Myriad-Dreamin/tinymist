@@ -30,3 +30,6 @@ macro_rules! log_debug_ct_ {
     };
 }
 pub use log_debug_ct_ as log_debug_ct;
+
+#[cfg(test)]
+mod tests;
