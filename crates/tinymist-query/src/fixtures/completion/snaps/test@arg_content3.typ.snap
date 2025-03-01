@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on   (41..42)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/arg_content3.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "center",
+    "labelDetails": {
+     "description": "alignment"
+    },
+    "sortText": "022",
+    "textEdit": {
+     "newText": "center",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 2
+      },
+      "start": {
+       "character": 9,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
