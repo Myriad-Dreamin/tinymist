@@ -7,6 +7,9 @@ on:
         required: true
         type: string
 
+env:
+  isNightly: ${{ ((!((!contains(input.tags, 'rc') && (endsWith(input.tags, '0') || endsWith(input.tags, '2') || endsWith(input.tags, '4') || endsWith(input.tags, '6') || endsWith(input.tags, '8')))))) }}
+
 jobs:
 
   build:
@@ -52,3 +55,10 @@ jobs:
         with:
           name: announcement.gen.md
           path: target/announcement.gen.md
+      - name: Create GitHub Release
+        env:
+          PRERELEASE_FLAG: "${{ env.isNightly && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
+        run: |
+          gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
