@@ -6,9 +6,13 @@ on:
         description: Release Tag
         required: true
         type: string
+permissions:
+  "contents": "write"
+
+env:
+  isNightly: ${{ ((!((!contains(inputs.tags, 'rc') && (endsWith(inputs.tags, '0') || endsWith(inputs.tags, '2') || endsWith(inputs.tags, '4') || endsWith(inputs.tags, '6') || endsWith(inputs.tags, '8')))))) }}
 
 jobs:
-
   build:
     runs-on: "ubuntu-20.04"
     steps:
@@ -52,3 +56,11 @@ jobs:
         with:
           name: announcement.gen.md
           path: target/announcement.gen.md
+      - name: Create GitHub Release
+        env:
+          PRERELEASE_FLAG: "${{ env.isNightly && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
