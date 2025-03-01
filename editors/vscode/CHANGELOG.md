@@ -6,6 +6,20 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.4 - [2025-03-02]
+
+### Code Analysis
+
+* (Fix) Skipping context type checking of hash token in https://github.com/Myriad-Dreamin/tinymist/pull/1432
+
+### Preview
+
+* (Fix) Using the background rect to calculate cursor 
+position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
+
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
+
 ## v0.13.2 - [2025-02-27]
 
 * Bumped MSRV to v1.83 and Rust to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1407
