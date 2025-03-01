@@ -6,6 +6,8 @@ on:
         description: Release Tag
         required: true
         type: string
+permissions:
+  "contents": "write"
 
 env:
   isNightly: ${{ ((!((!contains(inputs.tags, 'rc') && (endsWith(inputs.tags, '0') || endsWith(inputs.tags, '2') || endsWith(inputs.tags, '4') || endsWith(inputs.tags, '6') || endsWith(inputs.tags, '8')))))) }}
