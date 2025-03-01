@@ -1,4 +1,4 @@
-name: tinymist::crates::publish::preview
+name: tinymist::assets::publish
 on:
   workflow_dispatch:
 
