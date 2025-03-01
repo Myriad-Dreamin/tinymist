@@ -40,7 +40,7 @@ jobs:
           yarn build:preview
       - name: Publish crates
         run: |
-          cargo publish --no-verify --allow-dirty --dry-run -p tinymist-assets || true
+          cargo publish --allow-dirty --no-verify -p tinymist-assets || true
       - name: Verifies crate health (Optional)
         run: |
           cargo publish --allow-dirty --dry-run -p tinymist-assets
