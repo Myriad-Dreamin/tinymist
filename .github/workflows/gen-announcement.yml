@@ -7,9 +7,11 @@ on:
         required: true
         type: string
 
+env:
+  isNightly: ${{ ((!((!contains(inputs.tags, 'rc') && (endsWith(inputs.tags, '0') || endsWith(inputs.tags, '2') || endsWith(inputs.tags, '4') || endsWith(inputs.tags, '6') || endsWith(inputs.tags, '8')))))) }}
 
 jobs:
-  announce:
+  build:
     runs-on: "ubuntu-20.04"
     steps:
       - uses: actions/checkout@v4
@@ -54,10 +56,8 @@ jobs:
           path: target/announcement.gen.md
       - name: Create GitHub Release
         env:
-          isNightly: ${{ !(!contains(input.tags, 'rc') && (endsWith(input.tags, '0') || endsWith(input.tags, '2') || endsWith(input.tags, '4') || endsWith(input.tags, '6') || endsWith(input.tags, '8'))) }}
           PRERELEASE_FLAG: "${{ env.isNightly && '--prerelease' || '' }}"
           ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
           RELEASE_COMMIT: "${{ github.sha }}"
         run: |
-          echo "Creating release for ${{ inputs.tag }} is nighty: ${{ env.isNightly }} prerelease flag: ${{ env.PRERELEASE_FLAG }}"
           gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
