@@ -7,13 +7,12 @@ on:
         required: true
         type: string
 
-env:
-  isNightly: ${{ ((!((!contains(input.tags, 'rc') && (endsWith(input.tags, '0') || endsWith(input.tags, '2') || endsWith(input.tags, '4') || endsWith(input.tags, '6') || endsWith(input.tags, '8')))))) }}
 
 jobs:
-
-  build:
+  announce:
     runs-on: "ubuntu-20.04"
+    env:
+      isNightly: ${{ ((!((!contains(input.tags, 'rc') && (endsWith(input.tags, '0') || endsWith(input.tags, '2') || endsWith(input.tags, '4') || endsWith(input.tags, '6') || endsWith(input.tags, '8')))))) }}
     steps:
       - uses: actions/checkout@v4
         with:
