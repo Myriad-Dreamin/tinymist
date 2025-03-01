@@ -3,8 +3,9 @@ name = "tinymist-analysis"
 description = "Typst Static Analyzers for Tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
+# group: world
+version = "0.13.2"
 authors.workspace = true
-version.workspace = true
 license.workspace = true
 edition.workspace = true
 homepage.workspace = true
