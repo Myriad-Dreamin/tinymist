@@ -1,0 +1,46 @@
+name: tinymist::assets::publish
+on:
+  workflow_dispatch:
+
+env:
+  RUSTFLAGS: '-Dwarnings'
+
+jobs:
+
+  publish-crates:
+    name: build 
+    runs-on: ubuntu-20.04
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      # https://github.com/dtolnay/rust-toolchain/issues/133
+      # https://github.com/rust-lang/rustup/issues/3635
+      # Only needed if your action will run two or more rust
+      # commands concurrently, otherwise rustup will lazily 
+      # install your rust-toolchain.toml when needed:
+      - name: 'Install from rust-toolchain.toml'
+        run: rustup show
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install llvm
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
+      # - name: Run rust-cache
+      #   uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: yarn install
+      - name: Check and build typst-preview
+        run: |
+          yarn build:preview
+      - name: Publish crates
+        run: |
+          cargo publish --no-verify -p tinymist-assets --dry-run || true
+      - name: Verifies crate health (Optional)
+        run: |
+          cargo publish --dry-run -p tinymist-assets
