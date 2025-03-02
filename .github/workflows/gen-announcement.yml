@@ -10,7 +10,7 @@ permissions:
   "contents": "write"
 
 env:
-  isNightly: ${{ ((!((!contains(inputs.tags, 'rc') && (endsWith(inputs.tags, '0') || endsWith(inputs.tags, '2') || endsWith(inputs.tags, '4') || endsWith(inputs.tags, '6') || endsWith(inputs.tags, '8')))))) }}
+  isNightly: ${{ ((!((!contains(inputs.tag, 'rc') && (endsWith(inputs.tag, '0') || endsWith(inputs.tag, '2') || endsWith(inputs.tag, '4') || endsWith(inputs.tag, '6') || endsWith(inputs.tag, '8')))))) }}
 
 jobs:
   build:
