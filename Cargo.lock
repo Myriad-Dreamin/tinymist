@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -3690,7 +3690,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "clap",
@@ -3821,7 +3821,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3944,7 +3944,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4038,11 +4038,11 @@ checksum = "2c57010af6092d64e8954c0591146519bf6a058fd0f309ec5f496cef971406a3"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.4-rc1"
+version = "0.13.4"
 
 [[package]]
 name = "tinymist-core"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4091,7 +4091,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -4145,7 +4145,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "base64",
  "log",
@@ -4536,7 +4536,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "base64",
  "clap",
@@ -4755,7 +4755,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.13.4-rc1"
+version = "0.13.4"
 dependencies = [
  "clap",
  "comemo",
