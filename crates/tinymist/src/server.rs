@@ -16,7 +16,7 @@ use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp_query::OnEnter;
 use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
 use crate::route::ProjectRouteState;
-use crate::task::{ExportTask, FormatTask, UserActionTask};
+use crate::task::{ExportTask, FormatTask, ServerTraceTask, UserActionTask};
 use crate::world::TaskInputs;
 use crate::{init::*, *};
 
@@ -73,6 +73,8 @@ pub struct ServerState {
     pub ever_focusing_by_activities: bool,
     /// The client ever sent manual focusing request.
     pub ever_manual_focusing: bool,
+    /// The running server trace.
+    pub server_trace: Option<ServerTraceTask>,
 
     // Configurations
     /// User configuration from the editor.
@@ -115,6 +117,7 @@ impl ServerState {
             ever_manual_focusing: false,
             sema_tokens_registered: false,
             formatter_registered: false,
+            server_trace: None,
             config,
 
             pinning_by_user: false,
@@ -255,6 +258,8 @@ impl ServerState {
             .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
             .with_command("tinymist.getDocumentTrace", State::get_document_trace)
+            .with_command("tinymist.startServerProfiling", State::start_server_trace)
+            .with_command("tinymist.stopServerProfiling", State::stop_server_trace)
             .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
             .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labels)
             .with_command_("tinymist.getServerInfo", State::get_server_info)

@@ -281,6 +281,22 @@ impl<T, E: std::fmt::Display> IgnoreLogging<T> for Result<T, E> {
     }
 }
 
+impl<T> IgnoreLogging<T> for Option<T> {
+    fn log_error(self, msg: &str) -> Option<T> {
+        self.or_else(|| {
+            log::error!("{msg}");
+            None
+        })
+    }
+
+    fn log_error_with(self, f: impl FnOnce() -> String) -> Option<T> {
+        self.or_else(|| {
+            log::error!("{}", f());
+            None
+        })
+    }
+}
+
 /// A trait to add context to a result.
 pub trait WithContext<T>: Sized {
     /// Add a context to the result.

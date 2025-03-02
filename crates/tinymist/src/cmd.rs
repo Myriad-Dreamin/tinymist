@@ -531,7 +531,7 @@ impl ServerState {
                 )
                 .map_err(internal_error)?;
 
-            let task = user_action.trace(TraceParams {
+            let task = user_action.trace_document(TraceParams {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
@@ -544,6 +544,47 @@ impl ServerState {
             task.as_mut().await;
             task.take_output().unwrap()
         })
+    }
+
+    /// Start to get the trace data of the server.
+    pub fn start_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_cell = &mut self.server_trace;
+        if task_cell
+            .as_ref()
+            .is_some_and(|task| task.stop_tx.is_closed())
+        {
+            *task_cell = None;
+        }
+
+        if task_cell.is_some() {
+            return Err(internal_error("server trace is already started"));
+        }
+
+        let (task, resp) = self.user_action.trace_server();
+        *task_cell = Some(task);
+
+        resp
+    }
+
+    /// Stop getting the trace data of the server.
+    pub fn stop_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_cell = &mut self.server_trace;
+        if task_cell
+            .as_ref()
+            .is_some_and(|task| task.stop_tx.is_closed())
+        {
+            *task_cell = None;
+        }
+
+        let Some(task) = task_cell.take() else {
+            return Err(internal_error("server trace is not started or stopped"));
+        };
+
+        if task.stop_tx.send(()).is_err() {
+            return Err(internal_error("cannot send stop signal to server trace"));
+        }
+
+        just_future(async move { task.resp_rx.await.map_err(internal_error)? })
     }
 
     /// Get the metrics of the document.
