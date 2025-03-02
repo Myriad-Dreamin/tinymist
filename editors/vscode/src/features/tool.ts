@@ -47,6 +47,12 @@ const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
     description: "Profile Current File",
     toolId: "tracing",
   },
+  "profile-server": {
+    command: "tinymist.profileServer",
+    title: "Profiling Server",
+    description: "Profile the Language SErver",
+    toolId: "profile-server",
+  },
 };
 
 export function toolFeatureActivate(context: vscode.ExtensionContext) {
@@ -65,6 +71,7 @@ export function toolFeatureActivate(context: vscode.ExtensionContext) {
 export type EditorToolName =
   | "template-gallery"
   | "tracing"
+  | "profile-server"
   | "summary"
   | "font-view"
   | "symbol-view"
@@ -76,6 +83,7 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
     "font-view": "Font View",
     "symbol-view": "Symbol View",
     tracing: "Tracing",
+    "profile-server": "Profile Server",
     summary: "Summary",
     docs: `@${opts?.pkg?.namespace}/${opts?.pkg?.name}:${opts?.pkg?.version} (Docs)`,
   }[tool];
@@ -88,7 +96,7 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
     title,
     {
       viewColumn: vscode.ViewColumn.Beside,
-      preserveFocus: tool === "summary" || tool === "tracing",
+      preserveFocus: tool === "summary" || tool === "tracing" || tool === "profile-server",
     }, // Which sides
     {
       enableScripts: true,
@@ -271,6 +279,13 @@ export async function editorToolAt(
         await writeFile(path, data);
         break;
       }
+      case "stopServerProfiling": {
+        const resp = await vscode.commands.executeCommand("tinymist.stopServerProfiling");
+        if (!disposed) {
+          panel.webview.postMessage({ type: "didStopServerProfiling", data: resp });
+        }
+        break;
+      }
       default: {
         console.error("Unknown message type", message.type);
         break;
@@ -316,6 +331,19 @@ export async function editorToolAt(
         const traceData = await traceDataTask;
         if (!disposed) {
           panel.webview.postMessage({ type: "traceData", data: traceData });
+        }
+      };
+
+      break;
+    }
+    case "profile-server": {
+      const profileTask = vscode.commands.executeCommand("tinymist.startServerProfiling");
+
+      // do that after the html is reloaded
+      afterReloadHtml = async () => {
+        const resp = await profileTask;
+        if (!disposed) {
+          panel.webview.postMessage({ type: "didStartServerProfiling", data: resp });
         }
       };
 
