@@ -4,9 +4,4 @@ description: "On Enter on r 1..2 */\n|$|$\n)"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/on_enter/math2.typ
 ---
-[
- {
-  "newText": "\n  $0\n",
-  "range": "1:0:1:1"
- }
-]
+null

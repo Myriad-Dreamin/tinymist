@@ -10,6 +10,9 @@ use crate::{prelude::*, syntax::node_ancestors, SyntaxRequest};
 /// - `kbd:Enter` inside triple-slash comments automatically inserts `///`
 /// - `kbd:Enter` in the middle or after a trailing space in `//` inserts `//`
 /// - `kbd:Enter` inside `//!` doc comments automatically inserts `//!`
+/// - `kbd:Enter` inside block math automatically inserts a newline and indents
+/// - `kbd:Enter` inside `list` or `enum` items automatically automatically
+///   inserts `-` or `+` and indents
 ///
 /// [`experimental/onEnter`]: https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter
 ///
@@ -34,7 +37,7 @@ impl SyntaxRequest for OnEnterRequest {
     ) -> Option<Self::Response> {
         let root = LinkedNode::new(source.root());
         let rng = to_typst_range(self.range, position_encoding, source)?;
-        let cursor = rng.end;
+        let cursor = rng.start;
         let leaf = root.leaf_at_compat(cursor)?;
 
         let worker = OnEnterWorker {
@@ -42,17 +45,42 @@ impl SyntaxRequest for OnEnterRequest {
             position_encoding,
         };
 
-        if matches!(leaf.kind(), SyntaxKind::LineComment) {
-            return worker.enter_line_doc_comment(&leaf, rng);
+        enum Cases<'a> {
+            LineComment(LinkedNode<'a>),
+            Equation(LinkedNode<'a>),
+            ListOrEnum(LinkedNode<'a>),
         }
 
-        let math_node =
-            node_ancestors(&leaf).find(|node| matches!(node.kind(), SyntaxKind::Equation));
-        if let Some(mn) = math_node {
-            return worker.enter_block_math(mn, rng);
-        }
+        let case = node_ancestors(&leaf).find_map(|node| match node.kind() {
+            SyntaxKind::LineComment => Some(Cases::LineComment(node.clone())),
+            SyntaxKind::Equation => Some(Cases::Equation(node.clone())),
+            SyntaxKind::ListItem | SyntaxKind::EnumItem => Some(Cases::ListOrEnum(node.clone())),
+            SyntaxKind::Space | SyntaxKind::Parbreak => {
+                let prev_leaf = node.prev_sibling()?;
 
-        None
+                let inter_space = node.offset()..rng.start;
+                if !inter_space.is_empty() && source.text()[inter_space].contains(['\r', '\n']) {
+                    return None;
+                }
+
+                match prev_leaf.kind() {
+                    SyntaxKind::ListItem | SyntaxKind::EnumItem => {
+                        return Some(Cases::ListOrEnum(prev_leaf))
+                    }
+                    _ => {}
+                }
+
+                None
+            }
+            _ => None,
+        });
+
+        match case {
+            Some(Cases::LineComment(node)) => worker.enter_line_doc_comment(node, rng),
+            Some(Cases::Equation(node)) => worker.enter_block_math(node, rng),
+            Some(Cases::ListOrEnum(node)) => worker.enter_list_or_enum(node, rng),
+            _ => None,
+        }
     }
 }
 
@@ -69,11 +97,7 @@ impl OnEnterWorker<'_> {
         " ".repeat(indent_size)
     }
 
-    fn enter_line_doc_comment(
-        &self,
-        leaf: &LinkedNode,
-        rng: Range<usize>,
-    ) -> Option<Vec<TextEdit>> {
+    fn enter_line_doc_comment(&self, leaf: LinkedNode, rng: Range<usize>) -> Option<Vec<TextEdit>> {
         let skipper = |n: &LinkedNode| {
             matches!(
                 n.kind(),
@@ -115,7 +139,7 @@ impl OnEnterWorker<'_> {
 
     fn enter_block_math(
         &self,
-        math_node: &LinkedNode<'_>,
+        math_node: LinkedNode<'_>,
         rng: Range<usize>,
     ) -> Option<Vec<TextEdit>> {
         let o = math_node.range();
@@ -139,6 +163,20 @@ impl OnEnterWorker<'_> {
             } else {
                 format!("\n{indent}  $0")
             },
+        };
+
+        Some(vec![edit])
+    }
+
+    fn enter_list_or_enum(&self, node: LinkedNode<'_>, rng: Range<usize>) -> Option<Vec<TextEdit>> {
+        let indent = self.indent_of(node.range().start);
+
+        let is_list = matches!(node.kind(), SyntaxKind::ListItem);
+        let marker = if is_list { "-" } else { "+" };
+
+        let edit = TextEdit {
+            range: to_lsp_range(rng, self.source, self.position_encoding),
+            new_text: format!("\n{indent}{marker} $0"),
         };
 
         Some(vec![edit])
