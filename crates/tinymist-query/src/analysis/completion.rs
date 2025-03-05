@@ -210,6 +210,8 @@ impl<'a> CompletionCursor<'a> {
     /// Gets selected node under cursor.
     fn selected_node(&self) -> &Option<SelectedNode<'a>> {
         self.ident_cursor.get_or_init(|| {
+            // identifier
+            // ^ from
             let is_from_ident = matches!(
                 self.syntax,
                 Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
@@ -219,12 +221,16 @@ impl<'a> CompletionCursor<'a> {
                 return Some(SelectedNode::Ident(self.leaf.clone()));
             }
 
+            // <identifier
+            //  ^ from
             let is_from_label = matches!(self.syntax, Some(SyntaxClass::Label { .. }))
                 && self.leaf.offset() + 1 == self.from;
             if is_from_label {
                 return Some(SelectedNode::Label(self.leaf.clone()));
             }
 
+            // @identifier
+            //  ^ from
             let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref(..)))
                 && self.leaf.offset() + 1 == self.from;
             if is_from_ref {
