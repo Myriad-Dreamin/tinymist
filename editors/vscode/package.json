@@ -9,6 +9,7 @@
   ],
   "categories": [
     "Programming Languages",
+    "Debuggers",
     "Formatters"
   ],
   "repository": {
@@ -973,6 +974,120 @@
         }
       }
     ],
+    "breakpoints": [
+      {
+        "language": "typst"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "myriaddreamin.typst-debugger",
+        "languages": [
+          "typst"
+        ],
+        "label": "Mock Debug",
+        "program": "./out/typst-debugger.exe",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a text file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              },
+              "compileError": {
+                "type": "string",
+                "description": "Simulates a compile error in 'launch' request.",
+                "enum": [
+                  "default",
+                  "show",
+                  "hide"
+                ],
+                "enumDescriptions": [
+                  "default: show fake compile error to user",
+                  "show fake compile error to user",
+                  "do not show fake compile error to user"
+                ]
+              }
+            }
+          },
+          "attach": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a text file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after attach.",
+                "default": true
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              },
+              "compileError": {
+                "type": "string",
+                "description": "Simulates a compile error in 'attach' request.",
+                "enum": [
+                  "default",
+                  "show",
+                  "hide"
+                ],
+                "enumDescriptions": [
+                  "default: show fake compile error to user",
+                  "show fake compile error to user",
+                  "do not show fake compile error to user"
+                ]
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "myriaddreamin.typst-debugger",
+            "request": "launch",
+            "name": "Ask for file name",
+            "program": "${workspaceFolder}/${command:AskForProgramName}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Mock Debug: Launch",
+            "description": "A new configuration for 'debugging' a user selected typst file.",
+            "body": {
+              "type": "myriaddreamin.typst-debugger",
+              "request": "launch",
+              "name": "Ask for file name",
+              "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+              "stopOnEntry": true
+            }
+          }
+        ],
+        "variables": {
+          "AskForProgramName": "myriaddreamin.typst-debugger.getProgramName"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "tinymist.exportCurrentPdf",
@@ -1119,6 +1234,24 @@
         "title": "%extension.tinymist.command.typst-preview.noteOutline%",
         "description": "...",
         "icon": "$(extensions-info-message)"
+      },
+      {
+        "command": "extension.mock-debug.debugEditorContents",
+        "title": "Debug File",
+        "category": "Mock Debug",
+        "enablement": "!inDebugMode",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "extension.mock-debug.runEditorContents",
+        "title": "Run File",
+        "category": "Mock Debug",
+        "enablement": "!inDebugMode",
+        "icon": "$(play)"
+      },
+      {
+        "command": "extension.mock-debug.toggleFormatting",
+        "title": "Toggle between decimal and hex formatting"
       }
     ],
     "keybindings": [
@@ -1145,6 +1278,14 @@
           "when": "editorLangId == typst"
         },
         {
+          "command": "extension.mock-debug.debugEditorContents",
+          "when": "resourceLangId == typst"
+        },
+        {
+          "command": "extension.mock-debug.runEditorContents",
+          "when": "resourceLangId == typst"
+        },
+        {
           "command": "tinymist.restartServer",
           "when": "ext.tinymistActivated"
         }
@@ -1159,6 +1300,18 @@
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst",
           "group": "navigation"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "extension.mock-debug.runEditorContents",
+          "when": "resourceLangId == typst",
+          "group": "navigation@1"
+        },
+        {
+          "command": "extension.mock-debug.debugEditorContents",
+          "when": "resourceLangId == typst",
+          "group": "navigation@2"
         }
       ],
       "editor/context": [
@@ -1178,6 +1331,12 @@
           "command": "tinymist.syncLabel",
           "when": "view == tinymist.label-view",
           "group": "navigation"
+        }
+      ],
+      "debug/variables/context": [
+        {
+          "command": "extension.mock-debug.toggleFormatting",
+          "when": "debugType == 'mock' && debugProtocolVariableMenuContext == 'simple'"
         }
       ]
     }
@@ -1220,6 +1379,8 @@
     "@typescript-eslint/parser": "^8.2.4",
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.22.0",
+    "@vscode/debugadapter": "^1.56.0",
+    "@vscode/debugadapter-testsupport": "^1.56.0",
     "chai": "^5.2.0",
     "esbuild": "^0.24.2",
     "eslint": "^9.20.1",
