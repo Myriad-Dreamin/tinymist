@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on @R (135..137)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/completion_title.typ
-snapshot_kind: text
 ---
 [
  {
@@ -23,7 +22,7 @@ snapshot_kind: text
      "newText": "Russell:1908",
      "range": {
       "end": {
-       "character": 1,
+       "character": 2,
        "line": 5
       },
       "start": {
@@ -43,7 +42,7 @@ snapshot_kind: text
      "newText": "Russell:1908",
      "range": {
       "end": {
-       "character": 1,
+       "character": 2,
        "line": 5
       },
       "start": {
