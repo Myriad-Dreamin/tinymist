@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/ref_half_colon.typ
      "newText": "sec:it",
      "range": {
       "end": {
-       "character": 5,
+       "character": 6,
        "line": 13
       },
       "start": {
