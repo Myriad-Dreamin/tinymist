@@ -109,7 +109,7 @@ mod tests {
     fn run(config: TestConfig) -> impl Fn(&mut LocalContext, PathBuf) {
         fn test(ctx: &mut LocalContext, id: TypstFileId) {
             let source = ctx.source_by_id(id).unwrap();
-            let rng = find_test_range(&source);
+            let rng = find_test_range_(&source);
             let text = source.text()[rng.clone()].to_string();
 
             let docs = find_module_level_docs(&source).unwrap_or_default();

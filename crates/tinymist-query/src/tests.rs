@@ -11,6 +11,7 @@ use std::{
 use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::{CompileFontArgs, ExportTarget};
+use tinymist_std::debug_loc::LspRange;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
@@ -203,7 +204,12 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     f(&mut verse, pw)
 }
 
-pub fn find_test_range(s: &Source) -> Range<usize> {
+pub fn find_test_range(s: &Source) -> LspRange {
+    let range = find_test_range_(s);
+    crate::to_lsp_range(range, s, PositionEncoding::Utf16)
+}
+
+pub fn find_test_range_(s: &Source) -> Range<usize> {
     // /* range -3..-1 */
     fn find_prefix(s: &str, sub: &str, left: bool) -> Option<(usize, usize, bool)> {
         Some((s.find(sub)?, sub.len(), left))

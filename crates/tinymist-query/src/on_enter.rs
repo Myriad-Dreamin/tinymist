@@ -144,3 +144,41 @@ impl OnEnterWorker<'_> {
         Some(vec![edit])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn prepare() {
+        snapshot_testing("on_enter", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
+
+            let request = OnEnterRequest {
+                path: path.clone(),
+                range: find_test_range(&source),
+            };
+
+            let result = request.request(&source, PositionEncoding::Utf16);
+
+            let annotated = {
+                let range = find_test_range_(&source);
+                let range_before = range.start.saturating_sub(10)..range.start;
+                let range_window = range.clone();
+                let range_after = range.end..range.end.saturating_add(10).min(source.text().len());
+
+                let window_before = &source.text()[range_before];
+                let window_line = &source.text()[range_window];
+                let window_after = &source.text()[range_after];
+                format!("{window_before}|{window_line}|{window_after}")
+            };
+
+            insta::with_settings!({
+                description => format!("On Enter on {annotated})"),
+            }, {
+                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            })
+        });
+    }
+}
