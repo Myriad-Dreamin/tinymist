@@ -108,6 +108,102 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
   await editorToolAt(context, tool, panel, opts);
 }
 
+
+// Add this function outside the switch statement but within scope
+function openPerfettoViewer(traceData) {
+  // Create a webview panel for Perfetto
+  const perfettoPanel = vscode.window.createWebviewPanel(
+    'perfettoViewer',
+    'Perfetto Trace Viewer',
+    vscode.ViewColumn.Beside, // Open beside current editor
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true
+    }
+  );
+  
+  perfettoPanel.webview.html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Perfetto Trace Viewer</title>
+      <style>
+        body, html {
+          margin: 0;
+          padding: 0;
+          height: 100vh;
+          overflow: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        #message {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          padding: 20px;
+          background: rgba(255, 255, 255, 0.9);
+          z-index: 100;
+          border-radius: 8px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          text-align: center;
+        }
+        iframe {
+          width: 100%;
+          height: 100%;
+          border: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="message">Connecting to Perfetto UI...</div>
+      <iframe id="perfetto" src="https://ui.perfetto.dev" style="display: block;"></iframe>
+      
+      <script>
+        const vscode = acquireVsCodeApi();
+        const perfettoFrame = document.getElementById('perfetto');
+        const messageEl = document.getElementById('message');
+        const ORIGIN = "https://ui.perfetto.dev";
+        
+        // Create text encoder for binary data
+        const enc = new TextEncoder();
+        
+        // Convert trace data to ArrayBuffer
+        const traceData = ${JSON.stringify(traceData)};
+        const tracingContent = enc.encode(JSON.stringify(traceData)).buffer;
+        
+        // Ping Perfetto UI until it responds
+        const timer = setInterval(() => {
+          perfettoFrame.contentWindow.postMessage("PING", ORIGIN);
+        }, 50);
+        
+        // Listen for response from Perfetto UI
+        window.addEventListener("message", function onMessage(evt) {
+          if (evt.data !== "PONG") return;
+          
+          // We got a PONG, the UI is ready
+          clearInterval(timer);
+          window.removeEventListener("message", onMessage);
+          
+          messageEl.textContent = "Loading trace data...";
+          
+          // Send the trace data to Perfetto UI
+          perfettoFrame.contentWindow.postMessage({
+            perfetto: {
+              buffer: tracingContent,
+              title: "VSCode Extension Trace",
+            }
+          }, ORIGIN);
+          
+          // Hide the message after a short delay
+          setTimeout(() => {
+            messageEl.style.display = 'none';
+          }, 1000);
+        });
+      </script>
+    </body>
+    </html>`;
+}
+
 export async function editorToolAt(
   context: ExtensionContext,
   tool: EditorToolName,
@@ -280,9 +376,59 @@ export async function editorToolAt(
         break;
       }
       case "stopServerProfiling": {
-        const resp = await vscode.commands.executeCommand("tinymist.stopServerProfiling");
-        if (!disposed) {
-          panel.webview.postMessage({ type: "didStopServerProfiling", data: resp });
+        console.log("Stopping server profiling...");
+        const resp = await vscode.commands.executeCommand("tinymist.stopServerProfiling") as { tracingUrl?: string };
+        // url is sent to stopServerProfiling directly
+
+        // Check if tracingUrl exists in the response
+        if (resp && resp.tracingUrl) {
+          const serverUrl = resp.tracingUrl;
+          console.log(`Fetching trace data from: ${serverUrl}`);
+          
+          async function fetchTraceData(serverUrl: string) {
+            try {
+              const response = await fetch(serverUrl, {
+                method: 'GET',
+                headers: {
+                  'Origin': 'vscode-webview://' + panel.webview.cspSource.slice(13),
+                },
+              });
+        
+              if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+              }
+        
+              return await response.json(); // Parse as JSON
+            } catch (error) {
+              console.error('Error fetching trace data:', error);
+              return null;
+            }
+          }
+          
+          const traceData = await fetchTraceData(serverUrl);
+          
+          if (traceData) {
+            console.log('Trace data received successfully');
+            // Open a new window with Perfetto viewer immediately
+            // Log only a preview of the trace data (first 20 entries if it's an array)
+            if (Array.isArray(traceData)) {
+              console.log('Trace data preview (first 20 entries):', 
+                traceData.slice(0, 20));
+              console.log(`Total entries: ${traceData.length}`);
+            } else {
+              console.log('Trace data type:', typeof traceData);
+            }
+            openPerfettoViewer(traceData);
+            if (!disposed) {
+              panel.webview.postMessage({ type: "didStopServerProfiling", data: traceData });
+            }
+          } else {
+            console.log('No trace data received.');
+            vscode.window.showErrorMessage("Failed to load trace data");
+          }
+        } else {
+          console.log("No tracingUrl found in response.");
+          vscode.window.showErrorMessage("No tracing URL available");
         }
         break;
       }
@@ -341,11 +487,27 @@ export async function editorToolAt(
 
       // do that after the html is reloaded
       afterReloadHtml = async () => {
-        const resp = await profileTask;
+        const resp = await profileTask as { tracingUrl?: string };
         if (!disposed) {
           panel.webview.postMessage({ type: "didStartServerProfiling", data: resp });
+          // print the response
+          console.log("Here is the response of startServerProfiling: ", resp);
+          // resp is not used
         }
       };
+
+      // Add a button to the HTML to stop server profiling
+      html = html.replace(
+        "</body>", // good place to insert
+        `<button id="stop-profiling-button">Stop Server Profiling</button>
+         <script>
+           const vscode = acquireVsCodeApi();
+           document.getElementById('stop-profiling-button').addEventListener('click', () => {
+             vscode.postMessage({ type: 'stopServerProfiling' });
+           });
+         </script>
+         </body>`
+      );
 
       break;
     }
