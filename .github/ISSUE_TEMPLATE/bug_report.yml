@@ -61,7 +61,7 @@ body:
     description: |
       For example, for VSCode, get the logs in (Output Panel -> Tinymist).
       Please don't truncate it for us, attach it as a file if it's too long.
-    placeholder: |
+    value: |
       ```log
       Paste your logs here
       ```
@@ -73,7 +73,7 @@ body:
     description: |
       For example, for VSCode, get the logs in (Help -> Toggle Developer Tools -> Console).
       Please don't truncate it for us, attach it as a file if it's too long.
-    placeholder: |
+    value: |
       ```log
       Paste your logs here
       ```
