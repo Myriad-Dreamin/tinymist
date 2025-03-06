@@ -4,9 +4,4 @@ description: "On Enter on 3..3 */\n+ ||\n)"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/on_enter/enum2.typ
 ---
-[
- {
-  "newText": "\n+ $0",
-  "range": "1:2:1:2"
- }
-]
+null

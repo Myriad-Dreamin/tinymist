@@ -78,7 +78,13 @@ impl SyntaxRequest for OnEnterRequest {
         match case {
             Some(Cases::LineComment(node)) => worker.enter_line_doc_comment(node, rng),
             Some(Cases::Equation(node)) => worker.enter_block_math(node, rng),
-            Some(Cases::ListOrEnum(node)) => worker.enter_list_or_enum(node, rng),
+            Some(Cases::ListOrEnum(node)) => {
+                let _ = node;
+                let _ = OnEnterWorker::enter_list_or_enum;
+
+                // worker.enter_list_or_enum(node, rng)
+                None
+            }
             _ => None,
         }
     }
