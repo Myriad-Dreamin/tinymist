@@ -39,7 +39,10 @@ body:
       - Sublime Text
       - Helix
       - Zed
+      - Cli
       - Other
+  validations:
+    required: true
 - type: textarea
   attributes:
     label: Editor Version
