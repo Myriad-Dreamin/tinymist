@@ -1,4 +1,4 @@
-import { DOMParser } from 'xmldom';
+import { DOMParser } from '@xmldom/xmldom';
 
 export async function convertHtmlToTypst(html: string): Promise<string> {
     const parser = new DOMParser();
