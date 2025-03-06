@@ -14,8 +14,8 @@ import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from "./util";
-import { substVscodeVarsInConfig } from "./config";
-import { wordCountItemProcess } from "./ui-extends";
+import { substVscodeVarsInConfig, TinymistConfig } from "./config";
+import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
 
 interface ResourceRoutes {
@@ -121,7 +121,7 @@ export class LanguageState {
     const binaryName = "tinymist" + binarySuffix;
 
     const serverPaths: [string, string][] = configPath
-      ? [[`\`${configName}\` (${configPath})`, configPath as string]]
+      ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
           ["Bundled", resolve(__dirname, binaryName)],
           ["In PATH", binaryName],
@@ -162,7 +162,7 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: Record<string, any>) {
+  initClient(config: TinymistConfig) {
     const context = this.context;
     const isProdMode = context.extensionMode === ExtensionMode.Production;
 
@@ -228,8 +228,8 @@ export class LanguageState {
 
               // outline all data "data:image/svg+xml;base64," to render huge image correctly
               content.value = content.value.replace(
-                /\"data\:image\/svg\+xml\;base64,([^\"]*)\"/g,
-                (_, content) => hoverHandler.storeImage(content),
+                /"data:image\/svg\+xml;base64,([^"]*)"/g,
+                (_, content: string) => hoverHandler.storeImage(content),
               );
             }
           }
@@ -257,7 +257,7 @@ export class LanguageState {
       throw new Error("Language client is not set");
     }
 
-    client.onNotification("tinymist/compileStatus", (params) => {
+    client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
 

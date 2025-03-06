@@ -1,7 +1,7 @@
 import { type ExtensionContext, commands } from "vscode";
 import * as vscode from "vscode";
 
-import { loadTinymistConfig } from "./config";
+import { loadTinymistConfig, TinymistConfig } from "./config";
 import { tinymist } from "./lsp";
 import { extensionState } from "./state";
 
@@ -48,7 +48,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   extensionState.features.renderDocs = !isWeb && config.renderDocs === "enable";
 
   // Configures advanced editor settings to affect the host process
-  let configWordSeparators = async () => {
+  const configWordSeparators = async () => {
     const wordSeparators = "`~!@#$%^&*()=+[{]}\\|;:'\",.<>/?";
     const config1 = vscode.workspace.getConfiguration("", { languageId: "typst" });
     await config1.update("editor.wordSeparators", wordSeparators, true, true);
@@ -65,13 +65,13 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   }
 
   // Configures advanced language configuration
-  tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
+  tinymist.configureLanguage(config["typingContinueCommentsOnNewline"] || false);
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("tinymist.typingContinueCommentsOnNewline")) {
         const config = loadTinymistConfig();
         // Update language configuration
-        tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
+        tinymist.configureLanguage(config["typingContinueCommentsOnNewline"] || false);
       }
     }),
   );
@@ -79,7 +79,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
 
 interface TinymistTrait {
   activateTable(): FeatureEntry[];
-  config: Record<string, any>;
+  config: TinymistConfig;
 }
 
 export async function tinymistActivate(
@@ -133,7 +133,7 @@ export async function tinymistActivate(
 export async function tinymistDeactivate(
   trait: Pick<TinymistTrait, "activateTable">,
 ): Promise<void> {
-  for (const [condition, _, deactivate] of trait.activateTable()) {
+  for (const [condition, , deactivate] of trait.activateTable()) {
     if (deactivate && condition) {
       deactivate(tinymist.context);
     }

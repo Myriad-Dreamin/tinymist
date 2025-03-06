@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 
 import { vscodeVariables } from "./vscode-variables";
 
-export function loadTinymistConfig() {
+export interface TinymistConfig {
+  [key: string]: any;
+  typingContinueCommentsOnNewline?: boolean;
+  serverPath?: string;
+}
+
+export function loadTinymistConfig(): TinymistConfig {
   let config: Record<string, any> = JSON.parse(
     JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
   );
