@@ -283,91 +283,20 @@ impl ServerState {
     #[cfg(feature = "preview")]
     pub fn start_preview(
         &mut self,
-        args: Vec<JsonValue>,
+        mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
-        self.start_preview_inner(args, false)
+        let cli_args = get_arg_or_default!(args[0] as Vec<String>);
+        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Regular)
     }
 
     /// Start a preview instance for browsing.
     #[cfg(feature = "preview")]
     pub fn browse_preview(
         &mut self,
-        args: Vec<JsonValue>,
-    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
-        self.start_preview_inner(args, true)
-    }
-
-    /// Start a preview instance.
-    #[cfg(feature = "preview")]
-    pub fn start_preview_inner(
-        &mut self,
         mut args: Vec<JsonValue>,
-        browsing_preview: bool,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
-        use std::path::Path;
-
-        use crate::tool::preview::PreviewCliArgs;
-        use clap::Parser;
-
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
-        // clap parse
-        let cli_args = ["preview"]
-            .into_iter()
-            .chain(cli_args.iter().map(|e| e.as_str()));
-        let cli_args =
-            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
-
-        // todo: preview specific arguments are not used
-        let entry = cli_args.compile.input.as_ref();
-        let entry = entry
-            .map(|input| {
-                let input = Path::new(&input);
-                if !input.is_absolute() {
-                    // std::env::current_dir().unwrap().join(input)
-                    return Err(invalid_params("entry file must be absolute path"));
-                };
-
-                Ok(input.into())
-            })
-            .transpose()?;
-
-        let task_id = cli_args.preview.task_id.clone();
-        if task_id == "primary" {
-            return Err(invalid_params("task id 'primary' is reserved"));
-        }
-
-        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
-        let watcher = previewer.compile_watcher();
-
-        let primary = &mut self.project.compiler.primary;
-        // todo: recover pin status reliably
-        if !cli_args.not_as_primary
-            && (browsing_preview || entry.is_some())
-            && self.preview.watchers.register(&primary.id, watcher)
-        {
-            let id = primary.id.clone();
-
-            if let Some(entry) = entry {
-                self.change_main_file(Some(entry)).map_err(internal_error)?;
-            }
-            self.set_pin_by_preview(true, browsing_preview);
-
-            self.preview.start(cli_args, previewer, id, true)
-        } else if let Some(entry) = entry {
-            let id = self
-                .restart_dedicate(&task_id, Some(entry))
-                .map_err(internal_error)?;
-
-            if !self.project.preview.register(&id, watcher) {
-                return Err(invalid_params(
-                    "cannot register preview to the compiler instance",
-                ));
-            }
-
-            self.preview.start(cli_args, previewer, id, false)
-        } else {
-            return Err(internal_error("entry file must be provided"));
-        }
+        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 
     /// Kill a preview instance.

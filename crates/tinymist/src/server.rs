@@ -170,6 +170,9 @@ impl ServerState {
                 .reload_projects()
                 .log_error("could not restart primary");
 
+            #[cfg(feature = "preview")]
+            service.background_preview();
+
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
         }
