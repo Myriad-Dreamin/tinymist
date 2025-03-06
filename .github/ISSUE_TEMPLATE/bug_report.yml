@@ -42,17 +42,17 @@ body:
       - Other
 - type: textarea
   attributes:
-    label: Describe the bug
-    description: A clear and concise description of what the bug is.
+    label: Editor Version
+    description: |
+     For example, for VSCode, get the version in (Help -> About)
   validations:
     required: true
 - type: textarea
   attributes:
-    label: Editor version
-    description: |
-     For example, for VSCode, get the version in (Help -> About)
+    label: Describe the bug
+    description: A clear and concise description of what the bug is.
   validations:
-    required: false
+    required: true
 - type: textarea
   attributes:
     label: Server Logs
