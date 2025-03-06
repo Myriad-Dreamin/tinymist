@@ -357,7 +357,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   task.isNotPrimary = !isPrimary;
 
   if (isPrimary) {
-    let connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
+    const connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
     contentPreviewProvider.then((p) => p.postActivate(connectUrl));
     disposes.add(() => {
       contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
@@ -539,12 +539,12 @@ async function scrollPreviewPanel(taskId: string, scrollRequest: ScrollPreviewRe
 }
 
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};
-export let contentPreviewProvider = new Promise<ContentPreviewProvider>((resolve) => {
+export const contentPreviewProvider = new Promise<ContentPreviewProvider>((resolve) => {
   resolveContentPreviewProvider = resolve;
 });
 
 let resolveOutlineProvider: (value: OutlineProvider) => void = () => {};
-export let outlineProvider = new Promise<OutlineProvider>((resolve) => {
+export const outlineProvider = new Promise<OutlineProvider>((resolve) => {
   resolveOutlineProvider = resolve;
 });
 
@@ -671,7 +671,6 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
 // <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 
 interface CursorPosition {
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   page_no: number;
   x: number;
   y: number;
@@ -738,14 +737,21 @@ export class OutlineItem extends vscode.TreeItem {
   ) {
     super(data.title, collapsibleState);
     const span = this.data.span;
-    let detachedHint = span ? `` : `, detached`;
+    const detachedHint = span ? `` : `, detached`;
 
     const pos = this.data.position;
+
+    const label = this.label
+      ? typeof this.label === "string"
+        ? this.label
+        : this.label?.label
+      : "<no-label>";
+
     if (pos) {
-      this.tooltip = `${this.label} in page ${pos.page_no}, at (${pos.x.toFixed(3)} pt, ${pos.y.toFixed(3)} pt)${detachedHint}`;
+      this.tooltip = `${label} in page ${pos.page_no}, at (${pos.x.toFixed(3)} pt, ${pos.y.toFixed(3)} pt)${detachedHint}`;
       this.description = `page: ${pos.page_no}, at (${pos.x.toFixed(1)} pt, ${pos.y.toFixed(1)} pt)${detachedHint}`;
     } else {
-      this.tooltip = `${this.label}${detachedHint}`;
+      this.tooltip = `${label}${detachedHint}`;
       this.description = `no pos`;
     }
   }

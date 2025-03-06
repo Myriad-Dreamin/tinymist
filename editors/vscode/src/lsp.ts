@@ -508,13 +508,13 @@ export class LanguageState {
         {
           // Parent doc single-line comment
           // e.g. //!|
-          beforeText: /^\s*\/{2}\!.*$/,
+          beforeText: /^\s*\/{2}!.*$/,
           action: { indentAction, appendText: "//! " },
         },
         {
           // Begins an auto-closed multi-line comment (standard or parent doc)
           // e.g. /** | */ or /*! | */
-          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
           afterText: /^\s*\*\/$/,
           action: {
             indentAction: vscode.IndentAction.IndentOutdent,
@@ -524,19 +524,19 @@ export class LanguageState {
         {
           // Begins a multi-line comment (standard or parent doc)
           // e.g. /** ...| or /*! ...|
-          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
           action: { indentAction, appendText: " * " },
         },
         {
           // Continues a multi-line comment
           // e.g.  * ...|
-          beforeText: /^(\ \ )*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+          beforeText: /^( {2})* *( ([^*]|\*(?!\/))*)?$/,
           action: { indentAction, appendText: "* " },
         },
         {
           // Dedents after closing a multi-line comment
           // e.g.  */|
-          beforeText: /^(\ \ )*\ \*\/\s*$/,
+          beforeText: /^( {2})* *\/\s*$/,
           action: { indentAction, removeText: 1 },
         },
       ];
@@ -546,8 +546,7 @@ export class LanguageState {
     // todo: document difference here.
     //
     // https://code.visualstudio.com/api/language-extensions/language-configuration-guide#word-pattern
-    const wordPattern =
-      /(-?\d*.\d\w*)|([^\`\~\!\@\#\$\%\^\&\*\(\)\=\+\[\{\]\}\\\|\;\:\'\"\,\.<\>\/\?\s]+)/;
+    const wordPattern = /(-?\d*.\d\w*)|([^`~!@#$%^&*()=+[{\]}\\|;:'",.<>/?\s]+)/;
 
     console.log("Setting up language configuration", typingContinueCommentsOnNewline);
     this.configureLang = vscode.languages.setLanguageConfiguration("typst", {

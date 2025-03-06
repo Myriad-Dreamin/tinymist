@@ -1,7 +1,5 @@
 import * as vscode from "vscode";
-import { commands } from "vscode";
-import * as path from "path";
-import { readFile, writeFile } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { tinymist } from "../lsp";
 import { extensionState, ExtensionContext } from "../state";
 import { activeTypstEditor, base64Encode, loadHTMLFile } from "../util";
@@ -125,7 +123,7 @@ export async function editorToolAt(
     console.log("onDidReceiveMessage", message);
     switch (message.type) {
       case "revealPath": {
-        const path = message.path;
+        const path: string = message.path;
         const x = await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(path));
         const y = await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path));
         console.log("revealPath", x, y);
@@ -148,7 +146,7 @@ export async function editorToolAt(
         break;
       }
       case "initTemplate": {
-        const packageSpec = message.packageSpec;
+        const packageSpec: string = message.packageSpec;
         const initArgs = [packageSpec];
         const path = await vscode.window.showOpenDialog({
           canSelectFiles: false,
@@ -167,7 +165,8 @@ export async function editorToolAt(
         break;
       }
       case "copyToClipboard": {
-        vscode.env.clipboard.writeText(message.content);
+        vscode.env.clipboard.writeText(message.content as string);
+        break;
       }
       case "editText": {
         const activeDocument = extensionState.getFocusingDoc();
@@ -191,8 +190,9 @@ export async function editorToolAt(
         const edit = message.edit;
         if (typeof edit.newText === "string") {
           // replace the selection with the new text
+          // todo: eslint reports that edit.newText is not a string here.
           await editor.edit((editBuilder) => {
-            editBuilder.replace(selection, edit.newText);
+            editBuilder.replace(selection, edit.newText as string);
           });
         } else {
           const {
@@ -204,7 +204,7 @@ export async function editorToolAt(
             string: stringContent,
             raw,
             rest,
-          } = edit.newText;
+          }: Record<string, string> = edit.newText;
           const newText = kind === "by-mode" ? rest || "" : "";
 
           const res = await vscode.commands.executeCommand<
@@ -231,7 +231,7 @@ export async function editorToolAt(
               // todo: whether to keep stupid
               // if it is before an identifier character, then add a space
               let replaceText = math || newText;
-              let range = new vscode.Range(
+              const range = new vscode.Range(
                 selectionStart.with(undefined, selectionStart.character - 1),
                 selectionStart,
               );
@@ -260,15 +260,18 @@ export async function editorToolAt(
         break;
       }
       case "saveDataToFile": {
-        let { data, path, option } = message;
+        let { path } = message;
+        const { data, option } = message;
         if (typeof path !== "string") {
-          const uri = await vscode.window.showSaveDialog(option);
+          // todo: unsafe cast here.
+          const uri = await vscode.window.showSaveDialog(option as vscode.SaveDialogOptions);
           path = uri?.fsPath;
         }
         if (typeof path !== "string") {
           return;
         }
-        await writeFile(path, data);
+        // todo: unsafe cast here.
+        await writeFile(path, data as string);
         break;
       }
       default: {
@@ -295,11 +298,12 @@ export async function editorToolAt(
   let afterReloadHtml = undefined;
 
   switch (tool) {
-    case "template-gallery":
+    case "template-gallery": {
       const userPackageData = getUserPackageData(context);
       const packageData = JSON.stringify(userPackageData.data);
       html = html.replace(":[[preview:FavoritePlaceholder]]:", base64Encode(packageData));
       break;
+    }
     case "tracing": {
       const focusingFile = extensionState.getFocusingFile();
       if (focusingFile === undefined) {
@@ -464,7 +468,8 @@ export async function editorToolAt(
       break;
     }
     case "docs": {
-      html = html.replace(":[[preview:DocContent]]:", base64Encode(opts.content));
+      // todo: unsafe cast here.
+      html = html.replace(":[[preview:DocContent]]:", base64Encode(opts.content as string));
       break;
     }
   }
@@ -583,8 +588,8 @@ interface fontsExportCommonConfigure {
 export type fontsExportConfigure = fontsExportCommonConfigure & fontsExportFormatConfigure;
 
 const waitTimeList = [100, 200, 400, 1000, 1200, 1500, 1800, 2000];
-async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
-  let res: [any | undefined, any | undefined] = [undefined, undefined];
+async function fetchSummaryInfo(): Promise<[string | undefined, string | undefined]> {
+  const res: [string | undefined, string | undefined] = [undefined, undefined];
 
   for (const to of waitTimeList) {
     const focusingFile = extensionState.getFocusingFile();
@@ -603,7 +608,7 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
 
   return res;
 
-  async function work(focusingFile: string, res: [any | undefined, any | undefined]) {
+  async function work(focusingFile: string, res: [string | undefined, string | undefined]) {
     if (!res[0]) {
       const result = await vscode.commands.executeCommand(
         "tinymist.getDocumentMetrics",

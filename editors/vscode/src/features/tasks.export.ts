@@ -56,7 +56,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
 
   async function run() {
     const rawFormat = exportArgs.format;
-    let formats = typeof rawFormat === "string" ? [rawFormat] : rawFormat;
+    const formats = typeof rawFormat === "string" ? [rawFormat] : rawFormat;
 
     const uri = ops.resolveInputPath();
     if (uri === undefined) {
@@ -64,7 +64,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
       return;
     }
 
-    for (let format of formats) {
+    for (const format of formats) {
       const provider = formatProvider[format];
       if (!provider) {
         vc.writeln(`Unsupported export format: ${format}`);
