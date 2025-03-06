@@ -277,7 +277,7 @@ impl ServerState {
         just_ok(JsonValue::Null)
     }
 
-    /// Start a preview instance.
+    /// Starts a preview instance.
     #[cfg(feature = "preview")]
     pub fn start_preview(
         &mut self,
@@ -287,13 +287,41 @@ impl ServerState {
         self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Regular)
     }
 
-    /// Start a preview instance for browsing.
+    /// Starts a preview instance for browsing.
     #[cfg(feature = "preview")]
     pub fn browse_preview(
         &mut self,
         mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
+        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
+    }
+
+    /// Starts a preview instance but without arguments. This is used for the
+    /// case where a client cannot pass arguments to the preview command. It
+    /// is also an example of how to use the `preview` command.
+    ///
+    /// Behaviors:
+    /// - The preview server listens on a random port.
+    /// - The colors are inverted according to the user's system settings.
+    /// - The preview follows an inferred focused file from the requests from
+    ///   the client.
+    /// - The preview is opened in the default browser.
+    #[cfg(feature = "preview")]
+    pub fn default_preview(
+        &mut self,
+        mut _args: Vec<JsonValue>,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
+        let cli_args = self.config.preview.browsing.args.clone();
+        let cli_args = cli_args.unwrap_or_else(|| {
+            let default_args = [
+                "--data-plane-host=127.0.0.1:0",
+                "--control-plane-host=127.0.0.1:0",
+                "--invert-colors=auto",
+                "--open",
+            ];
+            default_args.map(ToString::to_string).to_vec()
+        });
         self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 

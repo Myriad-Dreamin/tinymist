@@ -569,7 +569,7 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 
     switch (moreAction) {
       case kBrowsing: {
-        void vscode.commands.executeCommand(`tinymist.browsing-preview`);
+        void vscode.commands.executeCommand(`tinymist.browsingPreview`);
         return;
       }
       case kPreviewIn: {

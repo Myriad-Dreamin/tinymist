@@ -51,7 +51,42 @@ Also see:
 
 == Builtin Preview Feature
 
-See #link("https://enter-tainer.github.io/typst-preview/arch.html")[Typst-Preview Developer Guide].
+=== Using `tinymist.startDefaultPreview` Command <default-preview>
+
+You can use `tinymist.startDefaultPreview` command to start a preview instance without arguments. This is used for the
+case where a client cannot pass arguments to the preview command, e.g. helix. Default Behaviors:
+- The preview server listens on a random port.
+- The colors are inverted according to the browser (usually also system) settings.
+- The preview follows an inferred focused file from the requests from
+  the client.
+- The preview is opened in the default browser.
+
+You can set the arguments to used by configuration `tinymist.preview.browsing.args` to *override* the default behavior. The default
+value is `["--data-plane-host=127.0.0.1:0", "--invert-colors=auto", "--open"]`. Intentionally, the name of the configuration is *not* `tinymist.defaultPreviewArgs` or `tinymist.preview.defaultArgs` to avoid confusion.
+
+=== Running preview server in background <background-preview>
+
+You can start a preview instance in background with configuration:
+```jsonc
+{
+  "tinymist.preview.background.enabled": true,
+}
+```
+
+Default Behaviors:
+- The preview server listens on `127.0.0.1:23635`.
+- The colors are inverted according to the browser (usually also system) settings.
+- The preview follows an inferred focused file from the requests from
+  the client.
+
+You can set the arguments to used by configuration `tinymist.preview.background.args` to *override* the default behavior. The default
+value is `["--data-plane-host=127.0.0.1:23635", "--invert-colors=auto"]`. Example:
+
+```jsonc
+{
+  "tinymist.preview.background.args": ["--data-plane-host=127.0.0.1:23635", "--invert-colors=never"],
+}
+```
 
 === CLI Integration
 
@@ -70,7 +105,7 @@ tinymist preview /abs-path/to/main.typ --partial-rendering
 #pro-tip[
   === VSCode:
 
-  The preview feature is also integrated into the language server. You can use the preview feature like when you were using it in `mgt19937.typst-preview` extension.
+  The preview feature is integrated into the tinymist extension.
 ]
 
 #pro-tip[
@@ -101,6 +136,10 @@ There is a `version` field in the `preview-args` object, which will increase whe
   assert(preview-args.at("theme", default: "light") in ("light", "dark"))
 }
 ```
+
+=== Developer Guide
+
+See #link("https://enter-tainer.github.io/typst-preview/arch.html")[Typst-Preview Developer Guide].
 
 ==== Theme-aware template
 

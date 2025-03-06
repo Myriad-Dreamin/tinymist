@@ -103,7 +103,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   const launchDevPreview = launch("webview", "doc", { isDev: true });
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
-    vscode.commands.registerCommand("tinymist.browsing-preview", launchBrowsingPreview),
+    vscode.commands.registerCommand("tinymist.browsingPreview", launchBrowsingPreview),
     vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
