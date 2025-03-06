@@ -334,9 +334,21 @@ pub struct PreviewCliArgs {
     #[clap(long = "not-primary", hide(true))]
     pub not_as_primary: bool,
 
-    /// Don't open the preview in the browser after compilation.
+    /// Open the preview in the browser after compilation. If `--no-open` is
+    /// set, this flag will be ignored.
+    #[clap(long = "open")]
+    pub open: bool,
+
+    /// Don't open the preview in the browser after compilation. If `--open` is
+    /// set as well, this flag will win.
     #[clap(long = "no-open")]
-    pub dont_open_in_browser: bool,
+    pub no_open: bool,
+}
+
+impl PreviewCliArgs {
+    pub fn open_in_browser(&self, default: bool) -> bool {
+        !self.no_open && (self.open || default)
+    }
 }
 
 /// The global state of the preview tool.
@@ -475,6 +487,7 @@ impl PreviewState {
         });
 
         let task_id = args.preview.task_id.clone();
+        let open_in_browser = args.open_in_browser(false);
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
         if !args.static_file_host.is_empty() && (args.static_file_host != args.data_plane_host) {
@@ -552,6 +565,11 @@ impl PreviewState {
                 data_plane_port: Some(addr.port()),
                 is_primary,
             };
+
+            if open_in_browser {
+                open::that_detached(format!("http://127.0.0.1:{}", addr.port()))
+                    .log_error("failed to open browser for preview");
+            }
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
@@ -824,6 +842,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
     let handle = tokio::runtime::Handle::current();
 
+    let open_in_browser = args.open_in_browser(true);
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
             Some(args.static_file_host)
@@ -990,7 +1009,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
     log::info!("Static file server listening on: {static_server_addr}");
 
-    if !args.dont_open_in_browser {
+    if open_in_browser {
         open::that_detached(format!("http://{static_server_addr}"))
             .log_error("failed to open browser for preview");
     }

@@ -143,6 +143,13 @@ Whether to enable right-variant UFCS-style completion. For example, `[A].table|`
 - **Type**: `boolean`
 - **Default**: `true`
 
+## `preview.browsing.args`
+
+The arguments used by `tinymist.startDefaultPreview` command. Check `tinymist preview` to see the allowed arguments.
+
+- **Type**: `array`
+- **Default**: `["--data-plane-host=127.0.0.1:0","--invert-colors=auto","--open"]`
+
 ## `preview.background.enabled`
 
 This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server listens a specific tcp port in the background. You can discover the background previewers in the preview panel.

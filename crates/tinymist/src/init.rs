@@ -868,8 +868,20 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
 #[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFeat {
-    /// Whether to run the preview in the background.
+    /// The browsing preview options.
+    #[serde(default)]
+    pub browsing: BrowsingPreviewOpts,
+    /// The background preview options.
+    #[serde(default)]
     pub background: BackgroundPreviewOpts,
+}
+
+/// Options for browsing preview.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowsingPreviewOpts {
+    /// The arguments for the `tinymist.startDefaultPreview` command.
+    pub args: Option<Vec<String>>,
 }
 
 /// Options for background preview.
