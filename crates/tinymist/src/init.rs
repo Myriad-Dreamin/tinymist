@@ -465,16 +465,20 @@ impl Config {
         }
     }
 
+    /// Gets the export task configuration.
+    pub(crate) fn export_task(&self) -> ExportTask {
+        ExportTask {
+            when: self.compile.export_pdf,
+            output: Some(self.compile.output_path.clone()),
+            transform: vec![],
+        }
+    }
+
     /// Gets the export configuration.
     pub(crate) fn export(&self) -> ExportUserConfig {
         let compile_config = &self.compile;
 
-        let export = ExportTask {
-            output: Some(compile_config.output_path.clone()),
-            when: compile_config.export_pdf,
-            transform: vec![],
-        };
-
+        let export = self.export_task();
         ExportUserConfig {
             export_target: self.export_target,
             // todo: we only have `exportPdf` for now
