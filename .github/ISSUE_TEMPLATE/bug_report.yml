@@ -39,7 +39,7 @@ body:
       - Sublime Text
       - Helix
       - Zed
-      - Cli
+      - CLI (Command Line Interface)
       - Other
   validations:
     required: true
