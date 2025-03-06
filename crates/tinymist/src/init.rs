@@ -244,6 +244,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
     "exportPdf",
     "rootPath",
+    "preview",
     "semanticTokens",
     "formatterMode",
     "formatterPrintWidth",
@@ -263,7 +264,7 @@ const CONFIG_ITEMS: &[&str] = &[
 ///
 /// Note: `Config::default` is intentionally to be "pure" and not to be
 /// affected by system environment variables.
-/// To get the configuration with system defaults, use [`Config::new`] intead.
+/// To get the configuration with system defaults, use [`Config::new`] instead.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The resolution kind of the project.
@@ -287,6 +288,8 @@ pub struct Config {
     pub export_target: ExportTarget,
     /// Tinymist's completion features.
     pub completion: CompletionFeat,
+    /// Tinymist's preview features.
+    pub preview: PreviewFeat,
 }
 
 impl Config {
@@ -432,6 +435,10 @@ impl Config {
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
+
+        assign_config!(preview.background := "preview.background"?: bool);
+        assign_config!(preview.listen := "preview.background.listen": String = "127.0.0.1:23637".into());
+
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }
@@ -856,6 +863,16 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
         ..SemanticTokensOptions::default()
     }
+}
+
+/// The preview features.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewFeat {
+    /// Whether to run the preview in the background.
+    background: bool,
+    /// The address to listen for the preview, e.g. `127.0.0.1:23637`.
+    listen: String,
 }
 
 /// Additional options for compilation.

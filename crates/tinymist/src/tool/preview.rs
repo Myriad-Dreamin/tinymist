@@ -192,7 +192,7 @@ pub struct PreviewCliArgs {
     )]
     pub control_plane_host: String,
 
-    /// (File) Host for the preview server. Note: if it equals to
+    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
     /// `data_plane_host`, same address will be used.
     #[clap(
         long = "host",

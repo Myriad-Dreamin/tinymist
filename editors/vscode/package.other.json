@@ -4,9 +4,17 @@
     "configuration": {
       "properties": {
         "tinymist.preview.background": {
-          "markdownDescription": "This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server is started in the background with a random port. You can discover the background previewers by running `tinymist preview`.",
+          "description": "This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server listens a specific tcp port in the background. You can discover the background previewers in the preview panel.",
           "type": "boolean",
           "default": false
+        },
+        "tinymist.preview.background.args": {
+          "description": "The arguments that the background preview server used for. It is only used when `tinymist.preview.background` is enabled. Check `tinymist preview` to see the allowed arguments.",
+          "type": "array",
+          "default": ["--data-plane-host", "127.0.0.1:23635"],
+          "properties": {
+            "type": "string"
+          }
         }
       }
     }
