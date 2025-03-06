@@ -72,10 +72,11 @@ impl ServerState {
             self.config.compile.determine_creation_timestamp()
         };
 
+        let export = self.config.export_task();
         self.export(
             req_id,
             ProjectTask::ExportPdf(ExportPdfTask {
-                export: ExportTask::default(),
+                export,
                 pdf_standards: vec![],
                 creation_timestamp,
             }),
@@ -87,11 +88,10 @@ impl ServerState {
     /// Export the current document as HTML file(s).
     pub fn export_html(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let export = self.config.export_task();
         self.export(
             req_id,
-            ProjectTask::ExportHtml(ExportHtmlTask {
-                export: ExportTask::default(),
-            }),
+            ProjectTask::ExportHtml(ExportHtmlTask { export }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -104,11 +104,10 @@ impl ServerState {
         mut args: Vec<JsonValue>,
     ) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let export = self.config.export_task();
         self.export(
             req_id,
-            ProjectTask::ExportMd(ExportMarkdownTask {
-                export: ExportTask::default(),
-            }),
+            ProjectTask::ExportMd(ExportMarkdownTask { export }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -117,11 +116,10 @@ impl ServerState {
     /// Export the current document as Text file(s).
     pub fn export_text(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let export = self.config.export_task();
         self.export(
             req_id,
-            ProjectTask::ExportText(ExportTextTask {
-                export: ExportTask::default(),
-            }),
+            ProjectTask::ExportText(ExportTextTask { export }),
             opts.open.unwrap_or_default(),
             args,
         )
@@ -133,7 +131,7 @@ impl ServerState {
         // todo: deprecate it
         let _ = opts.strict;
 
-        let mut export = ExportTask::default();
+        let mut export = self.config.export_task();
         if opts.pretty.unwrap_or(true) {
             export.apply_pretty();
         }
@@ -157,7 +155,7 @@ impl ServerState {
     pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
 
-        let mut export = ExportTask::default();
+        let mut export = self.config.export_task();
         select_page(&mut export, opts.page).map_err(invalid_params)?;
 
         self.export(
@@ -178,7 +176,7 @@ impl ServerState {
             .context("cannot convert ppi")
             .map_err(invalid_params)?;
 
-        let mut export = ExportTask::default();
+        let mut export = self.config.export_task();
         select_page(&mut export, opts.page).map_err(invalid_params)?;
 
         self.export(
