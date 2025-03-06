@@ -26,6 +26,8 @@ pub struct PreviewTab {
     pub compile_handler: Arc<PreviewProjectHandler>,
     /// Whether this tab is primary
     pub is_primary: bool,
+    /// Whether this tab is background
+    pub is_background: bool,
 }
 
 pub enum PreviewRequest {
@@ -51,6 +53,15 @@ impl PreviewActor {
                 }
                 PreviewRequest::Kill(task_id, tx) => {
                     log::info!("PreviewTask({task_id}): killing");
+
+                    if self.tabs.get(&task_id).is_some_and(|tab| tab.is_background) {
+                        // todo: eliminate this warning in log in future
+                        log::warn!("PreviewTask({task_id}): cannot kill a background preview");
+
+                        let _ = tx.send(Ok(JsonValue::Null));
+                        continue;
+                    }
+
                     let Some(mut tab) = self.tabs.remove(&task_id) else {
                         let _ = tx.send(Err(internal_error("task not found")));
                         continue;

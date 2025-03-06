@@ -436,8 +436,7 @@ impl Config {
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
 
-        assign_config!(preview.background := "preview.background"?: bool);
-        assign_config!(preview.listen := "preview.background.listen": String = "127.0.0.1:23637".into());
+        assign_config!(preview := "preview"?: PreviewFeat);
 
         self.compile.update_by_map(update)?;
         self.compile.validate()
@@ -870,9 +869,17 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFeat {
     /// Whether to run the preview in the background.
-    background: bool,
-    /// The address to listen for the preview, e.g. `127.0.0.1:23637`.
-    listen: String,
+    pub background: BackgroundPreviewOpts,
+}
+
+/// Options for background preview.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundPreviewOpts {
+    /// Whether to run the preview in the background.
+    pub enabled: bool,
+    /// The arguments for the background preview.
+    pub args: Option<Vec<String>>,
 }
 
 /// Additional options for compilation.

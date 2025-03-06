@@ -48,6 +48,129 @@ use project::{watch_deps, ProjectPreviewState};
 
 pub use typst_preview::CompileStatus;
 
+pub enum PreviewKind {
+    Regular,
+    Browsing,
+    Background,
+}
+
+impl ServerState {
+    pub fn background_preview(&mut self) {
+        if !self.config.preview.background.enabled {
+            return;
+        }
+
+        let args = self.config.preview.background.args.clone();
+        let args = args.unwrap_or_else(|| vec!["--data-plane-host=127.0.0.1:23635".to_string()]);
+
+        let res = self.start_preview_inner(args, PreviewKind::Background);
+
+        // todo: looks ugly
+        self.client.handle.spawn(async move {
+            let fut = match res {
+                Ok(fut) => fut,
+                Err(e) => {
+                    log::error!("failed to start background preview: {e:?}");
+                    return;
+                }
+            };
+            tokio::pin!(fut);
+            let () = fut.as_mut().await;
+
+            if let Some(Err(e)) = fut.as_mut().take_output() {
+                log::error!("failed to start background preview: {e:?}");
+            }
+        });
+    }
+
+    /// Start a preview instance.
+    pub fn start_preview_inner(
+        &mut self,
+        cli_args: Vec<String>,
+        kind: PreviewKind,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
+        use std::path::Path;
+
+        use crate::tool::preview::PreviewCliArgs;
+        use clap::Parser;
+
+        // clap parse
+        let cli_args = ["preview"]
+            .into_iter()
+            .chain(cli_args.iter().map(|e| e.as_str()));
+        let cli_args =
+            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+
+        // todo: preview specific arguments are not used
+        let entry = cli_args.compile.input.as_ref();
+        let entry = entry
+            .map(|input| {
+                let input = Path::new(&input);
+                if !input.is_absolute() {
+                    // std::env::current_dir().unwrap().join(input)
+                    return Err(invalid_params("entry file must be absolute path"));
+                };
+
+                Ok(input.into())
+            })
+            .transpose()?;
+
+        let task_id = cli_args.preview.task_id.clone();
+        if task_id == "primary" {
+            return Err(invalid_params("task id 'primary' is reserved"));
+        }
+
+        if cli_args.not_as_primary && matches!(kind, PreviewKind::Background) {
+            return Err(invalid_params(
+                "cannot start background preview as non-primary",
+            ));
+        }
+
+        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+        let watcher = previewer.compile_watcher();
+
+        let primary = &mut self.project.compiler.primary;
+        // todo: recover pin status reliably
+        let is_browsing = matches!(kind, PreviewKind::Browsing | PreviewKind::Background);
+        let is_background = matches!(kind, PreviewKind::Background);
+
+        let registered_as_primary = !cli_args.not_as_primary
+            && (is_browsing || entry.is_some())
+            && self.preview.watchers.register(&primary.id, watcher);
+        if matches!(kind, PreviewKind::Background) && !registered_as_primary {
+            return Err(invalid_params(
+                "failed to register background preview to the primary instance",
+            ));
+        }
+
+        if registered_as_primary {
+            let id = primary.id.clone();
+
+            if let Some(entry) = entry {
+                self.change_main_file(Some(entry)).map_err(internal_error)?;
+            }
+            self.set_pin_by_preview(true, is_browsing);
+
+            self.preview
+                .start(cli_args, previewer, id, true, is_background)
+        } else if let Some(entry) = entry {
+            let id = self
+                .restart_dedicate(&task_id, Some(entry))
+                .map_err(internal_error)?;
+
+            if !self.project.preview.register(&id, watcher) {
+                return Err(invalid_params(
+                    "cannot register preview to the compiler instance",
+                ));
+            }
+
+            self.preview
+                .start(cli_args, previewer, id, false, is_background)
+        } else {
+            return Err(internal_error("entry file must be provided"));
+        }
+    }
+}
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
     /// The artifact and snap.
@@ -339,6 +462,7 @@ impl PreviewState {
         // compile_handler: Arc<CompileHandler>,
         project_id: ProjectInsId,
         is_primary: bool,
+        is_background: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let compile_handler = Arc::new(PreviewProjectHandler {
             project_id,
@@ -431,6 +555,7 @@ impl PreviewState {
                 ctl_tx,
                 compile_handler,
                 is_primary,
+                is_background,
             }));
             sent.map_err(|_| internal_error("failed to register preview tab"))?;
 
