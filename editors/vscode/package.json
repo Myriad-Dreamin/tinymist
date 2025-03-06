@@ -1037,6 +1037,11 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.profileServer",
+        "title": "Profile the entire language server",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.syncLabel",
         "title": "Scan workspace and collect all labels again",
         "icon": "$(extensions-sync-enabled)",

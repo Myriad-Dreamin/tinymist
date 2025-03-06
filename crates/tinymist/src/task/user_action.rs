@@ -10,9 +10,10 @@ use lsp_server::RequestId;
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sync_lsp::{just_future, LspClient, SchedulableResponse};
+use sync_lsp::{just_future, LspClient, LspResult, SchedulableResponse};
 use tinymist_project::LspWorld;
 use tinymist_std::error::IgnoreLogging;
+use tokio::sync::oneshot;
 use typst::{syntax::Span, World};
 
 use crate::{internal_error, ServerState};
@@ -33,13 +34,81 @@ pub struct TraceParams {
 pub struct UserActionTask;
 
 impl UserActionTask {
-    /// Run a trace.
-    pub fn trace(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
+    /// Traces a specific document.
+    pub fn trace_document(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
         just_future(async move {
             run_trace_program(params)
                 .await
                 .map_err(|e| internal_error(format!("failed to run trace program: {e:?}")))
         })
+    }
+
+    /// Traces the entire server.
+    pub fn trace_server(&self) -> (ServerTraceTask, SchedulableResponse<JsonValue>) {
+        let (stop_tx, stop_rx) = oneshot::channel();
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let task = ServerTraceTask { stop_tx, resp_rx };
+
+        typst_timing::enable();
+
+        let resp = just_future(async move {
+            let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
+            let t = tokio::spawn(async move {
+                // todo: disable timing
+                // typst_timing::disable();
+                // todo: take all event and prepare data
+                let timings = vec![];
+
+                // let _ = resp_tx;
+                // let res = serde_json::to_value(TraceReport {
+                //     request: params,
+                //     messages,
+                //     stderr: base64::engine::general_purpose::STANDARD.encode(String::new()),
+                // })?;
+
+                let static_file_addr = "127.0.0.1:0".to_owned();
+                make_http_server(timings, static_file_addr, addr_tx).await;
+            });
+
+            tokio::spawn(async move {
+                let selected = tokio::select! {
+                    a = stop_rx => {
+                        log::info!("trace server task stopped by timeout");
+                        Ok(a)
+                    },
+                    b = t => {
+                        log::info!("trace server task stopped");
+                        Err(b)
+                    },
+                };
+
+                match selected {
+                    Ok(Err(err)) => {
+                        log::error!("trace server task stopped by user: {err:?}");
+                    }
+                    Err(Err(err)) => {
+                        log::error!("trace server task stopped by timeout: {err:?}");
+                    }
+                    Ok(Ok(())) | Err(Ok(())) => {}
+                };
+
+                resp_tx
+                    .send(Ok(JsonValue::Null))
+                    .ok()
+                    .log_error("failed to send response");
+            });
+
+            let addr = addr_rx.await.map_err(|err| {
+                log::error!("failed to get address of trace server: {err:?}");
+                internal_error("failed to get address of trace server")
+            })?;
+
+            Ok(serde_json::json!({
+                "tracingUrl": format!("http://{addr}"),
+            }))
+        });
+
+        (task, resp)
     }
 
     /// Run a trace request in subprocess.
@@ -202,6 +271,7 @@ async fn trace_main(
             let t = tokio::spawn(async move {
                 let static_file_addr = "127.0.0.1:0".to_owned();
                 make_http_server(timings, static_file_addr, addr_tx).await;
+                std::process::exit(0);
             });
 
             let addr = addr_rx.await.unwrap();
@@ -224,13 +294,21 @@ async fn trace_main(
     std::process::exit(0);
 }
 
+/// The server trace task.
+pub struct ServerTraceTask {
+    /// The sender to stop the trace.
+    pub stop_tx: oneshot::Sender<()>,
+    /// The receiver to get the trace result.
+    pub resp_rx: oneshot::Receiver<LspResult<JsonValue>>,
+}
+
 // todo: reuse code from tools preview
 /// Create a http server for the trace program.
-pub async fn make_http_server(
+async fn make_http_server(
     timings: Vec<u8>,
     static_file_addr: String,
     addr_tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>,
-) -> ! {
+) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
@@ -364,7 +442,6 @@ pub async fn make_http_server(
 
     addr_tx.send(addr).ok();
     join.await.unwrap();
-    std::process::exit(0);
 }
 
 /// Turns a span into a (file, line) pair.
