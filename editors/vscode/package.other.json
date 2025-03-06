@@ -11,7 +11,7 @@
         "tinymist.preview.background.args": {
           "description": "The arguments that the background preview server used for. It is only used when `tinymist.preview.background` is enabled. Check `tinymist preview` to see the allowed arguments.",
           "type": "array",
-          "default": ["--data-plane-host=127.0.0.1:23635"],
+          "default": ["--data-plane-host=127.0.0.1:23635", "--invert-colors=auto"],
           "properties": {
             "type": "string"
           }

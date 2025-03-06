@@ -61,7 +61,12 @@ impl ServerState {
         }
 
         let args = self.config.preview.background.args.clone();
-        let args = args.unwrap_or_else(|| vec!["--data-plane-host=127.0.0.1:23635".to_string()]);
+        let args = args.unwrap_or_else(|| {
+            vec![
+                "--data-plane-host=127.0.0.1:23635".to_string(),
+                "--invert-colors=auto".to_string(),
+            ]
+        });
 
         let res = self.start_preview_inner(args, PreviewKind::Background);
 
