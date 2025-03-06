@@ -1,5 +1,5 @@
-name: Bug report
-description: File a bug/issue
+name: Feature request
+description: Create a feature request
 labels: ["enhancement", "need-to-investigate"]
 body:
 - type: textarea
