@@ -1,7 +1,6 @@
 name: Bug report
 description: File a bug/issue
-title: "<title>"
-labels: ["Feature Request", "Needs Triage"]
+labels: ["enhancement", "need-to-investigate"]
 body:
 - type: textarea
   attributes:

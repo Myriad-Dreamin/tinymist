@@ -1,7 +1,6 @@
 name: Bug report
 description: File a bug/issue
-title: "<title>"
-labels: ["Bug", "Needs Triage"]
+labels: ["bug", "need-to-investigate"]
 body:
 - type: checkboxes
   attributes:
