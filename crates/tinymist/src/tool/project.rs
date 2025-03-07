@@ -106,6 +106,21 @@ impl LockFileExt for LockFile {
 }
 
 /// Runs project compilation(s)
+pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
+    // Prepares for the compilation
+    let universe = args.resolve()?;
+    let world = universe.snapshot();
+
+    let res =
+        tinymist_debug::collect_coverage::<tinymist_std::typst::TypstPagedDocument, _>(&world)?;
+    let cov_path = Path::new("target/coverage.json");
+    let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
+    std::fs::write(cov_path, res).context("write coverage")?;
+
+    Ok(())
+}
+
+/// Runs project compilation(s)
 pub async fn compile_main(args: CompileArgs) -> Result<()> {
     // Identifies the input and output
     let input = args.compile.declare.to_input();

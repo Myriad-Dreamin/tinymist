@@ -3990,6 +3990,7 @@ dependencies = [
  "temp-env",
  "tinymist-assets 0.13.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
+ "tinymist-debug",
  "tinymist-project",
  "tinymist-query",
  "tinymist-render",
@@ -4050,6 +4051,21 @@ dependencies = [
  "tinymist-world",
  "vergen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "tinymist-debug"
+version = "0.13.4"
+dependencies = [
+ "base64",
+ "comemo",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tinymist-std",
+ "tinymist-world",
+ "typst",
+ "typst-library",
 ]
 
 [[package]]

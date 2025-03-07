@@ -79,6 +79,7 @@ typst-shim.workspace = true
 typst-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
 tinymist-task.workspace = true
+tinymist-debug.workspace = true
 typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
