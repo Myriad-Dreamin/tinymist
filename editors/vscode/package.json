@@ -686,13 +686,7 @@
       }
     },
     "configurationDefaults": {
-      "[typst]": {
-        "editor.wordWrap": "on",
-        "editor.semanticHighlighting.enabled": true,
-        "editor.tabSize": 2,
-        "editor.inlayHints.enabled": "off"
-      },
-      "[typst-code]": {
+      "[typst][typst-code]": {
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
