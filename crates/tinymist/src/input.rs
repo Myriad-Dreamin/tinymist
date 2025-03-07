@@ -1,11 +1,11 @@
 use lsp_types::*;
 use reflexo_typst::Bytes;
-use tinymist_project::{Interrupt, ProjectResolutionKind};
 use tinymist_query::{to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::{diag::FileResult, syntax::Source};
 
+use crate::project::{Interrupt, ProjectResolutionKind};
 use crate::route::ProjectResolution;
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;

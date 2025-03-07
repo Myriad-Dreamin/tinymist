@@ -7,10 +7,10 @@ use lsp_types::notification::{Notification, PublishDiagnostics as PublishDiagnos
 use lsp_types::{Diagnostic, Url};
 use reflexo_typst::typst::prelude::{eco_vec, EcoVec};
 use serde::{Deserialize, Serialize};
-use tinymist_project::ProjectInsId;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
 
+use crate::project::ProjectInsId;
 use crate::{tool::word_count::WordsCount, LspClient};
 
 /// The request to the editor actor.

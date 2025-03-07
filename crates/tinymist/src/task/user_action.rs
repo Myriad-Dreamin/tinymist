@@ -11,10 +11,10 @@ use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
-use tinymist_project::LspWorld;
 use tinymist_std::error::IgnoreLogging;
 use typst::{syntax::Span, World};
 
+use crate::project::LspWorld;
 use crate::{internal_error, ServerState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

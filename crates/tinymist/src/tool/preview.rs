@@ -22,7 +22,6 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{LspWorld, ProjectInsId, WorldProvider};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
@@ -38,8 +37,8 @@ use typst_preview::{
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
-    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, ProjectClient,
-    ProjectCompiler, ProjectState,
+    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, LspWorld,
+    ProjectClient, ProjectCompiler, ProjectInsId, ProjectState, WorldProvider,
 };
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};

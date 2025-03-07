@@ -1,12 +1,9 @@
 use std::path::Path;
 
 use sync_lsp::transport::MirrorArgs;
-
-use tinymist::{
-    project::DocCommands,
-    tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands},
-    CompileFontArgs, CompileOnceArgs,
-};
+use tinymist::project::DocCommands;
+use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
+use tinymist::{CompileFontArgs, CompileOnceArgs};
 use tinymist_core::LONG_VERSION;
 
 #[derive(Debug, Clone, clap::Parser)]

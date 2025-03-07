@@ -1,10 +1,8 @@
 //! Statistics about the analyzers
 
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxDashMap, path::unix_slash};

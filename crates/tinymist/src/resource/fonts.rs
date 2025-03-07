@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tinymist_project::LspCompileSnapshot;
 use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
+use crate::project::LspCompileSnapshot;
 use crate::world::font::FontResolver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

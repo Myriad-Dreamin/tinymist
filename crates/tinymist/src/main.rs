@@ -2,11 +2,9 @@
 
 mod args;
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::io;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use clap::Parser;
 use clap_builder::CommandFactory;
@@ -17,16 +15,12 @@ use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
 use serde_json::Value as JsonValue;
-use sync_lsp::{
-    internal_error,
-    transport::{with_stdio_transport, MirrorArgs},
-    LspBuilder, LspClientRoot, LspResult,
-};
-use tinymist::{tool::project::generate_script_main, world::TaskInputs};
-use tinymist::{
-    tool::project::{compile_main, project_main, task_main},
-    CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask,
-};
+use sync_lsp::internal_error;
+use sync_lsp::transport::{with_stdio_transport, MirrorArgs};
+use sync_lsp::{LspBuilder, LspClientRoot, LspResult};
+use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
+use tinymist::world::TaskInputs;
+use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;

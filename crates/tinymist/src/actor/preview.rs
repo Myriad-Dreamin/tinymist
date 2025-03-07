@@ -8,10 +8,8 @@ use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
-use crate::{
-    project::ProjectPreviewState,
-    tool::preview::{HttpServer, PreviewProjectHandler},
-};
+use crate::project::ProjectPreviewState;
+use crate::tool::preview::{HttpServer, PreviewProjectHandler};
 
 pub struct PreviewTab {
     /// Task ID
