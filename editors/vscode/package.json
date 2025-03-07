@@ -1172,6 +1172,7 @@
     "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
+    "@xmldom/xmldom": "^0.9.8",
     "cpr": "^3.0.1",
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
