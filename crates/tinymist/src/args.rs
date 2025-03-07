@@ -31,6 +31,9 @@ pub enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
 
+    /// Execute a document and collect coverage
+    #[clap(hide(true))] // still in development
+    Cov(CompileOnceArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
     /// Generates build script for compilation
