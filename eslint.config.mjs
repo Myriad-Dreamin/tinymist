@@ -50,7 +50,7 @@ export default [
       sourceType: "module",
 
       parserOptions: {
-        project: ["./editors/vscode/tsconfig.json"],
+        project: true,
 
         ecmaFeatures: {
           modules: true,
@@ -84,6 +84,22 @@ export default [
         },
       ],
 
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn", // or "error"
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+
+      "require-await": "off",
+      "@typescript-eslint/require-await": 0,
+      // todo: is it ok to disable this?
+      "@typescript-eslint/restrict-template-expressions": 0,
+      // todo: enable it in future
+      "@typescript-eslint/no-misused-promises": 0,
       "@typescript-eslint/ban-ts-comment": 0,
       "@typescript-eslint/no-empty-function": 0,
       "@typescript-eslint/no-var-requires": 0,

@@ -15,7 +15,7 @@ import {
 import { tinymist } from "../lsp";
 import { loadHTMLFile } from "../util";
 
-const vscodeVariables = require("vscode-variables");
+import { vscodeVariables } from "../vscode-variables";
 
 let isTinymist = false;
 let guy = "$(typst-guy)";
@@ -188,7 +188,6 @@ function runServer(
   const serverProcess = spawn(command, args, {
     env: {
       ...process.env,
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       RUST_BACKTRACE: "1",
     },
     cwd: projectRoot,
@@ -217,20 +216,20 @@ function runServer(
   });
 
   serverProcesses.push(serverProcesses);
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     let dataPlanePort: string | undefined = undefined;
     let controlPlanePort: string | undefined = undefined;
     let staticFilePort: string | undefined = undefined;
     serverProcess.stderr.on("data", (data: Buffer) => {
       if (data.toString().includes("listening on")) {
         console.log(data.toString());
-        let ctrlPort = data
+        const ctrlPort = data
           .toString()
           .match(/Control plane server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
-        let dataPort = data
+        const dataPort = data
           .toString()
           .match(/Data plane server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
-        let staticPort = data
+        const staticPort = data
           .toString()
           .match(/Static file server listening on: 127\.0\.0\.1:(\d+)/)?.[1];
         if (ctrlPort !== undefined) {
@@ -306,7 +305,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     vscode.commands.executeCommand("typst-lsp.pinMainToCurrent");
   }
 
-  serverProcess.on("exit", (code: any) => {
+  serverProcess.on("exit", (_code: any) => {
     if (activeTask.has(bindDocument)) {
       activeTask.delete(bindDocument);
     }
@@ -320,7 +319,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     }
   });
 
-  let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
+  const connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
   contentPreviewProvider.then((p) => p.postActivate(connectUrl));
   let panel: vscode.WebviewPanel | undefined = undefined;
   if (task.kind == "webview") {
@@ -460,10 +459,10 @@ export function getCliFontPathArgs(fontPaths?: string[]): string[] {
 }
 
 export function codeGetCliFontArgs(): string[] {
-  let needSystemFonts = vscode.workspace
+  const needSystemFonts = vscode.workspace
     .getConfiguration()
     .get<boolean>("typst-preview.systemFonts");
-  let fontPaths = getCliFontPathArgs(
+  const fontPaths = getCliFontPathArgs(
     vscode.workspace.getConfiguration().get<string[]>("typst-preview.fontPaths"),
   );
   return [...(needSystemFonts ? [] : ["--ignore-system-fonts"]), ...fontPaths];
@@ -485,11 +484,11 @@ export class Addon2Server {
       const data = JSON.parse(message.data as string);
       switch (data.event) {
         case "editorScrollTo":
-          return await editorScrollTo(activeEditor, data /* JumpInfo */);
+          return await editorScrollTo(activeEditor, data as JumpInfo);
         case "syncEditorChanges":
           return syncEditorChanges(conn);
         case "compileStatus": {
-          statusBarItemProcess(data.kind);
+          statusBarItemProcess(data.kind as "Compiling" | "CompileSuccess" | "CompileError");
           break;
         }
         case "outline": {
@@ -566,7 +565,7 @@ export class Addon2Server {
 
     function syncEditorChanges(addonΠserver: WebSocket) {
       console.log("recv syncEditorChanges request");
-      let files: Record<string, string> = {};
+      const files: Record<string, string> = {};
       vscode.workspace.textDocuments.forEach((doc) => {
         if (doc.isDirty) {
           files[doc.fileName] = doc.getText();

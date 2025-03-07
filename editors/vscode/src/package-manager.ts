@@ -35,14 +35,14 @@ function versionCompare(a: string, b: string) {
  */
 export async function getLocalPackagesList() {
   const localPackagesDir = await getLocalPackagesDir();
-  // return list of local packages like ['@local/mypkg:1.0.0']
+  // return list of local packages like ['@local/touying:1.0.0']
   if (!localPackagesDir) {
     return [];
   }
   // if localPackagesDir doesn't exist, return []
   try {
     await fs.promises.access(localPackagesDir);
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
   const localPackagesList = await fs.promises.readdir(localPackagesDir);
@@ -174,11 +174,11 @@ export async function commandOpenLocalPackage() {
   // if typst.toml doesn't exist, return
   try {
     await fs.promises.access(`${packageDir}/typst.toml`);
-  } catch (err) {
+  } catch (_err) {
     window.showErrorMessage("Can not find typst.toml.");
     return;
   }
-  const typstToml = await fs.readFileSync(`${packageDir}/typst.toml`, "utf-8");
+  const typstToml = await fs.promises.readFile(`${packageDir}/typst.toml`, "utf-8");
   // parse typst.toml
   const entrypoint = typstToml.match(/entrypoint\s*=\s*"(.*)"/)?.[1];
   if (!entrypoint) {

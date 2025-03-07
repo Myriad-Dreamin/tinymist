@@ -33,12 +33,12 @@ export async function applySnippetWorkspaceEdit(
     const editor = await editorFromUri(uri);
     if (editor) {
       await editor.edit((builder) => {
-        for (const indel of edits) {
+        for (const edit of edits) {
           assert(
-            !(indel instanceof vscode.SnippetTextEdit),
+            !(edit instanceof vscode.SnippetTextEdit),
             `bad ws edit: snippet received with multiple edits: ${JSON.stringify(edit)}`,
           );
-          builder.replace(indel.range, indel.newText);
+          builder.replace(edit.range, edit.newText);
         }
       });
     }
