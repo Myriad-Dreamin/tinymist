@@ -1,0 +1,21 @@
+[package]
+name = "tinymist-bench-font-load"
+description = "Font loading bench for tinymist."
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+divan.workspace = true
+tinymist.workspace = true
+
+[[bench]]
+name = "tinymist-bench-font-load"
+path = "src/load.rs"
+harness = false
+
+[features]
+the-thesis = []
