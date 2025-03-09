@@ -6,6 +6,32 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.6 - [2025-03-10]
+
+### Compiler
+
+* (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
+* (Perf) Parallelizing and synchronously waiting font loading in https://github.com/Myriad-Dreamin/tinymist/pull/1470
+
+### Editor
+
+* (Fix) Combining VS Code language specific default settings into one block by @0risc in https://github.com/Myriad-Dreamin/tinymist/pull/1462
+
+### Completion
+
+* Adjusting range of label and reference completions in https://github.com/Myriad-Dreamin/tinymist/pull/1443 and https://github.com/Myriad-Dreamin/tinymist/pull/1444
+
+### Preview
+
+* Added support to run preview server in background in https://github.com/Myriad-Dreamin/tinymist/pull/1233
+* Added `tinymist.startDefaultPreview` and revised documentation about preview in https://github.com/Myriad-Dreamin/tinymist/pull/1448
+
+### Misc
+
+* Updated bug report and feature request template in https://github.com/Myriad-Dreamin/tinymist/pull/1454, https://github.com/Myriad-Dreamin/tinymist/pull/1455, https://github.com/Myriad-Dreamin/tinymist/pull/1456, https://github.com/Myriad-Dreamin/tinymist/pull/1457, and https://github.com/Myriad-Dreamin/tinymist/pull/1458
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.4...v0.13.6
+
 ## v0.13.4 - [2025-03-02]
 
 ### Code Analysis
