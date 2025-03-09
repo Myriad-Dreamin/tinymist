@@ -39,12 +39,10 @@ use tokio::sync::mpsc;
 use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
 use super::ServerState;
+use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
-use crate::{
-    actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion},
-    ServerEvent,
-};
-use crate::{task::ExportUserConfig, Config};
+use crate::task::ExportUserConfig;
+use crate::{Config, ServerEvent};
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 

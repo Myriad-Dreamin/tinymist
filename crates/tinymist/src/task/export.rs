@@ -3,15 +3,7 @@
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
-use crate::project::{
-    ApplyProjectTask, CompiledArtifact, ExportHtmlTask, ExportMarkdownTask, ExportPdfTask,
-    ExportPngTask, ExportTextTask, TaskWhen,
-};
 use reflexo::ImmutPath;
-use tinymist_project::{
-    convert_source_date_epoch, EntryReader, ExportSvgTask, ExportTask as ProjectExportTask,
-    LspCompiledArtifact, ProjectTask, QueryTask,
-};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
@@ -21,9 +13,14 @@ use typst::foundations::IntoValue;
 use typst::visualize::Color;
 use typst_pdf::PdfOptions;
 
-use crate::{actor::editor::EditorRequest, tool::word_count};
-
 use super::{FutureFolder, SyncTaskFactory};
+use crate::project::{
+    convert_source_date_epoch, ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask,
+    ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask,
+    ExportTask as ProjectExportTask, ExportTextTask, LspCompiledArtifact, ProjectTask, QueryTask,
+    TaskWhen,
+};
+use crate::{actor::editor::EditorRequest, tool::word_count};
 
 #[derive(Clone)]
 pub struct ExportTask {

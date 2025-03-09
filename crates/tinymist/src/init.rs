@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::project::font::TinymistFontResolver;
 use anyhow::bail;
 use clap::Parser;
 use itertools::Itertools;
@@ -13,10 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
-use tinymist_project::{
-    EntryResolver, ExportPdfTask, ExportTask, PathPattern, ProjectResolutionKind, ProjectTask,
-    TaskWhen,
-};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -29,7 +24,11 @@ use typst_shim::utils::LazyHash;
 // textDocument.definition.linkSupport capability.
 
 use super::*;
-use crate::project::ImmutDict;
+use crate::project::font::TinymistFontResolver;
+use crate::project::{
+    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
+    ProjectTask, TaskWhen,
+};
 
 /// Capability to add valid commands to the arguments.
 pub trait AddCommands {
