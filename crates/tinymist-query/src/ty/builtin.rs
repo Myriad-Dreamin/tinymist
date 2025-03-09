@@ -36,30 +36,29 @@ pub enum PathPreference {
 
 impl PathPreference {
     pub fn ext_matcher(&self) -> &'static RegexSet {
-        static SOURCE_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
-        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^wasm$"]).unwrap());
+        fn make_regex(patterns: &[&str]) -> RegexSet {
+            let patterns = patterns.iter().map(|pattern| format!("(?i)^{pattern}$"));
+            RegexSet::new(patterns).unwrap()
+        }
+
+        static SOURCE_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["typ", "typc"]));
+        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["wasm"]));
         static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
-            RegexSet::new([
-                r"^ico$", r"^bmp$", r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^jfif$", r"^tiff$",
-                r"^gif$", r"^svg$", r"^svgz$",
+            make_regex(&[
+                "ico", "bmp", "png", "webp", "jpg", "jpeg", "jfif", "tiff", "gif", "svg", "svgz",
             ])
-            .unwrap()
         });
-        static JSON_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^json$", r"^jsonc$", r"^json5$"]).unwrap());
-        static YAML_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$"]).unwrap());
-        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^xml$"]).unwrap());
-        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^toml$"]).unwrap());
-        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csv$"]).unwrap());
-        static BIB_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$", r"^bib$"]).unwrap());
-        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csl$"]).unwrap());
-        static RAW_THEME_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^tmTheme$", r"^xml$"]).unwrap());
+        static JSON_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["json", "jsonc", "json5"]));
+        static YAML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml"]));
+        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["xml"]));
+        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["toml"]));
+        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csv"]));
+        static BIB_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml", "bib"]));
+        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csl"]));
+        static RAW_THEME_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["tmTheme", "xml"]));
         static RAW_SYNTAX_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^tmLanguage$", r"^sublime-syntax$"]).unwrap());
+            Lazy::new(|| make_regex(&["tmLanguage", "sublime-syntax"]));
+
         static ALL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r".*"]).unwrap());
         static ALL_SPECIAL_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new({
@@ -710,6 +709,20 @@ mod tests {
     use crate::syntax::Decl;
 
     use super::{SigTy, Ty, TypeVar};
+
+    #[test]
+    fn test_image_extension() {
+        let path = "test.png";
+        let preference = super::PathPreference::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathPreference::Image);
+    }
+
+    #[test]
+    fn test_image_extension_uppercase() {
+        let path = "TEST.PNG";
+        let preference = super::PathPreference::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathPreference::Image);
+    }
 
     // todo: map function
     // Technical Note for implementing a map function:
