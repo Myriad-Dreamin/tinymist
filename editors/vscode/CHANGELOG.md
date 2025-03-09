@@ -6,6 +6,36 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.6 - [2025-03-10]
+
+% background preview and a preview command (`tinymist.startDefaultPreview`) that doesn't require arguments,
+
+We has provided more ways of previewing documents for editors having poor lsp support. The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly. The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser. See the [issue](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
+
+### Compiler
+
+* (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
+* (Perf) Parallelizing and synchronously waiting font loading in https://github.com/Myriad-Dreamin/tinymist/pull/1470
+
+### Editor
+
+* (Fix) Combining VS Code language specific default settings into one block by @0risc in https://github.com/Myriad-Dreamin/tinymist/pull/1462
+
+### Completion
+
+* Adjusting range of label and reference completions in https://github.com/Myriad-Dreamin/tinymist/pull/1443 and https://github.com/Myriad-Dreamin/tinymist/pull/1444
+
+### Preview
+
+* Added support to run preview server in background in https://github.com/Myriad-Dreamin/tinymist/pull/1233
+* Added `tinymist.startDefaultPreview` and revised documentation about preview in https://github.com/Myriad-Dreamin/tinymist/pull/1448
+
+### Misc
+
+* Updated bug report and feature request template in https://github.com/Myriad-Dreamin/tinymist/pull/1454, https://github.com/Myriad-Dreamin/tinymist/pull/1455, https://github.com/Myriad-Dreamin/tinymist/pull/1456, https://github.com/Myriad-Dreamin/tinymist/pull/1457, and https://github.com/Myriad-Dreamin/tinymist/pull/1458
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.4...v0.13.6
+
 ## v0.13.4 - [2025-03-02]
 
 ### Code Analysis
@@ -16,7 +46,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Fix) Using the background rect to calculate cursor 
 position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
-
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
 
