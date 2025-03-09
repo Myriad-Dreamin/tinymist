@@ -8,6 +8,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.6 - [2025-03-10]
 
+% background preview and a preview command (`tinymist.startDefaultPreview`) that doesn't require arguments,
+
+We has provided more ways of previewing documents for editors having poor lsp support. The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly. The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser. See the [issue](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
+
 ### Compiler
 
 * (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
@@ -42,7 +46,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Fix) Using the background rect to calculate cursor 
 position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
-
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
 
