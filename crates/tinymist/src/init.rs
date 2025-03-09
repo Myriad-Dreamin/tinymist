@@ -22,7 +22,7 @@ use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
-use typst_shim::utils::{Deferred, LazyHash};
+use typst_shim::utils::LazyHash;
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -579,7 +579,7 @@ pub struct CompileConfig {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Deferred<Arc<TinymistFontResolver>>>>,
+    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
     /// Notify the compile status to the editor.
     pub notify_status: bool,
     /// Enable periscope document in hover.
@@ -750,17 +750,17 @@ impl CompileConfig {
     }
 
     /// Determines the font resolver.
-    pub fn determine_fonts(&self) -> Deferred<Arc<TinymistFontResolver>> {
+    pub fn determine_fonts(&self) -> Arc<TinymistFontResolver> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let opts = self.determine_font_opts();
 
             log::info!("creating SharedFontResolver with {opts:?}");
-            Derived(Deferred::new(|| {
+            Derived(
                 crate::project::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
-                    .expect("failed to create font book")
-            }))
+                    .expect("failed to create font book"),
+            )
         };
         self.fonts.get_or_init(font).clone().0
     }

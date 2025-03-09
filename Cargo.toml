@@ -12,7 +12,7 @@ rust-version = "1.83"
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "tests"]
+members = ["benches/*", "crates/*", "tests"]
 
 [workspace.dependencies]
 
