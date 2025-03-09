@@ -7,6 +7,7 @@ use std::{
 };
 
 use fontdb::Database;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sha2::{Digest, Sha256};
 use tinymist_std::debug_loc::{DataSource, MemoryDataSource};
 use tinymist_std::error::prelude::*;
@@ -134,12 +135,12 @@ impl SystemFontSearcher {
         self.flush();
 
         // Source3: add the fonts in memory.
-        for font_data in opts.with_embedded_fonts {
-            self.add_memory_font(match font_data {
+        self.add_memory_fonts(opts.with_embedded_fonts.into_par_iter().map(|font_data| {
+            match font_data {
                 Cow::Borrowed(data) => Bytes::new(data),
                 Cow::Owned(data) => Bytes::new(data),
-            });
-        }
+            }
+        }));
 
         Ok(())
     }
@@ -235,6 +236,41 @@ impl SystemFontSearcher {
                     name: "<memory>".to_owned(),
                 })),
             );
+        }
+    }
+
+    // /// Add an in-memory font.
+    // pub fn add_memory_font(&mut self, data: Bytes) {
+    //     self.add_memory_fonts([data].into_par_iter());
+    // }
+
+    /// Adds in-memory fonts.
+    pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
+        if !self.db.is_empty() {
+            panic!("dirty font search state, please flush the searcher before adding memory fonts");
+        }
+
+        let loaded = data.flat_map(|data| {
+            FontInfo::iter(&data)
+                .enumerate()
+                .map(|(index, info)| {
+                    (
+                        info,
+                        FontSlot::new_boxed(BufferFontLoader {
+                            buffer: Some(data.clone()),
+                            index: index as u32,
+                        })
+                        .describe(DataSource::Memory(MemoryDataSource {
+                            name: "<memory>".to_owned(),
+                        })),
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+
+        for (info, slot) in loaded.collect::<Vec<_>>() {
+            self.book.push(info);
+            self.fonts.push(slot);
         }
     }
 

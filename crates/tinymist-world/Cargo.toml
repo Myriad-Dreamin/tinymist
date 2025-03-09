@@ -27,6 +27,7 @@ hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true
 parking_lot.workspace = true
+rayon.workspace = true
 reqwest = { workspace = true, optional = true }
 rpds.workspace = true
 serde.workspace = true

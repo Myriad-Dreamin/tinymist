@@ -26,9 +26,16 @@ fn load_system() {
 }
 
 /*
+No par
 Timer precision: 17 ns
 tinymist_bench_font_load  fastest       │ slowest       │ median        │ mean          │ samples │ iters
 ├─ load_embedded          1.167 ms      │ 1.697 ms      │ 1.176 ms      │ 1.188 ms      │ 100     │ 100
 ╰─ load_system            111.8 ms      │ 123 ms        │ 113.6 ms      │ 114.3 ms      │ 100     │ 100
+
+Par
+Timer precision: 17 ns
+tinymist_bench_font_load  fastest       │ slowest       │ median        │ mean          │ samples │ iters
+├─ load_embedded          131.4 µs      │ 894.4 µs      │ 153.5 µs      │ 164.9 µs      │ 100     │ 100
+╰─ load_system            -
 
  */
