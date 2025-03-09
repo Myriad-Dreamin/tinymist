@@ -187,7 +187,8 @@ impl SystemFontSearcher {
         use fontdb::Source;
         use tinymist_std::debug_loc::FsDataSource;
 
-        for face in self.db.faces() {
+        let face = self.db.faces().collect::<Vec<_>>();
+        let info = face.into_par_iter().map(|face| {
             let path = match &face.source {
                 Source::File(path) | Source::SharedFile(path, _) => path,
                 // We never add binary sources to the database, so there
@@ -200,20 +201,26 @@ impl SystemFontSearcher {
                 .with_face_data(face.id, FontInfo::new)
                 .expect("database must contain this font");
 
-            // eprintln!("searched font: {idx} {:?}", path);
+            info.map(|info| {
+                let slot = FontSlot::new_boxed(LazyBufferFontLoader::new(
+                    LazyFile::new(path.clone()),
+                    face.index,
+                ))
+                .describe(DataSource::Fs(FsDataSource {
+                    path: path.to_str().unwrap_or_default().to_owned(),
+                }));
 
-            if let Some(info) = info {
-                self.book.push(info);
-                self.fonts.push(
-                    FontSlot::new_boxed(LazyBufferFontLoader::new(
-                        LazyFile::new(path.clone()),
-                        face.index,
-                    ))
-                    .describe(DataSource::Fs(FsDataSource {
-                        path: path.to_str().unwrap_or_default().to_owned(),
-                    })),
-                );
-            }
+                (info, slot)
+            })
+        });
+
+        for face in info.collect::<Vec<_>>() {
+            let Some((info, slot)) = face else {
+                continue;
+            };
+
+            self.book.push(info);
+            self.fonts.push(slot);
         }
 
         self.db = Database::new();

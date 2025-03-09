@@ -189,17 +189,11 @@ impl ServerState {
 
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
-        // todo: never fail?
-        let embedded_fonts = Arc::new(LspUniverseBuilder::only_embedded_fonts().unwrap());
+        let fonts = config.compile.determine_fonts();
         let package_registry =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-        let verse = LspUniverseBuilder::build(
-            entry,
-            export_target,
-            inputs,
-            embedded_fonts,
-            package_registry,
-        );
+        let verse =
+            LspUniverseBuilder::build(entry, export_target, inputs, fonts, package_registry);
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
@@ -219,14 +213,6 @@ impl ServerState {
                 enable_watch: true,
             },
         );
-
-        // Delayed Loads fonts
-        let font_client = client.clone();
-        let font_resolver = config.compile.determine_fonts();
-        client.handle.spawn_blocking(move || {
-            // Refresh fonts
-            font_client.send_event(LspInterrupt::Font(font_resolver.wait().clone()));
-        });
 
         ProjectState {
             compiler,

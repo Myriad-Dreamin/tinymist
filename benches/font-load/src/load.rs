@@ -20,22 +20,20 @@ fn load_embedded() {
 fn load_system() {
     let config = Config::default();
 
-    let font_resolver = config.compile.determine_fonts();
-
-    let _font = font_resolver.wait().clone();
+    let _fonts = config.compile.determine_fonts();
 }
 
 /*
-No par
+Without Parallelization
 Timer precision: 17 ns
 tinymist_bench_font_load  fastest       │ slowest       │ median        │ mean          │ samples │ iters
 ├─ load_embedded          1.167 ms      │ 1.697 ms      │ 1.176 ms      │ 1.188 ms      │ 100     │ 100
 ╰─ load_system            111.8 ms      │ 123 ms        │ 113.6 ms      │ 114.3 ms      │ 100     │ 100
 
-Par
+With Parallelization
 Timer precision: 17 ns
 tinymist_bench_font_load  fastest       │ slowest       │ median        │ mean          │ samples │ iters
-├─ load_embedded          131.4 µs      │ 894.4 µs      │ 153.5 µs      │ 164.9 µs      │ 100     │ 100
-╰─ load_system            -
+├─ load_embedded          130.8 µs      │ 1.164 ms      │ 157 µs        │ 170.3 µs      │ 100     │ 100
+╰─ load_system            14.44 ms      │ 18.22 ms      │ 15.37 ms      │ 15.54 ms      │ 100     │ 100
 
  */
