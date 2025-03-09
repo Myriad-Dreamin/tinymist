@@ -530,13 +530,13 @@ export class LanguageState {
         {
           // Continues a multi-line comment
           // e.g.  * ...|
-          beforeText: /^( {2})* *( ([^*]|\*(?!\/))*)?$/,
+          beforeText: /^( {2})* \*( ([^*]|\*(?!\/))*)?$/,
           action: { indentAction, appendText: "* " },
         },
         {
           // Dedents after closing a multi-line comment
           // e.g.  */|
-          beforeText: /^( {2})* *\/\s*$/,
+          beforeText: /^( {2})* \*\/\s*$/,
           action: { indentAction, removeText: 1 },
         },
       ];
