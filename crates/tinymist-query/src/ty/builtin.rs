@@ -208,7 +208,6 @@ impl TryFrom<FileId> for PackageId {
 pub enum BuiltinTy {
     Clause,
     Undef,
-    Content(Option<typst::foundations::Element>),
     Space,
     None,
     Break,
@@ -239,9 +238,16 @@ pub enum BuiltinTy {
     Radius,
 
     Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
+
+    /// A value having a specific type.
     Type(typst::foundations::Type),
+    /// A value of some type.
     TypeType(typst::foundations::Type),
+    /// A content having a specific element type.
+    Content(Option<typst::foundations::Element>),
+    /// A value of some element type.
     Element(typst::foundations::Element),
+
     Module(Interned<Decl>),
     Path(PathPreference),
 }
