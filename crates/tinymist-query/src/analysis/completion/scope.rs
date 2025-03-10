@@ -124,16 +124,17 @@ impl CompletionPair<'_, '_, '_> {
                 SurroundingSyntax::Regular => true,
                 SurroundingSyntax::StringContent => false,
                 SurroundingSyntax::ImportList | SurroundingSyntax::ParamList => false,
-                SurroundingSyntax::Selector => 'selector: {
-                    for func in &checker.functions {
-                        if func.element().is_some() {
-                            break 'selector true;
-                        }
-                    }
+                // SurroundingSyntax::Selector => 'selector: {
+                //     for func in &checker.functions {
+                //         if func.element().is_some() {
+                //             break 'selector true;
+                //         }
+                //     }
 
-                    false
-                }
-                SurroundingSyntax::ShowTransform => !checker.functions.is_empty(),
+                //     false
+                // }
+                // SurroundingSyntax::ShowTransform => !checker.functions.is_empty(),
+                SurroundingSyntax::Selector | SurroundingSyntax::ShowTransform => true,
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
                     for func in &checker.functions {
