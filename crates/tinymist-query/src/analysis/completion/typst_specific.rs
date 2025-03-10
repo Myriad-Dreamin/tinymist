@@ -159,16 +159,7 @@ impl CompletionPair<'_, '_, '_> {
         parens: bool,
         docs: Option<&str>,
     ) {
-        self.value_completion_(
-            label,
-            value,
-            parens,
-            match value {
-                Value::Symbol(s) => Some(symbol_label_detail(s.get())),
-                _ => None,
-            },
-            docs,
-        );
+        self.value_completion_(label, value, parens, None, docs);
     }
 
     /// Add a completion for a specific value.
@@ -196,6 +187,10 @@ impl CompletionPair<'_, '_, '_> {
                 let repr = v.repr();
                 (repr.as_str() != label).then_some(repr)
             }
+        });
+        let label_details = label_details.or_else(|| match value {
+            Value::Symbol(s) => Some(symbol_label_detail(s.get())),
+            _ => None,
         });
 
         let mut apply = None;
