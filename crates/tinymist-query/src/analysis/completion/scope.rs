@@ -279,7 +279,7 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     self.defines.insert(name.clone().into(), term);
                 }
             }
-            Iface::Element { val, .. } if self.is_field_access() => {
+            Iface::Content { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
                 let styles = StyleChain::default();
                 for field_id in 0u8..254u8 {
@@ -326,7 +326,7 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Dict { .. } if self.is_field_access() => {
                 self.type_methods(Some(iface.to_type()), Type::of::<Dict>());
             }
-            Iface::Element { val, .. } => {
+            Iface::Content { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
             // todo: distingusish TypeType and Type

@@ -136,7 +136,7 @@ impl Ty {
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
         match func.inner() {
-            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Element(*elem)),
+            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
             Repr::Closure(_) | Repr::Plugin(_) => {}
             Repr::With(w) => return Ty::from_return_site(&w.0, ty),
             Repr::Native(_) => {}
@@ -208,7 +208,7 @@ impl TryFrom<FileId> for PackageId {
 pub enum BuiltinTy {
     Clause,
     Undef,
-    Content,
+    Content(Option<typst::foundations::Element>),
     Space,
     None,
     Break,
@@ -251,7 +251,13 @@ impl fmt::Debug for BuiltinTy {
         match self {
             BuiltinTy::Clause => f.write_str("Clause"),
             BuiltinTy::Undef => f.write_str("Undef"),
-            BuiltinTy::Content => f.write_str("Content"),
+            BuiltinTy::Content(ty) => {
+                if let Some(ty) = ty {
+                    write!(f, "Content({ty:?})")
+                } else {
+                    f.write_str("Content")
+                }
+            }
             BuiltinTy::Space => f.write_str("Space"),
             BuiltinTy::None => f.write_str("None"),
             BuiltinTy::Break => f.write_str("Break"),
@@ -324,7 +330,7 @@ impl BuiltinTy {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return Ty::Builtin(BuiltinTy::Content);
+            return Ty::Builtin(BuiltinTy::Content(Option::None));
         }
 
         BuiltinTy::Type(builtin).literally()
@@ -334,7 +340,13 @@ impl BuiltinTy {
         let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
-            BuiltinTy::Content => "content",
+            BuiltinTy::Content(ty) => {
+                return if let Some(ty) = ty {
+                    eco_format!("content({:?})", ty)
+                } else {
+                    "content".into()
+                };
+            }
             BuiltinTy::Space => "content",
             BuiltinTy::None => "none",
             BuiltinTy::Break => "break",
