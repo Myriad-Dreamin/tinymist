@@ -179,8 +179,7 @@ impl<'a> CompletionCursor<'a> {
             && matches!(syntax_context.as_ref(), Some(
                 SyntaxContext::Element { container, .. } |
                 SyntaxContext::Arg { args: container, .. } |
-                SyntaxContext::Paren { container, .. }) 
-              if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()) )
+                SyntaxContext::Paren { container, .. }) if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()))
         {
             return None;
         }
