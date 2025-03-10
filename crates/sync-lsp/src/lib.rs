@@ -297,7 +297,7 @@ impl LspClient {
         let mut req_queue = self.req_queue.lock();
         let method = request.method.clone();
         let req_id = request.id.clone();
-        self.start_request(&req_id, &method, received_at);
+        self.start_request(&req_id, &method);
         req_queue.incoming.register(req_id, (method, received_at));
     }
 
@@ -378,8 +378,8 @@ impl LspClient {
 }
 
 impl LspClient {
-    fn start_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
-        log::info!("handling {method} - ({req_id}) at {received_at:0.2?}");
+    fn start_request(&self, req_id: &RequestId, method: &str) {
+        log::info!("handling {method} - ({req_id})");
     }
 
     fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
@@ -387,16 +387,16 @@ impl LspClient {
         log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
     }
 
-    fn start_notification(&self, method: &str, received_at: Instant) {
-        log::info!("notifying {method} at {received_at:0.2?}");
+    fn start_notification(&self, method: &str) {
+        log::info!("notifying {method}");
     }
 
     fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>) {
         let request_duration = received_at.elapsed();
         if let Err(err) = result {
-            log::error!("notifying {method} failed in {request_duration:0.2?}: {err:?}");
+            log::error!("notify {method} failed in {request_duration:0.2?}: {err:?}");
         } else {
-            log::info!("notifying {method} succeeded in {request_duration:0.2?}");
+            log::info!("notify {method} succeeded in {request_duration:0.2?}");
         }
     }
 }
@@ -884,7 +884,7 @@ where
 
     /// Handles an incoming notification.
     fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
-        self.client.start_notification(&not.method, received_at);
+        self.client.start_notification(&not.method);
         let handle = |s, Notification { method, params }: Notification| {
             let Some(handler) = self.notifications.get(method.as_str()) else {
                 log::warn!("unhandled notification: {method}");

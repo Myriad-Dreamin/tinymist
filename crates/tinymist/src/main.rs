@@ -116,7 +116,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
         .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     log::info!("tinymist version information: {pairs:?}");
-    log::info!("starting Language server: {args:#?}");
+    log::info!("starting language server: {args:?}");
 
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport(args.mirror.clone(), |conn| {
