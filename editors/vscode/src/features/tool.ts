@@ -339,7 +339,7 @@ export async function editorToolAt(
         }
 
         dispose();
-        return;
+        throw new Error("No document metrics or server info");
       }
 
       html = html.replace(":[[preview:FontsExportConfigure]]:", base64Encode(fontsExportConfig));
