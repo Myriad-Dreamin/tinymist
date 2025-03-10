@@ -15,7 +15,7 @@ use crate::*;
 impl ServerState {
     /// Updates a set of source files.
     fn update_sources(&mut self, files: FileChangeSet) -> Result<()> {
-        log::info!("update source: {files:?}");
+        log::trace!("update source: {files:?}");
 
         let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
         self.project.interrupt(intr);
@@ -25,7 +25,7 @@ impl ServerState {
 
     /// Creates a new source file.
     pub fn create_source(&mut self, path: ImmutPath, content: String) -> Result<()> {
-        log::info!("create source: {path:?}");
+        log::trace!("create source: {path:?}");
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
 
@@ -40,7 +40,7 @@ impl ServerState {
     /// Removes a source file.
     pub fn remove_source(&mut self, path: ImmutPath) -> Result<()> {
         self.memory_changes.remove(&path);
-        log::info!("remove source: {path:?}");
+        log::trace!("remove source: {path:?}");
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
