@@ -6,9 +6,15 @@ use crate::{syntax::Decl, ty::prelude::*};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Iface<'a> {
+    Array(&'a Interned<Ty>),
+    Tuple(&'a Interned<Vec<Ty>>),
     Dict(&'a Interned<RecordTy>),
     Element {
         val: &'a typst::foundations::Element,
+        at: &'a Ty,
+    },
+    TypeType {
+        val: &'a typst::foundations::Type,
         at: &'a Ty,
     },
     Type {
@@ -34,14 +40,33 @@ pub enum Iface<'a> {
 }
 
 impl Iface<'_> {
+    pub fn to_type(self) -> Ty {
+        match self {
+            Iface::Array(ty) => Ty::Array(ty.clone()),
+            Iface::Tuple(tys) => Ty::Tuple(tys.clone()),
+            Iface::Dict(dict) => Ty::Dict(dict.clone()),
+            Iface::Element { at, .. }
+            | Iface::TypeType { at, .. }
+            | Iface::Type { at, .. }
+            | Iface::Func { at, .. }
+            | Iface::Value { at, .. }
+            | Iface::Module { at, .. }
+            | Iface::ModuleVal { at, .. } => at.clone(),
+        }
+    }
+
     // IfaceShape { iface }
     pub fn select(self, ctx: &mut impl TyCtxMut, key: &StrRef) -> Option<Ty> {
         crate::log_debug_ct!("iface shape: {self:?}");
 
         match self {
+            Iface::Array(..) | Iface::Tuple(..) => None,
             Iface::Dict(dict) => dict.field_by_name(key).cloned(),
             Iface::Element { val, .. } => select_scope(Some(val.scope()), key),
-            Iface::Type { val, .. } => select_scope(Some(val.scope()), key),
+            // todo: distinguish TypeType and Type
+            Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
+                select_scope(Some(val.scope()), key)
+            }
             Iface::Func { val, .. } => select_scope(val.scope(), key),
             Iface::Value { val, at: _ } => ctx.type_of_dict(val).field_by_name(key).cloned(),
             Iface::Module { val, at: _ } => ctx.check_module_item(val, key),
@@ -97,6 +122,14 @@ impl BoundChecker for IfaceCheckDriver<'_> {
 }
 
 impl IfaceCheckDriver<'_> {
+    fn array_as_iface(&self) -> bool {
+        // matches!(
+        // self.ctx.sig_kind,
+        // SigSurfaceKind::DictIface | SigSurfaceKind::ArrayOrDict
+        // )
+        true
+    }
+
     fn dict_as_iface(&self) -> bool {
         // matches!(
         // self.ctx.sig_kind,
@@ -152,7 +185,7 @@ impl IfaceCheckDriver<'_> {
                         }
                         Value::Type(ty) => {
                             self.checker
-                                .check(Iface::Type { val: ty, at }, &mut self.ctx, pol);
+                                .check(Iface::TypeType { val: ty, at }, &mut self.ctx, pol);
                         }
                         Value::Func(func) => {
                             self.checker
@@ -195,6 +228,14 @@ impl IfaceCheckDriver<'_> {
             Ty::Dict(sig) if self.dict_as_iface() => {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Iface::Dict(sig), &mut self.ctx, pol);
+            }
+            Ty::Tuple(sig) if self.array_as_iface() => {
+                // self.check_dict_signature(sig, pol, self.checker);
+                self.checker.check(Iface::Tuple(sig), &mut self.ctx, pol);
+            }
+            Ty::Array(sig) if self.array_as_iface() => {
+                // self.check_dict_signature(sig, pol, self.checker);
+                self.checker.check(Iface::Array(sig), &mut self.ctx, pol);
             }
             Ty::Var(..) => at.bounds(pol, self),
             _ if at.has_bounds() => at.bounds(pol, self),
