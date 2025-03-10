@@ -6,6 +6,56 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.6 - [2025-03-10]
+
+% background preview and a preview command (`tinymist.startDefaultPreview`) that doesn't require arguments,
+
+We has provided more ways of previewing documents for editors having poor lsp support. The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly. The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser. See the [issue](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
+
+### Compiler
+
+* (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
+* (Fix) Displaying `ProjectInsId` without quoting in https://github.com/Myriad-Dreamin/tinymist/pull/1476
+  * This made document summary not working in the previous version.
+* (Perf) Parallelizing and synchronously waiting font loading in https://github.com/Myriad-Dreamin/tinymist/pull/1470
+
+### Code Analysis
+
+* Made file type recognization by file extension case-insensitive in https://github.com/Myriad-Dreamin/tinymist/pull/1472
+  * For example, `IMAGE.PNG` is recognized as an image file now.
+
+### Editor
+
+* (Fix) Combining VS Code language specific default settings into one block by @0risc in https://github.com/Myriad-Dreamin/tinymist/pull/1462
+
+### Completion
+
+* (Fix) Skipping argument completion when the cursor is on the right parenthesis in https://github.com/Myriad-Dreamin/tinymist/pull/1480
+* (Fix) Distinguished content value from content type in https://github.com/Myriad-Dreamin/tinymist/pull/1482
+  * `math.op("+")` was wrongly inferred as an element function (type), instead of a value having the element type.
+* Adjusting range of label and reference completions in https://github.com/Myriad-Dreamin/tinymist/pull/1443 and https://github.com/Myriad-Dreamin/tinymist/pull/1444
+  * It becomes more sensible when you request completions from anywhere on the labels or references.
+* Unifying and improving function and method completion in https://github.com/Myriad-Dreamin/tinymist/pull/1478
+  * The was affecting `show outline.entry`. It was completing `e|` as `entry()` instead of `entry`.
+* Skip completion of types having no constructors or scopes in https://github.com/Myriad-Dreamin/tinymist/pull/1481
+  * For example, `content` is not completed.
+* Completing `std` module in https://github.com/Myriad-Dreamin/tinymist/pull/1483
+  * `std` is in neither global scope nor math scope, so we have to handle it manually.
+* Accepting arbitrary expressions in show rules in https://github.com/Myriad-Dreamin/tinymist/pull/1484
+  * For example, `show: s|` now can be completed as `show: std|`, and so that further completed as `show: std.scale(..)`. It was not working because modules were filtered out as not a valid show transform function.
+
+### Preview
+
+* Added support to run preview server in background in https://github.com/Myriad-Dreamin/tinymist/pull/1233
+* Added `tinymist.startDefaultPreview` and revised documentation about preview in https://github.com/Myriad-Dreamin/tinymist/pull/1448
+
+### Misc
+
+* Updated bug report and feature request template in https://github.com/Myriad-Dreamin/tinymist/pull/1454, https://github.com/Myriad-Dreamin/tinymist/pull/1455, https://github.com/Myriad-Dreamin/tinymist/pull/1456, https://github.com/Myriad-Dreamin/tinymist/pull/1457, and https://github.com/Myriad-Dreamin/tinymist/pull/1458
+* Logging `update_by_map` to debug zed configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1474
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.4...v0.13.6
+
 ## v0.13.4 - [2025-03-02]
 
 ### Code Analysis
@@ -16,7 +66,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Fix) Using the background rect to calculate cursor 
 position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
-
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
 
