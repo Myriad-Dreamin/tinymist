@@ -13,6 +13,10 @@ pub enum Iface<'a> {
         val: &'a typst::foundations::Element,
         at: &'a Ty,
     },
+    TypeType {
+        val: &'a typst::foundations::Type,
+        at: &'a Ty,
+    },
     Type {
         val: &'a typst::foundations::Type,
         at: &'a Ty,
@@ -42,6 +46,7 @@ impl Iface<'_> {
             Iface::Tuple(tys) => Ty::Tuple(tys.clone()),
             Iface::Dict(dict) => Ty::Dict(dict.clone()),
             Iface::Element { at, .. }
+            | Iface::TypeType { at, .. }
             | Iface::Type { at, .. }
             | Iface::Func { at, .. }
             | Iface::Value { at, .. }
@@ -58,7 +63,10 @@ impl Iface<'_> {
             Iface::Array(..) | Iface::Tuple(..) => None,
             Iface::Dict(dict) => dict.field_by_name(key).cloned(),
             Iface::Element { val, .. } => select_scope(Some(val.scope()), key),
-            Iface::Type { val, .. } => select_scope(Some(val.scope()), key),
+            // todo: distinguish TypeType and Type
+            Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
+                select_scope(Some(val.scope()), key)
+            }
             Iface::Func { val, .. } => select_scope(val.scope(), key),
             Iface::Value { val, at: _ } => ctx.type_of_dict(val).field_by_name(key).cloned(),
             Iface::Module { val, at: _ } => ctx.check_module_item(val, key),
@@ -177,7 +185,7 @@ impl IfaceCheckDriver<'_> {
                         }
                         Value::Type(ty) => {
                             self.checker
-                                .check(Iface::Type { val: ty, at }, &mut self.ctx, pol);
+                                .check(Iface::TypeType { val: ty, at }, &mut self.ctx, pol);
                         }
                         Value::Func(func) => {
                             self.checker

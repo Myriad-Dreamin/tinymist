@@ -311,7 +311,10 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     }
                 }
             }
-            Iface::Type { val, .. } if self.is_field_access() => {
+            Iface::Type { val, at } if self.is_field_access() => {
+                self.type_methods(Some(at.clone()), *val);
+            }
+            Iface::TypeType { val, .. } if self.is_field_access() => {
                 self.type_methods(None, *val);
             }
             Iface::Func { .. } if self.is_field_access() => {
@@ -326,7 +329,8 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Element { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
-            Iface::Type { val, .. } => {
+            // todo: distingusish TypeType and Type
+            Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
             Iface::Func { val, .. } => {
