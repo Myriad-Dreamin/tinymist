@@ -610,10 +610,7 @@ async function fetchSummaryInfo(): Promise<[string | undefined, string | undefin
 
   async function work(focusingFile: string, res: [string | undefined, string | undefined]) {
     if (!res[0]) {
-      const result = await vscode.commands.executeCommand(
-        "tinymist.getDocumentMetrics",
-        focusingFile,
-      );
+      const result = await tinymist.executeCommand("tinymist.getDocumentMetrics", [focusingFile]);
       if (!result) {
         return;
       }
@@ -622,7 +619,7 @@ async function fetchSummaryInfo(): Promise<[string | undefined, string | undefin
     }
 
     if (!res[1]) {
-      const result2 = await vscode.commands.executeCommand("tinymist.getServerInfo");
+      const result2 = await tinymist.executeCommand("tinymist.getServerInfo", []);
       if (!result2) {
         return;
       }
