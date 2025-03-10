@@ -259,7 +259,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Undef => f.write_str("Undef"),
             BuiltinTy::Content(ty) => {
                 if let Some(ty) = ty {
-                    write!(f, "Content({ty:?})")
+                    write!(f, "Content({})", ty.name())
                 } else {
                     f.write_str("Content")
                 }
@@ -348,7 +348,7 @@ impl BuiltinTy {
             BuiltinTy::Undef => "any",
             BuiltinTy::Content(ty) => {
                 return if let Some(ty) = ty {
-                    eco_format!("content({:?})", ty)
+                    eco_format!("content({})", ty.name())
                 } else {
                     "content".into()
                 };

@@ -7,19 +7,19 @@ input_file: crates/tinymist-query/src/fixtures/type_check/text_font.typ
 "y" = ("Test", )
 =====
 1..5 -> Func(text)
-1..21 -> Element(text)
+1..21 -> Content(text)
 23..27 -> Func(text)
-23..39 -> Element(text)
+23..39 -> Content(text)
 34..36 -> ()
 41..45 -> Func(text)
-41..64 -> Element(text)
+41..64 -> Content(text)
 52..61 -> ("Test", )
 70..71 -> @x
 82..86 -> Func(text)
-82..97 -> Element(text)
+82..97 -> Content(text)
 93..94 -> @x
 103..104 -> @y
 107..116 -> ("Test", )
 118..122 -> Func(text)
-118..133 -> Element(text)
+118..133 -> Content(text)
 129..130 -> @y
