@@ -403,6 +403,10 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        log::info!(
+            "LanguageState: config update_by_map {}",
+            serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
+        );
         macro_rules! assign_config {
             ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
                 let v = try_deserialize::<$ty>(update, $bind);
