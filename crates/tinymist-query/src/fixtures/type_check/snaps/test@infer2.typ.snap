@@ -2,11 +2,11 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
-snapshot_kind: text
 ---
 =====
 1..5 -> Func(text)
 1..52 -> Element(text)
+23..25 -> ()
 46..49 -> Rgb(1, 0.254902, 0.211765, 1)
 54..58 -> Func(path)
 54..82 -> Element(path)
@@ -49,3 +49,4 @@ snapshot_kind: text
 432..435 -> Rgb(1, 0.254902, 0.211765, 1)
 441..445 -> Func(text)
 441..457 -> Element(text)
+454..456 -> ()

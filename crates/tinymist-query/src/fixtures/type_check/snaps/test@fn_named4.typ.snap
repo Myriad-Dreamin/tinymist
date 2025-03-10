@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named4.typ
-snapshot_kind: text
 ---
 "dict" = {"x": 3}
 "foo" = (("c": Any) => Any).with(..("c": (3 | {"x": 3}.x)) => any)
@@ -10,6 +9,7 @@ snapshot_kind: text
 "x" = (3 | {"x": 3}.x)
 =====
 5..9 -> @dict
+12..18 -> {"x": 3}
 24..27 -> @foo
 28..29 -> @c
 31..35 -> @dict
