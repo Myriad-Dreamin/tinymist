@@ -174,6 +174,16 @@ impl<'a> CompletionCursor<'a> {
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
 
+        // todo: don't match here?
+        if matches!(syntax, Some(SyntaxClass::Callee(..)))
+            && matches!(syntax_context.as_ref(), Some(
+                SyntaxContext::Element { container, .. } |
+                SyntaxContext::Arg { args: container, .. } |
+                SyntaxContext::Paren { container, .. }) if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()))
+        {
+            return None;
+        }
+
         crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
         crate::log_debug_ct!("CompletionCursor: surrounding {leaf:?} -> {surrounding_syntax:#?}");
