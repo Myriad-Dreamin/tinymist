@@ -49,6 +49,7 @@ use crate::upstream::{plain_docs_sentence, summarize_font_family};
 use super::SharedContext;
 
 mod field_access;
+mod func;
 mod import;
 mod kind;
 mod mode;

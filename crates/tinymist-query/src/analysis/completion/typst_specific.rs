@@ -199,19 +199,15 @@ impl CompletionPair<'_, '_, '_> {
         });
 
         let mut apply = None;
-        let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
-            if let Value::Func(func) = value {
-                command = self.worker.ctx.analysis.trigger_parameter_hints(true);
-                if func
-                    .params()
-                    .is_some_and(|params| params.iter().all(|param| param.name == "self"))
-                {
-                    apply = Some(eco_format!("{label}()${{}}"));
-                } else {
-                    apply = Some(eco_format!("{label}(${{}})"));
-                }
-            }
+            let mode = interpret_mode_at(Some(&self.cursor.leaf));
+            let kind_checker = CompletionKindChecker {
+                symbols: HashSet::default(),
+                functions: HashSet::from_iter([Ty::Value(InsTy::new(value.clone()))]),
+            };
+            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+            self.func_completion(mode, fn_feat, label, label_details, detail, parens);
+            return;
         } else if at {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
@@ -239,7 +235,6 @@ impl CompletionPair<'_, '_, '_> {
             apply,
             detail,
             label_details,
-            command: command.map(From::from),
             ..Completion::default()
         });
     }

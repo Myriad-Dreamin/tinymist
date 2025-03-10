@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/builtin_shadow_existin
     "labelDetails": {
      "description": "(fill-rest: false) => none"
     },
-    "sortText": "128",
+    "sortText": "129",
     "textEdit": {
      "newText": "pagebreak()${1:}",
      "range": {
