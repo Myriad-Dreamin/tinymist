@@ -164,7 +164,7 @@ impl FnCompletionFeat {
                 BuiltinTy::TypeType(..) => {}
                 BuiltinTy::Clause
                 | BuiltinTy::Undef
-                | BuiltinTy::Content
+                | BuiltinTy::Content(..)
                 | BuiltinTy::Space
                 | BuiltinTy::None
                 | BuiltinTy::Break

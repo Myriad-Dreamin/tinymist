@@ -170,7 +170,10 @@ impl TypeDescriber {
             Ty::With(w) => {
                 return self.describe(&w.sig);
             }
-            Ty::Builtin(BuiltinTy::Content | BuiltinTy::Space) => {
+            Ty::Builtin(BuiltinTy::Content(Some(elem))) => {
+                return elem.name().into();
+            }
+            Ty::Builtin(BuiltinTy::Content(None) | BuiltinTy::Space) => {
                 return "content".into();
             }
             // Doesn't provide any information, hence we doesn't describe it intermediately here.

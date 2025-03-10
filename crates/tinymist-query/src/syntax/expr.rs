@@ -6,9 +6,10 @@ use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use tinymist_std::hash::hash128;
 use typst::{
-    foundations::{Element, NativeElement, Value},
-    model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
-    syntax::{Span, SyntaxNode},
+    foundations::{Element, NativeElement, Type, Value},
+    model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
+    syntax::{ast::MathTextKind, Span, SyntaxNode},
+    text::LinebreakElem,
     utils::LazyHash,
 };
 
@@ -370,16 +371,37 @@ impl ExprWorker<'_> {
                     .map_or_else(none_expr, |body| self.check(body)),
             )),
 
-            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            MathText(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::TextElem,
+            >())))),
+            MathText(t) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some({
+                match t.get() {
+                    MathTextKind::Character(..) => Element::of::<typst::foundations::SymbolElem>(),
+                    MathTextKind::Number(..) => Element::of::<typst::foundations::SymbolElem>(),
+                }
+            })))),
+            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::RawElem,
+            >())))),
+            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::model::LinkElem,
+            >())))),
             Space(..) => Expr::Type(Ty::Builtin(BuiltinTy::Space)),
-            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                LinebreakElem,
+            >())))),
+            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                ParbreakElem,
+            >())))),
+            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::TextElem,
+            >())))),
+            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+                typst::foundations::Symbol,
+            >()))),
+            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::SmartQuoteElem,
+            >())))),
 
             Strong(strong) => {
                 let body = self.check_inline_markup(strong.body());
@@ -407,8 +429,13 @@ impl ExprWorker<'_> {
                 self.check_element::<TermsElem>(eco_vec![term, description])
             }
 
-            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::math::AlignPointElem,
+            >(
+            ))))),
+            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+                typst::foundations::Symbol,
+            >()))),
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }

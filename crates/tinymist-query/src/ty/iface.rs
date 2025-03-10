@@ -1,4 +1,4 @@
-use typst::foundations::{Dict, Module, Scope, Type};
+use typst::foundations::{Dict, Func, Module, Scope, Type};
 use typst::syntax::FileId;
 
 use super::BoundChecker;
@@ -9,7 +9,7 @@ pub enum Iface<'a> {
     Array(&'a Interned<Ty>),
     Tuple(&'a Interned<Vec<Ty>>),
     Dict(&'a Interned<RecordTy>),
-    Element {
+    Content {
         val: &'a typst::foundations::Element,
         at: &'a Ty,
     },
@@ -45,7 +45,7 @@ impl Iface<'_> {
             Iface::Array(ty) => Ty::Array(ty.clone()),
             Iface::Tuple(tys) => Ty::Tuple(tys.clone()),
             Iface::Dict(dict) => Ty::Dict(dict.clone()),
-            Iface::Element { at, .. }
+            Iface::Content { at, .. }
             | Iface::TypeType { at, .. }
             | Iface::Type { at, .. }
             | Iface::Func { at, .. }
@@ -62,7 +62,7 @@ impl Iface<'_> {
         match self {
             Iface::Array(..) | Iface::Tuple(..) => None,
             Iface::Dict(dict) => dict.field_by_name(key).cloned(),
-            Iface::Element { val, .. } => select_scope(Some(val.scope()), key),
+            Iface::Content { val, .. } => select_scope(Some(val.scope()), key),
             // todo: distinguish TypeType and Type
             Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
                 select_scope(Some(val.scope()), key)
@@ -196,7 +196,11 @@ impl IfaceCheckDriver<'_> {
                 }
             }
             // todo: more builtin types to check
-            Ty::Builtin(BuiltinTy::Content) if self.value_as_iface() => {
+            Ty::Builtin(BuiltinTy::Content(Some(elem))) if self.value_as_iface() => {
+                self.checker
+                    .check(Iface::Content { val: elem, at }, &mut self.ctx, pol);
+            }
+            Ty::Builtin(BuiltinTy::Content(..)) if self.value_as_iface() => {
                 let ty = Type::of::<typst::foundations::Content>();
                 self.checker
                     .check(Iface::Type { val: &ty, at }, &mut self.ctx, pol);
@@ -207,8 +211,14 @@ impl IfaceCheckDriver<'_> {
                     .check(Iface::Type { val: ty, at }, &mut self.ctx, pol);
             }
             Ty::Builtin(BuiltinTy::Element(elem)) if self.value_as_iface() => {
-                self.checker
-                    .check(Iface::Element { val: elem, at }, &mut self.ctx, pol);
+                self.checker.check(
+                    Iface::Func {
+                        val: &Func::from(*elem),
+                        at,
+                    },
+                    &mut self.ctx,
+                    pol,
+                );
             }
             Ty::Builtin(BuiltinTy::Module(module)) => {
                 if let Decl::Module(m) = module.as_ref() {

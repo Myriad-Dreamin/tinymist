@@ -220,7 +220,7 @@ impl Ty {
         }
     }
 
-    /// Get the type of the type
+    /// Get as element type
     pub fn element(&self) -> Option<Element> {
         match self {
             Ty::Value(ins_ty) => match &ins_ty.val {
@@ -242,7 +242,7 @@ impl Ty {
             res = res || {
                 match ty {
                     Ty::Value(v) => is_content_builtin_type(&v.val.ty()),
-                    Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
+                    Ty::Builtin(BuiltinTy::Content(..)) => true,
                     Ty::Builtin(BuiltinTy::Type(v)) => is_content_builtin_type(v),
                     _ => false,
                 }
