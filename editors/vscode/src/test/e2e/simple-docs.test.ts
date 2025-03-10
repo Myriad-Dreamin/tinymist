@@ -67,7 +67,7 @@ export async function getTests(ctx: Context) {
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     });
 
-    suite.addTest("diagnostics works well", async () => {
+    suite.addTest("tinymist.showSummary works well", async () => {
       await ctx.openDocument(vscode.Uri.joinPath(workspaceUri, "preview-skyzh-cv.typ"));
 
       await vscode.commands.executeCommand("tinymist.showSummary");
