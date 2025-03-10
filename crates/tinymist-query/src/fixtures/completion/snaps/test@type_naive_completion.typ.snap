@@ -1,29 +1,29 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on n (32..33)
+description: Completion on ) (30..31)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/keyword_ident.typ
+input_file: crates/tinymist-query/src/fixtures/completion/type_naive_completion.typ
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
-    "kind": 5,
-    "label": "inset",
+    "kind": 7,
+    "label": "content",
     "labelDetails": {
-     "description": "inset"
+     "description": "type"
     },
-    "sortText": "006",
+    "sortText": "032",
     "textEdit": {
-     "newText": "inset: ${1:}",
+     "newText": "content",
      "range": {
       "end": {
-       "character": 13,
+       "character": 8,
        "line": 1
       },
       "start": {
-       "character": 11,
+       "character": 8,
        "line": 1
       }
      }
