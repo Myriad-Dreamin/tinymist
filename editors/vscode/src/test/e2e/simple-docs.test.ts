@@ -68,6 +68,15 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("diagnostics works well", async () => {
+      await ctx.openDocument(vscode.Uri.joinPath(workspaceUri, "preview-skyzh-cv.typ"));
+
+      await vscode.commands.executeCommand("tinymist.showSummary");
+
+      // close the editor
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    });
+
+    suite.addTest("diagnostics works well", async () => {
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "diagnostics.typ");
 
       const largeDoc0 = "#for i in range(500) { lorem(i) };";
