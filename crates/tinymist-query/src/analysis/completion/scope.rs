@@ -1,5 +1,9 @@
 //! Completion of definitions in scope.
 
+use typst::foundations::{Array, Dict};
+
+use crate::ty::SigWithTy;
+
 use super::*;
 
 #[derive(BindTyCtx)]
@@ -172,7 +176,6 @@ impl CompletionPair<'_, '_, '_> {
             let detail = docs.or_else(|| label_details.clone());
 
             if !kind_checker.functions.is_empty() {
-                // todo: bound self checking
                 let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
                 crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
                 self.func_completion(mode, fn_feat, name, label_details, detail, parens);
@@ -224,12 +227,33 @@ impl CompletionScopeChecker<'_> {
         matches!(self.check_kind, ScopeCheckKind::FieldAccess)
     }
 
-    fn type_methods(&mut self, ty: Type) {
+    fn type_methods(&mut self, bound_self: Option<Ty>, ty: Type) {
         for name in fields_on(ty) {
             self.defines.insert((*name).into(), Ty::Any);
         }
+        let bound_self = bound_self.map(|this| SigTy::unary(this, Ty::Any));
         for (name, bind) in ty.scope().iter() {
-            let ty = Ty::Value(InsTy::new(bind.read().clone()));
+            let val = bind.read().clone();
+            let has_self = bound_self.is_some()
+                && (if let Value::Func(func) = &val {
+                    let first_pos = func
+                        .params()
+                        .and_then(|params| params.iter().find(|p| p.required));
+                    first_pos.is_some_and(|p| p.name == "self")
+                } else {
+                    false
+                });
+            let ty = Ty::Value(InsTy::new(val));
+            let ty = if has_self {
+                if let Some(bound_self) = bound_self.as_ref() {
+                    Ty::With(SigWithTy::new(ty.into(), bound_self.clone()))
+                } else {
+                    ty
+                }
+            } else {
+                ty
+            };
+
             self.defines.insert(name.into(), ty);
         }
     }
@@ -255,7 +279,6 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     self.defines.insert(name.clone().into(), term);
                 }
             }
-            Iface::Dict(..) | Iface::Value { .. } => {}
             Iface::Element { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
                 let styles = StyleChain::default();
@@ -289,10 +312,16 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                 }
             }
             Iface::Type { val, .. } if self.is_field_access() => {
-                self.type_methods(*val);
+                self.type_methods(None, *val);
             }
             Iface::Func { .. } if self.is_field_access() => {
-                self.type_methods(Type::of::<Func>());
+                self.type_methods(Some(iface.to_type()), Type::of::<Func>());
+            }
+            Iface::Array { .. } | Iface::Tuple { .. } if self.is_field_access() => {
+                self.type_methods(Some(iface.to_type()), Type::of::<Array>());
+            }
+            Iface::Dict { .. } if self.is_field_access() => {
+                self.type_methods(Some(iface.to_type()), Type::of::<Dict>());
             }
             Iface::Element { val, .. } => {
                 self.defines.insert_scope(val.scope());
@@ -321,6 +350,7 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::ModuleVal { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
+            Iface::Array { .. } | Iface::Tuple { .. } | Iface::Dict(..) | Iface::Value { .. } => {}
         }
         None
     }

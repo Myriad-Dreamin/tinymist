@@ -887,7 +887,7 @@ impl ExprWorker<'_> {
             }
         }
 
-        Expr::Array(items.into())
+        Expr::Array(ArgsExpr::new(typed.span(), items))
     }
 
     fn check_dict(&mut self, typed: ast::Dict) -> Expr {
@@ -921,7 +921,7 @@ impl ExprWorker<'_> {
             }
         }
 
-        Expr::Dict(items.into())
+        Expr::Dict(ArgsExpr::new(typed.span(), items))
     }
 
     fn check_args(&mut self, typed: ast::Args) -> Expr {
@@ -941,7 +941,7 @@ impl ExprWorker<'_> {
                 }
             }
         }
-        Expr::Args(args.into())
+        Expr::Args(ArgsExpr::new(typed.span(), args))
     }
 
     fn check_unary(&mut self, typed: ast::Unary) -> Expr {

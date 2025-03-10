@@ -23,11 +23,11 @@ pub enum Expr {
     /// A sequence of expressions
     Block(Interned<Vec<Expr>>),
     /// An array literal
-    Array(Interned<Vec<ArgExpr>>),
+    Array(Interned<ArgsExpr>),
     /// A dict literal
-    Dict(Interned<Vec<ArgExpr>>),
+    Dict(Interned<ArgsExpr>),
     /// An args literal
-    Args(Interned<Vec<ArgExpr>>),
+    Args(Interned<ArgsExpr>),
     /// A pattern
     Pattern(Interned<Pattern>),
     /// An element literal
@@ -748,6 +748,18 @@ impl SelectExpr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArgsExpr {
+    pub args: Vec<ArgExpr>,
+    pub span: Span,
+}
+
+impl ArgsExpr {
+    pub fn new(span: Span, args: Vec<ArgExpr>) -> Interned<Self> {
+        Interned::new(Self { args, span })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
     pub elem: Element,
     pub content: EcoVec<Expr>,
@@ -936,6 +948,7 @@ impl<T> BinInst<T> {
 
 impl_internable!(
     Expr,
+    ArgsExpr,
     ElementExpr,
     ContentSeqExpr,
     RefExpr,

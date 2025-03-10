@@ -211,6 +211,7 @@ impl CompletionPair<'_, '_, '_> {
                 functions: HashSet::from_iter([Ty::Value(InsTy::new(value.clone()))]),
             };
             let mut fn_feat = FnCompletionFeat::default();
+            // todo: unify bound self checking
             fn_feat.bound_self = bound_self;
             let fn_feat = fn_feat.check(kind_checker.functions.iter());
             self.func_completion(mode, fn_feat, label, label_details, detail, parens);

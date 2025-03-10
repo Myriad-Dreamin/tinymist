@@ -15,9 +15,9 @@ impl TypeChecker<'_> {
     pub(crate) fn check_syntax(&mut self, expr: &Expr) -> Option<Ty> {
         Some(match expr {
             Expr::Block(exprs) => self.check_block(exprs),
-            Expr::Array(elems) => self.check_array(elems),
-            Expr::Dict(elems) => self.check_dict(elems),
-            Expr::Args(args) => self.check_args(args),
+            Expr::Array(elems) => self.check_array(elems.span, &elems.args),
+            Expr::Dict(elems) => self.check_dict(elems.span, &elems.args),
+            Expr::Args(args) => self.check_args(&args.args),
             // todo: check pattern correctly
             Expr::Pattern(pattern) => self.check_pattern_exp(pattern),
             Expr::Element(element) => self.check_element(element),
@@ -53,7 +53,7 @@ impl TypeChecker<'_> {
         joiner.finalize()
     }
 
-    fn check_array(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_array(&mut self, arr_span: Span, elems: &[ArgExpr]) -> Ty {
         let mut elements = Vec::new();
 
         for elem in elems.iter() {
@@ -68,10 +68,12 @@ impl TypeChecker<'_> {
             }
         }
 
-        Ty::Tuple(elements.into())
+        let res = Ty::Tuple(elements.into());
+        self.info.witness_at_most(arr_span, res.clone());
+        res
     }
 
-    fn check_dict(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_dict(&mut self, dict_span: Span, elems: &[ArgExpr]) -> Ty {
         let mut fields = Vec::new();
 
         for elem in elems.iter() {
@@ -92,10 +94,12 @@ impl TypeChecker<'_> {
             }
         }
 
-        Ty::Dict(RecordTy::new(fields))
+        let res = Ty::Dict(RecordTy::new(fields));
+        self.info.witness_at_most(dict_span, res.clone());
+        res
     }
 
-    fn check_args(&mut self, args: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_args(&mut self, args: &[ArgExpr]) -> Ty {
         let mut args_res = Vec::new();
         let mut named = vec![];
 
