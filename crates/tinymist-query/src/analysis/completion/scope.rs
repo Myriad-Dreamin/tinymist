@@ -98,6 +98,11 @@ impl CompletionPair<'_, '_, '_> {
             .clone();
         defines.insert_scope(&scope);
 
+        defines.insert(
+            EcoString::inline("std"),
+            Ty::Value(InsTy::new(lib.std.read().clone())),
+        );
+
         Some(defines)
     }
 

@@ -1228,12 +1228,20 @@ impl ExprWorker<'_> {
             _ => return (None, None),
         };
 
-        // ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         let val = scope
             .get(name)
             .cloned()
             .map(|val| Ty::Value(InsTy::new(val.read().clone())));
-        (None, val)
+        if let Some(val) = val {
+            return (None, Some(val));
+        }
+
+        if name.as_ref() == "std" {
+            let val = Ty::Value(InsTy::new(self.ctx.world.library.std.read().clone()));
+            return (None, Some(val));
+        }
+
+        (None, None)
     }
 
     fn fold_expr_and_val(&mut self, src: ConcolicExpr) -> Option<Expr> {

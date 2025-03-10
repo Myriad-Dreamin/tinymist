@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
-    "sortText": "182",
+    "sortText": "183",
     "textEdit": {
      "newText": "strong(${1:})",
      "range": {
@@ -35,7 +35,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
     "labelDetails": {
      "description": "(content, delta: int) => strong"
     },
-    "sortText": "183",
+    "sortText": "184",
     "textEdit": {
      "newText": "strong[${1:}]",
      "range": {
