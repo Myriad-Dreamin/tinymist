@@ -7,28 +7,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/module_show.typ
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 9,
-    "label": "std",
-    "labelDetails": {
-     "description": "module(\"global\")"
-    },
-    "sortText": "263",
-    "textEdit": {
-     "newText": "std",
-     "range": {
-      "end": {
-       "character": 12,
-       "line": 1
-      },
-      "start": {
-       "character": 11,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]
