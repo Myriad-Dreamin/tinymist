@@ -172,6 +172,7 @@ impl CompletionPair<'_, '_, '_> {
             let detail = docs.or_else(|| label_details.clone());
 
             if !kind_checker.functions.is_empty() {
+                // todo: bound self checking
                 let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
                 crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
                 self.func_completion(mode, fn_feat, name, label_details, detail, parens);

@@ -68,6 +68,7 @@ pub(crate) struct FnCompletionFeat {
     min_pos: Option<usize>,
     has_only_self: bool,
     min_named: Option<usize>,
+    pub bound_self: bool,
     pub has_rest: bool,
     pub next_arg_is_content: bool,
     pub is_element: bool,
@@ -107,9 +108,10 @@ impl FnCompletionFeat {
                     let sig = func_signature(func.clone()).type_sig();
                     let has_only_self = self.has_only_self;
                     self.has_only_self = has_only_self
-                        || func
-                            .params()
-                            .is_some_and(|params| params.iter().all(|param| param.name == "self"));
+                        || (self.bound_self
+                            && func.params().is_some_and(|params| {
+                                params.iter().all(|param| param.name == "self")
+                            }));
                     self.check_sig(&sig, pos);
                 }
                 Value::None

@@ -159,18 +159,28 @@ impl CompletionPair<'_, '_, '_> {
         parens: bool,
         docs: Option<&str>,
     ) {
-        self.value_completion_(label, value, parens, None, docs);
+        self.value_completion_(
+            value,
+            ValueCompletionInfo {
+                label,
+                parens,
+                label_details: None,
+                docs,
+                bound_self: false,
+            },
+        );
     }
 
     /// Add a completion for a specific value.
-    pub fn value_completion_(
-        &mut self,
-        label: Option<EcoString>,
-        value: &Value,
-        parens: bool,
-        label_details: Option<EcoString>,
-        docs: Option<&str>,
-    ) {
+    pub fn value_completion_(&mut self, value: &Value, extras: ValueCompletionInfo) {
+        let ValueCompletionInfo {
+            label,
+            parens,
+            label_details,
+            docs,
+            bound_self,
+        } = extras;
+
         // Prevent duplicate completions from appearing.
         if !self.worker.seen_casts.insert(hash128(&(&label, &value))) {
             return;
@@ -200,7 +210,9 @@ impl CompletionPair<'_, '_, '_> {
                 symbols: HashSet::default(),
                 functions: HashSet::from_iter([Ty::Value(InsTy::new(value.clone()))]),
             };
-            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+            let mut fn_feat = FnCompletionFeat::default();
+            fn_feat.bound_self = bound_self;
+            let fn_feat = fn_feat.check(kind_checker.functions.iter());
             self.func_completion(mode, fn_feat, label, label_details, detail, parens);
             return;
         } else if at {
@@ -233,4 +245,13 @@ impl CompletionPair<'_, '_, '_> {
             ..Completion::default()
         });
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ValueCompletionInfo<'a> {
+    pub label: Option<EcoString>,
+    pub parens: bool,
+    pub label_details: Option<EcoString>,
+    pub docs: Option<&'a str>,
+    pub bound_self: bool,
 }
