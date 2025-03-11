@@ -4061,6 +4061,7 @@ version = "0.13.2"
 dependencies = [
  "ecow",
  "insta",
+ "log",
  "lsp-types",
  "regex",
  "serde",
@@ -4109,6 +4110,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
+ "tinymist-analysis",
  "tinymist-std",
  "tinymist-world",
  "typst",
