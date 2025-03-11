@@ -15,14 +15,15 @@ import {
   typstPasteUriEditKind,
   Schemes,
 } from "./drop-paste.def";
+import { IContext } from "../context";
 
-export function dragAndDropActivate(context: vscode.ExtensionContext) {
+export function dragAndDropActivate(context: IContext) {
   context.subscriptions.push(
     vscode.languages.registerDocumentDropEditProvider(typstDocumentSelector, new DropProvider()),
   );
 }
 
-export function copyAndPasteActivate(context: vscode.ExtensionContext) {
+export function copyAndPasteActivate(context: IContext) {
   const providedEditKinds = [
     typstPasteLinkEditKind,
     typstPasteUriEditKind,

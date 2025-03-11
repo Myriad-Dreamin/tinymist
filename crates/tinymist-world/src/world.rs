@@ -547,25 +547,6 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         ))
     }
 
-    /// Lookup a source file by id.
-    #[track_caller]
-    fn lookup(&self, id: FileId) -> Source {
-        self.source(id)
-            .expect("file id does not point to any source file")
-    }
-
-    fn map_source_or_default<T>(
-        &self,
-        id: FileId,
-        default_v: T,
-        f: impl FnOnce(Source) -> CodespanResult<T>,
-    ) -> CodespanResult<T> {
-        match World::source(self, id).ok() {
-            Some(source) => f(source),
-            None => Ok(default_v),
-        }
-    }
-
     pub fn revision(&self) -> NonZeroUsize {
         self.revision
     }
@@ -750,6 +731,105 @@ impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     }
 }
 
+pub trait SourceWorld: World {
+    fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError>;
+    fn lookup(&self, id: FileId) -> Source {
+        self.source(id)
+            .expect("file id does not point to any source file")
+    }
+    fn map_source_or_default<T>(
+        &self,
+        id: FileId,
+        default_v: T,
+        f: impl FnOnce(Source) -> CodespanResult<T>,
+    ) -> CodespanResult<T> {
+        match self.source(id).ok() {
+            Some(source) => f(source),
+            None => Ok(default_v),
+        }
+    }
+
+    fn for_codespan_reporting(&self) -> CodeSpanReportWorld<Self>
+    where
+        Self: Sized,
+    {
+        CodeSpanReportWorld { world: self }
+    }
+}
+
+impl<F: CompilerFeat> SourceWorld for CompilerWorld<F> {
+    /// Resolve the real path for a file id.
+    fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
+        self.path_for_id(id)
+    }
+}
+
+pub struct CodeSpanReportWorld<'a, T> {
+    pub world: &'a T,
+}
+
+impl<'a, T: SourceWorld> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a, T> {
+    /// A unique identifier for files in the file provider. This will be used
+    /// for rendering `diagnostic::Label`s in the corresponding source files.
+    type FileId = FileId;
+
+    /// The user-facing name of a file, to be displayed in diagnostics.
+    type Name = String;
+
+    /// The source code of a file.
+    type Source = Source;
+
+    /// The user-facing name of a file.
+    fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
+        Ok(match self.world.path_for_id(id) {
+            Ok(path) => path.as_path().display().to_string(),
+            Err(_) => format!("{id:?}"),
+        })
+    }
+
+    /// The source code of a file.
+    fn source(&'a self, id: FileId) -> CodespanResult<Self::Source> {
+        Ok(self.world.lookup(id))
+    }
+
+    /// See [`codespan_reporting::files::Files::line_index`].
+    fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
+        let source = self.world.lookup(id);
+        source
+            .byte_to_line(given)
+            .ok_or_else(|| CodespanError::IndexTooLarge {
+                given,
+                max: source.len_bytes(),
+            })
+    }
+
+    /// See [`codespan_reporting::files::Files::column_number`].
+    fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
+        let source = self.world.lookup(id);
+        source.byte_to_column(given).ok_or_else(|| {
+            let max = source.len_bytes();
+            if given <= max {
+                CodespanError::InvalidCharBoundary { given }
+            } else {
+                CodespanError::IndexTooLarge { given, max }
+            }
+        })
+    }
+
+    /// See [`codespan_reporting::files::Files::line_range`].
+    fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
+        self.world.map_source_or_default(id, 0..0, |source| {
+            source
+                .line_to_range(given)
+                .ok_or_else(|| CodespanError::LineTooLarge {
+                    given,
+                    max: source.len_lines(),
+                })
+        })
+    }
+}
+
+// todo: remove me
 impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld<F> {
     /// A unique identifier for files in the file provider. This will be used
     /// for rendering `diagnostic::Label`s in the corresponding source files.
@@ -763,51 +843,27 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
-        Ok(match self.path_for_id(id) {
-            Ok(path) => path.as_path().display().to_string(),
-            Err(_) => format!("{id:?}"),
-        })
+        self.for_codespan_reporting().name(id)
     }
 
     /// The source code of a file.
     fn source(&'a self, id: FileId) -> CodespanResult<Self::Source> {
-        Ok(self.lookup(id))
+        self.for_codespan_reporting().source(id)
     }
 
     /// See [`codespan_reporting::files::Files::line_index`].
     fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
-        let source = self.lookup(id);
-        source
-            .byte_to_line(given)
-            .ok_or_else(|| CodespanError::IndexTooLarge {
-                given,
-                max: source.len_bytes(),
-            })
+        self.for_codespan_reporting().line_index(id, given)
     }
 
     /// See [`codespan_reporting::files::Files::column_number`].
     fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
-        let source = self.lookup(id);
-        source.byte_to_column(given).ok_or_else(|| {
-            let max = source.len_bytes();
-            if given <= max {
-                CodespanError::InvalidCharBoundary { given }
-            } else {
-                CodespanError::IndexTooLarge { given, max }
-            }
-        })
+        self.for_codespan_reporting().column_number(id, 0, given)
     }
 
     /// See [`codespan_reporting::files::Files::line_range`].
     fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
-        self.map_source_or_default(id, 0..0, |source| {
-            source
-                .line_to_range(given)
-                .ok_or_else(|| CodespanError::LineTooLarge {
-                    given,
-                    max: source.len_lines(),
-                })
-        })
+        self.for_codespan_reporting().line_range(id, given)
     }
 }
 

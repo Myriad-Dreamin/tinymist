@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
+import { IContext } from "../context";
 
-export function devKitFeatureActivate(context: vscode.ExtensionContext) {
+export function devKitFeatureActivate(context: IContext) {
   vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
   context.subscriptions.push({
     dispose: () => {

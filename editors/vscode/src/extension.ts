@@ -27,8 +27,10 @@ import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
 import { toolFeatureActivate } from "./features/tool";
 import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste";
+import { testingFeatureActivate } from "./features/testing";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { LanguageClient } from "vscode-languageclient/node";
+import { IContext } from "./context";
 
 LanguageState.Client = LanguageClient;
 
@@ -39,6 +41,7 @@ const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.dragAndDrop, dragAndDropActivate],
   [extensionState.features.copyAndPaste, copyAndPasteActivate],
   [extensionState.features.task, taskActivate],
+  [extensionState.features.testing, testingFeatureActivate],
   [extensionState.features.devKit, devKitFeatureActivate],
   [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],
   [extensionState.features.language, languageActivate],
@@ -62,7 +65,7 @@ export async function deactivate(): Promise<void> {
   });
 }
 
-function previewActivateInTinymist(context: ExtensionContext) {
+function previewActivateInTinymist(context: IContext) {
   const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
   if (typstPreviewExtension) {
     void vscode.window.showWarningMessage(
@@ -75,10 +78,10 @@ function previewActivateInTinymist(context: ExtensionContext) {
 
   // Runs Integrated preview extension
   previewSetIsTinymist();
-  previewActivate(context, false);
+  previewActivate(context.context, false);
 }
 
-async function languageActivate(context: ExtensionContext) {
+async function languageActivate(context: IContext) {
   const client = tinymist.client;
   if (!client) {
     console.warn("activating language feature without starting the tinymist language server");
@@ -190,7 +193,7 @@ async function languageActivate(context: ExtensionContext) {
   const initTemplateCommand =
     (inPlace: boolean) =>
     (...args: string[]) =>
-      initTemplate(context, inPlace, ...args);
+      initTemplate(context.context, inPlace, ...args);
 
   // prettier-ignore
   context.subscriptions.push(
@@ -220,7 +223,7 @@ async function languageActivate(context: ExtensionContext) {
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
   );
   // context.subscriptions.push
-  const provider = new SymbolViewProvider(context);
+  const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );

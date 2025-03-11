@@ -4100,10 +4100,11 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.13.4"
+version = "0.13.6-rc1"
 dependencies = [
  "base64",
  "comemo",
+ "insta",
  "parking_lot",
  "serde",
  "serde_json",

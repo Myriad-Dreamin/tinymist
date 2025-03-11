@@ -17,6 +17,7 @@ interface ExtensionState {
     onEnter: boolean;
     preview: boolean;
     language: boolean;
+    testing: boolean;
     renderDocs: boolean;
   };
   mut: {
@@ -42,6 +43,7 @@ export const extensionState: ExtensionState = {
     onEnter: false,
     preview: false,
     language: true,
+    testing: true,
     renderDocs: false,
   },
   mut: {

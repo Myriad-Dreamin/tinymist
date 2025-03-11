@@ -10,7 +10,7 @@ use base64::Engine;
 use parking_lot::Mutex;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
-use tinymist_world::{CompilerFeat, CompilerWorld};
+use tinymist_world::{print_diagnostics, CompilerFeat, CompilerWorld};
 use typst::diag::EcoString;
 use typst::syntax::package::PackageVersion;
 use typst::syntax::FileId;
@@ -123,7 +123,11 @@ pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
 
     let _cov_lock = cov::COVERAGE_LOCK.lock();
 
-    let _ = typst::compile::<D>(&instr).output?;
+    if let Err(e) = typst::compile::<D>(&instr).output {
+        print_diagnostics(&instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
+            .context_ut("failed to print diagnostics")?;
+        bail!("");
+    }
 
     let meta = std::mem::take(instr.instr.map.lock().deref_mut());
     let CoverageMap { regions, .. } = std::mem::take(cov::COVERAGE_MAP.lock().deref_mut());

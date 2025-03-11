@@ -188,6 +188,14 @@ impl Error {
     pub fn arguments(&self) -> &[(&'static str, String)] {
         self.err.args.as_deref().unwrap_or_default()
     }
+
+    /// Returns the diagnostics attach to the error.
+    pub fn diagnostics(&self) -> Option<&[SourceDiagnostic]> {
+        match &self.err.kind {
+            ErrKind::RawDiag(diag) => Some(diag),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Error {

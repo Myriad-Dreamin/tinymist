@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { runExport } from "./tasks.export";
+import { IContext } from "../context";
 
 export const TYPST_TASK_SOURCE = "typst";
 
-export function taskActivate(context: vscode.ExtensionContext) {
+export function taskActivate(context: IContext) {
   const provide = (cls: typeof TypstTaskProvider) =>
     context.subscriptions.push(vscode.tasks.registerTaskProvider(cls.TYPE, new cls(context)));
 
@@ -20,7 +21,7 @@ class TypstTaskProvider implements vscode.TaskProvider {
     },
   } as const;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: IContext) {}
 
   static has(task: vscode.Task): boolean {
     return task.definition.type === TypstTaskProvider.TYPE;

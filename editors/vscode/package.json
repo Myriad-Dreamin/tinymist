@@ -1027,7 +1027,12 @@
       },
       {
         "command": "tinymist.profileCurrentFile",
-        "title": "Profile and visualize execution of the current Typst file",
+        "title": "Profile and visualize execution of the current document",
+        "category": "Typst"
+      },
+      {
+        "command": "tinymist.profileCurrentFileCoverage",
+        "title": "Profile coverage of the current document",
         "category": "Typst"
       },
       {
