@@ -6,11 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.6 - [2025-03-10]
+## v0.13.6 - [2025-03-12]
 
-% background preview and a preview command (`tinymist.startDefaultPreview`) that doesn't require arguments,
+We has provided more ways of previewing documents for editors having poor lsp support.
+- Default Preview: The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly.
+- Background Preview: The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser.
 
-We has provided more ways of previewing documents for editors having poor lsp support. The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly. The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser. See the [issue](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
+See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
 
 ### Compiler
 
@@ -21,7 +23,7 @@ We has provided more ways of previewing documents for editors having poor lsp su
 
 ### Code Analysis
 
-* Made file type recognization by file extension case-insensitive in https://github.com/Myriad-Dreamin/tinymist/pull/1472
+* Made file type recognition by file extension case-insensitive in https://github.com/Myriad-Dreamin/tinymist/pull/1472
   * For example, `IMAGE.PNG` is recognized as an image file now.
 
 ### Editor
@@ -204,7 +206,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 * (Fix) Fixed a panic when getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
   * This could be true when the fonts are hot reloaded.
-* (Fix) Emiting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
+* (Fix) Emitting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
   * Because of this, the compile status bar was not updated correctly.
 * (Perf) Detecting compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
 * (Perf) Scatter-gathering the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
@@ -213,7 +215,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * Tracking fine-grained revisions of `font`, `registry`, `entry`, and `vfs` in https://github.com/Myriad-Dreamin/tinymist/pull/1192
   * This prepares for better configuration hot reloading in future.
 * Triggering project compilations on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/1197
-  * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unreleated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
+  * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unrelated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
 ### Editor
 
 * Showing name of the compiling file in the status bar in https://github.com/Myriad-Dreamin/tinymist/pull/1147
@@ -253,7 +255,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * Added `depended_{paths,{source_,}files}` methods in https://github.com/Myriad-Dreamin/tinymist/pull/1150
 * Preferring to select the previous token when cursor is before a marker in https://github.com/Myriad-Dreamin/tinymist/pull/1175
 * Support more path types and add path parameters (#1312) in https://github.com/Myriad-Dreamin/tinymist/pull/1331
-  * Completes mutiple paths on `bibliography` and completes wasm files on `plugin`.
+  * Completes multiple paths on `bibliography` and completes wasm files on `plugin`.
 
 ### Crityp (New)
 
