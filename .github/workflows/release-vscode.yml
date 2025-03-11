@@ -201,7 +201,7 @@ jobs:
       # todo: pdf documentation for all platforms
       - name: Build PDF Documentation
         run: |
-          yarn docs:gh-pdf
+          cargo run --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
           cp docs/tinymist/ebook.pdf tinymist-docs.pdf
           cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
           cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
