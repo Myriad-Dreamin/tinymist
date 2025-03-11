@@ -1,6 +1,7 @@
 //! Tinymist Analysis
 
 pub mod debug_loc;
+pub mod location;
 mod prelude;
 pub mod syntax;
 
