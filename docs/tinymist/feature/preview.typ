@@ -51,7 +51,7 @@ Also see:
 
 == Builtin Preview Feature
 
-=== Using `tinymist.startDefaultPreview` Command <default-preview>
+=== Using `tinymist.startDefaultPreview` Command (Since Tinymist v0.13.6) <default-preview>
 
 You can use `tinymist.startDefaultPreview` command to start a preview instance without arguments. This is used for the
 case where a client cannot pass arguments to the preview command, e.g. helix. Default Behaviors:
@@ -64,7 +64,7 @@ case where a client cannot pass arguments to the preview command, e.g. helix. De
 You can set the arguments to used by configuration `tinymist.preview.browsing.args` to *override* the default behavior. The default
 value is `["--data-plane-host=127.0.0.1:0", "--invert-colors=auto", "--open"]`. Intentionally, the name of the configuration is *not* `tinymist.defaultPreviewArgs` or `tinymist.preview.defaultArgs` to avoid confusion.
 
-=== Running preview server in background <background-preview>
+=== Running preview server in background (Since Tinymist v0.13.6) <background-preview>
 
 You can start a preview instance in background with configuration:
 ```jsonc
