@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Command Line Interface (CLI)")
+#show: book-page.with(title: [Command Line Interface (CLI)])
 
 == Starting a Language Server
 

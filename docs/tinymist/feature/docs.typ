@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Documentation")
+#show: book-page.with(title: [Code Documentation])
 
 Tinymist will read the documentation from the source code and display it in the editor. For example, you can hover over a identifier to see its documentation, usually the content of the comments above the identifier's definition. The format of the documentation follows #link("https://github.com/typst-community/guidelines/pull/8")[this guideline].
 

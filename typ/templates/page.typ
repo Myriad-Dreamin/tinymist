@@ -1,12 +1,15 @@
 // This is important for shiroa to produce a responsive layout
 // and multiple targets.
-#import "@preview/shiroa:0.1.2": get-page-width, target, is-web-target, is-pdf-target, plain-text, templates
+#import "@preview/shiroa:0.2.0": get-page-width, target, is-web-target, is-pdf-target, plain-text, templates
 #import templates: *
+#import "@preview/numbly:0.1.0": numbly
 
 // Metadata
 #let page-width = get-page-width()
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
+
+#let part-counter = counter("shiroa-part-counter")
 
 // Theme (Colors)
 #let (
@@ -44,13 +47,15 @@
 /// The project function defines how your document looks.
 /// It takes your content and some metadata and formats it.
 /// Go ahead and customize it to your liking!
-#let project(title: "Typst Book", authors: (), kind: "page", body) = {
-
+#let project(title: "Tinymist Documentation", authors: (), kind: "page", body) = {
   // set basic document metadata
   set document(
     author: authors,
     title: title,
   ) if not is-pdf-target
+
+  // todo dirty hack to check is main
+  let is-main = title == "Tinymist Documentation"
 
   // set web/pdf page properties
   set page(
@@ -58,6 +63,7 @@
     number-align: center,
     width: page-width,
   )
+  set page(numbering: "1") if is-pdf-target and not is-main and kind == "page"
 
   // remove margins for web target
   set page(
@@ -113,6 +119,15 @@
       it,
     )
   }
+  set heading(
+    numbering: (..numbers) => context {
+      if part-counter.get().at(0) > 0 {
+        numbering("1.", ..part-counter.get(), ..numbers)
+      } else {
+        h(-0.3em)
+      }
+    },
+  ) if is-pdf-target
 
   // link setting
   show link: set text(fill: dash-color)
@@ -145,10 +160,22 @@
     it.lines.at(0).body.children.slice(0, -2).join()
   }
 
+  if kind == "page" and is-pdf-target and not is-main {
+    [= #title]
+  }
+
   // Main body.
   set par(justify: true)
 
   body
 }
 
-#let part-style = heading
+#let part-style(it) = {
+  set text(size: heading-sizes.at(1))
+  set text(weight: "bold")
+  set text(fill: main-color)
+  part-counter.step()
+
+  context heading(numbering: none, [Part #part-counter.display(numbly("{1}. "))#it])
+  counter(heading).update(0)
+}

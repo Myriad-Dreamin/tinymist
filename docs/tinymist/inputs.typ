@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist LSP Inputs")
+#show: book-page.with(title: [LSP Inputs])
 
 == Prefer to Using LSP Configurations
 

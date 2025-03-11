@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Type System")
+#show: book-page.with(title: [Type System])
 
 The underlying techniques are not easy to understand, but there are some links:
 - bidirectional type checking: https://jaked.org/blog/2021-09-15-Reconstructing-TypeScript-part-1
@@ -25,10 +25,10 @@ Second, the $sig$ and the $sans("argument")$ type are reused frequently.
   - an optional rest argument, in $sans("arr")$ type.
   - an *optional* body, in any type.
 
-  notated as $sig := sig(sans("tup")(tau_1,..,tau_n),sans("rec")(a_1=tau_(n+1),..,a_m=tau_(n+m)),..sans("arr")(tau_(n+m+1))) arrow psi$
+  notated as $sig := sig\(sans("tup")(tau_1,..,tau_n),sans("rec")(a_1=tau_(n+1),..,a_m=tau_(n+m)),\.\.sans("arr");(tau_(n+m+1))) arrow psi$
 - the $sans("argument")$ is a $sans("signature")$ without rest and body.
 
-  $args := args(sig(..))$
+  $args := args\(sig\(..))$
 
 With aboving constructors, we soonly get typst's type checker.
 

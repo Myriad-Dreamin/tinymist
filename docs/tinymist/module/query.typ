@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Language Queries")
+#show: book-page.with(title: [Language Queries])
 
 == Base Analyses
 
@@ -47,11 +47,14 @@ There are seven basic analyzers:
       edge(sig-n, call-n, "-|>"),
       edge(type-n, call-n, "-|>"),
       for i in range(9) {
-        let j = 1 + i * 0.25;
+        let j = 1 + i * 0.25
         edge((j, 1.4), (j, 1.8), "-|>")
       },
-      pg-node((2, 2.3), [`Extended`\
-      `Language Features`]),
+      pg-node(
+        (2, 2.3),
+        [`Extended`\
+          `Language Features`],
+      ),
       // for i in (1, 3, 5) {
       //   edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
       // },

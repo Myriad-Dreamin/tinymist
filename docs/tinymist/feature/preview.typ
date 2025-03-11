@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Preview Feature")
+#show: book-page.with(title: [Preview Feature])
 
 Two ways of previewing a Typst document are provided:
 - PDF Preview: let lsp export your PDF on typed, and open related PDF by your favorite PDF viewer.
