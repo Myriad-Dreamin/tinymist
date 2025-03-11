@@ -14,6 +14,8 @@ We has provided more ways of previewing documents for editors having poor lsp su
 
 See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
 
+* Provided tinymist documentation in PDF format in https://github.com/Myriad-Dreamin/tinymist/pull/1485
+
 ### Compiler
 
 * (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
