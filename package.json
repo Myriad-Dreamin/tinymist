@@ -19,6 +19,7 @@
     "maintainers": "typst query MAINTAINERS.typ \"<maintainer-meta>\" --pretty --one --field value --input=action=help",
     "docs": "shiroa serve --font-path assets/fonts -w . docs/tinymist",
     "docs:pdf": "cargo run --bin tinymist --release -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ",
+    "docs:gh-pdf": "cargo run --bin tinymist --profile gh-release -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ",
     "docs:typ": "node scripts/link-docs.mjs",
     "docs:rs": "cargo doc --workspace --document-private-items --no-deps",
     "lint": "eslint editors/vscode/src",
