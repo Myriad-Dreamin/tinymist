@@ -713,10 +713,13 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
 
         if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
             matches!(mode, InterpretMode::Markup)
-                && matches!(
+                && (matches!(
+                    dot_target.kind(),
+                    SyntaxKind::Ident | SyntaxKind::MathIdent | SyntaxKind::FuncCall
+                ) || (matches!(
                     dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
                     Some(SyntaxKind::Hash)
-                )
+                )))
         } {
             return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
         }
@@ -1527,6 +1530,17 @@ Text
         assert_snapshot!(access_field("\"a\".", 4), @"");
         assert_snapshot!(access_field("@a.", 3), @"");
         assert_snapshot!(access_field("<a>.", 4), @"");
+    }
+
+    #[test]
+    fn test_markup_chain_access() {
+        assert_snapshot!(access_field("#a.b.", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_field("#a.b.c.", 7), @"DotSuffix: 7");
+        assert_snapshot!(access_field("#context a.", 11), @"DotSuffix: 11");
+        assert_snapshot!(access_field("#context a.b.", 13), @"DotSuffix: 13");
+
+        assert_snapshot!(access_field("#a.at(1).", 9), @"DotSuffix: 9");
+        assert_snapshot!(access_field("#context a.at(1).", 17), @"DotSuffix: 17");
     }
 
     #[test]
