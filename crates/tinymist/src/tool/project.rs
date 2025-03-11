@@ -117,6 +117,8 @@ pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
             tinymist_debug::collect_coverage::<tinymist_std::typst::TypstPagedDocument, _>(&world)?;
         let cov_path = Path::new("target/coverage.json");
         let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
+
+        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
         std::fs::write(cov_path, res).context("write coverage")?;
 
         Ok(())

@@ -60,13 +60,19 @@ pub fn __cov_pc(span: Span, pc: i64) {
     let mut map = COVERAGE_MAP.lock();
     if let Some(last_hit) = map.last_hit.as_ref() {
         if last_hit.0 == fid {
-            last_hit.1.hits.lock()[pc as usize] += 1;
+            let mut hits = last_hit.1.hits.lock();
+            let c = &mut hits[pc as usize];
+            *c = c.saturating_add(1);
             return;
         }
     }
 
     let region = map.regions.entry(fid).or_default();
-    region.hits.lock()[pc as usize] += 1;
+    {
+        let mut hits = region.hits.lock();
+        let c = &mut hits[pc as usize];
+        *c = c.saturating_add(1);
+    }
     map.last_hit = Some((fid, region.clone()));
 }
 

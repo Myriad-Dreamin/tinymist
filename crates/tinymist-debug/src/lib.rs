@@ -3,11 +3,13 @@
 mod cov;
 mod instrument;
 
+use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-use base64::Engine;
 use parking_lot::Mutex;
+use tinymist_analysis::location::PositionEncoding;
+use tinymist_std::debug_loc::LspRange;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
 use tinymist_world::{print_diagnostics, CompilerFeat, CompilerWorld};
@@ -15,7 +17,7 @@ use typst::diag::EcoString;
 use typst::syntax::package::PackageVersion;
 use typst::syntax::FileId;
 use typst::utils::LazyHash;
-use typst::{Library, WorldExt};
+use typst::{Library, World, WorldExt};
 
 use cov::*;
 use instrument::InstrumentWorld;
@@ -31,82 +33,49 @@ pub struct CoverageResult {
 impl CoverageResult {
     /// Converts the coverage result to JSON.
     pub fn to_json<F: CompilerFeat>(&self, w: &CompilerWorld<F>) -> serde_json::Value {
-        // vector of file ids
-        let mut file_ids: Vec<FileId> = self.regions.keys().cloned().collect();
-        file_ids.sort_by(|a, b| {
-            a.package()
-                .map(PackageSpecCmp::from)
-                .cmp(&b.package().map(PackageSpecCmp::from))
-                .then_with(|| a.vpath().cmp(b.vpath()))
-        });
+        let lsp_position_encoding = PositionEncoding::Utf16;
 
-        let mut regions = vec![];
+        let mut result = VscodeCoverage::new();
 
-        let mut file_meta = FxHashMap::default();
+        for (file_id, region) in &self.regions {
+            let file_path = w
+                .path_for_id(*file_id)
+                .unwrap()
+                .as_path()
+                .to_str()
+                .unwrap()
+                .to_string();
 
-        for file_id in file_ids {
-            let fid = {
-                if let Some((index, _)) = file_meta.get(&file_id) {
-                    *index
-                } else {
-                    let index = file_meta.len();
+            let mut details = vec![];
 
-                    let meta = {
-                        let meta = self.meta.get(&file_id).unwrap();
+            let meta = self.meta.get(file_id).unwrap();
 
-                        let pc_meta = meta
-                            .meta
-                            .as_slice()
-                            .iter()
-                            .flat_map(|(s, kind)| {
-                                // todo: pool performance
-                                let range = w.range(*s);
-                                let kind = match kind {
-                                    Kind::OpenBrace => 0,
-                                    Kind::CloseBrace => 1,
-                                    Kind::Functor => 2,
-                                };
-
-                                if let Some(range) = range {
-                                    [kind, range.start as isize, range.end as isize]
-                                } else {
-                                    [kind, -1, -1]
-                                }
-                            })
-                            .collect::<Vec<isize>>();
-
-                        serde_json::json!({
-                            "filePath": w.path_for_id(file_id).unwrap().as_path().to_str(),
-                            "pcMeta": pc_meta,
-                        })
-                    };
-
-                    file_meta.insert(file_id, (index, meta));
-
-                    index
-                }
+            let Ok(typst_source) = w.source(*file_id) else {
+                continue;
             };
 
-            let region = self.regions.get(&file_id).unwrap();
-            let hits = base64::prelude::BASE64_STANDARD.encode(region.hits.lock().deref_mut());
+            let hits = region.hits.lock();
+            for (idx, (span, _kind)) in meta.meta.iter().enumerate() {
+                let Some(typst_range) = w.range(*span) else {
+                    continue;
+                };
 
-            regions.push(serde_json::json!({
-                "file_id": fid,
-                "hits": hits,
-            }));
+                let rng = tinymist_analysis::location::to_lsp_range(
+                    typst_range,
+                    &typst_source,
+                    lsp_position_encoding,
+                );
+
+                details.push(VscodeFileCoverageDetail {
+                    executed: hits[idx] > 0,
+                    location: rng,
+                });
+            }
+
+            result.insert(file_path, details);
         }
 
-        let mut file_meta = file_meta.values().collect::<Vec<_>>();
-        file_meta.sort_by(|a, b| a.0.cmp(&b.0));
-        let file_meta = file_meta
-            .into_iter()
-            .map(|(_, meta)| meta)
-            .collect::<Vec<_>>();
-
-        serde_json::json!({
-            "meta": file_meta,
-            "regions": regions,
-        })
+        serde_json::to_value(result).unwrap()
     }
 }
 
@@ -161,4 +130,16 @@ impl<'a> From<&'a PackageSpec> for PackageSpecCmp<'a> {
             version: &spec.version,
         }
     }
+}
+
+/// The coverage result in the format of the VSCode coverage data.
+pub type VscodeCoverage = HashMap<String, Vec<VscodeFileCoverageDetail>>;
+
+/// Converts the coverage result to the VSCode coverage data.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct VscodeFileCoverageDetail {
+    /// Whether the location is being executed
+    pub executed: bool,
+    /// The location of the coverage.
+    pub location: LspRange,
 }

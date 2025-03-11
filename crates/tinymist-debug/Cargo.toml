@@ -15,6 +15,7 @@ rust-version.workspace = true
 typst-library.workspace = true
 typst.workspace = true
 tinymist-std.workspace = true
+tinymist-analysis.workspace = true
 tinymist-world = { workspace = true, features = ["system"] }
 parking_lot.workspace = true
 comemo.workspace = true
