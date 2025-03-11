@@ -203,6 +203,7 @@ jobs:
         run: |
           cargo run --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
           cp docs/tinymist/ebook.pdf tinymist-docs.pdf
+          mkdir -p contrib/html/editors/vscode/out/ editors/vscode/out/
           cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
           cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
         if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
