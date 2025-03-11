@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tinymist_std::hash::FxHashMap;
+use tinymist_world::vfs::PathResolution;
+use tinymist_world::SourceWorld;
 use tinymist_world::{vfs::FileId, CompilerFeat, CompilerWorld};
 use typst::diag::FileResult;
 use typst::foundations::{Bytes, Datetime};
@@ -60,5 +62,11 @@ where
 
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         self.base.today(offset)
+    }
+}
+
+impl<F: CompilerFeat, I: Instrumenter> SourceWorld for InstrumentWorld<'_, F, I> {
+    fn path_for_id(&self, id: FileId) -> FileResult<PathResolution> {
+        self.base.path_for_id(id)
     }
 }

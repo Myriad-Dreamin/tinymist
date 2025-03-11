@@ -257,6 +257,105 @@ impl InstrumentWorker {
         self.visit_node_fallback(child);
         self.instrumented.push_str("\n__it => {");
         self.make_cov(s, Kind::Functor);
-        self.instrumented.push_str("; __cov_functor(__it); } }\n");
+        self.instrumented.push_str("__cov_functor(__it); } }\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn instr(input: &str) -> String {
+        let source = Source::detached(input);
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        new.text().to_string()
+    }
+
+    #[test]
+    fn test_physica_vector() {
+        let instrumented = instr(include_str!("fixtures/instr_coverage/physica_vector.typ"));
+        insta::assert_snapshot!(instrumented, @r#"
+        // A show rule, should be used like:
+        //   #show: super-plus-as-dagger
+        //   U^+U = U U^+ = I
+        // or in scope:
+        //   #[
+        //     #show: super-plus-as-dagger
+        //     U^+U = U U^+ = I
+        //   ]
+        #let super-plus-as-dagger(document) = {
+        __cov_pc(0);
+        {
+          show math.attach: {
+        let __cov_functor = elem => {
+        __cov_pc(1);
+        {
+            if __eligible(elem.base) and elem.at("t", default: none) == [+] {
+        __cov_pc(2);
+        {
+              $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
+            }
+        __cov_pc(3);
+        }
+         else {
+        __cov_pc(4);
+        {
+              elem
+            }
+        __cov_pc(5);
+        }
+
+          }
+        __cov_pc(6);
+        }
+
+        __it => {__cov_pc(7);
+        __cov_functor(__it); } }
+
+
+          document
+        }
+        __cov_pc(8);
+        }
+        "#);
+    }
+
+    #[test]
+    fn test_playground() {
+        let instrumented = instr(include_str!("fixtures/instr_coverage/playground.typ"));
+        insta::assert_snapshot!(instrumented, @"");
+    }
+
+    #[test]
+    fn test_instrument_coverage() {
+        let source = Source::detached("#let a = 1;");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @"#let a = 1;");
+    }
+
+    #[test]
+    fn test_instrument_coverage_nested() {
+        let source = Source::detached("#let a = {1};");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r"
+        #let a = {
+        __cov_pc(0);
+        {1}
+        __cov_pc(1);
+        }
+        ;
+        ");
+    }
+
+    #[test]
+    fn test_instrument_coverage_functor() {
+        let source = Source::detached("#show: main");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r"
+        #show: {
+        let __cov_functor = main
+        __it => {__cov_pc(0);
+        __cov_functor(__it); } }
+        ");
     }
 }

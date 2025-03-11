@@ -12,6 +12,9 @@ use crate::{
     EntryState,
 };
 
+mod diag;
+pub use diag::*;
+
 /// type trait of [`TypstSystemWorld`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemCompilerFeat;
