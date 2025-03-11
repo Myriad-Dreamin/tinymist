@@ -20,7 +20,7 @@ See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dream
 
 * (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
 * (Fix) Displaying `ProjectInsId` without quoting in https://github.com/Myriad-Dreamin/tinymist/pull/1476
-  * This made document summary not working in the previous version.
+  * This made document summary not working.
 * (Perf) Parallelizing and synchronously waiting font loading in https://github.com/Myriad-Dreamin/tinymist/pull/1470
 
 ### Code Analysis
