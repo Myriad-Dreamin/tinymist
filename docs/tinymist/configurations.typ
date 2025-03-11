@@ -1,7 +1,7 @@
 #import "mod.typ": *
 #import "@preview/cmarker:0.1.0": render as md
 
-#show: book-page.with(title: "Tinymist Configurations")
+#show: book-page.with(title: [Configurations])
 
 #let packages = json("/editors/vscode/package.json")
 

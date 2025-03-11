@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: "Tinymist Neovim Extension")
+#show: book-page.with(title: [Neovim])
 
 Run and configure `tinymist` in Neovim with support for all major distros and package managers.
 

@@ -1,7 +1,7 @@
 
 #import "/docs/tinymist/book.typ": book-page, cross-link
 #import "/typ/templates/page.typ": *
-#import "@preview/fletcher:0.4.4" as fletcher: *
+#import "@preview/fletcher:0.5.6" as fletcher: *
 #import "@preview/numbly:0.1.0": numbly
 
 /// This function is to render a text string in monospace style and function
