@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.6 - [2025-03-12]
+## v0.13.6 - [2025-03-13]
 
 We has provided more ways of previewing documents for editors having poor lsp support.
 - Default Preview: The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly.
