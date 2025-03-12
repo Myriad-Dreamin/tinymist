@@ -34,6 +34,9 @@ pub enum Commands {
     /// Execute a document and collect coverage
     #[clap(hide(true))] // still in development
     Cov(CompileOnceArgs),
+    /// Test a document and gives summary
+    #[clap(hide(true))] // still in development
+    Test(CompileOnceArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
     /// Generates build script for compilation

@@ -7,7 +7,6 @@ use std::{
 
 use clap_complete::Shell;
 use reflexo::{path::unix_slash, ImmutPath};
-use reflexo_typst::{diag::print_diagnostics, DiagnosticFormat};
 use tinymist_std::{bail, error::prelude::*};
 
 use crate::{project::*, task::ExportTask};
@@ -104,41 +103,6 @@ impl LockFileExt for LockFile {
 
         Ok(task_id)
     }
-}
-
-/// Runs project compilation(s)
-pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
-    // Prepares for the compilation
-    let universe = args.resolve()?;
-    let world = universe.snapshot();
-
-    let result = Ok(()).and_then(|_| -> Result<()> {
-        let res =
-            tinymist_debug::collect_coverage::<tinymist_std::typst::TypstPagedDocument, _>(&world)?;
-        let cov_path = Path::new("target/coverage.json");
-        let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
-
-        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
-        std::fs::write(cov_path, res).context("write coverage")?;
-
-        Ok(())
-    });
-
-    print_diag_or_error(&world, result)
-}
-
-fn print_diag_or_error(world: &LspWorld, result: Result<()>) -> Result<()> {
-    if let Err(e) = result {
-        if let Some(diagnostics) = e.diagnostics() {
-            print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                .context_ut("print diagnostics")?;
-            bail!("");
-        }
-
-        return Err(e);
-    }
-
-    Ok(())
 }
 
 /// Runs project compilation(s)

@@ -1,48 +1,68 @@
 import * as vscode from "vscode";
-import { IContext } from "../context";
+import { FileLevelContext, IContext } from "../context";
 import { VirtualConsole } from "../util";
 import * as fs from "fs";
 
 export function testingFeatureActivate(context: IContext) {
+  const runTests =
+    (kind: "cov" | "test") => (request: vscode.TestRunRequest, token: vscode.CancellationToken) =>
+      runCoverageTests(kind, request, token);
+
   const testController = vscode.tests.createTestController(
     "tinymist-tests",
     "Typst Tests (Tinymist)",
   );
 
-  const profileCoverage = testController.createRunProfile(
-    "tinymist-profile-coverage",
+  const profileFileCoverage = testController.createRunProfile(
+    "tinymist-profile-file-coverage",
     vscode.TestRunProfileKind.Coverage,
-    runCoverageTests,
+    runTests("cov"),
   );
 
-  context.subscriptions.push(testController, profileCoverage);
+  const profileTestCoverage = testController.createRunProfile(
+    "tinymist-profile-test-coverage",
+    vscode.TestRunProfileKind.Coverage,
+    runTests("test"),
+  );
+
+  context.subscriptions.push(testController, profileFileCoverage, profileTestCoverage);
+
+  const makeCommand = (kind: "cov" | "test") => async (ctx: FileLevelContext) => {
+    if (!context.isValidEditor(ctx.currentEditor)) {
+      return;
+    }
+    const document = ctx.currentEditor.document;
+
+    const includes = [
+      testController.createTestItem("tinymist-profile", "tinymist-profile", document.uri),
+    ];
+
+    const testRunRequest = new vscode.TestRunRequest(
+      includes,
+      undefined,
+      kind == "cov" ? profileFileCoverage : profileTestCoverage,
+      false,
+      true,
+    );
+
+    const cc = new vscode.CancellationTokenSource();
+    runCoverageTests(kind, testRunRequest, cc.token);
+  };
 
   context.registerFileLevelCommand({
     command: "tinymist.profileCurrentFileCoverage",
-    execute: async (ctx) => {
-      if (!context.isValidEditor(ctx.currentEditor)) {
-        return;
-      }
-      const document = ctx.currentEditor.document;
-
-      const includes = [
-        testController.createTestItem("tinymist-profile", "tinymist-profile", document.uri),
-      ];
-
-      const testRunRequest = new vscode.TestRunRequest(
-        includes,
-        undefined,
-        profileCoverage,
-        false,
-        true,
-      );
-
-      const cc = new vscode.CancellationTokenSource();
-      runCoverageTests(testRunRequest, cc.token);
-    },
+    execute: makeCommand("cov"),
+  });
+  context.registerFileLevelCommand({
+    command: "tinymist.profileCurrentTestCoverage",
+    execute: makeCommand("test"),
   });
 
-  async function runCoverageTests(request: vscode.TestRunRequest, token: vscode.CancellationToken) {
+  async function runCoverageTests(
+    testKind: "cov" | "test",
+    request: vscode.TestRunRequest,
+    token: vscode.CancellationToken,
+  ) {
     const testRun = testController.createTestRun(request);
     if (request.include?.length !== 1) {
       context.showErrorMessage("Invalid tinymist test run request");
@@ -56,6 +76,7 @@ export function testingFeatureActivate(context: IContext) {
       return;
     }
     testRun.started(item);
+    const cwd = context.getRootForUri(uri);
 
     const failed = (msg: string) => {
       testRun.failed(item, new vscode.TestMessage(msg));
@@ -88,6 +109,7 @@ export function testingFeatureActivate(context: IContext) {
 
     const coverageTask = executable.execute(
       {
+        cwd,
         killer,
         isTTY: true,
         stdout: (data: Buffer) => {
@@ -97,7 +119,7 @@ export function testingFeatureActivate(context: IContext) {
           vc.write(data.toString("utf8"));
         },
       },
-      ["cov", uri.fsPath],
+      [testKind, uri.fsPath],
     );
 
     const detailsFut = coverageTask.then<Map<string, vscode.FileCoverageDetail[]>>((res) => {
@@ -106,12 +128,13 @@ export function testingFeatureActivate(context: IContext) {
         return details;
       }
 
-      const cov_path = "target/coverage.json";
-      if (!fs.existsSync(cov_path)) {
+      const covPath = vscode.Uri.joinPath(vscode.Uri.file(cwd!), "target/coverage.json").fsPath;
+      console.log("covPath", covPath);
+      if (!fs.existsSync(covPath)) {
         return details;
       }
 
-      const cov = fs.readFileSync(cov_path, "utf8");
+      const cov = fs.readFileSync(covPath, "utf8");
       const cov_json: Record<string, vscode.StatementCoverage[]> = JSON.parse(cov);
       for (const [k, v] of Object.entries(cov_json)) {
         details.set(

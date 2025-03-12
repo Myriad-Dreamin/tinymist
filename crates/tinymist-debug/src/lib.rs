@@ -83,6 +83,25 @@ impl CoverageResult {
 pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
+    let (cov, result) = with_cov(base, |instr| {
+        if let Err(e) = typst::compile::<D>(&instr).output {
+            print_diagnostics(instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
+                .context_ut("failed to print diagnostics")?;
+            bail!("");
+        }
+
+        Ok(())
+    });
+
+    result?;
+    cov
+}
+
+/// Collects the coverage with a callback.
+pub fn with_cov<F: CompilerFeat>(
+    base: &CompilerWorld<F>,
+    mut f: impl FnMut(&InstrumentWorld<F, CoverageInstrumenter>) -> Result<()>,
+) -> (Result<CoverageResult>, Result<()>) {
     let instr = InstrumentWorld {
         base,
         library: instrument_library(&base.library),
@@ -92,16 +111,12 @@ pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
 
     let _cov_lock = cov::COVERAGE_LOCK.lock();
 
-    if let Err(e) = typst::compile::<D>(&instr).output {
-        print_diagnostics(&instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
-            .context_ut("failed to print diagnostics")?;
-        bail!("");
-    }
+    let result = f(&instr);
 
     let meta = std::mem::take(instr.instr.map.lock().deref_mut());
     let CoverageMap { regions, .. } = std::mem::take(cov::COVERAGE_MAP.lock().deref_mut());
 
-    Ok(CoverageResult { meta, regions })
+    (Ok(CoverageResult { meta, regions }), result)
 }
 
 #[comemo::memoize]
