@@ -580,7 +580,7 @@ impl ServerState {
             return Err(internal_error("server trace is not started or stopped"));
         };
 
-        if task.stop_tx.send(()).is_err() {
+        if task.stop_tx.send(true).is_err() {
             return Err(internal_error("cannot send stop signal to server trace"));
         }
 
