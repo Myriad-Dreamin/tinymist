@@ -25,6 +25,8 @@ See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dream
 
 ### Code Analysis
 
+* (Fix) Identifying chained dot access when matching atomic expression in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/1488 and https://github.com/Myriad-Dreamin/tinymist/pull/1489
+  * When completing `#a.b.|`, the second `.` was viewed as a text dot and failed to trigger the field completion. It now reparses correctly.
 * Made file type recognition by file extension case-insensitive in https://github.com/Myriad-Dreamin/tinymist/pull/1472
   * For example, `IMAGE.PNG` is recognized as an image file now.
 
