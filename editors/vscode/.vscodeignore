@@ -1,4 +1,6 @@
 **
+!package.nls.json
+!package.nls.*.json
 !out/tinymist-docs.pdf
 !out/extension.js
 !out/extension.web.js
