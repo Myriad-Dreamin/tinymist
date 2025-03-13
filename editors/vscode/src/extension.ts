@@ -562,7 +562,8 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
     const kBrowsing = "Browsing Preview Documents";
     const kPreviewIn = "Preview in ..";
     const kExportAs = "Export as ..";
-    const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs] as const;
+    const kProfileServer = "Profile Server";
+    const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs, kProfileServer] as const;
 
     const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
       title: "More Actions",
@@ -631,6 +632,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
             return;
         }
 
+        return;
+      }
+      case kProfileServer: {
+        void vscode.commands.executeCommand(`tinymist.profileServer`);
         return;
       }
     }

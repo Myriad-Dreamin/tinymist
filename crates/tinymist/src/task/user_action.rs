@@ -9,9 +9,10 @@ use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use lsp_server::RequestId;
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
-use sync_lsp::{just_future, LspClient, SchedulableResponse};
+use serde_json::{json, Value as JsonValue};
+use sync_lsp::{just_future, LspClient, LspResult, SchedulableResponse};
 use tinymist_std::error::IgnoreLogging;
+use tokio::sync::{oneshot, watch};
 use typst::{syntax::Span, World};
 
 use crate::project::LspWorld;
@@ -33,13 +34,107 @@ pub struct TraceParams {
 pub struct UserActionTask;
 
 impl UserActionTask {
-    /// Run a trace.
-    pub fn trace(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
+    /// Traces a specific document.
+    pub fn trace_document(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
         just_future(async move {
             run_trace_program(params)
                 .await
                 .map_err(|e| internal_error(format!("failed to run trace program: {e:?}")))
         })
+    }
+
+    /// Traces the entire server.
+    pub fn trace_server(&self) -> (ServerTraceTask, SchedulableResponse<JsonValue>) {
+        let (stop_tx, mut stop_rx) = watch::channel(false);
+        let mut stop_rx2 = stop_rx.clone();
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let task = ServerTraceTask { stop_tx, resp_rx };
+
+        typst_timing::enable();
+
+        let resp = just_future(async move {
+            let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
+            let t = tokio::spawn(async move {
+                log::info!("before generate timings");
+
+                let timings = async {
+                    stop_rx.wait_for(|stopped| *stopped).await.ok();
+                    typst_timing::disable();
+
+                    let mut writer = std::io::BufWriter::new(Vec::new());
+                    // todo: resolve span correctly
+                    let _ = typst_timing::export_json(&mut writer, |_| ("unknown".to_string(), 0));
+
+                    let timings = writer.into_inner().unwrap();
+
+                    // let timings_debug =
+                    // serde_json::from_slice::<serde_json::Value>(&timings).unwrap();
+                    // log::info!("timings: {:?}", timings_debug);
+
+                    timings
+                }
+                .await;
+
+                log::info!("after generate timings");
+                //log::info!("timings: {:?}", timings);
+
+                // let _ = resp_tx;
+                // let res = serde_json::to_value(TraceReport {
+                //     request: params,
+                //     messages,
+                //     stderr: base64::engine::general_purpose::STANDARD.encode(String::new()),
+                // })?;
+
+                log::info!("now make http server");
+
+                let static_file_addr = "127.0.0.1:0".to_owned();
+                make_http_server(timings, static_file_addr, addr_tx).await;
+            });
+
+            let addr = addr_rx.await.map_err(|err| {
+                log::error!("failed to get address of trace server: {err:?}");
+                internal_error("failed to get address of trace server")
+            })?;
+
+            log::info!("trace server has started at {addr}");
+
+            tokio::spawn(async move {
+                let selected = tokio::select! {
+                    a = stop_rx2.wait_for(|stopped| *stopped) => {
+                        log::info!("trace server task stopped by user");
+                        Ok(a)
+                    },
+                    b = t => {
+                        log::info!("trace server task stopped by timeout");
+                        Err(b)
+                    },
+                };
+
+                match selected {
+                    Ok(Err(err)) => {
+                        log::error!("Error occurs when trace server task stopped by user: {err:?}");
+                    }
+                    Err(Err(err)) => {
+                        log::error!("occurs when trace server task stopped by timeout: {err:?}");
+                    }
+                    Ok(Ok(_)) | Err(Ok(_)) => {}
+                };
+
+                resp_tx
+                    .send(Ok(json!({
+                        "tracingUrl": format!("http://{addr}"),  // send attr to stopServerProfiling message processor directly
+                    })))
+                    .ok()
+                    .log_error("failed to send response");
+            });
+
+            Ok(serde_json::json!({
+                "tracingUrl": format!("http://{addr}"),  // not used
+            }))
+        });
+
+        (task, resp)
     }
 
     /// Run a trace request in subprocess.
@@ -202,6 +297,7 @@ async fn trace_main(
             let t = tokio::spawn(async move {
                 let static_file_addr = "127.0.0.1:0".to_owned();
                 make_http_server(timings, static_file_addr, addr_tx).await;
+                std::process::exit(0);
             });
 
             let addr = addr_rx.await.unwrap();
@@ -224,13 +320,21 @@ async fn trace_main(
     std::process::exit(0);
 }
 
+/// The server trace task.
+pub struct ServerTraceTask {
+    /// The sender to stop the trace.
+    pub stop_tx: watch::Sender<bool>,
+    /// The receiver to get the trace result.
+    pub resp_rx: oneshot::Receiver<LspResult<JsonValue>>,
+}
+
 // todo: reuse code from tools preview
 /// Create a http server for the trace program.
-pub async fn make_http_server(
+async fn make_http_server(
     timings: Vec<u8>,
     static_file_addr: String,
     addr_tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>,
-) -> ! {
+) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
@@ -364,7 +468,6 @@ pub async fn make_http_server(
 
     addr_tx.send(addr).ok();
     join.await.unwrap();
-    std::process::exit(0);
 }
 
 /// Turns a span into a (file, line) pair.
