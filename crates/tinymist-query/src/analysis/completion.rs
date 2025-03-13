@@ -10,6 +10,7 @@ use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
+use tinymist_analysis::syntax::bad_completion_cursor;
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -174,13 +175,7 @@ impl<'a> CompletionCursor<'a> {
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
 
-        // todo: don't match here?
-        if matches!(syntax, Some(SyntaxClass::Callee(..)))
-            && matches!(syntax_context.as_ref(), Some(
-                SyntaxContext::Element { container, .. } |
-                SyntaxContext::Arg { args: container, .. } |
-                SyntaxContext::Paren { container, .. }) if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()))
-        {
+        if bad_completion_cursor(syntax.as_ref(), syntax_context.as_ref(), &leaf).is_some() {
             return None;
         }
 

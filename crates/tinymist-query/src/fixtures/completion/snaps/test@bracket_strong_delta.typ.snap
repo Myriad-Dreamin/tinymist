@@ -7,28 +7,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong_delta.t
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 5,
-    "label": "delta",
-    "labelDetails": {
-     "description": "int"
-    },
-    "sortText": "000",
-    "textEdit": {
-     "newText": "delta: ${1:})",
-     "range": {
-      "end": {
-       "character": 31,
-       "line": 2
-      },
-      "start": {
-       "character": 31,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]

@@ -181,11 +181,12 @@ impl<'a> PostTypeChecker<'a> {
             None
         };
 
-        let can_penetrate_context = !(matches!(node.kind(), SyntaxKind::Hash)
-            || matches!(context.kind(), SyntaxKind::FieldAccess) && {
-                let field_access = context.cast::<ast::FieldAccess>()?;
-                field_access.field().span() == node.span()
-            });
+        let can_penetrate_context =
+            !(matches!(node.kind(), SyntaxKind::Hash | SyntaxKind::ContentBlock)
+                || matches!(context.kind(), SyntaxKind::FieldAccess) && {
+                    let field_access = context.cast::<ast::FieldAccess>()?;
+                    field_access.field().span() == node.span()
+                });
 
         let contextual_self_ty = can_penetrate_context
             .then(|| self.check_cursor(classify_context(node.clone(), None), context_ty));
