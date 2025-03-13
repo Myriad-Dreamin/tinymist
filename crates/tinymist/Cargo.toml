@@ -83,6 +83,7 @@ typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
+tinymist-l10n.workspace = true
 
 [features]
 default = ["cli", "html", "pdf", "preview", "embed-fonts", "no-content-hint"]

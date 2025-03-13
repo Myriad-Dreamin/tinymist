@@ -4027,6 +4027,7 @@ dependencies = [
  "temp-env",
  "tinymist-assets 0.13.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
+ "tinymist-l10n",
  "tinymist-project",
  "tinymist-query",
  "tinymist-render",
@@ -4115,6 +4116,7 @@ dependencies = [
  "ecow",
  "insta",
  "rayon",
+ "serde_json",
  "walkdir",
 ]
 
@@ -4186,6 +4188,7 @@ dependencies = [
  "strum",
  "tinymist-analysis",
  "tinymist-derive",
+ "tinymist-l10n",
  "tinymist-project",
  "tinymist-std",
  "tinymist-world",

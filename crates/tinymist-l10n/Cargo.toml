@@ -28,6 +28,7 @@ comemo.workspace = true
 ecow.workspace = true
 walkdir.workspace = true
 rayon.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
