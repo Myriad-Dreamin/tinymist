@@ -228,9 +228,8 @@ impl ServerState {
         let context = params.context.as_ref();
         let explicit =
             context.is_some_and(|context| context.trigger_kind == CompletionTriggerKind::INVOKED);
-        let trigger_character = params
-            .context
-            .and_then(|c| c.trigger_character)
+        let trigger_character = context
+            .and_then(|c| c.trigger_character.as_ref())
             .and_then(|c| c.chars().next());
 
         run_query!(

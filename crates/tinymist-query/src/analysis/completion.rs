@@ -10,7 +10,7 @@ use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use tinymist_analysis::syntax::bad_completion_cursor;
+use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -174,10 +174,6 @@ impl<'a> CompletionCursor<'a> {
         let syntax = classify_syntax(leaf.clone(), cursor);
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
-
-        if bad_completion_cursor(syntax.as_ref(), syntax_context.as_ref(), &leaf).is_some() {
-            return None;
-        }
 
         crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
@@ -637,12 +633,21 @@ impl CompletionPair<'_, '_, '_> {
             | None => {}
         }
 
+        let cursor_pos = bad_completion_cursor(
+            self.cursor.syntax.as_ref(),
+            self.cursor.syntax_context.as_ref(),
+            &self.cursor.leaf,
+        );
+
         // Triggers a complete type checking.
         let ty = self
             .worker
             .ctx
             .post_type_of_node(self.cursor.leaf.clone())
-            .filter(|ty| !matches!(ty, Ty::Any));
+            .filter(|ty| !matches!(ty, Ty::Any))
+            // Forbids argument completion list if the cursor is in a bad position. This will
+            // prevent the completion list from showing up.
+            .filter(|_| !matches!(cursor_pos, Some(BadCompletionCursor::ArgListPos)));
 
         crate::log_debug_ct!(
             "complete_type: {:?} -> ({surrounding_syntax:?}, {ty:#?})",
