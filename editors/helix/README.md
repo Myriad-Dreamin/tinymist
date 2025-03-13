@@ -44,6 +44,10 @@ language-servers = ["tinymist"]
 
 ## Tips
 
+### Getting Preview Feature
+
+[Default Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) are suitable in helix.
+
 ### Working with Multiple-File Projects
 
 There is a way in [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md#multiple-file-project-support), but you cannot invoke related commands with arguments by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix. As a candidate solution, assuming your having following directory layout:
