@@ -119,6 +119,10 @@ If you are interested by any above features, please feel free to send Issues to 
 
 Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution guidelines.
 
+== Localization
+
+Tinymist is localized in multiple languages. You can contribute to the localization of Tinymist by translating or correcting the locale files in the [locales](./locales) folder. This is also a good start of contributing to the project.
+
 == Maintainers
 
 Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ")[MAINTAINERS.typ]. Or programmatically by `yarn maintainers`
