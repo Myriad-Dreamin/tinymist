@@ -1,6 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "fs";
+import * as path from "path";
 
+import { vscodeExtTranslations } from "../../../scripts/build-l10n.mjs";
+
+const __dirname = new URL(".", import.meta.url).toString().replace("file:///", "");
 const projectRoot = path.join(__dirname, "../../..");
 
 const packageJsonPath = path.join(projectRoot, "editors/vscode/package.json");
@@ -11,6 +14,17 @@ const otherPackageJson = JSON.parse(fs.readFileSync(otherPackageJsonPath, "utf8"
 
 const config = packageJson.contributes.configuration.properties;
 const otherConfig = otherPackageJson.contributes.configuration.properties;
+
+const translate = (desc) => {
+  const translations = vscodeExtTranslations["en"];
+  desc = desc.replace(/\%(.*?)\%/g, (_, key) => {
+    if (!translations[key]) {
+      throw new Error(`Missing translation for ${key}`);
+    }
+    return translations[key];
+  });
+  return desc;
+};
 
 // Generate Configuration.md string
 
@@ -91,7 +105,7 @@ const configMd = (editor, prefix) => {
       markdownDeprecationMessage,
     } = config[key];
 
-    const description = markdownDescription || rawDescription;
+    const description = translate(markdownDescription || rawDescription);
 
     if (markdownDeprecationMessage) {
       return;
@@ -119,7 +133,7 @@ const configMd = (editor, prefix) => {
       // zip enum values and descriptions
       for (let i = 0; i < enumBase.length; i++) {
         if (enumBaseDescription?.[i]) {
-          enumSections.push(`  - \`${enumBase[i]}\`: ${enumBaseDescription[i]}`);
+          enumSections.push(`  - \`${enumBase[i]}\`: ${translate(enumBaseDescription[i])}`);
         } else {
           enumSections.push(`  - \`${enumBase[i]}\``);
         }

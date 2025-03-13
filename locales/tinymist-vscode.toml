@@ -988,3 +988,531 @@ uk = "Примітка: Перехід до вихідного місця роз
 vi = "Lưu ý: Nhảy đến vị trí nguồn của mục đề cương không hoạt động tốt nếu phần thân của nó không có vị trí nguồn, ví dụ\n```\n#let my-heading(h) = heading(h) // sẽ nhảy đến đây\n#my-heading(\"Title\") // sẽ không nhảy đến đây\n```.\nDo đó, bạn có thể muốn sử dụng `my-heading[Title]` thay thế để có trải nghiệm nhảy đề cương tốt hơn."
 zh = "注意：如果大纲项的主体没有源位置，例如\n```\n#let my-heading(h) = heading(h) // 会跳到这里\n#my-heading(\"Title\") // 不会跳到这里\n```。\n因此，您可能希望使用 `my-heading[Title]` 以获得更好的大纲跳转体验。"
 zh-TW = "注意：如果大綱項的主體沒有源位置，例如\n```\n#let my-heading(h) = heading(h) // 會跳到這裡\n#my-heading(\"Title\") // 不會跳到這裡\n```。\n因此，您可能希望使用 `my-heading[Title]` 以獲得更好的大綱跳轉體驗。"
+
+[extension.tinymist.config.tinymist.projectResolution.title]
+en = "Project Resolution"
+zh = "项目解析"
+
+[extension.tinymist.config.tinymist.projectResolution.desc]
+en = "This configuration specifies the way to resolved projects."
+zh = "此配置指定了解析项目的方式。"
+
+[extension.tinymist.config.tinymist.projectResolution.string.enum.singleFile]
+en = "Manage typst documents like what we did in Markdown. Each single file is an individual document and no project resolution is needed."
+zh = "像在 Markdown 中一样管理 typst 文档。每个单独的文件都是一个独立的文档，不需要项目解析。"
+
+[extension.tinymist.config.tinymist.projectResolution.string.enum.lockDatabase]
+en = "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file."
+zh = "像在 Rust 中一样管理 typst 文档。对于每个工作区，tinymist 会跟踪您的预览和编译历史，并将信息存储在锁定文件中。Tinymist 将根据锁定文件自动选择要使用的主文件。这还允许其他工具通过更新锁定文件将预览和导出任务推送到语言服务器。"
+
+[extension.tinymist.config.tinymist.outputPath.title]
+en = "Output Path"
+zh = "输出路径"
+
+[extension.tinymist.config.tinymist.outputPath.desc]
+en = "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`."
+zh = "存储 Typst 产物的路径模式，您可以使用 `$root` 或 `$dir` 或 `$name` 来进行魔法配置，例如 `$dir/$name`（默认） 和 `$root/target/$dir/$name`。"
+
+[extension.tinymist.config.tinymist.exportTarget.title]
+en = "Export target"
+zh = "导出目标"
+
+[extension.tinymist.config.tinymist.exportTarget.desc]
+en = "The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code."
+zh = "导出文档的目标。默认为 `paged`。注意：即使设置为 `html`，您仍然可以导出 PDF。此配置仅影响语言服务器如何完成您的代码。"
+
+[extension.tinymist.config.tinymist.exportTarget.string.enum.paged]
+en = "The current export target is for PDF, PNG, and SVG export."
+zh = "当前的导出目标是 PDF、PNG 和 SVG 导出。"
+
+[extension.tinymist.config.tinymist.exportTarget.string.enum.html]
+en = "The current export target is for HTML export."
+zh = "当前的导出目标是 HTML 导出。"
+
+[extension.tinymist.config.tinymist.exportPdf.title]
+en = "Export PDF"
+zh = "导出 PDF"
+
+[extension.tinymist.config.tinymist.exportPdf.desc]
+en = "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs."
+zh = "扩展可以导出 Typst 文件的 PDF。此设置控制此功能是否启用以及运行频率。"
+
+[extension.tinymist.config.tinymist.exportPdf.string.enum.never]
+en = "Never export PDFs, you will manually run typst."
+zh = "从不导出 PDF，您将手动运行 typst。"
+
+[extension.tinymist.config.tinymist.exportPdf.string.enum.onSave]
+en = "Export PDFs when you save a file."
+zh = "保存文件时导出 PDF。"
+
+[extension.tinymist.config.tinymist.exportPdf.string.enum.onType]
+en = "Export PDFs as you type in a file."
+zh = "在文件中输入时导出 PDF。"
+
+[extension.tinymist.config.tinymist.exportPdf.string.enum.onDocumentHasTitle]
+en = "(Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
+zh = "（已废除） 当文档有标题时导出 PDF（并保存文件），这对于过滤模板文件很有用。"
+
+[extension.tinymist.config.tinymist.rootPath.title]
+en = "Root path"
+zh = "根路径"
+
+[extension.tinymist.config.tinymist.rootPath.desc]
+en = "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)."
+zh = "配置 typst 中绝对路径的根。提示：您可以将 rootPath 设置为 `-`，这样 tinymist 将始终使用文件的父目录作为根路径。注意：对于 neovim 用户，如果它抱怨找不到根目录，您还必须设置 `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }`，请参见 [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)。"
+
+[extension.tinymist.config.tinymist.configureDefaultWordSeparator.title]
+en = "Configure default word separators"
+zh = "配置默认单词分隔符"
+
+[extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.desc]
+en = "Whether to configure default word separators on startup"
+zh = "是否在启动时配置默认单词分隔符"
+
+[extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.enum.enable]
+en = "Override the default word separators on startup"
+zh = "在启动时覆盖默认单词分隔符"
+
+[extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.enum.disable]
+en = "Do not override the default word separators on startup"
+zh = "在启动时不覆盖默认单词分隔符"
+
+[extension.tinymist.config.tinymist.semanticTokens.title]
+en = "Semantic tokens mode"
+zh = "语义标记模式"
+
+[extension.tinymist.config.tinymist.semanticTokens.desc]
+en = "Enable or disable semantic tokens (LSP syntax highlighting)"
+zh = "启用或禁用语义标记（LSP 语法高亮）"
+
+[extension.tinymist.config.tinymist.semanticTokens.string.enum.enable]
+en = "Use semantic tokens for syntax highlighting"
+zh = "使用语义标记进行语法高亮"
+
+[extension.tinymist.config.tinymist.semanticTokens.string.enum.disable]
+en = "Do not use semantic tokens for syntax highlighting"
+zh = "不使用语义标记进行语法高亮"
+
+[extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title]
+en = "Continue Comments on Newline"
+zh = "在新行上继续注释"
+
+[extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.desc]
+en = "Whether to prefix newlines after comments with the corresponding comment prefix."
+zh = "是否在注释后的新行上添加相应的注释前缀。"
+
+[extension.tinymist.config.tinymist.onEnterEvent.title]
+en = "Handling on enter events"
+zh = "处理回车事件"
+
+[extension.tinymist.config.tinymist.onEnterEvent.desc]
+en = "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting."
+zh = "启用或禁用 [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)（LSP onEnter 功能）以允许在回车时自动插入字符，例如用于注释的 `///`。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.systemFonts.title]
+en = "System Fonts"
+zh = "系统字体"
+
+[extension.tinymist.config.tinymist.systemFonts.desc]
+en = "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options."
+zh = "一个标志，用于确定是否为 Typst 编译器加载系统字体，这对于确保可重现的编译很有用。如果设置为 null 或未设置，扩展将使用 Typst 编译器的默认行为。注意：更改此选项需要重新启动 LSP。"
+
+[extension.tinymist.config.tinymist.fontPaths.title]
+en = "Font Paths"
+zh = "字体路径"
+
+[extension.tinymist.config.tinymist.fontPaths.desc]
+en = "A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`."
+zh = "字体文件或目录路径列表。注意：优先级较高的配置源将**覆盖**优先级较低的配置源。优先级顺序为：配置 `tinymist.fontPaths` > 配置 `tinymist.typstExtraArgs.fontPaths` > LSP 的 CLI 参数 `--font-path` > 环境变量 `TYPST_FONT_PATHS`（由 `;`（在 Windows 上）或 `:`（其他情况）分隔的路径列表）。注意：如果字体路径是相对路径，它将基于根目录解析。注意：在 VSCode 中，您可以在路径中使用 VSCode 变量，例如 `${workspaceFolder}/fonts`。"
+
+[extension.tinymist.config.tinymist.compileStatus.title]
+en = "Compile Status"
+zh = "编译状态"
+
+[extension.tinymist.config.tinymist.compileStatus.desc]
+en = "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label."
+zh = "在 VSCode 中，启用编译状态意味着扩展将在状态栏中显示编译状态。由于 Neovim 和 Helix 没有这样的功能，因此在语言服务器标签上默认禁用。"
+
+[extension.tinymist.config.tinymist.statusBarFormat.title]
+en = "Status Bar Format"
+zh = "状态栏格式"
+
+[extension.tinymist.config.tinymist.statusBarFormat.desc]
+en = "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty."
+zh = "设置服务器状态的格式字符串。例如，`{compileStatusIcon}{wordCount} [{fileName}]` 将格式化状态为 `$(check) 123 words [main]`。有效的占位符包括：\n\n- `{compileStatusIcon}`：指示编译状态的图标\n- `{wordCount}`：文档中的字数\n- `{fileName}`：正在编译的文件的名称\n\n注意：如果格式字符串为空，则状态栏将被隐藏。"
+
+[extension.tinymist.config.tinymist.typstExtraArgs.title]
+en = "Typst Extra Arguments"
+zh = "Typst 额外参数"
+
+[extension.tinymist.config.tinymist.typstExtraArgs.desc]
+en = "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`."
+zh = "您可以传递任何您喜欢的参数，我们将尝试遵循**相同版本**的 typst-cli 的行为。注意：参数可能会被其他设置覆盖。例如，`--font-path` 将被 `tinymist.fontPaths` 覆盖。"
+
+[extension.tinymist.config.tinymist.typstExtraArgs.items.title]
+en = "arguments in order"
+zh = "按顺序的参数"
+
+[extension.tinymist.config.tinymist.typstExtraArgs.items.desc]
+en = "The arguments for Typst as same as typst-cli"
+zh = "与 typst-cli 相同的 Typst 参数"
+
+[extension.tinymist.config.tinymist.serverPath.title]
+en = "Path to Server Binary"
+zh = "服务器二进制文件路径"
+
+[extension.tinymist.config.tinymist.serverPath.desc]
+en = "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable. The string \"tinymist\" means look up Tinymist in PATH."
+zh = "扩展可以使用本地 tinymist 可执行文件，而不是与扩展捆绑的可执行文件。此设置控制可执行文件的路径。字符串 \"tinymist\" 表示在 PATH 中查找 Tinymist。"
+
+[extension.tinymist.config.tinymist.trace.server.title]
+en = "Trace Server"
+zh = "跟踪服务器"
+
+[extension.tinymist.config.tinymist.trace.server.desc]
+en = "Traces the communication between VS Code and the language server."
+zh = "跟踪 VS Code 和语言服务器之间的通信。"
+
+[extension.tinymist.config.tinymist.formatterMode.title]
+en = "Formatter Mode"
+zh = "格式化工具模式"
+
+[extension.tinymist.config.tinymist.formatterMode.desc]
+en = "The extension can format Typst files using typstfmt or typstyle."
+zh = "扩展可以使用 typstfmt 或 typstyle 格式化 Typst 文件。"
+
+[extension.tinymist.config.tinymist.formatterMode.string.enum.disable]
+en = "Formatter is not activated."
+zh = "未激活格式化工具。"
+
+[extension.tinymist.config.tinymist.formatterMode.string.enum.typstyle]
+en = "Use typstyle formatter."
+zh = "使用 typstyle 格式化工具。"
+
+[extension.tinymist.config.tinymist.formatterMode.string.enum.typstfmt]
+en = "Use typstfmt formatter."
+zh = "使用 typstfmt 格式化工具。"
+
+[extension.tinymist.config.tinymist.formatterPrintWidth.title]
+en = "Formatter Print Width"
+zh = "格式化工具打印宽度"
+
+[extension.tinymist.config.tinymist.formatterPrintWidth.desc]
+en = "Sets the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations."
+zh = "设置格式化工具的打印宽度，这是每行字符的**软限制**。请参见[*Print Width*的定义](https://prettier.io/docs/en/options.html#print-width)。注意：这比格式化工具的特定配置优先级低。"
+
+[extension.tinymist.config.tinymist.formatterIndentSize.title]
+en = "Formatter Indent Size"
+zh = "格式化工具缩进长度"
+
+[extension.tinymist.config.tinymist.formatterIndentSize.desc]
+en = "Sets the indent size (using space) for the formatter."
+zh = "设置格式化工具的缩进长度（使用空格）。"
+
+[extension.tinymist.config.tinymist.showExportFileIn.title]
+en = "Show Export File In"
+zh = "在哪里显示导出文件"
+
+[extension.tinymist.config.tinymist.showExportFileIn.desc]
+en = "(Experimental) Show Exported Files in Some Place"
+zh = "（实验性）在某个地方显示导出的文件"
+
+[extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.title]
+en = "For all kind of files."
+zh = "对于所有类型的文件。"
+
+[extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.desc]
+en = "Configures way of opening exported files, e.g. inside of editor tabs or using system application."
+zh = "配置打开导出文件的方式，例如在编辑器选项卡中或使用系统应用程序。"
+
+[extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.enum.editorTab]
+en = "Show the exported files in editor tabs."
+zh = "在编辑器选项卡中显示导出的文件。"
+
+[extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.enum.systemDefault]
+en = "Show the exported files by system default application."
+zh = "使用系统默认应用程序显示导出的文件。"
+
+[extension.tinymist.config.tinymist.dragAndDrop.title]
+en = "Drag and Drop"
+zh = "拖放"
+
+[extension.tinymist.config.tinymist.dragAndDrop.desc]
+en = "Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting."
+zh = "是否处理将资源拖放到编辑 typst 文档中。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.dragAndDrop.string.enum.enable]
+en = "Enable drag-and-drop."
+zh = "启用拖放。"
+
+[extension.tinymist.config.tinymist.dragAndDrop.string.enum.disable]
+en = "Disable drag-and-drop."
+zh = "禁用拖放。"
+
+[extension.tinymist.config.tinymist.copyAndPaste.title]
+en = "Copy and Paste"
+zh = "复制和粘贴"
+
+[extension.tinymist.config.tinymist.copyAndPaste.desc]
+en = "Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting."
+zh = "是否处理将资源粘贴到编辑 typst 文档中。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.copyAndPaste.string.enum.enable]
+en = "Enable copy-and-paste."
+zh = "启用复制和粘贴。"
+
+[extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable]
+en = "Disable copy-and-paste."
+zh = "禁用复制和粘贴。"
+
+[extension.tinymist.config.tinymist.renderDocs.title]
+en = "(Experimental) Render Docs"
+zh = "（实验性）渲染文档"
+
+[extension.tinymist.config.tinymist.renderDocs.desc]
+en = "(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs."
+zh = "（实验性）是否在（悬停）文档中呈现 typst 元素。在 VS Code 中，启用此功能时，tinymist 将在文件系统的临时存储中存储呈现的结果，以在悬停内容中显示它们。注意：如果编辑器不支持/处理文档中的图像预览，请禁用此功能。"
+
+[extension.tinymist.config.tinymist.renderDocs.string.enum.enable]
+en = "Enable render docs."
+zh = "启用呈现文档。"
+
+[extension.tinymist.config.tinymist.renderDocs.string.enum.disable]
+en = "Disable render docs."
+zh = "禁用呈现文档。"
+
+[extension.tinymist.config.tinymist.completion.triggerOnSnippetPlaceholders.title]
+en = "Trigger LSP Completion on Snippet Placeholders"
+zh = "在片段的参数（占位符）上触发完成"
+
+[extension.tinymist.config.tinymist.completion.triggerOnSnippetPlaceholders.desc]
+en = "Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting."
+zh = "是否在片段的参数（占位符）上触发完成。例如，`box` 将被完成为 `box(|)`，并且服务器将请求编辑器（lsp 客户端）在将光标移动到片段中的占位符后请求完成。注意：如果编辑器不支持 `editor.action.triggerSuggest` 或 `tinymist.triggerSuggestAndParameterHints` 命令，则此设置无效。提示：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.completion.postfix.title]
+en = "Postfix Code Completion"
+zh = "后缀代码补全"
+
+[extension.tinymist.config.tinymist.completion.postfix.desc]
+en = "Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting."
+zh = "是否启用后缀代码补全。例如，`[A].box|` 将被完成为 `box[A]|`。提示：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcs.title]
+en = "UFCS-style Completion"
+zh = "UFCS 风格补全"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcs.desc]
+en = "Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting."
+zh = "是否启用 UFCS 风格补全。例如，`[A].box|` 将被完成为 `box[A]|`。提示：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcsLeft.title]
+en = "UFCS-style Completion (Left Variant)"
+zh = "UFCS 风格补全（左变体）"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcsLeft.desc]
+en = "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting."
+zh = "是否启用左变体 UFCS 风格补全。例如，`[A].table|` 将被完成为 `table(|)[A]`。提示：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcsRight.title]
+en = "UFCS-style Completion (Right Variant)"
+zh = "UFCS 风格补全（右变体）"
+
+[extension.tinymist.config.tinymist.completion.postfixUfcsRight.desc]
+en = "Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting."
+zh = "是否启用右变体 UFCS 风格补全。例如，`[A].table|` 将被完成为 `table([A], |)`。提示：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.previewFeature.title]
+en = "Enable preview features"
+zh = "启用预览功能"
+
+[extension.tinymist.config.tinymist.previewFeature.desc]
+en = "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting."
+zh = "启用或禁用 Typst 的预览功能。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.previewFeature.string.enum.enable]
+en = "Enable preview features."
+zh = "启用预览功能。"
+
+[extension.tinymist.config.tinymist.previewFeature.string.enum.disable]
+en = "Disable preview features."
+zh = "禁用预览功能。"
+
+[extension.tinymist.config.tinymist.preview.sysInputs.title]
+en = "Preview Sys Inputs"
+zh = "预览系统输入"
+
+[extension.tinymist.config.tinymist.preview.sysInputs.desc]
+en = "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
+zh = "通过 `sys.inputs` 可见的键值对，对应于 typst cli 的 `--input` 参数"
+
+[extension.tinymist.config.tinymist.preview.sysInputs.deprecation]
+en = "The configuration item is ignored. Please see `tinymist.typstExtraArgs` for inputs."
+zh = "此配置项被忽略。请查看 `tinymist.typstExtraArgs` 以获取输入。"
+
+[extension.tinymist.config.tinymist.preview.systemFonts.title]
+en = "Preview System Fonts"
+zh = "预览系统字体"
+
+[extension.tinymist.config.tinymist.preview.systemFonts.desc]
+en = "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
+zh = "是否加载系统字体。如果禁用，只会加载 `typst-preview.fontPaths` 中的字体"
+
+[extension.tinymist.config.tinymist.preview.systemFonts.deprecation]
+en = "The configuration item is ignored. Please use `tinymist.systemFonts` instead."
+zh = "此配置项被忽略。请使用 `tinymist.systemFonts`。"
+
+[extension.tinymist.config.tinymist.preview.fontPaths.title]
+en = "Preview Font Paths"
+zh = "预览字体路径"
+
+[extension.tinymist.config.tinymist.preview.fontPaths.desc]
+en = "List of *additional* paths to font assets used by typst-preview."
+zh = "用于 typst-preview 的字体资产的*附加*路径列表。"
+
+[extension.tinymist.config.tinymist.preview.fontPaths.deprecation]
+en = "The configuration item is ignored. Please use `tinymist.fontPaths` instead."
+zh = "此配置项被忽略。请使用 `tinymist.fontPaths`。"
+
+[extension.tinymist.config.tinymist.preview.fontPaths.items.desc]
+en = "Absolute path to a directory or file containing font assets."
+zh = "包含字体资产的目录或文件的绝对路径。"
+
+[extension.tinymist.config.tinymist.preview.refresh.title]
+en = "Preview Refresh"
+zh = "预览刷新"
+
+[extension.tinymist.config.tinymist.preview.refresh.desc]
+en = "Refresh preview when the document is saved or when the document is changed"
+zh = "在保存文档或更改文档时刷新预览"
+
+[extension.tinymist.config.tinymist.preview.refresh.string.enum.onSave]
+en = "Refresh preview on save"
+zh = "保存时刷新预览"
+
+[extension.tinymist.config.tinymist.preview.refresh.string.enum.onType]
+en = "Refresh preview on type"
+zh = "输入时刷新预览"
+
+[extension.tinymist.config.tinymist.preview.scrollSync.title]
+en = "Preview Scroll Sync"
+zh = "预览滚动同步"
+
+[extension.tinymist.config.tinymist.preview.scrollSync.desc]
+en = "Configure scroll sync mode."
+zh = "配置滚动同步模式。"
+
+[extension.tinymist.config.tinymist.preview.scrollSync.string.enum.never]
+en = "Disable automatic scroll sync"
+zh = "禁用自动滚动同步"
+
+[extension.tinymist.config.tinymist.preview.scrollSync.string.enum.onSelectionChangeByMouse]
+en = "Scroll preview to current cursor position when selection changes by mouse"
+zh = "当选择通过鼠标更改时，将预览滚动到当前光标位置"
+
+[extension.tinymist.config.tinymist.preview.scrollSync.string.enum.onSelectionChange]
+en = "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
+zh = "当选择通过鼠标或键盘更改时，将预览滚动到当前光标位置"
+
+[extension.tinymist.config.tinymist.preview.partialRendering.title]
+en = "Preview Partial Rendering"
+zh = "预览部分渲染"
+
+[extension.tinymist.config.tinymist.preview.partialRendering.desc]
+en = "Only render visible part of the document. This can improve performance but still being experimental."
+zh = "仅呈现文档的可见部分。这可以提高性能，但仍处于实验阶段。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.title]
+en = "Preview Invert Colors"
+zh = "预览反色"
+
+[extension.tinymist.config.tinymist.preview.invertColors.desc]
+en = "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format."
+zh = "反转预览的颜色（适用于没有成本的深色主题）。请注意，当您在预览中悬停元素时，您可能会看到原始颜色。还可以通过 JSON 格式的对象映射为每种元素指定策略。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.title]
+en = "Invert Colors"
+zh = "反色"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.desc]
+en = "Invert colors of the preview."
+zh = "反转预览的颜色。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.never]
+en = "Never"
+zh = "从不"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.auto]
+en = "Inferring from the browser settings"
+zh = "从浏览器配置推断"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.always]
+en = "Always"
+zh = "总是"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.title]
+en = "Invert Colors (Per Element)"
+zh = "反色（按元素）"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.desc]
+en = "Invert colors of the preview in a more fine-grained way."
+zh = "以更细粒度的方式反转预览的颜色。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.title]
+en = "Rest"
+zh = "其余"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.desc]
+en = "Invert colors of the rest of the elements."
+zh = "反转其余元素的颜色。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.never]
+en = "Never"
+zh = "从不"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.auto]
+en = "Inferring from the browser settings"
+zh = "从浏览器配置推断"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.always]
+en = "Always"
+zh = "总是"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.title]
+en = "Image"
+zh = "图像"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.desc]
+en = "Invert colors of the images."
+zh = "反转图像的颜色。"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.never]
+en = "Never"
+zh = "从不"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.auto]
+en = "Inferring from the browser settings"
+zh = "从浏览器配置推断"
+
+[extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.always]
+en = "Always"
+zh = "总是"
+
+[extension.tinymist.config.tinymist.preview.cursorIndicator.title]
+en = "Preview Cursor Indicator"
+zh = "预览光标指示器"
+
+[extension.tinymist.config.tinymist.preview.cursorIndicator.desc]
+en = "(Experimental) Show typst cursor indicator in preview."
+zh = "（实验性）在预览中显示 typst 光标指示器。"
+
+[extension.tinymist.config.tinymist.preview.pinPreviewFile.title]
+en = "Preview Pin Preview File"
+zh = "预览固定预览文件"
+
+[extension.tinymist.config.tinymist.preview.pinPreviewFile.desc]
+en = "Declare current previewing file as entrypoint for typst-lsp or tinymist. This will make typst-lsp or tinymist to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental."
+zh = "将当前预览文件声明为 typst-lsp 或 tinymist 的入口点。这将使 typst-lsp 或 tinymist 使用此文件作为入口点，而不是在 vscode 中打开的文件。这可以改善诊断消息和自动完成，但仍处于实验阶段。"
+
+[extension.tinymist.config.tinymist.preview.pinPreviewFile.deprecation]
+en = "This setting is deprecated and no longer needed. The extension will always pin the previewed file as the entrypoint for the language server."
+zh = "此设置已弃用，不再需要。扩展程序将始终将预览的文件固定为语言服务器的入口点。"

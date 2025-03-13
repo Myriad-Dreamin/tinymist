@@ -6,9 +6,13 @@
 // zh-CN = "Typst 的集成语言服务"
 
 import * as fs from "fs";
+import * as path from "path";
+
+const __dirname = new URL(".", import.meta.url).toString().replace("file:///", "");
+const projectRoot = path.resolve(__dirname, "..");
 
 function translate(input, output) {
-  const data = fs.readFileSync(input, "utf-8");
+  const data = fs.readFileSync(path.resolve(projectRoot, input), "utf-8");
   const lines = data
     .split("\n")
     .map((line) => line.trim())
@@ -38,15 +42,40 @@ function translate(input, output) {
 
   const langRest = langs.filter((lang) => lang !== "en");
 
-  const langEnPath = `${output}/package.nls.json`;
+  const langEnPath = path.resolve(projectRoot, `${output}/package.nls.json`);
   const langEnData = translations["en"];
   fs.writeFileSync(langEnPath, JSON.stringify(langEnData, null, 2));
 
   for (let lang of langRest) {
-    const langPath = `${output}/package.nls.${lang}.json`;
+    const langPath = path.resolve(projectRoot, `${output}/package.nls.${lang}.json`);
     const langData = translations[lang];
     fs.writeFileSync(langPath, JSON.stringify(langData, null, 2));
   }
+
+  return translations;
 }
 
-translate("locales/tinymist-vscode.toml", "editors/vscode");
+function genVscodeExt() {
+  const translations = translate("locales/tinymist-vscode.toml", "editors/vscode");
+
+  const pat = /\%(extension\.tinymist\..*?)\%/g;
+  const data = fs.readFileSync(path.resolve(projectRoot, "editors/vscode/package.json"), "utf-8");
+  const matchAll = data.matchAll(pat);
+  const used = Array.from(matchAll).map((m) => m[1]);
+  used.push("description");
+
+  const en = translations["en"];
+  const enKeys = Object.keys(en);
+  const missing = used.filter((key) => !enKeys.includes(key));
+  if (missing.length > 0) {
+    console.error("Missing translations", missing);
+  }
+  const extra = enKeys.filter((key) => !used.includes(key));
+  if (extra.length > 0) {
+    console.error("Extra translations", extra);
+  }
+
+  return translations;
+}
+
+export const vscodeExtTranslations = genVscodeExt();
