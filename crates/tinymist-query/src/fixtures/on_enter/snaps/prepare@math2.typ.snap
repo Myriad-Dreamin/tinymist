@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/on_enter.rs
+description: "On Enter on r 1..2 */\n|$|$\n)"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/on_enter/math2.typ
+---
+null

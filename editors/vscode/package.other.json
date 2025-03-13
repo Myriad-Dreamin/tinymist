@@ -1,0 +1,30 @@
+{
+  "$schema": "vscode://schemas/vscode-extensions",
+  "contributes": {
+    "configuration": {
+      "properties": {
+        "tinymist.preview.browsing.args": {
+          "description": "The arguments used by `tinymist.startDefaultPreview` command. Check `tinymist preview` to see the allowed arguments.",
+          "type": "array",
+          "default": ["--data-plane-host=127.0.0.1:0", "--invert-colors=auto", "--open"],
+          "properties": {
+            "type": "string"
+          }
+        },
+        "tinymist.preview.background.enabled": {
+          "description": "This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server listens a specific tcp port in the background. You can discover the background previewers in the preview panel.",
+          "type": "boolean",
+          "default": false
+        },
+        "tinymist.preview.background.args": {
+          "description": "The arguments that the background preview server used for. It is only used when `tinymist.preview.background` is enabled. Check `tinymist preview` to see the allowed arguments.",
+          "type": "array",
+          "default": ["--data-plane-host=127.0.0.1:23635", "--invert-colors=auto"],
+          "properties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

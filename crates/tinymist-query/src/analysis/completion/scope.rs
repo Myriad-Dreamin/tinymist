@@ -1,5 +1,9 @@
 //! Completion of definitions in scope.
 
+use typst::foundations::{Array, Dict};
+
+use crate::ty::SigWithTy;
+
 use super::*;
 
 #[derive(BindTyCtx)]
@@ -94,6 +98,11 @@ impl CompletionPair<'_, '_, '_> {
             .clone();
         defines.insert_scope(&scope);
 
+        defines.insert(
+            EcoString::inline("std"),
+            Ty::Value(InsTy::new(lib.std.read().clone())),
+        );
+
         Some(defines)
     }
 
@@ -115,16 +124,17 @@ impl CompletionPair<'_, '_, '_> {
                 SurroundingSyntax::Regular => true,
                 SurroundingSyntax::StringContent => false,
                 SurroundingSyntax::ImportList | SurroundingSyntax::ParamList => false,
-                SurroundingSyntax::Selector => 'selector: {
-                    for func in &checker.functions {
-                        if func.element().is_some() {
-                            break 'selector true;
-                        }
-                    }
+                // SurroundingSyntax::Selector => 'selector: {
+                //     for func in &checker.functions {
+                //         if func.element().is_some() {
+                //             break 'selector true;
+                //         }
+                //     }
 
-                    false
-                }
-                SurroundingSyntax::ShowTransform => !checker.functions.is_empty(),
+                //     false
+                // }
+                // SurroundingSyntax::ShowTransform => !checker.functions.is_empty(),
+                SurroundingSyntax::Selector | SurroundingSyntax::ShowTransform => true,
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
                     for func in &checker.functions {
@@ -166,89 +176,15 @@ impl CompletionPair<'_, '_, '_> {
 
             let docs = default_docs.get(&name).cloned();
 
-            let label_detail = ty.describe().or_else(|| Some("any".into()));
+            let label_details = ty.describe().or_else(|| Some("any".into()));
 
-            crate::log_debug_ct!("scope completions!: {name} {ty:?} {label_detail:?}");
-            let detail = docs.or_else(|| label_detail.clone());
+            crate::log_debug_ct!("scope completions!: {name} {ty:?} {label_details:?}");
+            let detail = docs.or_else(|| label_details.clone());
 
             if !kind_checker.functions.is_empty() {
-                let base = Completion {
-                    kind: CompletionKind::Func,
-                    label_details: label_detail,
-                    detail,
-                    command: self
-                        .worker
-                        .ctx
-                        .analysis
-                        .trigger_on_snippet_with_param_hint(true)
-                        .map(From::from),
-                    ..Default::default()
-                };
-
                 let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
-
                 crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
-
-                if matches!(
-                    self.cursor.surrounding_syntax,
-                    SurroundingSyntax::ShowTransform
-                ) && (fn_feat.min_pos() > 0 || fn_feat.min_named() > 0)
-                {
-                    self.push_completion(Completion {
-                        label: eco_format!("{name}.with"),
-                        apply: Some(eco_format!("{name}.with(${{}})")),
-                        ..base.clone()
-                    });
-                }
-                if fn_feat.is_element
-                    && matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector)
-                {
-                    self.push_completion(Completion {
-                        label: eco_format!("{name}.where"),
-                        apply: Some(eco_format!("{name}.where(${{}})")),
-                        ..base.clone()
-                    });
-                }
-
-                let bad_instantiate = matches!(
-                    self.cursor.surrounding_syntax,
-                    SurroundingSyntax::Selector | SurroundingSyntax::SetRule
-                ) && !fn_feat.is_element;
-                if !bad_instantiate {
-                    if !parens
-                        || matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector)
-                    {
-                        self.push_completion(Completion {
-                            label: name,
-                            ..base
-                        });
-                    } else if fn_feat.min_pos() < 1 && !fn_feat.has_rest {
-                        self.push_completion(Completion {
-                            apply: Some(eco_format!("{}()${{}}", name)),
-                            label: name,
-                            ..base
-                        });
-                    } else {
-                        let accept_content_arg = fn_feat.next_arg_is_content && !fn_feat.has_rest;
-                        let scope_reject_content = matches!(mode, InterpretMode::Math)
-                            || matches!(
-                                self.cursor.surrounding_syntax,
-                                SurroundingSyntax::Selector | SurroundingSyntax::SetRule
-                            );
-                        self.push_completion(Completion {
-                            apply: Some(eco_format!("{name}(${{}})")),
-                            label: name.clone(),
-                            ..base.clone()
-                        });
-                        if !scope_reject_content && accept_content_arg {
-                            self.push_completion(Completion {
-                                apply: Some(eco_format!("{name}[${{}}]")),
-                                label: eco_format!("{name}.bracket"),
-                                ..base
-                            });
-                        };
-                    }
-                }
+                self.func_completion(mode, fn_feat, name, label_details, detail, parens);
                 continue;
             }
 
@@ -256,7 +192,7 @@ impl CompletionPair<'_, '_, '_> {
             self.push_completion(Completion {
                 kind,
                 label: name,
-                label_details: label_detail.clone(),
+                label_details,
                 detail,
                 ..Completion::default()
             });
@@ -297,12 +233,33 @@ impl CompletionScopeChecker<'_> {
         matches!(self.check_kind, ScopeCheckKind::FieldAccess)
     }
 
-    fn type_methods(&mut self, ty: Type) {
+    fn type_methods(&mut self, bound_self: Option<Ty>, ty: Type) {
         for name in fields_on(ty) {
             self.defines.insert((*name).into(), Ty::Any);
         }
+        let bound_self = bound_self.map(|this| SigTy::unary(this, Ty::Any));
         for (name, bind) in ty.scope().iter() {
-            let ty = Ty::Value(InsTy::new(bind.read().clone()));
+            let val = bind.read().clone();
+            let has_self = bound_self.is_some()
+                && (if let Value::Func(func) = &val {
+                    let first_pos = func
+                        .params()
+                        .and_then(|params| params.iter().find(|p| p.required));
+                    first_pos.is_some_and(|p| p.name == "self")
+                } else {
+                    false
+                });
+            let ty = Ty::Value(InsTy::new(val));
+            let ty = if has_self {
+                if let Some(bound_self) = bound_self.as_ref() {
+                    Ty::With(SigWithTy::new(ty.into(), bound_self.clone()))
+                } else {
+                    ty
+                }
+            } else {
+                ty
+            };
+
             self.defines.insert(name.into(), ty);
         }
     }
@@ -328,8 +285,7 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     self.defines.insert(name.clone().into(), term);
                 }
             }
-            Iface::Dict(..) | Iface::Value { .. } => {}
-            Iface::Element { val, .. } if self.is_field_access() => {
+            Iface::Content { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
                 let styles = StyleChain::default();
                 for field_id in 0u8..254u8 {
@@ -361,16 +317,26 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
                     }
                 }
             }
-            Iface::Type { val, .. } if self.is_field_access() => {
-                self.type_methods(*val);
+            Iface::Type { val, at } if self.is_field_access() => {
+                self.type_methods(Some(at.clone()), *val);
+            }
+            Iface::TypeType { val, .. } if self.is_field_access() => {
+                self.type_methods(None, *val);
             }
             Iface::Func { .. } if self.is_field_access() => {
-                self.type_methods(Type::of::<Func>());
+                self.type_methods(Some(iface.to_type()), Type::of::<Func>());
             }
-            Iface::Element { val, .. } => {
+            Iface::Array { .. } | Iface::Tuple { .. } if self.is_field_access() => {
+                self.type_methods(Some(iface.to_type()), Type::of::<Array>());
+            }
+            Iface::Dict { .. } if self.is_field_access() => {
+                self.type_methods(Some(iface.to_type()), Type::of::<Dict>());
+            }
+            Iface::Content { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
-            Iface::Type { val, .. } => {
+            // todo: distingusish TypeType and Type
+            Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
             Iface::Func { val, .. } => {
@@ -394,6 +360,7 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::ModuleVal { val, .. } => {
                 self.defines.insert_scope(val.scope());
             }
+            Iface::Array { .. } | Iface::Tuple { .. } | Iface::Dict(..) | Iface::Value { .. } => {}
         }
         None
     }

@@ -198,6 +198,21 @@ jobs:
         run: |
           cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
+      # todo: pdf documentation for all platforms
+      - name: Build PDF Documentation
+        run: |
+          cargo run --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
+          cp docs/tinymist/ebook.pdf tinymist-docs.pdf
+          mkdir -p contrib/html/editors/vscode/out/ editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+          cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
+        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Upload PDF Documentation
+        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+          path: tinymist-docs.pdf
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |

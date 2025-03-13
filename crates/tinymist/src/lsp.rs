@@ -80,7 +80,7 @@ impl ServerState {
 /// LSP Document Synchronization
 impl ServerState {
     pub(crate) fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
-        log::info!("did open {:?}", params.text_document.uri);
+        log::info!("did open {}", params.text_document.uri);
         let path: ImmutPath = as_path_(params.text_document.uri).as_path().into();
         let text = params.text_document.text;
 

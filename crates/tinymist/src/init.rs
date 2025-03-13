@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::project::font::TinymistFontResolver;
 use anyhow::bail;
 use clap::Parser;
 use itertools::Itertools;
@@ -13,23 +12,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
-use tinymist_project::{
-    EntryResolver, ExportPdfTask, ExportTask, PathPattern, ProjectResolutionKind, ProjectTask,
-    TaskWhen,
-};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
-use typst_shim::utils::{Deferred, LazyHash};
+use typst_shim::utils::LazyHash;
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
 // textDocument.definition.linkSupport capability.
 
 use super::*;
-use crate::project::ImmutDict;
+use crate::project::font::TinymistFontResolver;
+use crate::project::{
+    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
+    ProjectTask, TaskWhen,
+};
 
 /// Capability to add valid commands to the arguments.
 pub trait AddCommands {
@@ -244,6 +243,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
     "exportPdf",
     "rootPath",
+    "preview",
     "semanticTokens",
     "formatterMode",
     "formatterPrintWidth",
@@ -263,7 +263,7 @@ const CONFIG_ITEMS: &[&str] = &[
 ///
 /// Note: `Config::default` is intentionally to be "pure" and not to be
 /// affected by system environment variables.
-/// To get the configuration with system defaults, use [`Config::new`] intead.
+/// To get the configuration with system defaults, use [`Config::new`] instead.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The resolution kind of the project.
@@ -287,6 +287,8 @@ pub struct Config {
     pub export_target: ExportTarget,
     /// Tinymist's completion features.
     pub completion: CompletionFeat,
+    /// Tinymist's preview features.
+    pub preview: PreviewFeat,
 }
 
 impl Config {
@@ -401,6 +403,10 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        log::info!(
+            "LanguageState: config update_by_map {}",
+            serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
+        );
         macro_rules! assign_config {
             ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
                 let v = try_deserialize::<$ty>(update, $bind);
@@ -432,6 +438,9 @@ impl Config {
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
+
+        assign_config!(preview := "preview"?: PreviewFeat);
+
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }
@@ -459,16 +468,20 @@ impl Config {
         }
     }
 
+    /// Gets the export task configuration.
+    pub(crate) fn export_task(&self) -> ExportTask {
+        ExportTask {
+            when: self.compile.export_pdf,
+            output: Some(self.compile.output_path.clone()),
+            transform: vec![],
+        }
+    }
+
     /// Gets the export configuration.
     pub(crate) fn export(&self) -> ExportUserConfig {
         let compile_config = &self.compile;
 
-        let export = ExportTask {
-            output: Some(compile_config.output_path.clone()),
-            when: compile_config.export_pdf,
-            transform: vec![],
-        };
-
+        let export = self.export_task();
         ExportUserConfig {
             export_target: self.export_target,
             // todo: we only have `exportPdf` for now
@@ -569,7 +582,7 @@ pub struct CompileConfig {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Deferred<Arc<TinymistFontResolver>>>>,
+    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
     /// Notify the compile status to the editor.
     pub notify_status: bool,
     /// Enable periscope document in hover.
@@ -740,17 +753,17 @@ impl CompileConfig {
     }
 
     /// Determines the font resolver.
-    pub fn determine_fonts(&self) -> Deferred<Arc<TinymistFontResolver>> {
+    pub fn determine_fonts(&self) -> Arc<TinymistFontResolver> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let opts = self.determine_font_opts();
 
             log::info!("creating SharedFontResolver with {opts:?}");
-            Derived(Deferred::new(|| {
+            Derived(
                 crate::project::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
-                    .expect("failed to create font book")
-            }))
+                    .expect("failed to create font book"),
+            )
         };
         self.fonts.get_or_init(font).clone().0
     }
@@ -856,6 +869,36 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
         ..SemanticTokensOptions::default()
     }
+}
+
+/// The preview features.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewFeat {
+    /// The browsing preview options.
+    #[serde(default)]
+    pub browsing: BrowsingPreviewOpts,
+    /// The background preview options.
+    #[serde(default)]
+    pub background: BackgroundPreviewOpts,
+}
+
+/// Options for browsing preview.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowsingPreviewOpts {
+    /// The arguments for the `tinymist.startDefaultPreview` command.
+    pub args: Option<Vec<String>>,
+}
+
+/// Options for background preview.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundPreviewOpts {
+    /// Whether to run the preview in the background.
+    pub enabled: bool,
+    /// The arguments for the background preview.
+    pub args: Option<Vec<String>>,
 }
 
 /// Additional options for compilation.

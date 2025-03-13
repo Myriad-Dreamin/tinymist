@@ -49,6 +49,7 @@ use crate::upstream::{plain_docs_sentence, summarize_font_family};
 use super::SharedContext;
 
 mod field_access;
+mod func;
 mod import;
 mod kind;
 mod mode;
@@ -157,7 +158,7 @@ pub struct CompletionCursor<'a> {
     /// Cache for the last lsp range conversion.
     last_lsp_range_pair: Option<(Range<usize>, LspRange)>,
     /// Cache for the ident cursor.
-    ident_cursor: OnceLock<Option<LinkedNode<'a>>>,
+    ident_cursor: OnceLock<Option<SelectedNode<'a>>>,
     /// Cache for the arg cursor.
     arg_cursor: OnceLock<Option<SyntaxNode>>,
 }
@@ -172,6 +173,16 @@ impl<'a> CompletionCursor<'a> {
         let syntax = classify_syntax(leaf.clone(), cursor);
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
+
+        // todo: don't match here?
+        if matches!(syntax, Some(SyntaxClass::Callee(..)))
+            && matches!(syntax_context.as_ref(), Some(
+                SyntaxContext::Element { container, .. } |
+                SyntaxContext::Arg { args: container, .. } |
+                SyntaxContext::Paren { container, .. }) if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()))
+        {
+            return None;
+        }
 
         crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
@@ -207,16 +218,37 @@ impl<'a> CompletionCursor<'a> {
         matches!(self.syntax, Some(SyntaxClass::Callee(..)))
     }
 
-    /// Gets Identifier under cursor.
-    fn ident_cursor(&self) -> &Option<LinkedNode> {
+    /// Gets selected node under cursor.
+    fn selected_node(&self) -> &Option<SelectedNode<'a>> {
         self.ident_cursor.get_or_init(|| {
+            // identifier
+            // ^ from
             let is_from_ident = matches!(
                 self.syntax,
                 Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..))
             ) && is_ident_like(&self.leaf)
                 && self.leaf.offset() == self.from;
+            if is_from_ident {
+                return Some(SelectedNode::Ident(self.leaf.clone()));
+            }
 
-            is_from_ident.then(|| self.leaf.clone())
+            // <identifier
+            //  ^ from
+            let is_from_label = matches!(self.syntax, Some(SyntaxClass::Label { .. }))
+                && self.leaf.offset() + 1 == self.from;
+            if is_from_label {
+                return Some(SelectedNode::Label(self.leaf.clone()));
+            }
+
+            // @identifier
+            //  ^ from
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref(..)))
+                && self.leaf.offset() + 1 == self.from;
+            if is_from_ref {
+                return Some(SelectedNode::Ref(self.leaf.clone()));
+            }
+
+            None
         })
     }
 
@@ -269,23 +301,43 @@ impl<'a> CompletionCursor<'a> {
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
-        let replace_range = if let Some(from_ident) = self.ident_cursor() {
-            let mut rng = from_ident.range();
+        let replace_range = match self.selected_node() {
+            Some(SelectedNode::Ident(from_ident)) => {
+                let mut rng = from_ident.range();
 
-            // if modifying some arguments, we need to truncate and add a comma
-            if !self.is_callee() && self.cursor != rng.end && is_arg_like_context(from_ident) {
-                // extend comma
-                if !snippet.trim_end().ends_with(',') {
-                    snippet.push_str(", ");
+                // if modifying some arguments, we need to truncate and add a comma
+                if !self.is_callee() && self.cursor != rng.end && is_arg_like_context(from_ident) {
+                    // extend comma
+                    if !snippet.trim_end().ends_with(',') {
+                        snippet.push_str(", ");
+                    }
+
+                    // Truncate
+                    rng.end = self.cursor;
                 }
 
-                // Truncate
-                rng.end = self.cursor;
+                self.lsp_range_of(rng)
             }
+            Some(SelectedNode::Label(from_label)) => {
+                let mut rng = from_label.range();
+                if from_label.text().starts_with('<') && !snippet.starts_with('<') {
+                    rng.start += 1;
+                }
+                if from_label.text().ends_with('>') && !snippet.ends_with('>') {
+                    rng.end -= 1;
+                }
 
-            self.lsp_range_of(rng)
-        } else {
-            self.lsp_range_of(self.from..self.cursor)
+                self.lsp_range_of(rng)
+            }
+            Some(SelectedNode::Ref(from_ref)) => {
+                let mut rng = from_ref.range();
+                if from_ref.text().starts_with('@') && !snippet.starts_with('@') {
+                    rng.start += 1;
+                }
+
+                self.lsp_range_of(rng)
+            }
+            None => self.lsp_range_of(self.from..self.cursor),
         };
 
         let text_edit = EcoTextEdit::new(replace_range, snippet);
@@ -308,6 +360,16 @@ impl<'a> CompletionCursor<'a> {
 
 /// Alias for a completion cursor, [`CompletionCursor`].
 type Cursor<'a> = CompletionCursor<'a>;
+
+/// A node selected by [`CompletionCursor`].
+enum SelectedNode<'a> {
+    /// Selects an identifier, e.g. `foo|` or `fo|o`.
+    Ident(LinkedNode<'a>),
+    /// Selects a label, e.g. `<foo|>` or `<fo|o>`.
+    Label(LinkedNode<'a>),
+    /// Selects a reference, e.g. `@foo|` or `@fo|o`.
+    Ref(LinkedNode<'a>),
+}
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -390,7 +452,7 @@ impl<'a> CompletionWorker<'a> {
 
     /// Starts the completion process.
     pub(crate) fn work(&mut self, cursor: &mut Cursor) -> Option<()> {
-        // Skip if is the let binding item *directly*
+        // Skips if is the let binding item *directly*
         if let Some(SyntaxClass::VarAccess(var)) = &cursor.syntax {
             let node = var.node();
             match node.parent_kind() {
@@ -411,7 +473,7 @@ impl<'a> CompletionWorker<'a> {
             }
         }
 
-        // Skip if an error node starts with number (e.g. `1pt`)
+        // Skips if an error node starts with number (e.g. `1pt`)
         if matches!(
             cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
@@ -429,7 +491,7 @@ impl<'a> CompletionWorker<'a> {
             }
         }
 
-        // Exclude it self from auto completion
+        // Excludes it self from auto completion
         // e.g. `#let x = (1.);`
         let self_ty = cursor.leaf.cast::<ast::Expr>().and_then(|leaf| {
             let v = self.ctx.mini_eval(leaf)?;
@@ -446,8 +508,8 @@ impl<'a> CompletionWorker<'a> {
         };
         let _ = pair.complete_cursor();
 
-        // Filter
-        if let Some(from_ident) = cursor.ident_cursor() {
+        // Filters
+        if let Some(SelectedNode::Ident(from_ident)) = cursor.selected_node() {
             let ident_prefix = cursor.text[from_ident.offset()..cursor.cursor].to_string();
 
             self.completions.retain(|item| {

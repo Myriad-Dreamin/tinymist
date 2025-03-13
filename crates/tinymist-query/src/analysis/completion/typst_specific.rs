@@ -160,26 +160,27 @@ impl CompletionPair<'_, '_, '_> {
         docs: Option<&str>,
     ) {
         self.value_completion_(
-            label,
             value,
-            parens,
-            match value {
-                Value::Symbol(s) => Some(symbol_label_detail(s.get())),
-                _ => None,
+            ValueCompletionInfo {
+                label,
+                parens,
+                label_details: None,
+                docs,
+                bound_self: false,
             },
-            docs,
         );
     }
 
     /// Add a completion for a specific value.
-    pub fn value_completion_(
-        &mut self,
-        label: Option<EcoString>,
-        value: &Value,
-        parens: bool,
-        label_details: Option<EcoString>,
-        docs: Option<&str>,
-    ) {
+    pub fn value_completion_(&mut self, value: &Value, extras: ValueCompletionInfo) {
+        let ValueCompletionInfo {
+            label,
+            parens,
+            label_details,
+            docs,
+            bound_self,
+        } = extras;
+
         // Prevent duplicate completions from appearing.
         if !self.worker.seen_casts.insert(hash128(&(&label, &value))) {
             return;
@@ -197,21 +198,24 @@ impl CompletionPair<'_, '_, '_> {
                 (repr.as_str() != label).then_some(repr)
             }
         });
+        let label_details = label_details.or_else(|| match value {
+            Value::Symbol(s) => Some(symbol_label_detail(s.get())),
+            _ => None,
+        });
 
         let mut apply = None;
-        let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
-            if let Value::Func(func) = value {
-                command = self.worker.ctx.analysis.trigger_parameter_hints(true);
-                if func
-                    .params()
-                    .is_some_and(|params| params.iter().all(|param| param.name == "self"))
-                {
-                    apply = Some(eco_format!("{label}()${{}}"));
-                } else {
-                    apply = Some(eco_format!("{label}(${{}})"));
-                }
-            }
+            let mode = interpret_mode_at(Some(&self.cursor.leaf));
+            let kind_checker = CompletionKindChecker {
+                symbols: HashSet::default(),
+                functions: HashSet::from_iter([Ty::Value(InsTy::new(value.clone()))]),
+            };
+            let mut fn_feat = FnCompletionFeat::default();
+            // todo: unify bound self checking
+            fn_feat.bound_self = bound_self;
+            let fn_feat = fn_feat.check(kind_checker.functions.iter());
+            self.func_completion(mode, fn_feat, label, label_details, detail, parens);
+            return;
         } else if at {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
@@ -239,8 +243,16 @@ impl CompletionPair<'_, '_, '_> {
             apply,
             detail,
             label_details,
-            command: command.map(From::from),
             ..Completion::default()
         });
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ValueCompletionInfo<'a> {
+    pub label: Option<EcoString>,
+    pub parens: bool,
+    pub label_details: Option<EcoString>,
+    pub docs: Option<&'a str>,
+    pub bound_self: bool,
 }

@@ -174,7 +174,7 @@ display_possible_values!(OutputFormat);
 /// - (default) `$root/$dir/$name` will help store pdf file along with the input
 ///   file.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PathPattern(pub String);
+pub struct PathPattern(pub EcoString);
 
 impl fmt::Display for PathPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -185,7 +185,7 @@ impl fmt::Display for PathPattern {
 impl PathPattern {
     /// Creates a new path pattern.
     pub fn new(pattern: &str) -> Self {
-        Self(pattern.to_owned())
+        Self(pattern.into())
     }
 
     /// Substitutes the path pattern with `$root`, and `$dir/$name`.
@@ -232,7 +232,7 @@ impl PathPattern {
         }
         path = path.replace("$name", &f);
 
-        Some(PathBuf::from(path).clean().into())
+        Some(Path::new(path.as_str()).clean().into())
     }
 }
 

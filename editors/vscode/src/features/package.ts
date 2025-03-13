@@ -15,10 +15,7 @@ export function packageFeatureActivate(context: vscode.ExtensionContext) {
           const docs = await tinymist.getResource("/package/docs", pkg);
           // console.log("docs", docs);
 
-          const content = (await vscode.commands.executeCommand(
-            "markdown.api.render",
-            docs,
-          )) as string;
+          const content = await vscode.commands.executeCommand<string>("markdown.api.render", docs);
 
           await editorTool(context, "docs", { pkg, content });
         } catch (e) {
@@ -39,7 +36,7 @@ class PackageViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     return element;
   }
 
-  getChildren(element?: any): Thenable<vscode.TreeItem[]> {
+  getChildren(element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> {
     if (element && CommandsItem.is(element)) {
       return this.getCommands();
     } else if (element && NamespaceItem.is(element)) {

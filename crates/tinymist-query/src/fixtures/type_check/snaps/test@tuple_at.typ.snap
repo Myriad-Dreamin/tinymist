@@ -2,12 +2,12 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_at.typ
-snapshot_kind: text
 ---
 "a" = (1, 2, 3, )
 "b" = 2
 =====
 5..6 -> @a
+9..18 -> (1, 2, 3, )
 25..26 -> @b
 29..30 -> @a
 29..33 -> @v"a".at

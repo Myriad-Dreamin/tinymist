@@ -337,10 +337,11 @@ async function commandShow(kind: "Pdf" | "Html" | "Svg" | "Png", extraOpts?: any
       vscode.window.showWarningMessage(
         `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
       );
+    // fall through
     case "editorTab": {
       // find and replace exportUri
       const exportUri = Uri.file(exportPath);
-      let uriToFind = exportUri.toString();
+      const uriToFind = exportUri.toString();
       findTab: for (const editor of vscode.window.tabGroups.all) {
         for (const tab of editor.tabs) {
           if ((tab.input as any)?.uri?.toString() === uriToFind) {
@@ -558,10 +559,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   }
 
   async function codeLensMore(): Promise<void> {
-    const kBrowsing = "Browsing Preview Documents" as const;
-    const kPreviewIn = "Preview in .." as const;
-    const kExportAs = "Export as .." as const;
-    const kProfileServer = "Profile Server" as const;
+    const kBrowsing = "Browsing Preview Documents";
+    const kPreviewIn = "Preview in ..";
+    const kExportAs = "Export as ..";
+    const kProfileServer = "Profile Server";
     const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs, kProfileServer] as const;
 
     const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
@@ -570,7 +571,7 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 
     switch (moreAction) {
       case kBrowsing: {
-        void vscode.commands.executeCommand(`tinymist.browsing-preview`);
+        void vscode.commands.executeCommand(`tinymist.browsingPreview`);
         return;
       }
       case kPreviewIn: {

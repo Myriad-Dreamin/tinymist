@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on t (103..104)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/complete_purely_label.typ
-snapshot_kind: text
 ---
 [
  {
@@ -20,7 +19,7 @@ snapshot_kind: text
      "newText": "test>",
      "range": {
       "end": {
-       "character": 2,
+       "character": 4,
        "line": 11
       },
       "start": {

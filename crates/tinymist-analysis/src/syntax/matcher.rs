@@ -71,7 +71,37 @@ pub fn node_ancestors<'a, 'b>(
 
 /// Finds the first ancestor node that is an expression.
 pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
-    node_ancestors(&node).find(|n| n.is::<ast::Expr>()).cloned()
+    node_ancestors(&node)
+        .find(|n| n.is::<ast::Expr>())
+        .map(|mut node| {
+            while matches!(node.kind(), SyntaxKind::Ident | SyntaxKind::MathIdent) {
+                let Some(parent) = node.parent() else {
+                    return node;
+                };
+
+                let Some(field_access) = parent.cast::<ast::FieldAccess>() else {
+                    return node;
+                };
+
+                let dot = parent
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Dot));
+
+                // Since typst matches `field()` by `case_last_match`, when the field access
+                // `x.` (`Ident(x).Error("")`), it will match the `x` as the
+                // field. We need to check dot position to filter out such cases.
+                if dot.is_some_and(|dot| {
+                    dot.offset() <= node.offset() && field_access.field().span() == node.span()
+                }) {
+                    node = parent;
+                } else {
+                    return node;
+                }
+            }
+
+            node
+        })
+        .cloned()
 }
 
 /// A node that is an ancestor of the given node or the previous sibling
@@ -713,10 +743,16 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
 
         if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
             matches!(mode, InterpretMode::Markup)
-                && matches!(
+                && (matches!(
+                    dot_target.kind(),
+                    SyntaxKind::Ident
+                        | SyntaxKind::MathIdent
+                        | SyntaxKind::FieldAccess
+                        | SyntaxKind::FuncCall
+                ) || (matches!(
                     dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
                     Some(SyntaxKind::Hash)
-                )
+                )))
         } {
             return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
         }
@@ -1527,6 +1563,28 @@ Text
         assert_snapshot!(access_field("\"a\".", 4), @"");
         assert_snapshot!(access_field("@a.", 3), @"");
         assert_snapshot!(access_field("<a>.", 4), @"");
+    }
+
+    #[test]
+    fn test_markup_chain_access() {
+        assert_snapshot!(access_node("#a.b.", 5), @"a.b");
+        assert_snapshot!(access_field("#a.b.", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_node("#a.b.c.", 7), @"a.b.c");
+        assert_snapshot!(access_field("#a.b.c.", 7), @"DotSuffix: 7");
+        assert_snapshot!(access_node("#context a.", 11), @"a");
+        assert_snapshot!(access_field("#context a.", 11), @"DotSuffix: 11");
+        assert_snapshot!(access_node("#context a.b.", 13), @"a.b");
+        assert_snapshot!(access_field("#context a.b.", 13), @"DotSuffix: 13");
+
+        assert_snapshot!(access_node("#a.at(1).", 9), @"a.at(1)");
+        assert_snapshot!(access_field("#a.at(1).", 9), @"DotSuffix: 9");
+        assert_snapshot!(access_node("#context a.at(1).", 17), @"a.at(1)");
+        assert_snapshot!(access_field("#context a.at(1).", 17), @"DotSuffix: 17");
+
+        assert_snapshot!(access_node("#a.at(1).c.", 11), @"a.at(1).c");
+        assert_snapshot!(access_field("#a.at(1).c.", 11), @"DotSuffix: 11");
+        assert_snapshot!(access_node("#context a.at(1).c.", 19), @"a.at(1).c");
+        assert_snapshot!(access_field("#context a.at(1).c.", 19), @"DotSuffix: 19");
     }
 
     #[test]

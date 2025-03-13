@@ -36,30 +36,29 @@ pub enum PathPreference {
 
 impl PathPreference {
     pub fn ext_matcher(&self) -> &'static RegexSet {
-        static SOURCE_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
-        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^wasm$"]).unwrap());
+        fn make_regex(patterns: &[&str]) -> RegexSet {
+            let patterns = patterns.iter().map(|pattern| format!("(?i)^{pattern}$"));
+            RegexSet::new(patterns).unwrap()
+        }
+
+        static SOURCE_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["typ", "typc"]));
+        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["wasm"]));
         static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
-            RegexSet::new([
-                r"^ico$", r"^bmp$", r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^jfif$", r"^tiff$",
-                r"^gif$", r"^svg$", r"^svgz$",
+            make_regex(&[
+                "ico", "bmp", "png", "webp", "jpg", "jpeg", "jfif", "tiff", "gif", "svg", "svgz",
             ])
-            .unwrap()
         });
-        static JSON_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^json$", r"^jsonc$", r"^json5$"]).unwrap());
-        static YAML_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$"]).unwrap());
-        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^xml$"]).unwrap());
-        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^toml$"]).unwrap());
-        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csv$"]).unwrap());
-        static BIB_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$", r"^bib$"]).unwrap());
-        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csl$"]).unwrap());
-        static RAW_THEME_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^tmTheme$", r"^xml$"]).unwrap());
+        static JSON_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["json", "jsonc", "json5"]));
+        static YAML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml"]));
+        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["xml"]));
+        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["toml"]));
+        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csv"]));
+        static BIB_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml", "bib"]));
+        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csl"]));
+        static RAW_THEME_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["tmTheme", "xml"]));
         static RAW_SYNTAX_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| RegexSet::new([r"^tmLanguage$", r"^sublime-syntax$"]).unwrap());
+            Lazy::new(|| make_regex(&["tmLanguage", "sublime-syntax"]));
+
         static ALL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r".*"]).unwrap());
         static ALL_SPECIAL_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new({
@@ -137,7 +136,7 @@ impl Ty {
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
         match func.inner() {
-            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Element(*elem)),
+            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
             Repr::Closure(_) | Repr::Plugin(_) => {}
             Repr::With(w) => return Ty::from_return_site(&w.0, ty),
             Repr::Native(_) => {}
@@ -209,7 +208,6 @@ impl TryFrom<FileId> for PackageId {
 pub enum BuiltinTy {
     Clause,
     Undef,
-    Content,
     Space,
     None,
     Break,
@@ -240,9 +238,16 @@ pub enum BuiltinTy {
     Radius,
 
     Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
+
+    /// A value having a specific type.
     Type(typst::foundations::Type),
+    /// A value of some type.
     TypeType(typst::foundations::Type),
+    /// A content having a specific element type.
+    Content(Option<typst::foundations::Element>),
+    /// A value of some element type.
     Element(typst::foundations::Element),
+
     Module(Interned<Decl>),
     Path(PathPreference),
 }
@@ -252,7 +257,13 @@ impl fmt::Debug for BuiltinTy {
         match self {
             BuiltinTy::Clause => f.write_str("Clause"),
             BuiltinTy::Undef => f.write_str("Undef"),
-            BuiltinTy::Content => f.write_str("Content"),
+            BuiltinTy::Content(ty) => {
+                if let Some(ty) = ty {
+                    write!(f, "Content({})", ty.name())
+                } else {
+                    f.write_str("Content")
+                }
+            }
             BuiltinTy::Space => f.write_str("Space"),
             BuiltinTy::None => f.write_str("None"),
             BuiltinTy::Break => f.write_str("Break"),
@@ -325,7 +336,7 @@ impl BuiltinTy {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return Ty::Builtin(BuiltinTy::Content);
+            return Ty::Builtin(BuiltinTy::Content(Option::None));
         }
 
         BuiltinTy::Type(builtin).literally()
@@ -335,7 +346,13 @@ impl BuiltinTy {
         let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
-            BuiltinTy::Content => "content",
+            BuiltinTy::Content(ty) => {
+                return if let Some(ty) = ty {
+                    eco_format!("content({})", ty.name())
+                } else {
+                    "content".into()
+                };
+            }
             BuiltinTy::Space => "content",
             BuiltinTy::None => "none",
             BuiltinTy::Break => "break",
@@ -710,6 +727,20 @@ mod tests {
     use crate::syntax::Decl;
 
     use super::{SigTy, Ty, TypeVar};
+
+    #[test]
+    fn test_image_extension() {
+        let path = "test.png";
+        let preference = super::PathPreference::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathPreference::Image);
+    }
+
+    #[test]
+    fn test_image_extension_uppercase() {
+        let path = "TEST.PNG";
+        let preference = super::PathPreference::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathPreference::Image);
+    }
 
     // todo: map function
     // Technical Note for implementing a map function:

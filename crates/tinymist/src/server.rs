@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use lsp_types::*;
 use sync_lsp::*;
-use tinymist_project::{CompiledArtifact, EntryResolver, LspCompileSnapshot, ProjectInsId};
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -14,7 +13,10 @@ use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp_query::OnEnter;
-use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
+use crate::project::{
+    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
+};
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, ServerTraceTask, UserActionTask};
 use crate::world::TaskInputs;
@@ -173,6 +175,9 @@ impl ServerState {
                 .reload_projects()
                 .log_error("could not restart primary");
 
+            #[cfg(feature = "preview")]
+            service.background_preview();
+
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
         }
@@ -190,10 +195,13 @@ impl ServerState {
 
         #[cfg(feature = "preview")]
         let provider = provider
+            // User commands
+            .with_command("tinymist.startDefaultPreview", State::default_preview)
+            .with_command("tinymist.scrollPreview", State::scroll_preview)
+            // Internal commands
             .with_command("tinymist.doStartPreview", State::start_preview)
             .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
-            .with_command("tinymist.doKillPreview", State::kill_preview)
-            .with_command("tinymist.scrollPreview", State::scroll_preview);
+            .with_command("tinymist.doKillPreview", State::kill_preview);
 
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider

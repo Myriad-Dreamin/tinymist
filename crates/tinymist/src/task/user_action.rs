@@ -11,11 +11,11 @@ use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 use sync_lsp::{just_future, LspClient, LspResult, SchedulableResponse};
-use tinymist_project::LspWorld;
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{oneshot, watch};
 use typst::{syntax::Span, World};
 
+use crate::project::LspWorld;
 use crate::{internal_error, ServerState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,28 +56,25 @@ impl UserActionTask {
         let resp = just_future(async move {
             let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
             let t = tokio::spawn(async move {
-
                 log::info!("before generate timings");
 
                 let timings = async {
-
                     stop_rx.wait_for(|stopped| *stopped).await.ok();
                     typst_timing::disable();
 
                     let mut writer = std::io::BufWriter::new(Vec::new());
                     // todo: resolve span correctly
-                    let _ = typst_timing::export_json(&mut writer, |_| {
-                        ("unknown".to_string(), 0)
-                    });
+                    let _ = typst_timing::export_json(&mut writer, |_| ("unknown".to_string(), 0));
 
                     let timings = writer.into_inner().unwrap();
 
-                    // let timings_debug = serde_json::from_slice::<serde_json::Value>(&timings).unwrap();
+                    // let timings_debug =
+                    // serde_json::from_slice::<serde_json::Value>(&timings).unwrap();
                     // log::info!("timings: {:?}", timings_debug);
 
                     timings
-
-                }.await;
+                }
+                .await;
 
                 log::info!("after generate timings");
                 //log::info!("timings: {:?}", timings);
@@ -99,11 +96,10 @@ impl UserActionTask {
                 log::error!("failed to get address of trace server: {err:?}");
                 internal_error("failed to get address of trace server")
             })?;
-            
+
             log::info!("trace server has started at {addr}");
 
             tokio::spawn(async move {
-
                 let selected = tokio::select! {
                     a = stop_rx2.wait_for(|stopped| *stopped) => {
                         log::info!("trace server task stopped by user");

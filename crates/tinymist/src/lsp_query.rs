@@ -6,14 +6,14 @@ use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use sync_lsp::*;
-use tinymist_project::{EntryState, TaskInputs, DETACHED_ENTRY};
-use tinymist_query::SyntaxRequest;
+use tinymist_query::{
+    CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
+};
 use tinymist_std::{ImmutPath, Result};
 
 use super::ServerState;
+use crate::project::{EntryState, TaskInputs, DETACHED_ENTRY};
 use crate::{as_path, as_path_, as_path_pos, FormatterMode};
-
-use tinymist_query::{CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature};
 
 /// The future type for a lsp query.
 pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;

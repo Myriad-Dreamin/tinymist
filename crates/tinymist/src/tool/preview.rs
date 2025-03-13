@@ -22,7 +22,6 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{LspWorld, ProjectInsId, WorldProvider};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
@@ -38,8 +37,8 @@ use typst_preview::{
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
-    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, ProjectClient,
-    ProjectCompiler, ProjectState,
+    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, LspWorld,
+    ProjectClient, ProjectCompiler, ProjectInsId, ProjectState, WorldProvider,
 };
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -48,6 +47,134 @@ use project::{watch_deps, ProjectPreviewState};
 
 pub use typst_preview::CompileStatus;
 
+pub enum PreviewKind {
+    Regular,
+    Browsing,
+    Background,
+}
+
+impl ServerState {
+    pub fn background_preview(&mut self) {
+        if !self.config.preview.background.enabled {
+            return;
+        }
+
+        let args = self.config.preview.background.args.clone();
+        let args = args.unwrap_or_else(|| {
+            vec![
+                "--data-plane-host=127.0.0.1:23635".to_string(),
+                "--invert-colors=auto".to_string(),
+            ]
+        });
+
+        let res = self.start_preview_inner(args, PreviewKind::Background);
+
+        // todo: looks ugly
+        self.client.handle.spawn(async move {
+            let fut = match res {
+                Ok(fut) => fut,
+                Err(e) => {
+                    log::error!("failed to start background preview: {e:?}");
+                    return;
+                }
+            };
+            tokio::pin!(fut);
+            let () = fut.as_mut().await;
+
+            if let Some(Err(e)) = fut.as_mut().take_output() {
+                log::error!("failed to start background preview: {e:?}");
+            }
+        });
+    }
+
+    /// Start a preview instance.
+    pub fn start_preview_inner(
+        &mut self,
+        cli_args: Vec<String>,
+        kind: PreviewKind,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
+        use std::path::Path;
+
+        use crate::tool::preview::PreviewCliArgs;
+        use clap::Parser;
+
+        // clap parse
+        let cli_args = ["preview"]
+            .into_iter()
+            .chain(cli_args.iter().map(|e| e.as_str()));
+        let cli_args =
+            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+
+        // todo: preview specific arguments are not used
+        let entry = cli_args.compile.input.as_ref();
+        let entry = entry
+            .map(|input| {
+                let input = Path::new(&input);
+                if !input.is_absolute() {
+                    // std::env::current_dir().unwrap().join(input)
+                    return Err(invalid_params("entry file must be absolute path"));
+                };
+
+                Ok(input.into())
+            })
+            .transpose()?;
+
+        let task_id = cli_args.preview.task_id.clone();
+        if task_id == "primary" {
+            return Err(invalid_params("task id 'primary' is reserved"));
+        }
+
+        if cli_args.not_as_primary && matches!(kind, PreviewKind::Background) {
+            return Err(invalid_params(
+                "cannot start background preview as non-primary",
+            ));
+        }
+
+        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+        let watcher = previewer.compile_watcher();
+
+        let primary = &mut self.project.compiler.primary;
+        // todo: recover pin status reliably
+        let is_browsing = matches!(kind, PreviewKind::Browsing | PreviewKind::Background);
+        let is_background = matches!(kind, PreviewKind::Background);
+
+        let registered_as_primary = !cli_args.not_as_primary
+            && (is_browsing || entry.is_some())
+            && self.preview.watchers.register(&primary.id, watcher);
+        if matches!(kind, PreviewKind::Background) && !registered_as_primary {
+            return Err(invalid_params(
+                "failed to register background preview to the primary instance",
+            ));
+        }
+
+        if registered_as_primary {
+            let id = primary.id.clone();
+
+            if let Some(entry) = entry {
+                self.change_main_file(Some(entry)).map_err(internal_error)?;
+            }
+            self.set_pin_by_preview(true, is_browsing);
+
+            self.preview
+                .start(cli_args, previewer, id, true, is_background)
+        } else if let Some(entry) = entry {
+            let id = self
+                .restart_dedicate(&task_id, Some(entry))
+                .map_err(internal_error)?;
+
+            if !self.project.preview.register(&id, watcher) {
+                return Err(invalid_params(
+                    "cannot register preview to the compiler instance",
+                ));
+            }
+
+            self.preview
+                .start(cli_args, previewer, id, false, is_background)
+        } else {
+            return Err(internal_error("entry file must be provided"));
+        }
+    }
+}
 /// The preview's view of the compiled artifact.
 pub struct PreviewCompileView {
     /// The artifact and snap.
@@ -192,7 +319,7 @@ pub struct PreviewCliArgs {
     )]
     pub control_plane_host: String,
 
-    /// (File) Host for the preview server. Note: if it equals to
+    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
     /// `data_plane_host`, same address will be used.
     #[clap(
         long = "host",
@@ -206,9 +333,21 @@ pub struct PreviewCliArgs {
     #[clap(long = "not-primary", hide(true))]
     pub not_as_primary: bool,
 
-    /// Don't open the preview in the browser after compilation.
+    /// Open the preview in the browser after compilation. If `--no-open` is
+    /// set, this flag will be ignored.
+    #[clap(long = "open")]
+    pub open: bool,
+
+    /// Don't open the preview in the browser after compilation. If `--open` is
+    /// set as well, this flag will win.
     #[clap(long = "no-open")]
-    pub dont_open_in_browser: bool,
+    pub no_open: bool,
+}
+
+impl PreviewCliArgs {
+    pub fn open_in_browser(&self, default: bool) -> bool {
+        !self.no_open && (self.open || default)
+    }
 }
 
 /// The global state of the preview tool.
@@ -339,6 +478,7 @@ impl PreviewState {
         // compile_handler: Arc<CompileHandler>,
         project_id: ProjectInsId,
         is_primary: bool,
+        is_background: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let compile_handler = Arc::new(PreviewProjectHandler {
             project_id,
@@ -346,6 +486,7 @@ impl PreviewState {
         });
 
         let task_id = args.preview.task_id.clone();
+        let open_in_browser = args.open_in_browser(false);
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
         if !args.static_file_host.is_empty() && (args.static_file_host != args.data_plane_host) {
@@ -424,6 +565,11 @@ impl PreviewState {
                 is_primary,
             };
 
+            if open_in_browser {
+                open::that_detached(format!("http://127.0.0.1:{}", addr.port()))
+                    .log_error("failed to open browser for preview");
+            }
+
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
                 previewer,
@@ -431,6 +577,7 @@ impl PreviewState {
                 ctl_tx,
                 compile_handler,
                 is_primary,
+                is_background,
             }));
             sent.map_err(|_| internal_error("failed to register preview tab"))?;
 
@@ -694,6 +841,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
     let handle = tokio::runtime::Handle::current();
 
+    let open_in_browser = args.open_in_browser(true);
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
             Some(args.static_file_host)
@@ -860,7 +1008,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
     log::info!("Static file server listening on: {static_server_addr}");
 
-    if !args.dont_open_in_browser {
+    if open_in_browser {
         open::that_detached(format!("http://{static_server_addr}"))
             .log_error("failed to open browser for preview");
     }

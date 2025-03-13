@@ -1,0 +1,58 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on i  (126..128)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/ref_half_colon.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 18,
+    "label": "sec:it",
+    "labelDetails": {
+     "description": "H"
+    },
+    "textEdit": {
+     "newText": "sec:it",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 13
+      },
+      "start": {
+       "character": 1,
+       "line": 13
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 18,
+    "label": "sec:it",
+    "labelDetails": {
+     "description": "H"
+    },
+    "textEdit": {
+     "newText": "sec:it",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 13
+      },
+      "start": {
+       "character": 1,
+       "line": 13
+      }
+     }
+    }
+   }
+  ]
+ }
+]

@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.4-rc1",
+  "version": "0.13.6",
   "description": "An integrated language service for Typst",
   "keywords": [
     "typst",
@@ -686,13 +686,7 @@
       }
     },
     "configurationDefaults": {
-      "[typst]": {
-        "editor.wordWrap": "on",
-        "editor.semanticHighlighting.enabled": true,
-        "editor.tabSize": 2,
-        "editor.inlayHints.enabled": "off"
-      },
-      "[typst-code]": {
+      "[typst][typst-code]": {
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
@@ -1048,7 +1042,7 @@
         "category": "Typst"
       },
       {
-        "command": "tinymist.browsing-preview",
+        "command": "tinymist.browsingPreview",
         "title": "Tinymist: Browsing Preview",
         "description": "Open a preview panel to browsing through documents. The preview panel will pick a main file when switching between files. By default, every single file is a document. This doesn't work well with multiple-files projects. To allow tinymist learn the structure of your projects, please configure `tinymist.projectResolution` as `lockDatabase`.",
         "icon": "$(open-preview)"

@@ -1,0 +1,30 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (36..37)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/markup_chain2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "sin",
+    "textEdit": {
+     "newText": "sin(${1:})",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 3
+      },
+      "start": {
+       "character": 14,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
