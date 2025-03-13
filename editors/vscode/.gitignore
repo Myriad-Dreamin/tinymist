@@ -5,3 +5,5 @@ test-dist
 coverage
 icons/ti.svg
 icons/typst-small.svg
+package.nls.json
+package.nls.*.json

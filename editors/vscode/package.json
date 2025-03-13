@@ -1,7 +1,7 @@
 {
   "name": "tinymist",
   "version": "0.13.8",
-  "description": "An integrated language service for Typst",
+  "description": "%description%",
   "keywords": [
     "typst",
     "lsp",
@@ -944,142 +944,142 @@
     "commands": [
       {
         "command": "tinymist.exportCurrentPdf",
-        "title": "Export the Opened File as PDF",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentPdf%",
         "category": "Typst"
       },
       {
         "command": "tinymist.pinMainToCurrent",
-        "title": "Pin the Main file to the Opening Document",
+        "title": "%extension.tinymist.command.tinymist.pinMainToCurrent%",
         "category": "Typst"
       },
       {
         "command": "tinymist.unpinMain",
-        "title": "Unpin the main file",
+        "title": "%extension.tinymist.command.tinymist.unpinMain%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showPdf",
-        "title": "Show exported PDF",
+        "title": "%extension.tinymist.command.tinymist.showPdf%",
         "category": "Typst",
         "icon": "$(file-pdf)"
       },
       {
         "command": "tinymist.copyAnsiHighlight",
-        "title": "Copy as ANSI Code",
+        "title": "%extension.tinymist.command.tinymist.copyAnsiHighlight%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showLog",
-        "title": "Tinymist: Show Log",
+        "title": "%extension.tinymist.command.tinymist.showLog%",
         "description": "Show log of the language server",
         "category": "Typst",
         "icon": "$(list-flat)"
       },
       {
         "command": "tinymist.restartServer",
-        "title": "Restart server",
+        "title": "%extension.tinymist.command.tinymist.restartServer%",
         "category": "Typst"
       },
       {
         "command": "tinymist.clearCache",
-        "title": "Clear all Cached Resources",
+        "title": "%extension.tinymist.command.tinymist.clearCache%",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplate",
-        "title": "Initialize a New Typst Project based on a Template",
+        "title": "%extension.tinymist.command.tinymist.initTemplate%",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplateInPlace",
-        "title": "Insert the Content of Template Entry in Place",
+        "title": "%extension.tinymist.command.tinymist.initTemplateInPlace%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showTemplateGallery",
-        "title": "Show Available Typst Templates (Gallery) for Picking up a Template to Initialize",
+        "title": "%extension.tinymist.command.tinymist.showTemplateGallery%",
         "category": "Typst"
       },
       {
         "command": "tinymist.createLocalPackage",
-        "title": "Create Typst Local Package",
+        "title": "%extension.tinymist.command.tinymist.createLocalPackage%",
         "category": "Typst"
       },
       {
         "command": "tinymist.openLocalPackage",
-        "title": "Open Typst Local Package",
+        "title": "%extension.tinymist.command.tinymist.openLocalPackage%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showSummary",
-        "title": "Show current document summary",
+        "title": "%extension.tinymist.command.tinymist.showSummary%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showSymbolView",
-        "title": "Show Symbol View",
+        "title": "%extension.tinymist.command.tinymist.showSymbolView%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showFontView",
-        "title": "Show Font View",
+        "title": "%extension.tinymist.command.tinymist.showFontView%",
         "category": "Typst"
       },
       {
         "command": "tinymist.profileCurrentFile",
-        "title": "Profile and visualize execution of the current Typst file",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFile%",
         "category": "Typst"
       },
       {
         "command": "tinymist.syncLabel",
-        "title": "Scan workspace and collect all labels again",
+        "title": "%extension.tinymist.command.tinymist.syncLabel%",
         "icon": "$(extensions-sync-enabled)",
         "category": "Typst"
       },
       {
         "command": "tinymist.browsingPreview",
-        "title": "Tinymist: Browsing Preview",
+        "title": "%extension.tinymist.command.tinymist.browsingPreview%",
         "description": "Open a preview panel to browsing through documents. The preview panel will pick a main file when switching between files. By default, every single file is a document. This doesn't work well with multiple-files projects. To allow tinymist learn the structure of your projects, please configure `tinymist.projectResolution` as `lockDatabase`.",
         "icon": "$(open-preview)"
       },
       {
         "command": "typst-preview.preview",
-        "title": "Typst Preview: Preview Opened File",
+        "title": "%extension.tinymist.command.typst-preview.preview%",
         "description": "Launch typst-preview server",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser",
-        "title": "Typst Preview: Preview Opened File in Browser",
+        "title": "%extension.tinymist.command.typst-preview.browser%",
         "description": "Launch typst-preview server and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.preview-slide",
-        "title": "Typst Preview: Preview Opened File in Slide Mode",
+        "title": "%extension.tinymist.command.typst-preview.preview-slide%",
         "description": "Launch typst-preview server in slide mode",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser-slide",
-        "title": "Typst Preview: Preview Opened file in Browser and Slide Mode",
+        "title": "%extension.tinymist.command.typst-preview.browser-slide%",
         "description": "Launch typst-preview server in slide mode and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.sync",
-        "title": "Typst Preview: Sync Preview with Current Cursor",
+        "title": "%extension.tinymist.command.typst-preview.sync%",
         "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.noteOutline",
-        "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
+        "title": "%extension.tinymist.command.typst-preview.noteOutline%",
         "description": "...",
         "icon": "$(extensions-info-message)"
       }
@@ -1151,10 +1151,11 @@
   "scripts": {
     "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
     "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
+    "build:l10n": "cd ../../ && yarn build:l10n",
     "build-web-base": "node esbuild.web.mjs",
     "build-system-base": "node esbuild.system.mjs",
     "build-base": "yarn run build-web-base && yarn run build-system-base",
-    "compile-shared": "yarn run build:syntax && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
+    "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
     "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
     "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
     "package": "npx @vscode/vsce package --yarn",
