@@ -7,25 +7,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/arg_range5.typ
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 15,
-    "label": "alignment",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "${1:alignment}",
-     "range": {
-      "end": {
-       "character": 9,
-       "line": 1
-      },
-      "start": {
-       "character": 9,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]
