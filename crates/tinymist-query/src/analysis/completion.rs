@@ -10,7 +10,7 @@ use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use tinymist_analysis::syntax::bad_completion_cursor;
+use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -174,10 +174,6 @@ impl<'a> CompletionCursor<'a> {
         let syntax = classify_syntax(leaf.clone(), cursor);
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
-
-        if bad_completion_cursor(syntax.as_ref(), syntax_context.as_ref(), &leaf).is_some() {
-            return None;
-        }
 
         crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
@@ -447,6 +443,17 @@ impl<'a> CompletionWorker<'a> {
 
     /// Starts the completion process.
     pub(crate) fn work(&mut self, cursor: &mut Cursor) -> Option<()> {
+        match bad_completion_cursor(
+            cursor.syntax.as_ref(),
+            cursor.syntax_context.as_ref(),
+            &cursor.leaf,
+        ) {
+            // Returns an empty completion list if the cursor is in a bad position. This will
+            // prevent the completion list from showing up.
+            Some(BadCompletionCursor::ArgListPos) => return Some(()),
+            None => {}
+        }
+
         // Skips if is the let binding item *directly*
         if let Some(SyntaxClass::VarAccess(var)) = &cursor.syntax {
             let node = var.node();
