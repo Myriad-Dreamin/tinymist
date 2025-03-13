@@ -1,4 +1,5 @@
 **
+!l10n/**/*
 !package.nls.json
 !package.nls.*.json
 !out/tinymist-docs.pdf

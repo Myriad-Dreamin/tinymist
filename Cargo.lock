@@ -4106,6 +4106,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymist-l10n"
+version = "0.13.8"
+dependencies = [
+ "anyhow",
+ "clap",
+ "comemo",
+ "ecow",
+ "insta",
+ "rayon",
+ "walkdir",
+]
+
+[[package]]
 name = "tinymist-project"
 version = "0.13.2"
 dependencies = [

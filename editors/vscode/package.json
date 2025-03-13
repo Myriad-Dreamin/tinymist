@@ -29,6 +29,7 @@
   "main": "./out/extension.js",
   "browser": "./out/extension.web.js",
   "icon": "./icons/ti-white.png",
+  "l10n": "./l10n",
   "contributes": {
     "viewsContainers": {
       "activitybar": [

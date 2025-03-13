@@ -11,18 +11,29 @@ import * as path from "path";
 const __dirname = new URL(".", import.meta.url).toString().replace("file:///", "");
 const projectRoot = path.resolve(__dirname, "..");
 
-function translate(input, output) {
-  const data = fs.readFileSync(path.resolve(projectRoot, input), "utf-8");
-  const lines = data
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => !line.startsWith("#") && line.length > 0);
+/**
+ *
+ * @param {string} output
+ * @param {string[]} inputs
+ * @returns
+ */
+function translate(output, kind, inputs) {
+  const lines = inputs.flatMap((input) =>
+    fs
+      .readFileSync(path.resolve(projectRoot, input), "utf-8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => !line.startsWith("#") && line.length > 0),
+  );
 
   const translations = {};
   let key = "";
   for (let line of lines) {
     if (line.startsWith("[")) {
       key = line.substring(1, line.length - 1);
+      if (key.startsWith('"')) {
+        key = JSON.parse(key);
+      }
     } else {
       const equalIndex = line.indexOf("=");
       const lang = line.substring(0, equalIndex).trim();
@@ -42,21 +53,34 @@ function translate(input, output) {
 
   const langRest = langs.filter((lang) => lang !== "en");
 
-  const langEnPath = path.resolve(projectRoot, `${output}/package.nls.json`);
+  const langDir = path.resolve(projectRoot, output);
+  fs.mkdirSync(langDir, { recursive: true });
+
+  const langEnPath = `${langDir}/${kind}.json`;
   const langEnData = translations["en"];
   fs.writeFileSync(langEnPath, JSON.stringify(langEnData, null, 2));
 
   for (let lang of langRest) {
-    const langPath = path.resolve(projectRoot, `${output}/package.nls.${lang}.json`);
+    const langPath = `${langDir}/${kind}.${lang}.json`;
     const langData = translations[lang];
-    fs.writeFileSync(langPath, JSON.stringify(langData, null, 2));
+    const langPack = JSON.stringify(langData, null, 2);
+
+    fs.writeFileSync(langPath, langPack);
+
+    // alias zh-cn
+    if (kind === "bundle.l10n" && lang === "zh") {
+      const langZhCNPath = `${langDir}/${kind}.zh-cn.json`;
+      fs.writeFileSync(langZhCNPath, langPack);
+    }
   }
 
   return translations;
 }
 
+// todo: verify using rust
 function genVscodeExt() {
-  const translations = translate("locales/tinymist-vscode.toml", "editors/vscode");
+  const translations = translate("editors/vscode", "package.nls", ["locales/tinymist-vscode.toml"]);
+  translate("editors/vscode/l10n", "bundle.l10n", ["locales/tinymist-vscode-rt.toml"]);
 
   const pat = /\%(extension\.tinymist\..*?)\%/g;
   const data = fs.readFileSync(path.resolve(projectRoot, "editors/vscode/package.json"), "utf-8");
