@@ -1088,6 +1088,18 @@ impl<'a> SyntaxContext<'a> {
             | SyntaxContext::Normal(node) => node.clone(),
         })
     }
+
+    /// Gets the argument container node.
+    pub fn arg_container(&self) -> Option<&LinkedNode<'a>> {
+        match self {
+            Self::Arg { args, .. }
+            | Self::Element {
+                container: args, ..
+            } => Some(args),
+            Self::Paren { container, .. } => Some(container),
+            _ => None,
+        }
+    }
 }
 
 /// Kind of argument source.
@@ -1340,6 +1352,37 @@ fn arg_context<'a>(
             })
         }
     }
+}
+
+/// The cursor is on an invalid position.
+pub enum BadCompletionCursor {
+    /// The cursor is outside of the argument list.
+    ArgListPos,
+}
+
+/// Checks if the cursor is on an invalid position for completion.
+pub fn bad_completion_cursor(
+    syntax: Option<&SyntaxClass>,
+    syntax_context: Option<&SyntaxContext>,
+    leaf: &LinkedNode,
+) -> Option<BadCompletionCursor> {
+    // The cursor is on `f()|`
+    if (matches!(syntax, Some(SyntaxClass::Callee(..))) && {
+        syntax_context
+            .and_then(SyntaxContext::arg_container)
+            .is_some_and(|container| {
+                container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset())
+            })
+        // The cursor is on `f[]|`
+    }) || (matches!(
+        syntax,
+        Some(SyntaxClass::Normal(SyntaxKind::ContentBlock, _))
+    ) && matches!(leaf.kind(), SyntaxKind::RightBracket))
+    {
+        return Some(BadCompletionCursor::ArgListPos);
+    }
+
+    None
 }
 
 #[cfg(test)]

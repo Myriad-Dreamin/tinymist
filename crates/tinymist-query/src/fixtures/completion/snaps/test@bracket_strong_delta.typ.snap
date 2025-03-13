@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: "Completion on ] (52..53)"
+description: Completion on / (29..30)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong_delta.typ
 ---
@@ -19,11 +19,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong_delta.t
      "newText": "delta: ${1:})",
      "range": {
       "end": {
-       "character": 31,
+       "character": 8,
        "line": 2
       },
       "start": {
-       "character": 31,
+       "character": 8,
        "line": 2
       }
      }
