@@ -443,17 +443,6 @@ impl<'a> CompletionWorker<'a> {
 
     /// Starts the completion process.
     pub(crate) fn work(&mut self, cursor: &mut Cursor) -> Option<()> {
-        match bad_completion_cursor(
-            cursor.syntax.as_ref(),
-            cursor.syntax_context.as_ref(),
-            &cursor.leaf,
-        ) {
-            // Returns an empty completion list if the cursor is in a bad position. This will
-            // prevent the completion list from showing up.
-            Some(BadCompletionCursor::ArgListPos) => return Some(()),
-            None => {}
-        }
-
         // Skips if is the let binding item *directly*
         if let Some(SyntaxClass::VarAccess(var)) = &cursor.syntax {
             let node = var.node();
@@ -644,12 +633,21 @@ impl CompletionPair<'_, '_, '_> {
             | None => {}
         }
 
+        let cursor_pos = bad_completion_cursor(
+            self.cursor.syntax.as_ref(),
+            self.cursor.syntax_context.as_ref(),
+            &self.cursor.leaf,
+        );
+
         // Triggers a complete type checking.
         let ty = self
             .worker
             .ctx
             .post_type_of_node(self.cursor.leaf.clone())
-            .filter(|ty| !matches!(ty, Ty::Any));
+            .filter(|ty| !matches!(ty, Ty::Any))
+            // Forbids argument completion list if the cursor is in a bad position. This will
+            // prevent the completion list from showing up.
+            .filter(|_| !matches!(cursor_pos, Some(BadCompletionCursor::ArgListPos)));
 
         crate::log_debug_ct!(
             "complete_type: {:?} -> ({surrounding_syntax:?}, {ty:#?})",

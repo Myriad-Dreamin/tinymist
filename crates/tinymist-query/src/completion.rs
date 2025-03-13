@@ -68,7 +68,7 @@ impl StatefulRequest for CompletionRequest {
         //
         // Hence, we cannot distinguish between the two cases. Conservatively, we
         // assume that the completion is not explicit.
-        let explicit = false;
+        let explicit = self.explicit && self.trigger_character.is_none();
 
         let document = doc.as_ref().map(|doc| &doc.document);
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -118,6 +118,11 @@ mod tests {
             let trigger_character = properties
                 .get("trigger_character")
                 .map(|v| v.chars().next().unwrap());
+            let explicit = match properties.get("explicit").copied().map(str::trim) {
+                Some("true") => true,
+                Some("false") | None => false,
+                Some(v) => panic!("invalid value for 'explicit' property: {v}"),
+            };
 
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
@@ -171,7 +176,7 @@ mod tests {
                 let request = CompletionRequest {
                     path: ctx.path_for_id(id).unwrap().as_path().to_owned(),
                     position: ctx.to_lsp_pos(s, &source),
-                    explicit: false,
+                    explicit,
                     trigger_character,
                 };
                 let result = request
