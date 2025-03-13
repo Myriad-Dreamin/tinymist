@@ -753,10 +753,9 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         if matches!(mode, InterpretMode::Math)
             && prev_leaf.as_ref().is_some_and(|leaf| {
                 // Don't match `$ a.| $` or `$.| $`
-                matches!(leaf.kind(), SyntaxKind::MathText | SyntaxKind::Text)
-                    || node_ancestors(leaf)
-                        .find(|t| matches!(t.kind(), SyntaxKind::Equation))
-                        .is_some_and(|parent| parent.offset() == leaf.offset())
+                node_ancestors(leaf)
+                    .find(|t| matches!(t.kind(), SyntaxKind::Equation))
+                    .is_some_and(|parent| parent.offset() == leaf.offset())
             })
         {
             return None;
