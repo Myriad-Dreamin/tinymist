@@ -6,6 +6,21 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.8 - [2025-03-13]
+
+### Completion
+
+* (Fix) More rules to forbidden arg completion in https://github.com/Myriad-Dreamin/tinymist/pull/1493
+  * It were completing arguments from `#align[]|` or `#align()[]|`
+* (Fix) Don't check context type if parent is a block in https://github.com/Myriad-Dreamin/tinymist/pull/1494
+  * It were completing arguments from `#align[|]`, `#align([|])`, or `#align({|})`
+* (Fix) Forbid some bad cases of dot access in https://github.com/Myriad-Dreamin/tinymist/pull/1497
+  * It were issuing postfix completion from `$.|$` or `$ .| $`
+* Detecting explicit completion from vscode in https://github.com/Myriad-Dreamin/tinymist/pull/1496
+  * Requesting completion about `$|$` or `$abs(a)|$` took no effect.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.6...v0.13.8
+
 ## v0.13.6 - [2025-03-13]
 
 We has provided more ways of previewing documents for editors having poor lsp support.
