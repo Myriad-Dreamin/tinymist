@@ -55,6 +55,10 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
+        let document = doc.as_ref().map(|doc| &doc.document);
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
+
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
         // FIXME: correctly identify a completion which is triggered
@@ -68,11 +72,17 @@ impl StatefulRequest for CompletionRequest {
         //
         // Hence, we cannot distinguish between the two cases. Conservatively, we
         // assume that the completion is not explicit.
-        let explicit = self.explicit && self.trigger_character.is_none();
-
-        let document = doc.as_ref().map(|doc| &doc.document);
-        let source = ctx.source_by_path(&self.path).ok()?;
-        let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
+        //
+        // Second try: According to VSCode:
+        // - <https://github.com/microsoft/vscode/issues/130953>
+        // - <https://github.com/microsoft/vscode/commit/0984071fe0d8a3c157a1ba810c244752d69e5689>
+        // Checks the previous text to filter out letter explicit completions.
+        let explicit = self.explicit
+            && (self.trigger_character.is_none() && {
+                let prev_text = &source.text()[..cursor];
+                let prev_char = prev_text.chars().next_back();
+                prev_char.is_none_or(|c| !c.is_alphabetic())
+            });
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
         let mut worker = CompletionWorker::new(ctx, document, explicit, self.trigger_character)?;
