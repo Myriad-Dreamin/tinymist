@@ -494,10 +494,11 @@ pub async fn make_http_server(
             let static_file_addr = static_file_addr.clone();
             async move {
                 // When a user visits a website in a browser, that website can try to connect to
-                // our http / websocket server on `127.0.0.1` which may leak sensitive information.
-                // We could use CORS headers to explicitly disallow this. However, for Websockets,
-                // this does not work. Thus, we manually check the `Origin` header. Browsers
-                // always send this header for cross-origin requests.
+                // our http / websocket server on `127.0.0.1` which may leak sensitive
+                // information. We could use CORS headers to explicitly disallow
+                // this. However, for Websockets, this does not work. Thus, we
+                // manually check the `Origin` header. Browsers always send this
+                // header for cross-origin requests.
                 //
                 // Important: This does _not_ protect against malicious users that share the
                 // same computer as us (i.e. multi- user systems where the users
@@ -622,7 +623,8 @@ fn is_valid_origin(h: &HeaderValue, static_file_addr: &str, expected_port: u16) 
     is_valid_origin_impl(h, static_file_addr, expected_port, &GITPOD_ID_AND_HOST)
 }
 
-// Separate function so we can do gitpod-related tests without relying on env vars.
+// Separate function so we can do gitpod-related tests without relying on env
+// vars.
 fn is_valid_origin_impl(
     origin_header: &HeaderValue,
     static_file_addr: &str,
@@ -642,7 +644,8 @@ fn is_valid_origin_impl(
     let expected_origin = {
         let expected_host = Url::parse(&format!("http://{static_file_addr}")).unwrap();
         let expected_host = expected_host.host_str().unwrap();
-        // Don't take the port from `static_file_addr` (it may have a dummy port e.g. `127.0.0.1:0`)
+        // Don't take the port from `static_file_addr` (it may have a dummy port e.g.
+        // `127.0.0.1:0`)
         format!("http://{expected_host}:{expected_port}")
     };
 
@@ -653,7 +656,7 @@ fn is_valid_origin_impl(
         });
 
     *origin_header == expected_origin
-        // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
+        // tmistele (PR #1382): The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
         // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
         // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
         // point of view, because I think malicious websites can't trick browsers into sending
