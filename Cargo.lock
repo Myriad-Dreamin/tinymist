@@ -4112,10 +4112,10 @@ version = "0.13.8"
 dependencies = [
  "anyhow",
  "clap",
- "comemo",
  "ecow",
  "insta",
  "rayon",
+ "rustc-hash 2.1.1",
  "serde_json",
  "walkdir",
 ]

@@ -65,7 +65,7 @@ fn main() -> Result<()> {
 
     const TINYMIST_RT: &str = include_str!("../../../locales/tinymist-rt.toml");
 
-    tinymist_l10n::replace_translations(tinymist_l10n::load_toml(TINYMIST_RT));
+    tinymist_l10n::set_translations(tinymist_l10n::load_translations(TINYMIST_RT)?);
     tinymist_l10n::set_locale("zh");
 
     let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));

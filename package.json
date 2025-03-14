@@ -16,7 +16,7 @@
   "scripts": {
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
-    "build:l10n": "node scripts/build-l10n.mjs",
+    "build:l10n": "yarn extract:l10n && node scripts/build-l10n.mjs",
     "extract:l10n": "yarn extract:l10n:ts && yarn extract:l10n:rs",
     "extract:l10n:ts": "cargo run --release --bin tinymist-l10n -- --kind ts --dir ./editors/vscode --output ./locales/tinymist-vscode-rt.toml",
     "extract:l10n:rs": "cargo run --release --bin tinymist-l10n -- --kind rs --dir ./crates --output ./locales/tinymist-rt.toml",
