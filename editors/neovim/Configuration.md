@@ -18,7 +18,7 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 
 ## `exportTarget`
 
-The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
 
 - **Type**: `string`
 - **Enum**:
@@ -35,7 +35,7 @@ The extension can export PDFs of your Typst files. This setting controls whether
   - `never`: Never export PDFs, you will manually run typst.
   - `onSave`: Export PDFs when you save a file.
   - `onType`: Export PDFs as you type in a file.
-  - `onDocumentHasTitle`: Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
+  - `onDocumentHasTitle`: (Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
 - **Default**: `"never"`
 
 ## `rootPath`
@@ -56,7 +56,7 @@ Enable or disable semantic tokens (LSP syntax highlighting)
 
 ## `systemFonts`
 
-A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. 
+A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options.
 
 - **Type**: `boolean`
 - **Default**: `true`

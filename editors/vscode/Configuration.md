@@ -18,7 +18,7 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 
 ## `tinymist.exportTarget`
 
-The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
 
 - **Type**: `string`
 - **Enum**:
@@ -35,7 +35,7 @@ The extension can export PDFs of your Typst files. This setting controls whether
   - `never`: Never export PDFs, you will manually run typst.
   - `onSave`: Export PDFs when you save a file.
   - `onType`: Export PDFs as you type in a file.
-  - `onDocumentHasTitle`: Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
+  - `onDocumentHasTitle`: (Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
 - **Default**: `"never"`
 
 ## `tinymist.rootPath`
@@ -80,7 +80,7 @@ Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analy
 
 ## `tinymist.systemFonts`
 
-A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. 
+A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options.
 
 - **Type**: `boolean`
 - **Default**: `true`
@@ -165,7 +165,7 @@ Sets the indent size (using space) for the formatter.
 
 ## `tinymist.showExportFileIn`
 
-Configures way of opening exported files, e.g. inside of editor tabs or using system application.
+(Experimental) Show Exported Files in Some Place
 
 
 ## `tinymist.dragAndDrop`
@@ -174,8 +174,8 @@ Whether to handle drag-and-drop of resources into the editing typst document. No
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable drag-and-drop.
+  - `disable`: Disable drag-and-drop.
 - **Default**: `"enable"`
 
 ## `tinymist.copyAndPaste`
@@ -184,8 +184,8 @@ Whether to handle paste of resources into the editing typst document. Note: rest
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable copy-and-paste.
+  - `disable`: Disable copy-and-paste.
 - **Default**: `"enable"`
 
 ## `tinymist.renderDocs`
@@ -194,8 +194,8 @@ Whether to handle paste of resources into the editing typst document. Note: rest
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable render docs.
+  - `disable`: Disable render docs.
 - **Default**: `"enable"`
 
 ## `tinymist.completion.triggerOnSnippetPlaceholders`
@@ -238,8 +238,8 @@ Enable or disable preview features of Typst. Note: restarting the editor is requ
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable preview features.
+  - `disable`: Disable preview features.
 - **Default**: `"enable"`
 
 ## `tinymist.preview.refresh`
