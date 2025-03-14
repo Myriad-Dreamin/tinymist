@@ -16,7 +16,7 @@ struct Args {
     ///
     /// It can be `rs` for Rust or `ts` for TypeScript.
     /// - `rs`: checks `tinymist_l10n::t!` macro in Rust files.
-    /// - `ts`: checks `l10nStr` function in TypeScript files.
+    /// - `ts`: checks `l10nMsg` function in TypeScript files.
     #[clap(long)]
     kind: String,
     /// The directory to process recursively.
@@ -100,7 +100,7 @@ fn write_toml(translations: TranslationMapSet) -> String {
     result
 }
 
-const L10N_FN_TS: &str = "l10nStr";
+const L10N_FN_TS: &str = "l10nMsg";
 const L10N_FN_RS: &str = "tinymist_l10n::t!";
 
 fn check_calls(e: walkdir::DirEntry, is_rs: bool) -> Vec<(String, String)> {
