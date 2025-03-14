@@ -32,7 +32,15 @@ pub fn set_translations(translations: TranslationMapSet) {
 /// Sets the current locale.
 pub fn set_locale(locale: &str) -> Option<()> {
     let translations = ALL_TRANSLATIONS.get()?;
-    let translations = translations.get(locale)?;
+    let lower_locale = locale.to_lowercase();
+    let locale = lower_locale.as_str();
+    let translations = translations.get(locale).or_else(|| {
+        // Tries s to find a language that starts with the locale and follow a hyphen.
+        translations
+            .iter()
+            .find(|(k, _)| locale.starts_with(*k) && locale.chars().nth(k.len()) == Some('-'))
+            .map(|(_, v)| v)
+    })?;
 
     *LOCALE_TRANSLATIONS.write().unwrap() = Some(translations);
 

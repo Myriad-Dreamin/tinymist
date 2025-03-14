@@ -22,6 +22,7 @@ use tinymist::tool::project::{compile_main, generate_script_main, project_main, 
 use tinymist::world::TaskInputs;
 use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
+use tinymist_l10n::{load_translations, set_translations};
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
@@ -56,22 +57,20 @@ fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    // Parse command line arguments
+    // Parses command line arguments
     let args = CliArguments::parse();
 
-    if let Some(Commands::Probe) = args.command.as_ref() {
+    // Probes soon to avoid other initializations causing errors
+    if matches!(args.command, Some(Commands::Probe)) {
         return Ok(());
     }
 
-    const TINYMIST_RT: &str = include_str!("../../../locales/tinymist-rt.toml");
+    // Loads translations
+    set_translations(load_translations(tinymist_assets::L10N_DATA)?);
 
-    tinymist_l10n::set_translations(tinymist_l10n::load_translations(TINYMIST_RT)?);
-    tinymist_l10n::set_locale("zh");
-
-    let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
-
-    // Start logging
+    // Starts logging
     let _ = {
+        let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
         use log::LevelFilter::*;
         let base_level = if is_transient_cmd { Warn } else { Info };
 
