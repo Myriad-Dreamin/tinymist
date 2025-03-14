@@ -1,6 +1,6 @@
 [package]
 name = "tinymist-l10n"
-description = "Benchmark support for typst."
+description = "Localization support for tinymist and typst."
 categories = ["compilers", "command-line-utilities"]
 keywords = ["language", "typst"]
 authors.workspace = true
