@@ -132,6 +132,7 @@ preview = [
 ]
 
 # l10n = ["tinymist-assets/l10n"]
+l10n = []
 
 [dev-dependencies]
 temp-env.workspace = true

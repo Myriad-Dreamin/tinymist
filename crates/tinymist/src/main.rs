@@ -22,10 +22,12 @@ use tinymist::tool::project::{compile_main, generate_script_main, project_main, 
 use tinymist::world::TaskInputs;
 use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
-use tinymist_l10n::{load_translations, set_translations};
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
+
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
 
 use crate::args::*;
 
@@ -66,6 +68,7 @@ fn main() -> Result<()> {
     }
 
     // Loads translations
+    #[cfg(feature = "l10n")]
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
 
     // Starts logging
