@@ -90,7 +90,8 @@ default = [
     "cli",
     "html",
     "pdf",
-    "l10n",
+    # enable it once we upload assets.
+    # "l10n",
     "preview",
     "embed-fonts",
     "no-content-hint",

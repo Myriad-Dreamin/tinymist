@@ -52,10 +52,11 @@ jobs:
           node-version: 22
       - name: Install deps
         run: yarn install
-      - name: Check and build typst-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Check and build assets
         run: |
           yarn build:preview
-      - uses: Swatinem/rust-cache@v2
+          yarn build:l10n
       - run: cargo clippy --workspace --all-targets
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps

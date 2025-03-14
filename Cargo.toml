@@ -252,7 +252,7 @@ extend-exclude = ["/.git", "fixtures"]
 # However, it is not suggested to install it in that way. The suggested ways are: 
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
 # - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
-tinymist-assets = { path = "./crates/tinymist-assets/" }
+# tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
