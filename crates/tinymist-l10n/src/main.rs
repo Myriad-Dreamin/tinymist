@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 const L10N_FN_TS: &str = "l10nMsg";
-const L10N_FN_RS: &str = "tinymist_l10n::t!";
+const L10N_FN_RS: &str = "tinymist_l10n::";
 
 fn check_calls(e: walkdir::DirEntry, is_rs: bool) -> Vec<(String, String)> {
     let path = e.path();
@@ -80,6 +80,11 @@ fn check_calls(e: walkdir::DirEntry, is_rs: bool) -> Vec<(String, String)> {
             }
             if is_rs && s.starts_with(L10N_FN_RS) {
                 let suffix = &content[e.0 + L10N_FN_RS.len()..];
+
+                let suffix = suffix
+                    .strip_prefix("t!")
+                    .or_else(|| suffix.strip_prefix("bail!"))?;
+
                 return parse_l10n_args_rs(suffix);
 
                 fn parse_l10n_args_rs(s: &str) -> Option<(String, String)> {

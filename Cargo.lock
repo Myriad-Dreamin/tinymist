@@ -4159,6 +4159,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-derive",
+ "tinymist-l10n",
  "tinymist-std",
  "tinymist-task",
  "tinymist-world",

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -12,9 +13,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
+use tinymist_l10n::DebugL10n;
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
+use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
@@ -398,7 +401,11 @@ impl Config {
             }
             Ok(())
         } else {
-            bail!("got invalid configuration object {update}")
+            let msg = tinymist_l10n::t!(
+                "tinymist.config.invalidObject",
+                "got invalid configuration object"
+            );
+            bail!("{msg}: {update}")
         }
     }
 
@@ -406,7 +413,7 @@ impl Config {
     ///
     /// # Errors
     /// Errors if the update is invalid.
-    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
         log::info!(
             "LanguageState: config update_by_map {}",
             serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
@@ -614,16 +621,20 @@ pub struct CompileConfig {
 
 impl CompileConfig {
     /// Updates the configuration with a JSON object.
-    pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
+    pub fn update(&mut self, update: &JsonValue) -> Result<()> {
         if let JsonValue::Object(update) = update {
             self.update_by_map(update)
         } else {
-            bail!("got invalid configuration object {update}")
+            tinymist_l10n::bail!(
+                "tinymist.config.invalidObject",
+                "got invalid configuration object: {object}",
+                object = update.debug_l10n(),
+            );
         }
     }
 
     /// Updates the configuration with a map.
-    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
         macro_rules! deser_or_default {
             ($key:expr, $ty:ty) => {
                 try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
@@ -636,7 +647,13 @@ impl CompileConfig {
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
-            _ => bail!("compileStatus must be either 'enable' or 'disable'"),
+            Some(value) => {
+                tinymist_l10n::bail!(
+                    "tinymist.config.badCompileStatus",
+                    "compileStatus must be either 'enable' or 'disable', got {value}",
+                    value = value.debug_l10n(),
+                );
+            }
         };
         self.color_theme = try_(|| Some(update.get("colorTheme")?.as_str()?.to_owned()));
         log::info!("color theme: {:?}", self.color_theme);
@@ -646,8 +663,14 @@ impl CompileConfig {
             Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
             Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
             Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
-                Ok(e) => Some(e),
-                Err(e) => bail!("failed to parse hoverPeriscope: {e}"),
+                Ok(args) => Some(args),
+                Err(err) => {
+                    tinymist_l10n::bail!(
+                        "tinymist.config.badHoverPeriscope",
+                        "failed to parse hoverPeriscope: {err}",
+                        err = err.debug_l10n(),
+                    );
+                }
             },
         };
         if let Some(args) = self.periscope_args.as_mut() {
@@ -656,34 +679,41 @@ impl CompileConfig {
             }
         }
 
+        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> Result<()> {
+            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+            tinymist_l10n::bail!(
+                "tinymist.config.badTypstExtraArgs",
+                "failed to parse typstExtraArgs: {err}, args: {args}",
+                err = err.debug_l10n(),
+                args = args.debug_l10n(),
+            );
+        }
+
         {
-            let typst_args: Vec<String> = match update
-                .get("typstExtraArgs")
-                .cloned()
-                .map(serde_json::from_value)
-            {
-                Some(Ok(e)) => e,
-                Some(Err(e)) => bail!("failed to parse typstExtraArgs: {e}"),
+            let raw_args = || update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+                Some(Ok(args)) => args,
+                Some(Err(err)) => return invalid_extra_args(&raw_args(), err),
                 // Even if the list is none, it should be parsed since we have env vars to retrieve.
                 None => Vec::new(),
             };
 
-            let command = match CompileOnceArgs::try_parse_from(
+            let args = match CompileOnceArgs::try_parse_from(
                 Some("typst-cli".to_owned()).into_iter().chain(typst_args),
             ) {
-                Ok(e) => e,
-                Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
+                Ok(args) => args,
+                Err(e) => return invalid_extra_args(&raw_args(), e),
             };
 
             // todo: the command.root may be not absolute
             self.typst_extra_args = Some(CompileExtraOpts {
-                inputs: command.resolve_inputs().unwrap_or_default(),
-                entry: command.input.map(|e| Path::new(&e).into()),
-                root_dir: command.root.as_ref().map(|r| r.as_path().into()),
-                font: command.font,
-                package: command.package,
-                creation_timestamp: command.creation_timestamp,
-                cert: command.cert.as_deref().map(From::from),
+                inputs: args.resolve_inputs().unwrap_or_default(),
+                entry: args.input.map(|e| Path::new(&e).into()),
+                root_dir: args.root.as_ref().map(|r| r.as_path().into()),
+                font: args.font,
+                package: args.package,
+                creation_timestamp: args.creation_timestamp,
+                cert: args.cert.as_deref().map(From::from),
             });
         }
 
@@ -839,7 +869,7 @@ impl CompileConfig {
     }
 
     /// Validates the configuration.
-    pub fn validate(&self) -> anyhow::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         self.entry_resolver.validate()?;
 
         Ok(())
