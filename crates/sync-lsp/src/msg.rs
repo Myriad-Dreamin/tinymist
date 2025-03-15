@@ -64,6 +64,24 @@ impl From<lsp::Notification> for Message {
     }
 }
 
+impl From<dap::Request> for Message {
+    fn from(request: dap::Request) -> Message {
+        Message::Dap(request.into())
+    }
+}
+
+impl From<dap::Response> for Message {
+    fn from(response: dap::Response) -> Message {
+        Message::Dap(response.into())
+    }
+}
+
+impl From<dap::Event> for Message {
+    fn from(notification: dap::Event) -> Message {
+        Message::Dap(notification.into())
+    }
+}
+
 #[cfg(feature = "lsp")]
 impl TryFrom<Message> for LspMessage {
     type Error = anyhow::Error;

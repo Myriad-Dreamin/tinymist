@@ -2,11 +2,14 @@
 
 import * as vscode from "vscode";
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from "vscode";
+import { IContext } from "./context";
+// import { ProtocolServer } from "@vscode/debugadapter/lib/protocol";
+// import { spawn } from "cross-spawn";
 
 export const TYPST_DEBUGGER_TYPE = "myriaddreamin.typst-debugger";
 
-export function debugActivate(context: vscode.ExtensionContext) {
-  const factory: vscode.DebugAdapterDescriptorFactory = new DebugAdapterExecutableFactory();
+export function debugActivate(context: IContext) {
+  const factory: vscode.DebugAdapterDescriptorFactory = new DebugAdapterExecutableFactory(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("tinymist.runEditorContents", (resource: vscode.Uri) => {
@@ -42,12 +45,12 @@ export function debugActivate(context: vscode.ExtensionContext) {
         });
       }
     }),
-    // vscode.commands.registerCommand("extension.mock-debug.toggleFormatting", (variable) => {
-    //   const ds = vscode.debug.activeDebugSession;
-    //   if (ds) {
-    //     ds.customRequest("toggleFormatting");
-    //   }
-    // }),
+    vscode.commands.registerCommand("extension.mock-debug.toggleFormatting", (variable) => {
+      const ds = vscode.debug.activeDebugSession;
+      if (ds) {
+        ds.customRequest("toggleFormatting");
+      }
+    }),
   );
 
   context.subscriptions.push(
@@ -191,17 +194,24 @@ class MockConfigurationProvider implements vscode.DebugConfigurationProvider {
 }
 
 class DebugAdapterExecutableFactory implements vscode.DebugAdapterDescriptorFactory {
+  // static outputChannel = vscode.window.createOutputChannel("Tinymist Debugging", "log");
+
+  constructor(private readonly context: IContext) {}
+
   // The following use of a DebugAdapter factory shows how to control what debug adapter executable is used.
-  // Since the code implements the default behavior, it is absolutely not neccessary and we show it here only for educational purpose.
+  // Since the code implements the default behavior, it is absolutely not necessary and we show it here only for educational purpose.
   createDebugAdapterDescriptor(
     session: vscode.DebugSession,
     executable: vscode.DebugAdapterExecutable | undefined,
   ): ProviderResult<vscode.DebugAdapterDescriptor> {
-    const isProdMode = true; // context.extensionMode === ExtensionMode.Production;
+    const isProdMode = this.context.context.extensionMode === vscode.ExtensionMode.Production;
 
-    // param "executable" contains the executable optionally specified in the package.json (if any)
-    console.log("executable from configuration", executable);
+    const hasMirrorFlag = () => {
+      return executable?.args?.some((arg) => arg.startsWith("--mirror=") || arg === "--mirror");
+    };
 
+    /// The `--mirror` flag is only used in development/test mode for testing
+    const mirrorFlag = isProdMode ? [] : hasMirrorFlag() ? [] : ["--mirror", "tinymist-dap.log"];
     /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
     /// production mode because we don't put the debug information in the binary.
     ///
@@ -209,31 +219,55 @@ class DebugAdapterExecutableFactory implements vscode.DebugAdapterDescriptorFact
     /// manually by themselves.
     const RUST_BACKTRACE = isProdMode ? "1" : "full";
 
-    // use the executable specified in the package.json if it exists or determine it based on some other information (e.g. the session)
-    if (!executable) {
-      const command = "absolute path to my DA executable";
-      const args = ["dap"];
-      const options = {
-        cwd: "working directory for executable",
-        env: { RUST_BACKTRACE },
-      };
-      executable = new vscode.DebugAdapterExecutable(command, args, options);
+    const args = executable?.args?.length
+      ? [...executable.args, ...mirrorFlag]
+      : ["dap", ...mirrorFlag];
+
+    const command = executable?.command || this.context.tinymistExecutable;
+
+    console.log("dap executable", executable, "=>", command, args);
+
+    if (!command) {
+      vscode.window.showErrorMessage("Cannot find tinymist executable to debug");
+      return;
     }
 
-    const command = executable.command;
-    const rootCwd = executable.options?.cwd || session.workspaceFolder?.uri.fsPath;
-    const args = ["dap"];
+    // todo: resolve the cwd according to the program being debugged
+    const cwd =
+      executable?.options?.cwd ||
+      session.workspaceFolder?.uri.fsPath ||
+      (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0
+        ? vscode.workspace.workspaceFolders[0].uri.fsPath
+        : undefined);
 
-    const options = executable.options || {};
-    options.cwd = rootCwd;
-    options.env = Object.assign({}, process.env, {
-      ...(options.env || {}),
-      RUST_BACKTRACE,
-    }) as Record<string, string>;
+    // const child = spawn(command, args, {
+    //   stdio: "pipe",
+    //   cwd,
+    //   env: Object.assign({}, process.env, {
+    //     ...(executable?.options?.env || {}),
+    //     RUST_BACKTRACE,
+    //   }),
+    // });
 
-    executable = new vscode.DebugAdapterExecutable(command, args, options);
+    // const server = new ProtocolServer();
+    // server.start(child.stdout, child.stdin);
+    // child.stderr.on("data", (data) => {
+    //   DebugAdapterExecutableFactory.outputChannel.append(data.toString());
+    // });
+    // child.on("exit", (code) => {
+    //   DebugAdapterExecutableFactory.outputChannel.appendLine(
+    //     `Tinymist Debug Adapter exited with code ${code}`,
+    //   );
+    // });
 
-    // make VS Code launch the DA executable
-    return executable;
+    // return new vscode.DebugAdapterInlineImplementation(server);
+
+    return new vscode.DebugAdapterExecutable(command, args, {
+      cwd,
+      env: {
+        ...(executable?.options?.env || {}),
+        RUST_BACKTRACE,
+      },
+    });
   }
 }

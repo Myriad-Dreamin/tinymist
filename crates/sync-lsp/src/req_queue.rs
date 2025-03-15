@@ -104,11 +104,17 @@ impl<I> Incoming<I> {
 }
 
 impl<O> Outgoing<O> {
+    /// Allocates a request ID.
+    pub fn alloc_request_id(&mut self) -> i32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+
     /// Registers a request with the given method, params, and data.
     pub fn register<P: Serialize>(&mut self, method: String, params: P, data: O) -> Request {
-        let id = RequestId::from(self.next_id);
+        let id = RequestId::from(self.alloc_request_id());
         self.pending.insert(id.clone(), data);
-        self.next_id += 1;
         Request::new(id, method, params)
     }
 

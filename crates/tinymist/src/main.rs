@@ -13,16 +13,18 @@ use futures::future::MaybeDone;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
-use serde_json::Value as JsonValue;
 use sync_lsp::transport::{with_stdio_transport, MirrorArgs};
 use sync_lsp::{
-    internal_error, DapMessage, LspBuilder, LspClientRoot, LspMessage, LspResult, RequestId,
+    internal_error, DapBuilder, DapMessage, LspBuilder, LspClientRoot, LspMessage, LspResult,
+    RequestId,
 };
 use tinymist::tool::project::{
     compile_main, coverage_main, generate_script_main, project_main, task_main,
 };
 use tinymist::world::TaskInputs;
-use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
+use tinymist::{
+    CompileConfig, Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask,
+};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
@@ -145,7 +147,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
             client.weak(),
         ))
         .build()
-        .start_lsp(conn.receiver, is_replay)
+        .start(conn.receiver, is_replay)
     })?;
 
     log::info!("language server did shut down");
@@ -164,16 +166,15 @@ pub fn dap_main(args: DapArgs) -> Result<()> {
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        ServerState::install_dap(LspBuilder::new(
-            RegularInit {
+        ServerState::install_dap(DapBuilder::new(
+            DapRegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
-                exec_cmds: Vec::new(),
             },
             client.weak(),
         ))
         .build()
-        .start_dap(conn.receiver, is_replay)
+        .start(conn.receiver, is_replay)
     })?;
 
     log::info!("language server did shut down");
@@ -236,14 +237,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let request_received = reflexo::time::Instant::now();
 
         let req_id: RequestId = 0.into();
-        client.register_request(
-            &sync_lsp::lsp::Request {
-                id: req_id.clone(),
-                method: "tinymistExt/documentProfiling".to_owned(),
-                params: JsonValue::Null,
-            },
-            request_received,
-        );
+        client.register_request("tinymistExt/documentProfiling", &req_id, request_received);
 
         let state = service.state_mut().unwrap();
 

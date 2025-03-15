@@ -33,6 +33,8 @@ mod task;
 pub mod tool;
 mod utils;
 
+pub use dap::RegularInit as DapRegularInit;
+pub use dap::SuperInit as DapSuperInit;
 pub use lsp::init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;

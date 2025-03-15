@@ -7,6 +7,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::{collections::HashMap, path::PathBuf};
 
+use dapts::IRequest;
 use futures::future::MaybeDone;
 use lsp::{ErrorCode, Notification, Request, Response};
 use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
@@ -60,9 +61,9 @@ impl<M: TryFrom<Message, Error = anyhow::Error>> TConnectionRx<M> {
     }
 }
 
-/// The untyped connnect tx for the language server.
+/// The untyped connect tx for the language server.
 pub type ConnectionTx = TConnectionTx<Message>;
-/// The untyped connnect rx for the language server.
+/// The untyped connect rx for the language server.
 pub type ConnectionRx = TConnectionRx<Message>;
 
 /// This is a helper enum to handle both events and messages.
@@ -209,8 +210,22 @@ impl<S: 'static> TypedLspClient<S> {
     }
 
     /// Sends a dap event to the client.
-    pub fn send_dap_event<E: dapts::IEvent>(&self, _body: E::Body) {
-        todo!()
+    pub fn send_dap_event<E: dapts::IEvent>(&self, body: E::Body) {
+        let req_id = self.req_queue.lock().outgoing.alloc_request_id();
+
+        self.send_dap_event_(dap::Event::new(req_id as i64, E::EVENT.to_owned(), body));
+    }
+
+    /// Sends an untyped dap_event to the client.
+    pub fn send_dap_event_(&self, evt: dap::Event) {
+        let method = &evt.event;
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send dap event ({method}): connection closed");
+            return;
+        };
+        if let Err(res) = sender.lsp.send(evt.into()) {
+            log::warn!("failed to send dap event: {res:?}");
+        }
     }
 }
 
@@ -340,7 +355,7 @@ impl LspClient {
     }
 
     /// Completes an server2client request in the request queue.
-    pub fn complete_dap_request<S: Any>(&self, service: &mut S, response: dapts::Response) {
+    pub fn complete_dap_request<S: Any>(&self, service: &mut S, response: dap::Response) {
         let mut req_queue = self.req_queue.lock();
         let Some(handler) = req_queue
             .outgoing
@@ -355,12 +370,12 @@ impl LspClient {
     }
 
     /// Registers an client2server request in the request queue.
-    pub fn register_request(&self, request: &lsp::Request, received_at: Instant) {
+    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Instant) {
         let mut req_queue = self.req_queue.lock();
-        let method = request.method.clone();
-        let req_id = request.id.clone();
-        self.start_request(&req_id, &method);
-        req_queue.incoming.register(req_id, (method, received_at));
+        self.start_request(id, method);
+        req_queue
+            .incoming
+            .register(id.clone(), (method.to_owned(), received_at));
     }
 
     /// Completes an client2server request in the request queue.
@@ -490,7 +505,7 @@ pub trait Initializer {
 }
 
 /// The builder pattern for the language server.
-pub struct LspBuilder<Args: Initializer> {
+pub struct LsBuilder<M, Args: Initializer> {
     /// The extra initialization arguments.
     pub args: Args,
     /// The client surface for the implementing language server.
@@ -507,9 +522,15 @@ pub struct LspBuilder<Args: Initializer> {
     pub dap_req_handlers: RegularCmdMap<Args::S>,
     /// The resource handlers.
     pub resource_handlers: ResourceMap<Args::S>,
+    _marker: std::marker::PhantomData<M>,
 }
 
-impl<Args: Initializer> LspBuilder<Args>
+/// The language server builder serving LSP.
+pub type LspBuilder<Args> = LsBuilder<LspMessage, Args>;
+/// The language server builder serving DAP.
+pub type DapBuilder<Args> = LsBuilder<DapMessage, Args>;
+
+impl<M, Args: Initializer> LsBuilder<M, Args>
 where
     Args::S: 'static,
 {
@@ -524,6 +545,7 @@ where
             lsp_req_handlers: RegularCmdMap::new(),
             dap_req_handlers: RegularCmdMap::new(),
             resource_handlers: ResourceMap::new(),
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -540,6 +562,115 @@ where
         self
     }
 
+    /// Registers a raw resource handler.
+    pub fn with_resource_(
+        mut self,
+        path: ImmutPath,
+        handler: RawHandler<Args::S, Vec<JsonValue>>,
+    ) -> Self {
+        self.resource_handlers.insert(path, raw_to_boxed(handler));
+        self
+    }
+
+    /// Registers an async resource handler.
+    pub fn with_resource(
+        mut self,
+        path: &'static str,
+        handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
+    ) -> Self {
+        self.resource_handlers.insert(
+            Path::new(path).into(),
+            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
+        );
+        self
+    }
+
+    /// Builds the language server driver.
+    pub fn build(self) -> LsDriver<M, Args> {
+        LsDriver {
+            state: State::Uninitialized(Some(Box::new(self.args))),
+            events: self.events,
+            client: self.client,
+            commands: self.command_handlers,
+            notifications: self.notif_handlers,
+            requests: self.lsp_req_handlers,
+            resources: self.resource_handlers,
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Args: Initializer> LsBuilder<DapMessage, Args>
+where
+    Args::S: 'static,
+{
+    /// Registers an raw event handler.
+    pub fn with_command_(
+        mut self,
+        cmd: &'static str,
+        handler: RawHandler<Args::S, Vec<JsonValue>>,
+    ) -> Self {
+        self.command_handlers.insert(cmd, raw_to_boxed(handler));
+        self
+    }
+
+    /// Registers an async command handler.
+    pub fn with_command<R: Serialize + 'static>(
+        mut self,
+        cmd: &'static str,
+        handler: AsyncHandler<Args::S, Vec<JsonValue>, R>,
+    ) -> Self {
+        self.command_handlers.insert(
+            cmd,
+            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
+        );
+        self
+    }
+
+    /// Registers a raw request handler that handlers a kind of untyped lsp
+    /// request.
+    pub fn with_raw_request<R: dapts::IRequest>(
+        mut self,
+        handler: RawHandler<Args::S, JsonValue>,
+    ) -> Self {
+        self.dap_req_handlers
+            .insert(R::COMMAND, raw_to_boxed(handler));
+        self
+    }
+
+    // todo: unsafe typed
+    /// Registers an raw request handler that handlers a kind of typed lsp
+    /// request.
+    pub fn with_request_<R: dapts::IRequest>(
+        mut self,
+        handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
+    ) -> Self {
+        self.dap_req_handlers.insert(
+            R::COMMAND,
+            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
+        );
+        self
+    }
+
+    /// Registers a typed request handler.
+    pub fn with_request<R: dapts::IRequest>(
+        mut self,
+        handler: AsyncHandler<Args::S, R::Arguments, R::Response>,
+    ) -> Self {
+        self.dap_req_handlers.insert(
+            R::COMMAND,
+            Box::new(move |s, client, req_id, req| {
+                client.schedule(req_id, handler(s, from_json(req)?))
+            }),
+        );
+        self
+    }
+}
+
+impl<Args: Initializer> LsBuilder<LspMessage, Args>
+where
+    Args::S: 'static,
+{
     /// Registers an raw event handler.
     pub fn with_command_(
         mut self,
@@ -592,7 +723,7 @@ where
     // todo: unsafe typed
     /// Registers an raw request handler that handlers a kind of typed lsp
     /// request.
-    pub fn with_lsp_request_<R: Req>(
+    pub fn with_request_<R: Req>(
         mut self,
         handler: fn(&mut Args::S, RequestId, R::Params) -> ScheduledResult,
     ) -> Self {
@@ -604,7 +735,7 @@ where
     }
 
     /// Registers a typed request handler.
-    pub fn with_lsp_request<R: Req>(
+    pub fn with_request<R: Req>(
         mut self,
         handler: AsyncHandler<Args::S, R::Params, R::Result>,
     ) -> Self {
@@ -643,42 +774,6 @@ where
             }),
         );
         self
-    }
-
-    /// Registers a raw resource handler.
-    pub fn with_resource_(
-        mut self,
-        path: ImmutPath,
-        handler: RawHandler<Args::S, Vec<JsonValue>>,
-    ) -> Self {
-        self.resource_handlers.insert(path, raw_to_boxed(handler));
-        self
-    }
-
-    /// Registers an async resource handler.
-    pub fn with_resource(
-        mut self,
-        path: &'static str,
-        handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
-    ) -> Self {
-        self.resource_handlers.insert(
-            Path::new(path).into(),
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
-        );
-        self
-    }
-
-    /// Builds the language server driver.
-    pub fn build(self) -> LspDriver<Args> {
-        LspDriver {
-            state: State::Uninitialized(Some(Box::new(self.args))),
-            events: self.events,
-            client: self.client,
-            commands: self.command_handlers,
-            notifications: self.notif_handlers,
-            requests: self.lsp_req_handlers,
-            resources: self.resource_handlers,
-        }
     }
 }
 
@@ -725,7 +820,7 @@ impl<Args, S> State<Args, S> {
 }
 
 /// The language server driver.
-pub struct LspDriver<Args: Initializer> {
+pub struct LsDriver<M, Args: Initializer> {
     /// State to synchronize with the client.
     state: State<Args, Args::S>,
     /// The language server client.
@@ -742,9 +837,10 @@ pub struct LspDriver<Args: Initializer> {
     pub requests: RegularCmdMap<Args::S>,
     /// Resources for dispatching.
     pub resources: ResourceMap<Args::S>,
+    _marker: std::marker::PhantomData<M>,
 }
 
-impl<Args: Initializer> LspDriver<Args> {
+impl<M, Args: Initializer> LsDriver<M, Args> {
     /// Gets the state of the language server.
     pub fn state(&self) -> Option<&Args::S> {
         self.state.opt()
@@ -768,9 +864,49 @@ impl<Args: Initializer> LspDriver<Args> {
 
         res
     }
+
+    /// The entry point for the `workspace/executeCommand` request.
+    fn on_execute_command(&mut self, req: Request) -> ScheduledResult {
+        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
+
+        let params = from_value::<ExecuteCommandParams>(req.params)
+            .map_err(|e| invalid_params(e.to_string()))?;
+
+        let ExecuteCommandParams {
+            command, arguments, ..
+        } = params;
+
+        // todo: generalize this
+        if command == "tinymist.getResources" {
+            self.get_resources(req.id, arguments)
+        } else {
+            let Some(handler) = self.commands.get(command.as_str()) else {
+                log::error!("asked to execute unknown command: {command}");
+                return Err(method_not_found());
+            };
+            handler(s, &self.client, req.id, arguments)
+        }
+    }
+
+    /// Get static resources with help of tinymist service, for example, a
+    /// static help pages for some typst function.
+    pub fn get_resources(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
+
+        let path =
+            from_value::<PathBuf>(args[0].clone()).map_err(|e| invalid_params(e.to_string()))?;
+
+        let Some(handler) = self.resources.get(path.as_path()) else {
+            log::error!("asked for unknown resource: {path:?}");
+            return Err(method_not_found());
+        };
+
+        // Note our redirection will keep the first path argument in the args vec.
+        handler(s, &self.client, req_id, args)
+    }
 }
 
-impl<Args: Initializer> LspDriver<Args>
+impl<Args: Initializer> LsDriver<LspMessage, Args>
 where
     Args::S: 'static,
 {
@@ -781,7 +917,7 @@ where
     ///
     /// See [`transport::MirrorArgs`] for information about the record-replay
     /// feature.
-    pub fn start_lsp(
+    pub fn start(
         &mut self,
         inbox: TConnectionRx<LspMessage>,
         is_replay: bool,
@@ -883,125 +1019,11 @@ where
         Ok(())
     }
 
-    /// Starts the debug adaptor on the given connection.
-    ///
-    /// If `is_replay` is true, the server will wait for all pending requests to
-    /// finish before exiting. This is useful for testing the language server.
-    ///
-    /// See [`transport::MirrorArgs`] for information about the record-replay
-    /// feature.
-    pub fn start_dap(
-        &mut self,
-        inbox: TConnectionRx<DapMessage>,
-        is_replay: bool,
-    ) -> anyhow::Result<()> {
-        let res = self.start_dap_(inbox);
-
-        if is_replay {
-            let client = self.client.clone();
-            let _ = std::thread::spawn(move || {
-                let since = std::time::Instant::now();
-                let timeout = std::env::var("REPLAY_TIMEOUT")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(60);
-                client.handle.block_on(async {
-                    while client.has_pending_requests() {
-                        if since.elapsed().as_secs() > timeout {
-                            log::error!("replay timeout reached, {timeout}s");
-                            client.begin_panic();
-                        }
-
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
-                })
-            })
-            .join();
-        }
-
-        res
-    }
-
-    /// Starts the debug adaptor on the given connection.
-    pub fn start_dap_(&mut self, inbox: TConnectionRx<DapMessage>) -> anyhow::Result<()> {
-        use EventOrMessage::*;
-        // todo: follow what rust analyzer does
-        // Windows scheduler implements priority boosts: if thread waits for an
-        // event (like a condvar), and event fires, priority of the thread is
-        // temporary bumped. This optimization backfires in our case: each time
-        // the `main_loop` schedules a task to run on a threadpool, the
-        // worker threads gets a higher priority, and (on a machine with
-        // fewer cores) displaces the main loop! We work around this by
-        // marking the main loop as a higher-priority thread.
-        //
-        // https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
-        // https://docs.microsoft.com/en-us/windows/win32/procthread/priority-boosts
-        // https://github.com/rust-lang/rust-analyzer/issues/2835
-        // #[cfg(windows)]
-        // unsafe {
-        //     use winapi::um::processthreadsapi::*;
-        //     let thread = GetCurrentThread();
-        //     let thread_priority_above_normal = 1;
-        //     SetThreadPriority(thread, thread_priority_above_normal);
-        // }
-
-        while let Ok(msg) = inbox.recv() {
-            let loop_start = Instant::now();
-            match msg {
-                Evt(event) => {
-                    let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
-                        log::warn!("unhandled event: {:?}", event.as_ref().type_id());
-                        continue;
-                    };
-
-                    let s = match &mut self.state {
-                        State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
-                        State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
-                        State::ShuttingDown => {
-                            log::warn!("server is shutting down");
-                            continue;
-                        }
-                    };
-
-                    event_handler(s, &self.client, event)?;
-                }
-                Msg(DapMessage::Request(req)) => self.on_dap_request(loop_start, req),
-                Msg(DapMessage::Event(_not)) => {
-                    // let is_exit = not.method == EXIT_METHOD;
-                    // self.on_notification(loop_start, not)?;
-                    // if is_exit {
-                    //     return Ok(());
-                    // }
-                    todo!()
-                }
-                Msg(DapMessage::Response(resp)) => {
-                    let s = match &mut self.state {
-                        State::Ready(s) => s,
-                        _ => {
-                            log::warn!("server is not ready yet");
-                            continue;
-                        }
-                    };
-
-                    self.client.clone().complete_dap_request(s, resp)
-                }
-            }
-        }
-
-        log::warn!("client exited without proper shutdown sequence");
-        Ok(())
-    }
-
-    /// Registers and handles a request. This should only be called once per
-    /// incoming request.
-    fn on_dap_request(&mut self, _request_received: Instant, _req: dapts::Request) {
-        todo!()
-    }
-
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
     fn on_lsp_request(&mut self, request_received: Instant, req: Request) {
-        self.client.register_request(&req, request_received);
+        self.client
+            .register_request(&req.method, &req.id, request_received);
 
         let req_id = req.id.clone();
         let resp = match (&mut self.state, &*req.method) {
@@ -1055,46 +1077,6 @@ where
         self.client.schedule_tail(req_id, result);
     }
 
-    /// The entry point for the `workspace/executeCommand` request.
-    fn on_execute_command(&mut self, req: Request) -> ScheduledResult {
-        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
-
-        let params = from_value::<ExecuteCommandParams>(req.params)
-            .map_err(|e| invalid_params(e.to_string()))?;
-
-        let ExecuteCommandParams {
-            command, arguments, ..
-        } = params;
-
-        // todo: generalize this
-        if command == "tinymist.getResources" {
-            self.get_resources(req.id, arguments)
-        } else {
-            let Some(handler) = self.commands.get(command.as_str()) else {
-                log::error!("asked to execute unknown command: {command}");
-                return Err(method_not_found());
-            };
-            handler(s, &self.client, req.id, arguments)
-        }
-    }
-
-    /// Get static resources with help of tinymist service, for example, a
-    /// static help pages for some typst function.
-    pub fn get_resources(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
-
-        let path =
-            from_value::<PathBuf>(args[0].clone()).map_err(|e| invalid_params(e.to_string()))?;
-
-        let Some(handler) = self.resources.get(path.as_path()) else {
-            log::error!("asked for unknown resource: {path:?}");
-            return Err(method_not_found());
-        };
-
-        // Note our redirection will keep the first path argument in the args vec.
-        handler(s, &self.client, req_id, args)
-    }
-
     /// Handles an incoming notification.
     fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
         self.client.start_notification(&not.method);
@@ -1140,6 +1122,204 @@ where
             }
             (State::ShuttingDown, method) => {
                 log::warn!("server is shutting down, while received notification {method}");
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<Args: Initializer> LsDriver<DapMessage, Args>
+where
+    Args::S: 'static,
+{
+    /// Starts the debug adaptor on the given connection.
+    ///
+    /// If `is_replay` is true, the server will wait for all pending requests to
+    /// finish before exiting. This is useful for testing the language server.
+    ///
+    /// See [`transport::MirrorArgs`] for information about the record-replay
+    /// feature.
+    pub fn start(
+        &mut self,
+        inbox: TConnectionRx<DapMessage>,
+        is_replay: bool,
+    ) -> anyhow::Result<()> {
+        let res = self.start_(inbox);
+
+        if is_replay {
+            let client = self.client.clone();
+            let _ = std::thread::spawn(move || {
+                let since = std::time::Instant::now();
+                let timeout = std::env::var("REPLAY_TIMEOUT")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(60);
+                client.handle.block_on(async {
+                    while client.has_pending_requests() {
+                        if since.elapsed().as_secs() > timeout {
+                            log::error!("replay timeout reached, {timeout}s");
+                            client.begin_panic();
+                        }
+
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                })
+            })
+            .join();
+        }
+
+        res
+    }
+
+    /// Starts the debug adaptor on the given connection.
+    pub fn start_(&mut self, inbox: TConnectionRx<DapMessage>) -> anyhow::Result<()> {
+        use EventOrMessage::*;
+
+        while let Ok(msg) = inbox.recv() {
+            let loop_start = Instant::now();
+            match msg {
+                Evt(event) => {
+                    let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
+                        log::warn!("unhandled event: {:?}", event.as_ref().type_id());
+                        continue;
+                    };
+
+                    let s = match &mut self.state {
+                        State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
+                        State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
+                        State::ShuttingDown => {
+                            log::warn!("server is shutting down");
+                            continue;
+                        }
+                    };
+
+                    event_handler(s, &self.client, event)?;
+                }
+                Msg(DapMessage::Request(req)) => self.on_request(loop_start, req),
+                Msg(DapMessage::Event(not)) => {
+                    self.on_event(loop_start, not)?;
+                }
+                Msg(DapMessage::Response(resp)) => {
+                    let s = match &mut self.state {
+                        State::Ready(s) => s,
+                        _ => {
+                            log::warn!("server is not ready yet");
+                            continue;
+                        }
+                    };
+
+                    self.client.clone().complete_dap_request(s, resp)
+                }
+            }
+        }
+
+        log::warn!("client exited without proper shutdown sequence");
+        Ok(())
+    }
+
+    /// Registers and handles a request. This should only be called once per
+    /// incoming request.
+    fn on_request(&mut self, request_received: Instant, req: dap::Request) {
+        let req_id = (req.seq as i32).into();
+        self.client
+            .register_request(&req.command, &req_id, request_received);
+
+        let resp = match (&mut self.state, &*req.command) {
+            (State::Uninitialized(args), dapts::requests::Initialize::COMMAND) => {
+                // todo: what will happen if the request cannot be deserialized?
+                let params = serde_json::from_value::<Args::I>(req.arguments);
+                match params {
+                    Ok(params) => {
+                        let args = args.take().expect("already initialized");
+                        let (s, res) = args.initialize(params);
+                        self.state = State::Ready(s);
+                        res
+                    }
+                    Err(e) => just_result(Err(invalid_request(e))),
+                }
+            }
+            // (state, dap::events::Initialized::METHOD) => {
+            //     let mut s = State::ShuttingDown;
+            //     std::mem::swap(state, &mut s);
+            //     match s {
+            //         State::Initializing(s) => {
+            //             *state = State::Ready(s);
+            //         }
+            //         _ => {
+            //             std::mem::swap(state, &mut s);
+            //         }
+            //     }
+
+            //     let s = match state {
+            //         State::Ready(s) => s,
+            //         _ => {
+            //             log::warn!("server is not ready yet");
+            //             return Ok(());
+            //         }
+            //     };
+            //     handle(s, not)
+            // }
+            (State::Uninitialized(..) | State::Initializing(..), _) => {
+                just_result(Err(not_initialized()))
+            }
+            (_, request::Initialize::METHOD) => {
+                just_result(Err(invalid_request("server is already initialized")))
+            }
+            // todo: generalize this
+            // (State::Ready(..), request::ExecuteCommand::METHOD) => {
+            // reschedule!(self.on_execute_command(req))
+            // }
+            (State::Ready(s), _) => {
+                let method = req.command.as_str();
+
+                let Some(handler) = self.requests.get(method) else {
+                    log::warn!("unhandled request: {method}");
+                    return;
+                };
+
+                let result = handler(s, &self.client, req_id.clone(), req.arguments);
+                self.client.schedule_tail(req_id, result);
+
+                return;
+            }
+            (State::ShuttingDown, _) => {
+                just_result(Err(invalid_request("server is shutting down")))
+            }
+        };
+
+        let result = self.client.schedule(req_id.clone(), resp);
+        self.client.schedule_tail(req_id, result);
+    }
+
+    /// Handles an incoming event.
+    fn on_event(&mut self, received_at: Instant, not: dap::Event) -> anyhow::Result<()> {
+        self.client.start_notification(&not.event);
+        let handle = |s,
+                      dap::Event {
+                          seq: _,
+                          event,
+                          body,
+                      }: dap::Event| {
+            let Some(handler) = self.notifications.get(event.as_str()) else {
+                log::warn!("unhandled event: {event}");
+                return Ok(());
+            };
+
+            let result = handler(s, body);
+            self.client.stop_notification(&event, received_at, result);
+
+            Ok(())
+        };
+
+        match (&mut self.state, &*not.event) {
+            (State::Ready(state), _) => handle(state, not),
+            // todo: whether it is safe to ignore events
+            (State::Uninitialized(..) | State::Initializing(..), method) => {
+                log::warn!("server is not ready yet, while received event {method}");
+                Ok(())
+            }
+            (State::ShuttingDown, method) => {
+                log::warn!("server is shutting down, while received event {method}");
                 Ok(())
             }
         }

@@ -1,6 +1,6 @@
 [package]
 name = "tinymist"
-description = "Fast lsp implementation for typst."
+description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
 keywords = ["cli", "lsp", "language", "typst"]
 authors.workspace = true

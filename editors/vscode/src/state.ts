@@ -18,6 +18,7 @@ interface ExtensionState {
     preview: boolean;
     language: boolean;
     testing: boolean;
+    testingDebug: boolean;
     renderDocs: boolean;
   };
   mut: {
@@ -32,6 +33,7 @@ export const extensionState: ExtensionState = {
   features: {
     web: false,
     lsp: true,
+    testingDebug: true,
     task: true,
     wordSeparator: true,
     label: true,
