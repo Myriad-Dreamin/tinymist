@@ -71,11 +71,7 @@ impl Initializer for RegularInit {
     /// # Errors
     /// Errors if the configuration could not be updated.
     fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
-        let (config, err) = Config::from_params(params, self.font_opts);
-
-        if let Some(locale) = config.const_config.locale.as_ref() {
-            tinymist_l10n::set_locale(locale);
-        }
+        let (config, err) = Config::extract_params(params, self.font_opts);
 
         let super_init = SuperInit {
             client: self.client,
@@ -321,7 +317,11 @@ impl Config {
     }
 
     /// Creates a new configuration from the lsp initialization parameters.
-    pub fn from_params(
+    ///
+    /// The function has side effects:
+    /// - Getting environment variables.
+    /// - Setting the locale.
+    pub fn extract_params(
         params: InitializeParams,
         font_opts: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
@@ -341,6 +341,11 @@ impl Config {
                 .collect(),
         };
         let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+
+        // Sets locale as soon as possible
+        if let Some(locale) = config.const_config.locale.as_ref() {
+            tinymist_l10n::set_locale(locale);
+        }
 
         let err = params.initialization_options.and_then(|init| {
             config
@@ -1227,7 +1232,7 @@ mod tests {
     #[test]
     fn test_default_config_initialize() {
         let (_conf, err) =
-            Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+            Config::extract_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
     }
 
@@ -1237,7 +1242,7 @@ mod tests {
 
         temp_env::with_var("TYPST_PACKAGE_CACHE_PATH", Some(pkg_path), || {
             let (conf, err) =
-                Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+                Config::extract_params(InitializeParams::default(), CompileFontArgs::default());
             assert!(err.is_none());
             let applied_cache_path = conf
                 .compile
