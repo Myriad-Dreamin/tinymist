@@ -629,7 +629,7 @@ impl CompileConfig {
                 "tinymist.config.invalidObject",
                 "got invalid configuration object: {object}",
                 object = update.debug_l10n(),
-            );
+            )
         }
     }
 
@@ -686,7 +686,7 @@ impl CompileConfig {
                 "failed to parse typstExtraArgs: {err}, args: {args}",
                 err = err.debug_l10n(),
                 args = args.debug_l10n(),
-            );
+            )
         }
 
         {
@@ -1167,11 +1167,11 @@ mod tests {
             });
 
             let err = format!("{}", update_config(&mut config, &update).unwrap_err());
+            assert!(err.contains("typstExtraArgs"), "unexpected error: {err}");
             assert!(
-                err.contains("unexpected argument"),
+                err.contains(r#"String("main.typ")"#),
                 "unexpected error: {err}"
             );
-            assert!(err.contains("help"), "unexpected error: {err}");
         }
         {
             let mut config = Config::default();

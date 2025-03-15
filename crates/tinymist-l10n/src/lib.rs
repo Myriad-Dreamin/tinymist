@@ -210,16 +210,34 @@ pub fn t_with_args(
 ) -> Cow<'static, str> {
     let message = find_message(key, message);
     let mut result = String::new();
-    let mut arg_index = 0;
 
-    for c in message.chars() {
+    // for c in message.chars() {
+    //     if c == '{' {
+    //         let Some(bracket_index) = message[arg_index..].find('}') else {
+    //             result.push(c);
+    //             continue;
+    //         };
+
+    //         let arg_index_str = &message[arg_index + 1..arg_index +
+    // bracket_index];
+
+    //         match arg {
+    //             Arg::Str(s) => result.push_str(s.as_ref()),
+    //             Arg::Int(i) => result.push_str(&i.to_string()),
+    //             Arg::Float(f) => result.push_str(&f.to_string()),
+    //         }
+
+    //         arg_index += arg_index_str.len() + 2;
+    //     } else {
+    //         result.push(c);
+    //     }
+    // }
+
+    let message_iter = &mut message.chars();
+    while let Some(c) = message_iter.next() {
         if c == '{' {
-            let Some(bracket_index) = message[arg_index..].find('}') else {
-                result.push(c);
-                continue;
-            };
-
-            let arg_index_str = &message[arg_index + 1..arg_index + bracket_index];
+            let arg_index_str = message_iter.take_while(|c| *c != '}').collect::<String>();
+            message_iter.next();
 
             let Some(arg) = args
                 .iter()
@@ -227,6 +245,7 @@ pub fn t_with_args(
                 .map(|(_, v)| v)
             else {
                 result.push(c);
+                result.push_str(&arg_index_str);
                 continue;
             };
 
@@ -235,8 +254,6 @@ pub fn t_with_args(
                 Arg::Int(i) => result.push_str(&i.to_string()),
                 Arg::Float(f) => result.push_str(&f.to_string()),
             }
-
-            arg_index += arg_index_str.len() + 2;
         } else {
             result.push(c);
         }
