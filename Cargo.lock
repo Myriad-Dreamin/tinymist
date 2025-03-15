@@ -844,9 +844,9 @@ dependencies = [
 
 [[package]]
 name = "dapts"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c0cd737eefa0d353f8e8a6430d74f7e7513c2eb4622f946cd094b33875ebba"
+checksum = "91cb856c2bdc2dd86028d14550d86f88afc6dd1887e14274b906ad98921555e9"
 dependencies = [
  "serde",
  "serde_json",
