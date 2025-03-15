@@ -7,12 +7,12 @@ import { dirname, extname, basename, relative } from "path";
 import { typstDocumentSelector } from "../util";
 import {
   Mime,
-  mediaMimes,
+  typstSupportedMimes,
   PasteResourceKind,
   pasteResourceKinds as pasteResourceKinds,
-  typstPasteImageEditKind,
+  typstImageEditKind,
   typstPasteLinkEditKind,
-  typstPasteUriEditKind,
+  typstUriEditKind,
   Schemes,
 } from "./drop-paste.def";
 
@@ -23,16 +23,17 @@ export function dragAndDropActivate(context: vscode.ExtensionContext) {
 }
 
 export function copyAndPasteActivate(context: vscode.ExtensionContext) {
-  const providedEditKinds = [
-    typstPasteLinkEditKind,
-    typstPasteUriEditKind,
-    typstPasteImageEditKind,
-  ];
+  const providedEditKinds = [typstPasteLinkEditKind, typstUriEditKind, typstImageEditKind];
 
+  const sel = typstDocumentSelector;
   context.subscriptions.push(
-    vscode.languages.registerDocumentPasteEditProvider(typstDocumentSelector, new PasteProvider(), {
+    vscode.languages.registerDocumentPasteEditProvider(sel, new PasteUriProvider(), {
+      providedPasteEditKinds: [typstPasteLinkEditKind],
+      pasteMimeTypes: PasteUriProvider.mimeTypes,
+    }),
+    vscode.languages.registerDocumentPasteEditProvider(sel, new PasteResourceProvider(), {
       providedPasteEditKinds: providedEditKinds,
-      pasteMimeTypes: PasteProvider.mimeTypes,
+      pasteMimeTypes: PasteResourceProvider.mimeTypes,
     }),
   );
 }
@@ -53,12 +54,21 @@ interface ResolvedEdits {
 }
 
 class DropOrPasteContext<A extends DropPasteAction> {
+  title: string;
+  editKind = typstUriEditKind;
+
   constructor(
     private kind: A,
     private context: vscode.DocumentPasteEditContext | undefined,
     private document: vscode.TextDocument,
     private token: vscode.CancellationToken,
-  ) {}
+  ) {
+    if (this.kind === DropPasteAction.Drop) {
+      this.title = "Drop (Typst)";
+    } else {
+      this.title = "Paste (Typst)";
+    }
+  }
 
   private readonly _yieldTo = [
     vscode.DocumentDropOrPasteEditKind.Text,
@@ -78,7 +88,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
       dropEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
       return dropEdit as EditClass<A>;
     } else {
-      const pasteEdit = new vscode.DocumentPasteEdit(edit.snippet, "Paste", typstPasteUriEditKind);
+      const pasteEdit = new vscode.DocumentPasteEdit(edit.snippet, this.title, this.editKind);
       pasteEdit.additionalEdit = edit.additionalEdits;
       pasteEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
       return pasteEdit as EditClass<A>;
@@ -94,6 +104,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
       if (mediaFiles) {
         const edit = await this.handleMediaFiles(ranges, mediaFiles);
         if (edit) {
+          this.editKind = typstImageEditKind;
           this.resolved.push(edit);
           return this.wrapRangeAsLinkContent();
         }
@@ -101,12 +112,38 @@ class DropOrPasteContext<A extends DropPasteAction> {
 
       const uriList = await this.takeUriList(dataTransfer);
       if (uriList) {
-        const edit = await this.editByUriList(ranges, uriList);
+        const edit = await this.editByUriList(ranges, uriList, false);
         if (edit) {
           this.resolved.push(edit);
           return this.wrapRangeAsLinkContent();
         }
       }
+    }
+
+    return false;
+  }
+
+  async pasteUri(ranges: readonly vscode.Range[], dataTransfer: vscode.DataTransfer) {
+    this.editKind = typstUriEditKind;
+    this.title = "Paste Link (Typst)";
+    const item = dataTransfer.get(Mime.textPlain);
+    const text = await item?.asString();
+    if (this.token.isCancellationRequested || !text) {
+      return;
+    }
+
+    // TODO: If the user has explicitly requested to paste as a typst link,
+    // try to paste even if we don't have a valid uri
+    const uriText = findValidUriInText(text);
+    if (!uriText) {
+      return;
+    }
+
+    const uriList = UriList.from(uriText);
+    const edit = await this.editByUriList(ranges, uriList, false);
+    if (edit) {
+      this.resolved.push(edit);
+      return this.wrapRangeAsLinkContent();
     }
 
     return false;
@@ -133,7 +170,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     const fileEntries = coalesce(
       await Promise.all(
         Array.from(dataTransfer, async ([mime, item]): Promise<MediaFileEntry | undefined> => {
-          if (!mediaMimes.has(mime)) {
+          if (!typstSupportedMimes.has(mime)) {
             return;
           }
 
@@ -182,7 +219,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     if (
       uriList.entries.length === 1 &&
       [Schemes.http, Schemes.https].includes(uriList.entries[0].uri.scheme as Schemes) &&
-      !this.context?.only?.contains(typstPasteUriEditKind)
+      !this.context?.only?.contains(typstUriEditKind)
     ) {
       const text = await dataTransfer.get(Mime.textPlain)?.asString();
       if (this.token.isCancellationRequested) {
@@ -202,7 +239,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
       mediaFiles.map((entry) => ({ uri: entry.uri, str: entry.uri.toString() })),
     );
 
-    return this.editByUriList(ranges, mediaUriList, (additionalEdits) => {
+    return this.editByUriList(ranges, mediaUriList, true, (additionalEdits) => {
       for (const entry of mediaFiles) {
         if (entry.newFile) {
           additionalEdits.createFile(entry.uri, {
@@ -217,6 +254,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
   async editByUriList(
     ranges: readonly vscode.Range[],
     uriList: UriList,
+    isMedia: boolean,
     createAdditionalEdits?: (additionalEdits: vscode.WorkspaceEdit) => void,
   ): Promise<ResolvedEdits | undefined> {
     if (uriList.entries.length !== 1) {
@@ -238,12 +276,14 @@ class DropOrPasteContext<A extends DropPasteAction> {
 
     const additionalImports = new Set<string>();
 
+    let resolved = true;
     for (const range of orderedRanges) {
       const snippetEdit = await this.createUriListSnippet(uriList, range, {
-        placeholderText: range.isEmpty ? undefined : this.document.getText(range),
+        isMedia,
         placeholderStartIndex: allRangesAreEmpty ? 1 : placeHolderStartIndex,
       });
       if (!snippetEdit) {
+        resolved = false;
         continue;
       }
 
@@ -260,6 +300,10 @@ class DropOrPasteContext<A extends DropPasteAction> {
       for (const importLine of imports) {
         additionalImports.add(importLine);
       }
+    }
+
+    if (!resolved) {
+      return;
     }
 
     const imports = Array.from(additionalImports).sort();
@@ -279,16 +323,77 @@ class DropOrPasteContext<A extends DropPasteAction> {
   async createUriListSnippet(
     uriList: UriList,
     range: vscode.Range,
-    _exts: { placeholderText: string | undefined; placeholderStartIndex: number },
+    exts: { isMedia: boolean; placeholderStartIndex: number },
   ) {
     if (uriList.entries.length !== 1) {
       vscode.window.showErrorMessage("Only one URI can be pasted at a time.");
       return;
     }
 
+    const entry = uriList.entries[0];
+
+    if (exts.isMedia || entry.uri.scheme === "file" || entry.uri.scheme === "untitled") {
+      return this.createLocalUriListSnippet(entry.uri, range, exts);
+    } else {
+      return this.createRemoteUriListSnippet(entry.uri, range, exts);
+    }
+  }
+
+  async createRemoteUriListSnippet(
+    dragFileUri: vscode.Uri,
+    range: vscode.Range,
+    _exts: { placeholderStartIndex: number },
+  ) {
+    // todo: check valid plain url, because some url may contain invalid characters for http markup.
+    if (range.isEmpty) {
+      return;
+    }
+
+    const res = await vscode.commands.executeCommand<
+      [{ mode: "math" | "markup" | "code" | "comment" | "string" | "raw" }]
+    >("tinymist.interactCodeContext", {
+      textDocument: {
+        uri: this.document.uri.toString(),
+      },
+      query: [
+        {
+          kind: "modeAt",
+          position: {
+            line: range.start.line,
+            character: range.start.character,
+          },
+        },
+      ],
+    });
+
+    const linkText = dragFileUri.toString();
+    const wrappedText = this.document.getText(range);
+    let text = "";
+    switch (res?.[0]?.mode || undefined) {
+      case "markup":
+        text = `#link("${escapeStr(linkText)}")[${wrappedText}]`;
+        break;
+      case "math":
+        text = `#link("${escapeStr(linkText)}", $${wrappedText}$)`;
+        break;
+      case "code":
+        text = `link("${escapeStr(linkText)}", {${wrappedText}})`;
+        break;
+      case "string":
+      case "comment":
+      case "raw":
+        return undefined;
+    }
+
+    return [text, []] as const;
+  }
+
+  async createLocalUriListSnippet(
+    dragFileUri: vscode.Uri,
+    range: vscode.Range,
+    _exts: { placeholderStartIndex: number },
+  ) {
     const dropFileUri = this.document.uri;
-    // todo: multiple files
-    const dragFileUri = uriList.entries[0].uri;
 
     let dragFilePath = "";
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(dragFileUri);
@@ -300,8 +405,8 @@ class DropOrPasteContext<A extends DropPasteAction> {
       dragFilePath = relative(dirname(dropFileUri.fsPath), dragFileUri.fsPath);
     }
 
-    const barPath = dragFilePath.replace(/\\/g, "/");
-    const strPath = `"${barPath}"`;
+    const barStrPath = escapeStr(dragFilePath.replace(/\\/g, "/"));
+    const strPath = `"${barStrPath}"`;
     let codeSnippet = strPath;
     const resourceKind: PasteResourceKind | undefined =
       pasteResourceKinds[extname(dragFileUri.fsPath)];
@@ -373,7 +478,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     });
 
     let text = codeSnippet;
-    switch (res?.[0]?.mode) {
+    switch (res?.[0]?.mode || undefined) {
       case "math":
       case "markup":
         text = `#${codeSnippet}`;
@@ -381,11 +486,13 @@ class DropOrPasteContext<A extends DropPasteAction> {
       case "code":
         text = codeSnippet;
         break;
+      case "string":
+        text = barStrPath;
+        break;
       case "comment":
       case "raw":
-      case "string":
-        text = barPath;
-        break;
+      case undefined:
+        return undefined;
     }
 
     const additionalImports = [];
@@ -429,8 +536,8 @@ export class DropProvider implements vscode.DocumentDropEditProvider {
   }
 }
 
-export class PasteProvider implements vscode.DocumentPasteEditProvider {
-  public static readonly mimeTypes = [Mime.textUriList, "files", ...mediaMimes];
+export class PasteResourceProvider implements vscode.DocumentPasteEditProvider {
+  public static readonly mimeTypes = [Mime.textUriList, "files", ...typstSupportedMimes];
 
   public async provideDocumentPasteEdits(
     document: vscode.TextDocument,
@@ -443,6 +550,27 @@ export class PasteProvider implements vscode.DocumentPasteEditProvider {
 
     const transferred = await ctx.transfer(ranges, dataTransfer);
 
+    if (!transferred || token.isCancellationRequested) {
+      return;
+    }
+
+    return ctx.finalize();
+  }
+}
+
+export class PasteUriProvider implements vscode.DocumentPasteEditProvider {
+  public static readonly mimeTypes = [Mime.textPlain];
+
+  public async provideDocumentPasteEdits(
+    document: vscode.TextDocument,
+    ranges: readonly vscode.Range[],
+    dataTransfer: vscode.DataTransfer,
+    context: vscode.DocumentPasteEditContext,
+    token: vscode.CancellationToken,
+  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
+    const ctx = new PasteContext(DropPasteAction.Paste, context, document, token);
+
+    const transferred = await ctx.pasteUri(ranges, dataTransfer);
     if (!transferred || token.isCancellationRequested) {
       return;
     }
@@ -597,6 +725,56 @@ export class UriList {
   ) {}
 }
 
+const externalUriSchemes: ReadonlySet<string> = new Set([
+  Schemes.http,
+  Schemes.https,
+  Schemes.mailto,
+  Schemes.file,
+]);
+
+export function findValidUriInText(text: string): string | undefined {
+  const trimmedUrlList = text.trim();
+
+  if (
+    !/^\S+$/.test(trimmedUrlList) || // Uri must consist of a single sequence of characters without spaces
+    !trimmedUrlList.includes(":") // And it must have colon somewhere for the scheme. We will verify the schema again later
+  ) {
+    return;
+  }
+
+  let uri: vscode.Uri;
+  try {
+    uri = vscode.Uri.parse(trimmedUrlList);
+  } catch {
+    // Could not parse
+    return;
+  }
+
+  // `Uri.parse` is lenient and will return a `file:` uri even for non-uri text such as `abc`
+  // Make sure that the resolved scheme starts the original text
+  if (!trimmedUrlList.toLowerCase().startsWith(uri.scheme.toLowerCase() + ":")) {
+    return;
+  }
+
+  // Only enable for an allow list of schemes. Otherwise this can be accidentally activated for non-uri text
+  // such as `c:\abc` or `value:foo`
+  if (!externalUriSchemes.has(uri.scheme.toLowerCase())) {
+    return;
+  }
+
+  // Some part of the uri must not be empty
+  // This disables the feature for text such as `http:`
+  if (!uri.authority && uri.path.length < 2 && !uri.query && !uri.fragment) {
+    return;
+  }
+
+  return trimmedUrlList;
+}
+
 function coalesce<T>(array: ReadonlyArray<T | undefined | null>): T[] {
   return <T[]>array.filter((e) => !!e);
+}
+
+function escapeStr(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
