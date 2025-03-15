@@ -20,6 +20,7 @@
 
 mod actor;
 mod cmd;
+pub(crate) mod config;
 pub(crate) mod dap;
 pub(crate) mod input;
 pub(crate) mod lsp;
@@ -32,6 +33,7 @@ mod task;
 pub mod tool;
 mod utils;
 
+pub use config::*;
 pub use dap::RegularInit as DapRegularInit;
 pub use dap::SuperInit as DapSuperInit;
 pub use lsp::init::*;

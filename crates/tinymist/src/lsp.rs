@@ -11,7 +11,7 @@ pub mod init;
 pub(crate) mod query;
 
 use crate::task::FormatterConfig;
-use crate::{lsp::init::*, *};
+use crate::*;
 
 /// Trait implemented by language server backends.
 ///
