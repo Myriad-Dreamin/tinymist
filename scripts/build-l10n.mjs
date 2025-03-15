@@ -8,8 +8,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-const __dirname = new URL(".", import.meta.url).toString().replace("file:///", "");
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = path.resolve(import.meta.dirname, "..");
 
 /**
  *

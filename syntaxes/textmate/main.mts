@@ -14,7 +14,6 @@ import { blockRaw, blockRawGeneral, blockRawLangs, inlineRaw } from "./fenced.mj
 
 import * as fs from "fs";
 import * as path from "path";
-import { fileURLToPath } from "node:url";
 import {
   FIXED_LENGTH_LOOK_BEHIND,
   POLYFILL_P_XID,
@@ -1465,8 +1464,6 @@ export const typst: textmate.Grammar = {
 };
 
 function generate() {
-  const dirname = fileURLToPath(new URL(".", import.meta.url));
-
   let compiled = textmate.compile(typst);
 
   if (POLYFILL_P_XID) {
@@ -1492,7 +1489,7 @@ function generate() {
 
   // dump to file
   fs.writeFileSync(
-    path.join(dirname, "../typst.tmLanguage.json"),
+    path.join(import.meta.dirname, "../typst.tmLanguage.json"),
     JSON.stringify({
       $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
       scopeName: "source.typst",
@@ -1504,7 +1501,7 @@ function generate() {
 
   // dump to file
   fs.writeFileSync(
-    path.join(dirname, "../typst-code.tmLanguage.json"),
+    path.join(import.meta.dirname, "../typst-code.tmLanguage.json"),
     JSON.stringify({
       $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
       scopeName: "source.typst-code",

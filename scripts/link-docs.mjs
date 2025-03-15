@@ -1,10 +1,8 @@
 import { resolve, basename } from "path";
-import { fileURLToPath } from "url";
 import * as fs from "fs";
 import { execSync } from "child_process";
 
-const filename = fileURLToPath(import.meta.url);
-const root = resolve(filename, "../..");
+const root = resolve(import.meta.dirname, "../..");
 const dry = process.argv.includes("--dry");
 
 const bytes2utf8 = new TextDecoder();
@@ -59,7 +57,7 @@ const convert = async (inp, out, opts) => {
         imageCnt += 1;
         fs.writeFileSync(resolve(assetsDir, fileName), base64Decode(content));
         return `"./assets/images/${fileName}"`;
-      }
+      },
     );
 
   await fs.promises.writeFile(output, outputContent);
@@ -70,13 +68,9 @@ const main = async () => {
     convert("docs/tinymist/introduction.typ", "README.md", {
       before: "# Tinymist\n\n",
     }),
-    convert(
-      "docs/tinymist/release-instruction.typ",
-      "docs/release-instruction.md",
-      {
-        before: "# Release Instructions\n\n",
-      }
-    ),
+    convert("docs/tinymist/release-instruction.typ", "docs/release-instruction.md", {
+      before: "# Release Instructions\n\n",
+    }),
     convert("docs/tinymist/frontend/emacs.typ", "editors/emacs/README.md", {
       before: "# Tinymist Emacs Support for Typst\n\n",
     }),
@@ -86,11 +80,9 @@ const main = async () => {
     convert("docs/tinymist/frontend/neovim.typ", "editors/neovim/README.md", {
       before: "# Tinymist Neovim Support for Typst\n\n",
     }),
-    convert(
-      "docs/tinymist/frontend/sublime-text.typ",
-      "editors/sublime-text/README.md",
-      { before: "# Tinymist Sublime Support for Typst\n\n" }
-    ),
+    convert("docs/tinymist/frontend/sublime-text.typ", "editors/sublime-text/README.md", {
+      before: "# Tinymist Sublime Support for Typst\n\n",
+    }),
     convert("docs/tinymist/frontend/vscode.typ", "editors/vscode/README.md", {
       before: "# Tinymist Typst VS Code Extension\n\n",
     }),
