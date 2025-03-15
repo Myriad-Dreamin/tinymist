@@ -843,6 +843,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dapts"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15c0cd737eefa0d353f8e8a6430d74f7e7513c2eb4622f946cd094b33875ebba"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2188,19 +2198,6 @@ name = "log"
 version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
-
-[[package]]
-name = "lsp-server"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9462c4dc73e17f971ec1f171d44bfffb72e65a130117233388a0ebc7ec5656f9"
-dependencies = [
- "crossbeam-channel",
- "log",
- "serde",
- "serde_derive",
- "serde_json",
-]
 
 [[package]]
 name = "lsp-types"
@@ -3732,9 +3729,9 @@ dependencies = [
  "anyhow",
  "clap",
  "crossbeam-channel",
+ "dapts",
  "futures",
  "log",
- "lsp-server",
  "lsp-types",
  "parking_lot",
  "reflexo",
@@ -3861,11 +3858,11 @@ name = "tests"
 version = "0.13.8"
 dependencies = [
  "insta",
- "lsp-server",
  "lsp-types",
  "reflexo",
  "serde",
  "serde_json",
+ "sync-lsp",
 ]
 
 [[package]]
@@ -3997,6 +3994,7 @@ dependencies = [
  "codespan-reporting",
  "comemo",
  "crossbeam-channel",
+ "dapts",
  "dhat",
  "dirs",
  "env_logger",
@@ -4007,7 +4005,6 @@ dependencies = [
  "hyper-util",
  "itertools 0.13.0",
  "log",
- "lsp-server",
  "lsp-types",
  "once_cell",
  "open",

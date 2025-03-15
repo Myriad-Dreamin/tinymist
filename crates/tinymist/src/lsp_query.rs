@@ -1,7 +1,6 @@
 //! tinymist's language server
 
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};

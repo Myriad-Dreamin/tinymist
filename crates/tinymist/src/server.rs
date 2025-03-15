@@ -182,8 +182,8 @@ impl ServerState {
         service
     }
 
-    /// Installs handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
+    /// Installs LSP handlers to the language server.
+    pub fn install_lsp<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;
@@ -202,7 +202,7 @@ impl ServerState {
 
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
-            .with_request::<Shutdown>(State::shutdown)
+            .with_lsp_request::<Shutdown>(State::shutdown)
             // customized event
             .with_event(
                 &LspInterrupt::Compile(ProjectInsId::default()),
@@ -213,32 +213,32 @@ impl ServerState {
                 State::server_event::<T>,
             )
             // lantency sensitive
-            .with_request_::<Completion>(State::completion)
-            .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
-            .with_request_::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
-            .with_request_::<DocumentHighlightRequest>(State::document_highlight)
-            .with_request_::<DocumentSymbolRequest>(State::document_symbol)
+            .with_lsp_request_::<Completion>(State::completion)
+            .with_lsp_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
+            .with_lsp_request_::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
+            .with_lsp_request_::<DocumentHighlightRequest>(State::document_highlight)
+            .with_lsp_request_::<DocumentSymbolRequest>(State::document_symbol)
             // Sync for low latency
-            .with_request_::<Formatting>(State::formatting)
-            .with_request_::<SelectionRangeRequest>(State::selection_range)
+            .with_lsp_request_::<Formatting>(State::formatting)
+            .with_lsp_request_::<SelectionRangeRequest>(State::selection_range)
             // latency insensitive
-            .with_request_::<InlayHintRequest>(State::inlay_hint)
-            .with_request_::<DocumentColor>(State::document_color)
-            .with_request_::<DocumentLinkRequest>(State::document_link)
-            .with_request_::<ColorPresentationRequest>(State::color_presentation)
-            .with_request_::<HoverRequest>(State::hover)
-            .with_request_::<CodeActionRequest>(State::code_action)
-            .with_request_::<CodeLensRequest>(State::code_lens)
-            .with_request_::<FoldingRangeRequest>(State::folding_range)
-            .with_request_::<SignatureHelpRequest>(State::signature_help)
-            .with_request_::<PrepareRenameRequest>(State::prepare_rename)
-            .with_request_::<Rename>(State::rename)
-            .with_request_::<GotoDefinition>(State::goto_definition)
-            .with_request_::<GotoDeclaration>(State::goto_declaration)
-            .with_request_::<References>(State::references)
-            .with_request_::<WorkspaceSymbolRequest>(State::symbol)
-            .with_request_::<OnEnter>(State::on_enter)
-            .with_request_::<WillRenameFiles>(State::will_rename_files)
+            .with_lsp_request_::<InlayHintRequest>(State::inlay_hint)
+            .with_lsp_request_::<DocumentColor>(State::document_color)
+            .with_lsp_request_::<DocumentLinkRequest>(State::document_link)
+            .with_lsp_request_::<ColorPresentationRequest>(State::color_presentation)
+            .with_lsp_request_::<HoverRequest>(State::hover)
+            .with_lsp_request_::<CodeActionRequest>(State::code_action)
+            .with_lsp_request_::<CodeLensRequest>(State::code_lens)
+            .with_lsp_request_::<FoldingRangeRequest>(State::folding_range)
+            .with_lsp_request_::<SignatureHelpRequest>(State::signature_help)
+            .with_lsp_request_::<PrepareRenameRequest>(State::prepare_rename)
+            .with_lsp_request_::<Rename>(State::rename)
+            .with_lsp_request_::<GotoDefinition>(State::goto_definition)
+            .with_lsp_request_::<GotoDeclaration>(State::goto_declaration)
+            .with_lsp_request_::<References>(State::references)
+            .with_lsp_request_::<WorkspaceSymbolRequest>(State::symbol)
+            .with_lsp_request_::<OnEnter>(State::on_enter)
+            .with_lsp_request_::<WillRenameFiles>(State::will_rename_files)
             // notifications
             .with_notification::<Initialized>(State::initialized)
             .with_notification::<DidOpenTextDocument>(State::did_open)

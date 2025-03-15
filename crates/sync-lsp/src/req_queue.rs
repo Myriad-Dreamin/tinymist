@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use lsp_server::{ErrorCode, Request, RequestId, Response, ResponseError};
+use crate::lsp::{ErrorCode, Request, RequestId, Response, ResponseError};
 
 /// Manages the set of pending requests, both incoming and outgoing.
 pub struct ReqQueue<I, O> {
