@@ -1225,7 +1225,7 @@ where
             .register_request(&req.command, &req_id, request_received);
 
         let resp = match (&mut self.state, &*req.command) {
-            (State::Uninitialized(args), dapts::requests::Initialize::COMMAND) => {
+            (State::Uninitialized(args), dapts::request::Initialize::COMMAND) => {
                 // todo: what will happen if the request cannot be deserialized?
                 let params = serde_json::from_value::<Args::I>(req.arguments);
                 match params {
