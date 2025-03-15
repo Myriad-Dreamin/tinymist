@@ -985,8 +985,11 @@
         "languages": [
           "typst"
         ],
-        "label": "Mock Debug",
-        "program": "./out/typst-debugger.exe",
+        "label": "Typst Debug",
+        "program": "./out/tinymist",
+        "windows": {
+          "program": "./out/tinymist.exe"
+        },
         "configurationAttributes": {
           "launch": {
             "required": [
@@ -1023,42 +1026,6 @@
                 ]
               }
             }
-          },
-          "attach": {
-            "required": [
-              "program"
-            ],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "Absolute path to a text file.",
-                "default": "${workspaceFolder}/${command:AskForProgramName}"
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "description": "Automatically stop after attach.",
-                "default": true
-              },
-              "trace": {
-                "type": "boolean",
-                "description": "Enable logging of the Debug Adapter Protocol.",
-                "default": true
-              },
-              "compileError": {
-                "type": "string",
-                "description": "Simulates a compile error in 'attach' request.",
-                "enum": [
-                  "default",
-                  "show",
-                  "hide"
-                ],
-                "enumDescriptions": [
-                  "default: show fake compile error to user",
-                  "show fake compile error to user",
-                  "do not show fake compile error to user"
-                ]
-              }
-            }
           }
         },
         "initialConfigurations": [
@@ -1072,7 +1039,7 @@
         ],
         "configurationSnippets": [
           {
-            "label": "Mock Debug: Launch",
+            "label": "Typst Debug: Launch",
             "description": "A new configuration for 'debugging' a user selected typst file.",
             "body": {
               "type": "myriaddreamin.typst-debugger",
@@ -1236,22 +1203,18 @@
         "icon": "$(extensions-info-message)"
       },
       {
-        "command": "extension.mock-debug.debugEditorContents",
+        "command": "tinymist.debugEditorContents",
         "title": "Debug File",
-        "category": "Mock Debug",
+        "category": "Typst Debug",
         "enablement": "!inDebugMode",
         "icon": "$(debug-alt)"
       },
       {
-        "command": "extension.mock-debug.runEditorContents",
+        "command": "tinymist.runEditorContents",
         "title": "Run File",
-        "category": "Mock Debug",
+        "category": "Typst Debug",
         "enablement": "!inDebugMode",
         "icon": "$(play)"
-      },
-      {
-        "command": "extension.mock-debug.toggleFormatting",
-        "title": "Toggle between decimal and hex formatting"
       }
     ],
     "keybindings": [
@@ -1278,11 +1241,11 @@
           "when": "editorLangId == typst"
         },
         {
-          "command": "extension.mock-debug.debugEditorContents",
+          "command": "tinymist.debugEditorContents",
           "when": "resourceLangId == typst"
         },
         {
-          "command": "extension.mock-debug.runEditorContents",
+          "command": "tinymist.runEditorContents",
           "when": "resourceLangId == typst"
         },
         {
@@ -1304,12 +1267,12 @@
       ],
       "editor/title/run": [
         {
-          "command": "extension.mock-debug.runEditorContents",
+          "command": "tinymist.runEditorContents",
           "when": "resourceLangId == typst",
           "group": "navigation@1"
         },
         {
-          "command": "extension.mock-debug.debugEditorContents",
+          "command": "tinymist.debugEditorContents",
           "when": "resourceLangId == typst",
           "group": "navigation@2"
         }
@@ -1331,12 +1294,6 @@
           "command": "tinymist.syncLabel",
           "when": "view == tinymist.label-view",
           "group": "navigation"
-        }
-      ],
-      "debug/variables/context": [
-        {
-          "command": "extension.mock-debug.toggleFormatting",
-          "when": "debugType == 'mock' && debugProtocolVariableMenuContext == 'simple'"
         }
       ]
     }
@@ -1379,8 +1336,6 @@
     "@typescript-eslint/parser": "^8.2.4",
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.22.0",
-    "@vscode/debugadapter": "^1.56.0",
-    "@vscode/debugadapter-testsupport": "^1.56.0",
     "chai": "^5.2.0",
     "esbuild": "^0.24.2",
     "eslint": "^9.20.1",

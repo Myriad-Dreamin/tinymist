@@ -853,25 +853,6 @@
     loupe "^3.1.2"
     tinyrainbow "^2.0.0"
 
-"@vscode/debugadapter-testsupport@^1.56.0":
-  version "1.68.0"
-  resolved "https://registry.yarnpkg.com/@vscode/debugadapter-testsupport/-/debugadapter-testsupport-1.68.0.tgz#27e7c38d2f5af1e1c4f9ca88b87bccf5c4cefab2"
-  integrity sha512-UpbaPsCGMKyjIvJFtqFKDD1MVvME50xuOtRBPrqY1WdhAOLjWQN7FcKEoHv3X85twfNL21jW2M54FYwEdEQv4Q==
-  dependencies:
-    "@vscode/debugprotocol" "1.68.0"
-
-"@vscode/debugadapter@^1.56.0":
-  version "1.68.0"
-  resolved "https://registry.yarnpkg.com/@vscode/debugadapter/-/debugadapter-1.68.0.tgz#abb23463cb750ca4a6f0834c5d4db659258dc159"
-  integrity sha512-D6gk5Fw2y4FV8oYmltoXpj+VAZexxJFopN/mcZ6YcgzQE9dgq2L45Aj3GLxScJOD6GeLILcxJIaA8l3v11esGg==
-  dependencies:
-    "@vscode/debugprotocol" "1.68.0"
-
-"@vscode/debugprotocol@1.68.0":
-  version "1.68.0"
-  resolved "https://registry.yarnpkg.com/@vscode/debugprotocol/-/debugprotocol-1.68.0.tgz#e558ba6affe1be7aff4ec824599f316b61d9a69d"
-  integrity sha512-2J27dysaXmvnfuhFGhfeuxfHRXunqNPxtBoR3koiTOA9rdxWNDTa1zIFLCFMSHJ9MPTPKFcBeblsyaCJCIlQxg==
-
 "@vscode/l10n@^0.0.18":
   version "0.0.18"
   resolved "https://registry.yarnpkg.com/@vscode/l10n/-/l10n-0.0.18.tgz#916d3a5e960dbab47c1c56f58a7cb5087b135c95"
