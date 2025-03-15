@@ -7,3 +7,4 @@ icons/ti.svg
 icons/typst-small.svg
 package.nls.json
 package.nls.*.json
+l10n/**/*

@@ -83,9 +83,19 @@ typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
+tinymist-l10n.workspace = true
 
 [features]
-default = ["cli", "html", "pdf", "preview", "embed-fonts", "no-content-hint"]
+default = [
+    "cli",
+    "html",
+    "pdf",
+    # enable it once we upload assets.
+    # "l10n",
+    "preview",
+    "embed-fonts",
+    "no-content-hint",
+]
 
 cli = ["sync-lsp/clap", "clap/wrap_help"]
 
@@ -120,6 +130,9 @@ preview = [
     "tinymist-assets/typst-preview",
     "hyper-tungstenite",
 ]
+
+# l10n = ["tinymist-assets/l10n"]
+l10n = []
 
 [dev-dependencies]
 temp-env.workspace = true

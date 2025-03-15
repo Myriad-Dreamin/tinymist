@@ -73,6 +73,10 @@ impl Initializer for RegularInit {
     fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
         let (config, err) = Config::from_params(params, self.font_opts);
 
+        if let Some(locale) = config.const_config.locale.as_ref() {
+            tinymist_l10n::set_locale(locale);
+        }
+
         let super_init = SuperInit {
             client: self.client,
             exec_cmds: self.exec_cmds,
@@ -524,6 +528,8 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// The locale of the editor.
+    pub locale: Option<String>,
 }
 
 impl Default for ConstConfig {
@@ -555,6 +561,12 @@ impl From<&InitializeParams> for ConstConfig {
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
 
+        let locale = params
+            .initialization_options
+            .as_ref()
+            .and_then(|init| init.get("locale").and_then(|v| v.as_str()))
+            .or(params.locale.as_deref());
+
         Self {
             position_encoding,
             cfg_change_registration: try_or(|| workspace?.configuration, false),
@@ -564,6 +576,7 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            locale: locale.map(ToOwned::to_owned),
         }
     }
 }

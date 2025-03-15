@@ -24,6 +24,7 @@ import {
   ScrollPreviewRequest,
   tinymist,
 } from "../lsp";
+import { l10nMsg } from "../l10n";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
@@ -259,7 +260,7 @@ export async function openPreviewInWebView({
       ? webviewPanel
       : vscode.window.createWebviewPanel(
           "typst-preview",
-          `${basename} (Preview)`,
+          `${basename}${l10nMsg(" (Preview)")}`,
           getTargetViewColumn(activeEditor.viewColumn),
           {
             enableScripts: true,

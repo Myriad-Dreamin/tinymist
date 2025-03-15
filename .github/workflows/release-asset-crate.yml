@@ -35,9 +35,10 @@ jobs:
       #   uses: Swatinem/rust-cache@v2
       - name: Install deps
         run: yarn install
-      - name: Check and build typst-preview
+      - name: Check and build assets
         run: |
           yarn build:preview
+          yarn build:l10n
       - name: Publish crates
         run: |
           cargo publish --allow-dirty --no-verify -p tinymist-assets || true

@@ -26,6 +26,9 @@ use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
 
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
+
 use crate::args::*;
 
 #[cfg(feature = "dhat-heap")]
@@ -56,13 +59,21 @@ fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    // Parse command line arguments
+    // Parses command line arguments
     let args = CliArguments::parse();
 
-    let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+    // Probes soon to avoid other initializations causing errors
+    if matches!(args.command, Some(Commands::Probe)) {
+        return Ok(());
+    }
 
-    // Start logging
+    // Loads translations
+    #[cfg(feature = "l10n")]
+    set_translations(load_translations(tinymist_assets::L10N_DATA)?);
+
+    // Starts logging
     let _ = {
+        let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
         use log::LevelFilter::*;
         let base_level = if is_transient_cmd { Warn } else { Info };
 

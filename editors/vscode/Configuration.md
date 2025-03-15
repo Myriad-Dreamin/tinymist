@@ -165,7 +165,7 @@ Sets the indent size (using space) for the formatter.
 
 ## `tinymist.showExportFileIn`
 
-(Experimental) Show Exported Files in Some Place
+Configures way of opening exported files, e.g. inside of editor tabs or using system application.
 
 
 ## `tinymist.dragAndDrop`

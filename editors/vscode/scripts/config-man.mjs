@@ -3,8 +3,7 @@ import * as path from "path";
 
 import { vscodeExtTranslations } from "../../../scripts/build-l10n.mjs";
 
-const __dirname = new URL(".", import.meta.url).toString().replace("file:///", "");
-const projectRoot = path.join(__dirname, "../../..");
+const projectRoot = path.join(import.meta.dirname, "../../..");
 
 const packageJsonPath = path.join(projectRoot, "editors/vscode/package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
@@ -155,7 +154,7 @@ ${typeSection}${enumSection}${defaultSection}
     .join("\n");
 };
 
-const configMdPath = path.join(__dirname, "..", "Configuration.md");
+const configMdPath = path.join(import.meta.dirname, "..", "Configuration.md");
 
 fs.writeFileSync(
   configMdPath,
@@ -164,7 +163,10 @@ fs.writeFileSync(
 ${configMd("vscode", true)}`,
 );
 
-const configMdPathNeovim = path.join(__dirname, "../../../editors/neovim/Configuration.md");
+const configMdPathNeovim = path.join(
+  import.meta.dirname,
+  "../../../editors/neovim/Configuration.md",
+);
 
 fs.writeFileSync(
   configMdPathNeovim,

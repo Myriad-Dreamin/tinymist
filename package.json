@@ -16,7 +16,10 @@
   "scripts": {
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
-    "build:l10n": "node scripts/build-l10n.mjs",
+    "build:l10n": "yarn extract:l10n && node scripts/build-l10n.mjs",
+    "extract:l10n": "yarn extract:l10n:ts && yarn extract:l10n:rs",
+    "extract:l10n:ts": "cargo run --release --bin tinymist-l10n -- --kind ts --dir ./editors/vscode --output ./locales/tinymist-vscode-rt.toml",
+    "extract:l10n:rs": "cargo run --release --bin tinymist-l10n -- --kind rs --dir ./crates --output ./locales/tinymist-rt.toml && rimraf ./crates/tinymist-assets/src/tinymist-rt.toml && cpr ./locales/tinymist-rt.toml ./crates/tinymist-assets/src/tinymist-rt.toml",
     "maintainers": "typst query MAINTAINERS.typ \"<maintainer-meta>\" --pretty --one --field value --input=action=help",
     "docs": "shiroa serve --font-path assets/fonts -w . docs/tinymist",
     "docs:pdf": "cargo run --bin tinymist --release -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ",
