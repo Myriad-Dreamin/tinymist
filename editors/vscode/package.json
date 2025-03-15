@@ -1059,12 +1059,12 @@
       },
       {
         "command": "tinymist.profileCurrentFile",
-        "title": "Profile and visualize execution of the current document",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFile%",
         "category": "Typst"
       },
       {
         "command": "tinymist.profileCurrentFileCoverage",
-        "title": "Profile coverage of the current document",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFileCoverage%",
         "category": "Typst"
       },
       {
