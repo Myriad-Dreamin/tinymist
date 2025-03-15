@@ -1,5 +1,6 @@
-use anyhow::bail;
 use serde::{Deserialize, Serialize};
+use tinymist_l10n::DebugL10n;
+use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
 use typst::syntax::VirtualPath;
@@ -139,10 +140,14 @@ impl EntryResolver {
     }
 
     /// Validates the configuration.
-    pub fn validate(&self) -> anyhow::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if let Some(root) = &self.root_path {
             if !root.is_absolute() {
-                bail!("rootPath or typstExtraArgs.root must be an absolute path: {root:?}");
+                tinymist_l10n::bail!(
+                    "tinymist-project.validate-error.root-path-not-absolute",
+                    "rootPath or typstExtraArgs.root must be an absolute path: {root:?}",
+                    root = root.debug_l10n()
+                );
             }
         }
 

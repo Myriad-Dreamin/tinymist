@@ -140,9 +140,18 @@ macro_rules! t {
     ($key:expr, $message:expr) => {
         $crate::t_without_args($key, $message)
     };
-    ($key:expr, $message:expr, $($args:expr),*) => {
-        $crate::t_with_args($key, $message, &[$($args),*])
+    ($key:expr, $message:expr $(, $arg_key:ident = $arg_value:expr)+ $(,)?) => {
+        $crate::t_with_args($key, $message, &[$((stringify!($arg_key), $arg_value)),*])
     };
+}
+
+/// Returns an error with a translated message.
+#[macro_export]
+macro_rules! bail {
+    ($key:expr, $message:expr $(, $arg_key:ident = $args:expr)* $(,)?) => {{
+        let msg = $crate::t!($key, $message $(, $arg_key = $args)*);
+        return Err(tinymist_std::error::prelude::_msg(concat!(file!(), ":", line!(), ":", column!()), msg.into()));
+    }};
 }
 
 /// Tries to get a translation for a key.
@@ -162,43 +171,89 @@ pub fn t_without_args(key: &'static str, message: &'static str) -> Cow<'static, 
 /// An argument for a translation.
 pub enum Arg<'a> {
     /// A string argument.
-    Str(&'a str),
+    Str(Cow<'a, str>),
     /// An integer argument.
     Int(i64),
     /// A float argument.
     Float(f64),
 }
 
+impl<'a> From<&'a String> for Arg<'a> {
+    fn from(s: &'a String) -> Self {
+        Arg::Str(Cow::Borrowed(s.as_str()))
+    }
+}
+
+impl<'a> From<&'a str> for Arg<'a> {
+    fn from(s: &'a str) -> Self {
+        Arg::Str(Cow::Borrowed(s))
+    }
+}
+
+/// Converts an object to an argument of debug message.
+pub trait DebugL10n {
+    /// Returns a debug string for the current language.
+    fn debug_l10n(&self) -> Arg<'_>;
+}
+
+impl<T: std::fmt::Debug> DebugL10n for T {
+    fn debug_l10n(&self) -> Arg<'static> {
+        Arg::Str(Cow::Owned(format!("{self:?}")))
+    }
+}
+
 /// Tries to translate a string to the current language.
-pub fn t_with_args(key: &'static str, message: &'static str, args: &[&Arg]) -> Cow<'static, str> {
+pub fn t_with_args(
+    key: &'static str,
+    message: &'static str,
+    args: &[(&'static str, Arg)],
+) -> Cow<'static, str> {
     let message = find_message(key, message);
     let mut result = String::new();
-    let mut arg_index = 0;
 
-    for c in message.chars() {
+    // for c in message.chars() {
+    //     if c == '{' {
+    //         let Some(bracket_index) = message[arg_index..].find('}') else {
+    //             result.push(c);
+    //             continue;
+    //         };
+
+    //         let arg_index_str = &message[arg_index + 1..arg_index +
+    // bracket_index];
+
+    //         match arg {
+    //             Arg::Str(s) => result.push_str(s.as_ref()),
+    //             Arg::Int(i) => result.push_str(&i.to_string()),
+    //             Arg::Float(f) => result.push_str(&f.to_string()),
+    //         }
+
+    //         arg_index += arg_index_str.len() + 2;
+    //     } else {
+    //         result.push(c);
+    //     }
+    // }
+
+    let message_iter = &mut message.chars();
+    while let Some(c) = message_iter.next() {
         if c == '{' {
-            let mut arg_index_str = String::new();
+            let arg_index_str = message_iter.take_while(|c| *c != '}').collect::<String>();
+            message_iter.next();
 
-            let chars = message.chars().skip(arg_index + 1);
-
-            for c in chars {
-                if c == '}' {
-                    break;
-                }
-
-                arg_index_str.push(c);
-            }
-
-            arg_index = arg_index_str.parse::<usize>().unwrap();
-            let arg = args[arg_index];
+            let Some(arg) = args
+                .iter()
+                .find(|(k, _)| k == &arg_index_str)
+                .map(|(_, v)| v)
+            else {
+                result.push(c);
+                result.push_str(&arg_index_str);
+                continue;
+            };
 
             match arg {
-                Arg::Str(s) => result.push_str(s),
+                Arg::Str(s) => result.push_str(s.as_ref()),
                 Arg::Int(i) => result.push_str(&i.to_string()),
                 Arg::Float(f) => result.push_str(&f.to_string()),
             }
-
-            arg_index += arg_index_str.len() + 2;
         } else {
             result.push(c);
         }
