@@ -20,7 +20,7 @@ use crate::project::{
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
-use crate::{init::*, *};
+use crate::{lsp::init::*, *};
 
 pub(crate) use futures::Future;
 

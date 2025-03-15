@@ -20,7 +20,6 @@
 
 mod actor;
 mod cmd;
-mod init;
 pub(crate) mod input;
 pub(crate) mod lsp;
 pub(crate) mod lsp_query;
@@ -33,7 +32,7 @@ mod task;
 pub mod tool;
 mod utils;
 
-pub use init::*;
+pub use lsp::init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
 pub use task::export2 as export;
@@ -43,7 +42,6 @@ pub use tinymist_query as query;
 pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
 use lsp_query::QueryFuture;
-use lsp_server::ResponseError;
 use serde_json::from_value;
 use sync_lsp::*;
 use utils::*;

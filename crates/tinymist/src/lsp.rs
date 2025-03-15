@@ -7,8 +7,10 @@ use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
 use tinymist_std::error::{prelude::*, IgnoreLogging};
 
+pub mod init;
+
 use crate::task::FormatterConfig;
-use crate::{init::*, *};
+use crate::{lsp::init::*, *};
 
 /// Trait implemented by language server backends.
 ///
