@@ -78,6 +78,7 @@ export class IContext {
   }
 
   // todo: provide it correctly.
+  tinymistExecutable?: string;
   tinymistExec?: ICommand<ExecContext, Promise<ExecResult | undefined>>;
 
   showErrorMessage(message: string) {

@@ -31,6 +31,7 @@ import { testingFeatureActivate } from "./features/testing";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { LanguageClient } from "vscode-languageclient/node";
 import { IContext } from "./context";
+import { debugActivate } from "./dap";
 
 LanguageState.Client = LanguageClient;
 
@@ -42,6 +43,7 @@ const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.copyAndPaste, copyAndPasteActivate],
   [extensionState.features.task, taskActivate],
   [extensionState.features.testing, testingFeatureActivate],
+  [extensionState.features.testingDebug, debugActivate],
   [extensionState.features.devKit, devKitFeatureActivate],
   [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],
   [extensionState.features.language, languageActivate],

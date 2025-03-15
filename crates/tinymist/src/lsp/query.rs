@@ -1,7 +1,6 @@
 //! tinymist's language server
 
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
@@ -11,9 +10,8 @@ use tinymist_query::{
 };
 use tinymist_std::{ImmutPath, Result};
 
-use super::ServerState;
 use crate::project::{EntryState, TaskInputs, DETACHED_ENTRY};
-use crate::{as_path, as_path_, as_path_pos, FormatterMode};
+use crate::{as_path, as_path_, as_path_pos, FormatterMode, ServerState};
 
 /// The future type for a lsp query.
 pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;

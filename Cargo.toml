@@ -149,8 +149,9 @@ typlite = { path = "./crates/typlite" }
 
 # LSP
 crossbeam-channel = "0.5.12"
-lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
+dapts = "0.0.4"
+# dapts = { git = "https://github.com/Myriad-Dreamin/dapts", branch = "main" }
 sync-lsp = { path = "./crates/sync-lsp", features = ["clap"] }
 
 # CLI
