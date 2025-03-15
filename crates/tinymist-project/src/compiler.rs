@@ -162,6 +162,29 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             deps: OnceLock::default(),
         }
     }
+
+    /// Returns error diagnostics.
+    pub fn errors(&self) -> Option<&EcoVec<SourceDiagnostic>> {
+        self.doc.as_ref().err()
+    }
+
+    /// Returns warning diagnostics.
+    pub fn warnings(&self) -> &EcoVec<SourceDiagnostic> {
+        &self.warnings
+    }
+
+    /// Returns whether there are any errors.
+    pub fn has_errors(&self) -> bool {
+        self.errors().is_some_and(|e| !e.is_empty())
+    }
+
+    /// Returns whether there are any warnings.
+    pub fn diagnostics(&self) -> impl Iterator<Item = &SourceDiagnostic> {
+        self.errors()
+            .into_iter()
+            .flatten()
+            .chain(self.warnings.iter())
+    }
 }
 
 // todo: remove me

@@ -173,6 +173,15 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     // Compiles the project
     let compiled = CompiledArtifact::from_snapshot(snap);
 
+    let diag = compiled.diagnostics();
+    print_diagnostics(&compiled.world, diag, DiagnosticFormat::Human)
+        .context_ut("print diagnostics")?;
+
+    if compiled.has_errors() {
+        // todo: we should process case of compile error in fn main function
+        std::process::exit(1);
+    }
+
     // Exports the compiled project
     let lock_dir = save_lock.then_some(lock_dir);
     ExportTask::do_export(output.task, compiled, lock_dir).await?;
