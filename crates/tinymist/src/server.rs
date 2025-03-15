@@ -289,6 +289,13 @@ impl ServerState {
         provider
     }
 
+    /// Installs DAP handlers to the language server.
+    pub fn install_dap<T: Initializer<S = Self> + 'static>(
+        provider: LspBuilder<T>,
+    ) -> LspBuilder<T> {
+        provider
+    }
+
     /// Handles the project interrupts.
     fn compile_interrupt<T: Initializer<S = Self>>(
         mut state: ServiceState<T, T::S>,

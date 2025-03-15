@@ -74,7 +74,7 @@ impl Initializer for RegularInit {
     /// # Errors
     /// Errors if the configuration could not be updated.
     fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
-        let (config, err) = Config::extract_params(params, self.font_opts);
+        let (config, err) = Config::extract_lsp_params(params, self.font_opts);
 
         let super_init = SuperInit {
             client: self.client,
@@ -324,7 +324,7 @@ impl Config {
     /// The function has side effects:
     /// - Getting environment variables.
     /// - Setting the locale.
-    pub fn extract_params(
+    pub fn extract_lsp_params(
         params: InitializeParams,
         font_opts: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
@@ -359,6 +359,29 @@ impl Config {
         });
 
         (config, err)
+    }
+
+    /// Creates a new configuration from the dap initialization parameters.
+    ///
+    /// The function has side effects:
+    /// - Getting environment variables.
+    /// - Setting the locale.
+    pub fn extract_dap_params(
+        params: dapts::InitializeRequestArguments,
+        font_opts: CompileFontArgs,
+    ) -> (Self, Option<ResponseError>) {
+        // todo: lines_start_at1, columns_start_at1, path_format
+
+        // Initialize configurations
+        let roots = vec![];
+        let config = Config::new(ConstConfig::from(&params), roots, font_opts);
+
+        // Sets locale as soon as possible
+        if let Some(locale) = config.const_config.locale.as_ref() {
+            tinymist_l10n::set_locale(locale);
+        }
+
+        (config, None)
     }
 
     /// Gets items for serialization.
@@ -589,6 +612,17 @@ impl From<&InitializeParams> for ConstConfig {
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
             locale: locale.map(ToOwned::to_owned),
+        }
+    }
+}
+
+impl From<&dapts::InitializeRequestArguments> for ConstConfig {
+    fn from(params: &dapts::InitializeRequestArguments) -> Self {
+        let locale = params.locale.as_deref();
+
+        Self {
+            locale: locale.map(ToOwned::to_owned),
+            ..Default::default()
         }
     }
 }
@@ -1260,9 +1294,18 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config_initialize() {
+    fn test_default_lsp_config_initialize() {
         let (_conf, err) =
-            Config::extract_params(InitializeParams::default(), CompileFontArgs::default());
+            Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn test_default_dap_config_initialize() {
+        let (_conf, err) = Config::extract_dap_params(
+            dapts::InitializeRequestArguments::default(),
+            CompileFontArgs::default(),
+        );
         assert!(err.is_none());
     }
 
@@ -1272,7 +1315,7 @@ mod tests {
 
         temp_env::with_var("TYPST_PACKAGE_CACHE_PATH", Some(pkg_path), || {
             let (conf, err) =
-                Config::extract_params(InitializeParams::default(), CompileFontArgs::default());
+                Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
             assert!(err.is_none());
             let applied_cache_path = conf
                 .compile

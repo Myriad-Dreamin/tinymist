@@ -40,7 +40,6 @@ hyper-util = { workspace = true, features = [
 http-body-util = "0.1.2"
 hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
-lsp-server.workspace = true
 lsp-types.workspace = true
 log.workspace = true
 once_cell.workspace = true
@@ -57,7 +56,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 strum.workspace = true
-sync-lsp.workspace = true
+sync-lsp = { workspace = true, features = ["dap"] }
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-std.workspace = true
@@ -85,6 +84,8 @@ typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
 tinymist-l10n.workspace = true
+
+dapts.workspace = true
 
 [features]
 default = [

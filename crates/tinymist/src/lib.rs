@@ -20,6 +20,7 @@
 
 mod actor;
 mod cmd;
+pub(crate) mod dap;
 pub(crate) mod input;
 pub(crate) mod lsp;
 pub(crate) mod lsp_query;
