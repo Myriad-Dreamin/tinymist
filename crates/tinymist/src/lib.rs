@@ -23,7 +23,6 @@ mod cmd;
 pub(crate) mod dap;
 pub(crate) mod input;
 pub(crate) mod lsp;
-pub(crate) mod lsp_query;
 pub mod project;
 mod resource;
 pub(crate) mod route;
@@ -44,7 +43,7 @@ pub use tinymist_project::world;
 pub use tinymist_query as query;
 pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
-use lsp_query::QueryFuture;
+use lsp::query::QueryFuture;
 use serde_json::from_value;
 use sync_lsp::*;
 use utils::*;

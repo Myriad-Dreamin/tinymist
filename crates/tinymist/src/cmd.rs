@@ -21,7 +21,7 @@ use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use world::TaskInputs;
 
 use super::*;
-use crate::lsp_query::{run_query, LspClientExt};
+use crate::lsp::query::{run_query, LspClientExt};
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].

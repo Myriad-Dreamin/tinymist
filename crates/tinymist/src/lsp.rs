@@ -8,6 +8,7 @@ use sync_lsp::*;
 use tinymist_std::error::{prelude::*, IgnoreLogging};
 
 pub mod init;
+pub(crate) mod query;
 
 use crate::task::FormatterConfig;
 use crate::{lsp::init::*, *};
