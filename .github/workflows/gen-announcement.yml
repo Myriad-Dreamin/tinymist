@@ -58,9 +58,10 @@ jobs:
           path: target/announcement.gen.md
       - name: Create GitHub Release
         env:
-          PRERELEASE_FLAG: "${{ env.isNightly && '--prerelease' || '' }}"
+          PRERELEASE_FLAG: "${{ (env.isNightly && '--prerelease') || '' }}"
           ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
           RELEASE_COMMIT: "${{ github.sha }}"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "Creating release for ${{ inputs.tag }} with PRERELEASE_FLAG=$PRERELEASE_FLAG (isNightly=$isNightly)"
           gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
