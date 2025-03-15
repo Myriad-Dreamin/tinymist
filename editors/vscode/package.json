@@ -1063,6 +1063,11 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.profileCurrentFileCoverage",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFileCoverage%",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.syncLabel",
         "title": "%extension.tinymist.command.tinymist.syncLabel%",
         "icon": "$(extensions-sync-enabled)",

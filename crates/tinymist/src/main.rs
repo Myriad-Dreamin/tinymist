@@ -18,7 +18,9 @@ use serde_json::Value as JsonValue;
 use sync_lsp::internal_error;
 use sync_lsp::transport::{with_stdio_transport, MirrorArgs};
 use sync_lsp::{LspBuilder, LspClientRoot, LspResult};
-use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
+use tinymist::tool::project::{
+    compile_main, coverage_main, generate_script_main, project_main, task_main,
+};
 use tinymist::world::TaskInputs;
 use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
@@ -90,6 +92,7 @@ fn main() -> Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Cov(args) => coverage_main(args),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),

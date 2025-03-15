@@ -3,6 +3,7 @@ import { writeFile } from "fs/promises";
 import { tinymist } from "../lsp";
 import { extensionState, ExtensionContext } from "../state";
 import { activeTypstEditor, base64Encode, loadHTMLFile } from "../util";
+import { IContext } from "../context";
 
 const USER_PACKAGE_VERSION = "0.0.1";
 const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
@@ -47,14 +48,14 @@ const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
   },
 };
 
-export function toolFeatureActivate(context: vscode.ExtensionContext) {
+export function toolFeatureActivate(context: IContext) {
   const toolView = new ToolViewProvider();
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.tool-view", toolView),
     ...Object.values(toolDesc).map((desc) =>
       vscode.commands.registerCommand(desc.command, async () => {
-        await editorTool(context, desc.toolId);
+        await editorTool(context.context, desc.toolId);
       }),
     ),
   );

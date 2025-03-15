@@ -176,7 +176,7 @@ export class LanguageState {
     const RUST_BACKTRACE = isProdMode ? "1" : "full";
 
     const run = {
-      command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
+      command: config.probedServerPath,
       args: ["lsp", ...mirrorFlag],
       options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
     };
