@@ -2,10 +2,10 @@
 
 use core::fmt;
 use std::any::Any;
-use std::path::Path;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
-use reflexo::{time::Instant, ImmutPath};
 use serde::Serialize;
 use serde_json::{from_value, Value as JsonValue};
 
@@ -21,6 +21,7 @@ use crate::msg::*;
 use crate::*;
 
 type Event = Box<dyn Any + Send>;
+type ImmutPath = Arc<Path>;
 
 type AsyncHandler<S, T, R> = fn(srv: &mut S, args: T) -> SchedulableResponse<R>;
 type RawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;

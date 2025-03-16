@@ -18,10 +18,10 @@ mod server;
 use std::any::Any;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
+use std::time::Instant;
 
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
-use reflexo::time::Instant;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 
