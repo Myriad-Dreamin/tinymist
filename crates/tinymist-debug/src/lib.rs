@@ -1,11 +1,15 @@
 //! Tinymist coverage support for Typst.
 
+pub use debugger::set_debug_session;
+
 mod cov;
+mod debugger;
 mod instrument;
 
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use debugger::BreakpointInstr;
 use parking_lot::Mutex;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
@@ -39,12 +43,12 @@ pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
 /// Collects the coverage with a callback.
 pub fn with_cov<F: CompilerFeat>(
     base: &CompilerWorld<F>,
-    mut f: impl FnMut(&InstrumentWorld<F, CoverageInstrumenter>) -> Result<()>,
+    mut f: impl FnMut(&InstrumentWorld<F, CovInstr>) -> Result<()>,
 ) -> (Result<CoverageResult>, Result<()>) {
     let instr = InstrumentWorld {
         base,
         library: instrument_library(&base.library),
-        instr: CoverageInstrumenter::default(),
+        instr: CovInstr::default(),
         instrumented: Mutex::new(FxHashMap::default()),
     };
 
@@ -58,11 +62,39 @@ pub fn with_cov<F: CompilerFeat>(
     (Ok(CoverageResult { meta, regions }), result)
 }
 
+/// The world for debugging.
+pub type DebuggerWorld<'a, F> = InstrumentWorld<'a, F, BreakpointInstr>;
+/// Creates a world for debugging.
+pub fn instr_breakpoints<F: CompilerFeat>(base: &CompilerWorld<F>) -> DebuggerWorld<'_, F> {
+    InstrumentWorld {
+        base,
+        library: instrument_library(&base.library),
+        instr: BreakpointInstr::default(),
+        instrumented: Mutex::new(FxHashMap::default()),
+    }
+}
+
 #[comemo::memoize]
 fn instrument_library(library: &Arc<LazyHash<Library>>) -> Arc<LazyHash<Library>> {
+    use debugger::breakpoints::*;
+
     let mut library = library.as_ref().clone();
 
-    library.global.scope_mut().define_func::<__cov_pc>();
+    let scope = library.global.scope_mut();
+    scope.define_func::<__cov_pc>();
+    scope.define_func::<__breakpoint_call_start>();
+    scope.define_func::<__breakpoint_call_end>();
+    scope.define_func::<__breakpoint_function>();
+    scope.define_func::<__breakpoint_break>();
+    scope.define_func::<__breakpoint_continue>();
+    scope.define_func::<__breakpoint_return>();
+    scope.define_func::<__breakpoint_block_start>();
+    scope.define_func::<__breakpoint_block_end>();
+    scope.define_func::<__breakpoint_show_start>();
+    scope.define_func::<__breakpoint_show_end>();
+    scope.define_func::<__breakpoint_doc_start>();
+    scope.define_func::<__breakpoint_doc_end>();
+
     Arc::new(library)
 }
 
