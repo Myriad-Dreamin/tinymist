@@ -109,8 +109,7 @@ fn with_stdio_transport_impl(
 ///
 /// ```
 /// use std::io::{stdin, stdout};
-/// use sync_ls::transport::{io_transport, IoThreads, MessageKind};
-/// use lsp_server::Message;
+/// use sync_ls::{Message, MessageKind, transport::{io_transport, IoThreads}};
 /// use crossbeam_channel::{bounded, Receiver, Sender};
 /// pub fn stdio_transport() -> (Sender<Message>, Receiver<Message>, IoThreads) {
 ///   io_transport(MessageKind::Lsp, || stdin().lock(), || stdout().lock())
