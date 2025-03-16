@@ -5,7 +5,6 @@ use std::any::Any;
 use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
 
-use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
 use reflexo::{time::Instant, ImmutPath};
 use serde::Serialize;
 use serde_json::{from_value, Value as JsonValue};
@@ -24,7 +23,6 @@ use crate::*;
 type Event = Box<dyn Any + Send>;
 
 type AsyncHandler<S, T, R> = fn(srv: &mut S, args: T) -> SchedulableResponse<R>;
-type PureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
 type RawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;
 type BoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
 type BoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient, RequestId, T) -> ScheduledResult>;
@@ -163,6 +161,7 @@ impl<A, S> ServiceState<'_, A, S> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 enum State<Args, S> {
     Uninitialized(Option<Box<Args>>),
     Initializing(S),

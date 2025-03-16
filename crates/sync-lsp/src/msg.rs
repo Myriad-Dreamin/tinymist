@@ -18,6 +18,7 @@ use crate::lsp;
 pub struct RequestId(IdRepr);
 
 impl RequestId {
+    #[cfg(feature = "dap")]
     pub(crate) fn dap(id: RequestId) -> i64 {
         match id.0 {
             IdRepr::I32(it) => it as i64,

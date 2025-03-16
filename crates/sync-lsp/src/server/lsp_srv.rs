@@ -1,5 +1,22 @@
 use super::*;
 
+use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
+
+type PureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
+
+/// Converts a `ScheduledResult` to a `SchedulableResponse`.
+macro_rules! reschedule {
+    ($expr:expr) => {
+        match $expr {
+            Ok(Some(())) => return,
+            Ok(None) => Ok(futures::future::MaybeDone::Done(Ok(
+                serde_json::Value::Null,
+            ))),
+            Err(e) => Err(e),
+        }
+    };
+}
+
 impl<S: 'static> TypedLspClient<S> {
     /// Sends a request to the client and registers a handler handled by the
     /// service `S`.

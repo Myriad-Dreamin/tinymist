@@ -87,34 +87,6 @@ where
         );
         self
     }
-
-    // todo: unsafe typed
-    /// Registers an raw request handler that handlers a kind of typed lsp
-    /// request.
-    pub fn with_dap_request_<R: dapts::IRequest>(
-        mut self,
-        handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
-    ) -> Self {
-        self.req_handlers.insert(
-            R::COMMAND,
-            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
-        );
-        self
-    }
-
-    /// Registers a typed request handler.
-    pub fn with_dap_request<R: Req>(
-        mut self,
-        handler: AsyncHandler<Args::S, R::Params, R::Result>,
-    ) -> Self {
-        self.req_handlers.insert(
-            R::METHOD,
-            Box::new(move |s, client, req_id, req| {
-                client.schedule(req_id, handler(s, from_json(req)?))
-            }),
-        );
-        self
-    }
 }
 
 impl<Args: Initializer> LsDriver<DapMessage, Args>
@@ -251,7 +223,7 @@ where
             (State::Uninitialized(..) | State::Initializing(..), _) => {
                 just_result(Err(not_initialized()))
             }
-            (_, request::Initialize::METHOD) => {
+            (_, dapts::request::Initialize::COMMAND) => {
                 just_result(Err(invalid_request("server is already initialized")))
             }
             // todo: generalize this

@@ -137,20 +137,6 @@ pub fn just_future<T, E>(
     Ok(futures::future::MaybeDone::Future(Box::pin(fut)))
 }
 
-/// Converts a `ScheduledResult` to a `SchedulableResponse`.
-macro_rules! reschedule {
-    ($expr:expr) => {
-        match $expr {
-            Ok(Some(())) => return,
-            Ok(None) => Ok(futures::future::MaybeDone::Done(Ok(
-                serde_json::Value::Null,
-            ))),
-            Err(e) => Err(e),
-        }
-    };
-}
-pub(crate) use reschedule;
-
 type AnyCaster<S> = Arc<dyn Fn(&mut dyn Any) -> &mut S + Send + Sync>;
 
 /// A Lsp client with typed service `S`.

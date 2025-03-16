@@ -16,21 +16,21 @@ rust-version.workspace = true
 anyhow.workspace = true
 clap = { workspace = true, optional = true }
 crossbeam-channel.workspace = true
+dapts = { workspace = true, optional = true }
 futures.workspace = true
 log.workspace = true
-lsp-types.workspace = true
+lsp-types = { workspace = true, optional = true }
 parking_lot.workspace = true
 reflexo.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
 tokio-util.workspace = true
-dapts = { workspace = true, optional = true }
 
 [features]
 default = ["dap", "lsp"]
 dap = ["dapts"]
-lsp = []
+lsp = ["lsp-types"]
 
 [lints]
 workspace = true

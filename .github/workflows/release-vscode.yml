@@ -58,6 +58,7 @@ jobs:
           yarn build:preview
           yarn build:l10n
       - run: cargo clippy --workspace --all-targets
+      - run: scripts/feature-testing.sh
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
       - name: Generate completions
