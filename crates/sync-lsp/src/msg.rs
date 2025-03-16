@@ -18,8 +18,9 @@ use crate::lsp;
 pub struct RequestId(IdRepr);
 
 impl RequestId {
+    /// Converts the request ID back to the original dap type.
     #[cfg(feature = "dap")]
-    pub(crate) fn dap(id: RequestId) -> i64 {
+    pub fn dap(id: RequestId) -> i64 {
         match id.0 {
             IdRepr::I32(it) => it as i64,
             IdRepr::String(it) => panic!("unexpected string ID in DAP: {it}"),

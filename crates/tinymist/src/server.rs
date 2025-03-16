@@ -307,7 +307,7 @@ impl ServerState {
             .with_request::<request::TerminateThreads>(Self::terminate_debug_thread)
             .with_request::<request::Attach>(Self::attach_debug)
             .with_request::<request::Launch>(Self::launch_debug)
-            .with_request::<request::Evaluate>(Self::evaluate_repl)
+            .with_request_::<request::Evaluate>(Self::evaluate_repl)
             .with_request::<request::Completions>(Self::complete_repl)
             .with_request::<request::Threads>(Self::debug_threads)
     }

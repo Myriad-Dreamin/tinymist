@@ -188,6 +188,7 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.2" }
 
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.8", default-features = false }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.8" }
+tinymist-dap = { path = "./crates/tinymist-dap/", version = "0.13.8" }
 tinymist = { path = "./crates/tinymist/", version = "0.13.8" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.8" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.8" }

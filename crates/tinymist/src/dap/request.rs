@@ -1,14 +1,22 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use comemo::Track;
 use dapts::{CompletionItem, ProcessEventStartMethod, StoppedEventReason, ThreadEventReason};
 use reflexo::ImmutPath;
-use reflexo_typst::{EntryReader, TaskInputs};
+use reflexo_typst::{EntryReader, TaskInputs, TypstPagedDocument};
 use serde::Deserialize;
-use sync_ls::{internal_error, invalid_params, invalid_request, just_ok, SchedulableResponse};
+use sync_ls::{
+    internal_error, invalid_params, invalid_request, just_ok, RequestId, SchedulableResponse,
+    ScheduledResult,
+};
+use tinymist_dap::{BreakpointContext, DebugAdaptor, DebugRequest};
 use tinymist_std::error::prelude::*;
 use typst::{
-    foundations::Repr,
+    diag::{SourceResult, Warned},
+    foundations::{Repr, Value},
     routines::EvalMode,
     syntax::{LinkedNode, Span},
     World,
@@ -118,11 +126,20 @@ impl ServerState {
         let main_eof = main_source.text().len();
         let source = main_source.clone();
 
-        self.debug.session = Some(DebugSession {
-            config: self.config.const_dap_config.clone(),
-            snapshot,
+        let (adaptor_tx, adaptor_rx) = std::sync::mpsc::channel();
+        let adaptor = Arc::new(Debugee {
+            tx: adaptor_tx,
             stop_on_entry: args.stop_on_entry.unwrap_or_default(),
             thread_id: 1,
+            client: self.client.clone().to_untyped(),
+        });
+
+        tinymist_dap::start_session(snapshot.world.clone(), adaptor.clone(), adaptor_rx);
+
+        self.debug.session = Some(DebugSession {
+            config: self.config.const_dap_config.clone(),
+            adaptor,
+            snapshot,
             // Since we haven't implemented breakpoints, we can only stop intermediately and
             // response completions in repl console.
             source,
@@ -139,64 +156,7 @@ impl ServerState {
         self.client
             .send_dap_event::<dapts::event::Thread>(dapts::ThreadEvent {
                 reason: ThreadEventReason::Started,
-                thread_id: self.debug.session()?.thread_id,
-            });
-
-        // if args.compile_error {
-        // simulate a compile/build error in "launch" request:
-        // the error should not result in a modal dialog since 'showUser' is
-        // set to false. A missing 'showUser' should result in a
-        // modal dialog.
-
-        // this.sendErrorResponse(response, {
-        //   id: 1001,
-        //   format: `compile error: some fake error.`,
-        //   showUser:
-        //     args.compileError === "show" ? true : args.compileError ===
-        // "hide" ? false : undefined, });
-        // } else {
-        // this.sendResponse(response);
-        // }
-
-        // Creates a fake breakpoint at the end of document.
-        // const MAIN_EOF: u64 = 1;
-        // let source = self.debug.session()?.to_dap_source(main);
-        // let pos = self
-        //     .debug
-        //     .session()?
-        //     .to_dap_position(main_eof, &main_source);
-        // let _ = self.debug.session()?.source;
-        // let _ = self.debug.session()?.position;
-        // self.client
-        //     .send_dap_event::<dapts::event::Breakpoint>(dapts::BreakpointEvent {
-        //         breakpoint: Breakpoint {
-        //             message: Some("The end of the document".into()),
-        //             source: Some(source),
-        //             line: Some(pos.line),
-        //             column: None,
-        //             verified: false,
-        //             end_column: None,
-        //             end_line: None,
-        //             offset: None,
-        //             id: Some(MAIN_EOF),
-        //             instruction_reference: None,
-        //             reason: None,
-        //         },
-        //         reason: BreakpointEventReason::New,
-        //     });
-
-        // Since we haven't implemented breakpoints, we can only stop intermediately and
-        // response completions in repl console.
-        let _ = self.debug.session()?.stop_on_entry;
-        self.client
-            .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
-                all_threads_stopped: Some(true),
-                reason: StoppedEventReason::Pause,
-                description: Some("Paused at the end of the document".into()),
-                thread_id: Some(self.debug.session()?.thread_id),
-                hit_breakpoint_ids: None,
-                preserve_focus_hint: Some(false),
-                text: None,
+                thread_id: self.debug.session()?.adaptor.thread_id,
             });
 
         just_ok(())
@@ -764,36 +724,16 @@ impl ServerState {
 
     pub(crate) fn evaluate_repl(
         &mut self,
+        req_id: RequestId,
         args: dapts::EvaluateArguments,
-    ) -> SchedulableResponse<dapts::EvaluateResponse> {
+    ) -> ScheduledResult {
         let session = self.debug.session()?;
-        let world = &session.snapshot.world;
-        let library = &world.library;
 
-        let root = session.source.root();
-        let span = LinkedNode::new(root)
-            .leaf_at_compat(session.position)
-            .map(|node| node.span())
-            .unwrap_or_else(Span::detached);
-
-        let source = typst_shim::eval::eval_compat(&world, &session.source)
-            .map_err(|e| invalid_params(format!("{e:?}")))?;
-
-        let val = typst_shim::eval::eval_string(
-            &typst::ROUTINES,
-            (world as &dyn World).track(),
-            &args.expression,
-            span,
-            EvalMode::Code,
-            source.scope().clone(),
-        )
-        .map_err(|e| invalid_params(format!("{e:?}")))?;
-
-        just_ok(dapts::EvaluateResponse {
-            result: format!("{}", val.repr()),
-            ty: Some(format!("{}", val.ty().repr())),
-            ..dapts::EvaluateResponse::default()
-        })
+        session.adaptor.tx.send(DebugRequest::Evaluate(
+            RequestId::dap(req_id),
+            args.expression,
+        ));
+        Ok(Some(()))
     }
 
     pub(crate) fn complete_repl(

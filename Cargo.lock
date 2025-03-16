@@ -4023,6 +4023,7 @@ dependencies = [
  "temp-env",
  "tinymist-assets 0.13.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
+ "tinymist-dap",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-project",

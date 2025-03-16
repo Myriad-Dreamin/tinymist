@@ -2,7 +2,7 @@ use dapts::IRequest;
 
 use super::*;
 
-impl<S: 'static> TypedLspClient<S> {
+impl LspClient {
     /// Sends a dap event to the client.
     pub fn send_dap_event<E: dapts::IEvent>(&self, body: E::Body) {
         let req_id = self.req_queue.lock().outgoing.alloc_request_id();
