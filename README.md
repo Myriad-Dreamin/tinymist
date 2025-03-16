@@ -91,7 +91,7 @@ The release cycle is as follows:
 
 Follow the instructions to enable tinymist in your favorite editor.
 - [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist//frontend/vscode.html)
-- [NeoVim](https://myriad-dreamin.github.io/tinymist//frontend/neovim.html)
+- [Neovim](https://myriad-dreamin.github.io/tinymist//frontend/neovim.html)
 - [Emacs](https://myriad-dreamin.github.io/tinymist//frontend/emacs.html)
 - [Sublime Text](https://myriad-dreamin.github.io/tinymist//frontend/sublime-text.html)
 - [Helix](https://myriad-dreamin.github.io/tinymist//frontend/helix.html)
