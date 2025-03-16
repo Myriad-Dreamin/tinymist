@@ -65,7 +65,7 @@ const matchRegion = (content, regionName) => {
 };
 
 const serverSideKeys = (() => {
-  const initPath = path.join(projectRoot, "crates/tinymist/src/init.rs");
+  const initPath = path.join(projectRoot, "crates/tinymist/src/config.rs");
   const initContent = fs.readFileSync(initPath, "utf8");
   const configItemContent = matchRegion(initContent, "Configuration Items");
   const strReg = /"([^"]+)"/g;
