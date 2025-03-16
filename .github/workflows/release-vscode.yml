@@ -207,6 +207,7 @@ jobs:
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
+        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Build PDF Documentation
         run: |
           cargo run --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
