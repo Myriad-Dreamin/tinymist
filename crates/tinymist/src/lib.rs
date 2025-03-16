@@ -35,7 +35,7 @@ mod utils;
 pub use config::*;
 pub use lsp::init::*;
 pub use server::*;
-pub use sync_lsp::LspClient;
+pub use sync_ls::LspClient;
 pub use task::export2 as export;
 pub use task::UserActionTask;
 pub use tinymist_project::world;
@@ -44,6 +44,6 @@ pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
 use lsp::query::QueryFuture;
 use serde_json::from_value;
-use sync_lsp::*;
+use sync_ls::*;
 use utils::*;
 use world::*;

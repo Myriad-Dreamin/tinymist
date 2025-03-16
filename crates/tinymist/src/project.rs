@@ -26,7 +26,7 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
-use sync_lsp::{LspClient, TypedLspClient};
+use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard, PeriscopeProvider},

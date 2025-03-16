@@ -10,14 +10,11 @@ use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
-use serde_json::Value as JsonValue;
-use sync_lsp::internal_error;
-use sync_lsp::transport::{with_stdio_transport, MirrorArgs};
-use sync_lsp::{LspBuilder, LspClientRoot, LspResult};
+use sync_ls::transport::{with_stdio_transport, MirrorArgs};
+use sync_ls::{internal_error, LspBuilder, LspClientRoot, LspMessage, LspResult, RequestId};
 use tinymist::tool::project::{
     compile_main, coverage_main, generate_script_main, project_main, task_main,
 };
@@ -84,7 +81,7 @@ fn main() -> Result<()> {
             .filter_module("typst_preview", Debug)
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
-            .filter_module("sync_lsp", base_level)
+            .filter_module("sync_ls", base_level)
             .filter_module("reflexo_typst2vec::pass::span2vec", Error)
             .filter_module("reflexo_typst::diag::console", Info)
             .try_init()
@@ -133,9 +130,9 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
     log::info!("starting language server: {args:?}");
 
     let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        ServerState::install(LspBuilder::new(
+        ServerState::install_lsp(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
@@ -170,7 +167,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
         let roots = vec![ImmutPath::from(root_path)];
@@ -186,7 +183,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
             ..Config::default()
         };
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
@@ -207,14 +204,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let request_received = reflexo::time::Instant::now();
 
         let req_id: RequestId = 0.into();
-        client.register_request(
-            &lsp_server::Request {
-                id: req_id.clone(),
-                method: "tinymistExt/documentProfiling".to_owned(),
-                params: JsonValue::Null,
-            },
-            request_received,
-        );
+        client.register_request("tinymistExt/documentProfiling", &req_id, request_received);
 
         let state = service.state_mut().unwrap();
 
@@ -241,14 +231,14 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
 pub fn query_main(cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
 
-    with_stdio_transport(MirrorArgs::default(), |conn| {
+    with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
 
         // todo: roots, inputs, font_opts
         let config = Config::default();
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),

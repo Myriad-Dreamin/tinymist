@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sync_lsp::transport::MirrorArgs;
+use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
 use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
 use tinymist::{CompileFontArgs, CompileOnceArgs};

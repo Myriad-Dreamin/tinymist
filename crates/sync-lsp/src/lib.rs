@@ -1,73 +1,110 @@
 //! A synchronous language server implementation.
 
-use core::fmt;
-use std::any::Any;
-use std::path::Path;
-use std::pin::Pin;
-use std::sync::{Arc, Weak};
-use std::{collections::HashMap, path::PathBuf};
-
-use crossbeam_channel::RecvError;
-use futures::future::MaybeDone;
-use lsp_server::{ErrorCode, Notification, Request, RequestId, Response};
-use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
-use parking_lot::Mutex;
-use reflexo::{time::Instant, ImmutPath};
-use serde::Serialize;
-use serde_json::{from_value, Value as JsonValue};
-
+#[cfg(feature = "dap")]
+pub mod dap;
+#[cfg(feature = "lsp")]
+pub mod lsp;
 pub mod req_queue;
 pub mod transport;
+
+pub use error::*;
+pub use msg::*;
+pub use server::*;
+
+mod error;
+mod msg;
+mod server;
+
+use std::any::Any;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+
+use futures::future::MaybeDone;
+use parking_lot::Mutex;
+use reflexo::time::Instant;
+use serde::Serialize;
+use serde_json::Value as JsonValue;
 
 type Event = Box<dyn Any + Send>;
 
 /// The sender of the language server.
 #[derive(Debug, Clone)]
-pub struct ConnectionTx {
+pub struct TConnectionTx<M> {
     /// The sender of the events.
     pub event: crossbeam_channel::Sender<Event>,
     /// The sender of the LSP messages.
     pub lsp: crossbeam_channel::Sender<Message>,
+    marker: std::marker::PhantomData<M>,
 }
 
 /// The sender of the language server.
 #[derive(Debug, Clone)]
-pub struct ConnectionRx {
+pub struct TConnectionRx<M> {
     /// The receiver of the events.
     pub event: crossbeam_channel::Receiver<Event>,
     /// The receiver of the LSP messages.
     pub lsp: crossbeam_channel::Receiver<Message>,
+    marker: std::marker::PhantomData<M>,
 }
 
-impl ConnectionRx {
+impl<M: TryFrom<Message, Error = anyhow::Error>> TConnectionRx<M> {
     /// Receives a message or an event.
-    fn recv(&self) -> Result<EventOrMessage, RecvError> {
+    fn recv(&self) -> anyhow::Result<EventOrMessage<M>> {
         crossbeam_channel::select_biased! {
-            recv(self.lsp) -> msg => msg.map(EventOrMessage::Msg),
-            recv(self.event) -> event => event.map(EventOrMessage::Evt),
+            recv(self.lsp) -> msg => Ok(EventOrMessage::Msg(msg?.try_into()?)),
+            recv(self.event) -> event => Ok(event.map(EventOrMessage::Evt)?),
         }
     }
 }
 
+/// The untyped connect tx for the language server.
+pub type ConnectionTx = TConnectionTx<Message>;
+/// The untyped connect rx for the language server.
+pub type ConnectionRx = TConnectionRx<Message>;
+
 /// This is a helper enum to handle both events and messages.
-enum EventOrMessage {
+enum EventOrMessage<M> {
     Evt(Event),
-    Msg(Message),
+    Msg(M),
 }
 
 /// Connection is just a pair of channels of LSP messages.
-pub struct Connection {
+pub struct Connection<M> {
     /// The senders of the connection.
-    pub sender: ConnectionTx,
+    pub sender: TConnectionTx<M>,
     /// The receivers of the connection.
-    pub receiver: ConnectionRx,
+    pub receiver: TConnectionRx<M>,
 }
 
-/// The common message type for the language server.
-pub type Message = lsp_server::Message;
+impl<M: TryFrom<Message, Error = anyhow::Error>> From<Connection<Message>> for Connection<M> {
+    fn from(conn: Connection<Message>) -> Self {
+        Self {
+            sender: TConnectionTx {
+                event: conn.sender.event,
+                lsp: conn.sender.lsp,
+                marker: std::marker::PhantomData,
+            },
+            receiver: TConnectionRx {
+                event: conn.receiver.event,
+                lsp: conn.receiver.lsp,
+                marker: std::marker::PhantomData,
+            },
+        }
+    }
+}
+
+impl<M: TryFrom<Message, Error = anyhow::Error>> From<TConnectionTx<M>> for ConnectionTx {
+    fn from(conn: TConnectionTx<M>) -> Self {
+        Self {
+            event: conn.event,
+            lsp: conn.lsp,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
 
 /// The common error type for the language server.
-pub use lsp_server::ResponseError;
+pub use msg::ResponseError;
 /// The common result type for the language server.
 pub type LspResult<T> = Result<T, ResponseError>;
 /// A future that may be done in place or not.
@@ -112,6 +149,7 @@ macro_rules! reschedule {
         }
     };
 }
+pub(crate) use reschedule;
 
 type AnyCaster<S> = Arc<dyn Fn(&mut dyn Any) -> &mut S + Send + Sync>;
 
@@ -141,18 +179,6 @@ impl<S: 'static> TypedLspClient<S> {
             client: self.client.clone(),
             caster: Arc::new(move |s| f(caster(s))),
         }
-    }
-
-    /// Sends a request to the client and registers a handler handled by the
-    /// service `S`.
-    pub fn send_request<R: Req>(
-        &self,
-        params: R::Params,
-        handler: impl FnOnce(&mut S, lsp_server::Response) + Send + Sync + 'static,
-    ) {
-        let caster = self.caster.clone();
-        self.client
-            .send_request_::<R>(params, move |s, resp| handler(caster(s), resp))
     }
 
     /// Sends a event to the client itself.
@@ -196,10 +222,14 @@ pub struct LspClientRoot {
 
 impl LspClientRoot {
     /// Creates a new language server host.
-    pub fn new(handle: tokio::runtime::Handle, sender: ConnectionTx) -> Self {
-        let _strong = Arc::new(sender);
+    pub fn new<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
+        handle: tokio::runtime::Handle,
+        sender: TConnectionTx<M>,
+    ) -> Self {
+        let _strong = Arc::new(sender.into());
         let weak = LspClient {
             handle,
+            msg_kind: M::get_message_kind(),
             sender: Arc::downgrade(&_strong),
             req_queue: Arc::new(Mutex::new(ReqQueue::default())),
         };
@@ -212,7 +242,7 @@ impl LspClientRoot {
     }
 }
 
-type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, lsp_server::Response) + Send + Sync>;
+type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, LspOrDapResponse) + Send + Sync>;
 type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
 
 /// The host for the language server, or known as the LSP client.
@@ -221,6 +251,7 @@ pub struct LspClient {
     /// The tokio handle.
     pub handle: tokio::runtime::Handle,
 
+    msg_kind: MessageKind,
     sender: Weak<ConnectionTx>,
     req_queue: Arc<Mutex<ReqQueue>>,
 }
@@ -249,7 +280,7 @@ impl LspClient {
         self.req_queue.lock().begin_panic();
     }
 
-    /// Sends a event to the client itself.
+    /// Sends a event to the server itself.
     pub fn send_event<T: std::any::Any + Send + 'static>(&self, event: T) {
         let Some(sender) = self.sender.upgrade() else {
             log::warn!("failed to send request: connection closed");
@@ -261,78 +292,82 @@ impl LspClient {
         }
     }
 
-    /// Sends a request to the client and registers a handler.
-    pub fn send_request_<R: Req>(
-        &self,
-        params: R::Params,
-        handler: impl FnOnce(&mut dyn Any, lsp_server::Response) + Send + Sync + 'static,
-    ) {
-        let mut req_queue = self.req_queue.lock();
-        let request = req_queue
-            .outgoing
-            .register(R::METHOD.to_owned(), params, Box::new(handler));
-
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send request: connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(request.into()) {
-            log::warn!("failed to send request: {res:?}");
-        }
-    }
-
     /// Completes an server2client request in the request queue.
-    pub fn complete_request<S: Any>(&self, service: &mut S, response: lsp_server::Response) {
+    #[cfg(feature = "lsp")]
+    pub fn complete_lsp_request<S: Any>(&self, service: &mut S, response: lsp::Response) {
         let mut req_queue = self.req_queue.lock();
         let Some(handler) = req_queue.outgoing.complete(response.id.clone()) else {
             log::warn!("received response for unknown request");
             return;
         };
         drop(req_queue);
-        handler(service, response)
+        handler(service, response.into())
+    }
+
+    /// Completes an server2client request in the request queue.
+    #[cfg(feature = "dap")]
+    pub fn complete_dap_request<S: Any>(&self, service: &mut S, response: dap::Response) {
+        let mut req_queue = self.req_queue.lock();
+        let Some(handler) = req_queue
+            .outgoing
+            // todo: casting i64 to i32
+            .complete((response.request_seq as i32).into())
+        else {
+            log::warn!("received response for unknown request");
+            return;
+        };
+        drop(req_queue);
+        handler(service, response.into())
     }
 
     /// Registers an client2server request in the request queue.
-    pub fn register_request(&self, request: &lsp_server::Request, received_at: Instant) {
+    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Instant) {
         let mut req_queue = self.req_queue.lock();
-        let method = request.method.clone();
-        let req_id = request.id.clone();
-        self.start_request(&req_id, &method);
-        req_queue.incoming.register(req_id, (method, received_at));
+        self.start_request(id, method);
+        req_queue
+            .incoming
+            .register(id.clone(), (method.to_owned(), received_at));
+    }
+
+    /// Responds a typed result to the client.
+    pub fn respond_result<T: Serialize>(&self, id: RequestId, result: LspResult<T>) {
+        let result = result.and_then(|t| serde_json::to_value(t).map_err(internal_error));
+        self.respond_any_result(id, result);
+    }
+
+    fn respond_any_result(&self, id: RequestId, result: LspResult<JsonValue>) {
+        let req_id = id.clone();
+        let msg: Message = match (self.msg_kind, result) {
+            #[cfg(feature = "lsp")]
+            (MessageKind::Lsp, Ok(resp)) => lsp::Response::new_ok(id, resp).into(),
+            #[cfg(feature = "lsp")]
+            (MessageKind::Lsp, Err(e)) => lsp::Response::new_err(id, e.code, e.message).into(),
+            #[cfg(feature = "dap")]
+            (MessageKind::Dap, Ok(resp)) => dap::Response::success(RequestId::dap(id), resp).into(),
+            #[cfg(feature = "dap")]
+            (MessageKind::Dap, Err(e)) => {
+                dap::Response::error(RequestId::dap(id), Some(e.message), None).into()
+            }
+        };
+
+        self.respond(req_id, msg);
     }
 
     /// Completes an client2server request in the request queue.
-    pub fn respond(&self, response: lsp_server::Response) {
+    pub fn respond(&self, id: RequestId, response: Message) {
         let mut req_queue = self.req_queue.lock();
-        let Some((method, received_at)) = req_queue.incoming.complete(response.id.clone()) else {
+        let Some((method, received_at)) = req_queue.incoming.complete(&id) else {
             return;
         };
 
-        self.stop_request(&response.id, &method, received_at);
+        self.stop_request(&id, &method, received_at);
 
         let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send response ({method}): connection closed");
+            log::warn!("failed to send response ({method}, {id}): connection closed");
             return;
         };
-        if let Err(res) = sender.lsp.send(response.into()) {
-            log::warn!("failed to send response ({method}): {res:?}");
-        }
-    }
-
-    /// Sends a typed notification to the client.
-    pub fn send_notification<N: Notif>(&self, params: &N::Params) {
-        self.send_notification_(lsp_server::Notification::new(N::METHOD.to_owned(), params));
-    }
-
-    /// Sends an untyped notification to the client.
-    pub fn send_notification_(&self, notif: lsp_server::Notification) {
-        let method = &notif.method;
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send notification ({method}): connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(notif.into()) {
-            log::warn!("failed to send notification: {res:?}");
+        if let Err(res) = sender.lsp.send(response) {
+            log::warn!("failed to send response ({method}, {id}): {res:?}");
         }
     }
 }
@@ -349,13 +384,13 @@ impl LspClient {
         use futures::future::MaybeDone::*;
         match resp {
             Done(output) => {
-                self.respond(result_to_response(req_id, output));
+                self.respond_result(req_id, output);
             }
             Future(fut) => {
                 let client = self.clone();
                 let req_id = req_id.clone();
                 self.handle.spawn(async move {
-                    client.respond(result_to_response(req_id, fut.await));
+                    client.respond_result(req_id, fut.await);
                 });
             }
             Gone => {
@@ -372,7 +407,7 @@ impl LspClient {
             // Already responded
             Ok(Some(())) => {}
             // The requests that doesn't start.
-            _ => self.respond(result_to_response(req_id, resp)),
+            _ => self.respond_result(req_id, resp),
         }
     }
 }
@@ -398,586 +433,5 @@ impl LspClient {
         } else {
             log::info!("notify {method} succeeded in {request_duration:0.2?}");
         }
-    }
-}
-
-type AsyncHandler<S, T, R> = fn(srv: &mut S, args: T) -> SchedulableResponse<R>;
-type PureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
-type RawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;
-type BoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
-type BoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient, RequestId, T) -> ScheduledResult>;
-type ExecuteCmdMap<S> = HashMap<&'static str, BoxHandler<S, Vec<JsonValue>>>;
-type RegularCmdMap<S> = HashMap<&'static str, BoxHandler<S, JsonValue>>;
-type NotifyCmdMap<S> = HashMap<&'static str, BoxPureHandler<S, JsonValue>>;
-type ResourceMap<S> = HashMap<ImmutPath, BoxHandler<S, Vec<JsonValue>>>;
-type MayInitBoxHandler<A, S, T> =
-    Box<dyn for<'a> Fn(ServiceState<'a, A, S>, &LspClient, T) -> anyhow::Result<()>>;
-type EventMap<A, S> = HashMap<core::any::TypeId, MayInitBoxHandler<A, S, Event>>;
-
-/// A trait that initializes the language server.
-pub trait Initializer {
-    /// The type of the initialization request.
-    type I: for<'de> serde::Deserialize<'de>;
-    /// The type of the service.
-    type S;
-
-    /// Handles the initialization request.
-    /// If the behind protocol is the standard LSP, the request is
-    /// `InitializeParams`.
-    fn initialize(self, req: Self::I) -> (Self::S, AnySchedulableResponse);
-}
-
-/// The builder pattern for the language server.
-pub struct LspBuilder<Args: Initializer> {
-    /// The extra initialization arguments.
-    pub args: Args,
-    /// The client surface for the implementing language server.
-    pub client: LspClient,
-    /// The event handlers.
-    pub events: EventMap<Args, Args::S>,
-    /// The command handlers.
-    pub command_handlers: ExecuteCmdMap<Args::S>,
-    /// The notification handlers.
-    pub notif_handlers: NotifyCmdMap<Args::S>,
-    /// The request handlers.
-    pub req_handlers: RegularCmdMap<Args::S>,
-    /// The resource handlers.
-    pub resource_handlers: ResourceMap<Args::S>,
-}
-
-impl<Args: Initializer> LspBuilder<Args>
-where
-    Args::S: 'static,
-{
-    /// Creates a new language server builder.
-    pub fn new(args: Args, client: LspClient) -> Self {
-        Self {
-            args,
-            client,
-            events: EventMap::new(),
-            command_handlers: ExecuteCmdMap::new(),
-            notif_handlers: NotifyCmdMap::new(),
-            req_handlers: RegularCmdMap::new(),
-            resource_handlers: ResourceMap::new(),
-        }
-    }
-
-    /// Registers an event handler.
-    pub fn with_event<T: std::any::Any>(
-        mut self,
-        ins: &T,
-        handler: impl for<'a> Fn(ServiceState<'a, Args, Args::S>, T) -> anyhow::Result<()> + 'static,
-    ) -> Self {
-        self.events.insert(
-            ins.type_id(),
-            Box::new(move |s, _client, req| handler(s, *req.downcast().unwrap())),
-        );
-        self
-    }
-
-    /// Registers an raw event handler.
-    pub fn with_command_(
-        mut self,
-        cmd: &'static str,
-        handler: RawHandler<Args::S, Vec<JsonValue>>,
-    ) -> Self {
-        self.command_handlers.insert(cmd, raw_to_boxed(handler));
-        self
-    }
-
-    /// Registers an async command handler.
-    pub fn with_command<R: Serialize + 'static>(
-        mut self,
-        cmd: &'static str,
-        handler: AsyncHandler<Args::S, Vec<JsonValue>, R>,
-    ) -> Self {
-        self.command_handlers.insert(
-            cmd,
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
-        );
-        self
-    }
-
-    /// Registers an untyped notification handler.
-    pub fn with_notification_<R: Notif>(
-        mut self,
-        handler: PureHandler<Args::S, JsonValue>,
-    ) -> Self {
-        self.notif_handlers.insert(R::METHOD, Box::new(handler));
-        self
-    }
-
-    /// Registers a typed notification handler.
-    pub fn with_notification<R: Notif>(mut self, handler: PureHandler<Args::S, R::Params>) -> Self {
-        self.notif_handlers.insert(
-            R::METHOD,
-            Box::new(move |s, req| handler(s, from_json(req)?)),
-        );
-        self
-    }
-
-    /// Registers a raw request handler that handlers a kind of untyped lsp
-    /// request.
-    pub fn with_raw_request<R: Req>(mut self, handler: RawHandler<Args::S, JsonValue>) -> Self {
-        self.req_handlers.insert(R::METHOD, raw_to_boxed(handler));
-        self
-    }
-
-    // todo: unsafe typed
-    /// Registers an raw request handler that handlers a kind of typed lsp
-    /// request.
-    pub fn with_request_<R: Req>(
-        mut self,
-        handler: fn(&mut Args::S, RequestId, R::Params) -> ScheduledResult,
-    ) -> Self {
-        self.req_handlers.insert(
-            R::METHOD,
-            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
-        );
-        self
-    }
-
-    /// Registers a typed request handler.
-    pub fn with_request<R: Req>(
-        mut self,
-        handler: AsyncHandler<Args::S, R::Params, R::Result>,
-    ) -> Self {
-        self.req_handlers.insert(
-            R::METHOD,
-            Box::new(move |s, client, req_id, req| {
-                client.schedule(req_id, handler(s, from_json(req)?))
-            }),
-        );
-        self
-    }
-
-    /// Registers a raw resource handler.
-    pub fn with_resource_(
-        mut self,
-        path: ImmutPath,
-        handler: RawHandler<Args::S, Vec<JsonValue>>,
-    ) -> Self {
-        self.resource_handlers.insert(path, raw_to_boxed(handler));
-        self
-    }
-
-    /// Registers an async resource handler.
-    pub fn with_resource(
-        mut self,
-        path: &'static str,
-        handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
-    ) -> Self {
-        self.resource_handlers.insert(
-            Path::new(path).into(),
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
-        );
-        self
-    }
-
-    /// Builds the language server driver.
-    pub fn build(self) -> LspDriver<Args> {
-        LspDriver {
-            state: State::Uninitialized(Some(Box::new(self.args))),
-            events: self.events,
-            client: self.client,
-            commands: self.command_handlers,
-            notifications: self.notif_handlers,
-            requests: self.req_handlers,
-            resources: self.resource_handlers,
-        }
-    }
-}
-
-/// An enum to represent the state of the language server.
-pub enum ServiceState<'a, A, S> {
-    /// The service is uninitialized.
-    Uninitialized(Option<&'a mut A>),
-    /// The service is initializing.
-    Ready(&'a mut S),
-}
-
-impl<A, S> ServiceState<'_, A, S> {
-    /// Converts the state to an option holding the ready service.
-    pub fn ready(&mut self) -> Option<&mut S> {
-        match self {
-            ServiceState::Ready(s) => Some(s),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum State<Args, S> {
-    Uninitialized(Option<Box<Args>>),
-    Initializing(S),
-    Ready(S),
-    ShuttingDown,
-}
-
-impl<Args, S> State<Args, S> {
-    fn opt(&self) -> Option<&S> {
-        match &self {
-            State::Ready(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    fn opt_mut(&mut self) -> Option<&mut S> {
-        match self {
-            State::Ready(s) => Some(s),
-            _ => None,
-        }
-    }
-}
-
-/// The language server driver.
-pub struct LspDriver<Args: Initializer> {
-    /// State to synchronize with the client.
-    state: State<Args, Args::S>,
-    /// The language server client.
-    pub client: LspClient,
-
-    // Handle maps
-    /// Events for dispatching.
-    pub events: EventMap<Args, Args::S>,
-    /// Extra commands provided with `textDocument/executeCommand`.
-    pub commands: ExecuteCmdMap<Args::S>,
-    /// Notifications for dispatching.
-    pub notifications: NotifyCmdMap<Args::S>,
-    /// Requests for dispatching.
-    pub requests: RegularCmdMap<Args::S>,
-    /// Resources for dispatching.
-    pub resources: ResourceMap<Args::S>,
-}
-
-impl<Args: Initializer> LspDriver<Args> {
-    /// Gets the state of the language server.
-    pub fn state(&self) -> Option<&Args::S> {
-        self.state.opt()
-    }
-
-    /// Gets the mutable state of the language server.
-    pub fn state_mut(&mut self) -> Option<&mut Args::S> {
-        self.state.opt_mut()
-    }
-
-    /// Makes the language server ready.
-    pub fn ready(&mut self, params: Args::I) -> AnySchedulableResponse {
-        let args = match &mut self.state {
-            State::Uninitialized(args) => args,
-            _ => return just_result(Err(invalid_request("server is already initialized"))),
-        };
-
-        let args = args.take().expect("already initialized");
-        let (s, res) = args.initialize(params);
-        self.state = State::Ready(s);
-
-        res
-    }
-}
-
-impl<Args: Initializer> LspDriver<Args>
-where
-    Args::S: 'static,
-{
-    /// Starts the language server on the given connection.
-    ///
-    /// If `is_replay` is true, the server will wait for all pending requests to
-    /// finish before exiting. This is useful for testing the language server.
-    ///
-    /// See [`transport::MirrorArgs`] for information about the record-replay
-    /// feature.
-    pub fn start(&mut self, inbox: ConnectionRx, is_replay: bool) -> anyhow::Result<()> {
-        let res = self.start_(inbox);
-
-        if is_replay {
-            let client = self.client.clone();
-            let _ = std::thread::spawn(move || {
-                let since = std::time::Instant::now();
-                let timeout = std::env::var("REPLAY_TIMEOUT")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(60);
-                client.handle.block_on(async {
-                    while client.has_pending_requests() {
-                        if since.elapsed().as_secs() > timeout {
-                            log::error!("replay timeout reached, {timeout}s");
-                            client.begin_panic();
-                        }
-
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                    }
-                })
-            })
-            .join();
-        }
-
-        res
-    }
-
-    /// Starts the language server on the given connection.
-    pub fn start_(&mut self, inbox: ConnectionRx) -> anyhow::Result<()> {
-        use EventOrMessage::*;
-        // todo: follow what rust analyzer does
-        // Windows scheduler implements priority boosts: if thread waits for an
-        // event (like a condvar), and event fires, priority of the thread is
-        // temporary bumped. This optimization backfires in our case: each time
-        // the `main_loop` schedules a task to run on a threadpool, the
-        // worker threads gets a higher priority, and (on a machine with
-        // fewer cores) displaces the main loop! We work around this by
-        // marking the main loop as a higher-priority thread.
-        //
-        // https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
-        // https://docs.microsoft.com/en-us/windows/win32/procthread/priority-boosts
-        // https://github.com/rust-lang/rust-analyzer/issues/2835
-        // #[cfg(windows)]
-        // unsafe {
-        //     use winapi::um::processthreadsapi::*;
-        //     let thread = GetCurrentThread();
-        //     let thread_priority_above_normal = 1;
-        //     SetThreadPriority(thread, thread_priority_above_normal);
-        // }
-
-        while let Ok(msg) = inbox.recv() {
-            const EXIT_METHOD: &str = notification::Exit::METHOD;
-            let loop_start = Instant::now();
-            match msg {
-                Evt(event) => {
-                    let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
-                        log::warn!("unhandled event: {:?}", event.as_ref().type_id());
-                        continue;
-                    };
-
-                    let s = match &mut self.state {
-                        State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
-                        State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
-                        State::ShuttingDown => {
-                            log::warn!("server is shutting down");
-                            continue;
-                        }
-                    };
-
-                    event_handler(s, &self.client, event)?;
-                }
-                Msg(Message::Request(req)) => self.on_request(loop_start, req),
-                Msg(Message::Notification(not)) => {
-                    let is_exit = not.method == EXIT_METHOD;
-                    self.on_notification(loop_start, not)?;
-                    if is_exit {
-                        return Ok(());
-                    }
-                }
-                Msg(Message::Response(resp)) => {
-                    let s = match &mut self.state {
-                        State::Ready(s) => s,
-                        _ => {
-                            log::warn!("server is not ready yet");
-                            continue;
-                        }
-                    };
-
-                    self.client.clone().complete_request(s, resp)
-                }
-            }
-        }
-
-        log::warn!("client exited without proper shutdown sequence");
-        Ok(())
-    }
-
-    /// Registers and handles a request. This should only be called once per
-    /// incoming request.
-    fn on_request(&mut self, request_received: Instant, req: Request) {
-        self.client.register_request(&req, request_received);
-
-        let req_id = req.id.clone();
-        let resp = match (&mut self.state, &*req.method) {
-            (State::Uninitialized(args), request::Initialize::METHOD) => {
-                // todo: what will happen if the request cannot be deserialized?
-                let params = serde_json::from_value::<Args::I>(req.params);
-                match params {
-                    Ok(params) => {
-                        let args = args.take().expect("already initialized");
-                        let (s, res) = args.initialize(params);
-                        self.state = State::Initializing(s);
-                        res
-                    }
-                    Err(e) => just_result(Err(invalid_request(e))),
-                }
-            }
-            (State::Uninitialized(..) | State::Initializing(..), _) => {
-                just_result(Err(not_initialized()))
-            }
-            (_, request::Initialize::METHOD) => {
-                just_result(Err(invalid_request("server is already initialized")))
-            }
-            // todo: generalize this
-            (State::Ready(..), request::ExecuteCommand::METHOD) => {
-                reschedule!(self.on_execute_command(req))
-            }
-            (State::Ready(s), _) => {
-                let method = req.method.as_str();
-                let is_shutdown = method == request::Shutdown::METHOD;
-
-                let Some(handler) = self.requests.get(method) else {
-                    log::warn!("unhandled request: {method}");
-                    return;
-                };
-
-                let result = handler(s, &self.client, req_id.clone(), req.params);
-                self.client.schedule_tail(req_id, result);
-
-                if is_shutdown {
-                    self.state = State::ShuttingDown;
-                }
-
-                return;
-            }
-            (State::ShuttingDown, _) => {
-                just_result(Err(invalid_request("server is shutting down")))
-            }
-        };
-
-        let result = self.client.schedule(req_id.clone(), resp);
-        self.client.schedule_tail(req_id, result);
-    }
-
-    /// The entry point for the `workspace/executeCommand` request.
-    fn on_execute_command(&mut self, req: Request) -> ScheduledResult {
-        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
-
-        let params = from_value::<ExecuteCommandParams>(req.params)
-            .map_err(|e| invalid_params(e.to_string()))?;
-
-        let ExecuteCommandParams {
-            command, arguments, ..
-        } = params;
-
-        // todo: generalize this
-        if command == "tinymist.getResources" {
-            self.get_resources(req.id, arguments)
-        } else {
-            let Some(handler) = self.commands.get(command.as_str()) else {
-                log::error!("asked to execute unknown command: {command}");
-                return Err(method_not_found());
-            };
-            handler(s, &self.client, req.id, arguments)
-        }
-    }
-
-    /// Get static resources with help of tinymist service, for example, a
-    /// static help pages for some typst function.
-    pub fn get_resources(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        let s = self.state.opt_mut().ok_or_else(not_initialized)?;
-
-        let path =
-            from_value::<PathBuf>(args[0].clone()).map_err(|e| invalid_params(e.to_string()))?;
-
-        let Some(handler) = self.resources.get(path.as_path()) else {
-            log::error!("asked for unknown resource: {path:?}");
-            return Err(method_not_found());
-        };
-
-        // Note our redirection will keep the first path argument in the args vec.
-        handler(s, &self.client, req_id, args)
-    }
-
-    /// Handles an incoming notification.
-    fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
-        self.client.start_notification(&not.method);
-        let handle = |s, Notification { method, params }: Notification| {
-            let Some(handler) = self.notifications.get(method.as_str()) else {
-                log::warn!("unhandled notification: {method}");
-                return Ok(());
-            };
-
-            let result = handler(s, params);
-            self.client.stop_notification(&method, received_at, result);
-
-            Ok(())
-        };
-
-        match (&mut self.state, &*not.method) {
-            (state, notification::Initialized::METHOD) => {
-                let mut s = State::ShuttingDown;
-                std::mem::swap(state, &mut s);
-                match s {
-                    State::Initializing(s) => {
-                        *state = State::Ready(s);
-                    }
-                    _ => {
-                        std::mem::swap(state, &mut s);
-                    }
-                }
-
-                let s = match state {
-                    State::Ready(s) => s,
-                    _ => {
-                        log::warn!("server is not ready yet");
-                        return Ok(());
-                    }
-                };
-                handle(s, not)
-            }
-            (State::Ready(state), _) => handle(state, not),
-            // todo: whether it is safe to ignore notifications
-            (State::Uninitialized(..) | State::Initializing(..), method) => {
-                log::warn!("server is not ready yet, while received notification {method}");
-                Ok(())
-            }
-            (State::ShuttingDown, method) => {
-                log::warn!("server is shutting down, while received notification {method}");
-                Ok(())
-            }
-        }
-    }
-}
-
-fn from_json<T: serde::de::DeserializeOwned>(json: JsonValue) -> LspResult<T> {
-    serde_json::from_value(json).map_err(invalid_request)
-}
-
-fn raw_to_boxed<S: 'static, T: 'static>(handler: RawHandler<S, T>) -> BoxHandler<S, T> {
-    Box::new(move |s, _client, req_id, req| handler(s, req_id, req))
-}
-
-fn resp_err(code: ErrorCode, msg: impl fmt::Display) -> ResponseError {
-    ResponseError {
-        code: code as i32,
-        message: msg.to_string(),
-        data: None,
-    }
-}
-
-/// Creates an invalid params error.
-pub fn invalid_params(msg: impl fmt::Display) -> ResponseError {
-    resp_err(ErrorCode::InvalidParams, msg)
-}
-
-/// Creates an internal error.
-pub fn internal_error(msg: impl fmt::Display) -> ResponseError {
-    resp_err(ErrorCode::InternalError, msg)
-}
-
-/// Creates a not initialized error.
-pub fn not_initialized() -> ResponseError {
-    resp_err(ErrorCode::ServerNotInitialized, "not initialized yet")
-}
-
-/// Creates a method not found error.
-pub fn method_not_found() -> ResponseError {
-    resp_err(ErrorCode::MethodNotFound, "method not found")
-}
-
-/// Creates an invalid request error.
-pub fn invalid_request(msg: impl fmt::Display) -> ResponseError {
-    resp_err(ErrorCode::InvalidRequest, msg)
-}
-
-/// Converts an [`LspResult`] to a response.
-pub fn result_to_response<T: Serialize>(id: RequestId, result: LspResult<T>) -> Response {
-    match result.and_then(|t| serde_json::to_value(t).map_err(internal_error)) {
-        Ok(resp) => Response::new_ok(id, resp),
-        Err(e) => Response::new_err(id, e.code, e.message),
     }
 }
