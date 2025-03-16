@@ -31,5 +31,8 @@ default = ["dap", "lsp"]
 dap = ["dapts"]
 lsp = ["lsp-types"]
 
+[package.metadata.docs.rs]
+features = ["dap", "lsp"]
+
 [lints]
 workspace = true
