@@ -6,7 +6,7 @@ use super::*;
 
 impl Instrumenter for BreakpointInstr {
     fn instrument(&self, _source: Source) -> FileResult<Source> {
-        let (new, meta) = instrument_coverage(_source)?;
+        let (new, meta) = instrument_breakpoints(_source)?;
 
         let mut session = DEBUG_SESSION.write();
         let session = session
@@ -20,7 +20,7 @@ impl Instrumenter for BreakpointInstr {
 }
 
 #[comemo::memoize]
-fn instrument_coverage(source: Source) -> FileResult<(Source, Arc<BreakpointInfo>)> {
+fn instrument_breakpoints(source: Source) -> FileResult<(Source, Arc<BreakpointInfo>)> {
     let node = source.root();
     let mut worker = InstrumentWorker {
         meta: BreakpointInfo::default(),
@@ -160,15 +160,18 @@ impl InstrumentWorker {
 
     fn make_cov(&mut self, span: Span, kind: BreakpointKind) {
         let it = self.meta.meta.len();
-        self.meta.meta.push(BreakpointItem {
-            origin_span: span,
-            kind,
-        });
-        self.instrumented.push_str("__breakpoint_");
+        self.meta.meta.push(BreakpointItem { origin_span: span });
+        self.instrumented.push_str("if __breakpoint_");
         self.instrumented.push_str(kind.to_str());
         self.instrumented.push('(');
         self.instrumented.push_str(&it.to_string());
-        self.instrumented.push_str(");\n");
+        self.instrumented.push_str(") {");
+        self.instrumented.push_str("__breakpoint_");
+        self.instrumented.push_str(kind.to_str());
+        self.instrumented.push_str("_handle(");
+        self.instrumented.push_str(&it.to_string());
+        self.instrumented.push_str(", (:)); ");
+        self.instrumented.push_str("};\n");
     }
 
     fn instrument_block(&mut self, child: &SyntaxNode) {
@@ -194,12 +197,12 @@ impl InstrumentWorker {
     }
 
     fn instrument_functor(&mut self, child: &SyntaxNode) {
-        self.instrumented.push_str("{\nlet __cov_functor = ");
+        self.instrumented.push_str("{\nlet __bp_functor = ");
         let s = child.span();
         self.visit_node_fallback(child);
         self.instrumented.push_str("\n__it => {");
         self.make_cov(s, BreakpointKind::ShowStart);
-        self.instrumented.push_str("__cov_functor(__it); } }\n");
+        self.instrumented.push_str("__bp_functor(__it); } }\n");
     }
 }
 
@@ -209,7 +212,7 @@ mod tests {
 
     fn instr(input: &str) -> String {
         let source = Source::detached(input);
-        let (new, _meta) = instrument_coverage(source).unwrap();
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
         new.text().to_string()
     }
 
@@ -218,7 +221,7 @@ mod tests {
         let instrumented = instr(include_str!(
             "../fixtures/instr_coverage/physica_vector.typ"
         ));
-        insta::assert_snapshot!(instrumented, @r#"
+        insta::assert_snapshot!(instrumented, @r###"
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -228,40 +231,40 @@ mod tests {
         //     U^+U = U U^+ = I
         //   ]
         #let super-plus-as-dagger(document) = {
-        __cov_pc(0);
+        if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {
           show math.attach: {
-        let __cov_functor = elem => {
-        __cov_pc(1);
+        let __bp_functor = elem => {
+        if __breakpoint_block_start(1) {__breakpoint_block_start_handle(1, (:)); };
         {
             if __eligible(elem.base) and elem.at("t", default: none) == [+] {
-        __cov_pc(2);
+        if __breakpoint_block_start(2) {__breakpoint_block_start_handle(2, (:)); };
         {
               $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
             }
-        __cov_pc(3);
+        if __breakpoint_block_end(3) {__breakpoint_block_end_handle(3, (:)); };
         }
          else {
-        __cov_pc(4);
+        if __breakpoint_block_start(4) {__breakpoint_block_start_handle(4, (:)); };
         {
               elem
             }
-        __cov_pc(5);
+        if __breakpoint_block_end(5) {__breakpoint_block_end_handle(5, (:)); };
         }
 
           }
-        __cov_pc(6);
+        if __breakpoint_block_end(6) {__breakpoint_block_end_handle(6, (:)); };
         }
 
-        __it => {__cov_pc(7);
-        __cov_functor(__it); } }
+        __it => {if __breakpoint_show_start(7) {__breakpoint_show_start_handle(7, (:)); };
+        __bp_functor(__it); } }
 
 
           document
         }
-        __cov_pc(8);
+        if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
         }
-        "#);
+        "###);
     }
 
     #[test]
@@ -273,33 +276,33 @@ mod tests {
     #[test]
     fn test_instrument_coverage() {
         let source = Source::detached("#let a = 1;");
-        let (new, _meta) = instrument_coverage(source).unwrap();
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
         insta::assert_snapshot!(new.text(), @"#let a = 1;");
     }
 
     #[test]
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
-        let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
         #let a = {
-        __cov_pc(0);
+        if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {1}
-        __cov_pc(1);
+        if __breakpoint_block_end(1) {__breakpoint_block_end_handle(1, (:)); };
         }
         ;
-        ");
+        "###);
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
-        let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
         #show: {
-        let __cov_functor = main
-        __it => {__cov_pc(0);
-        __cov_functor(__it); } }
-        ");
+        let __bp_functor = main
+        __it => {if __breakpoint_show_start(0) {__breakpoint_show_start_handle(0, (:)); };
+        __bp_functor(__it); } }
+        "###);
     }
 }

@@ -1,6 +1,8 @@
 //! Tinymist coverage support for Typst.
 
-pub use debugger::set_debug_session;
+pub use debugger::{
+    set_debug_session, with_debug_session, BreakpointKind, DebugSession, DebugSessionHandler,
+};
 
 mod cov;
 mod debugger;
@@ -94,6 +96,19 @@ fn instrument_library(library: &Arc<LazyHash<Library>>) -> Arc<LazyHash<Library>
     scope.define_func::<__breakpoint_show_end>();
     scope.define_func::<__breakpoint_doc_start>();
     scope.define_func::<__breakpoint_doc_end>();
+
+    scope.define_func::<__breakpoint_call_start_handle>();
+    scope.define_func::<__breakpoint_call_end_handle>();
+    scope.define_func::<__breakpoint_function_handle>();
+    scope.define_func::<__breakpoint_break_handle>();
+    scope.define_func::<__breakpoint_continue_handle>();
+    scope.define_func::<__breakpoint_return_handle>();
+    scope.define_func::<__breakpoint_block_start_handle>();
+    scope.define_func::<__breakpoint_block_end_handle>();
+    scope.define_func::<__breakpoint_show_start_handle>();
+    scope.define_func::<__breakpoint_show_end_handle>();
+    scope.define_func::<__breakpoint_doc_start_handle>();
+    scope.define_func::<__breakpoint_doc_end_handle>();
 
     Arc::new(library)
 }
