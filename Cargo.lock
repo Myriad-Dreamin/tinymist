@@ -4102,11 +4102,13 @@ version = "0.13.8"
 dependencies = [
  "base64",
  "comemo",
+ "ecow",
  "insta",
  "parking_lot",
  "serde",
  "serde_json",
  "tinymist-analysis",
+ "tinymist-debug",
  "tinymist-std",
  "tinymist-world",
  "typst",
