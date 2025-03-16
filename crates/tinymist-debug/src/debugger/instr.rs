@@ -274,14 +274,14 @@ mod tests {
     }
 
     #[test]
-    fn test_instrument_coverage() {
+    fn test_instrument_breakpoint() {
         let source = Source::detached("#let a = 1;");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
         insta::assert_snapshot!(new.text(), @"#let a = 1;");
     }
 
     #[test]
-    fn test_instrument_coverage_nested() {
+    fn test_instrument_breakpoint_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
         insta::assert_snapshot!(new.text(), @r###"
@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn test_instrument_coverage_functor() {
+    fn test_instrument_breakpoint_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
         insta::assert_snapshot!(new.text(), @r###"
