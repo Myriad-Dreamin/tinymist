@@ -304,7 +304,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 * Revised neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
 * Added release instruction by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1163, https://github.com/Myriad-Dreamin/tinymist/pull/1169, https://github.com/Myriad-Dreamin/tinymist/pull/1173, and https://github.com/Myriad-Dreamin/tinymist/pull/1212
-* Documenting `sync-ls` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
+* Documenting `sync-lsp` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
 * CI used newest deploy-pages, upload-pages-artifact, and configure-pages actions in https://github.com/Myriad-Dreamin/tinymist/pull/1249 and https://github.com/Myriad-Dreamin/tinymist/pull/1251
 * Documenting Myriad-Dreamin's workspace setting in https://github.com/Myriad-Dreamin/tinymist/pull/1264
 * CI Added release crates action in https://github.com/Myriad-Dreamin/tinymist/pull/1298
