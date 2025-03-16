@@ -1,15 +1,89 @@
 //! Tinymist coverage support for Typst.
+use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
 use parking_lot::Mutex;
+use tinymist_analysis::location::PositionEncoding;
+use tinymist_std::debug_loc::LspRange;
 use tinymist_std::hash::FxHashMap;
 use tinymist_world::vfs::FileId;
+use tinymist_world::{CompilerFeat, CompilerWorld};
 use typst::diag::FileResult;
 use typst::foundations::func;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Source, Span, SyntaxNode};
+use typst::{World, WorldExt};
 
 use crate::instrument::Instrumenter;
+
+/// The coverage result.
+pub struct CoverageResult {
+    /// The coverage meta.
+    pub meta: FxHashMap<FileId, Arc<InstrumentMeta>>,
+    /// The coverage map.
+    pub regions: FxHashMap<FileId, CovRegion>,
+}
+
+impl CoverageResult {
+    /// Converts the coverage result to JSON.
+    pub fn to_json<F: CompilerFeat>(&self, w: &CompilerWorld<F>) -> serde_json::Value {
+        let lsp_position_encoding = PositionEncoding::Utf16;
+
+        let mut result = VscodeCoverage::new();
+
+        for (file_id, region) in &self.regions {
+            let file_path = w
+                .path_for_id(*file_id)
+                .unwrap()
+                .as_path()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut details = vec![];
+
+            let meta = self.meta.get(file_id).unwrap();
+
+            let Ok(typst_source) = w.source(*file_id) else {
+                continue;
+            };
+
+            let hits = region.hits.lock();
+            for (idx, (span, _kind)) in meta.meta.iter().enumerate() {
+                let Some(typst_range) = w.range(*span) else {
+                    continue;
+                };
+
+                let rng = tinymist_analysis::location::to_lsp_range(
+                    typst_range,
+                    &typst_source,
+                    lsp_position_encoding,
+                );
+
+                details.push(VscodeFileCoverageDetail {
+                    executed: hits[idx] > 0,
+                    location: rng,
+                });
+            }
+
+            result.insert(file_path, details);
+        }
+
+        serde_json::to_value(result).unwrap()
+    }
+}
+
+/// The coverage result in the format of the VSCode coverage data.
+pub type VscodeCoverage = HashMap<String, Vec<VscodeFileCoverageDetail>>;
+
+/// Converts the coverage result to the VSCode coverage data.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct VscodeFileCoverageDetail {
+    /// Whether the location is being executed
+    pub executed: bool,
+    /// The location of the coverage.
+    pub location: LspRange,
+}
 
 #[derive(Default)]
 pub struct CoverageInstrumenter {
