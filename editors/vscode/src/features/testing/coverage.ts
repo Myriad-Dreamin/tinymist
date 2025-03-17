@@ -71,6 +71,11 @@ export function testingCovActivate(context: IContext, testController: vscode.Tes
     }
     testRun.started(item);
     const cwd = context.getRootForUri(uri);
+    if (!cwd) {
+      context.showErrorMessage(`tinymist cannot find root for uri: ${uri}`);
+      return;
+    }
+    const rootArgs = ["--root", cwd];
 
     const failed = (msg: string) => {
       testRun.failed(item, new vscode.TestMessage(msg));
@@ -113,7 +118,7 @@ export function testingCovActivate(context: IContext, testController: vscode.Tes
           vc.write(data.toString("utf8"));
         },
       },
-      [testKind, uri.fsPath],
+      [testKind, ...rootArgs, uri.fsPath],
     );
 
     const detailsFut = coverageTask.then<Map<string, vscode.FileCoverageDetail[]>>((res) => {
@@ -123,7 +128,6 @@ export function testingCovActivate(context: IContext, testController: vscode.Tes
       }
 
       const covPath = vscode.Uri.joinPath(vscode.Uri.file(cwd!), "target/coverage.json").fsPath;
-      console.log("covPath", covPath);
       if (!fs.existsSync(covPath)) {
         return details;
       }
