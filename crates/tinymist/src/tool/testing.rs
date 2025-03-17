@@ -118,7 +118,7 @@ pub fn test_main(args: TestArgs) -> Result<()> {
         std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
         std::fs::write(cov_path, res).context("write coverage")?;
 
-        eprintln!("Written coverage to {} ...", cov_path.display());
+        eprintln!("  Info: Written coverage to {} ...", cov_path.display());
 
         result
     });
