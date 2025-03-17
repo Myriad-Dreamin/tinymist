@@ -69,7 +69,7 @@ impl ServerState {
                     .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
             )
         } else {
-            self.config.compile.determine_creation_timestamp()
+            self.config.creation_timestamp()
         };
 
         let export = self.config.export_task();

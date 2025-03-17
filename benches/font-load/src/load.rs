@@ -20,7 +20,7 @@ fn load_embedded() {
 fn load_system() {
     let config = Config::default();
 
-    let _fonts = config.compile.determine_fonts();
+    let _fonts = config.fonts();
 }
 
 /*

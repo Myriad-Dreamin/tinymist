@@ -30,7 +30,7 @@ There are three servers in the `server` directory:
 - `trace` provides the trace server (profiling typst programs), initialized by `trace_lsp_main` in `main.rs`.
 - `preview` provides a `typst-preview` compatible preview server, initialized by `preview_main` in `tool/preview.rs`.
 
-The long-running servers are contributed by the `LanguageState` in the `server.rs` file.
+The long-running servers are contributed by the `ServerState` in the `server.rs` file.
 
 They will bootstrap actors in the `actor` directory and start tasks in the `task` directory.
 
