@@ -1,6 +1,7 @@
+use std::sync::OnceLock;
+
 use lsp_types::request::WorkspaceConfiguration;
 use lsp_types::*;
-use once_cell::sync::OnceCell;
 use reflexo::ImmutPath;
 use request::{RegisterCapability, UnregisterCapability};
 use serde_json::{Map, Value as JsonValue};
@@ -149,7 +150,7 @@ impl ServerState {
         }
 
         if old_config.primary_opts() != self.config.primary_opts() {
-            self.config.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
+            self.config.fonts = OnceLock::new(); // todo: don't reload fonts if not changed
             self.reload_projects()
                 .log_error("could not restart primary");
         }

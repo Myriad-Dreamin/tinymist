@@ -4038,7 +4038,6 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "lsp-types",
- "once_cell",
  "open",
  "parking_lot",
  "paste",
