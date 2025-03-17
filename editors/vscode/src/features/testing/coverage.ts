@@ -3,10 +3,7 @@ import { IContext } from "../../context";
 import { VirtualConsole } from "../../util";
 import * as fs from "fs";
 
-export function testingCovFeatureActivate(
-  context: IContext,
-  testController: vscode.TestController,
-) {
+export function testingCovActivate(context: IContext, testController: vscode.TestController) {
   const profileCoverage = testController.createRunProfile(
     "tinymist-profile-coverage",
     vscode.TestRunProfileKind.Coverage,

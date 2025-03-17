@@ -11,40 +11,40 @@ import * as vscode from "vscode";
 import * as path from "path";
 
 import { loadTinymistConfig } from "./config";
-import { triggerStatusBar } from "./ui-extends";
-import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { activeTypstEditor } from "./util";
-import { LanguageState, tinymist } from "./lsp";
-import { extensionState } from "./state";
-
+import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { LanguageState, tinymist } from "./lsp";
+import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
+import { extensionState } from "./state";
+import { triggerStatusBar } from "./ui-extends";
+import { activeTypstEditor } from "./util";
+import { LanguageClient } from "vscode-languageclient/node";
+
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import { previewActivate, previewDeactivate } from "./features/preview";
 import { taskActivate } from "./features/tasks";
-import { devKitFeatureActivate } from "./features/dev-kit";
-import { labelFeatureActivate } from "./features/label";
-import { packageFeatureActivate } from "./features/package";
-import { toolFeatureActivate } from "./features/tool";
+import { devKitActivate } from "./features/dev-kit";
+import { labelActivate } from "./features/label";
+import { packageActivate } from "./features/package";
+import { toolActivate } from "./features/tool";
 import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste";
-import { testingFeatureActivate } from "./features/testing";
+import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
-import { LanguageClient } from "vscode-languageclient/node";
-import { IContext } from "./context";
 
 LanguageState.Client = LanguageClient;
 
 const systemActivateTable = (): FeatureEntry[] => [
-  [extensionState.features.label, labelFeatureActivate],
-  [extensionState.features.package, packageFeatureActivate],
-  [extensionState.features.tool, toolFeatureActivate],
+  [extensionState.features.label, labelActivate],
+  [extensionState.features.package, packageActivate],
+  [extensionState.features.tool, toolActivate],
   [extensionState.features.dragAndDrop, dragAndDropActivate],
   [extensionState.features.copyAndPaste, copyAndPasteActivate],
   [extensionState.features.task, taskActivate],
-  [extensionState.features.testing, testingFeatureActivate],
+  [extensionState.features.testing, testingActivate],
   [extensionState.features.testingDebug, testingDebugActivate],
-  [extensionState.features.devKit, devKitFeatureActivate],
+  [extensionState.features.devKit, devKitActivate],
   [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],
   [extensionState.features.language, languageActivate],
 ];

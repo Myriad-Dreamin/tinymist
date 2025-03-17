@@ -3,7 +3,7 @@ import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
 import { editorTool } from "./tool";
 import { IContext } from "../context";
 
-export function packageFeatureActivate(context: IContext) {
+export function packageActivate(context: IContext) {
   const packageView = new PackageViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.package-view", packageView),
