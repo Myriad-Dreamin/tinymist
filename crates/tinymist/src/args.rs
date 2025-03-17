@@ -3,6 +3,7 @@ use std::path::Path;
 use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
 use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
+use tinymist::tool::testing::TestArgs;
 use tinymist::{CompileFontArgs, CompileOnceArgs};
 use tinymist_core::LONG_VERSION;
 
@@ -38,7 +39,7 @@ pub enum Commands {
     Cov(CompileOnceArgs),
     /// Test a document and gives summary
     #[clap(hide(true))] // still in development
-    Test(CompileOnceArgs),
+    Test(TestArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
     /// Generates build script for compilation

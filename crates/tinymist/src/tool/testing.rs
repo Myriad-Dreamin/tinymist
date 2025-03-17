@@ -1,10 +1,11 @@
 //! Testing utilities
 
-use std::{path::Path, sync::Arc};
+use std::{collections::HashSet, path::Path, sync::Arc};
 
 use comemo::Track;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use reflexo::ImmutPath;
 use reflexo_typst::{vfs::FileId, Bytes, LazyHash, SourceWorld, TypstDocument, TypstHtmlDocument};
 use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
 use tinymist_query::{
@@ -47,11 +48,44 @@ pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
     print_diag_or_error(&world, result)
 }
 
+/// Testing arguments
+#[derive(Debug, Clone, clap::Parser)]
+pub struct TestArgs {
+    /// The argument to compile once.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// Configuration for testing
+    #[clap(flatten)]
+    pub config: TestConfigArgs,
+}
+
+/// Testing config arguments
+#[derive(Debug, Clone, clap::Parser)]
+pub struct TestConfigArgs {
+    /// Whether to update the reference images.
+    #[clap(long)]
+    pub update: bool,
+
+    /// The argument to export to PNG.
+    #[clap(flatten)]
+    pub png: PngExportArgs,
+}
+
 /// Runs tests on a document
-pub fn test_main(args: CompileOnceArgs) -> Result<()> {
+pub fn test_main(args: TestArgs) -> Result<()> {
     // Prepares for the compilation
-    let universe = args.resolve()?;
+    let universe = args.compile.resolve()?;
     let world = universe.snapshot();
+    let root = universe.entry_state().root().map(Ok);
+    let root = root
+        .unwrap_or_else(|| std::env::current_dir().map(|p| p.into()))
+        .context("cannot find root")?;
+
+    let config = TestConfig {
+        root,
+        args: args.config,
+    };
 
     let result = Ok(()).and_then(|_| -> Result<()> {
         let analysis = Analysis::default();
@@ -70,7 +104,8 @@ pub fn test_main(args: CompileOnceArgs) -> Result<()> {
 
         let (cov, result) = tinymist_debug::with_cov(&world, |world| {
             let suites = suites.recheck(world);
-            print_diag_or_error(world, TestRunner::new(&world, &suites).run())
+            let runner = TestRunner::new(config.clone(), &world, &suites);
+            print_diag_or_error(world, runner.run())
         });
         let cov = cov?;
         let cov_path = Path::new("target/coverage.json");
@@ -88,18 +123,28 @@ pub fn test_main(args: CompileOnceArgs) -> Result<()> {
     print_diag_or_error(&world, result)
 }
 
+#[derive(Debug, Clone)]
+struct TestConfig {
+    root: ImmutPath,
+    args: TestConfigArgs,
+}
+
 struct TestRunner<'a> {
+    config: TestConfig,
     world: &'a dyn World,
     suites: &'a TestSuites,
     diagnostics: Mutex<Vec<EcoVec<SourceDiagnostic>>>,
+    examples: Mutex<HashSet<String>>,
 }
 
 impl<'a> TestRunner<'a> {
-    fn new(world: &'a dyn World, suites: &'a TestSuites) -> Self {
+    fn new(config: TestConfig, world: &'a dyn World, suites: &'a TestSuites) -> Self {
         Self {
+            config,
             world,
             suites,
             diagnostics: Mutex::new(Vec::new()),
+            examples: Mutex::new(HashSet::new()),
         }
     }
 
@@ -122,7 +167,7 @@ impl<'a> TestRunner<'a> {
             s.spawn(|_| {
                 self.suites.tests.par_iter().for_each(|test| {
                     let name = &test.name;
-                    eprintln!("Running test: {name}");
+                    eprintln!("Running test({name})");
                     let world = with_main(self.world, test.location);
                     let introspector = Introspector::default();
                     let traced = Traced::default();
@@ -150,9 +195,9 @@ impl<'a> TestRunner<'a> {
                     match test.kind {
                         TestCaseKind::Test | TestCaseKind::Bench => {
                             if let Err(err) = call_once() {
-                                eprintln!("call error in {name}: {err:?}");
+                                eprintln!(" Failed test({name}): call error {err:?}");
                             } else {
-                                eprintln!("Passed {name}");
+                                eprintln!(" Passed test({name})");
                             }
                         }
                         TestCaseKind::Panic => match call_once() {
@@ -163,10 +208,10 @@ impl<'a> TestRunner<'a> {
                                 let has_panic = err.iter().any(|p| p.message.contains("panic"));
 
                                 if !has_panic {
-                                    eprintln!("{name} exited with error, expected panic");
+                                    eprintln!(" Failed test({name}): exited with error, expected panic");
                                     self.diagnostics.lock().push(err);
                                 } else {
-                                    eprintln!("Passed {name}");
+                                    eprintln!(" Passed test({name})");
                                 }
                             }
                         },
@@ -205,24 +250,125 @@ impl<'a> TestRunner<'a> {
     }
 
     fn run_example(&self, test: &Source) {
-        let example = test.id().vpath().as_rooted_path().display();
-        eprintln!("Running example: {example}",);
+        let example_path = test.id().vpath().as_rooted_path().with_extension("");
+        let example = example_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+        eprintln!("Running example({example}");
+        if !self.examples.lock().insert(example.to_string()) {
+            eprintln!(" Failed example({example}: duplicate");
+            return;
+        }
         let world = with_main(self.world, test.id());
         let mut has_err = false;
         let doc = self.collect_diag(typst::compile::<TypstPagedDocument>(&world));
         has_err |= doc.is_none();
-        if self.can_html(doc) {
+        if let Err(err) = self.render_paged(example, doc.as_ref()) {
+            eprintln!("cannot render example({example}, Paged): {err}");
+            has_err = true;
+        }
+
+        if self.can_html(doc.as_ref()) {
             let doc = self.collect_diag(typst::compile::<TypstHtmlDocument>(&world));
             has_err |= doc.is_none();
+
+            if let Err(err) = self.render_html(example, doc.as_ref()) {
+                eprintln!("cannot render example({example}, Html): {err}");
+                has_err = true;
+            }
         }
 
         if has_err {
-            return;
+            eprintln!(" Failed example({example}");
+        } else {
+            eprintln!(" Passed example({example})");
         }
-        eprintln!("Passed {example}");
     }
 
-    fn can_html(&self, doc: Option<TypstPagedDocument>) -> bool {
+    fn render_paged(&self, example: &str, doc: Option<&TypstPagedDocument>) -> Result<()> {
+        let Some(doc) = doc else {
+            return Ok(());
+        };
+        let pixmap = typst_render::render_merged(
+            doc,
+            self.config.args.png.ppi / 72.0,
+            Default::default(),
+            None,
+        );
+        let output = pixmap.encode_png().context_ut("cannot encode pixmap")?;
+
+        let ref_image = self
+            .config
+            .root
+            .join("refs/png")
+            .join(example)
+            .with_extension("png");
+
+        self.update_example(example, &output, &ref_image, "image")
+    }
+
+    fn render_html(&self, example: &str, doc: Option<&TypstHtmlDocument>) -> Result<()> {
+        let Some(doc) = doc else {
+            return Ok(());
+        };
+        let output = typst_html::html(doc)?.into_bytes();
+
+        let ref_html = self
+            .config
+            .root
+            .join("refs/html")
+            .join(example)
+            .with_extension("html");
+
+        self.update_example(example, &output, &ref_html, "html")
+    }
+
+    fn update_example(&self, example: &str, data: &[u8], path: &Path, kind: &str) -> Result<()> {
+        let tmp_path = &path.with_extension("tmp");
+        let hash_path = &path.with_extension("hash");
+        let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
+
+        let existing_hash = if std::fs::exists(hash_path).context("exists hash ref")? {
+            Some(std::fs::read(hash_path).context("read hash ref")?)
+        } else {
+            None
+        };
+
+        let equal = existing_hash.map(|existing| existing.as_slice() == hash.as_bytes());
+
+        match (self.config.args.update, equal) {
+            // Doesn't exist, create it
+            (_, None) => {}
+            (_, Some(true)) => {
+                eprintln!("   Info example({example}): {kind} matches");
+            }
+            (false, Some(false)) => {
+                eprintln!(" Failed example({example}): {kind} mismatch");
+                eprintln!(
+                    "   Hint example({example}): compare {kind} at {}",
+                    path.display()
+                );
+                tinymist_std::fs::paths::write_atomic(tmp_path, data).context("write tmp ref")?;
+                return Ok(());
+            }
+            (true, Some(false)) => {
+                eprintln!("   Info example({example}): updating ref {kind}");
+            }
+        }
+
+        if std::fs::exists(tmp_path).context("exists tmp")? {
+            std::fs::remove_file(tmp_path).context("remove tmp")?;
+        }
+
+        std::fs::create_dir_all(path.parent().context("parent")?).context("create ref")?;
+        tinymist_std::fs::paths::write_atomic(path, data).context("write ref")?;
+        tinymist_std::fs::paths::write_atomic(hash_path, hash).context("write hash ref")?;
+
+        Ok(())
+    }
+
+    fn can_html(&self, doc: Option<&TypstPagedDocument>) -> bool {
         let Some(doc) = doc else {
             return false;
         };
