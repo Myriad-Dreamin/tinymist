@@ -325,7 +325,8 @@ impl<'a> TestRunner<'a> {
     }
 
     fn update_example(&self, example: &str, data: &[u8], path: &Path, kind: &str) -> Result<()> {
-        let tmp_path = &path.with_extension("tmp");
+        let ext = path.extension().unwrap().to_string_lossy();
+        let tmp_path = &path.with_extension(format!("tmp.{ext}"));
         let hash_path = &path.with_extension("hash");
         let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
 
