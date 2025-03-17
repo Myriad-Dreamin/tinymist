@@ -133,3 +133,9 @@
 //     });
 //   });
 // });
+import * as vscode from "vscode";
+import type { Context } from ".";
+
+export async function getTests(ctx: Context) {
+  void vscode;
+}
