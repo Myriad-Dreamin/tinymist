@@ -29,7 +29,7 @@ The release cycle is as follows:
 
 Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/vscode.typ")[VS Cod(e,ium)]
-- #cross-link("/frontend/neovim.typ")[NeoVim]
+- #cross-link("/frontend/neovim.typ")[Neovim]
 - #cross-link("/frontend/emacs.typ")[Emacs]
 - #cross-link("/frontend/sublime-text.typ")[Sublime Text]
 - #cross-link("/frontend/helix.typ")[Helix]

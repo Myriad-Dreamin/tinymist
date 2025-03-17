@@ -24,7 +24,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ## v0.13.6 - [2025-03-13]
 
 We has provided more ways of previewing documents for editors having poor lsp support.
-- Default Preview: The editors supporting lsp commands, e.g. neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly.
+- Default Preview: The editors supporting lsp commands, e.g. Neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly.
 - Background Preview: The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser.
 
 See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
@@ -302,7 +302,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 ### Misc
 
-* Revised neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
+* Revised Neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
 * Added release instruction by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1163, https://github.com/Myriad-Dreamin/tinymist/pull/1169, https://github.com/Myriad-Dreamin/tinymist/pull/1173, and https://github.com/Myriad-Dreamin/tinymist/pull/1212
 * Documenting `sync-lsp` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
 * CI used newest deploy-pages, upload-pages-artifact, and configure-pages actions in https://github.com/Myriad-Dreamin/tinymist/pull/1249 and https://github.com/Myriad-Dreamin/tinymist/pull/1251

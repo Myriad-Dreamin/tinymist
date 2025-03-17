@@ -1030,8 +1030,8 @@ en = "Root path"
 zh = "根路径"
 
 [extension.tinymist.config.tinymist.rootPath.desc]
-en = "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)."
-zh = "配置 typst 中绝对路径的根。提示：您可以将 rootPath 设置为 `-`，这样 tinymist 将始终使用文件的父目录作为根路径。注意：对于 neovim 用户，如果它抱怨找不到根目录，您还必须设置 `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }`，请参见 [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)。"
+en = "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for Neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)."
+zh = "配置 typst 中绝对路径的根。提示：您可以将 rootPath 设置为 `-`，这样 tinymist 将始终使用文件的父目录作为根路径。注意：对于 Neovim 用户，如果它抱怨找不到根目录，您还必须设置 `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }`，请参见 [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)。"
 
 [extension.tinymist.config.tinymist.configureDefaultWordSeparator.title]
 en = "Configure default word separators"

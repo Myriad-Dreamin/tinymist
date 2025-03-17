@@ -136,7 +136,7 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
 ```
 
-It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting neovim.
+It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
 This could be improved in the future.
 
@@ -154,7 +154,7 @@ This is most commonly due to nvim not recognizing the `.typ` file extension as a
 :set filetype=typst
 ```
 
-In older versions of neovim an autocommand may be necessary.
+In older versions of Neovim an autocommand may be necessary.
 
 ```vim
 autocmd BufNewFile,BufRead *.typ setfiletype typst

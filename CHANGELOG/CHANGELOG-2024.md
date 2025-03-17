@@ -242,7 +242,7 @@ We are going to add maintainers to GitHub since 2024-11-22 (in 7 days):
 
 * Added coc.nvim config example by @tanloong in https://github.com/Myriad-Dreamin/tinymist/pull/727
 * Maintained docs for tinymist 0.12.2 in https://github.com/Myriad-Dreamin/tinymist/pull/733 and https://github.com/Myriad-Dreamin/tinymist/pull/825
-* Updated neovim's setup section in https://github.com/Myriad-Dreamin/tinymist/pull/749
+* Updated Neovim's setup section in https://github.com/Myriad-Dreamin/tinymist/pull/749
 * Added documentation about docstring in https://github.com/Myriad-Dreamin/tinymist/pull/771
 
 ### Editor
@@ -517,7 +517,7 @@ This is a new release channel for Tinymist, which uses *main branch of typst*. C
 * Generating shell completion by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/525
 * Added installation and configuration instruction for Emacs by @Ziqi-Yang in https://github.com/Myriad-Dreamin/tinymist/pull/538
 * Added document preview feature documentations for non-vscode clients in https://github.com/Myriad-Dreamin/tinymist/pull/560
-* Added root path hints in documentation for neovim users in https://github.com/Myriad-Dreamin/tinymist/pull/561
+* Added root path hints in documentation for Neovim users in https://github.com/Myriad-Dreamin/tinymist/pull/561
 * Added notes to stateful pin commands in documentation in https://github.com/Myriad-Dreamin/tinymist/pull/562
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.19...v0.11.20
@@ -1087,7 +1087,7 @@ This version is published with mostly internal optimizations.
 
 ### Hover (Tooltip)
 
-* Joining array of hover contents by divider for neovim clients in https://github.com/Myriad-Dreamin/tinymist/pull/157
+* Joining array of hover contents by divider for Neovim clients in https://github.com/Myriad-Dreamin/tinymist/pull/157
 
 ### Internal Optimization
 
@@ -1142,7 +1142,7 @@ This version is published with mostly internal optimizations.
 
 ### Editor
 
-* Integrated neovim support in https://github.com/Myriad-Dreamin/tinymist/pull/91
+* Integrated Neovim support in https://github.com/Myriad-Dreamin/tinymist/pull/91
 * docs: mention how to work with multiple-file projects in https://github.com/Myriad-Dreamin/tinymist/pull/108
 * feat: add minimal helix support in https://github.com/Myriad-Dreamin/tinymist/pull/107
 
