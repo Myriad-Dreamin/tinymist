@@ -9,6 +9,7 @@
   ],
   "categories": [
     "Programming Languages",
+    "Debuggers",
     "Formatters"
   ],
   "repository": {
@@ -973,6 +974,87 @@
         }
       }
     ],
+    "breakpoints": [
+      {
+        "language": "typst"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "myriaddreamin.typst-debugger",
+        "languages": [
+          "typst"
+        ],
+        "label": "Typst Debug",
+        "program": "./out/tinymist",
+        "windows": {
+          "program": "./out/tinymist.exe"
+        },
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a text file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              },
+              "compileError": {
+                "type": "string",
+                "description": "Simulates a compile error in 'launch' request.",
+                "enum": [
+                  "default",
+                  "show",
+                  "hide"
+                ],
+                "enumDescriptions": [
+                  "default: show fake compile error to user",
+                  "show fake compile error to user",
+                  "do not show fake compile error to user"
+                ]
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "myriaddreamin.typst-debugger",
+            "request": "launch",
+            "name": "Ask for file name",
+            "program": "${workspaceFolder}/${command:AskForProgramName}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Typst Debug: Launch",
+            "description": "A new configuration for 'debugging' a user selected typst file.",
+            "body": {
+              "type": "myriaddreamin.typst-debugger",
+              "request": "launch",
+              "name": "Ask for file name",
+              "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+              "stopOnEntry": true
+            }
+          }
+        ],
+        "variables": {
+          "AskForProgramName": "tinymist.debuggerGetProgramName"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "tinymist.exportCurrentPdf",
@@ -1119,6 +1201,13 @@
         "title": "%extension.tinymist.command.typst-preview.noteOutline%",
         "description": "...",
         "icon": "$(extensions-info-message)"
+      },
+      {
+        "command": "tinymist.debugCurrentFile",
+        "title": "Execute Current File for Debugging",
+        "category": "Typst",
+        "enablement": "!inDebugMode",
+        "icon": "$(debug-alt)"
       }
     ],
     "keybindings": [
@@ -1145,6 +1234,10 @@
           "when": "editorLangId == typst"
         },
         {
+          "command": "tinymist.debugCurrentFile",
+          "when": "resourceLangId == typst"
+        },
+        {
           "command": "tinymist.restartServer",
           "when": "ext.tinymistActivated"
         }
@@ -1159,6 +1252,13 @@
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst",
           "group": "navigation"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "tinymist.debugCurrentFile",
+          "when": "resourceLangId == typst",
+          "group": "navigation@2"
         }
       ],
       "editor/context": [
