@@ -18,9 +18,8 @@ use sync_ls::{
     internal_error, DapBuilder, DapMessage, LspBuilder, LspClientRoot, LspMessage, LspResult,
     RequestId,
 };
-use tinymist::tool::project::{
-    compile_main, coverage_main, generate_script_main, project_main, task_main,
-};
+use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
+use tinymist::tool::testing::{coverage_main, test_main};
 use tinymist::world::TaskInputs;
 use tinymist::{
     CompileConfig, Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask,
@@ -95,6 +94,7 @@ fn main() -> Result<()> {
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
         Commands::Cov(args) => coverage_main(args),
+        Commands::Test(args) => test_main(args),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),

@@ -12,6 +12,7 @@ pub mod analysis;
 pub mod docs;
 pub mod package;
 pub mod syntax;
+pub mod testing;
 pub mod ty;
 mod upstream;
 
