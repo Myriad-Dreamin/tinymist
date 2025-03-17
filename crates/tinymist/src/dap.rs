@@ -38,7 +38,7 @@ impl DebugState {
 
 pub(crate) struct DebugSession {
     config: ConstDapConfig,
-    adaptor: Arc<Debugee>,
+    adaptor: Arc<Debuggee>,
 
     snapshot: LspCompileSnapshot,
 
@@ -100,7 +100,7 @@ pub struct DapPosition {
     pub character: u64,
 }
 
-struct Debugee {
+struct Debuggee {
     tx: std::sync::mpsc::Sender<DebugRequest>,
     /// Whether the debugger should stop on entry.
     stop_on_entry: bool,
@@ -111,7 +111,7 @@ struct Debugee {
     client: LspClient,
 }
 
-impl DebugAdaptor for Debugee {
+impl DebugAdaptor for Debuggee {
     fn before_compile(&self) {
         if self.stop_on_entry {
             self.client

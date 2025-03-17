@@ -127,7 +127,7 @@ impl ServerState {
         let source = main_source.clone();
 
         let (adaptor_tx, adaptor_rx) = std::sync::mpsc::channel();
-        let adaptor = Arc::new(Debugee {
+        let adaptor = Arc::new(Debuggee {
             tx: adaptor_tx,
             stop_on_entry: args.stop_on_entry.unwrap_or_default(),
             thread_id: 1,

@@ -4114,6 +4114,7 @@ dependencies = [
  "tinymist-world",
  "typst",
  "typst-library",
+ "typst-shim",
 ]
 
 [[package]]

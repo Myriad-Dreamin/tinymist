@@ -182,10 +182,22 @@ fn step_global(kind: BreakpointKind, world: &dyn World) {
 
     let span = Span::detached();
 
+    let mut scopes = Scopes::new(Some(world.library()));
+    if matches!(kind, BreakpointKind::AfterCompile) {
+        let m = world
+            .source(world.main())
+            .ok()
+            .and_then(|s| typst_shim::eval::eval_compat(world, &s).ok());
+
+        if let Some(m) = m {
+            scopes.top = m.scope().clone();
+        }
+    }
+
     let context = BreakpointContext {
         engine: &engine,
         context: context.track(),
-        scopes: Scopes::new(Some(world.library())),
+        scopes,
         span,
         kind,
     };
@@ -247,35 +259,6 @@ fn step(ctx: &BreakpointContext, resource: &mut Resource) {
                 let res = ctx.evaluate(&expr);
                 eprintln!("evaluate: {expr} => {res:?}");
                 resource.adaptor.respond(id, res);
-
-                // let world = &session.snapshot.world;
-                // let library = &world.library;
-
-                // let root = session.source.root();
-                // let span = LinkedNode::new(root)
-                //     .leaf_at_compat(session.position)
-                //     .map(|node| node.span())
-                //     .unwrap_or_else(Span::detached);
-
-                // let source = typst_shim::eval::eval_compat(&world,
-                // &session.source)     .map_err(|e|
-                // invalid_params(format!("{e:?}")))?;
-
-                // let val = typst_shim::eval::eval_string(
-                //     &typst::ROUTINES,
-                //     (world as &dyn World).track(),
-                //     &args.expression,
-                //     span,
-                //     EvalMode::Code,
-                //     source.scope().clone(),
-                // )
-                // .map_err(|e| invalid_params(format!("{e:?}")))?;
-
-                // just_ok(dapts::EvaluateResponse {
-                //     result: format!("{}", val.repr()),
-                //     ty: Some(format!("{}", val.ty().repr())),
-                //     ..dapts::EvaluateResponse::default()
-                // })
             }
             Ok(DebugRequest::Continue) => {
                 break;
