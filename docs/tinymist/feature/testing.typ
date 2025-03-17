@@ -8,7 +8,7 @@ You can run tests and check coverage in the IDE or CLI.
 
 == Test Discovery <tinymist-test-discovery>
 
-Given a file, tinymist will try to discover tests in the file.
+Given a file, tinymist will try to discover tests related to the file.
 - All dependent files in the same workspace will be checked.
   - For example, if file `a.typ` contains `import "b.typ"` or `include "b.typ"`, tinymist will check `b.typ` for tests as well.
 - For each file including the entry file itself, tinymist will check the file for tests.
