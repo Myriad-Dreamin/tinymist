@@ -221,10 +221,15 @@ impl InstrumentWorker {
                 }
                 ast::Expr::Show(show_rule) => {
                     let transform = show_rule.transform().to_untyped().span();
+                    let is_set = matches!(show_rule.transform(), ast::Expr::Set(..));
 
                     for child in node.children() {
                         if transform == child.span() {
-                            self.instrument_functor(child);
+                            if is_set {
+                                self.instrument_show_set(child);
+                            } else {
+                                self.instrument_show_transform(child);
+                            }
                         } else {
                             self.visit_node(child);
                         }
@@ -328,10 +333,17 @@ impl InstrumentWorker {
         self.visit_node_fallback(child);
         self.instrumented.push('\n');
         self.make_cov(last, Kind::CloseBrace);
-        self.instrumented.push_str("}");
+        self.instrumented.push('}');
     }
 
-    fn instrument_functor(&mut self, child: &SyntaxNode) {
+    fn instrument_show_set(&mut self, child: &SyntaxNode) {
+        self.instrumented.push_str("__it => {");
+        self.make_cov(child.span(), Kind::Functor);
+        self.visit_node_fallback(child);
+        self.instrumented.push_str("\n__it; }\n");
+    }
+
+    fn instrument_show_transform(&mut self, child: &SyntaxNode) {
         self.instrumented.push_str("{\nlet __cov_functor = ");
         let s = child.span();
         self.visit_node_fallback(child);
@@ -477,5 +489,16 @@ mod tests {
         __it => {__cov_pc(0);
         __cov_functor(__it); } }
         ");
+    }
+
+    #[test]
+    fn test_instrument_coverage_set() {
+        let source = Source::detached("#show raw: set text(12pt)");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #show raw: __it => {__cov_pc(0);
+        set text(12pt)
+        __it; }
+        "###);
     }
 }
