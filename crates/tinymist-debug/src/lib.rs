@@ -43,10 +43,10 @@ pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
 }
 
 /// Collects the coverage with a callback.
-pub fn with_cov<F: CompilerFeat>(
+pub fn with_cov<F: CompilerFeat, T>(
     base: &CompilerWorld<F>,
-    mut f: impl FnMut(&InstrumentWorld<F, CovInstr>) -> Result<()>,
-) -> (Result<CoverageResult>, Result<()>) {
+    mut f: impl FnMut(&InstrumentWorld<F, CovInstr>) -> Result<T>,
+) -> (Result<CoverageResult>, Result<T>) {
     let instr = InstrumentWorld {
         base,
         library: instrument_library(&base.library),

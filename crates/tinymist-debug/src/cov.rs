@@ -154,7 +154,7 @@ pub fn __cov_pc(span: Span, pc: i64) {
 pub enum Kind {
     OpenBrace,
     CloseBrace,
-    Functor,
+    Show,
 }
 
 #[derive(Default)]
@@ -221,14 +221,25 @@ impl InstrumentWorker {
                 }
                 ast::Expr::Show(show_rule) => {
                     let transform = show_rule.transform().to_untyped().span();
+                    let is_set = matches!(show_rule.transform(), ast::Expr::Set(..));
 
                     for child in node.children() {
                         if transform == child.span() {
-                            self.instrument_functor(child);
+                            if is_set {
+                                self.instrument_show_set(child);
+                            } else {
+                                self.instrument_show_transform(child);
+                            }
                         } else {
                             self.visit_node(child);
                         }
                     }
+                    return;
+                }
+                ast::Expr::Contextual(body) => {
+                    self.instrumented.push_str("context (");
+                    self.visit_node(body.body().to_untyped());
+                    self.instrumented.push(')');
                     return;
                 }
                 ast::Expr::Text(..)
@@ -278,7 +289,6 @@ impl InstrumentWorker {
                 | ast::Expr::Let(..)
                 | ast::Expr::DestructAssign(..)
                 | ast::Expr::Set(..)
-                | ast::Expr::Contextual(..)
                 | ast::Expr::Import(..)
                 | ast::Expr::Include(..)
                 | ast::Expr::Break(..)
@@ -328,16 +338,24 @@ impl InstrumentWorker {
         self.visit_node_fallback(child);
         self.instrumented.push('\n');
         self.make_cov(last, Kind::CloseBrace);
-        self.instrumented.push_str("}\n");
+        self.instrumented.push('}');
     }
 
-    fn instrument_functor(&mut self, child: &SyntaxNode) {
-        self.instrumented.push_str("{\nlet __cov_functor = ");
+    fn instrument_show_set(&mut self, child: &SyntaxNode) {
+        self.instrumented.push_str("__it => {");
+        self.make_cov(child.span(), Kind::Show);
+        self.visit_node(child);
+        self.instrumented.push_str("\n__it; }\n");
+    }
+
+    fn instrument_show_transform(&mut self, child: &SyntaxNode) {
+        self.instrumented.push_str("{\nlet __cov_show_body = ");
         let s = child.span();
-        self.visit_node_fallback(child);
+        self.visit_node(child);
         self.instrumented.push_str("\n__it => {");
-        self.make_cov(s, Kind::Functor);
-        self.instrumented.push_str("__cov_functor(__it); } }\n");
+        self.make_cov(s, Kind::Show);
+        self.instrumented
+            .push_str("if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }\n");
     }
 }
 
@@ -354,7 +372,7 @@ mod tests {
     #[test]
     fn test_physica_vector() {
         let instrumented = instr(include_str!("fixtures/instr_coverage/physica_vector.typ"));
-        insta::assert_snapshot!(instrumented, @r#"
+        insta::assert_snapshot!(instrumented, @r###"
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -367,7 +385,7 @@ mod tests {
         __cov_pc(0);
         {
           show math.attach: {
-        let __cov_functor = elem => {
+        let __cov_show_body = elem => {
         __cov_pc(1);
         {
             if __eligible(elem.base) and elem.at("t", default: none) == [+] {
@@ -376,28 +394,25 @@ mod tests {
               $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
             }
         __cov_pc(3);
-        }
-         else {
+        } else {
         __cov_pc(4);
         {
               elem
             }
         __cov_pc(5);
         }
-
           }
         __cov_pc(6);
         }
-
         __it => {__cov_pc(7);
-        __cov_functor(__it); } }
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
 
 
           document
         }
         __cov_pc(8);
         }
-        "#);
+        "###);
     }
 
     #[test]
@@ -414,28 +429,98 @@ mod tests {
     }
 
     #[test]
+    fn test_instrument_coverage_show_content() {
+        let source = Source::detached("#show math.equation: context it => it");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #show math.equation: {
+        let __cov_show_body = context (it => {
+        __cov_pc(0);
+        it
+        __cov_pc(1);
+        })
+        __it => {__cov_pc(2);
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
+        "###);
+    }
+
+    #[test]
+    fn test_instrument_inline_block() {
+        let source = Source::detached("#let main-size = {1} + 2 + {3}");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #let main-size = {
+        __cov_pc(0);
+        {1}
+        __cov_pc(1);
+        } + 2 + {
+        __cov_pc(2);
+        {3}
+        __cov_pc(3);
+        }
+        "###);
+    }
+
+    #[test]
+    fn test_instrument_if() {
+        let source = Source::detached(
+            "#let main-size = if is-web-target {
+  16pt
+} else {
+  10.5pt
+}",
+        );
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #let main-size = if is-web-target {
+        __cov_pc(0);
+        {
+          16pt
+        }
+        __cov_pc(1);
+        } else {
+        __cov_pc(2);
+        {
+          10.5pt
+        }
+        __cov_pc(3);
+        }
+        "###);
+    }
+
+    #[test]
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        insta::assert_snapshot!(new.text(), @r###"
         #let a = {
         __cov_pc(0);
         {1}
         __cov_pc(1);
-        }
-        ;
-        ");
+        };
+        "###);
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        insta::assert_snapshot!(new.text(), @r###"
         #show: {
-        let __cov_functor = main
+        let __cov_show_body = main
         __it => {__cov_pc(0);
-        __cov_functor(__it); } }
-        ");
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
+        "###);
+    }
+
+    #[test]
+    fn test_instrument_coverage_set() {
+        let source = Source::detached("#show raw: set text(12pt)");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #show raw: __it => {__cov_pc(0);
+        set text(12pt)
+        __it; }
+        "###);
     }
 }

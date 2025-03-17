@@ -98,6 +98,7 @@ export interface ICommand<T = unknown, R = any> {
 export type IFileLevelCommand = ICommand<FileLevelContext>;
 
 export interface ExecContext extends FileLevelContext {
+  cwd?: string;
   isTTY?: boolean;
   stdout?: (data: Buffer) => void;
   stderr?: (data: Buffer) => void;
