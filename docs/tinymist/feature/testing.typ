@@ -52,9 +52,9 @@ Running example(example-hello-world
 
 == Visualizing Coverage
 
-- Run and collect file coverage using command `tinymist.profileCurrentFileCoverage` in VS Cod(e,ium)
-- Run and collect test coverage using command `tinymist.profileCurrentTestCoverage` in VS Cod(e,ium)
-  - Check #link(<tinymist-test-discovery>)[Test Suites] to learn how tinymist discovers tests
+- Run and collect file coverage using command `tinymist.profileCurrentFileCoverage` in VS Cod(e,ium).
+- Run and collect test coverage using command `tinymist.profileCurrentTestCoverage` in VS Cod(e,ium).
+  - Check #link(<tinymist-test-discovery>)[Test Suites] to learn how tinymist discovers tests.
 
 VS Cod(e,ium) will show the overall coverage in the editor.
 
@@ -86,7 +86,7 @@ To update the reference files, you can run:
 tinymist test tests/main.typ --update
 ```
 
-To get image files to diff you can use grep to find the image files to update
+To get image files to diff you can use grep to find the image files to update:
 
 ```bash
 tinymist test tests/main.typ 2> 2> >(grep Hint) > >(grep "compare image")
@@ -114,8 +114,7 @@ Install `tinymist` on CI and run `tinymist test` to check whether the content is
 ```yaml
 - name: Install tinymist
   env:
-    TINYMIST_VERSION: 0.14.x # to test with typst compiler v0.13.x
-    TINYMIST_VERSION: 0.14.x # to test with typst compiler v0.14.x
+    TINYMIST_VERSION: 0.13.x # to test with typst compiler v0.13.x, tinymist v0.14.x for typst v0.14.x, and so on.
   run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/tinymist/releases/download/${TINYMIST_VERSION}/tinymist-installer.sh | sh
 - name: Run tests (Typst)
   run: tinymist test tests/main.typ --root . --ppi 144
