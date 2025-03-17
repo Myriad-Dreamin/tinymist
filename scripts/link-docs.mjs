@@ -2,7 +2,7 @@ import { resolve, basename } from "path";
 import * as fs from "fs";
 import { execSync } from "child_process";
 
-const root = resolve(import.meta.dirname, "../..");
+const root = resolve(import.meta.dirname, "..");
 const dry = process.argv.includes("--dry");
 
 const bytes2utf8 = new TextDecoder();
