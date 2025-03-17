@@ -1,6 +1,10 @@
 //! Testing utilities
 
-use std::{collections::HashSet, path::Path, sync::Arc};
+use std::{
+    collections::HashSet,
+    path::Path,
+    sync::{atomic::AtomicBool, Arc},
+};
 
 use comemo::Track;
 use parking_lot::Mutex;
@@ -87,7 +91,7 @@ pub fn test_main(args: TestArgs) -> Result<()> {
         args: args.config,
     };
 
-    let result = Ok(()).and_then(|_| -> Result<()> {
+    let result = Ok(()).and_then(|_| -> Result<bool> {
         let analysis = Analysis::default();
 
         let mut ctx = analysis.snapshot(world.clone());
@@ -114,13 +118,21 @@ pub fn test_main(args: TestArgs) -> Result<()> {
         std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
         std::fs::write(cov_path, res).context("write coverage")?;
 
-        result?;
-        eprintln!("All test cases passed...");
-        eprintln!("Written coverage to {}...", cov_path.display());
-        Ok(())
+        eprintln!("Written coverage to {} ...", cov_path.display());
+
+        result
     });
 
-    print_diag_or_error(&world, result)
+    let passed = print_diag_or_error(&world, result);
+
+    if matches!(passed, Ok(true)) {
+        eprintln!("  Info: All test cases passed...");
+    } else {
+        eprintln!(" Fatal: some test cases failed...");
+        std::process::exit(1);
+    }
+
+    passed.map(|_| ())
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +147,7 @@ struct TestRunner<'a> {
     suites: &'a TestSuites,
     diagnostics: Mutex<Vec<EcoVec<SourceDiagnostic>>>,
     examples: Mutex<HashSet<String>>,
+    failed: AtomicBool,
 }
 
 impl<'a> TestRunner<'a> {
@@ -145,7 +158,12 @@ impl<'a> TestRunner<'a> {
             suites,
             diagnostics: Mutex::new(Vec::new()),
             examples: Mutex::new(HashSet::new()),
+            failed: AtomicBool::new(false),
         }
+    }
+
+    fn mark_failed(&self) {
+        self.failed.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     fn collect_diag<T>(&self, result: Warned<SourceResult<T>>) -> Option<T> {
@@ -162,7 +180,8 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn run(self) -> Result<()> {
+    /// Runs the tests and returns whether all tests passed.
+    fn run(self) -> Result<bool> {
         rayon::in_place_scope(|s| {
             s.spawn(|_| {
                 self.suites.tests.par_iter().for_each(|test| {
@@ -196,6 +215,7 @@ impl<'a> TestRunner<'a> {
                         TestCaseKind::Test | TestCaseKind::Bench => {
                             if let Err(err) = call_once() {
                                 eprintln!(" Failed test({name}): call error {err:?}");
+                                self.mark_failed();
                             } else {
                                 eprintln!(" Passed test({name})");
                             }
@@ -210,6 +230,7 @@ impl<'a> TestRunner<'a> {
                                 if !has_panic {
                                     eprintln!(" Failed test({name}): exited with error, expected panic");
                                     self.diagnostics.lock().push(err);
+                                    self.mark_failed();
                                 } else {
                                     eprintln!(" Passed test({name})");
                                 }
@@ -221,7 +242,7 @@ impl<'a> TestRunner<'a> {
                             match example {
                                 Err(err) => {
                                     eprintln!("cannot find example file in {name}: {err:?}");
-                                    return;
+                                    self.mark_failed();
                                 }
                                 Ok(example) => self.run_example(&example),
                             };
@@ -246,7 +267,7 @@ impl<'a> TestRunner<'a> {
                 Err(diags)?
             }
         }
-        Ok(())
+        Ok(!self.failed.load(std::sync::atomic::Ordering::SeqCst))
     }
 
     fn run_example(&self, test: &Source) {
@@ -258,6 +279,7 @@ impl<'a> TestRunner<'a> {
         eprintln!("Running example({example}");
         if !self.examples.lock().insert(example.to_string()) {
             eprintln!(" Failed example({example}: duplicate");
+            self.mark_failed();
             return;
         }
         let world = with_main(self.world, test.id());
@@ -281,6 +303,7 @@ impl<'a> TestRunner<'a> {
 
         if has_err {
             eprintln!(" Failed example({example}");
+            self.mark_failed();
         } else {
             eprintln!(" Passed example({example})");
         }
@@ -350,6 +373,7 @@ impl<'a> TestRunner<'a> {
                     "   Hint example({example}): compare {kind} at {}",
                     path.display()
                 );
+                self.mark_failed();
                 tinymist_std::fs::paths::write_atomic(tmp_path, data).context("write tmp ref")?;
                 return Ok(());
             }
@@ -453,16 +477,17 @@ fn find_include_expr<'a>(name: &str, node: ast::Expr<'a>) -> Option<ast::Expr<'a
     }
 }
 
-fn print_diag_or_error(world: &impl SourceWorld, result: Result<()>) -> Result<()> {
-    if let Err(e) = result {
-        if let Some(diagnostics) = e.diagnostics() {
-            print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                .context_ut("print diagnostics")?;
-            bail!("");
+fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(err) => {
+            if let Some(diagnostics) = err.diagnostics() {
+                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
+                    .context_ut("print diagnostics")?;
+                bail!("");
+            }
+
+            Err(err)
         }
-
-        return Err(e);
     }
-
-    Ok(())
 }
