@@ -25,11 +25,15 @@ export class HoverTmpStorage {
         if (deleted > 0) {
           console.log(`Deleted ${deleted} hover images`);
         }
-      } catch {}
+      } catch (_err) {
+        // todo: handle errors safely
+      }
       try {
         await vscode.workspace.fs.createDirectory(tmpImageDir);
         return new HoverStorageTmpFsHandler(Uri.joinPath(this.context.storageUri, "tmp/"));
-      } catch {}
+      } catch (_err) {
+        // todo: handle errors safely
+      }
     }
 
     return new HoverStorageDummyHandler();

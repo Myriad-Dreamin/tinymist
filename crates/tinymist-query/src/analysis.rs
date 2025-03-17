@@ -103,7 +103,7 @@ impl LspWorldExt for tinymist_project::LspWorld {
     fn uri_for_id(&self, fid: FileId) -> Result<Url, FileError> {
         let res = path_res_to_url(self.path_for_id(fid)?);
 
-        log::info!("uri_for_id: {fid:?} -> {res:?}");
+        crate::log_debug_ct!("uri_for_id: {fid:?} -> {res:?}");
         res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
     }
 

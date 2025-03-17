@@ -27,4 +27,11 @@
 			"**/target": true
 		},
 	},
+	"extensions": {
+		"recommendations": [
+			"dbaeumer.vscode-eslint",
+			"esbenp.prettier-vscode",
+			"myriad-dreamin.tinymist",
+		]
+	},
 }

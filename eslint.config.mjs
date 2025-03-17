@@ -2,12 +2,10 @@ import globals from "globals";
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
 import { FlatCompat } from "@eslint/eslintrc";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(import.meta.dirname);
 const compat = new FlatCompat({
   baseDirectory: __dirname,
   recommendedConfig: js.configs.recommended,
@@ -50,7 +48,7 @@ export default [
       sourceType: "module",
 
       parserOptions: {
-        project: ["./editors/vscode/tsconfig.json"],
+        project: true,
 
         ecmaFeatures: {
           modules: true,
@@ -84,6 +82,22 @@ export default [
         },
       ],
 
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn", // or "error"
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+
+      "require-await": "off",
+      "@typescript-eslint/require-await": 0,
+      // todo: is it ok to disable this?
+      "@typescript-eslint/restrict-template-expressions": 0,
+      // todo: enable it in future
+      "@typescript-eslint/no-misused-promises": 0,
       "@typescript-eslint/ban-ts-comment": 0,
       "@typescript-eslint/no-empty-function": 0,
       "@typescript-eslint/no-var-requires": 0,

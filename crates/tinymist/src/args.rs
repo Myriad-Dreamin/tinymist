@@ -1,12 +1,9 @@
 use std::path::Path;
 
-use sync_lsp::transport::MirrorArgs;
-
-use tinymist::{
-    project::DocCommands,
-    tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands},
-    CompileFontArgs, CompileOnceArgs,
-};
+use sync_ls::transport::MirrorArgs;
+use tinymist::project::DocCommands;
+use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
+use tinymist::{CompileFontArgs, CompileOnceArgs};
 use tinymist_core::LONG_VERSION;
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -27,6 +24,8 @@ pub enum Commands {
     Completion(ShellCompletionArgs),
     /// Runs language server
     Lsp(LspArgs),
+    /// Runs debug adapter
+    Dap(DapArgs),
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(TraceLspArgs),
@@ -34,6 +33,9 @@ pub enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
 
+    /// Execute a document and collect coverage
+    #[clap(hide(true))] // still in development
+    Cov(CompileOnceArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
     /// Generates build script for compilation
@@ -157,6 +159,8 @@ pub struct LspArgs {
     #[clap(flatten)]
     pub font: CompileFontArgs,
 }
+
+pub type DapArgs = LspArgs;
 
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "camelCase")]

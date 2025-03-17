@@ -1,11 +1,11 @@
 use lsp_types::*;
 use reflexo_typst::Bytes;
-use tinymist_project::{Interrupt, ProjectResolutionKind};
 use tinymist_query::{to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::{diag::FileResult, syntax::Source};
 
+use crate::project::{Interrupt, ProjectResolutionKind};
 use crate::route::ProjectResolution;
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;
@@ -15,7 +15,7 @@ use crate::*;
 impl ServerState {
     /// Updates a set of source files.
     fn update_sources(&mut self, files: FileChangeSet) -> Result<()> {
-        log::info!("update source: {files:?}");
+        log::trace!("update source: {files:?}");
 
         let intr = Interrupt::Memory(MemoryEvent::Update(files.clone()));
         self.project.interrupt(intr);
@@ -25,7 +25,7 @@ impl ServerState {
 
     /// Creates a new source file.
     pub fn create_source(&mut self, path: ImmutPath, content: String) -> Result<()> {
-        log::info!("create source: {path:?}");
+        log::trace!("create source: {path:?}");
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
 
@@ -40,7 +40,7 @@ impl ServerState {
     /// Removes a source file.
     pub fn remove_source(&mut self, path: ImmutPath) -> Result<()> {
         self.memory_changes.remove(&path);
-        log::info!("remove source: {path:?}");
+        log::trace!("remove source: {path:?}");
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
@@ -152,7 +152,7 @@ impl ServerState {
     ///
     /// we do want to focus the file implicitly by `textDocument/diagnostic`
     /// (pullDiagnostics mode), as suggested by language-server-protocol#718,
-    /// however, this has poor support, e.g. since neovim 0.10.0.
+    /// however, this has poor support, e.g. since Neovim 0.10.0.
     pub fn implicit_focus_entry(
         &mut self,
         new_entry: impl FnOnce() -> Option<ImmutPath>,

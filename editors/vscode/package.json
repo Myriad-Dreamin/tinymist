@@ -1,7 +1,7 @@
 {
   "name": "tinymist",
-  "version": "0.13.4",
-  "description": "An integrated language service for Typst",
+  "version": "0.13.8",
+  "description": "%description%",
   "keywords": [
     "typst",
     "lsp",
@@ -9,6 +9,7 @@
   ],
   "categories": [
     "Programming Languages",
+    "Debuggers",
     "Formatters"
   ],
   "repository": {
@@ -29,6 +30,7 @@
   "main": "./out/extension.js",
   "browser": "./out/extension.web.js",
   "icon": "./icons/ti-white.png",
+  "l10n": "./l10n",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -277,27 +279,28 @@
       "title": "Tinymist Typst LSP",
       "properties": {
         "tinymist.projectResolution": {
+          "title": "%extension.tinymist.config.tinymist.projectResolution.title%",
           "type": "string",
           "default": "singleFile",
-          "markdownDescription": "This configuration specifies the way to resolved projects.",
+          "markdownDescription": "%extension.tinymist.config.tinymist.projectResolution.desc%",
           "enum": [
             "singleFile",
             "lockDatabase"
           ],
           "enumDescriptions": [
-            "Manage typst documents like what we did in Markdown. Each single file is an individual document and no project resolution is needed.",
-            "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file."
+            "%extension.tinymist.config.tinymist.projectResolution.string.enum.singleFile%",
+            "%extension.tinymist.config.tinymist.projectResolution.string.enum.lockDatabase%"
           ]
         },
         "tinymist.outputPath": {
-          "title": "Output path",
-          "description": "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.",
+          "title": "%extension.tinymist.config.tinymist.outputPath.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.outputPath.desc%",
           "type": "string",
           "default": ""
         },
         "tinymist.exportTarget": {
-          "title": "Export target",
-          "description": "The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.",
+          "title": "%extension.tinymist.config.tinymist.exportTarget.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.exportTarget.desc%",
           "type": "string",
           "default": "paged",
           "enum": [
@@ -305,13 +308,13 @@
             "html"
           ],
           "enumDescriptions": [
-            "The current export target is for PDF, PNG, and SVG export.",
-            "The current export target is for HTML export."
+            "%extension.tinymist.config.tinymist.exportTarget.string.enum.paged%",
+            "%extension.tinymist.config.tinymist.exportTarget.string.enum.html%"
           ]
         },
         "tinymist.exportPdf": {
-          "title": "Export PDF",
-          "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
+          "title": "%extension.tinymist.config.tinymist.exportPdf.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.exportPdf.desc%",
           "type": "string",
           "default": "never",
           "enum": [
@@ -321,15 +324,15 @@
             "onDocumentHasTitle"
           ],
           "enumDescriptions": [
-            "Never export PDFs, you will manually run typst.",
-            "Export PDFs when you save a file.",
-            "Export PDFs as you type in a file.",
-            "Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
+            "%extension.tinymist.config.tinymist.exportPdf.string.enum.never%",
+            "%extension.tinymist.config.tinymist.exportPdf.string.enum.onSave%",
+            "%extension.tinymist.config.tinymist.exportPdf.string.enum.onType%",
+            "%extension.tinymist.config.tinymist.exportPdf.string.enum.onDocumentHasTitle%"
           ]
         },
         "tinymist.rootPath": {
-          "title": "Root path",
-          "markdownDescription": "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528).",
+          "title": "%extension.tinymist.config.tinymist.rootPath.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.rootPath.desc%",
           "type": [
             "string",
             "null"
@@ -337,8 +340,8 @@
           "default": null
         },
         "tinymist.configureDefaultWordSeparator": {
-          "title": "Configure default word separators",
-          "description": "Whether to configure default word separators on startup",
+          "title": "%extension.tinymist.config.tinymist.configureDefaultWordSeparator.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.desc%",
           "type": "string",
           "default": "disable",
           "enum": [
@@ -346,13 +349,13 @@
             "disable"
           ],
           "enumDescriptions": [
-            "Override the default word separators on startup",
-            "Do not override the default word separators on startup"
+            "%extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.configureDefaultWordSeparator.string.enum.disable%"
           ]
         },
         "tinymist.semanticTokens": {
-          "title": "Semantic tokens mode",
-          "description": "Enable or disable semantic tokens (LSP syntax highlighting)",
+          "title": "%extension.tinymist.config.tinymist.semanticTokens.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.semanticTokens.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
@@ -360,31 +363,31 @@
             "disable"
           ],
           "enumDescriptions": [
-            "Use semantic tokens for syntax highlighting",
-            "Do not use semantic tokens for syntax highlighting"
+            "%extension.tinymist.config.tinymist.semanticTokens.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.semanticTokens.string.enum.disable%"
           ]
         },
         "tinymist.typingContinueCommentsOnNewline": {
-          "title": "Continue Comments on Newline",
-          "markdownDescription": "Whether to prefix newlines after comments with the corresponding comment prefix.",
+          "title": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.onEnterEvent": {
-          "title": "Handling on enter events",
-          "description": "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.onEnterEvent.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.onEnterEvent.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.systemFonts": {
-          "title": "Whether to load system fonts for Typst compiler",
-          "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. ",
+          "title": "%extension.tinymist.config.tinymist.systemFonts.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.systemFonts.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.fontPaths": {
-          "title": "Font paths for Typst compiler",
-          "description": "A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`.",
+          "title": "%extension.tinymist.config.tinymist.fontPaths.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.fontPaths.desc%",
           "type": [
             "array",
             "null"
@@ -392,8 +395,8 @@
           "default": null
         },
         "tinymist.compileStatus": {
-          "title": "Show/Report Compile Status",
-          "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label.",
+          "title": "%extension.tinymist.config.tinymist.compileStatus.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.compileStatus.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
@@ -402,25 +405,25 @@
           ]
         },
         "tinymist.statusBarFormat": {
-          "title": "Format of the Server Status in the Status Bar",
-          "markdownDescription": "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty.",
+          "title": "%extension.tinymist.config.tinymist.statusBarFormat.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.statusBarFormat.desc%",
           "type": "string",
           "default": "{compileStatusIcon} {wordCount} [{fileName}]"
         },
         "tinymist.typstExtraArgs": {
-          "title": "Specifies the arguments for Typst as same as typst-cli",
-          "description": "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.",
+          "title": "%extension.tinymist.config.tinymist.typstExtraArgs.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.typstExtraArgs.desc%",
           "type": "array",
           "items": {
             "type": "string",
-            "title": "arguments in order",
-            "description": "The arguments for Typst as same as typst-cli."
+            "title": "%extension.tinymist.config.tinymist.typstExtraArgs.items.title%",
+            "description": "%extension.tinymist.config.tinymist.typstExtraArgs.items.desc%"
           },
           "default": []
         },
         "tinymist.serverPath": {
-          "title": "Path to server executable",
-          "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable. The string \"tinymist\" means look up Tinymist in PATH.",
+          "title": "%extension.tinymist.config.tinymist.serverPath.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.serverPath.desc%",
           "type": [
             "string",
             "null"
@@ -428,6 +431,8 @@
           "default": null
         },
         "tinymist.trace.server": {
+          "title": "%extension.tinymist.config.tinymist.trace.server.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.trace.server.desc%",
           "scope": "window",
           "type": "string",
           "enum": [
@@ -435,12 +440,11 @@
             "messages",
             "verbose"
           ],
-          "default": "off",
-          "description": "Traces the communication between VS Code and the language server."
+          "default": "off"
         },
         "tinymist.formatterMode": {
-          "title": "Enable Experimental Formatter",
-          "description": "The extension can format Typst files using typstfmt or typstyle.",
+          "title": "%extension.tinymist.config.tinymist.formatterMode.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.formatterMode.desc%",
           "type": "string",
           "default": "disable",
           "enum": [
@@ -449,141 +453,161 @@
             "typstfmt"
           ],
           "enumDescriptions": [
-            "Formatter is not activated.",
-            "Use typstyle formatter.",
-            "Use typstfmt formatter."
+            "%extension.tinymist.config.tinymist.formatterMode.string.enum.disable%",
+            "%extension.tinymist.config.tinymist.formatterMode.string.enum.typstyle%",
+            "%extension.tinymist.config.tinymist.formatterMode.string.enum.typstfmt%"
           ]
         },
         "tinymist.formatterPrintWidth": {
-          "title": "Set formatter's (unsigned) print width",
-          "description": "Sets the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.",
+          "title": "%extension.tinymist.config.tinymist.formatterPrintWidth.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.formatterPrintWidth.desc%",
           "type": "number",
           "default": 120
         },
         "tinymist.formatterIndentSize": {
-          "title": "Set formatter's (unsigned) tab spaces",
-          "description": "Sets the indent size (using space) for the formatter.",
+          "title": "%extension.tinymist.config.tinymist.formatterIndentSize.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.formatterIndentSize.desc%",
           "type": "number",
           "default": 2
         },
         "tinymist.showExportFileIn": {
-          "title": "(Experimental) Show Exported Files in Some Place",
-          "description": "Configures way of opening exported files, e.g. inside of editor tabs or using system application.",
+          "title": "%extension.tinymist.config.tinymist.showExportFileIn.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.showExportFileIn.desc%",
           "anyOf": [
             {
+              "title": "%extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.title%",
+              "markdownDescription": "%extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.desc%",
               "type": "string",
-              "description": "For all kind of files.",
               "enum": [
                 "editorTab",
                 "systemDefault"
               ],
               "default": "editorTab",
               "enumDescriptions": [
-                "Show the exported files in editor tabs.",
-                "Show the exported files by system default application."
+                "%extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.enum.editorTab%",
+                "%extension.tinymist.config.tinymist.showExportFileIn.anyOf.string.enum.systemDefault%"
               ]
             }
           ]
         },
         "tinymist.dragAndDrop": {
-          "title": "Drag and Drop",
-          "description": "Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.dragAndDrop.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.dragAndDrop.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
             "enable",
             "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.dragAndDrop.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.dragAndDrop.string.enum.disable%"
           ]
         },
         "tinymist.copyAndPaste": {
-          "title": "Copy and Paste",
-          "description": "Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.copyAndPaste.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.copyAndPaste.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
             "enable",
             "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable%"
           ]
         },
         "tinymist.renderDocs": {
-          "title": "(Experimental) Render Docs",
-          "description": "(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs.",
+          "title": "%extension.tinymist.config.tinymist.renderDocs.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.renderDocs.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
             "enable",
             "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.renderDocs.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.renderDocs.string.enum.disable%"
           ]
         },
         "tinymist.completion.triggerOnSnippetPlaceholders": {
-          "title": "Trigger LSP Completion on Snippet Placeholders",
-          "markdownDescription": "Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.completion.triggerOnSnippetPlaceholders.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.completion.triggerOnSnippetPlaceholders.desc%",
           "type": "boolean",
           "default": false
         },
         "tinymist.completion.postfix": {
-          "title": "Enable Postfix Code Completion",
-          "markdownDescription": "Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.completion.postfix.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.completion.postfix.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.completion.postfixUfcs": {
-          "title": "Completion: Convert Field Access to Call",
-          "markdownDescription": "Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.completion.postfixUfcs.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.completion.postfixUfcs.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.completion.postfixUfcsLeft": {
-          "title": "Completion: Convert Field Access to Call (Left Variant)",
-          "markdownDescription": "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.completion.postfixUfcsLeft.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.completion.postfixUfcsLeft.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.completion.postfixUfcsRight": {
-          "title": "Completion: Convert Field Access to Call (Right Variant)",
-          "description": "Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.completion.postfixUfcsRight.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.completion.postfixUfcsRight.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.previewFeature": {
-          "title": "Enable preview features",
-          "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",
+          "title": "%extension.tinymist.config.tinymist.previewFeature.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.previewFeature.desc%",
           "type": "string",
           "default": "enable",
           "enum": [
             "enable",
             "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.previewFeature.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.previewFeature.string.enum.disable%"
           ]
         },
         "tinymist.preview.sysInputs": {
+          "title": "%extension.tinymist.config.tinymist.preview.sysInputs.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.sysInputs.desc%",
+          "markdownDeprecationMessage": "%extension.tinymist.config.tinymist.preview.sysInputs.deprecation%",
           "type": "object",
           "items": {
             "type": "string"
           },
-          "default": {},
-          "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli",
-          "markdownDeprecationMessage": "The configuration item is ignored. Please see `tinymist.typstExtraArgs` for inputs."
+          "default": {}
         },
         "tinymist.preview.systemFonts": {
+          "title": "%extension.tinymist.config.tinymist.preview.systemFonts.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.systemFonts.desc%",
+          "markdownDeprecationMessage": "%extension.tinymist.config.tinymist.preview.systemFonts.deprecation%",
           "type": "boolean",
-          "default": true,
-          "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded",
-          "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.systemFonts` instead."
+          "default": true
         },
         "tinymist.preview.fontPaths": {
+          "title": "%extension.tinymist.config.tinymist.preview.fontPaths.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.fontPaths.desc%",
+          "markdownDeprecationMessage": "%extension.tinymist.config.tinymist.preview.fontPaths.deprecation%",
           "type": "array",
           "items": {
             "type": "string",
             "title": "Font path",
-            "description": "Absolute path to a directory or file containing font assets."
+            "markdownDescription": "%extension.tinymist.config.tinymist.preview.fontPaths.items.desc%"
           },
-          "default": [],
-          "description": "List of *additional* paths to font assets used by typst-preview.",
-          "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.fontPaths` instead."
+          "default": []
         },
         "tinymist.preview.refresh": {
-          "title": "Refresh preview",
-          "description": "Refresh preview when the document is saved or when the document is changed",
+          "title": "%extension.tinymist.config.tinymist.preview.refresh.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.refresh.desc%",
           "type": "string",
           "enum": [
             "onSave",
@@ -591,12 +615,13 @@
           ],
           "default": "onType",
           "enumDescriptions": [
-            "Refresh preview on save",
-            "Refresh preview on type"
+            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onSave%",
+            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onType%"
           ]
         },
         "tinymist.preview.scrollSync": {
-          "description": "Configure scroll sync mode.",
+          "title": "%extension.tinymist.config.tinymist.preview.scrollSync.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.scrollSync.desc%",
           "type": "string",
           "enum": [
             "never",
@@ -605,22 +630,25 @@
           ],
           "default": "onSelectionChangeByMouse",
           "enumDescriptions": [
-            "Disable automatic scroll sync",
-            "Scroll preview to current cursor position when selection changes by mouse",
-            "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
+            "%extension.tinymist.config.tinymist.preview.scrollSync.string.enum.never%",
+            "%extension.tinymist.config.tinymist.preview.scrollSync.string.enum.onSelectionChangeByMouse%",
+            "%extension.tinymist.config.tinymist.preview.scrollSync.string.enum.onSelectionChange%"
           ]
         },
         "tinymist.preview.partialRendering": {
-          "description": "Only render visible part of the document. This can improve performance but still being experimental.",
+          "title": "%extension.tinymist.config.tinymist.preview.partialRendering.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.partialRendering.desc%",
           "type": "boolean",
           "default": true
         },
         "tinymist.preview.invertColors": {
-          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format.",
+          "title": "%extension.tinymist.config.tinymist.preview.invertColors.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.desc%",
           "anyOf": [
             {
+              "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.title%",
+              "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.desc%",
               "type": "string",
-              "description": "Specify a strategy for all elements in the preview.",
               "enum": [
                 "never",
                 "auto",
@@ -628,44 +656,47 @@
               ],
               "default": "never",
               "enumDescriptions": [
-                "Disable color inversion of the preview",
-                "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
-                "Always invert colors of the preview"
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.never%",
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.auto%",
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.always%"
               ]
             },
             {
+              "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.title%",
+              "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.desc%",
               "type": "object",
-              "description": "Specify strategies for each element kind",
               "default": {},
               "properties": {
                 "rest": {
+                  "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.title%",
+                  "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.desc%",
                   "type": "string",
                   "enum": [
                     "never",
                     "auto",
                     "always"
                   ],
-                  "description": "Specify a strategy for rest elements in the preview",
                   "default": "never",
                   "enumDescriptions": [
-                    "Disable color inversion of the preview",
-                    "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
-                    "Always invert colors of the preview"
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.never%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.auto%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.always%"
                   ]
                 },
                 "image": {
+                  "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.title%",
+                  "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.desc%",
                   "type": "string",
                   "enum": [
                     "never",
                     "auto",
                     "always"
                   ],
-                  "description": "Specify a strategy for images in the preview",
                   "default": "never",
                   "enumDescriptions": [
-                    "Disable color inversion of the preview",
-                    "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
-                    "Always invert colors of the preview"
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.never%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.auto%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.always%"
                   ]
                 }
               }
@@ -673,26 +704,22 @@
           ]
         },
         "tinymist.preview.cursorIndicator": {
-          "description": "(Experimental) Show typst cursor indicator in preview.",
+          "title": "%extension.tinymist.config.tinymist.preview.cursorIndicator.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.cursorIndicator.desc%",
           "type": "boolean",
           "default": false
         },
         "tinymist.preview.pinPreviewFile": {
-          "description": "Declare current previewing file as entrypoint for typst-lsp or tinymist. This will make typst-lsp or tinymist to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+          "title": "%extension.tinymist.config.tinymist.preview.pinPreviewFile.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.pinPreviewFile.desc%",
+          "markdownDeprecationMessage": "%extension.tinymist.config.tinymist.preview.pinPreviewFile.deprecation%",
           "type": "boolean",
-          "default": false,
-          "markdownDeprecationMessage": "This setting is deprecated and no longer needed. The extension will always pin the previewed file as the entrypoint for the language server."
+          "default": false
         }
       }
     },
     "configurationDefaults": {
-      "[typst]": {
-        "editor.wordWrap": "on",
-        "editor.semanticHighlighting.enabled": true,
-        "editor.tabSize": 2,
-        "editor.inlayHints.enabled": "off"
-      },
-      "[typst-code]": {
+      "[typst][typst-code]": {
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
@@ -947,147 +974,240 @@
         }
       }
     ],
+    "breakpoints": [
+      {
+        "language": "typst"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "myriaddreamin.typst-debugger",
+        "languages": [
+          "typst"
+        ],
+        "label": "Typst Debug",
+        "program": "./out/tinymist",
+        "windows": {
+          "program": "./out/tinymist.exe"
+        },
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to a text file.",
+                "default": "${workspaceFolder}/${command:AskForProgramName}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Enable logging of the Debug Adapter Protocol.",
+                "default": true
+              },
+              "compileError": {
+                "type": "string",
+                "description": "Simulates a compile error in 'launch' request.",
+                "enum": [
+                  "default",
+                  "show",
+                  "hide"
+                ],
+                "enumDescriptions": [
+                  "default: show fake compile error to user",
+                  "show fake compile error to user",
+                  "do not show fake compile error to user"
+                ]
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "myriaddreamin.typst-debugger",
+            "request": "launch",
+            "name": "Ask for file name",
+            "program": "${workspaceFolder}/${command:AskForProgramName}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Typst Debug: Launch",
+            "description": "A new configuration for 'debugging' a user selected typst file.",
+            "body": {
+              "type": "myriaddreamin.typst-debugger",
+              "request": "launch",
+              "name": "Ask for file name",
+              "program": "^\"\\${workspaceFolder}/\\${command:AskForProgramName}\"",
+              "stopOnEntry": true
+            }
+          }
+        ],
+        "variables": {
+          "AskForProgramName": "tinymist.debuggerGetProgramName"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "tinymist.exportCurrentPdf",
-        "title": "Export the Opened File as PDF",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentPdf%",
         "category": "Typst"
       },
       {
         "command": "tinymist.pinMainToCurrent",
-        "title": "Pin the Main file to the Opening Document",
+        "title": "%extension.tinymist.command.tinymist.pinMainToCurrent%",
         "category": "Typst"
       },
       {
         "command": "tinymist.unpinMain",
-        "title": "Unpin the main file",
+        "title": "%extension.tinymist.command.tinymist.unpinMain%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showPdf",
-        "title": "Show exported PDF",
+        "title": "%extension.tinymist.command.tinymist.showPdf%",
         "category": "Typst",
         "icon": "$(file-pdf)"
       },
       {
         "command": "tinymist.copyAnsiHighlight",
-        "title": "Copy as ANSI Code",
+        "title": "%extension.tinymist.command.tinymist.copyAnsiHighlight%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showLog",
-        "title": "Tinymist: Show Log",
+        "title": "%extension.tinymist.command.tinymist.showLog%",
         "description": "Show log of the language server",
         "category": "Typst",
         "icon": "$(list-flat)"
       },
       {
         "command": "tinymist.restartServer",
-        "title": "Restart server",
+        "title": "%extension.tinymist.command.tinymist.restartServer%",
         "category": "Typst"
       },
       {
         "command": "tinymist.clearCache",
-        "title": "Clear all Cached Resources",
+        "title": "%extension.tinymist.command.tinymist.clearCache%",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplate",
-        "title": "Initialize a New Typst Project based on a Template",
+        "title": "%extension.tinymist.command.tinymist.initTemplate%",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplateInPlace",
-        "title": "Insert the Content of Template Entry in Place",
+        "title": "%extension.tinymist.command.tinymist.initTemplateInPlace%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showTemplateGallery",
-        "title": "Show Available Typst Templates (Gallery) for Picking up a Template to Initialize",
+        "title": "%extension.tinymist.command.tinymist.showTemplateGallery%",
         "category": "Typst"
       },
       {
         "command": "tinymist.createLocalPackage",
-        "title": "Create Typst Local Package",
+        "title": "%extension.tinymist.command.tinymist.createLocalPackage%",
         "category": "Typst"
       },
       {
         "command": "tinymist.openLocalPackage",
-        "title": "Open Typst Local Package",
+        "title": "%extension.tinymist.command.tinymist.openLocalPackage%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showSummary",
-        "title": "Show current document summary",
+        "title": "%extension.tinymist.command.tinymist.showSummary%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showSymbolView",
-        "title": "Show Symbol View",
+        "title": "%extension.tinymist.command.tinymist.showSymbolView%",
         "category": "Typst"
       },
       {
         "command": "tinymist.showFontView",
-        "title": "Show Font View",
+        "title": "%extension.tinymist.command.tinymist.showFontView%",
         "category": "Typst"
       },
       {
         "command": "tinymist.profileCurrentFile",
-        "title": "Profile and visualize execution of the current Typst file",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFile%",
+        "category": "Typst"
+      },
+      {
+        "command": "tinymist.profileCurrentFileCoverage",
+        "title": "%extension.tinymist.command.tinymist.profileCurrentFileCoverage%",
         "category": "Typst"
       },
       {
         "command": "tinymist.syncLabel",
-        "title": "Scan workspace and collect all labels again",
+        "title": "%extension.tinymist.command.tinymist.syncLabel%",
         "icon": "$(extensions-sync-enabled)",
         "category": "Typst"
       },
       {
         "command": "tinymist.browsingPreview",
-        "title": "Tinymist: Browsing Preview",
+        "title": "%extension.tinymist.command.tinymist.browsingPreview%",
         "description": "Open a preview panel to browsing through documents. The preview panel will pick a main file when switching between files. By default, every single file is a document. This doesn't work well with multiple-files projects. To allow tinymist learn the structure of your projects, please configure `tinymist.projectResolution` as `lockDatabase`.",
         "icon": "$(open-preview)"
       },
       {
         "command": "typst-preview.preview",
-        "title": "Typst Preview: Preview Opened File",
+        "title": "%extension.tinymist.command.typst-preview.preview%",
         "description": "Launch typst-preview server",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser",
-        "title": "Typst Preview: Preview Opened File in Browser",
+        "title": "%extension.tinymist.command.typst-preview.browser%",
         "description": "Launch typst-preview server and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.preview-slide",
-        "title": "Typst Preview: Preview Opened File in Slide Mode",
+        "title": "%extension.tinymist.command.typst-preview.preview-slide%",
         "description": "Launch typst-preview server in slide mode",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser-slide",
-        "title": "Typst Preview: Preview Opened file in Browser and Slide Mode",
+        "title": "%extension.tinymist.command.typst-preview.browser-slide%",
         "description": "Launch typst-preview server in slide mode and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.sync",
-        "title": "Typst Preview: Sync Preview with Current Cursor",
+        "title": "%extension.tinymist.command.typst-preview.sync%",
         "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.noteOutline",
-        "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
+        "title": "%extension.tinymist.command.typst-preview.noteOutline%",
         "description": "...",
         "icon": "$(extensions-info-message)"
+      },
+      {
+        "command": "tinymist.debugCurrentFile",
+        "title": "Execute Current File for Debugging",
+        "category": "Typst",
+        "enablement": "!inDebugMode",
+        "icon": "$(debug-alt)"
       }
     ],
     "keybindings": [
@@ -1114,6 +1234,10 @@
           "when": "editorLangId == typst"
         },
         {
+          "command": "tinymist.debugCurrentFile",
+          "when": "resourceLangId == typst"
+        },
+        {
           "command": "tinymist.restartServer",
           "when": "ext.tinymistActivated"
         }
@@ -1128,6 +1252,13 @@
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst",
           "group": "navigation"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "tinymist.debugCurrentFile",
+          "when": "resourceLangId == typst",
+          "group": "navigation@2"
         }
       ],
       "editor/context": [
@@ -1157,10 +1288,11 @@
   "scripts": {
     "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
     "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
+    "build:l10n": "cd ../../ && yarn build:l10n",
     "build-web-base": "node esbuild.web.mjs",
     "build-system-base": "node esbuild.system.mjs",
     "build-base": "yarn run build-web-base && yarn run build-system-base",
-    "compile-shared": "yarn run build:syntax && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.cjs",
+    "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.mjs",
     "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
     "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
     "package": "npx @vscode/vsce package --yarn",

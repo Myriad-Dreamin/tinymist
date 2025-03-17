@@ -18,6 +18,8 @@ export async function activate(context: ExtensionContext): Promise<void> {
     dragAndDrop: false,
     copyAndPaste: false,
     onEnter: false,
+    testing: false,
+    testingDebug: false,
     preview: false,
     language: false,
     renderDocs: false,

@@ -15,14 +15,15 @@ import {
   typstPasteUriEditKind,
   Schemes,
 } from "./drop-paste.def";
+import { IContext } from "../context";
 
-export function dragAndDropActivate(context: vscode.ExtensionContext) {
+export function dragAndDropActivate(context: IContext) {
   context.subscriptions.push(
     vscode.languages.registerDocumentDropEditProvider(typstDocumentSelector, new DropProvider()),
   );
 }
 
-export function copyAndPasteActivate(context: vscode.ExtensionContext) {
+export function copyAndPasteActivate(context: IContext) {
   const providedEditKinds = [
     typstPasteLinkEditKind,
     typstPasteUriEditKind,
@@ -181,8 +182,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     // unless we are explicitly requested.
     if (
       uriList.entries.length === 1 &&
-      (uriList.entries[0].uri.scheme === Schemes.http ||
-        uriList.entries[0].uri.scheme === Schemes.https) &&
+      [Schemes.http, Schemes.https].includes(uriList.entries[0].uri.scheme as Schemes) &&
       !this.context?.only?.contains(typstPasteUriEditKind)
     ) {
       const text = await dataTransfer.get(Mime.textPlain)?.asString();
@@ -280,7 +280,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
   async createUriListSnippet(
     uriList: UriList,
     range: vscode.Range,
-    exts: { placeholderText: string | undefined; placeholderStartIndex: number },
+    _exts: { placeholderText: string | undefined; placeholderStartIndex: number },
   ) {
     if (uriList.entries.length !== 1) {
       vscode.window.showErrorMessage("Only one URI can be pasted at a time.");
@@ -292,7 +292,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     const dragFileUri = uriList.entries[0].uri;
 
     let dragFilePath = "";
-    let workspaceFolder = vscode.workspace.getWorkspaceFolder(dragFileUri);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(dragFileUri);
     if (dropFileUri.scheme === "untitled") {
       if (workspaceFolder) {
         dragFilePath = relative(workspaceFolder.uri.fsPath, dragFileUri.fsPath);
@@ -301,10 +301,10 @@ class DropOrPasteContext<A extends DropPasteAction> {
       dragFilePath = relative(dirname(dropFileUri.fsPath), dragFileUri.fsPath);
     }
 
-    let barPath = dragFilePath.replace(/\\/g, "/");
-    let strPath = `"${barPath}"`;
+    const barPath = dragFilePath.replace(/\\/g, "/");
+    const strPath = `"${barPath}"`;
     let codeSnippet = strPath;
-    let resourceKind: PasteResourceKind | undefined =
+    const resourceKind: PasteResourceKind | undefined =
       pasteResourceKinds[extname(dragFileUri.fsPath)];
     // todo: fetch latest version
     const additionalPkgs: [string, string, string | undefined][] = [];
@@ -389,7 +389,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
         break;
     }
 
-    let additionalImports = [];
+    const additionalImports = [];
     if (additionalPkgs.length > 0) {
       const t = this.document.getText();
       for (const [pkgName, version, importName] of additionalPkgs) {
@@ -535,7 +535,7 @@ export function getDesiredNewFilePath(
 }
 
 function getParentDocumentUri(uri: vscode.Uri): vscode.Uri {
-  if (uri.scheme === Schemes.notebookCell) {
+  if ((uri.scheme as Schemes) === Schemes.notebookCell) {
     // is notebook documents necessary?
     for (const notebook of vscode.workspace.notebookDocuments) {
       for (const cell of notebook.getCells()) {

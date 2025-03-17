@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/op_contains.typ
-snapshot_kind: text
 ---
 "f" = (("line" | "number")) => Type(none)
 "x" = Any
@@ -12,3 +11,4 @@ snapshot_kind: text
 16..22 -> Func(assert)
 16..47 -> Type(none)
 23..24 -> @x
+28..46 -> ("line", "number", )

@@ -3,7 +3,7 @@
 use std::iter::zip;
 
 use lsp_types::TextEdit;
-use sync_lsp::{just_future, SchedulableResponse};
+use sync_ls::{just_future, SchedulableResponse};
 use tinymist_query::{to_lsp_range, PositionEncoding};
 use typst::syntax::Source;
 

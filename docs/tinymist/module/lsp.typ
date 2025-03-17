@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist LSP")
+#show: book-page.with(title: [LSP])
 
 == Architecture
 

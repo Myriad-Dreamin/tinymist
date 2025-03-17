@@ -32,7 +32,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_call_in_call.typ
     "labelDetails": {
      "description": "(content, size: relative) => content"
     },
-    "sortText": "058",
+    "sortText": "057",
     "textEdit": {
      "newText": "abs(${1:})",
      "range": {

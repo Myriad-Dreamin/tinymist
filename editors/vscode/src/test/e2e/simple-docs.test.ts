@@ -43,7 +43,7 @@ export async function getTests(ctx: Context) {
       );
       ctx.expect(previewState.tasks).to.have.lengthOf(1);
       ctx.expect(previewState.tasks[0].taskId).to.be.equal(taskId);
-      ctx.expect(previewState.tasks[0].panel).to.be.true;
+      ctx.expect(!!previewState.tasks[0].panel).to.be.equal(true);
 
       await ctx.openDocument(vscode.Uri.joinPath(workspaceUri, "preview-hello-world.typ"));
       resp = await vscode.commands.executeCommand("typst-preview.preview");

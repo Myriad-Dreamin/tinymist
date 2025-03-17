@@ -1,6 +1,6 @@
 [package]
 name = "tinymist"
-description = "Fast lsp implementation for typst."
+description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
 keywords = ["cli", "lsp", "language", "typst"]
 authors.workspace = true
@@ -40,7 +40,6 @@ hyper-util = { workspace = true, features = [
 http-body-util = "0.1.2"
 hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
-lsp-server.workspace = true
 lsp-types.workspace = true
 log.workspace = true
 once_cell.workspace = true
@@ -57,7 +56,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 strum.workspace = true
-sync-lsp.workspace = true
+sync-ls.workspace = true
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-std.workspace = true
@@ -79,15 +78,29 @@ typst-shim.workspace = true
 typst-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
 tinymist-task.workspace = true
+tinymist-debug.workspace = true
 typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
+tinymist-l10n.workspace = true
+
+dapts.workspace = true
 
 [features]
-default = ["cli", "html", "pdf", "preview", "embed-fonts", "no-content-hint"]
+default = [
+    "cli",
+    "html",
+    "pdf",
+    # enable it once we upload assets.
+    # "l10n",
+    "preview",
+    "embed-fonts",
+    "no-content-hint",
+    "dap",
+]
 
-cli = ["sync-lsp/clap", "clap/wrap_help"]
+cli = ["sync-ls/clap", "clap/wrap_help"]
 
 dhat-heap = ["dhat"]
 
@@ -120,6 +133,11 @@ preview = [
     "tinymist-assets/typst-preview",
     "hyper-tungstenite",
 ]
+
+dap = []
+
+# l10n = ["tinymist-assets/l10n"]
+l10n = []
 
 [dev-dependencies]
 temp-env.workspace = true

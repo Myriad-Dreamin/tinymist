@@ -1,5 +1,5 @@
 
-#import "@preview/shiroa:0.1.2": *
+#import "@preview/shiroa:0.2.0": *
 
 #show: book
 
@@ -15,15 +15,15 @@
     #prefix-chapter("configurations.typ")[Common Configurations]
     - #chapter("frontend/main.typ")[Editor Frontends]
       - #chapter("frontend/vscode.typ")[VS Cod(e,ium)]
-      - #chapter("frontend/neovim.typ")[NeoVim]
+      - #chapter("frontend/neovim.typ")[Neovim]
       - #chapter("frontend/emacs.typ")[Emacs]
       - #chapter("frontend/sublime-text.typ")[Sublime Text]
       - #chapter("frontend/helix.typ")[Helix]
       - #chapter("frontend/zed.typ")[Zed]
     = Features
     - #chapter("feature/cli.typ")[Command line interface]
-    - #chapter("feature/docs.typ")[Documentation]
-    - #chapter("guide/completion.typ")[Completion]
+    - #chapter("feature/docs.typ")[Code Documentation]
+    - #chapter("guide/completion.typ")[Code Completion]
     - #chapter("feature/export.typ")[Exporting Documents]
     - #chapter("feature/preview.typ")[Document Preview]
     - #chapter("feature/language.typ")[Other Features]

@@ -6,9 +6,10 @@ use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use tinymist_std::hash::hash128;
 use typst::{
-    foundations::{Element, NativeElement, Value},
-    model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
-    syntax::{Span, SyntaxNode},
+    foundations::{Element, NativeElement, Type, Value},
+    model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
+    syntax::{ast::MathTextKind, Span, SyntaxNode},
+    text::LinebreakElem,
     utils::LazyHash,
 };
 
@@ -370,16 +371,37 @@ impl ExprWorker<'_> {
                     .map_or_else(none_expr, |body| self.check(body)),
             )),
 
-            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            MathText(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::TextElem,
+            >())))),
+            MathText(t) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some({
+                match t.get() {
+                    MathTextKind::Character(..) => Element::of::<typst::foundations::SymbolElem>(),
+                    MathTextKind::Number(..) => Element::of::<typst::foundations::SymbolElem>(),
+                }
+            })))),
+            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::RawElem,
+            >())))),
+            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::model::LinkElem,
+            >())))),
             Space(..) => Expr::Type(Ty::Builtin(BuiltinTy::Space)),
-            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                LinebreakElem,
+            >())))),
+            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                ParbreakElem,
+            >())))),
+            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::TextElem,
+            >())))),
+            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+                typst::foundations::Symbol,
+            >()))),
+            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::text::SmartQuoteElem,
+            >())))),
 
             Strong(strong) => {
                 let body = self.check_inline_markup(strong.body());
@@ -407,8 +429,13 @@ impl ExprWorker<'_> {
                 self.check_element::<TermsElem>(eco_vec![term, description])
             }
 
-            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
+            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+                typst::math::AlignPointElem,
+            >(
+            ))))),
+            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+                typst::foundations::Symbol,
+            >()))),
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }
@@ -887,7 +914,7 @@ impl ExprWorker<'_> {
             }
         }
 
-        Expr::Array(items.into())
+        Expr::Array(ArgsExpr::new(typed.span(), items))
     }
 
     fn check_dict(&mut self, typed: ast::Dict) -> Expr {
@@ -921,7 +948,7 @@ impl ExprWorker<'_> {
             }
         }
 
-        Expr::Dict(items.into())
+        Expr::Dict(ArgsExpr::new(typed.span(), items))
     }
 
     fn check_args(&mut self, typed: ast::Args) -> Expr {
@@ -941,7 +968,7 @@ impl ExprWorker<'_> {
                 }
             }
         }
-        Expr::Args(args.into())
+        Expr::Args(ArgsExpr::new(typed.span(), args))
     }
 
     fn check_unary(&mut self, typed: ast::Unary) -> Expr {
@@ -1201,12 +1228,20 @@ impl ExprWorker<'_> {
             _ => return (None, None),
         };
 
-        // ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         let val = scope
             .get(name)
             .cloned()
             .map(|val| Ty::Value(InsTy::new(val.read().clone())));
-        (None, val)
+        if let Some(val) = val {
+            return (None, Some(val));
+        }
+
+        if name.as_ref() == "std" {
+            let val = Ty::Value(InsTy::new(self.ctx.world.library.std.read().clone()));
+            return (None, Some(val));
+        }
+
+        (None, None)
     }
 
     fn fold_expr_and_val(&mut self, src: ConcolicExpr) -> Option<Expr> {

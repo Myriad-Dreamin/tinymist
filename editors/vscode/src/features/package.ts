@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
 import { editorTool } from "./tool";
+import { IContext } from "../context";
 
-export function packageFeatureActivate(context: vscode.ExtensionContext) {
+export function packageFeatureActivate(context: IContext) {
   const packageView = new PackageViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.package-view", packageView),
@@ -15,12 +16,9 @@ export function packageFeatureActivate(context: vscode.ExtensionContext) {
           const docs = await tinymist.getResource("/package/docs", pkg);
           // console.log("docs", docs);
 
-          const content = (await vscode.commands.executeCommand(
-            "markdown.api.render",
-            docs,
-          )) as string;
+          const content = await vscode.commands.executeCommand<string>("markdown.api.render", docs);
 
-          await editorTool(context, "docs", { pkg, content });
+          await editorTool(context.context, "docs", { pkg, content });
         } catch (e) {
           console.error("show package docs error", e);
           vscode.window.showErrorMessage(`Failed to show package documentation: ${e}`);
@@ -39,7 +37,7 @@ class PackageViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     return element;
   }
 
-  getChildren(element?: any): Thenable<vscode.TreeItem[]> {
+  getChildren(element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> {
     if (element && CommandsItem.is(element)) {
       return this.getCommands();
     } else if (element && NamespaceItem.is(element)) {

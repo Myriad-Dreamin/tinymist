@@ -2,9 +2,10 @@
 //! Last Checked: 2024-07-25
 //! Since it is not well maintained, we copy the source code here for further development.
 
-import vscode = require("vscode");
-import process = require("process");
-import path = require("path");
+import * as vscode from "vscode";
+import * as process from "process";
+import * as path from "path";
+
 import { extensionState } from "./state";
 
 export function vscodeVariables(
@@ -127,7 +128,7 @@ export class CodeVariableContext {
     let relativeFilePath = this.absoluteFilePath;
     let relativeFileDirname = undefined;
     if (this.workspaces && this.absoluteFilePath) {
-      for (let workspace of this.workspaces) {
+      for (const workspace of this.workspaces) {
         if (this.absoluteFilePath.replace(workspace.uri.fsPath, "") !== this.absoluteFilePath) {
           activeWorkspace = workspace;
           relativeFilePath = this.absoluteFilePath
@@ -180,9 +181,9 @@ export class CodeVariableContext {
 }
 
 function variableRegex(replacers: Record<string, Replacer>) {
-  let regexParts = [];
+  const regexParts = [];
   regexParts.push("\\${(");
-  for (let key in replacers) {
+  for (const key in replacers) {
     regexParts.push("|");
     regexParts.push(key);
     if (replacers[key].variable) {

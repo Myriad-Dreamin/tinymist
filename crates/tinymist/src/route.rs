@@ -2,10 +2,11 @@ use std::{path::Path, sync::Arc};
 
 use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, LazyHash};
 use rpds::RedBlackTreeMapSync;
-use tinymist_project::{Id, LockFile, LspCompileSnapshot, ProjectPathMaterial, ProjectRoute};
 use tinymist_query::LspWorldExt;
 use tinymist_std::{hash::FxHashMap, ImmutPath};
 use typst::diag::EcoString;
+
+use crate::project::{Id, LockFile, LspCompileSnapshot, ProjectPathMaterial, ProjectRoute};
 
 #[derive(Default)]
 pub struct ProjectRouteState {

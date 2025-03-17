@@ -1,5 +1,7 @@
 //! Completion for field access on nodes.
 
+use crate::analysis::completion::typst_specific::ValueCompletionInfo;
+
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Add completions for all fields on a node.
@@ -43,7 +45,16 @@ impl CompletionPair<'_, '_, '_> {
 
         if let Some(scope) = value.scope() {
             for (name, bind) in scope.iter() {
-                self.value_completion(Some(name.clone()), bind.read(), true, None);
+                self.value_completion_(
+                    bind.read(),
+                    ValueCompletionInfo {
+                        label: Some(name.clone()),
+                        parens: true,
+                        docs: None,
+                        label_details: None,
+                        bound_self: true,
+                    },
+                );
             }
         }
 
@@ -53,11 +64,15 @@ impl CompletionPair<'_, '_, '_> {
             // with method syntax;
             // 2. We can unwrap the field's value since it's a field belonging to
             // this value's type, so accessing it should not fail.
-            self.value_completion(
-                Some(field.into()),
+            self.value_completion_(
                 &value.field(field, ()).unwrap(),
-                false,
-                None,
+                ValueCompletionInfo {
+                    label: Some(field.into()),
+                    parens: false,
+                    docs: None,
+                    label_details: None,
+                    bound_self: true,
+                },
             );
         }
 

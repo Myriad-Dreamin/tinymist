@@ -28,7 +28,7 @@ pub use tinymist_vfs as vfs;
 #[cfg(feature = "system")]
 pub mod system;
 #[cfg(feature = "system")]
-pub use system::{SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld};
+pub use system::{print_diagnostics, SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld};
 
 /// Run the compiler in the browser environment.
 #[cfg(feature = "browser")]
@@ -144,6 +144,14 @@ pub trait CompilerFeat: Send + Sync + 'static {
     type AccessModel: VfsAccessModel + Clone + Send + Sync + Sized;
     /// Specify the package registry.
     type Registry: PackageRegistry + Send + Sync + Sized;
+}
+
+/// Which format to use for diagnostics.
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd)]
+pub enum DiagnosticFormat {
+    #[default]
+    Human,
+    Short,
 }
 
 pub mod build_info {

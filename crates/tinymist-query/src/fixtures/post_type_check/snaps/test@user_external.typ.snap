@@ -3,6 +3,5 @@ source: crates/tinymist-query/src/analysis.rs
 description: "Check on \"(\" (56)"
 expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/user_external.typ
-snapshot_kind: text
 ---
-TextFont
+( ⪰ TextFont ⪯ "Test")

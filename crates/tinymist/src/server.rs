@@ -4,8 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lsp_types::*;
-use sync_lsp::*;
-use tinymist_project::{CompiledArtifact, EntryResolver, LspCompileSnapshot, ProjectInsId};
+use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -13,12 +12,15 @@ use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
-use crate::lsp_query::OnEnter;
-use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
+use crate::lsp::query::OnEnter;
+use crate::project::{
+    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
+};
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
-use crate::{init::*, *};
+use crate::{lsp::init::*, *};
 
 pub(crate) use futures::Future;
 
@@ -47,6 +49,8 @@ pub struct ServerState {
     /// The preview state.
     #[cfg(feature = "preview")]
     pub preview: tool::preview::PreviewState,
+    #[cfg(feature = "dap")]
+    pub(crate) debug: crate::dap::DebugState,
     /// The formatter tasks running in backend, which will be scheduled by async
     /// runtime.
     pub formatter: FormatTask,
@@ -111,6 +115,8 @@ impl ServerState {
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
             preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
+            #[cfg(feature = "dap")]
+            debug: crate::dap::DebugState::default(),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -180,8 +186,8 @@ impl ServerState {
         service
     }
 
-    /// Installs handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
+    /// Installs LSP handlers to the language server.
+    pub fn install_lsp<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;
@@ -285,6 +291,25 @@ impl ServerState {
         );
 
         provider
+    }
+
+    /// Installs DAP handlers to the language server.
+    pub fn install_dap<T: Initializer<S = Self> + 'static>(
+        provider: DapBuilder<T>,
+    ) -> DapBuilder<T> {
+        use dapts::request;
+
+        // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
+        provider
+            .with_request::<request::ConfigurationDone>(Self::configuration_done)
+            .with_request::<request::Disconnect>(Self::disconnect)
+            .with_request::<request::Terminate>(Self::terminate_debug)
+            .with_request::<request::TerminateThreads>(Self::terminate_debug_thread)
+            .with_request::<request::Attach>(Self::attach_debug)
+            .with_request::<request::Launch>(Self::launch_debug)
+            .with_request::<request::Evaluate>(Self::evaluate_repl)
+            .with_request::<request::Completions>(Self::complete_repl)
+            .with_request::<request::Threads>(Self::debug_threads)
     }
 
     /// Handles the project interrupts.

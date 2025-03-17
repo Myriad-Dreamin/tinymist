@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (32..33)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/module_show_calc.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 9,
+    "label": "calc",
+    "labelDetails": {
+     "description": "module(\"calc\")"
+    },
+    "sortText": "027",
+    "textEdit": {
+     "newText": "calc",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 1
+      },
+      "start": {
+       "character": 11,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

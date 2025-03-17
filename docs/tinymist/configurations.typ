@@ -1,7 +1,7 @@
 #import "mod.typ": *
 #import "@preview/cmarker:0.1.0": render as md
 
-#show: book-page.with(title: "Tinymist Configurations")
+#show: book-page.with(title: [Configurations])
 
 #let packages = json("/editors/vscode/package.json")
 
@@ -25,9 +25,9 @@
         // todo: anyOf
       } else if cfg.type == "array" [
         - Items: #raw(cfg.items.type)
-        - Description: #md(cfg.items.description)
+        - Description: #md(cfg.items.at("markdownDescription", default: cfg.at("description", default: "")))
       ]
-    - Description: #md(cfg.at("markdownDescription", default: cfg.at("description", default: none)))
+    - Description: #md(cfg.at("markdownDescription", default: cfg.at("description", default: "")))
     #if cfg.at("enum", default: none) != none [
       - Valid values: #for (i, item) in cfg.enum.enumerate() [
             - #raw(item): #if "enumDescriptions" in cfg { md(cfg.enumDescriptions.at(i)) }

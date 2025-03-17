@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 
 import { vscodeVariables } from "./vscode-variables";
 
-export function loadTinymistConfig() {
+export interface TinymistConfig {
+  [key: string]: any;
+  typingContinueCommentsOnNewline?: boolean;
+  serverPath?: string;
+}
+
+export function loadTinymistConfig(): TinymistConfig {
   let config: Record<string, any> = JSON.parse(
     JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
   );
@@ -81,7 +87,7 @@ function determineVscodeTheme(): any {
 
 // "tinymist.hoverPeriscope": {
 //     "title": "Show preview document in periscope mode on hovering",
-//     "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.",
+//     "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and helix don't have a such feature, it is disabled by default at the language server label.",
 //     "type": [
 //         "object",
 //         "string"

@@ -20,9 +20,9 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(exprs) => self.write_seq(exprs),
-            Expr::Array(elems) => self.write_array(elems),
-            Expr::Dict(elems) => self.write_dict(elems),
-            Expr::Args(args) => self.write_args(args),
+            Expr::Array(elems) => self.write_array(&elems.args),
+            Expr::Dict(elems) => self.write_dict(&elems.args),
+            Expr::Args(args) => self.write_args(&args.args),
             Expr::Pattern(pat) => self.write_pattern(pat),
             Expr::Element(elem) => self.write_element(elem),
             Expr::Unary(unary) => self.write_unary(unary),
@@ -64,7 +64,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, "]")
     }
 
-    fn write_array(&mut self, elems: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_array(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         self.indent += 1;
         for arg in elems.iter() {
@@ -77,7 +77,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
-    fn write_dict(&mut self, elems: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_dict(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(:")?;
         self.indent += 1;
         for arg in elems.iter() {
@@ -90,7 +90,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
-    fn write_args(&mut self, args: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_args(&mut self, args: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         for arg in args.iter() {
             self.write_indent()?;
@@ -352,9 +352,9 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(..) => self.f.write_str("Expr(..)"),
-            Expr::Array(elems) => self.write_array(elems),
-            Expr::Dict(elems) => self.write_dict(elems),
-            Expr::Args(args) => self.write_args(args),
+            Expr::Array(elems) => self.write_array(&elems.args),
+            Expr::Dict(elems) => self.write_dict(&elems.args),
+            Expr::Args(args) => self.write_args(&args.args),
             Expr::Pattern(pat) => self.write_pattern(pat),
             Expr::Element(elem) => self.write_element(elem),
             Expr::Unary(unary) => self.write_unary(unary),
@@ -381,7 +381,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, "{:indent$}", "", indent = self.indent)
     }
 
-    fn write_array(&mut self, elems: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_array(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         if elems.len() <= 1 {
             self.f.write_char('(')?;
             if let Some(arg) = elems.first() {
@@ -403,7 +403,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
-    fn write_dict(&mut self, elems: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_dict(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         if elems.len() <= 1 {
             self.f.write_char('(')?;
             if let Some(arg) = elems.first() {
@@ -426,7 +426,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
-    fn write_args(&mut self, args: &Interned<Vec<ArgExpr>>) -> fmt::Result {
+    fn write_args(&mut self, args: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         for arg in args.iter() {
             self.write_indent()?;

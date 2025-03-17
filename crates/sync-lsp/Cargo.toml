@@ -1,8 +1,8 @@
 [package]
-name = "sync-lsp"
-description = "Sync LSP server inspired by async-lsp, primarily for tinymist."
-categories = ["compilers"]
-keywords = ["lsp", "language", "language-server"]
+name = "sync-ls"
+description = "Synchronized language service inspired by async-lsp, primarily for tinymist."
+categories = ["compilers", "development-tools"]
+keywords = ["lsp", "dap", "language", "language-server"]
 authors.workspace = true
 version.workspace = true
 license.workspace = true
@@ -16,16 +16,23 @@ rust-version.workspace = true
 anyhow.workspace = true
 clap = { workspace = true, optional = true }
 crossbeam-channel.workspace = true
+dapts = { workspace = true, optional = true }
 futures.workspace = true
 log.workspace = true
-lsp-server.workspace = true
-lsp-types.workspace = true
+lsp-types = { workspace = true, optional = true }
 parking_lot.workspace = true
-reflexo.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
 tokio-util.workspace = true
+
+[features]
+default = ["dap", "lsp"]
+dap = ["dapts"]
+lsp = ["lsp-types"]
+
+[package.metadata.docs.rs]
+features = ["dap", "lsp"]
 
 [lints]
 workspace = true
