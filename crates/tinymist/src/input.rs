@@ -152,7 +152,7 @@ impl ServerState {
     ///
     /// we do want to focus the file implicitly by `textDocument/diagnostic`
     /// (pullDiagnostics mode), as suggested by language-server-protocol#718,
-    /// however, this has poor support, e.g. since neovim 0.10.0.
+    /// however, this has poor support, e.g. since Neovim 0.10.0.
     pub fn implicit_focus_entry(
         &mut self,
         new_entry: impl FnOnce() -> Option<ImmutPath>,

@@ -43,6 +43,7 @@ jobs:
       #   uses: Swatinem/rust-cache@v2
       - name: Publish crates
         run: |
+          cargo publish --no-verify -p sync-ls || true
           cargo publish --no-verify -p typst-shim || true
           cargo publish --no-verify -p tinymist-derive || true
           cargo publish --no-verify -p tinymist-analysis || true
@@ -55,6 +56,7 @@ jobs:
           cargo publish --no-verify -p crityp || true
       - name: Verifies crate health (Optional)
         run: |
+          cargo publish --dry-run -p sync-ls
           cargo publish --dry-run -p typst-shim
           cargo publish --dry-run -p tinymist-derive
           cargo publish --dry-run -p tinymist-analysis

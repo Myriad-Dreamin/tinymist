@@ -3,10 +3,10 @@
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use sync_ls::RequestId;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::{
@@ -21,7 +21,7 @@ use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use world::TaskInputs;
 
 use super::*;
-use crate::lsp_query::{run_query, LspClientExt};
+use crate::lsp::query::{run_query, LspClientExt};
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].

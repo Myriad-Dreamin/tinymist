@@ -173,7 +173,7 @@ impl ExportTask {
         });
 
         // Prepare the document.
-        let doc = doc.ok().context("no document")?;
+        let doc = doc.ok().context("cannot export with compilation errors")?;
 
         // Prepare data.
         let kind2 = task.clone();

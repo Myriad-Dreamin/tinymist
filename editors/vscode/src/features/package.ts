@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
 import { editorTool } from "./tool";
+import { IContext } from "../context";
 
-export function packageFeatureActivate(context: vscode.ExtensionContext) {
+export function packageFeatureActivate(context: IContext) {
   const packageView = new PackageViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.package-view", packageView),
@@ -17,7 +18,7 @@ export function packageFeatureActivate(context: vscode.ExtensionContext) {
 
           const content = await vscode.commands.executeCommand<string>("markdown.api.render", docs);
 
-          await editorTool(context, "docs", { pkg, content });
+          await editorTool(context.context, "docs", { pkg, content });
         } catch (e) {
           console.error("show package docs error", e);
           vscode.window.showErrorMessage(`Failed to show package documentation: ${e}`);

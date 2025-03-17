@@ -24,15 +24,13 @@ import {
   ScrollPreviewRequest,
   tinymist,
 } from "../lsp";
+import { l10nMsg } from "../l10n";
+import { IContext } from "../context";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
  */
 let launchImpl: typeof launchPreviewLsp;
-/**
- * The active editor owning *typst language document* to track.
- */
-let activeEditor: vscode.TextEditor | undefined;
 
 /**
  * Preload the preview resources to reduce the latency of the first preview.
@@ -85,18 +83,6 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       "typst-preview",
       new TypstPreviewSerializer(context),
     ),
-  );
-
-  // Tracks the active editor owning *typst language document*.
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
-      const langId = editor?.document.languageId;
-      if (langId === "typst") {
-        activeEditor = editor;
-      } else if (editor === undefined || activeEditor?.document.isClosed) {
-        activeEditor = undefined;
-      }
-    }),
   );
 
   const launchBrowsingPreview = launch("webview", "doc", { isBrowsing: true });
@@ -168,7 +154,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
    */
   function launch(kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
     return async () => {
-      activeEditor = activeEditor || vscode.window.activeTextEditor;
+      const activeEditor = IContext.currentActiveEditor() || vscode.window.activeTextEditor;
       if (!activeEditor) {
         vscode.window.showWarningMessage("No active editor");
         return;
@@ -259,7 +245,7 @@ export async function openPreviewInWebView({
       ? webviewPanel
       : vscode.window.createWebviewPanel(
           "typst-preview",
-          `${basename} (Preview)`,
+          `${basename}${l10nMsg(" (Preview)")}`,
           getTargetViewColumn(activeEditor.viewColumn),
           {
             enableScripts: true,

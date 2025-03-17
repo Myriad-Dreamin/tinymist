@@ -1,0 +1,33 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (48..49)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/math_dot3.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "abs",
+    "labelDetails": {
+     "description": "(content, size: relative) => content"
+    },
+    "textEdit": {
+     "newText": "",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 3
+      },
+      "start": {
+       "character": 4,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

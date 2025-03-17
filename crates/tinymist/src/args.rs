@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use sync_lsp::transport::MirrorArgs;
+use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
 use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
 use tinymist::{CompileFontArgs, CompileOnceArgs};
@@ -31,6 +31,9 @@ pub enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
 
+    /// Execute a document and collect coverage
+    #[clap(hide(true))] // still in development
+    Cov(CompileOnceArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),
     /// Generates build script for compilation

@@ -2,3 +2,7 @@
 # Tinymist Sublime Support for Typst
 
 Follow the instructions in the [sublimelsp documentation](https://github.com/sublimelsp/LSP/blob/main/docs/src/language_servers.md#tinymist) to make it work.
+
+## Getting Preview Feature
+
+[Default Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) are suitable in Sublime Text.

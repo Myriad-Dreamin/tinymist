@@ -4,11 +4,14 @@ use once_cell::sync::OnceCell;
 use reflexo::ImmutPath;
 use request::{RegisterCapability, UnregisterCapability};
 use serde_json::{Map, Value as JsonValue};
-use sync_lsp::*;
+use sync_ls::*;
 use tinymist_std::error::{prelude::*, IgnoreLogging};
 
+pub mod init;
+pub(crate) mod query;
+
 use crate::task::FormatterConfig;
-use crate::{init::*, *};
+use crate::*;
 
 /// Trait implemented by language server backends.
 ///
@@ -170,7 +173,7 @@ impl ServerState {
             return self.on_changed_configuration(settings);
         };
 
-        self.client.send_request::<WorkspaceConfiguration>(
+        self.client.send_lsp_request::<WorkspaceConfiguration>(
             ConfigurationParams {
                 items: Config::get_items(),
             },
@@ -179,7 +182,7 @@ impl ServerState {
         Ok(())
     }
 
-    fn workspace_configuration_callback(this: &mut ServerState, resp: lsp_server::Response) {
+    fn workspace_configuration_callback(this: &mut ServerState, resp: sync_ls::lsp::Response) {
         if let Some(err) = resp.error {
             log::error!("failed to request configuration: {err:?}");
             return;
@@ -202,7 +205,7 @@ impl ServerState {
 impl ServerState {
     // todo: handle error
     pub(crate) fn register_capability(&self, registrations: Vec<Registration>) -> Result<()> {
-        self.client.send_request_::<RegisterCapability>(
+        self.client.send_lsp_request_::<RegisterCapability>(
             RegistrationParams { registrations },
             |_, resp| {
                 if let Some(err) = resp.error {
@@ -217,7 +220,7 @@ impl ServerState {
         &self,
         unregisterations: Vec<Unregistration>,
     ) -> Result<()> {
-        self.client.send_request_::<UnregisterCapability>(
+        self.client.send_lsp_request_::<UnregisterCapability>(
             UnregistrationParams { unregisterations },
             |_, resp| {
                 if let Some(err) = resp.error {

@@ -7,6 +7,8 @@ import { extensionState } from "./state";
 
 import { previewPreload } from "./features/preview";
 import { onEnterHandler } from "./lsp.on-enter";
+import { ExecContext, ExecResult, ICommand, IContext } from "./context";
+import { spawn } from "cross-spawn";
 
 /**
  * The condition
@@ -15,7 +17,7 @@ type FeatureCondition = boolean;
 /**
  * The initialization vector
  */
-type ActivationVector = (context: ExtensionContext) => void;
+type ActivationVector = (context: IContext) => void;
 /**
  * The initialization vector
  */
@@ -88,6 +90,7 @@ export async function tinymistActivate(
 ): Promise<void> {
   const { activateTable, config } = trait;
   tinymist.context = context;
+  const contextExt = new IContext(context);
 
   // Sets a global context key to indicate that the extension is activated
   vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
@@ -101,7 +104,15 @@ export async function tinymistActivate(
 
   // Initializes language client
   if (extensionState.features.lsp) {
-    tinymist.initClient(config);
+    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+    config.probedServerPath = executable;
+    // todo: guide installation?
+
+    if (config.probedServerPath) {
+      tinymist.initClient(config);
+    }
+
+    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
   }
   // Register Shared commands
   context.subscriptions.push(
@@ -115,7 +126,7 @@ export async function tinymistActivate(
   // Activates platform-dependent features
   for (const [condition, activate] of activateTable()) {
     if (condition) {
-      activate(context);
+      activate(contextExt);
     }
   }
   // Starts language client
@@ -145,4 +156,63 @@ export async function tinymistDeactivate(
   }
   await tinymist.stop();
   tinymist.context = undefined!;
+}
+
+function makeExecCommand(
+  context: IContext,
+  executable?: string,
+): ICommand<ExecContext, Promise<ExecResult | undefined>> {
+  return {
+    command: "tinymist.executeCli",
+    execute: async (ctx, cliArgs: string[]) => {
+      if (!executable) {
+        return;
+      }
+
+      const cwd = context.getCwd(ctx);
+      const proc = spawn(executable, cliArgs, {
+        env: {
+          ...process.env,
+          RUST_BACKTRACE: "1",
+        },
+        cwd,
+      });
+
+      if (ctx.killer) {
+        ctx.killer.event(() => {
+          proc.kill();
+        });
+      }
+
+      const capturedStdout: Buffer[] = [];
+      const capturedStderr: Buffer[] = [];
+
+      proc.stdout.on("data", (data: Buffer) => {
+        if (ctx.stdout) {
+          ctx.stdout(data);
+        } else {
+          capturedStdout.push(data);
+        }
+      });
+      proc.stderr.on("data", (data: Buffer) => {
+        if (ctx.stderr) {
+          ctx.stderr(data);
+        } else {
+          capturedStderr.push(data);
+        }
+      });
+
+      return new Promise<ExecResult>((resolve, reject) => {
+        proc.on("error", reject);
+        proc.on("exit", (code: any, signal) => {
+          resolve({
+            stdout: Buffer.concat(capturedStdout),
+            stderr: Buffer.concat(capturedStderr),
+            code: code || 0,
+            signal,
+          });
+        });
+      });
+    },
+  };
 }

@@ -1,19 +1,17 @@
 //! tinymist's language server
 
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
-use sync_lsp::*;
+use sync_ls::*;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
 };
 use tinymist_std::{ImmutPath, Result};
 
-use super::ServerState;
 use crate::project::{EntryState, TaskInputs, DETACHED_ENTRY};
-use crate::{as_path, as_path_, as_path_pos, FormatterMode};
+use crate::{as_path, as_path_, as_path_pos, FormatterMode, ServerState};
 
 /// The future type for a lsp query.
 pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;
@@ -228,9 +226,8 @@ impl ServerState {
         let context = params.context.as_ref();
         let explicit =
             context.is_some_and(|context| context.trigger_kind == CompletionTriggerKind::INVOKED);
-        let trigger_character = params
-            .context
-            .and_then(|c| c.trigger_character)
+        let trigger_character = context
+            .and_then(|c| c.trigger_character.as_ref())
             .and_then(|c| c.chars().next());
 
         run_query!(

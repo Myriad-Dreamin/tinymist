@@ -5,9 +5,14 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use serde::Serialize;
+use crate::msg::RequestId;
 
-use lsp_server::{ErrorCode, Request, RequestId, Response, ResponseError};
+#[cfg(feature = "lsp")]
+use crate::lsp::{Request, Response};
+#[cfg(feature = "lsp")]
+use crate::msg::{ErrorCode, ResponseError};
+#[cfg(feature = "lsp")]
+use serde::Serialize;
 
 /// Manages the set of pending requests, both incoming and outgoing.
 pub struct ReqQueue<I, O> {
@@ -83,8 +88,9 @@ impl<I> Incoming<I> {
     }
 
     /// Cancels a request with the given ID.
+    #[cfg(feature = "lsp")]
     pub fn cancel(&mut self, id: RequestId) -> Option<Response> {
-        let _data = self.complete(id.clone())?;
+        let _data = self.complete(&id)?;
         let error = ResponseError {
             code: ErrorCode::RequestCanceled as i32,
             message: "canceled by client".to_string(),
@@ -98,17 +104,24 @@ impl<I> Incoming<I> {
     }
 
     /// Completes a request with the given ID.
-    pub fn complete(&mut self, id: RequestId) -> Option<I> {
-        self.pending.remove(&id)
+    pub fn complete(&mut self, id: &RequestId) -> Option<I> {
+        self.pending.remove(id)
     }
 }
 
 impl<O> Outgoing<O> {
-    /// Registers a request with the given method, params, and data.
-    pub fn register<P: Serialize>(&mut self, method: String, params: P, data: O) -> Request {
-        let id = RequestId::from(self.next_id);
-        self.pending.insert(id.clone(), data);
+    /// Allocates a request ID.
+    pub fn alloc_request_id(&mut self) -> i32 {
+        let id = self.next_id;
         self.next_id += 1;
+        id
+    }
+
+    /// Registers a request with the given method, params, and data.
+    #[cfg(feature = "lsp")]
+    pub fn register<P: Serialize>(&mut self, method: String, params: P, data: O) -> Request {
+        let id = RequestId::from(self.alloc_request_id());
+        self.pending.insert(id.clone(), data);
         Request::new(id, method, params)
     }
 

@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (37..38)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/mode_math2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "AA",
+    "labelDetails": {
+     "description": "𝔸"
+    },
+    "sortText": "000",
+    "textEdit": {
+     "newText": "AA",
+     "range": {
+      "end": {
+       "character": 1,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]

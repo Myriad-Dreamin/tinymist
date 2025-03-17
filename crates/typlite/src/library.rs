@@ -16,6 +16,7 @@ pub fn library() -> Scopes<Value> {
     scopes.define("image", image as RawFunc);
     scopes.define("figure", figure as RawFunc);
     scopes.define("raw", raw as RawFunc);
+    scopes.define("strike", strike as RawFunc);
     scopes.define("pad", pad as RawFunc);
     scopes.define("note-box", note as RawFunc);
     scopes.define("tip-box", tip as RawFunc);
@@ -27,7 +28,7 @@ pub fn library() -> Scopes<Value> {
     scopes
 }
 
-/// Evaluate a link.
+/// Evaluates a link.
 pub fn link(mut args: Args) -> Result<Value> {
     let dest = get_pos_named!(args, dest: EcoString);
     let body = get_pos_named!(args, body: Content);
@@ -35,7 +36,7 @@ pub fn link(mut args: Args) -> Result<Value> {
     Ok(Value::Content(eco_format!("[{body}]({dest})")))
 }
 
-/// Evaluate an image.
+/// Evaluates an image.
 pub fn image(mut args: Args) -> Result<Value> {
     let path = get_pos_named!(args, path: EcoString);
     let alt = get_named!(args, alt: EcoString := "");
@@ -43,7 +44,7 @@ pub fn image(mut args: Args) -> Result<Value> {
     Ok(Value::Image { path, alt })
 }
 
-/// Evaluate a figure.
+/// Evaluates a figure.
 pub fn figure(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, path: Value);
     let caption = get_named!(args, caption: Option<Value>).map(TypliteWorker::value);
@@ -60,26 +61,47 @@ pub fn figure(mut args: Args) -> Result<Value> {
     }
 }
 
-/// Evaluate a raw.
+/// Evaluates a raw.
 pub fn raw(mut args: Args) -> Result<Value> {
     let content = get_pos_named!(args, content: EcoString);
 
-    Ok(Value::Content(eco_format!("```` {content} ````")))
+    let max_consecutive_backticks = content
+        .chars()
+        .fold((0, 0), |(max, count), c| {
+            if c == '`' {
+                (max, count + 1)
+            } else {
+                (max.max(count), 0)
+            }
+        })
+        .0;
+
+    Ok(Value::Content(eco_format!(
+        "{backticks}\n{content}\n{backticks}",
+        backticks = "`".repeat((max_consecutive_backticks + 1).max(3)),
+    )))
 }
 
-/// Evaluate a padded content.
+/// Evaluates a strike.
+pub fn strike(mut args: Args) -> Result<Value> {
+    let body = get_pos_named!(args, body: Content);
+
+    Ok(Value::Content(eco_format!("~~{body}~~")))
+}
+
+/// Evaluates a padded content.
 pub fn pad(mut args: Args) -> Result<Value> {
     Ok(get_pos_named!(args, path: Value))
 }
 
-/// Evaluate a `kbd` element.
+/// Evaluates a `kbd` element.
 pub fn kbd(mut args: Args) -> Result<Value> {
     let key = get_pos_named!(args, key: EcoString);
 
     Ok(Value::Content(eco_format!("<kbd>{key}</kbd>")))
 }
 
-/// Evaluate a markdown alteration.
+/// Evaluates a markdown alteration.
 pub fn md_alter(mut args: Args) -> Result<Value> {
     let _: () = get_pos_named!(args, left: ());
     let right = get_pos_named!(args, right: LazyContent);
@@ -87,35 +109,35 @@ pub fn md_alter(mut args: Args) -> Result<Value> {
     Ok(Value::Content(right.0))
 }
 
-/// Evaluate a note.
+/// Evaluates a note.
 pub fn note(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
     Ok(note_box("NOTE", body))
 }
 
-/// Evaluate a tip note box.
+/// Evaluates a tip note box.
 pub fn tip(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
     Ok(note_box("TIP", body))
 }
 
-/// Create a important note box.
+/// Creates a important note box.
 pub fn important_box(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
     Ok(note_box("IMPORTANT", body))
 }
 
-/// Create a warning note box.
+/// Creates a warning note box.
 pub fn warning_box(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
     Ok(note_box("WARNING", body))
 }
 
-/// Create a caution note box.
+/// Creates a caution note box.
 pub fn caution_box(mut args: Args) -> Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
@@ -137,12 +159,12 @@ fn note_box(title: &str, body: Content) -> Value {
     Value::Content(res)
 }
 
-/// Evaluate a table.
+/// Evaluates a table.
 pub fn table(args: Args) -> Result<Value> {
     table_eval(args, &EcoString::from("table"))
 }
 
-/// Evaluate a grid.
+/// Evaluates a grid.
 pub fn grid(args: Args) -> Result<Value> {
     table_eval(args, &EcoString::from("grid"))
 }
