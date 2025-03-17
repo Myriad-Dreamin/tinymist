@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { tinymist } from "../lsp";
 import { IContext } from "../context";
 
-export function labelFeatureActivate(context: IContext) {
+export function labelActivate(context: IContext) {
   const labelViewProvider = new LabelViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.label-view", labelViewProvider),

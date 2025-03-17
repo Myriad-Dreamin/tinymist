@@ -48,7 +48,7 @@ const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
   },
 };
 
-export function toolFeatureActivate(context: IContext) {
+export function toolActivate(context: IContext) {
   const toolView = new ToolViewProvider();
 
   context.subscriptions.push(
