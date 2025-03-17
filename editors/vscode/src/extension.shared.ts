@@ -113,6 +113,7 @@ export async function tinymistActivate(
       tinymist.initClient(config);
     }
 
+    contextExt.tinymistExecutable = executable;
     contextExt.tinymistExec = makeExecCommand(contextExt, executable);
   }
   // Register Shared commands

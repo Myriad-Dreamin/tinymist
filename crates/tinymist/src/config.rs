@@ -63,6 +63,8 @@ pub struct Config {
     pub project_resolution: ProjectResolutionKind,
     /// Constant configuration for the server.
     pub const_config: ConstConfig,
+    /// Constant DAP configuration for the server.
+    pub const_dap_config: ConstDapConfig,
     /// The compile configurations
     pub compile: CompileConfig,
     /// Dynamic configuration for semantic tokens.
@@ -95,6 +97,7 @@ impl Config {
     ) -> Self {
         let mut config = Self {
             const_config,
+            const_dap_config: ConstDapConfig::default(),
             compile: CompileConfig {
                 entry_resolver: EntryResolver {
                     roots,
@@ -151,6 +154,35 @@ impl Config {
         });
 
         (config, err)
+    }
+
+    /// Creates a new configuration from the dap initialization parameters.
+    ///
+    /// The function has side effects:
+    /// - Getting environment variables.
+    /// - Setting the locale.
+    pub fn extract_dap_params(
+        params: dapts::InitializeRequestArguments,
+        font_opts: CompileFontArgs,
+    ) -> (Self, Option<ResponseError>) {
+        // todo: lines_start_at1, columns_start_at1, path_format
+
+        // This is reliable in DAP context.
+        let cwd = std::env::current_dir()
+            .expect("failed to get current directory")
+            .into();
+
+        // Initialize configurations
+        let roots = vec![cwd];
+        let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+        config.const_dap_config = ConstDapConfig::from(&params);
+
+        // Sets locale as soon as possible
+        if let Some(locale) = config.const_config.locale.as_ref() {
+            tinymist_l10n::set_locale(locale);
+        }
+
+        (config, None)
     }
 
     /// Gets items for serialization.
@@ -382,6 +414,49 @@ impl From<&InitializeParams> for ConstConfig {
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
             locale: locale.map(ToOwned::to_owned),
+        }
+    }
+}
+
+impl From<&dapts::InitializeRequestArguments> for ConstConfig {
+    fn from(params: &dapts::InitializeRequestArguments) -> Self {
+        let locale = params.locale.as_deref();
+
+        Self {
+            locale: locale.map(ToOwned::to_owned),
+            ..Default::default()
+        }
+    }
+}
+
+/// Determines in what format paths are specified. The default is `path`, which
+/// is the native format.
+pub type DapPathFormat = dapts::InitializeRequestArgumentsPathFormat;
+
+/// Configuration set at initialization that won't change within a single DAP
+/// session.
+#[derive(Debug, Clone)]
+pub struct ConstDapConfig {
+    /// The format of paths.
+    pub path_format: DapPathFormat,
+    /// Whether lines start at 1.
+    pub lines_start_at1: bool,
+    /// Whether columns start at 1.
+    pub columns_start_at1: bool,
+}
+
+impl Default for ConstDapConfig {
+    fn default() -> Self {
+        Self::from(&dapts::InitializeRequestArguments::default())
+    }
+}
+
+impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
+    fn from(params: &dapts::InitializeRequestArguments) -> Self {
+        Self {
+            path_format: params.path_format.clone().unwrap_or(DapPathFormat::Path),
+            lines_start_at1: params.lines_start_at1.unwrap_or(true),
+            columns_start_at1: params.columns_start_at1.unwrap_or(true),
         }
     }
 }
@@ -1056,6 +1131,15 @@ mod tests {
     fn test_default_lsp_config_initialize() {
         let (_conf, err) =
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn test_default_dap_config_initialize() {
+        let (_conf, err) = Config::extract_dap_params(
+            dapts::InitializeRequestArguments::default(),
+            CompileFontArgs::default(),
+        );
         assert!(err.is_none());
     }
 

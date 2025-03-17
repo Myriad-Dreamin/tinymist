@@ -24,6 +24,8 @@ pub enum Commands {
     Completion(ShellCompletionArgs),
     /// Runs language server
     Lsp(LspArgs),
+    /// Runs debug adapter
+    Dap(DapArgs),
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(TraceLspArgs),
@@ -157,6 +159,8 @@ pub struct LspArgs {
     #[clap(flatten)]
     pub font: CompileFontArgs,
 }
+
+pub type DapArgs = LspArgs;
 
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "camelCase")]

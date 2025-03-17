@@ -1,6 +1,6 @@
 [package]
 name = "tinymist"
-description = "Fast lsp implementation for typst."
+description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
 keywords = ["cli", "lsp", "language", "typst"]
 authors.workspace = true
@@ -85,6 +85,8 @@ unicode-script.workspace = true
 walkdir.workspace = true
 tinymist-l10n.workspace = true
 
+dapts.workspace = true
+
 [features]
 default = [
     "cli",
@@ -95,6 +97,7 @@ default = [
     "preview",
     "embed-fonts",
     "no-content-hint",
+    "dap",
 ]
 
 cli = ["sync-ls/clap", "clap/wrap_help"]
@@ -130,6 +133,8 @@ preview = [
     "tinymist-assets/typst-preview",
     "hyper-tungstenite",
 ]
+
+dap = []
 
 # l10n = ["tinymist-assets/l10n"]
 l10n = []
