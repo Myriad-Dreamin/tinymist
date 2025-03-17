@@ -133,7 +133,7 @@ where
 pub fn set_debug_session(session: Option<DebugSession>) -> bool {
     let mut lock = DEBUG_SESSION.write();
 
-    if session.is_some() {
+    if lock.is_some() {
         return false;
     }
 
