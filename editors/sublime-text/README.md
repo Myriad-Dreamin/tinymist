@@ -5,4 +5,4 @@ Follow the instructions in the [sublimelsp documentation](https://github.com/sub
 
 ## Getting Preview Feature
 
-[Default Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) are suitable in Sublime Text.
+[Default Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) are suitable in Sublime Text.
