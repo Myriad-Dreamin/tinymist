@@ -98,7 +98,7 @@ You can use your favorite image diff tool to compare the images, e.g. `magick co
 
 == Continuous Integration
 
-`tinymist test` only compares hash reference files to check whether content is changed. Therefore, you can ignore the image and html files and only commit the hash files to compare them on CI:
+`tinymist test` only compares hash reference files to check whether content is changed. Therefore, you can ignore the image and html files and only commit the hash files to compare them on CI. Putting the following content in `.gitignore` will help you to ignore the files:
 
 ```exclude
 # png files
