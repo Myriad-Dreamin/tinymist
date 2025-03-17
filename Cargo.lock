@@ -3993,6 +3993,7 @@ dependencies = [
  "codespan-reporting",
  "comemo",
  "crossbeam-channel",
+ "dapts",
  "dhat",
  "dirs",
  "env_logger",
@@ -4093,6 +4094,23 @@ dependencies = [
  "tinymist-world",
  "vergen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "tinymist-dap"
+version = "0.13.8"
+dependencies = [
+ "base64",
+ "comemo",
+ "insta",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tinymist-analysis",
+ "tinymist-std",
+ "tinymist-world",
+ "typst",
+ "typst-library",
 ]
 
 [[package]]

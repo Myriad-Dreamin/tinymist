@@ -49,6 +49,8 @@ pub struct ServerState {
     /// The preview state.
     #[cfg(feature = "preview")]
     pub preview: tool::preview::PreviewState,
+    #[cfg(feature = "dap")]
+    pub(crate) debug: crate::dap::DebugState,
     /// The formatter tasks running in backend, which will be scheduled by async
     /// runtime.
     pub formatter: FormatTask,
@@ -113,6 +115,8 @@ impl ServerState {
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
             preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
+            #[cfg(feature = "dap")]
+            debug: crate::dap::DebugState::default(),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -287,6 +291,25 @@ impl ServerState {
         );
 
         provider
+    }
+
+    /// Installs DAP handlers to the language server.
+    pub fn install_dap<T: Initializer<S = Self> + 'static>(
+        provider: DapBuilder<T>,
+    ) -> DapBuilder<T> {
+        use dapts::request;
+
+        // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
+        provider
+            .with_request::<request::ConfigurationDone>(Self::configuration_done)
+            .with_request::<request::Disconnect>(Self::disconnect)
+            .with_request::<request::Terminate>(Self::terminate_debug)
+            .with_request::<request::TerminateThreads>(Self::terminate_debug_thread)
+            .with_request::<request::Attach>(Self::attach_debug)
+            .with_request::<request::Launch>(Self::launch_debug)
+            .with_request::<request::Evaluate>(Self::evaluate_repl)
+            .with_request::<request::Completions>(Self::complete_repl)
+            .with_request::<request::Threads>(Self::debug_threads)
     }
 
     /// Handles the project interrupts.
