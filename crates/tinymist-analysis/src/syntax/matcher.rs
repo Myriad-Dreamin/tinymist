@@ -71,7 +71,37 @@ pub fn node_ancestors<'a, 'b>(
 
 /// Finds the first ancestor node that is an expression.
 pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
-    node_ancestors(&node).find(|n| n.is::<ast::Expr>()).cloned()
+    node_ancestors(&node)
+        .find(|n| n.is::<ast::Expr>())
+        .map(|mut node| {
+            while matches!(node.kind(), SyntaxKind::Ident | SyntaxKind::MathIdent) {
+                let Some(parent) = node.parent() else {
+                    return node;
+                };
+
+                let Some(field_access) = parent.cast::<ast::FieldAccess>() else {
+                    return node;
+                };
+
+                let dot = parent
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Dot));
+
+                // Since typst matches `field()` by `case_last_match`, when the field access
+                // `x.` (`Ident(x).Error("")`), it will match the `x` as the
+                // field. We need to check dot position to filter out such cases.
+                if dot.is_some_and(|dot| {
+                    dot.offset() <= node.offset() && field_access.field().span() == node.span()
+                }) {
+                    node = parent;
+                } else {
+                    return node;
+                }
+            }
+
+            node
+        })
+        .cloned()
 }
 
 /// A node that is an ancestor of the given node or the previous sibling
@@ -708,15 +738,43 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     /// When in markup mode, the dot access is valid if the dot is after a hash
     /// expression.
     fn classify_dot_access<'a>(node: &LinkedNode<'a>) -> Option<SyntaxClass<'a>> {
-        let dot_target = node.prev_leaf().and_then(first_ancestor_expr)?;
+        let prev_leaf = node.prev_leaf();
         let mode = interpret_mode_at(Some(node));
+
+        // Don't match `$ .| $`
+        if matches!(mode, InterpretMode::Markup | InterpretMode::Math)
+            && prev_leaf
+                .as_ref()
+                .is_some_and(|leaf| leaf.range().end < node.offset())
+        {
+            return None;
+        }
+
+        if matches!(mode, InterpretMode::Math)
+            && prev_leaf.as_ref().is_some_and(|leaf| {
+                // Don't match `$ a.| $` or `$.| $`
+                node_ancestors(leaf)
+                    .find(|t| matches!(t.kind(), SyntaxKind::Equation))
+                    .is_some_and(|parent| parent.offset() == leaf.offset())
+            })
+        {
+            return None;
+        }
+
+        let dot_target = prev_leaf.and_then(first_ancestor_expr)?;
 
         if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
             matches!(mode, InterpretMode::Markup)
-                && matches!(
+                && (matches!(
+                    dot_target.kind(),
+                    SyntaxKind::Ident
+                        | SyntaxKind::MathIdent
+                        | SyntaxKind::FieldAccess
+                        | SyntaxKind::FuncCall
+                ) || (matches!(
                     dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
                     Some(SyntaxKind::Hash)
-                )
+                )))
         } {
             return Some(SyntaxClass::VarAccess(VarClass::DotAccess(dot_target)));
         }
@@ -1052,6 +1110,18 @@ impl<'a> SyntaxContext<'a> {
             | SyntaxContext::Normal(node) => node.clone(),
         })
     }
+
+    /// Gets the argument container node.
+    pub fn arg_container(&self) -> Option<&LinkedNode<'a>> {
+        match self {
+            Self::Arg { args, .. }
+            | Self::Element {
+                container: args, ..
+            } => Some(args),
+            Self::Paren { container, .. } => Some(container),
+            _ => None,
+        }
+    }
 }
 
 /// Kind of argument source.
@@ -1306,6 +1376,37 @@ fn arg_context<'a>(
     }
 }
 
+/// The cursor is on an invalid position.
+pub enum BadCompletionCursor {
+    /// The cursor is outside of the argument list.
+    ArgListPos,
+}
+
+/// Checks if the cursor is on an invalid position for completion.
+pub fn bad_completion_cursor(
+    syntax: Option<&SyntaxClass>,
+    syntax_context: Option<&SyntaxContext>,
+    leaf: &LinkedNode,
+) -> Option<BadCompletionCursor> {
+    // The cursor is on `f()|`
+    if (matches!(syntax, Some(SyntaxClass::Callee(..))) && {
+        syntax_context
+            .and_then(SyntaxContext::arg_container)
+            .is_some_and(|container| {
+                container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset())
+            })
+        // The cursor is on `f[]|`
+    }) || (matches!(
+        syntax,
+        Some(SyntaxClass::Normal(SyntaxKind::ContentBlock, _))
+    ) && matches!(leaf.kind(), SyntaxKind::RightBracket))
+    {
+        return Some(BadCompletionCursor::ArgListPos);
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1527,6 +1628,28 @@ Text
         assert_snapshot!(access_field("\"a\".", 4), @"");
         assert_snapshot!(access_field("@a.", 3), @"");
         assert_snapshot!(access_field("<a>.", 4), @"");
+    }
+
+    #[test]
+    fn test_markup_chain_access() {
+        assert_snapshot!(access_node("#a.b.", 5), @"a.b");
+        assert_snapshot!(access_field("#a.b.", 5), @"DotSuffix: 5");
+        assert_snapshot!(access_node("#a.b.c.", 7), @"a.b.c");
+        assert_snapshot!(access_field("#a.b.c.", 7), @"DotSuffix: 7");
+        assert_snapshot!(access_node("#context a.", 11), @"a");
+        assert_snapshot!(access_field("#context a.", 11), @"DotSuffix: 11");
+        assert_snapshot!(access_node("#context a.b.", 13), @"a.b");
+        assert_snapshot!(access_field("#context a.b.", 13), @"DotSuffix: 13");
+
+        assert_snapshot!(access_node("#a.at(1).", 9), @"a.at(1)");
+        assert_snapshot!(access_field("#a.at(1).", 9), @"DotSuffix: 9");
+        assert_snapshot!(access_node("#context a.at(1).", 17), @"a.at(1)");
+        assert_snapshot!(access_field("#context a.at(1).", 17), @"DotSuffix: 17");
+
+        assert_snapshot!(access_node("#a.at(1).c.", 11), @"a.at(1).c");
+        assert_snapshot!(access_field("#a.at(1).c.", 11), @"DotSuffix: 11");
+        assert_snapshot!(access_node("#context a.at(1).c.", 19), @"a.at(1).c");
+        assert_snapshot!(access_field("#context a.at(1).c.", 19), @"DotSuffix: 19");
     }
 
     #[test]

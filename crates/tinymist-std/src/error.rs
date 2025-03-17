@@ -154,7 +154,7 @@ pub struct ErrorImpl {
 }
 
 /// This type represents all possible errors that can occur in typst.ts
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Error {
     /// This `Box` allows us to keep the size of `Error` as small as possible. A
     /// larger `Error` type was substantially slower due to all the functions
@@ -188,6 +188,31 @@ impl Error {
     pub fn arguments(&self) -> &[(&'static str, String)] {
         self.err.args.as_deref().unwrap_or_default()
     }
+
+    /// Returns the diagnostics attach to the error.
+    #[cfg(feature = "typst")]
+    pub fn diagnostics(&self) -> Option<&[SourceDiagnostic]> {
+        match &self.err.kind {
+            ErrKind::RawDiag(diag) => Some(diag),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as fmt::Display>::fmt(self, f)
+    }
+}
+
+macro_rules! write_with_args {
+    ($f:expr, $args:expr, $fmt:expr  $(, $arg:expr)*) => {
+        if let Some(args) = $args.as_ref() {
+            write!($f, "{}, with {:?}", format_args!($fmt $(, $arg)*), args)
+        } else {
+            write!($f, $fmt $(, $arg)*)
+        }
+    };
 }
 
 impl fmt::Display for Error {
@@ -196,29 +221,41 @@ impl fmt::Display for Error {
 
         if err.loc.is_empty() {
             match &err.kind {
-                ErrKind::Msg(msg) => write!(f, "{msg} with {:?}", err.args),
+                ErrKind::Msg(msg) => {
+                    if msg.is_empty() {
+                        write_with_args!(f, err.args, "{}", err.loc)
+                    } else {
+                        write_with_args!(f, err.args, "{}: {msg}", err.loc)
+                    }
+                }
                 #[cfg(feature = "typst")]
                 ErrKind::RawDiag(diag) => {
-                    write!(f, "{diag:?} with {:?}", err.args)
+                    write_with_args!(f, err.args, "{diag:?}")
                 }
                 ErrKind::Diag(diag) => {
-                    write!(f, "{} with {:?}", diag.message, err.args)
+                    write_with_args!(f, err.args, "{}", diag.message)
                 }
-                ErrKind::Inner(e) => write!(f, "{e} with {:?}", err.args),
-                ErrKind::None => write!(f, "error with {:?}", err.args),
+                ErrKind::Inner(e) => write_with_args!(f, err.args, "{e}"),
+                ErrKind::None => write_with_args!(f, err.args, "unknwon error"),
             }
         } else {
             match &err.kind {
-                ErrKind::Msg(msg) => write!(f, "{}: {} with {:?}", err.loc, msg, err.args),
+                ErrKind::Msg(msg) => {
+                    if msg.is_empty() {
+                        write_with_args!(f, err.args, "{}", err.loc)
+                    } else {
+                        write_with_args!(f, err.args, "{}: {msg}", err.loc)
+                    }
+                }
                 #[cfg(feature = "typst")]
                 ErrKind::RawDiag(diag) => {
-                    write!(f, "{}: {diag:?} with {:?}", err.loc, err.args)
+                    write_with_args!(f, err.args, "{}: {diag:?}", err.loc)
                 }
                 ErrKind::Diag(diag) => {
-                    write!(f, "{}: {} with {:?}", err.loc, diag.message, err.args)
+                    write_with_args!(f, err.args, "{}: {}", err.loc, diag.message)
                 }
-                ErrKind::Inner(e) => write!(f, "{}: {} with {:?}", err.loc, e, err.args),
-                ErrKind::None => write!(f, "{}: with {:?}", err.loc, err.args),
+                ErrKind::Inner(e) => write_with_args!(f, err.args, "{}: {}", err.loc, e),
+                ErrKind::None => write_with_args!(f, err.args, "{}", err.loc),
             }
         }
     }
@@ -441,7 +478,7 @@ pub mod prelude {
     macro_rules! bail {
         ($($arg:tt)+) => {{
             let args = $crate::error::prelude::_eco_format!($($arg)+);
-            return Err($crate::error::prelude::_msg(file!(), args))
+            return Err($crate::error::prelude::_msg(concat!(file!(), ":", line!(), ":", column!()), args))
         }};
     }
 

@@ -6,6 +6,77 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.8 - [2025-03-13]
+
+### Completion
+
+* (Fix) More rules to forbidden arg completion in https://github.com/Myriad-Dreamin/tinymist/pull/1493
+  * It were completing arguments from `#align[]|` or `#align()[]|`
+* (Fix) Don't check context type if parent is a block in https://github.com/Myriad-Dreamin/tinymist/pull/1494
+  * It were completing arguments from `#align[|]`, `#align([|])`, or `#align({|})`
+* (Fix) Forbid some bad cases of dot access in https://github.com/Myriad-Dreamin/tinymist/pull/1497
+  * It were issuing postfix completion from `$.|$` or `$ .| $`
+* Detecting explicit completion from vscode in https://github.com/Myriad-Dreamin/tinymist/pull/1496
+  * Requesting completion about `$|$` or `$abs(a)|$` took no effect.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.6...v0.13.8
+
+## v0.13.6 - [2025-03-13]
+
+We has provided more ways of previewing documents for editors having poor lsp support.
+- Default Preview: The editors supporting lsp commands, e.g. Neovim and helix, can use [`tinymist.startDefaultPreview`](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-default-preview) to start a browsing preview server directly.
+- Background Preview: The editors not supporting lsp commands can use the [background preview](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-background-preview) feature to start a preview server in background. You can bind a shortcut editor to open the preview in browser.
+
+See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dreamin/tinymist/issues/1237) for unimplemented features.
+
+* Provided tinymist documentation in PDF format in https://github.com/Myriad-Dreamin/tinymist/pull/1485
+
+### Compiler
+
+* (Fix) Getting task options from configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1449
+* (Fix) Displaying `ProjectInsId` without quoting in https://github.com/Myriad-Dreamin/tinymist/pull/1476
+  * This made document summary not working.
+* (Perf) Parallelizing and synchronously waiting font loading in https://github.com/Myriad-Dreamin/tinymist/pull/1470
+
+### Code Analysis
+
+* (Fix) Identifying chained dot access when matching atomic expression in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/1488 and https://github.com/Myriad-Dreamin/tinymist/pull/1489
+  * When completing `#a.b.|`, the second `.` was viewed as a text dot and failed to trigger the field completion. It now reparses correctly.
+* Made file type recognition by file extension case-insensitive in https://github.com/Myriad-Dreamin/tinymist/pull/1472
+  * For example, `IMAGE.PNG` is recognized as an image file now.
+
+### Editor
+
+* (Fix) Combining VS Code language specific default settings into one block by @0risc in https://github.com/Myriad-Dreamin/tinymist/pull/1462
+
+### Completion
+
+* (Fix) Skipping argument completion when the cursor is on the right parenthesis in https://github.com/Myriad-Dreamin/tinymist/pull/1480
+* (Fix) Distinguished content value from content type in https://github.com/Myriad-Dreamin/tinymist/pull/1482
+  * `math.op("+")` was wrongly inferred as an element function (type), instead of a value having the element type.
+* Adjusting range of label and reference completions in https://github.com/Myriad-Dreamin/tinymist/pull/1443 and https://github.com/Myriad-Dreamin/tinymist/pull/1444
+  * It becomes more sensible when you request completions from anywhere on the labels or references.
+* Unifying and improving function and method completion in https://github.com/Myriad-Dreamin/tinymist/pull/1478
+  * The was affecting `show outline.entry`. It was completing `e|` as `entry()` instead of `entry`.
+* Skip completion of types having no constructors or scopes in https://github.com/Myriad-Dreamin/tinymist/pull/1481
+  * For example, `content` is not completed.
+* Completing `std` module in https://github.com/Myriad-Dreamin/tinymist/pull/1483
+  * `std` is in neither global scope nor math scope, so we have to handle it manually.
+* Accepting arbitrary expressions in show rules in https://github.com/Myriad-Dreamin/tinymist/pull/1484
+  * For example, `show: s|` now can be completed as `show: std|`, and so that further completed as `show: std.scale(..)`. It was not working because modules were filtered out as not a valid show transform function.
+
+### Preview
+
+* Added support to run preview server in background in https://github.com/Myriad-Dreamin/tinymist/pull/1233
+* Added `tinymist.startDefaultPreview` and revised documentation about preview in https://github.com/Myriad-Dreamin/tinymist/pull/1448
+
+### Misc
+
+* Updated bug report and feature request template in https://github.com/Myriad-Dreamin/tinymist/pull/1454, https://github.com/Myriad-Dreamin/tinymist/pull/1455, https://github.com/Myriad-Dreamin/tinymist/pull/1456, https://github.com/Myriad-Dreamin/tinymist/pull/1457, and https://github.com/Myriad-Dreamin/tinymist/pull/1458
+* Logging `update_by_map` to debug zed configuration in https://github.com/Myriad-Dreamin/tinymist/pull/1474
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.4...v0.13.6
+
 ## v0.13.4 - [2025-03-02]
 
 ### Code Analysis
@@ -16,7 +87,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Fix) Using the background rect to calculate cursor 
 position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
-
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
 
@@ -155,7 +225,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 * (Fix) Fixed a panic when getting font index which is hit by comemo in https://github.com/Myriad-Dreamin/tinymist/pull/1213
   * This could be true when the fonts are hot reloaded.
-* (Fix) Emiting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
+* (Fix) Emitting latest status and artifact with correct signals (#1294) in https://github.com/Myriad-Dreamin/tinymist/pull/1330
   * Because of this, the compile status bar was not updated correctly.
 * (Perf) Detecting compilation-related vfs changes in https://github.com/Myriad-Dreamin/tinymist/pull/1199
 * (Perf) Scatter-gathering the editor diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1246
@@ -164,7 +234,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * Tracking fine-grained revisions of `font`, `registry`, `entry`, and `vfs` in https://github.com/Myriad-Dreamin/tinymist/pull/1192
   * This prepares for better configuration hot reloading in future.
 * Triggering project compilations on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/1197
-  * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unreleated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
+  * This helps apply more advanced compilation strategy with sync and mutable state on the main thread. For example, [Filtering out unrelated file changes](https://github.com/Myriad-Dreamin/tinymist/pull/1199) has been applied.
 ### Editor
 
 * Showing name of the compiling file in the status bar in https://github.com/Myriad-Dreamin/tinymist/pull/1147
@@ -204,7 +274,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * Added `depended_{paths,{source_,}files}` methods in https://github.com/Myriad-Dreamin/tinymist/pull/1150
 * Preferring to select the previous token when cursor is before a marker in https://github.com/Myriad-Dreamin/tinymist/pull/1175
 * Support more path types and add path parameters (#1312) in https://github.com/Myriad-Dreamin/tinymist/pull/1331
-  * Completes mutiple paths on `bibliography` and completes wasm files on `plugin`.
+  * Completes multiple paths on `bibliography` and completes wasm files on `plugin`.
 
 ### Crityp (New)
 
@@ -232,7 +302,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 
 ### Misc
 
-* Revised neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
+* Revised Neovim's install section by @SylvanFranklin and @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1090 and https://github.com/Myriad-Dreamin/tinymist/pull/1276
 * Added release instruction by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1163, https://github.com/Myriad-Dreamin/tinymist/pull/1169, https://github.com/Myriad-Dreamin/tinymist/pull/1173, and https://github.com/Myriad-Dreamin/tinymist/pull/1212
 * Documenting `sync-lsp` crate in https://github.com/Myriad-Dreamin/tinymist/pull/1155
 * CI used newest deploy-pages, upload-pages-artifact, and configure-pages actions in https://github.com/Myriad-Dreamin/tinymist/pull/1249 and https://github.com/Myriad-Dreamin/tinymist/pull/1251

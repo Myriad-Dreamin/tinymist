@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Command System")
+#show: book-page.with(title: [Command System])
 
 The extra features are exposed via LSP's #link("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand")[`workspace/executeCommand`] request, forming a command system. The commands in the system share a name convention.
 

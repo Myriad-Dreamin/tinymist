@@ -15,9 +15,9 @@ impl TypeChecker<'_> {
     pub(crate) fn check_syntax(&mut self, expr: &Expr) -> Option<Ty> {
         Some(match expr {
             Expr::Block(exprs) => self.check_block(exprs),
-            Expr::Array(elems) => self.check_array(elems),
-            Expr::Dict(elems) => self.check_dict(elems),
-            Expr::Args(args) => self.check_args(args),
+            Expr::Array(elems) => self.check_array(elems.span, &elems.args),
+            Expr::Dict(elems) => self.check_dict(elems.span, &elems.args),
+            Expr::Args(args) => self.check_args(&args.args),
             // todo: check pattern correctly
             Expr::Pattern(pattern) => self.check_pattern_exp(pattern),
             Expr::Element(element) => self.check_element(element),
@@ -53,7 +53,7 @@ impl TypeChecker<'_> {
         joiner.finalize()
     }
 
-    fn check_array(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_array(&mut self, arr_span: Span, elems: &[ArgExpr]) -> Ty {
         let mut elements = Vec::new();
 
         for elem in elems.iter() {
@@ -68,10 +68,12 @@ impl TypeChecker<'_> {
             }
         }
 
-        Ty::Tuple(elements.into())
+        let res = Ty::Tuple(elements.into());
+        self.info.witness_at_most(arr_span, res.clone());
+        res
     }
 
-    fn check_dict(&mut self, elems: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_dict(&mut self, dict_span: Span, elems: &[ArgExpr]) -> Ty {
         let mut fields = Vec::new();
 
         for elem in elems.iter() {
@@ -92,10 +94,12 @@ impl TypeChecker<'_> {
             }
         }
 
-        Ty::Dict(RecordTy::new(fields))
+        let res = Ty::Dict(RecordTy::new(fields));
+        self.info.witness_at_most(dict_span, res.clone());
+        res
     }
 
-    fn check_args(&mut self, args: &Interned<Vec<ArgExpr>>) -> Ty {
+    fn check_args(&mut self, args: &[ArgExpr]) -> Ty {
         let mut args_res = Vec::new();
         let mut named = vec![];
 
@@ -285,7 +289,7 @@ impl TypeChecker<'_> {
             self.check(content);
         }
 
-        Ty::Builtin(BuiltinTy::Element(element.elem))
+        Ty::Builtin(BuiltinTy::Content(Some(element.elem)))
     }
 
     fn check_unary(&mut self, unary: &Interned<UnExpr>) -> Ty {
@@ -448,7 +452,7 @@ impl TypeChecker<'_> {
 
         let selected = match selector {
             Some(selector) => Self::content_by_selector(selector)?,
-            None => Ty::Builtin(BuiltinTy::Content),
+            None => Ty::Builtin(BuiltinTy::Content(None)),
         };
 
         let show_fact = Ty::Func(SigTy::unary(selected, Ty::Any));
@@ -459,33 +463,38 @@ impl TypeChecker<'_> {
     }
 
     fn content_by_selector(selector: Ty) -> Option<Ty> {
+        #[inline(always)]
+        fn text_type() -> Ty {
+            Ty::Builtin(BuiltinTy::Content(Some(
+                Element::of::<typst::text::TextElem>(),
+            )))
+        }
+
         crate::log_debug_ct!("check selector {selector:?}");
 
         Some(match selector {
             Ty::With(with) => return Self::content_by_selector(with.sig.as_ref().clone()),
             Ty::Builtin(BuiltinTy::Type(ty)) => {
                 if ty == Type::of::<typst::foundations::Regex>() {
-                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                    text_type()
                 } else {
                     return None;
                 }
             }
-            Ty::Builtin(BuiltinTy::Element(..)) => selector,
+            Ty::Builtin(BuiltinTy::Element(ty)) => Ty::Builtin(BuiltinTy::Content(Some(ty))),
             Ty::Value(ins_ty) => match &ins_ty.val {
-                Value::Str(..) => {
-                    Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
-                }
-                Value::Content(c) => Ty::Builtin(BuiltinTy::Element(c.elem())),
+                Value::Str(..) => text_type(),
+                Value::Content(c) => Ty::Builtin(BuiltinTy::Content(Some(c.elem()))),
                 Value::Func(f) => {
                     if let Some(elem) = f.element() {
-                        Ty::Builtin(BuiltinTy::Element(elem))
+                        Ty::Builtin(BuiltinTy::Content(Some(elem)))
                     } else {
                         return None;
                     }
                 }
                 Value::Dyn(value) => {
                     if value.ty() == Type::of::<typst::foundations::Regex>() {
-                        Ty::Builtin(BuiltinTy::Element(Element::of::<typst::text::TextElem>()))
+                        text_type()
                     } else {
                         return None;
                     }
@@ -536,7 +545,7 @@ impl TypeChecker<'_> {
         if let Some(body) = content_ref.body.as_ref() {
             self.check(body);
         }
-        Ty::Builtin(BuiltinTy::Content)
+        Ty::Builtin(BuiltinTy::Content(None))
     }
 
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
@@ -545,7 +554,7 @@ impl TypeChecker<'_> {
     }
 
     fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
-        Ty::Builtin(BuiltinTy::Content)
+        Ty::Builtin(BuiltinTy::Content(None))
     }
 
     fn check_contextual(&mut self, expr: &Interned<Expr>) -> Ty {

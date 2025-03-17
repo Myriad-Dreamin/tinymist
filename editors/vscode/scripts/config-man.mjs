@@ -1,7 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "fs";
+import * as path from "path";
 
-const projectRoot = path.join(__dirname, "../../..");
+import { vscodeExtTranslations } from "../../../scripts/build-l10n.mjs";
+
+const projectRoot = path.join(import.meta.dirname, "../../..");
 
 const packageJsonPath = path.join(projectRoot, "editors/vscode/package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
@@ -11,6 +13,17 @@ const otherPackageJson = JSON.parse(fs.readFileSync(otherPackageJsonPath, "utf8"
 
 const config = packageJson.contributes.configuration.properties;
 const otherConfig = otherPackageJson.contributes.configuration.properties;
+
+const translate = (desc) => {
+  const translations = vscodeExtTranslations["en"];
+  desc = desc.replace(/\%(.*?)\%/g, (_, key) => {
+    if (!translations[key]) {
+      throw new Error(`Missing translation for ${key}`);
+    }
+    return translations[key];
+  });
+  return desc;
+};
 
 // Generate Configuration.md string
 
@@ -52,7 +65,7 @@ const matchRegion = (content, regionName) => {
 };
 
 const serverSideKeys = (() => {
-  const initPath = path.join(projectRoot, "crates/tinymist/src/init.rs");
+  const initPath = path.join(projectRoot, "crates/tinymist/src/config.rs");
   const initContent = fs.readFileSync(initPath, "utf8");
   const configItemContent = matchRegion(initContent, "Configuration Items");
   const strReg = /"([^"]+)"/g;
@@ -91,7 +104,7 @@ const configMd = (editor, prefix) => {
       markdownDeprecationMessage,
     } = config[key];
 
-    const description = markdownDescription || rawDescription;
+    const description = translate(markdownDescription || rawDescription);
 
     if (markdownDeprecationMessage) {
       return;
@@ -119,7 +132,7 @@ const configMd = (editor, prefix) => {
       // zip enum values and descriptions
       for (let i = 0; i < enumBase.length; i++) {
         if (enumBaseDescription?.[i]) {
-          enumSections.push(`  - \`${enumBase[i]}\`: ${enumBaseDescription[i]}`);
+          enumSections.push(`  - \`${enumBase[i]}\`: ${translate(enumBaseDescription[i])}`);
         } else {
           enumSections.push(`  - \`${enumBase[i]}\``);
         }
@@ -141,7 +154,7 @@ ${typeSection}${enumSection}${defaultSection}
     .join("\n");
 };
 
-const configMdPath = path.join(__dirname, "..", "Configuration.md");
+const configMdPath = path.join(import.meta.dirname, "..", "Configuration.md");
 
 fs.writeFileSync(
   configMdPath,
@@ -150,7 +163,10 @@ fs.writeFileSync(
 ${configMd("vscode", true)}`,
 );
 
-const configMdPathNeovim = path.join(__dirname, "../../../editors/neovim/Configuration.md");
+const configMdPathNeovim = path.join(
+  import.meta.dirname,
+  "../../../editors/neovim/Configuration.md",
+);
 
 fs.writeFileSync(
   configMdPathNeovim,

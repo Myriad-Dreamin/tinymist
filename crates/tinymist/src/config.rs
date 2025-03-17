@@ -1,7 +1,7 @@
+use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::project::font::TinymistFontResolver;
 use anyhow::bail;
 use clap::Parser;
 use itertools::Itertools;
@@ -10,232 +10,24 @@ use once_cell::sync::{Lazy, OnceCell};
 use reflexo::error::IgnoreLogging;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value as JsonValue};
+use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
-use tinymist_project::{
-    EntryResolver, ExportPdfTask, ExportTask, PathPattern, ProjectResolutionKind, ProjectTask,
-    TaskWhen,
-};
+use tinymist_l10n::DebugL10n;
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
+use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
-use typst_shim::utils::{Deferred, LazyHash};
-
-// todo: svelte-language-server responds to a Goto Definition request with
-// LocationLink[] even if the client does not report the
-// textDocument.definition.linkSupport capability.
+use typst_shim::utils::LazyHash;
 
 use super::*;
-use crate::project::ImmutDict;
-
-/// Capability to add valid commands to the arguments.
-pub trait AddCommands {
-    /// Adds commands to the arguments.
-    fn add_commands(&mut self, cmds: &[String]);
-}
-
-/// The regular initializer.
-pub struct RegularInit {
-    /// The connection to the client.
-    pub client: TypedLspClient<ServerState>,
-    /// The font options for the compiler.
-    pub font_opts: CompileFontArgs,
-    /// The commands to execute.
-    pub exec_cmds: Vec<String>,
-}
-
-impl AddCommands for RegularInit {
-    fn add_commands(&mut self, cmds: &[String]) {
-        self.exec_cmds.extend(cmds.iter().cloned());
-    }
-}
-
-impl Initializer for RegularInit {
-    type I = InitializeParams;
-    type S = ServerState;
-    /// The [`initialize`] request is the first request sent from the client to
-    /// the server.
-    ///
-    /// [`initialize`]: https://microsoft.github.io/language-server-protocol/specification#initialize
-    ///
-    /// This method is guaranteed to only execute once. If the client sends this
-    /// request to the server again, the server will respond with JSON-RPC
-    /// error code `-32600` (invalid request).
-    ///
-    /// # Panics
-    /// Panics if the const configuration is already initialized.
-    /// Panics if the cluster is already initialized.
-    ///
-    /// # Errors
-    /// Errors if the configuration could not be updated.
-    fn initialize(self, params: InitializeParams) -> (ServerState, AnySchedulableResponse) {
-        let (config, err) = Config::from_params(params, self.font_opts);
-
-        let super_init = SuperInit {
-            client: self.client,
-            exec_cmds: self.exec_cmds,
-            config,
-            err,
-        };
-
-        super_init.initialize(())
-    }
-}
-
-/// The super LSP initializer.
-pub struct SuperInit {
-    /// Using the connection to the client.
-    pub client: TypedLspClient<ServerState>,
-    /// The valid commands for `workspace/executeCommand` requests.
-    pub exec_cmds: Vec<String>,
-    /// The configuration for the server.
-    pub config: Config,
-    /// Whether an error occurred before super initialization.
-    pub err: Option<ResponseError>,
-}
-
-impl AddCommands for SuperInit {
-    fn add_commands(&mut self, cmds: &[String]) {
-        self.exec_cmds.extend(cmds.iter().cloned());
-    }
-}
-
-impl Initializer for SuperInit {
-    type I = ();
-    type S = ServerState;
-    fn initialize(self, _params: ()) -> (ServerState, AnySchedulableResponse) {
-        let SuperInit {
-            client,
-            exec_cmds,
-            config,
-            err,
-        } = self;
-        let const_config = config.const_config.clone();
-        // Bootstrap server
-        let service = ServerState::main(client, config, err.is_none());
-
-        if let Some(err) = err {
-            return (service, Err(err));
-        }
-
-        let semantic_tokens_provider = (!const_config.tokens_dynamic_registration).then(|| {
-            SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options())
-        });
-        let document_formatting_provider =
-            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
-
-        let file_operations = const_config.notify_will_rename_files.then(|| {
-            WorkspaceFileOperationsServerCapabilities {
-                will_rename: Some(FileOperationRegistrationOptions {
-                    filters: vec![FileOperationFilter {
-                        scheme: Some("file".to_string()),
-                        pattern: FileOperationPattern {
-                            glob: "**/*.typ".to_string(),
-                            matches: Some(FileOperationPatternKind::File),
-                            options: None,
-                        },
-                    }],
-                }),
-                ..WorkspaceFileOperationsServerCapabilities::default()
-            }
-        });
-
-        let res = InitializeResult {
-            capabilities: ServerCapabilities {
-                // todo: respect position_encoding
-                // position_encoding: Some(cc.position_encoding.into()),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                signature_help_provider: Some(SignatureHelpOptions {
-                    trigger_characters: Some(vec![
-                        String::from("("),
-                        String::from(","),
-                        String::from(":"),
-                    ]),
-                    retrigger_characters: None,
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                definition_provider: Some(OneOf::Left(true)),
-                references_provider: Some(OneOf::Left(true)),
-                completion_provider: Some(CompletionOptions {
-                    // Please update the language-configuration.json if you are changing this
-                    // setting.
-                    trigger_characters: Some(vec![
-                        String::from("#"),
-                        String::from("("),
-                        String::from("<"),
-                        String::from(","),
-                        String::from("."),
-                        String::from(":"),
-                        String::from("/"),
-                        String::from("\""),
-                        String::from("@"),
-                    ]),
-                    ..CompletionOptions::default()
-                }),
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
-                    TextDocumentSyncOptions {
-                        open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::INCREMENTAL),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
-                        ..TextDocumentSyncOptions::default()
-                    },
-                )),
-                semantic_tokens_provider,
-                execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: exec_cmds,
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                color_provider: Some(ColorProviderCapability::Simple(true)),
-                document_highlight_provider: Some(OneOf::Left(true)),
-                document_symbol_provider: Some(OneOf::Left(true)),
-                workspace_symbol_provider: Some(OneOf::Left(true)),
-                selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-                rename_provider: Some(OneOf::Right(RenameOptions {
-                    prepare_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                })),
-                document_link_provider: Some(DocumentLinkOptions {
-                    resolve_provider: None,
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                }),
-                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-                workspace: Some(WorkspaceServerCapabilities {
-                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                        supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
-                    }),
-                    file_operations,
-                }),
-                document_formatting_provider,
-                inlay_hint_provider: Some(OneOf::Left(true)),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
-                code_lens_provider: Some(CodeLensOptions {
-                    resolve_provider: Some(false),
-                }),
-
-                experimental: Some(json!({
-                  "onEnter": true,
-                })),
-                ..ServerCapabilities::default()
-            },
-            ..InitializeResult::default()
-        };
-
-        let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
-        (service, just_result(res))
-    }
-}
+use crate::project::font::TinymistFontResolver;
+use crate::project::{
+    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
+    ProjectTask, TaskWhen,
+};
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
@@ -318,7 +110,11 @@ impl Config {
     }
 
     /// Creates a new configuration from the lsp initialization parameters.
-    pub fn from_params(
+    ///
+    /// The function has side effects:
+    /// - Getting environment variables.
+    /// - Setting the locale.
+    pub fn extract_lsp_params(
         params: InitializeParams,
         font_opts: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
@@ -338,6 +134,11 @@ impl Config {
                 .collect(),
         };
         let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+
+        // Sets locale as soon as possible
+        if let Some(locale) = config.const_config.locale.as_ref() {
+            tinymist_l10n::set_locale(locale);
+        }
 
         let err = params.initialization_options.and_then(|init| {
             config
@@ -395,7 +196,11 @@ impl Config {
             }
             Ok(())
         } else {
-            bail!("got invalid configuration object {update}")
+            let msg = tinymist_l10n::t!(
+                "tinymist.config.invalidObject",
+                "got invalid configuration object"
+            );
+            bail!("{msg}: {update}")
         }
     }
 
@@ -403,7 +208,11 @@ impl Config {
     ///
     /// # Errors
     /// Errors if the update is invalid.
-    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
+        log::info!(
+            "LanguageState: config update_by_map {}",
+            serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
+        );
         macro_rules! assign_config {
             ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
                 let v = try_deserialize::<$ty>(update, $bind);
@@ -521,6 +330,8 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// The locale of the editor.
+    pub locale: Option<String>,
 }
 
 impl Default for ConstConfig {
@@ -552,6 +363,12 @@ impl From<&InitializeParams> for ConstConfig {
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
 
+        let locale = params
+            .initialization_options
+            .as_ref()
+            .and_then(|init| init.get("locale").and_then(|v| v.as_str()))
+            .or(params.locale.as_deref());
+
         Self {
             position_encoding,
             cfg_change_registration: try_or(|| workspace?.configuration, false),
@@ -561,6 +378,7 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            locale: locale.map(ToOwned::to_owned),
         }
     }
 }
@@ -579,7 +397,7 @@ pub struct CompileConfig {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Deferred<Arc<TinymistFontResolver>>>>,
+    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
     /// Notify the compile status to the editor.
     pub notify_status: bool,
     /// Enable periscope document in hover.
@@ -598,16 +416,20 @@ pub struct CompileConfig {
 
 impl CompileConfig {
     /// Updates the configuration with a JSON object.
-    pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
+    pub fn update(&mut self, update: &JsonValue) -> Result<()> {
         if let JsonValue::Object(update) = update {
             self.update_by_map(update)
         } else {
-            bail!("got invalid configuration object {update}")
+            tinymist_l10n::bail!(
+                "tinymist.config.invalidObject",
+                "got invalid configuration object: {object}",
+                object = update.debug_l10n(),
+            )
         }
     }
 
     /// Updates the configuration with a map.
-    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
         macro_rules! deser_or_default {
             ($key:expr, $ty:ty) => {
                 try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
@@ -620,7 +442,13 @@ impl CompileConfig {
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
-            _ => bail!("compileStatus must be either 'enable' or 'disable'"),
+            Some(value) => {
+                tinymist_l10n::bail!(
+                    "tinymist.config.badCompileStatus",
+                    "compileStatus must be either 'enable' or 'disable', got {value}",
+                    value = value.debug_l10n(),
+                );
+            }
         };
         self.color_theme = try_(|| Some(update.get("colorTheme")?.as_str()?.to_owned()));
         log::info!("color theme: {:?}", self.color_theme);
@@ -630,8 +458,14 @@ impl CompileConfig {
             Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
             Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
             Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
-                Ok(e) => Some(e),
-                Err(e) => bail!("failed to parse hoverPeriscope: {e}"),
+                Ok(args) => Some(args),
+                Err(err) => {
+                    tinymist_l10n::bail!(
+                        "tinymist.config.badHoverPeriscope",
+                        "failed to parse hoverPeriscope: {err}",
+                        err = err.debug_l10n(),
+                    );
+                }
             },
         };
         if let Some(args) = self.periscope_args.as_mut() {
@@ -640,34 +474,41 @@ impl CompileConfig {
             }
         }
 
+        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> Result<()> {
+            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+            tinymist_l10n::bail!(
+                "tinymist.config.badTypstExtraArgs",
+                "failed to parse typstExtraArgs: {err}, args: {args}",
+                err = err.debug_l10n(),
+                args = args.debug_l10n(),
+            )
+        }
+
         {
-            let typst_args: Vec<String> = match update
-                .get("typstExtraArgs")
-                .cloned()
-                .map(serde_json::from_value)
-            {
-                Some(Ok(e)) => e,
-                Some(Err(e)) => bail!("failed to parse typstExtraArgs: {e}"),
+            let raw_args = || update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+                Some(Ok(args)) => args,
+                Some(Err(err)) => return invalid_extra_args(&raw_args(), err),
                 // Even if the list is none, it should be parsed since we have env vars to retrieve.
                 None => Vec::new(),
             };
 
-            let command = match CompileOnceArgs::try_parse_from(
+            let args = match CompileOnceArgs::try_parse_from(
                 Some("typst-cli".to_owned()).into_iter().chain(typst_args),
             ) {
-                Ok(e) => e,
-                Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
+                Ok(args) => args,
+                Err(e) => return invalid_extra_args(&raw_args(), e),
             };
 
             // todo: the command.root may be not absolute
             self.typst_extra_args = Some(CompileExtraOpts {
-                inputs: command.resolve_inputs().unwrap_or_default(),
-                entry: command.input.map(|e| Path::new(&e).into()),
-                root_dir: command.root.as_ref().map(|r| r.as_path().into()),
-                font: command.font,
-                package: command.package,
-                creation_timestamp: command.creation_timestamp,
-                cert: command.cert.as_deref().map(From::from),
+                inputs: args.resolve_inputs().unwrap_or_default(),
+                entry: args.input.map(|e| Path::new(&e).into()),
+                root_dir: args.root.as_ref().map(|r| r.as_path().into()),
+                font: args.font,
+                package: args.package,
+                creation_timestamp: args.creation_timestamp,
+                cert: args.cert.as_deref().map(From::from),
             });
         }
 
@@ -750,17 +591,17 @@ impl CompileConfig {
     }
 
     /// Determines the font resolver.
-    pub fn determine_fonts(&self) -> Deferred<Arc<TinymistFontResolver>> {
+    pub fn determine_fonts(&self) -> Arc<TinymistFontResolver> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let opts = self.determine_font_opts();
 
             log::info!("creating SharedFontResolver with {opts:?}");
-            Derived(Deferred::new(|| {
+            Derived(
                 crate::project::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
-                    .expect("failed to create font book")
-            }))
+                    .expect("failed to create font book"),
+            )
         };
         self.fonts.get_or_init(font).clone().0
     }
@@ -823,7 +664,7 @@ impl CompileConfig {
     }
 
     /// Validates the configuration.
-    pub fn validate(&self) -> anyhow::Result<()> {
+    pub fn validate(&self) -> Result<()> {
         self.entry_resolver.validate()?;
 
         Ok(())
@@ -1121,11 +962,11 @@ mod tests {
             });
 
             let err = format!("{}", update_config(&mut config, &update).unwrap_err());
+            assert!(err.contains("typstExtraArgs"), "unexpected error: {err}");
             assert!(
-                err.contains("unexpected argument"),
+                err.contains(r#"String("main.typ")"#),
                 "unexpected error: {err}"
             );
-            assert!(err.contains("help"), "unexpected error: {err}");
         }
         {
             let mut config = Config::default();
@@ -1209,9 +1050,9 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config_initialize() {
+    fn test_default_lsp_config_initialize() {
         let (_conf, err) =
-            Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+            Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
     }
 
@@ -1221,7 +1062,7 @@ mod tests {
 
         temp_env::with_var("TYPST_PACKAGE_CACHE_PATH", Some(pkg_path), || {
             let (conf, err) =
-                Config::from_params(InitializeParams::default(), CompileFontArgs::default());
+                Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
             assert!(err.is_none());
             let applied_cache_path = conf
                 .compile

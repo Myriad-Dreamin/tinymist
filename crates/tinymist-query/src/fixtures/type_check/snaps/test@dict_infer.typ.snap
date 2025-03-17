@@ -2,12 +2,12 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/dict_infer.typ
-snapshot_kind: text
 ---
 "a" = {"a": "1"}
 "b" = ("1" | {"a": "1"}.a)
 =====
 5..6 -> @a
+9..22 -> {"a": "1"}
 29..30 -> @b
 33..34 -> @a
 33..36 -> ("1" | @v"a".a)

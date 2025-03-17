@@ -2,35 +2,31 @@
 
 mod args;
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::io;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
-use serde_json::Value as JsonValue;
-use sync_lsp::{
-    internal_error,
-    transport::{with_stdio_transport, MirrorArgs},
-    LspBuilder, LspClientRoot, LspResult,
+use sync_ls::transport::{with_stdio_transport, MirrorArgs};
+use sync_ls::{internal_error, LspBuilder, LspClientRoot, LspMessage, LspResult, RequestId};
+use tinymist::tool::project::{
+    compile_main, coverage_main, generate_script_main, project_main, task_main,
 };
-use tinymist::{tool::project::generate_script_main, world::TaskInputs};
-use tinymist::{
-    tool::project::{compile_main, project_main, task_main},
-    CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask,
-};
+use tinymist::world::TaskInputs;
+use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
+
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
 
 use crate::args::*;
 
@@ -62,13 +58,21 @@ fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    // Parse command line arguments
+    // Parses command line arguments
     let args = CliArguments::parse();
 
-    let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+    // Probes soon to avoid other initializations causing errors
+    if matches!(args.command, Some(Commands::Probe)) {
+        return Ok(());
+    }
 
-    // Start logging
+    // Loads translations
+    #[cfg(feature = "l10n")]
+    set_translations(load_translations(tinymist_assets::L10N_DATA)?);
+
+    // Starts logging
     let _ = {
+        let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
         use log::LevelFilter::*;
         let base_level = if is_transient_cmd { Warn } else { Info };
 
@@ -77,7 +81,7 @@ fn main() -> Result<()> {
             .filter_module("typst_preview", Debug)
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
-            .filter_module("sync_lsp", base_level)
+            .filter_module("sync_ls", base_level)
             .filter_module("reflexo_typst2vec::pass::span2vec", Error)
             .filter_module("reflexo_typst::diag::console", Info)
             .try_init()
@@ -85,6 +89,7 @@ fn main() -> Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Cov(args) => coverage_main(args),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
@@ -122,12 +127,12 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
         .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     log::info!("tinymist version information: {pairs:?}");
-    log::info!("starting Language server: {args:#?}");
+    log::info!("starting language server: {args:?}");
 
     let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        ServerState::install(LspBuilder::new(
+        ServerState::install_lsp(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
@@ -162,7 +167,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
         let roots = vec![ImmutPath::from(root_path)];
@@ -178,7 +183,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
             ..Config::default()
         };
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
@@ -199,14 +204,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let request_received = reflexo::time::Instant::now();
 
         let req_id: RequestId = 0.into();
-        client.register_request(
-            &lsp_server::Request {
-                id: req_id.clone(),
-                method: "tinymistExt/documentProfiling".to_owned(),
-                params: JsonValue::Null,
-            },
-            request_received,
-        );
+        client.register_request("tinymistExt/documentProfiling", &req_id, request_received);
 
         let state = service.state_mut().unwrap();
 
@@ -233,14 +231,14 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
 pub fn query_main(cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
 
-    with_stdio_transport(MirrorArgs::default(), |conn| {
+    with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
 
         // todo: roots, inputs, font_opts
         let config = Config::default();
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),

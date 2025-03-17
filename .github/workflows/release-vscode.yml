@@ -52,11 +52,13 @@ jobs:
           node-version: 22
       - name: Install deps
         run: yarn install
-      - name: Check and build typst-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Check and build assets
         run: |
           yarn build:preview
-      - uses: Swatinem/rust-cache@v2
+          yarn build:l10n
       - run: cargo clippy --workspace --all-targets
+      - run: scripts/feature-testing.sh
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
       - name: Generate completions
@@ -198,6 +200,21 @@ jobs:
         run: |
           cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
+      # todo: pdf documentation for all platforms
+      - name: Build PDF Documentation
+        run: |
+          cargo run --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
+          cp docs/tinymist/ebook.pdf tinymist-docs.pdf
+          mkdir -p contrib/html/editors/vscode/out/ editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+          cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
+        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Upload PDF Documentation
+        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+          path: tinymist-docs.pdf
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
@@ -447,7 +464,7 @@ jobs:
           name: tinymist-${{ env.target }}-npm
           path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
       - name: Package extension
-        if: "!fromJson(env.isNightly)"
+        if: '!fromJson(env.isNightly)'
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
       - name: Package extension (Nightly)

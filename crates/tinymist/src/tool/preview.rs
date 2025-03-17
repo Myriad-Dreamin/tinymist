@@ -20,9 +20,8 @@ use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
-use sync_lsp::just_ok;
+use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{LspWorld, ProjectInsId, WorldProvider};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
@@ -38,8 +37,8 @@ use typst_preview::{
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
-    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, ProjectClient,
-    ProjectCompiler, ProjectState,
+    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, LspWorld,
+    ProjectClient, ProjectCompiler, ProjectInsId, ProjectState, WorldProvider,
 };
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -630,38 +629,42 @@ pub async fn make_http_server(
         .unwrap();
     let addr = listener.local_addr().unwrap();
     log::info!("preview server listening on http://{addr}");
-    let expected_port = addr.port();
 
     let frontend_html = hyper::body::Bytes::from(frontend_html);
-    let expected_origin = format!("http://{static_file_addr}");
     let make_service = move || {
         let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
-        let expected_origin = expected_origin.clone();
+        let static_file_addr = static_file_addr.clone();
         service_fn(move |mut req: hyper::Request<Incoming>| {
             let frontend_html = frontend_html.clone();
             let websocket_tx = websocket_tx.clone();
-            let expected_origin = expected_origin.clone();
+            let static_file_addr = static_file_addr.clone();
             async move {
-                // Check if the request is a websocket upgrade request.
-                let response = if hyper_tungstenite::is_upgrade_request(&req) {
-                    // Any website a user visits in a browser can connect to our websocket server on
-                    // 127.0.0.1 because CORS does not work for websockets. Thus, check the `Origin`
-                    // header ourselves. See the comment on CORS below for more details.
-                    //
-                    // The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
-                    // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
-                    // `Origin` starting with `vscode-webview://` as well. I
-                    // think that's okay from a security point of view, because
-                    // I think malicious websites can't trick browsers into sending
-                    // `vscode-webview://...` as `Origin`.
-                    let origin_header = req.headers().get("Origin");
-                    if origin_header
-                        .is_some_and(|h| !is_valid_origin(h, &expected_origin, expected_port))
-                    {
-                        anyhow::bail!("websocket connection with unexpected `Origin` header. Closing connection");
-                    }
+                // When a user visits a website in a browser, that website can try to connect to
+                // our http / websocket server on `127.0.0.1` which may leak sensitive
+                // information. We could use CORS headers to explicitly disallow
+                // this. However, for Websockets, this does not work. Thus, we
+                // manually check the `Origin` header. Browsers always send this
+                // header for cross-origin requests.
+                //
+                // Important: This does _not_ protect against malicious users that share the
+                // same computer as us (i.e. multi- user systems where the users
+                // don't trust each other). In this case, malicious attackers can _still_
+                // connect to our http / websocket servers (using a browser and
+                // otherwise). And additionally they can impersonate a tinymist
+                // http / websocket server towards a legitimate frontend/html client.
+                // This requires additional protection that may be added in the future.
+                let origin_header = req.headers().get("Origin");
+                if origin_header
+                    .is_some_and(|h| !is_valid_origin(h, &static_file_addr, addr.port()))
+                {
+                    anyhow::bail!(
+                        "Connection with unexpected `Origin` header. Closing connection."
+                    );
+                }
 
+                // Check if the request is a websocket upgrade request.
+                if hyper_tungstenite::is_upgrade_request(&req) {
                     if origin_header.is_none() {
                         log::error!("websocket connection is not set `Origin` header, which will be a hard error in the future.");
                     }
@@ -682,7 +685,7 @@ pub async fn make_http_server(
                         .header(hyper::header::CONTENT_TYPE, "text/html")
                         .body(Full::<Bytes>::from(frontend_html))
                         .unwrap();
-                    Ok::<_, anyhow::Error>(res)
+                    Ok(res)
                 } else {
                     // jump to /
                     let res = hyper::Response::builder()
@@ -691,33 +694,7 @@ pub async fn make_http_server(
                         .body(Full::<Bytes>::default())
                         .unwrap();
                     Ok(res)
-                };
-
-                // When a user visits a website in a browser, that website can try to connect to
-                // our http / websocket server on `127.0.0.1` which may leak
-                // sensitive information. Thus, use CORS to explicitly disallow this.
-                //
-                // However, for Websockets, CORS does not work. Thus, we have additional checks
-                // of the `Origin` header above in the websocket upgrade path.
-                //
-                // Strictly speaking, setting the `Access-Control-Allow-Origin` header is not
-                // required here since browsers disallow cross origin access
-                // also when that header is missing. But I think it's better to be explicit.
-                //
-                // Important: This does _not_ protect against malicious users that share the
-                // same computer as us (i.e. multi- user systems where the users
-                // don't trust each other). In this case, malicious attackers can _still_
-                // connect to our http / websocket servers (using a browser and
-                // otherwise). And additionally they can impersonate a tinymist
-                // http / websocket server towards a legitimate frontend/html client.
-                // This requires additional protection that may be added in the future.
-                response.map(|mut response| {
-                    response.headers_mut().insert(
-                        hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN,
-                        HeaderValue::from_str(&expected_origin).unwrap(),
-                    );
-                    response
-                })
+                }
             }
         })
     };
@@ -783,58 +760,68 @@ pub async fn make_http_server(
     }
 }
 
-fn is_valid_origin(h: &HeaderValue, expected_origin: &str, expected_port: u16) -> bool {
-    struct SystemValidOriginContext;
-    impl ValidOriginContext for SystemValidOriginContext {
-        fn gitpod_suffix(&self) -> Option<&(String, String)> {
-            // A bit of hack, this is the copy code from the `editors/vscode/src/gitpod.ts`
-            // to ensure no regression is made. We should receive more reports from
-            // users to check if we can have a way to check valid origins sensibly.
-            static GITPOD_URL_SUFFIX: LazyLock<Option<(String, String)>> = LazyLock::new(|| {
-                let workspace_id = std::env::var("GITPOD_WORKSPACE_ID").ok();
-                let cluster_host = std::env::var("GITPOD_WORKSPACE_CLUSTER_HOST").ok();
-                workspace_id.zip(cluster_host)
-            });
+fn is_valid_origin(h: &HeaderValue, static_file_addr: &str, expected_port: u16) -> bool {
+    static GITPOD_ID_AND_HOST: LazyLock<Option<(String, String)>> = LazyLock::new(|| {
+        let workspace_id = std::env::var("GITPOD_WORKSPACE_ID").ok();
+        let cluster_host = std::env::var("GITPOD_WORKSPACE_CLUSTER_HOST").ok();
+        workspace_id.zip(cluster_host)
+    });
 
-            GITPOD_URL_SUFFIX.as_ref()
-        }
-    }
-
-    is_valid_origin_impl(h, expected_origin, expected_port, &SystemValidOriginContext)
+    is_valid_origin_impl(h, static_file_addr, expected_port, &GITPOD_ID_AND_HOST)
 }
 
-trait ValidOriginContext {
-    fn gitpod_suffix(&self) -> Option<&(String, String)>;
-}
-
+// Separate function so we can do gitpod-related tests without relying on env
+// vars.
 fn is_valid_origin_impl(
-    h: &HeaderValue,
-    expected_origin: &str,
+    origin_header: &HeaderValue,
+    static_file_addr: &str,
     expected_port: u16,
-    context: &impl ValidOriginContext,
+    gitpod_id_and_host: &Option<(String, String)>,
 ) -> bool {
-    h.as_bytes().starts_with(b"vscode-webview://") || {
-        // Matches the origin of the local listening port.
-        let matched = std::str::from_utf8(h.as_bytes()).ok().and_then(|h| {
-            let url = Url::parse(h).ok()?;
-            let valid = (matches!(url.scheme(), "http" | "https")
-                && url.host_str().is_some_and(|host| {
-                    // todo: allocate memory here.
-                    (matches!(host, "localhost" | "127.0.0.1")
-                        || Url::parse(&format!("http://{expected_origin}"))
-                            .ok()
-                            .is_some_and(|expected| Some(host) == expected.host_str())
-                        || context
-                            .gitpod_suffix()
-                            .is_some_and(|(workspace_id, cluster_host)| {
-                                *host == format!("{expected_port}-{workspace_id}.{cluster_host}")
-                            }))
-                }));
+    let Ok(Ok(origin_url)) = origin_header.to_str().map(Url::parse) else {
+        return false;
+    };
 
-            valid.then_some(())
+    // Path is not allowed in Origin headers
+    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin
+    if origin_url.path() != "/" && origin_url.path() != "" {
+        return false;
+    };
+
+    let expected_origin = {
+        let expected_host = Url::parse(&format!("http://{static_file_addr}")).unwrap();
+        let expected_host = expected_host.host_str().unwrap();
+        // Don't take the port from `static_file_addr` (it may have a dummy port e.g.
+        // `127.0.0.1:0`)
+        format!("http://{expected_host}:{expected_port}")
+    };
+
+    let gitpod_expected_origin = gitpod_id_and_host
+        .as_ref()
+        .map(|(workspace_id, cluster_host)| {
+            format!("https://{expected_port}-{workspace_id}.{cluster_host}")
         });
-        matched.is_some()
-    }
+
+    *origin_header == expected_origin
+        // tmistele (PR #1382): The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
+        // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
+        // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
+        // point of view, because I think malicious websites can't trick browsers into sending
+        // `vscode-webview://...` as `Origin`.
+        || origin_url.scheme() == "vscode-webview"
+        // `code-server` also needs an exception: It opens `http://localhost:8080/proxy/<port>` in
+        // the browser and proxies requests through to tinymist (which runs at `127.0.0.1:<port>`).
+        // Thus, the `Origin` header will be `http://localhost:8080` which doesn't match what
+        // we expect. Thus, just always allow anything from localhost/127.0.0.1
+        // https://github.com/Myriad-Dreamin/tinymist/issues/1350
+        || (
+            matches!(origin_url.host_str(), Some("localhost") | Some("127.0.0.1"))
+            && origin_url.scheme() == "http"
+        )
+        // `gitpod` also needs an exception. It loads `https://<port>-<workspace>.<host>` in the browser
+        // and proxies requests through to tinymist (which runs as `127.0.0.1:<port>`).
+        // We can detect this by looking at the env variables (see `GITPOD_ID_AND_HOST` in `is_valid_origin(..)`)
+        || gitpod_expected_origin.is_some_and(|o| o == *origin_header)
 }
 
 /// Entry point of the preview tool.
@@ -1218,8 +1205,8 @@ fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver
 mod tests {
     use super::*;
 
-    fn check_origin(origin: &'static str, expected: &str, port: u16) -> bool {
-        is_valid_origin(&HeaderValue::from_static(origin), expected, port)
+    fn check_origin(origin: &'static str, static_file_addr: &str, port: u16) -> bool {
+        is_valid_origin(&HeaderValue::from_static(origin), static_file_addr, port)
     }
 
     #[test]
@@ -1278,12 +1265,12 @@ mod tests {
 
     #[test]
     fn test_origin_manually_binding() {
-        assert!(check_origin("https://huh.io:8080", "huh.io:42", 42));
-        assert!(check_origin("http://huh.io:8080", "huh.io:42", 42));
-        assert!(check_origin("https://huh.io:443", "huh.io:42", 42));
+        assert!(!check_origin("https://huh.io:8080", "huh.io:42", 42));
+        assert!(!check_origin("http://huh.io:8080", "huh.io:42", 42));
+        assert!(!check_origin("https://huh.io:443", "huh.io:42", 42));
         assert!(check_origin("http://huh.io:42", "huh.io:0", 42));
-        assert!(check_origin("http://huh.io", "huh.io:42", 42));
-        assert!(check_origin("https://huh.io", "huh.io:42", 42));
+        assert!(!check_origin("http://huh.io", "huh.io:42", 42));
+        assert!(!check_origin("https://huh.io", "huh.io:42", 42));
 
         assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
         assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
@@ -1304,15 +1291,12 @@ mod tests {
     #[test]
     fn test_valid_origin_code_server_proxy() {
         assert!(check_origin(
-            "http://localhost:8080/proxy/45411",
+            // The URL has path /proxy/45411 but that is not sent in the Origin header
+            "http://localhost:8080",
             "127.0.0.1:42",
             42
         ));
-        assert!(check_origin(
-            "http://localhost/proxy/42",
-            "127.0.0.1:42",
-            42
-        ));
+        assert!(check_origin("http://localhost", "127.0.0.1:42", 42));
     }
 
     // the origin of gitpod
@@ -1320,23 +1304,16 @@ mod tests {
     fn test_valid_origin_gitpod_proxy() {
         fn check_gitpod_origin(
             origin: &'static str,
-            expected: &str,
+            static_file_addr: &str,
             port: u16,
             workspace: &str,
             cluster_host: &str,
         ) -> bool {
-            struct MockValidOriginContext((String, String));
-            impl ValidOriginContext for MockValidOriginContext {
-                fn gitpod_suffix(&self) -> Option<&(String, String)> {
-                    Some(&self.0)
-                }
-            }
-
             is_valid_origin_impl(
                 &HeaderValue::from_static(origin),
-                expected,
+                static_file_addr,
                 port,
-                &MockValidOriginContext((workspace.to_owned(), cluster_host.to_owned())),
+                &Some((workspace.to_owned(), cluster_host.to_owned())),
             )
         }
 
@@ -1352,15 +1329,17 @@ mod tests {
 
         assert!(check_gitpod_origin1("http://127.0.0.1:42"));
         assert!(check_gitpod_origin1("http://127.0.0.1:42"));
-        assert!(check_gitpod_origin1("http://42-workspace_id.gitpod.typ"));
-        assert!(check_gitpod_origin1(
-            "http://42-workspace_id.gitpod.typ/path"
-        ));
-        assert!(check_gitpod_origin1("http://42-workspace_id.gitpod.typ:42"));
-
+        assert!(check_gitpod_origin1("https://42-workspace_id.gitpod.typ"));
         assert!(!check_gitpod_origin1(
-            "http://42-workspace_id2.gitpod.typ:42"
+            // A path is not allowed in Origin header
+            "https://42-workspace_id.gitpod.typ/path"
         ));
+        assert!(!check_gitpod_origin1(
+            // Gitpod always runs on default port
+            "https://42-workspace_id.gitpod.typ:42"
+        ));
+
+        assert!(!check_gitpod_origin1("https://42-workspace_id2.gitpod.typ"));
         assert!(!check_gitpod_origin1("http://huh.io"));
         assert!(!check_gitpod_origin1("https://huh.io"));
     }

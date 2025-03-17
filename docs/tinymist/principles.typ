@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Principles")
+#show: book-page.with(title: [Principles])
 
 Four principles are followed.
 

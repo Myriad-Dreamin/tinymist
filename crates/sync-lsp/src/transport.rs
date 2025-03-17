@@ -7,7 +7,7 @@ use std::{
 
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 
-use crate::{Connection, ConnectionRx, ConnectionTx, Message};
+use crate::{Connection, ConnectionRx, ConnectionTx, GetMessageKind, Message};
 
 /// Convenience cli arguments for setting up a transport with an optional mirror
 /// or replay file.
@@ -18,7 +18,7 @@ use crate::{Connection, ConnectionRx, ConnectionTx, Message};
 /// # Example
 ///
 /// The example below shows the typical usage of the `MirrorArgs` struct.
-/// It records an LSP session and replays it to compare the output.
+/// It records an LSP or DAP session and replays it to compare the output.
 ///
 /// If the language server has stable output, the replayed output should be the
 /// same.
@@ -42,9 +42,18 @@ pub struct MirrorArgs {
 }
 
 /// Note that we must have our logging only write out to stderr.
-pub fn with_stdio_transport(
+pub fn with_stdio_transport<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
     args: MirrorArgs,
-    f: impl FnOnce(Connection) -> anyhow::Result<()>,
+    f: impl FnOnce(Connection<M>) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    with_stdio_transport_impl(args, M::get_message_kind(), |conn| f(conn.into()))
+}
+
+/// Note that we must have our logging only write out to stderr.
+fn with_stdio_transport_impl(
+    args: MirrorArgs,
+    kind: crate::MessageKind,
+    f: impl FnOnce(Connection<Message>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     // Set up input and output
     let replay = args.replay.clone();
@@ -71,17 +80,19 @@ pub fn with_stdio_transport(
 
     // Create the transport. Includes the stdio (stdin and stdout) versions but this
     // could also be implemented to use sockets or HTTP.
-    let (lsp_sender, lsp_receiver, io_threads) = io_transport(i, o);
+    let (lsp_sender, lsp_receiver, io_threads) = io_transport(kind, i, o);
     let connection = Connection {
         // lsp_sender,
         // lsp_receiver,
         sender: ConnectionTx {
             event: event_sender,
             lsp: lsp_sender,
+            marker: std::marker::PhantomData,
         },
         receiver: ConnectionRx {
             event: event_receiver,
             lsp: lsp_receiver,
+            marker: std::marker::PhantomData,
         },
     };
 
@@ -98,14 +109,14 @@ pub fn with_stdio_transport(
 ///
 /// ```
 /// use std::io::{stdin, stdout};
-/// use sync_lsp::transport::{io_transport, IoThreads};
-/// use lsp_server::Message;
+/// use sync_ls::{Message, MessageKind, transport::{io_transport, IoThreads}};
 /// use crossbeam_channel::{bounded, Receiver, Sender};
 /// pub fn stdio_transport() -> (Sender<Message>, Receiver<Message>, IoThreads) {
-///   io_transport(|| stdin().lock(), || stdout().lock())
+///   io_transport(MessageKind::Lsp, || stdin().lock(), || stdout().lock())
 /// }
 /// ```
 pub fn io_transport<I: BufRead, O: Write>(
+    kind: crate::MessageKind,
     inp: impl FnOnce() -> I + Send + Sync + 'static,
     out: impl FnOnce() -> O + Send + Sync + 'static,
 ) -> (Sender<Message>, Receiver<Message>, IoThreads) {
@@ -122,14 +133,24 @@ pub fn io_transport<I: BufRead, O: Write>(
     let (reader_sender, reader_receiver) = bounded::<Message>(0);
     let reader = thread::spawn(move || {
         let mut inp = inp();
-        while let Some(msg) = Message::read(&mut inp)? {
-            let is_exit = matches!(&msg, Message::Notification(n) if n.method == "exit");
+        let read_impl = match kind {
+            #[cfg(feature = "lsp")]
+            crate::MessageKind::Lsp => Message::read_lsp::<I>,
+            #[cfg(feature = "dap")]
+            crate::MessageKind::Dap => Message::read_dap::<I>,
+        };
+        while let Some(msg) = read_impl(&mut inp)? {
+            #[cfg(feature = "lsp")]
+            use crate::LspMessage;
+            #[cfg(feature = "lsp")]
+            let is_exit = matches!(&msg, Message::Lsp(LspMessage::Notification(n)) if n.is_exit());
 
             log::trace!("sending message {:#?}", msg);
             reader_sender
                 .send(msg)
                 .expect("receiver was dropped, failed to send a message");
 
+            #[cfg(feature = "lsp")]
             if is_exit {
                 break;
             }

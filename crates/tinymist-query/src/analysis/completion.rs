@@ -10,6 +10,7 @@ use lsp_types::InsertTextFormat;
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
+use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -49,6 +50,7 @@ use crate::upstream::{plain_docs_sentence, summarize_font_family};
 use super::SharedContext;
 
 mod field_access;
+mod func;
 mod import;
 mod kind;
 mod mode;
@@ -631,12 +633,21 @@ impl CompletionPair<'_, '_, '_> {
             | None => {}
         }
 
+        let cursor_pos = bad_completion_cursor(
+            self.cursor.syntax.as_ref(),
+            self.cursor.syntax_context.as_ref(),
+            &self.cursor.leaf,
+        );
+
         // Triggers a complete type checking.
         let ty = self
             .worker
             .ctx
             .post_type_of_node(self.cursor.leaf.clone())
-            .filter(|ty| !matches!(ty, Ty::Any));
+            .filter(|ty| !matches!(ty, Ty::Any))
+            // Forbids argument completion list if the cursor is in a bad position. This will
+            // prevent the completion list from showing up.
+            .filter(|_| !matches!(cursor_pos, Some(BadCompletionCursor::ArgListPos)));
 
         crate::log_debug_ct!(
             "complete_type: {:?} -> ({surrounding_syntax:?}, {ty:#?})",

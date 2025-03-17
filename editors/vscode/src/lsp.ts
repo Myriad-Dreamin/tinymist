@@ -14,8 +14,8 @@ import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from "./util";
-import { substVscodeVarsInConfig } from "./config";
-import { wordCountItemProcess } from "./ui-extends";
+import { substVscodeVarsInConfig, TinymistConfig } from "./config";
+import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
 
 interface ResourceRoutes {
@@ -121,7 +121,7 @@ export class LanguageState {
     const binaryName = "tinymist" + binarySuffix;
 
     const serverPaths: [string, string][] = configPath
-      ? [[`\`${configName}\` (${configPath})`, configPath as string]]
+      ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
           ["Bundled", resolve(__dirname, binaryName)],
           ["In PATH", binaryName],
@@ -162,7 +162,7 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: Record<string, any>) {
+  initClient(config: TinymistConfig) {
     const context = this.context;
     const isProdMode = context.extensionMode === ExtensionMode.Production;
 
@@ -176,7 +176,7 @@ export class LanguageState {
     const RUST_BACKTRACE = isProdMode ? "1" : "full";
 
     const run = {
-      command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
+      command: config.probedServerPath,
       args: ["lsp", ...mirrorFlag],
       options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
     };
@@ -228,8 +228,8 @@ export class LanguageState {
 
               // outline all data "data:image/svg+xml;base64," to render huge image correctly
               content.value = content.value.replace(
-                /\"data\:image\/svg\+xml\;base64,([^\"]*)\"/g,
-                (_, content) => hoverHandler.storeImage(content),
+                /"data:image\/svg\+xml;base64,([^"]*)"/g,
+                (_, content: string) => hoverHandler.storeImage(content),
               );
             }
           }
@@ -257,7 +257,7 @@ export class LanguageState {
       throw new Error("Language client is not set");
     }
 
-    client.onNotification("tinymist/compileStatus", (params) => {
+    client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
 
@@ -508,13 +508,13 @@ export class LanguageState {
         {
           // Parent doc single-line comment
           // e.g. //!|
-          beforeText: /^\s*\/{2}\!.*$/,
+          beforeText: /^\s*\/{2}!.*$/,
           action: { indentAction, appendText: "//! " },
         },
         {
           // Begins an auto-closed multi-line comment (standard or parent doc)
           // e.g. /** | */ or /*! | */
-          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
           afterText: /^\s*\*\/$/,
           action: {
             indentAction: vscode.IndentAction.IndentOutdent,
@@ -524,19 +524,19 @@ export class LanguageState {
         {
           // Begins a multi-line comment (standard or parent doc)
           // e.g. /** ...| or /*! ...|
-          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
           action: { indentAction, appendText: " * " },
         },
         {
           // Continues a multi-line comment
           // e.g.  * ...|
-          beforeText: /^(\ \ )*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+          beforeText: /^( {2})* \*( ([^*]|\*(?!\/))*)?$/,
           action: { indentAction, appendText: "* " },
         },
         {
           // Dedents after closing a multi-line comment
           // e.g.  */|
-          beforeText: /^(\ \ )*\ \*\/\s*$/,
+          beforeText: /^( {2})* \*\/\s*$/,
           action: { indentAction, removeText: 1 },
         },
       ];
@@ -546,8 +546,7 @@ export class LanguageState {
     // todo: document difference here.
     //
     // https://code.visualstudio.com/api/language-extensions/language-configuration-guide#word-pattern
-    const wordPattern =
-      /(-?\d*.\d\w*)|([^\`\~\!\@\#\$\%\^\&\*\(\)\=\+\[\{\]\}\\\|\;\:\'\"\,\.<\>\/\?\s]+)/;
+    const wordPattern = /(-?\d*.\d\w*)|([^`~!@#$%^&*()=+[{\]}\\|;:'",.<>/?\s]+)/;
 
     console.log("Setting up language configuration", typingContinueCommentsOnNewline);
     this.configureLang = vscode.languages.setLanguageConfiguration("typst", {

@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on n (32..33)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/keyword_ident.typ
-snapshot_kind: text
 ---
 [
  {
@@ -15,7 +14,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "inset"
     },
-    "sortText": "007",
+    "sortText": "006",
     "textEdit": {
      "newText": "inset: ${1:}",
      "range": {

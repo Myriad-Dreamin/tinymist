@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (33..34)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/arg_range2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]

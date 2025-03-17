@@ -5,8 +5,8 @@ use std::{
     process::Command,
 };
 
-use lsp_server::RequestId;
 use serde_json::{json, Value};
+use sync_ls::{lsp, RequestId};
 
 fn handle_io<T>(res: io::Result<T>) -> T {
     match res {
@@ -71,7 +71,7 @@ fn exec_output<'a>(cmd: &str, args: impl IntoIterator<Item = &'a str>) -> Vec<u8
 
 struct ReplayBuilder {
     id: i32,
-    messages: Vec<lsp_server::Message>,
+    messages: Vec<lsp::Message>,
 }
 
 impl ReplayBuilder {
@@ -79,9 +79,7 @@ impl ReplayBuilder {
         let id = RequestId::from(self.id);
         self.id += 1;
         self.messages
-            .push(lsp_server::Message::Request(lsp_server::Request::new(
-                id, method, req,
-            )));
+            .push(lsp::Message::Request(lsp::Request::new(id, method, req)));
     }
 
     fn request<R: lsp_types::request::Request>(&mut self, req: Value) {
@@ -89,9 +87,10 @@ impl ReplayBuilder {
     }
 
     fn notify_(&mut self, method: String, params: Value) {
-        self.messages.push(lsp_server::Message::Notification(
-            lsp_server::Notification::new(method, params),
-        ));
+        self.messages
+            .push(lsp::Message::Notification(lsp::Notification::new(
+                method, params,
+            )));
     }
 
     fn notify<N: lsp_types::notification::Notification>(&mut self, params: Value) {
@@ -122,11 +121,11 @@ fn gen(root: &Path, f: impl FnOnce(&mut ReplayBuilder)) {
     }
 }
 
-fn messages(output: Vec<u8>) -> Vec<lsp_server::Message> {
+fn messages(output: Vec<u8>) -> Vec<lsp::Message> {
     let mut output = std::io::BufReader::new(output.as_slice());
     // read all messages
     let mut messages = Vec::new();
-    while let Ok(Some(msg)) = lsp_server::Message::read(&mut output) {
+    while let Ok(Some(msg)) = lsp::Message::read(&mut output) {
         // match msg
         messages.push(msg);
     }
@@ -332,12 +331,12 @@ fn replay_log(tinymist_binary: &Path, root: &Path) -> String {
     let log_file = root.join("mirror.log").to_str().unwrap().to_owned();
     let mut res = messages(exec_output(tinymist_binary, ["lsp", "--replay", &log_file]));
     // retain not notification
-    res.retain(|msg| matches!(msg, lsp_server::Message::Response(_)));
+    res.retain(|msg| matches!(msg, lsp::Message::Response(_)));
     // sort by id
     res.sort_by_key(|msg| match msg {
-        lsp_server::Message::Request(req) => req.id.clone(),
-        lsp_server::Message::Response(res) => res.id.clone(),
-        lsp_server::Message::Notification(_) => RequestId::from(0),
+        lsp::Message::Request(req) => req.id.clone(),
+        lsp::Message::Response(res) => res.id.clone(),
+        lsp::Message::Notification(_) => RequestId::from(0),
     });
     // print to result.log
     let res = serde_json::to_value(&res).unwrap();
@@ -374,7 +373,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:2655017d733b6c6c753d92c5d5bbc65d");
+        insta::assert_snapshot!(hash, @"siphash128_13:ce179598883927533514674aa7930054");
     }
 
     {
@@ -385,7 +384,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:934ee53fdb376bbeba357953499f7a5f");
+        insta::assert_snapshot!(hash, @"siphash128_13:60813619e4478214e898a3d277ac031b");
     }
 }
 

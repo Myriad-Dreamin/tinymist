@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on o  (31..33)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
-snapshot_kind: text
 ---
 [
  {
@@ -15,7 +14,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "array | text.font"
     },
-    "sortText": "011",
+    "sortText": "010",
     "textEdit": {
      "newText": "font: ${1:}, ",
      "range": {
@@ -41,7 +40,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "array | text.font"
     },
-    "sortText": "011",
+    "sortText": "010",
     "textEdit": {
      "newText": "font: ${1:}",
      "range": {

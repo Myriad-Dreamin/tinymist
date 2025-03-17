@@ -8,11 +8,11 @@ export function isGitpod(): boolean {
 
 /**
  * Create a Gitpod URL for the given URL string.
- * @param urlstr The URL string to create a Gitpod URL for.
+ * @param urlStr The URL string to create a Gitpod URL for.
  * @return The Gitpod URL
  */
-export function translateGitpodURL(urlstr: string): string {
-  const url = new URL(urlstr);
+export function translateGitpodURL(urlStr: string): string {
+  const url = new URL(urlStr);
   if (!url.port) {
     throw new Error("port is not specified in the URL");
   }

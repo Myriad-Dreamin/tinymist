@@ -148,7 +148,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::Space => return None,
             BuiltinTy::Break => return None,
             BuiltinTy::Continue => return None,
-            BuiltinTy::Content => return None,
+            BuiltinTy::Content(..) => return None,
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,
             BuiltinTy::Tag(..) => return None,
@@ -308,7 +308,16 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                         true,
                         Some(docs),
                     );
-                } else {
+                } else if ty.scope().iter().any(|(_, b)| {
+                    if let Value::Func(f) = b.read() {
+                        let pos = f
+                            .params()
+                            .and_then(|params| params.iter().find(|s| s.required));
+                        pos.is_none_or(|pos| pos.name != "self")
+                    } else {
+                        true
+                    }
+                }) {
                     let docs = docs.unwrap_or(ty.docs());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
@@ -318,6 +327,11 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                         ..Completion::default()
                     });
                 }
+                // Otherwise, if the type doesn't have constructor and
+                // associated scope, we do nothing here. For example,
+                // - complete `content` doesn't make much sense.
+                // - complete `color` is okay because it has associated
+                //   constructors in scope.`
             }
             BuiltinTy::Element(elem) => {
                 self.base.value_completion(

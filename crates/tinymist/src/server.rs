@@ -4,8 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lsp_types::*;
-use sync_lsp::*;
-use tinymist_project::{CompiledArtifact, EntryResolver, LspCompileSnapshot, ProjectInsId};
+use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -13,12 +12,15 @@ use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
-use crate::lsp_query::OnEnter;
-use crate::project::{update_lock, LspInterrupt, ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY};
+use crate::lsp::query::OnEnter;
+use crate::project::{
+    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
+};
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
-use crate::{init::*, *};
+use crate::{lsp::init::*, *};
 
 pub(crate) use futures::Future;
 
@@ -180,8 +182,8 @@ impl ServerState {
         service
     }
 
-    /// Installs handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
+    /// Installs LSP handlers to the language server.
+    pub fn install_lsp<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;

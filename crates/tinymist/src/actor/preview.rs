@@ -3,15 +3,13 @@ use std::{collections::HashMap, sync::Arc};
 use lsp_types::notification::Notification;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sync_lsp::{internal_error, LspClient, LspResult};
+use sync_ls::{internal_error, LspClient, LspResult};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
-use crate::{
-    project::ProjectPreviewState,
-    tool::preview::{HttpServer, PreviewProjectHandler},
-};
+use crate::project::ProjectPreviewState;
+use crate::tool::preview::{HttpServer, PreviewProjectHandler};
 
 pub struct PreviewTab {
     /// Task ID
