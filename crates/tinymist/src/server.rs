@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use lsp_types::*;
-use sync_lsp::*;
+use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
@@ -182,8 +182,8 @@ impl ServerState {
         service
     }
 
-    /// Installs handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
+    /// Installs LSP handlers to the language server.
+    pub fn install_lsp<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;

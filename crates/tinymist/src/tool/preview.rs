@@ -20,7 +20,7 @@ use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
-use sync_lsp::just_ok;
+use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;

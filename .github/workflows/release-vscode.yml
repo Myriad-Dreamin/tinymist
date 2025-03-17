@@ -58,6 +58,7 @@ jobs:
           yarn build:preview
           yarn build:l10n
       - run: cargo clippy --workspace --all-targets
+      - run: scripts/feature-testing.sh
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
       - name: Generate completions
@@ -463,7 +464,7 @@ jobs:
           name: tinymist-${{ env.target }}-npm
           path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
       - name: Package extension
-        if: !fromJson(env.isNightly)
+        if: '!fromJson(env.isNightly)'
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
       - name: Package extension (Nightly)

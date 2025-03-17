@@ -1,11 +1,10 @@
 //! tinymist's language server
 
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
-use sync_lsp::*;
+use sync_ls::*;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
 };
