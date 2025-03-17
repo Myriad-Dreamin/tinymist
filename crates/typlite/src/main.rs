@@ -25,7 +25,9 @@ pub struct CompileArgs {
     #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
     pub assets_path: Option<String>,
 
-    /// Configure the path to the assets' corresponding source code directory. When the path is specified, typlite adds a href to jump to the source code in the exported asset.
+    /// Configure the path to the assets' corresponding source code directory.
+    /// When the path is specified, typlite adds a href to jump to the source
+    /// code in the exported asset.
     #[clap(long, default_value = None, value_name = "ASSETS_SRC_PATH")]
     pub assets_src_path: Option<String>,
 }
@@ -108,6 +110,12 @@ pub fn cross_link(mut args: Args) -> typlite::Result<Value> {
     let body = get_pos_named!(args, body: Content);
 
     let dest = std::path::Path::new(dest.as_str()).with_extension("html");
+    let mut dest = dest.as_path();
+
+    // strip leading `/` from the path
+    if let Ok(s) = dest.strip_prefix("/") {
+        dest = s;
+    }
 
     Ok(Value::Content(eco_format!(
         "[{body}](https://myriad-dreamin.github.io/tinymist/{dest})",

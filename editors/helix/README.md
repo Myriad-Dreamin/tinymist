@@ -46,7 +46,7 @@ language-servers = ["tinymist"]
 
 ### Getting Preview Feature
 
-[Default Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) are suitable in helix.
+[Default Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) are suitable in helix.
 
 ### Working with Multiple-File Projects
 

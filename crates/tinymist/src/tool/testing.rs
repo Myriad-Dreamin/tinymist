@@ -128,7 +128,7 @@ pub fn test_main(args: TestArgs) -> Result<()> {
     if matches!(passed, Ok(true)) {
         eprintln!("  Info: All test cases passed...");
     } else {
-        eprintln!(" Fatal: some test cases failed...");
+        eprintln!(" Fatal: Some test cases failed...");
         std::process::exit(1);
     }
 

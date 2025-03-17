@@ -5,4 +5,4 @@ See [typst.zed](https://github.com/WeetHet/typst.zed).
 
 ## Getting Preview Feature
 
-[Background Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html) is suitable in Zed.
+[Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) is suitable in Zed.
