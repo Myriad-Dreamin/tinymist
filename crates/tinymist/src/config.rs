@@ -2,7 +2,6 @@ use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::bail;
 use clap::Parser;
 use itertools::Itertools;
 use lsp_types::*;
@@ -59,16 +58,54 @@ const CONFIG_ITEMS: &[&str] = &[
 /// To get the configuration with system defaults, use [`Config::new`] instead.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
-    /// The resolution kind of the project.
-    pub project_resolution: ProjectResolutionKind,
-    /// Constant configuration for the server.
+    /// Constant configuration during session.
     pub const_config: ConstConfig,
-    /// Constant DAP configuration for the server.
+    /// Constant DAP-specific configuration during session.
     pub const_dap_config: ConstDapConfig,
-    /// The compile configurations
-    pub compile: CompileConfig,
-    /// Dynamic configuration for semantic tokens.
+
+    /// Whether to send show document requests with customized notification.
+    pub customized_show_document: bool,
+    /// Whether the configuration can have a default entry path.
+    pub has_default_entry_path: bool,
+    /// Whether to notify the compile status to the editor.
+    pub notify_status: bool,
+    /// Whether to remove HTML from markup content in responses.
+    pub support_html_in_markdown: bool,
+
+    /// The preferred color theme for rendering.
+    pub color_theme: Option<String>,
+    /// The entry resolver.
+    pub entry_resolver: EntryResolver,
+    /// The `sys.inputs` passed to the typst compiler.
+    pub lsp_inputs: ImmutDict,
+    /// The arguments about periscope rendering in hover window.
+    pub periscope_args: Option<PeriscopeArgs>,
+    /// The extra typst arguments passed to the language server.
+    pub typst_extra_args: Option<TypstExtraArgs>,
+    /// The dynamic configuration for semantic tokens.
     pub semantic_tokens: SemanticTokensMode,
+
+    /// Tinymist's completion features.
+    pub completion: CompletionFeat,
+    /// Tinymist's preview features.
+    pub preview: PreviewFeat,
+
+    /// Specifies the cli font options
+    pub font_opts: CompileFontArgs,
+    /// Specifies the font paths
+    pub font_paths: Vec<PathBuf>,
+    /// Computed fonts based on configuration.
+    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
+    /// Whether to use system fonts.
+    pub system_fonts: Option<bool>,
+
+    /// Tinymist's default export target.
+    pub export_target: ExportTarget,
+    /// The mode of PDF export.
+    pub export_pdf: TaskWhen,
+    /// The output directory for PDF export.
+    pub output_path: PathPattern,
+
     /// Dynamic configuration for the experimental formatter.
     pub formatter_mode: FormatterMode,
     /// Sets the print width for the formatter, which is a **soft limit** of
@@ -76,16 +113,6 @@ pub struct Config {
     pub formatter_print_width: Option<u32>,
     /// Sets the indent size (using space) for the formatter.
     pub formatter_indent_size: Option<u32>,
-    /// Whether to remove html from markup content in responses.
-    pub support_html_in_markdown: bool,
-    /// Whether to send show document requests with customized notification.
-    pub customized_show_document: bool,
-    /// Tinymist's default export target.
-    pub export_target: ExportTarget,
-    /// Tinymist's completion features.
-    pub completion: CompletionFeat,
-    /// Tinymist's preview features.
-    pub preview: PreviewFeat,
 }
 
 impl Config {
@@ -98,14 +125,11 @@ impl Config {
         let mut config = Self {
             const_config,
             const_dap_config: ConstDapConfig::default(),
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..EntryResolver::default()
-                },
-                font_opts,
-                ..CompileConfig::default()
+            entry_resolver: EntryResolver {
+                roots,
+                ..EntryResolver::default()
             },
+            font_opts,
             ..Self::default()
         };
         config
@@ -114,14 +138,14 @@ impl Config {
         config
     }
 
-    /// Creates a new configuration from the lsp initialization parameters.
+    /// Creates a new configuration from the LSP initialization parameters.
     ///
     /// The function has side effects:
     /// - Getting environment variables.
     /// - Setting the locale.
     pub fn extract_lsp_params(
         params: InitializeParams,
-        font_opts: CompileFontArgs,
+        font_args: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
         // Initialize configurations
         let roots = match params.workspace_folders.as_ref() {
@@ -138,35 +162,29 @@ impl Config {
                 .into_iter()
                 .collect(),
         };
-        let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+        let mut config = Config::new(ConstConfig::from(&params), roots, font_args);
 
         // Sets locale as soon as possible
         if let Some(locale) = config.const_config.locale.as_ref() {
             tinymist_l10n::set_locale(locale);
         }
 
-        let err = params.initialization_options.and_then(|init| {
-            config
-                .update(&init)
-                .map_err(|e| e.to_string())
-                .map_err(invalid_params)
-                .err()
-        });
+        let err = params
+            .initialization_options
+            .and_then(|init| config.update(&init).map_err(invalid_params).err());
 
         (config, err)
     }
 
-    /// Creates a new configuration from the dap initialization parameters.
+    /// Creates a new configuration from the DAP initialization parameters.
     ///
     /// The function has side effects:
     /// - Getting environment variables.
     /// - Setting the locale.
     pub fn extract_dap_params(
         params: dapts::InitializeRequestArguments,
-        font_opts: CompileFontArgs,
+        font_args: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
-        // todo: lines_start_at1, columns_start_at1, path_format
-
         // This is reliable in DAP context.
         let cwd = std::env::current_dir()
             .expect("failed to get current directory")
@@ -174,7 +192,7 @@ impl Config {
 
         // Initialize configurations
         let roots = vec![cwd];
-        let mut config = Config::new(ConstConfig::from(&params), roots, font_opts);
+        let mut config = Config::new(ConstConfig::from(&params), roots, font_args);
         config.const_dap_config = ConstDapConfig::from(&params);
 
         // Sets locale as soon as possible
@@ -185,13 +203,12 @@ impl Config {
         (config, None)
     }
 
-    /// Gets items for serialization.
+    /// Gets configuration descriptors to request configuration sections from
+    /// the client.
     pub fn get_items() -> Vec<ConfigurationItem> {
-        let sections = CONFIG_ITEMS
+        CONFIG_ITEMS
             .iter()
-            .flat_map(|item| [format!("tinymist.{item}"), item.to_string()]);
-
-        sections
+            .flat_map(|&item| [format!("tinymist.{item}"), item.to_owned()])
             .map(|section| ConfigurationItem {
                 section: Some(section),
                 ..ConfigurationItem::default()
@@ -199,7 +216,7 @@ impl Config {
             .collect()
     }
 
-    /// Converts values to a map.
+    /// Converts config values to a map object.
     pub fn values_to_map(values: Vec<JsonValue>) -> Map<String, JsonValue> {
         let unpaired_values = values
             .into_iter()
@@ -208,45 +225,44 @@ impl Config {
 
         CONFIG_ITEMS
             .iter()
-            .map(|item| item.to_string())
+            .map(|&item| item.to_owned())
             .zip(unpaired_values)
             .collect()
     }
 
-    /// Updates the configuration with a JSON object.
+    /// Updates (and validates) the configuration by a JSON object.
     ///
-    /// # Errors
-    /// Errors if the update is invalid.
-    pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
+    /// The config may be broken if the update is invalid. Please clone the
+    /// configuration before updating and revert if the update fails.
+    pub fn update(&mut self, update: &JsonValue) -> Result<()> {
         if let JsonValue::Object(update) = update {
-            let namespaced = update.get("tinymist").and_then(|m| match m {
-                JsonValue::Object(namespaced) => Some(namespaced),
-                _ => None,
-            });
-
             self.update_by_map(update)?;
-            if let Some(namespaced) = namespaced {
+
+            // Configurations in the tinymist namespace take precedence.
+            if let Some(namespaced) = update.get("tinymist").and_then(JsonValue::as_object) {
                 self.update_by_map(namespaced)?;
             }
+
             Ok(())
         } else {
-            let msg = tinymist_l10n::t!(
+            tinymist_l10n::bail!(
                 "tinymist.config.invalidObject",
-                "got invalid configuration object"
-            );
-            bail!("{msg}: {update}")
+                "invalid configuration object: {object}",
+                object = update.debug_l10n(),
+            )
         }
     }
 
-    /// Updates the configuration with a map.
+    /// Updates (and validates) the configuration by a map object.
     ///
-    /// # Errors
-    /// Errors if the update is invalid.
+    /// The config may be broken if the update is invalid. Please clone the
+    /// configuration before updating and revert if the update fails.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
         log::info!(
-            "LanguageState: config update_by_map {}",
+            "ServerState: config update_by_map {}",
             serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
         );
+
         macro_rules! assign_config {
             ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
                 let v = try_deserialize::<$ty>(update, $bind);
@@ -267,23 +283,135 @@ impl Config {
                 .ok()
         }
 
-        assign_config!(project_resolution := "projectResolution"?: ProjectResolutionKind);
-        assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
-        assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
-        assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
-        assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
-        assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
-        assign_config!(customized_show_document := "customizedShowDocument"?: bool);
-        assign_config!(export_target := "exportTarget"?: ExportTarget);
+        assign_config!(color_theme := "colorTheme"?: Option<String>);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
-
+        assign_config!(customized_show_document := "customizedShowDocument"?: bool);
+        assign_config!(entry_resolver.project_resolution := "projectResolution"?: ProjectResolutionKind);
+        assign_config!(export_pdf := "exportPdf"?: TaskWhen);
+        assign_config!(export_target := "exportTarget"?: ExportTarget);
+        assign_config!(font_paths := "fontPaths"?: Vec<_>);
+        assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
+        assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
+        assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
+        assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
+        assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
+        assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(system_fonts := "systemFonts"?: Option<bool>);
 
-        self.compile.update_by_map(update)?;
-        self.compile.validate()
+        self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
+            Some("enable") => true,
+            Some("disable") | None => false,
+            Some(value) => {
+                tinymist_l10n::bail!(
+                    "tinymist.config.badCompileStatus",
+                    "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}",
+                    value = value.debug_l10n(),
+                );
+            }
+        };
+
+        // periscope_args
+        self.periscope_args = match update.get("hoverPeriscope") {
+            Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
+            Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
+            Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
+                Ok(args) => Some(args),
+                Err(err) => {
+                    tinymist_l10n::bail!(
+                        "tinymist.config.badHoverPeriscope",
+                        "failed to parse hoverPeriscope: {err}",
+                        err = err.debug_l10n(),
+                    );
+                }
+            },
+        };
+        if let Some(args) = self.periscope_args.as_mut() {
+            if args.invert_color == "auto" && self.color_theme.as_deref() == Some("dark") {
+                "always".clone_into(&mut args.invert_color);
+            }
+        }
+
+        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> Result<()> {
+            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+            tinymist_l10n::bail!(
+                "tinymist.config.badTypstExtraArgs",
+                "failed to parse typstExtraArgs: {err}, args: {args}",
+                err = err.debug_l10n(),
+                args = args.debug_l10n(),
+            )
+        }
+
+        {
+            let raw_args = || update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+                Some(Ok(args)) => args,
+                Some(Err(err)) => return invalid_extra_args(&raw_args(), err),
+                // Even if the list is none, it should be parsed since we have env vars to retrieve.
+                None => Vec::new(),
+            };
+
+            let args = match CompileOnceArgs::try_parse_from(
+                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+            ) {
+                Ok(args) => args,
+                Err(e) => return invalid_extra_args(&raw_args(), e),
+            };
+
+            // todo: the command.root may be not absolute
+            self.typst_extra_args = Some(TypstExtraArgs {
+                inputs: args.resolve_inputs().unwrap_or_default(),
+                entry: args.input.map(|e| Path::new(&e).into()),
+                root_dir: args.root.as_ref().map(|r| r.as_path().into()),
+                font: args.font,
+                package: args.package,
+                creation_timestamp: args.creation_timestamp,
+                cert: args.cert.as_deref().map(From::from),
+            });
+        }
+
+        self.entry_resolver.root_path =
+            try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into())).or_else(|| {
+                self.typst_extra_args
+                    .as_ref()
+                    .and_then(|e| e.root_dir.clone())
+            });
+        self.entry_resolver.entry = self.typst_extra_args.as_ref().and_then(|e| e.entry.clone());
+        self.has_default_entry_path = self.entry_resolver.resolve_default().is_some();
+        self.lsp_inputs = {
+            let mut dict = TypstDict::default();
+
+            #[derive(Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct PreviewInputs {
+                pub version: u32,
+                pub theme: String,
+            }
+
+            dict.insert(
+                "x-preview".into(),
+                serde_json::to_string(&PreviewInputs {
+                    version: 1,
+                    theme: self.color_theme.clone().unwrap_or_default(),
+                })
+                .unwrap()
+                .into_value(),
+            );
+
+            Arc::new(LazyHash::new(dict))
+        };
+
+        self.validate()
+    }
+
+    /// Validates the configuration.
+    pub fn validate(&self) -> Result<()> {
+        self.entry_resolver.validate()?;
+
+        Ok(())
     }
 
     /// Gets the formatter configuration.
@@ -312,16 +440,14 @@ impl Config {
     /// Gets the export task configuration.
     pub(crate) fn export_task(&self) -> ExportTask {
         ExportTask {
-            when: self.compile.export_pdf,
-            output: Some(self.compile.output_path.clone()),
+            when: self.export_pdf,
+            output: Some(self.output_path.clone()),
             transform: vec![],
         }
     }
 
     /// Gets the export configuration.
     pub(crate) fn export(&self) -> ExportUserConfig {
-        let compile_config = &self.compile;
-
         let export = self.export_task();
         ExportUserConfig {
             export_target: self.export_target,
@@ -337,10 +463,123 @@ impl Config {
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export,
                 pdf_standards: vec![],
-                creation_timestamp: compile_config.determine_creation_timestamp(),
+                creation_timestamp: self.creation_timestamp(),
             }),
-            count_words: self.compile.notify_status,
+            count_words: self.notify_status,
         }
+    }
+
+    /// Determines the font options.
+    pub fn font_opts(&self) -> CompileFontArgs {
+        let mut opts = self.font_opts.clone();
+
+        if let Some(system_fonts) = self.system_fonts.or_else(|| {
+            self.typst_extra_args
+                .as_ref()
+                .map(|x| !x.font.ignore_system_fonts)
+        }) {
+            opts.ignore_system_fonts = !system_fonts;
+        }
+
+        let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
+        let font_paths =
+            font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font.font_paths));
+        if let Some(paths) = font_paths {
+            opts.font_paths.clone_from(paths);
+        }
+
+        let root = OnceCell::new();
+        for path in opts.font_paths.iter_mut() {
+            if path.is_relative() {
+                if let Some(root) = root.get_or_init(|| self.entry_resolver.root(None)) {
+                    let p = std::mem::take(path);
+                    *path = root.join(p);
+                }
+            }
+        }
+
+        opts
+    }
+
+    /// Determines the package options.
+    pub fn package_opts(&self) -> CompilePackageArgs {
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.package.clone();
+        }
+        CompilePackageArgs::default()
+    }
+
+    /// Determines the font resolver.
+    pub fn fonts(&self) -> Arc<TinymistFontResolver> {
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = || {
+            let opts = self.font_opts();
+
+            log::info!("creating SharedFontResolver with {opts:?}");
+            Derived(
+                crate::project::LspUniverseBuilder::resolve_fonts(opts)
+                    .map(Arc::new)
+                    .expect("failed to create font book"),
+            )
+        };
+        self.fonts.get_or_init(font).clone().0
+    }
+
+    /// Determines the `sys.inputs` for the entry file.
+    pub fn inputs(&self) -> ImmutDict {
+        #[comemo::memoize]
+        fn combine(lhs: ImmutDict, rhs: ImmutDict) -> ImmutDict {
+            let mut dict = (**lhs).clone();
+            for (k, v) in rhs.iter() {
+                dict.insert(k.clone(), v.clone());
+            }
+
+            Arc::new(LazyHash::new(dict))
+        }
+
+        let user_inputs = self.user_inputs();
+
+        combine(user_inputs, self.lsp_inputs.clone())
+    }
+
+    /// Determines the creation timestamp.
+    pub fn creation_timestamp(&self) -> Option<i64> {
+        self.typst_extra_args.as_ref()?.creation_timestamp
+    }
+
+    /// Determines the certification path.
+    pub fn certification_path(&self) -> Option<ImmutPath> {
+        let extras = self.typst_extra_args.as_ref()?;
+        extras.cert.clone()
+    }
+
+    fn user_inputs(&self) -> ImmutDict {
+        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
+
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.inputs.clone();
+        }
+
+        EMPTY.clone()
+    }
+
+    /// Applies the primary options related to compilation.
+    #[allow(clippy::type_complexity)]
+    pub fn primary_opts(
+        &self,
+    ) -> (
+        Option<bool>,
+        &Vec<PathBuf>,
+        Option<&CompileFontArgs>,
+        Option<Arc<Path>>,
+    ) {
+        (
+            self.system_fonts,
+            &self.font_paths,
+            self.typst_extra_args.as_ref().map(|e| &e.font),
+            self.entry_resolver
+                .root(self.entry_resolver.resolve_default().as_ref()),
+        )
     }
 }
 
@@ -461,294 +700,6 @@ impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
     }
 }
 
-/// The user configuration read from the editor.
-#[derive(Debug, Default, Clone)]
-pub struct CompileConfig {
-    /// The output directory for PDF export.
-    pub output_path: PathPattern,
-    /// The mode of PDF export.
-    pub export_pdf: TaskWhen,
-    /// Specifies the cli font options
-    pub font_opts: CompileFontArgs,
-    /// Whether to ignore system fonts
-    pub system_fonts: Option<bool>,
-    /// Specifies the font paths
-    pub font_paths: Vec<PathBuf>,
-    /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
-    /// Notify the compile status to the editor.
-    pub notify_status: bool,
-    /// Enable periscope document in hover.
-    pub periscope_args: Option<PeriscopeArgs>,
-    /// Typst extra arguments.
-    pub typst_extra_args: Option<CompileExtraOpts>,
-    /// The preferred color theme for the document.
-    pub color_theme: Option<String>,
-    /// Whether the configuration can have a default entry path.
-    pub has_default_entry_path: bool,
-    /// The inputs for the language server protocol.
-    pub lsp_inputs: ImmutDict,
-    /// The entry resolver.
-    pub entry_resolver: EntryResolver,
-}
-
-impl CompileConfig {
-    /// Updates the configuration with a JSON object.
-    pub fn update(&mut self, update: &JsonValue) -> Result<()> {
-        if let JsonValue::Object(update) = update {
-            self.update_by_map(update)
-        } else {
-            tinymist_l10n::bail!(
-                "tinymist.config.invalidObject",
-                "got invalid configuration object: {object}",
-                object = update.debug_l10n(),
-            )
-        }
-    }
-
-    /// Updates the configuration with a map.
-    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> Result<()> {
-        macro_rules! deser_or_default {
-            ($key:expr, $ty:ty) => {
-                try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
-            };
-        }
-
-        let project_resolution = deser_or_default!("projectResolution", ProjectResolutionKind);
-        self.output_path = deser_or_default!("outputPath", PathPattern);
-        self.export_pdf = deser_or_default!("exportPdf", TaskWhen);
-        self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
-            Some("enable") => true,
-            Some("disable") | None => false,
-            Some(value) => {
-                tinymist_l10n::bail!(
-                    "tinymist.config.badCompileStatus",
-                    "compileStatus must be either 'enable' or 'disable', got {value}",
-                    value = value.debug_l10n(),
-                );
-            }
-        };
-        self.color_theme = try_(|| Some(update.get("colorTheme")?.as_str()?.to_owned()));
-        log::info!("color theme: {:?}", self.color_theme);
-
-        // periscope_args
-        self.periscope_args = match update.get("hoverPeriscope") {
-            Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
-            Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
-            Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
-                Ok(args) => Some(args),
-                Err(err) => {
-                    tinymist_l10n::bail!(
-                        "tinymist.config.badHoverPeriscope",
-                        "failed to parse hoverPeriscope: {err}",
-                        err = err.debug_l10n(),
-                    );
-                }
-            },
-        };
-        if let Some(args) = self.periscope_args.as_mut() {
-            if args.invert_color == "auto" && self.color_theme.as_deref() == Some("dark") {
-                "always".clone_into(&mut args.invert_color);
-            }
-        }
-
-        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> Result<()> {
-            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
-            tinymist_l10n::bail!(
-                "tinymist.config.badTypstExtraArgs",
-                "failed to parse typstExtraArgs: {err}, args: {args}",
-                err = err.debug_l10n(),
-                args = args.debug_l10n(),
-            )
-        }
-
-        {
-            let raw_args = || update.get("typstExtraArgs");
-            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
-                Some(Ok(args)) => args,
-                Some(Err(err)) => return invalid_extra_args(&raw_args(), err),
-                // Even if the list is none, it should be parsed since we have env vars to retrieve.
-                None => Vec::new(),
-            };
-
-            let args = match CompileOnceArgs::try_parse_from(
-                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
-            ) {
-                Ok(args) => args,
-                Err(e) => return invalid_extra_args(&raw_args(), e),
-            };
-
-            // todo: the command.root may be not absolute
-            self.typst_extra_args = Some(CompileExtraOpts {
-                inputs: args.resolve_inputs().unwrap_or_default(),
-                entry: args.input.map(|e| Path::new(&e).into()),
-                root_dir: args.root.as_ref().map(|r| r.as_path().into()),
-                font: args.font,
-                package: args.package,
-                creation_timestamp: args.creation_timestamp,
-                cert: args.cert.as_deref().map(From::from),
-            });
-        }
-
-        self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
-        self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
-
-        self.entry_resolver.project_resolution = project_resolution;
-        self.entry_resolver.root_path =
-            try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into())).or_else(|| {
-                self.typst_extra_args
-                    .as_ref()
-                    .and_then(|e| e.root_dir.clone())
-            });
-        self.entry_resolver.entry = self.typst_extra_args.as_ref().and_then(|e| e.entry.clone());
-        self.has_default_entry_path = self.entry_resolver.resolve_default().is_some();
-        self.lsp_inputs = {
-            let mut dict = TypstDict::default();
-
-            #[derive(Serialize)]
-            #[serde(rename_all = "camelCase")]
-            struct PreviewInputs {
-                pub version: u32,
-                pub theme: String,
-            }
-
-            dict.insert(
-                "x-preview".into(),
-                serde_json::to_string(&PreviewInputs {
-                    version: 1,
-                    theme: self.color_theme.clone().unwrap_or_default(),
-                })
-                .unwrap()
-                .into_value(),
-            );
-
-            Arc::new(LazyHash::new(dict))
-        };
-
-        self.validate()
-    }
-
-    /// Determines the font options.
-    pub fn determine_font_opts(&self) -> CompileFontArgs {
-        let mut opts = self.font_opts.clone();
-
-        if let Some(system_fonts) = self.system_fonts.or_else(|| {
-            self.typst_extra_args
-                .as_ref()
-                .map(|x| !x.font.ignore_system_fonts)
-        }) {
-            opts.ignore_system_fonts = !system_fonts;
-        }
-
-        let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
-        let font_paths =
-            font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font.font_paths));
-        if let Some(paths) = font_paths {
-            opts.font_paths.clone_from(paths);
-        }
-
-        let root = OnceCell::new();
-        for path in opts.font_paths.iter_mut() {
-            if path.is_relative() {
-                if let Some(root) = root.get_or_init(|| self.entry_resolver.root(None)) {
-                    let p = std::mem::take(path);
-                    *path = root.join(p);
-                }
-            }
-        }
-
-        opts
-    }
-
-    /// Determines the package options.
-    pub fn determine_package_opts(&self) -> CompilePackageArgs {
-        if let Some(extras) = &self.typst_extra_args {
-            return extras.package.clone();
-        }
-        CompilePackageArgs::default()
-    }
-
-    /// Determines the font resolver.
-    pub fn determine_fonts(&self) -> Arc<TinymistFontResolver> {
-        // todo: on font resolving failure, downgrade to a fake font book
-        let font = || {
-            let opts = self.determine_font_opts();
-
-            log::info!("creating SharedFontResolver with {opts:?}");
-            Derived(
-                crate::project::LspUniverseBuilder::resolve_fonts(opts)
-                    .map(Arc::new)
-                    .expect("failed to create font book"),
-            )
-        };
-        self.fonts.get_or_init(font).clone().0
-    }
-
-    /// Determines the `sys.inputs` for the entry file.
-    pub fn determine_inputs(&self) -> ImmutDict {
-        #[comemo::memoize]
-        fn combine(lhs: ImmutDict, rhs: ImmutDict) -> ImmutDict {
-            let mut dict = (**lhs).clone();
-            for (k, v) in rhs.iter() {
-                dict.insert(k.clone(), v.clone());
-            }
-
-            Arc::new(LazyHash::new(dict))
-        }
-
-        let user_inputs = self.determine_user_inputs();
-
-        combine(user_inputs, self.lsp_inputs.clone())
-    }
-
-    /// Determines the creation timestamp.
-    pub fn determine_creation_timestamp(&self) -> Option<i64> {
-        self.typst_extra_args.as_ref()?.creation_timestamp
-    }
-
-    /// Determines the certification path.
-    pub fn determine_certification_path(&self) -> Option<ImmutPath> {
-        let extras = self.typst_extra_args.as_ref()?;
-        extras.cert.clone()
-    }
-
-    fn determine_user_inputs(&self) -> ImmutDict {
-        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
-
-        if let Some(extras) = &self.typst_extra_args {
-            return extras.inputs.clone();
-        }
-
-        EMPTY.clone()
-    }
-
-    /// Applies the primary options related to compilation.
-    #[allow(clippy::type_complexity)]
-    pub fn primary_opts(
-        &self,
-    ) -> (
-        Option<bool>,
-        &Vec<PathBuf>,
-        Option<&CompileFontArgs>,
-        Option<Arc<Path>>,
-    ) {
-        (
-            self.system_fonts,
-            &self.font_paths,
-            self.typst_extra_args.as_ref().map(|e| &e.font),
-            self.entry_resolver
-                .root(self.entry_resolver.resolve_default().as_ref()),
-        )
-    }
-
-    /// Validates the configuration.
-    pub fn validate(&self) -> Result<()> {
-        self.entry_resolver.validate()?;
-
-        Ok(())
-    }
-}
-
 /// The mode of the formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -771,20 +722,6 @@ pub enum SemanticTokensMode {
     /// Enable the semantic tokens.
     #[default]
     Enable,
-}
-
-pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
-    SemanticTokensOptions {
-        legend: SemanticTokensLegend {
-            token_types: TokenType::iter()
-                .filter(|e| *e != TokenType::None)
-                .map(Into::into)
-                .collect(),
-            token_modifiers: Modifier::iter().map(Into::into).collect(),
-        },
-        full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-        ..SemanticTokensOptions::default()
-    }
 }
 
 /// The preview features.
@@ -817,23 +754,39 @@ pub struct BackgroundPreviewOpts {
     pub args: Option<Vec<String>>,
 }
 
-/// Additional options for compilation.
+/// The extra typst arguments passed to the language server. You can pass any
+/// arguments as you like, and we will try to follow behaviors of the **same
+/// version** of typst-cli.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct CompileExtraOpts {
-    /// The root directory for compilation routine.
+pub struct TypstExtraArgs {
+    /// The root directory for the compilation routine.
     pub root_dir: Option<ImmutPath>,
-    /// Path to entry
+    /// The path to the entry.
     pub entry: Option<ImmutPath>,
-    /// Additional input arguments to compile the entry file.
+    /// The additional input arguments to compile the entry file.
     pub inputs: ImmutDict,
-    /// Additional font paths.
+    /// The additional font paths.
     pub font: CompileFontArgs,
-    /// Package related arguments.
+    /// The package related arguments.
     pub package: CompilePackageArgs,
-    /// The creation timestamp for various output (in seconds).
+    /// The creation timestamp for various outputs (in seconds).
     pub creation_timestamp: Option<i64>,
-    /// Path to certification file
+    /// The path to the certification file.
     pub cert: Option<ImmutPath>,
+}
+
+pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
+    SemanticTokensOptions {
+        legend: SemanticTokensLegend {
+            token_types: TokenType::iter()
+                .filter(|e| *e != TokenType::None)
+                .map(Into::into)
+                .collect(),
+            token_modifiers: Modifier::iter().map(Into::into).collect(),
+        },
+        full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
+        ..SemanticTokensOptions::default()
+    }
 }
 
 #[cfg(test)]
@@ -842,7 +795,7 @@ mod tests {
     use serde_json::json;
     use tinymist_project::PathPattern;
 
-    fn update_config(config: &mut Config, update: &JsonValue) -> anyhow::Result<()> {
+    fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
         temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
     }
 
@@ -872,24 +825,24 @@ mod tests {
         // Nix specifies this environment variable when testing.
         let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
         if has_source_date_epoch {
-            let args = config.compile.typst_extra_args.as_mut().unwrap();
+            let args = config.typst_extra_args.as_mut().unwrap();
             assert!(args.creation_timestamp.is_some());
             args.creation_timestamp = None;
         }
 
-        assert_eq!(config.compile.output_path, PathPattern::new("out"));
-        assert_eq!(config.compile.export_pdf, TaskWhen::OnSave);
+        assert_eq!(config.output_path, PathPattern::new("out"));
+        assert_eq!(config.export_pdf, TaskWhen::OnSave);
         assert_eq!(
-            config.compile.entry_resolver.root_path,
+            config.entry_resolver.root_path,
             Some(ImmutPath::from(root_path))
         );
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
         assert_eq!(config.formatter_mode, FormatterMode::Typstyle);
         assert_eq!(
-            config.compile.typst_extra_args,
-            Some(CompileExtraOpts {
+            config.typst_extra_args,
+            Some(TypstExtraArgs {
                 root_dir: Some(ImmutPath::from(root_path)),
-                ..CompileExtraOpts::default()
+                ..TypstExtraArgs::default()
             })
         );
     }
@@ -908,7 +861,7 @@ mod tests {
 
         update_config(&mut config, &update).unwrap();
 
-        assert_eq!(config.compile.export_pdf, TaskWhen::OnType);
+        assert_eq!(config.export_pdf, TaskWhen::OnType);
     }
 
     #[test]
@@ -920,7 +873,7 @@ mod tests {
 
             f(&mut config);
 
-            let args = config.compile.typst_extra_args;
+            let args = config.typst_extra_args;
             args.and_then(|args| args.creation_timestamp)
         }
 
@@ -966,7 +919,7 @@ mod tests {
                 update_config(&mut config, update).unwrap();
             }
 
-            config.compile.determine_font_opts()
+            config.font_opts()
         }
 
         let font_opts = opts(None);
@@ -1060,10 +1013,7 @@ mod tests {
             // Passing it twice doesn't affect the result.
             update_config(&mut config, &update).expect("updated");
 
-            assert_eq!(
-                config.compile.typst_extra_args,
-                simple_config.compile.typst_extra_args
-            );
+            assert_eq!(config.typst_extra_args, simple_config.typst_extra_args);
         }
     }
 
@@ -1152,7 +1102,6 @@ mod tests {
                 Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
             assert!(err.is_none());
             let applied_cache_path = conf
-                .compile
                 .typst_extra_args
                 .is_some_and(|args| args.package.package_cache_path == Some(pkg_path.into()));
             assert!(applied_cache_path);

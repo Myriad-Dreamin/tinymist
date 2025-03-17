@@ -139,8 +139,8 @@ impl ServerState {
             self.change_export_config(new_export_config);
         }
 
-        if old_config.compile.primary_opts() != self.config.compile.primary_opts() {
-            self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
+        if old_config.primary_opts() != self.config.primary_opts() {
+            self.config.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
             self.reload_projects()
                 .log_error("could not restart primary");
         }

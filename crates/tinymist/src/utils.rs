@@ -52,7 +52,3 @@ pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
 pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
     f().unwrap_or(default)
 }
-
-pub fn try_or_default<T: Default>(f: impl FnOnce() -> Option<T>) -> T {
-    f().unwrap_or_default()
-}
