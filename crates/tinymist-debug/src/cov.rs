@@ -154,7 +154,7 @@ pub fn __cov_pc(span: Span, pc: i64) {
 pub enum Kind {
     OpenBrace,
     CloseBrace,
-    Functor,
+    Show,
 }
 
 #[derive(Default)]
@@ -236,6 +236,12 @@ impl InstrumentWorker {
                     }
                     return;
                 }
+                ast::Expr::Contextual(body) => {
+                    self.instrumented.push_str("context (");
+                    self.visit_node(body.body().to_untyped());
+                    self.instrumented.push(')');
+                    return;
+                }
                 ast::Expr::Text(..)
                 | ast::Expr::Space(..)
                 | ast::Expr::Linebreak(..)
@@ -283,7 +289,6 @@ impl InstrumentWorker {
                 | ast::Expr::Let(..)
                 | ast::Expr::DestructAssign(..)
                 | ast::Expr::Set(..)
-                | ast::Expr::Contextual(..)
                 | ast::Expr::Import(..)
                 | ast::Expr::Include(..)
                 | ast::Expr::Break(..)
@@ -338,18 +343,19 @@ impl InstrumentWorker {
 
     fn instrument_show_set(&mut self, child: &SyntaxNode) {
         self.instrumented.push_str("__it => {");
-        self.make_cov(child.span(), Kind::Functor);
-        self.visit_node_fallback(child);
+        self.make_cov(child.span(), Kind::Show);
+        self.visit_node(child);
         self.instrumented.push_str("\n__it; }\n");
     }
 
     fn instrument_show_transform(&mut self, child: &SyntaxNode) {
-        self.instrumented.push_str("{\nlet __cov_functor = ");
+        self.instrumented.push_str("{\nlet __cov_show_body = ");
         let s = child.span();
-        self.visit_node_fallback(child);
+        self.visit_node(child);
         self.instrumented.push_str("\n__it => {");
-        self.make_cov(s, Kind::Functor);
-        self.instrumented.push_str("__cov_functor(__it); } }\n");
+        self.make_cov(s, Kind::Show);
+        self.instrumented
+            .push_str("if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }\n");
     }
 }
 
@@ -379,7 +385,7 @@ mod tests {
         __cov_pc(0);
         {
           show math.attach: {
-        let __cov_functor = elem => {
+        let __cov_show_body = elem => {
         __cov_pc(1);
         {
             if __eligible(elem.base) and elem.at("t", default: none) == [+] {
@@ -399,7 +405,7 @@ mod tests {
         __cov_pc(6);
         }
         __it => {__cov_pc(7);
-        __cov_functor(__it); } }
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
 
 
           document
@@ -420,6 +426,22 @@ mod tests {
         let source = Source::detached("#let a = 1;");
         let (new, _meta) = instrument_coverage(source).unwrap();
         insta::assert_snapshot!(new.text(), @"#let a = 1;");
+    }
+
+    #[test]
+    fn test_instrument_coverage_show_content() {
+        let source = Source::detached("#show math.equation: context it => it");
+        let (new, _meta) = instrument_coverage(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
+        #show math.equation: {
+        let __cov_show_body = context (it => {
+        __cov_pc(0);
+        it
+        __cov_pc(1);
+        })
+        __it => {__cov_pc(2);
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
+        "###);
     }
 
     #[test]
@@ -483,12 +505,12 @@ mod tests {
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        insta::assert_snapshot!(new.text(), @r###"
         #show: {
-        let __cov_functor = main
+        let __cov_show_body = main
         __it => {__cov_pc(0);
-        __cov_functor(__it); } }
-        ");
+        if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
+        "###);
     }
 
     #[test]
