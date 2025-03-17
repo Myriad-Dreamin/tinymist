@@ -78,6 +78,8 @@ pub struct Config {
     pub formatter_indent_size: Option<u32>,
     /// Whether to remove html from markup content in responses.
     pub support_html_in_markdown: bool,
+    /// Whether to send show document requests with customized notification.
+    pub customized_show_document: bool,
     /// Tinymist's default export target.
     pub export_target: ExportTarget,
     /// Tinymist's completion features.
@@ -271,6 +273,7 @@ impl Config {
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(customized_show_document := "customizedShowDocument"?: bool);
         assign_config!(export_target := "exportTarget"?: ExportTarget);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);

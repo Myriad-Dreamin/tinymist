@@ -22,6 +22,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
@@ -276,6 +277,8 @@ impl typst_preview::CompileView for PreviewCompileView {
                 range.start += off;
             }
         }
+
+        // todo: resolve untitled uri.
         let filepath = world.path_for_id(span.id()?).ok()?.to_err().ok()?;
         Some(DocToSrcJumpInfo {
             filepath: filepath.to_string_lossy().to_string(),
@@ -358,11 +361,17 @@ pub struct PreviewState {
     preview_tx: mpsc::UnboundedSender<PreviewRequest>,
     /// the watchers for the preview
     pub(crate) watchers: ProjectPreviewState,
+    /// Whether to send show document requests with customized notification.
+    pub customized_show_document: bool,
 }
 
 impl PreviewState {
     /// Create a new preview state.
-    pub fn new(watchers: ProjectPreviewState, client: TypedLspClient<PreviewState>) -> Self {
+    pub fn new(
+        config: &Config,
+        watchers: ProjectPreviewState,
+        client: TypedLspClient<PreviewState>,
+    ) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 
         client.handle.spawn(
@@ -379,6 +388,7 @@ impl PreviewState {
             client,
             preview_tx,
             watchers,
+            customized_show_document: config.customized_show_document,
         }
     }
 
@@ -507,6 +517,7 @@ impl PreviewState {
         // Forward preview responses to lsp client
         let tid = task_id.clone();
         let client = self.client.clone();
+        let customized_show_document = self.customized_show_document;
         self.client.handle.spawn(async move {
             let mut resp_rx = resp_rx;
             while let Some(resp) = resp_rx.recv().await {
@@ -518,7 +529,13 @@ impl PreviewState {
                     SyncEditorChanges(..) => {
                         log::warn!("PreviewTask({tid}): is sending SyncEditorChanges in lsp mode");
                     }
-                    EditorScrollTo(s) => client.send_notification::<ScrollSource>(&s),
+                    EditorScrollTo(s) => {
+                        if customized_show_document {
+                            client.send_notification::<ScrollSource>(&s)
+                        } else {
+                            send_show_document(&client, &s, &tid);
+                        }
+                    }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
                 }
             }
@@ -1020,6 +1037,48 @@ struct NotifDocumentOutline;
 impl Notification for NotifDocumentOutline {
     type Params = typst_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
+}
+
+fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInfo, tid: &str) {
+    let range_start = s.start.map(|(l, c)| LspPosition {
+        line: l as u32,
+        character: c as u32,
+    });
+    let range_end = s.end.map(|(l, c)| LspPosition {
+        line: l as u32,
+        character: c as u32,
+    });
+    let range = match (range_start, range_end) {
+        (Some(start), Some(end)) => Some(LspRange { start, end }),
+        (Some(start), None) | (None, Some(start)) => Some(LspRange { start, end: start }),
+        _ => None,
+    };
+
+    // todo: resolve uri if any
+    let uri = match Url::from_file_path(Path::new(&s.filepath)) {
+        Ok(uri) => uri,
+        Err(e) => {
+            log::error!(
+                "PreviewTask({tid}): failed to convert path to URI: {e:?}, path {:?}",
+                s.filepath
+            );
+            return;
+        }
+    };
+
+    client.send_lsp_request::<lsp_types::request::ShowDocument>(
+        lsp_types::ShowDocumentParams {
+            uri,
+            external: None,
+            take_focus: Some(true),
+            selection: range,
+        },
+        |_, resp| {
+            if let Some(err) = resp.error {
+                log::error!("failed to send ShowDocument request: {err:?}");
+            }
+        },
+    );
 }
 
 /// Determine where to jump to based on a click in a frame.
