@@ -1,5 +1,6 @@
 //! Testing utilities
 
+use core::fmt;
 use std::{
     collections::HashSet,
     path::Path,
@@ -10,27 +11,28 @@ use comemo::Track;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reflexo::ImmutPath;
-use reflexo_typst::{vfs::FileId, Bytes, LazyHash, SourceWorld, TypstDocument, TypstHtmlDocument};
+use reflexo_typst::{vfs::FileId, SourceWorld, TypstDocument, TypstHtmlDocument};
 use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
 use tinymist_query::{
     analysis::Analysis,
     syntax::{find_source_by_expr, node_ancestors},
     testing::{TestCaseKind, TestSuites},
 };
-use tinymist_std::{bail, error::prelude::*, typst::TypstPagedDocument};
+use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
 use typst::{
-    diag::{FileResult, SourceDiagnostic, SourceResult, Warned},
+    diag::{SourceDiagnostic, SourceResult, Warned},
     ecow::EcoVec,
     engine::{Engine, Route, Sink, Traced},
-    foundations::{Context, Datetime, Label, Value},
+    foundations::{Context, Label, Value},
     introspection::Introspector,
     syntax::{ast, LinkedNode, Source, Span},
-    text::{Font, FontBook},
     utils::PicoStr,
-    Library, World,
+    World,
 };
 
-use crate::project::*;
+use super::project::{start_project, StartProjectResult};
+use crate::world::with_main;
+use crate::{project::*, utils::exit_on_ctrl_c};
 
 /// Runs coverage test on a document
 pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
@@ -62,6 +64,14 @@ pub struct TestArgs {
     /// Configuration for testing
     #[clap(flatten)]
     pub config: TestConfigArgs,
+
+    /// Whether to run in watch mode.
+    #[clap(long)]
+    pub watch: bool,
+
+    /// Whether to log verbose information.
+    #[clap(long)]
+    pub verbose: bool,
 }
 
 /// Testing config arguments
@@ -76,69 +86,182 @@ pub struct TestConfigArgs {
     pub png: PngExportArgs,
 }
 
+macro_rules! test_log {
+    ($level:ident,$prefix:expr, $($arg:tt)*) => {
+        msg(Level::$level, $prefix, format_args!($($arg)*))
+    };
+}
+
+macro_rules! test_info {
+    ($( $arg:tt )*) => {
+        test_log!(Info, $($arg)*)
+    };
+}
+
+macro_rules! test_error {
+    ($( $arg:tt )*) => {
+        test_log!(Error, $($arg)*)
+    };
+}
+
+macro_rules! test_hint {
+    ($( $arg:tt )*) => {
+        test_log!(Hint, $($arg)*)
+    };
+}
+
 /// Runs tests on a document
-pub fn test_main(args: TestArgs) -> Result<()> {
+pub async fn test_main(args: TestArgs) -> Result<()> {
+    exit_on_ctrl_c();
+
     // Prepares for the compilation
-    let universe = args.compile.resolve()?;
-    let world = universe.snapshot();
-    let root = universe.entry_state().root().map(Ok);
+    let verse = args.compile.resolve()?;
+    let analysis = Analysis::default();
+
+    let root = verse.entry_state().root().map(Ok);
     let root = root
         .unwrap_or_else(|| std::env::current_dir().map(|p| p.into()))
         .context("cannot find root")?;
 
+    let out_file = if args.watch {
+        use std::io::Write;
+        let mut out_file = std::fs::File::create("test-watch.typ").context("create log file")?;
+        writeln!(out_file, "#import \"/target/test-template.typ\": *").context("write log")?;
+        writeln!(out_file, "#show: main").context("write log")?;
+        Some(Arc::new(Mutex::new(out_file)))
+    } else {
+        None
+    };
+
     let config = TestConfig {
         root,
         args: args.config,
+        out_file,
     };
 
-    let result = Ok(()).and_then(|_| -> Result<bool> {
-        let analysis = Analysis::default();
-
-        let mut ctx = analysis.snapshot(world.clone());
-        let doc = typst::compile::<TypstPagedDocument>(&ctx.world).output?;
-
-        let suites =
-            tinymist_query::testing::test_suites(&mut ctx, &TypstDocument::from(Arc::new(doc)))
-                .context("failed to find suites")?;
-        eprintln!(
-            "Found {} tests and {} examples",
-            suites.tests.len(),
-            suites.examples.len()
-        );
-
-        let (cov, result) = tinymist_debug::with_cov(&world, |world| {
-            let suites = suites.recheck(world);
-            let runner = TestRunner::new(config.clone(), &world, &suites);
-            print_diag_or_error(world, runner.run())
-        });
-        let cov = cov?;
-        let cov_path = Path::new("target/coverage.json");
-        let res = serde_json::to_string(&cov.to_json(&world)).context("coverage")?;
-
-        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
-        std::fs::write(cov_path, res).context("write coverage")?;
-
-        eprintln!("  Info: Written coverage to {} ...", cov_path.display());
-
-        result
-    });
-
-    let passed = print_diag_or_error(&world, result);
-
-    if matches!(passed, Ok(true)) {
-        eprintln!("  Info: All test cases passed...");
-    } else {
-        eprintln!(" Fatal: Some test cases failed...");
-        std::process::exit(1);
+    if !args.watch {
+        let snap = verse.snapshot();
+        return match test_once(&analysis, &snap, &config) {
+            Ok(true) => Ok(()),
+            Ok(false) | Err(..) => std::process::exit(1),
+        };
     }
 
-    passed.map(|_| ())
+    let config = Arc::new(Mutex::new(config.clone()));
+    let config_update = config.clone();
+
+    let mut is_first = true;
+    let StartProjectResult {
+        service,
+        mut editor_rx,
+        intr_tx,
+    } = start_project(verse, None, move |c, mut i, next| {
+        if let Interrupt::Compiled(artifact) = &mut i {
+            let mut config = config.lock();
+            let instant = std::time::Instant::now();
+            // todo: well term support
+            // Clear the screen and then move the cursor to the top left corner.
+            eprintln!("\x1B[2J\x1B[1;1H");
+
+            if is_first {
+                is_first = false;
+            } else {
+                test_info!("Info:", "Re-testing...");
+            }
+            // Sets is_compiling to track dependencies
+            artifact.snap.world.set_is_compiling(true);
+            let res = test_once(&analysis, &artifact.world, &config);
+            artifact.snap.world.set_is_compiling(false);
+            if let Err(err) = res {
+                test_error!("Fatal:", "{err}");
+            }
+            test_info!("Info:", "Tests finished in {:?}", instant.elapsed());
+            test_hint!("Hint:", "Press 'h' for help");
+            config.args.update = false;
+        }
+
+        next(c, i)
+    });
+
+    let id = service.compiler.primary.id.clone();
+    tokio::spawn(async move {
+        let mut line = String::new();
+        loop {
+            line.clear();
+            std::io::stdin().read_line(&mut line).unwrap();
+            match line.trim() {
+                "h" => {
+                    eprintln!("h/r/u/q: help/run/update/quit");
+                }
+                "r" => {
+                    let _ = intr_tx.send(Interrupt::Compile(id.clone()));
+                }
+                "u" => {
+                    let mut config = config_update.lock();
+                    config.args.update = true;
+                    let _ = intr_tx.send(Interrupt::Compile(id.clone()));
+                }
+                "q" => {
+                    std::process::exit(0);
+                }
+                _ => {
+                    println!("Unknown command");
+                }
+            }
+        }
+    });
+
+    // Consume service and editor_rx
+    tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
+
+    service.run().await;
+
+    Ok(())
+}
+
+fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Result<bool> {
+    let mut ctx = analysis.snapshot(world.clone());
+    let doc = typst::compile::<TypstPagedDocument>(&ctx.world).output?;
+
+    let suites =
+        tinymist_query::testing::test_suites(&mut ctx, &TypstDocument::from(Arc::new(doc)))
+            .context("failed to find suites")?;
+    test_info!(
+        "Info:",
+        "Found {} tests and {} examples",
+        suites.tests.len(),
+        suites.examples.len()
+    );
+
+    let (cov, result) = tinymist_debug::with_cov(world, |world| {
+        let suites = suites.recheck(world);
+        let runner = TestRunner::new(config.clone(), &world, &suites);
+        print_diag_or_error(world, runner.run())
+    });
+    let cov = cov?;
+    let cov_path = Path::new("target/coverage.json");
+    let res = serde_json::to_string(&cov.to_json(world)).context("coverage")?;
+
+    std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
+    write_atomic(cov_path, res).context("write coverage")?;
+
+    test_info!("Info:", "Written coverage to {} ...", cov_path.display());
+    let passed = print_diag_or_error(world, result);
+
+    if matches!(passed, Ok(true)) {
+        test_info!("Info:", "All test cases passed...");
+    } else {
+        test_error!("Fatal:", "Some test cases failed...");
+    }
+
+    passed
 }
 
 #[derive(Debug, Clone)]
 struct TestConfig {
     root: ImmutPath,
     args: TestConfigArgs,
+    out_file: Option<Arc<Mutex<std::fs::File>>>,
 }
 
 struct TestRunner<'a> {
@@ -162,8 +285,36 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn mark_failed(&self) {
+    fn failed_example(&self, name: &str, args: impl fmt::Display) {
+        self.mark_failed("example", name, args);
+    }
+
+    fn failed_test(&self, name: &str, args: impl fmt::Display) {
+        self.mark_failed("test", name, args);
+    }
+
+    fn mark_failed(&self, kind: &str, name: &str, args: impl fmt::Display) {
+        test_log!(Error, "Failed", "{kind}({name}): {args}");
+        self.put_log(format_args!("#failed-{kind}({name:?})"));
         self.failed.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn passed_example(&self, name: &str) {
+        self.mark_passed("example", name);
+    }
+
+    fn passed_test(&self, name: &str) {
+        self.mark_passed("test", name);
+    }
+
+    fn mark_passed(&self, kind: &str, name: &str) {
+        test_info!("Passed", "{kind}({name})");
+        self.put_log(format_args!("#passed-{kind}({name:?})"));
+    }
+
+    fn running(&self, kind: &str, name: &str) {
+        test_info!("Running", "{kind}({name})");
+        self.put_log(format_args!("#running-{kind}({name:?})"));
     }
 
     fn collect_diag<T>(&self, result: Warned<SourceResult<T>>) -> Option<T> {
@@ -180,13 +331,25 @@ impl<'a> TestRunner<'a> {
         }
     }
 
+    fn put_log(&self, args: fmt::Arguments) {
+        use std::io::Write;
+        if let Some(file) = &self.config.out_file {
+            writeln!(file.lock(), "{args}").unwrap();
+        }
+    }
+
     /// Runs the tests and returns whether all tests passed.
     fn run(self) -> Result<bool> {
+        self.put_log(format_args!(
+            "#reset();\n#running-tests({}, {})",
+            self.suites.tests.len(),
+            self.suites.examples.len()
+        ));
         rayon::in_place_scope(|s| {
             s.spawn(|_| {
                 self.suites.tests.par_iter().for_each(|test| {
                     let name = &test.name;
-                    eprintln!("Running test({name})");
+                    self.running("test", name);
                     let world = with_main(self.world, test.location);
                     let introspector = Introspector::default();
                     let traced = Traced::default();
@@ -214,25 +377,25 @@ impl<'a> TestRunner<'a> {
                     match test.kind {
                         TestCaseKind::Test | TestCaseKind::Bench => {
                             if let Err(err) = call_once() {
-                                eprintln!(" Failed test({name}): call error {err:?}");
-                                self.mark_failed();
+                                self.failed_test(name, format_args!("call error {err:?}"));
                             } else {
-                                eprintln!(" Passed test({name})");
+                                test_info!("Passed", "test({name})");
+                                self.passed_test(name);
                             }
                         }
                         TestCaseKind::Panic => match call_once() {
                             Ok(..) => {
-                                eprintln!("{name} exited normally, expected panic");
+                                self.failed_test(name, "exited normally, expected panic");
                             }
                             Err(err) => {
                                 let has_panic = err.iter().any(|p| p.message.contains("panic"));
 
                                 if !has_panic {
-                                    eprintln!(" Failed test({name}): exited with error, expected panic");
                                     self.diagnostics.lock().push(err);
-                                    self.mark_failed();
+                                    self.failed_test(name, "exited with error, expected panic");
                                 } else {
-                                    eprintln!(" Passed test({name})");
+                                    test_info!("Passed", "test({name})");
+                                    self.put_log(format_args!("#passed-test({name:?})"));
                                 }
                             }
                         },
@@ -241,8 +404,7 @@ impl<'a> TestRunner<'a> {
                                 get_example_file(&world, name, test.location, func.span());
                             match example {
                                 Err(err) => {
-                                    eprintln!("cannot find example file in {name}: {err:?}");
-                                    self.mark_failed();
+                                    self.failed_test(name, format_args!("not found: {err}"));
                                 }
                                 Ok(example) => self.run_example(&example),
                             };
@@ -276,18 +438,19 @@ impl<'a> TestRunner<'a> {
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or_default();
-        eprintln!("Running example({example}");
+        self.running("example", example);
+
         if !self.examples.lock().insert(example.to_string()) {
-            eprintln!(" Failed example({example}: duplicate");
-            self.mark_failed();
+            self.failed_example(example, "duplicate");
             return;
         }
+
         let world = with_main(self.world, test.id());
         let mut has_err = false;
         let doc = self.collect_diag(typst::compile::<TypstPagedDocument>(&world));
         has_err |= doc.is_none();
         if let Err(err) = self.render_paged(example, doc.as_ref()) {
-            eprintln!("cannot render example({example}, Paged): {err}");
+            self.failed_example(example, format_args!("cannot render paged: {err}"));
             has_err = true;
         }
 
@@ -296,16 +459,15 @@ impl<'a> TestRunner<'a> {
             has_err |= doc.is_none();
 
             if let Err(err) = self.render_html(example, doc.as_ref()) {
-                eprintln!("cannot render example({example}, Html): {err}");
+                self.failed_example(example, format_args!("cannot render html: {err}"));
                 has_err = true;
             }
         }
 
         if has_err {
-            eprintln!(" Failed example({example}");
-            self.mark_failed();
+            self.failed_example(example, "has error");
         } else {
-            eprintln!(" Passed example({example})");
+            self.passed_example(example);
         }
     }
 
@@ -321,14 +483,7 @@ impl<'a> TestRunner<'a> {
         );
         let output = pixmap.encode_png().context_ut("cannot encode pixmap")?;
 
-        let ref_image = self
-            .config
-            .root
-            .join("refs/png")
-            .join(example)
-            .with_extension("png");
-
-        self.update_example(example, &output, &ref_image, "image")
+        self.update_example(example, &output, "image")
     }
 
     fn render_html(&self, example: &str, doc: Option<&TypstHtmlDocument>) -> Result<()> {
@@ -337,22 +492,17 @@ impl<'a> TestRunner<'a> {
         };
         let output = typst_html::html(doc)?.into_bytes();
 
-        let ref_html = self
-            .config
-            .root
-            .join("refs/html")
-            .join(example)
-            .with_extension("html");
-
-        self.update_example(example, &output, &ref_html, "html")
+        self.update_example(example, &output, "html")
     }
 
-    fn update_example(&self, example: &str, data: &[u8], path: &Path, kind: &str) -> Result<()> {
-        let ext = path.extension().unwrap().to_string_lossy();
+    fn update_example(&self, example: &str, data: &[u8], kind: &str) -> Result<()> {
+        let ext = if kind == "image" { "png" } else { "html" };
+        let refs_path = self.config.root.join("refs");
+        let path = refs_path.join(kind).join(example).with_extension(ext);
         let tmp_path = &path.with_extension(format!("tmp.{ext}"));
         let hash_path = &path.with_extension("hash");
-        let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
 
+        let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
         let existing_hash = if std::fs::exists(hash_path).context("exists hash ref")? {
             Some(std::fs::read(hash_path).context("read hash ref")?)
         } else {
@@ -360,25 +510,36 @@ impl<'a> TestRunner<'a> {
         };
 
         let equal = existing_hash.map(|existing| existing.as_slice() == hash.as_bytes());
-
         match (self.config.args.update, equal) {
             // Doesn't exist, create it
             (_, None) => {}
             (_, Some(true)) => {
-                eprintln!("   Info example({example}): {kind} matches");
+                test_info!("Info", "example({example}): {kind} matches");
             }
             (false, Some(false)) => {
-                eprintln!(" Failed example({example}): {kind} mismatch");
-                eprintln!(
-                    "   Hint example({example}): compare {kind} at {}",
+                write_atomic(tmp_path, data).context("write tmp ref")?;
+                self.failed_example(
+                    example,
+                    format_args!("mismatch {kind} at {}", path.display()),
+                );
+                test_hint!(
+                    "Hint",
+                    "example({example}): compare {kind} at {}",
                     path.display()
                 );
-                self.mark_failed();
-                tinymist_std::fs::paths::write_atomic(tmp_path, data).context("write tmp ref")?;
+                match path.strip_prefix(&self.config.root) {
+                    Ok(p) => {
+                        self.put_log(format_args!("#mismatch-example({example:?}, {p:?})"));
+                    }
+                    Err(_) => {
+                        self.put_log(format_args!("#mismatch-example({example:?}, none)"));
+                    }
+                };
                 return Ok(());
             }
             (true, Some(false)) => {
-                eprintln!("   Info example({example}): updating ref {kind}");
+                // eprintln!("   Info example({example}): updating ref {kind}");
+                test_info!("Info", "example({example}): ref {kind}");
             }
         }
 
@@ -386,9 +547,13 @@ impl<'a> TestRunner<'a> {
             std::fs::remove_file(tmp_path).context("remove tmp")?;
         }
 
+        if matches!(equal, Some(true)) {
+            return Ok(());
+        }
+
         std::fs::create_dir_all(path.parent().context("parent")?).context("create ref")?;
-        tinymist_std::fs::paths::write_atomic(path, data).context("write ref")?;
-        tinymist_std::fs::paths::write_atomic(hash_path, hash).context("write hash ref")?;
+        write_atomic(path, data).context("write ref")?;
+        write_atomic(hash_path, hash).context("write hash ref")?;
 
         Ok(())
     }
@@ -401,45 +566,6 @@ impl<'a> TestRunner<'a> {
         let label = Label::new(PicoStr::intern("test-html-example"));
         // todo: error multiple times
         doc.introspector.query_label(label).is_ok()
-    }
-}
-
-fn with_main(world: &dyn World, id: FileId) -> WorldWithMain<'_> {
-    WorldWithMain { world, main: id }
-}
-
-struct WorldWithMain<'a> {
-    world: &'a dyn World,
-    main: FileId,
-}
-
-impl typst::World for WorldWithMain<'_> {
-    fn main(&self) -> FileId {
-        self.main
-    }
-
-    fn source(&self, id: FileId) -> FileResult<Source> {
-        self.world.source(id)
-    }
-
-    fn library(&self) -> &LazyHash<Library> {
-        self.world.library()
-    }
-
-    fn book(&self) -> &LazyHash<FontBook> {
-        self.world.book()
-    }
-
-    fn file(&self, id: FileId) -> FileResult<Bytes> {
-        self.world.file(id)
-    }
-
-    fn font(&self, index: usize) -> Option<Font> {
-        self.world.font(index)
-    }
-
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        self.world.today(offset)
     }
 }
 
@@ -490,4 +616,22 @@ fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result
             Err(err)
         }
     }
+}
+
+const PREFIX_LEN: usize = 7;
+
+enum Level {
+    Error,
+    Info,
+    Hint,
+}
+
+fn msg(level: Level, prefix: &str, msg: fmt::Arguments) {
+    let color = match level {
+        Level::Error => "\x1b[1;31m",
+        Level::Info => "\x1b[1;32m",
+        Level::Hint => "\x1b[1;36m",
+    };
+    let reset = "\x1b[0m";
+    eprintln!("{color}{prefix:>PREFIX_LEN$}{reset} {msg}");
 }

@@ -75,24 +75,29 @@ fn main() -> Result<()> {
     // Starts logging
     let _ = {
         let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+        let is_test_no_verbose =
+            matches!(&args.command, Some(Commands::Test(test)) if !test.verbose);
         use log::LevelFilter::*;
-        let base_level = if is_transient_cmd { Warn } else { Info };
+        let base_no_info = is_transient_cmd || is_test_no_verbose;
+        let base_level = if base_no_info { Warn } else { Info };
+        let preview_level = if is_test_no_verbose { Warn } else { Debug };
+        let diag_level = if is_test_no_verbose { Warn } else { Info };
 
         env_logger::builder()
             .filter_module("tinymist", base_level)
-            .filter_module("typst_preview", Debug)
+            .filter_module("typst_preview", preview_level)
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
             .filter_module("sync_ls", base_level)
             .filter_module("reflexo_typst2vec::pass::span2vec", Error)
-            .filter_module("reflexo_typst::diag::console", Info)
+            .filter_module("reflexo_typst::diag::console", diag_level)
             .try_init()
     };
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
         Commands::Cov(args) => coverage_main(args),
-        Commands::Test(args) => test_main(args),
+        Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),

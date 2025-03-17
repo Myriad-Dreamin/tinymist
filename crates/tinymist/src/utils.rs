@@ -52,3 +52,11 @@ pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
 pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
     f().unwrap_or(default)
 }
+
+pub fn exit_on_ctrl_c() {
+    tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        log::info!("Ctrl-C received, exiting");
+        std::process::exit(0);
+    });
+}

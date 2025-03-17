@@ -6,6 +6,6 @@ pub use tinymist_world::config::CompileFontOpts;
 pub use tinymist_world::entry::*;
 pub use tinymist_world::{font, package, system, vfs};
 pub use tinymist_world::{
-    CompilerUniverse, CompilerWorld, DiagnosticFormat, EntryOpts, EntryState, RevisingUniverse,
-    TaskInputs,
+    with_main, CompilerUniverse, CompilerWorld, DiagnosticFormat, EntryOpts, EntryState,
+    RevisingUniverse, TaskInputs,
 };

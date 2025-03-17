@@ -731,6 +731,46 @@ impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     }
 }
 
+/// Runs a world with a main file.
+pub fn with_main(world: &dyn World, id: FileId) -> WorldWithMain<'_> {
+    WorldWithMain { world, main: id }
+}
+
+pub struct WorldWithMain<'a> {
+    world: &'a dyn World,
+    main: FileId,
+}
+
+impl typst::World for WorldWithMain<'_> {
+    fn main(&self) -> FileId {
+        self.main
+    }
+
+    fn source(&self, id: FileId) -> FileResult<Source> {
+        self.world.source(id)
+    }
+
+    fn library(&self) -> &LazyHash<Library> {
+        self.world.library()
+    }
+
+    fn book(&self) -> &LazyHash<FontBook> {
+        self.world.book()
+    }
+
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        self.world.file(id)
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.world.font(index)
+    }
+
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        self.world.today(offset)
+    }
+}
+
 pub trait SourceWorld: World {
     fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError>;
     fn lookup(&self, id: FileId) -> Source {
