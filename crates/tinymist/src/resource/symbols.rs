@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
-use sync_lsp::LspResult;
+use sync_ls::LspResult;
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};

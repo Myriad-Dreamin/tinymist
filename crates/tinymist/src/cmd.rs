@@ -3,10 +3,10 @@
 use std::ops::Deref;
 use std::path::PathBuf;
 
-use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use sync_ls::RequestId;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::{

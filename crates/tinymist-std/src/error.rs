@@ -190,6 +190,7 @@ impl Error {
     }
 
     /// Returns the diagnostics attach to the error.
+    #[cfg(feature = "typst")]
     pub fn diagnostics(&self) -> Option<&[SourceDiagnostic]> {
         match &self.err.kind {
             ErrKind::RawDiag(diag) => Some(diag),
