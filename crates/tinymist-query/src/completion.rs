@@ -77,12 +77,9 @@ impl StatefulRequest for CompletionRequest {
         // - <https://github.com/microsoft/vscode/issues/130953>
         // - <https://github.com/microsoft/vscode/commit/0984071fe0d8a3c157a1ba810c244752d69e5689>
         // Checks the previous text to filter out letter explicit completions.
-        let explicit = self.explicit
-            && (self.trigger_character.is_none() && {
-                let prev_text = &source.text()[..cursor];
-                let prev_char = prev_text.chars().next_back();
-                prev_char.is_none_or(|c| !c.is_alphabetic())
-            });
+        //
+        // Second try is failed.
+        let explicit = false;
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
         let mut worker = CompletionWorker::new(ctx, document, explicit, self.trigger_character)?;
