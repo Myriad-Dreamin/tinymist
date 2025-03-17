@@ -365,7 +365,7 @@ export class LanguageState {
    * Kills all preview tasks. See {@link _GroupDocumentPreviewFeatureCommands} for more information.
    */
   async killAllPreview(): Promise<void> {
-    return await tinymist.executeCommand(`tinymist.doKillPreview`);
+    return await tinymist.executeCommand(`tinymist.doKillPreview`, []);
   }
 
   /**
@@ -384,7 +384,7 @@ export class LanguageState {
    * for more information.
    */
   async scrollAllPreview(): Promise<void> {
-    return await tinymist.executeCommand(`tinymist.scrollPreview`);
+    return await tinymist.executeCommand(`tinymist.scrollPreview`, []);
   }
 
   /**
