@@ -22,9 +22,7 @@ use tinymist::tool::project::{
     compile_main, coverage_main, generate_script_main, project_main, task_main,
 };
 use tinymist::world::TaskInputs;
-use tinymist::{
-    CompileConfig, Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask,
-};
+use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
@@ -205,14 +203,11 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let client = client_root.weak();
         let roots = vec![ImmutPath::from(root_path)];
         let config = Config {
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..EntryResolver::default()
-                },
-                font_opts: args.compile.font,
-                ..CompileConfig::default()
+            entry_resolver: EntryResolver {
+                roots,
+                ..EntryResolver::default()
             },
+            font_opts: args.compile.font,
             ..Config::default()
         };
 

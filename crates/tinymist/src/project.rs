@@ -123,7 +123,7 @@ impl ServerState {
         dedicate: &str,
         entry: Option<ImmutPath>,
     ) -> Result<ProjectInsId> {
-        let entry = self.config.compile.entry_resolver.resolve(entry);
+        let entry = self.config.entry_resolver.resolve(entry);
         let enable_html = matches!(self.config.export_target, ExportTarget::Html);
         self.project.restart_dedicate(dedicate, entry, enable_html)
     }
@@ -145,7 +145,7 @@ impl ServerState {
         );
 
         // Create the compile handler for client consuming results.
-        let periscope_args = config.compile.periscope_args.clone();
+        let periscope_args = config.periscope_args.clone();
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             preview,
@@ -159,7 +159,7 @@ impl ServerState {
                 allow_multiline_token: const_config.tokens_multiline_token_support,
                 remove_html: !config.support_html_in_markdown,
                 completion_feat: config.completion.clone(),
-                color_theme: match config.compile.color_theme.as_deref() {
+                color_theme: match config.color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
                 },
@@ -179,15 +179,15 @@ impl ServerState {
         });
 
         let export_target = config.export_target;
-        let default_path = config.compile.entry_resolver.resolve_default();
-        let entry = config.compile.entry_resolver.resolve(default_path);
-        let inputs = config.compile.determine_inputs();
-        let cert_path = config.compile.determine_certification_path();
-        let package = config.compile.determine_package_opts();
+        let default_path = config.entry_resolver.resolve_default();
+        let entry = config.entry_resolver.resolve(default_path);
+        let inputs = config.inputs();
+        let cert_path = config.certification_path();
+        let package = config.package_opts();
 
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
-        let fonts = config.compile.determine_fonts();
+        let fonts = config.fonts();
         let package_registry =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
         let verse =

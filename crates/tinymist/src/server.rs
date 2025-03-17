@@ -141,14 +141,9 @@ impl ServerState {
         &self.config.const_config
     }
 
-    /// Gets the compile configuration.
-    pub fn compile_config(&self) -> &CompileConfig {
-        &self.config.compile
-    }
-
     /// Gets the entry resolver.
     pub fn entry_resolver(&self) -> &EntryResolver {
-        &self.compile_config().entry_resolver
+        &self.config.entry_resolver
     }
 
     /// Whether the main file is pinning.
@@ -162,7 +157,7 @@ impl ServerState {
 
     /// The entry point for the language server.
     pub fn main(client: TypedLspClient<Self>, config: Config, start: bool) -> Self {
-        log::info!("LanguageState: initialized with config {config:?}");
+        log::info!("ServerState: initialized with config {config:?}");
 
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
@@ -173,7 +168,7 @@ impl ServerState {
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
-                service.config.compile.notify_status,
+                service.config.notify_status,
             );
 
             service
@@ -393,7 +388,7 @@ impl ServerState {
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, task, open } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
+        let lock_dir = self.entry_resolver().resolve_lock(&entry);
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
             |snap: LspCompileSnapshot| async move {
