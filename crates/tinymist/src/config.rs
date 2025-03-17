@@ -537,20 +537,7 @@ impl Config {
             Arc::new(LazyHash::new(dict))
         }
 
-        let user_inputs = self.user_inputs();
-
-        combine(user_inputs, self.lsp_inputs.clone())
-    }
-
-    /// Determines the creation timestamp.
-    pub fn creation_timestamp(&self) -> Option<i64> {
-        self.typst_extra_args.as_ref()?.creation_timestamp
-    }
-
-    /// Determines the certification path.
-    pub fn certification_path(&self) -> Option<ImmutPath> {
-        let extras = self.typst_extra_args.as_ref()?;
-        extras.cert.clone()
+        combine(self.user_inputs(), self.lsp_inputs.clone())
     }
 
     fn user_inputs(&self) -> ImmutDict {
@@ -561,6 +548,16 @@ impl Config {
         }
 
         EMPTY.clone()
+    }
+
+    /// Determines the creation timestamp.
+    pub fn creation_timestamp(&self) -> Option<i64> {
+        self.typst_extra_args.as_ref()?.creation_timestamp
+    }
+
+    /// Determines the certification path.
+    pub fn certification_path(&self) -> Option<ImmutPath> {
+        self.typst_extra_args.as_ref()?.cert.clone()
     }
 
     /// Applies the primary options related to compilation.
