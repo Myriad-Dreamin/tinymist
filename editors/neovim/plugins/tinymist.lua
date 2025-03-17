@@ -31,7 +31,7 @@ return {
             return vim.fn.getcwd()
           end
         end,
-        --- See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/blob/main/Configuration.md) for references.
+        --- See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/neovim/Configuration.md) for references.
         settings = {},
       }
     end,
