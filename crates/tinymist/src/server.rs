@@ -112,7 +112,11 @@ impl ServerState {
             editor_tx,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(
+                &config,
+                watchers,
+                client.cast(|s| &mut s.preview),
+            ),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
