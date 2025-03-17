@@ -1070,7 +1070,7 @@ fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInf
         lsp_types::ShowDocumentParams {
             uri,
             external: None,
-            take_focus: None,
+            take_focus: Some(true),
             selection: range,
         },
         |_, resp| {
