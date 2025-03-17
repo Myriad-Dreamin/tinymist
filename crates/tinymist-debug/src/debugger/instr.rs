@@ -1,172 +1,29 @@
-//! Tinymist coverage support for Typst.
-use std::collections::HashMap;
-use std::sync::{Arc, LazyLock};
+use typst::diag::FileError;
+use typst::syntax::ast::{self, AstNode};
+use typst::syntax::SyntaxNode;
 
-use parking_lot::Mutex;
-use tinymist_analysis::location::PositionEncoding;
-use tinymist_std::debug_loc::LspRange;
-use tinymist_std::hash::FxHashMap;
-use tinymist_world::vfs::FileId;
-use tinymist_world::{CompilerFeat, CompilerWorld};
-use typst::diag::FileResult;
-use typst::foundations::func;
-use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, Source, Span, SyntaxNode};
-use typst::{World, WorldExt};
+use super::*;
 
-use crate::instrument::Instrumenter;
-
-/// The coverage result.
-pub struct CoverageResult {
-    /// The coverage meta.
-    pub meta: FxHashMap<FileId, Arc<InstrumentMeta>>,
-    /// The coverage map.
-    pub regions: FxHashMap<FileId, CovRegion>,
-}
-
-impl CoverageResult {
-    /// Converts the coverage result to JSON.
-    pub fn to_json<F: CompilerFeat>(&self, w: &CompilerWorld<F>) -> serde_json::Value {
-        let lsp_position_encoding = PositionEncoding::Utf16;
-
-        let mut result = VscodeCoverage::new();
-
-        for (file_id, region) in &self.regions {
-            let file_path = w
-                .path_for_id(*file_id)
-                .unwrap()
-                .as_path()
-                .to_str()
-                .unwrap()
-                .to_string();
-
-            let mut details = vec![];
-
-            let meta = self.meta.get(file_id).unwrap();
-
-            let Ok(typst_source) = w.source(*file_id) else {
-                continue;
-            };
-
-            let hits = region.hits.lock();
-            for (idx, (span, _kind)) in meta.meta.iter().enumerate() {
-                let Some(typst_range) = w.range(*span) else {
-                    continue;
-                };
-
-                let rng = tinymist_analysis::location::to_lsp_range(
-                    typst_range,
-                    &typst_source,
-                    lsp_position_encoding,
-                );
-
-                details.push(VscodeFileCoverageDetail {
-                    executed: hits[idx] > 0,
-                    location: rng,
-                });
-            }
-
-            result.insert(file_path, details);
-        }
-
-        serde_json::to_value(result).unwrap()
-    }
-}
-
-/// The coverage result in the format of the VSCode coverage data.
-pub type VscodeCoverage = HashMap<String, Vec<VscodeFileCoverageDetail>>;
-
-/// Converts the coverage result to the VSCode coverage data.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct VscodeFileCoverageDetail {
-    /// Whether the location is being executed
-    pub executed: bool,
-    /// The location of the coverage.
-    pub location: LspRange,
-}
-
-#[derive(Default)]
-pub struct CovInstr {
-    /// The coverage map.
-    pub map: Mutex<FxHashMap<FileId, Arc<InstrumentMeta>>>,
-}
-
-impl Instrumenter for CovInstr {
+impl Instrumenter for BreakpointInstr {
     fn instrument(&self, _source: Source) -> FileResult<Source> {
-        let (new, meta) = instrument_coverage(_source)?;
-        let region = CovRegion {
-            hits: Arc::new(Mutex::new(vec![0; meta.meta.len()])),
-        };
+        let (new, meta) = instrument_breakpoints(_source)?;
 
-        let mut map = self.map.lock();
-        map.insert(new.id(), meta);
+        let mut session = DEBUG_SESSION.write();
+        let session = session
+            .as_mut()
+            .ok_or_else(|| FileError::Other(Some("No active debug session".into())))?;
 
-        let mut cov_map = COVERAGE_MAP.lock();
-        cov_map.regions.insert(new.id(), region);
+        session.breakpoints.insert(new.id(), meta);
 
         Ok(new)
     }
 }
 
-/// The coverage map.
-#[derive(Default)]
-pub struct CoverageMap {
-    last_hit: Option<(FileId, CovRegion)>,
-    /// The coverage map.
-    pub regions: FxHashMap<FileId, CovRegion>,
-}
-
-/// The coverage region
-#[derive(Default, Clone)]
-pub struct CovRegion {
-    /// The hits
-    pub hits: Arc<Mutex<Vec<u8>>>,
-}
-
-pub static COVERAGE_LOCK: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
-pub static COVERAGE_MAP: LazyLock<Mutex<CoverageMap>> = LazyLock::new(Mutex::default);
-
-#[func(name = "__cov_pc", title = "Coverage function")]
-pub fn __cov_pc(span: Span, pc: i64) {
-    let Some(fid) = span.id() else {
-        return;
-    };
-    let mut map = COVERAGE_MAP.lock();
-    if let Some(last_hit) = map.last_hit.as_ref() {
-        if last_hit.0 == fid {
-            let mut hits = last_hit.1.hits.lock();
-            let c = &mut hits[pc as usize];
-            *c = c.saturating_add(1);
-            return;
-        }
-    }
-
-    let region = map.regions.entry(fid).or_default();
-    {
-        let mut hits = region.hits.lock();
-        let c = &mut hits[pc as usize];
-        *c = c.saturating_add(1);
-    }
-    map.last_hit = Some((fid, region.clone()));
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    OpenBrace,
-    CloseBrace,
-    Functor,
-}
-
-#[derive(Default)]
-pub struct InstrumentMeta {
-    pub meta: Vec<(Span, Kind)>,
-}
-
 #[comemo::memoize]
-fn instrument_coverage(source: Source) -> FileResult<(Source, Arc<InstrumentMeta>)> {
+fn instrument_breakpoints(source: Source) -> FileResult<(Source, Arc<BreakpointInfo>)> {
     let node = source.root();
     let mut worker = InstrumentWorker {
-        meta: InstrumentMeta::default(),
+        meta: BreakpointInfo::default(),
         instrumented: String::new(),
     };
 
@@ -177,7 +34,7 @@ fn instrument_coverage(source: Source) -> FileResult<(Source, Arc<InstrumentMeta
 }
 
 struct InstrumentWorker {
-    meta: InstrumentMeta,
+    meta: BreakpointInfo,
     instrumented: String,
 }
 
@@ -301,12 +158,20 @@ impl InstrumentWorker {
         }
     }
 
-    fn make_cov(&mut self, span: Span, kind: Kind) {
+    fn make_cov(&mut self, span: Span, kind: BreakpointKind) {
         let it = self.meta.meta.len();
-        self.meta.meta.push((span, kind));
-        self.instrumented.push_str("__cov_pc(");
+        self.meta.meta.push(BreakpointItem { origin_span: span });
+        self.instrumented.push_str("if __breakpoint_");
+        self.instrumented.push_str(kind.to_str());
+        self.instrumented.push('(');
         self.instrumented.push_str(&it.to_string());
-        self.instrumented.push_str(");\n");
+        self.instrumented.push_str(") {");
+        self.instrumented.push_str("__breakpoint_");
+        self.instrumented.push_str(kind.to_str());
+        self.instrumented.push_str("_handle(");
+        self.instrumented.push_str(&it.to_string());
+        self.instrumented.push_str(", (:)); ");
+        self.instrumented.push_str("};\n");
     }
 
     fn instrument_block(&mut self, child: &SyntaxNode) {
@@ -324,20 +189,20 @@ impl InstrumentWorker {
 
             (first, last)
         };
-        self.make_cov(first, Kind::OpenBrace);
+        self.make_cov(first, BreakpointKind::BlockStart);
         self.visit_node_fallback(child);
         self.instrumented.push('\n');
-        self.make_cov(last, Kind::CloseBrace);
+        self.make_cov(last, BreakpointKind::BlockEnd);
         self.instrumented.push_str("}\n");
     }
 
     fn instrument_functor(&mut self, child: &SyntaxNode) {
-        self.instrumented.push_str("{\nlet __cov_functor = ");
+        self.instrumented.push_str("{\nlet __bp_functor = ");
         let s = child.span();
         self.visit_node_fallback(child);
         self.instrumented.push_str("\n__it => {");
-        self.make_cov(s, Kind::Functor);
-        self.instrumented.push_str("__cov_functor(__it); } }\n");
+        self.make_cov(s, BreakpointKind::ShowStart);
+        self.instrumented.push_str("__bp_functor(__it); } }\n");
     }
 }
 
@@ -347,14 +212,16 @@ mod tests {
 
     fn instr(input: &str) -> String {
         let source = Source::detached(input);
-        let (new, _meta) = instrument_coverage(source).unwrap();
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
         new.text().to_string()
     }
 
     #[test]
     fn test_physica_vector() {
-        let instrumented = instr(include_str!("fixtures/instr_coverage/physica_vector.typ"));
-        insta::assert_snapshot!(instrumented, @r#"
+        let instrumented = instr(include_str!(
+            "../fixtures/instr_coverage/physica_vector.typ"
+        ));
+        insta::assert_snapshot!(instrumented, @r###"
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -364,78 +231,78 @@ mod tests {
         //     U^+U = U U^+ = I
         //   ]
         #let super-plus-as-dagger(document) = {
-        __cov_pc(0);
+        if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {
           show math.attach: {
-        let __cov_functor = elem => {
-        __cov_pc(1);
+        let __bp_functor = elem => {
+        if __breakpoint_block_start(1) {__breakpoint_block_start_handle(1, (:)); };
         {
             if __eligible(elem.base) and elem.at("t", default: none) == [+] {
-        __cov_pc(2);
+        if __breakpoint_block_start(2) {__breakpoint_block_start_handle(2, (:)); };
         {
               $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
             }
-        __cov_pc(3);
+        if __breakpoint_block_end(3) {__breakpoint_block_end_handle(3, (:)); };
         }
          else {
-        __cov_pc(4);
+        if __breakpoint_block_start(4) {__breakpoint_block_start_handle(4, (:)); };
         {
               elem
             }
-        __cov_pc(5);
+        if __breakpoint_block_end(5) {__breakpoint_block_end_handle(5, (:)); };
         }
 
           }
-        __cov_pc(6);
+        if __breakpoint_block_end(6) {__breakpoint_block_end_handle(6, (:)); };
         }
 
-        __it => {__cov_pc(7);
-        __cov_functor(__it); } }
+        __it => {if __breakpoint_show_start(7) {__breakpoint_show_start_handle(7, (:)); };
+        __bp_functor(__it); } }
 
 
           document
         }
-        __cov_pc(8);
+        if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
         }
-        "#);
+        "###);
     }
 
     #[test]
     fn test_playground() {
-        let instrumented = instr(include_str!("fixtures/instr_coverage/playground.typ"));
+        let instrumented = instr(include_str!("../fixtures/instr_coverage/playground.typ"));
         insta::assert_snapshot!(instrumented, @"");
     }
 
     #[test]
     fn test_instrument_coverage() {
         let source = Source::detached("#let a = 1;");
-        let (new, _meta) = instrument_coverage(source).unwrap();
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
         insta::assert_snapshot!(new.text(), @"#let a = 1;");
     }
 
     #[test]
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
-        let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
         #let a = {
-        __cov_pc(0);
+        if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {1}
-        __cov_pc(1);
+        if __breakpoint_block_end(1) {__breakpoint_block_end_handle(1, (:)); };
         }
         ;
-        ");
+        "###);
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
-        let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r"
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        insta::assert_snapshot!(new.text(), @r###"
         #show: {
-        let __cov_functor = main
-        __it => {__cov_pc(0);
-        __cov_functor(__it); } }
-        ");
+        let __bp_functor = main
+        __it => {if __breakpoint_show_start(0) {__breakpoint_show_start_handle(0, (:)); };
+        __bp_functor(__it); } }
+        "###);
     }
 }
