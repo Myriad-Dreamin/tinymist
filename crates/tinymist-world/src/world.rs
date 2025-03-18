@@ -772,43 +772,37 @@ impl typst::World for WorldWithMain<'_> {
 }
 
 pub trait SourceWorld: World {
+    fn as_world(&self) -> &dyn World;
+
     fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError>;
     fn lookup(&self, id: FileId) -> Source {
         self.source(id)
             .expect("file id does not point to any source file")
     }
-    fn map_source_or_default<T>(
-        &self,
-        id: FileId,
-        default_v: T,
-        f: impl FnOnce(Source) -> CodespanResult<T>,
-    ) -> CodespanResult<T> {
-        match self.source(id).ok() {
-            Some(source) => f(source),
-            None => Ok(default_v),
-        }
-    }
-
-    fn for_codespan_reporting(&self) -> CodeSpanReportWorld<Self>
-    where
-        Self: Sized,
-    {
-        CodeSpanReportWorld { world: self }
-    }
 }
 
 impl<F: CompilerFeat> SourceWorld for CompilerWorld<F> {
+    fn as_world(&self) -> &dyn World {
+        self
+    }
+
     /// Resolve the real path for a file id.
     fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.path_for_id(id)
     }
 }
 
-pub struct CodeSpanReportWorld<'a, T> {
-    pub world: &'a T,
+pub struct CodeSpanReportWorld<'a> {
+    pub world: &'a dyn SourceWorld,
 }
 
-impl<'a, T: SourceWorld> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a, T> {
+impl<'a> CodeSpanReportWorld<'a> {
+    pub fn new(world: &'a dyn SourceWorld) -> Self {
+        Self { world }
+    }
+}
+
+impl<'a> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a> {
     /// A unique identifier for files in the file provider. This will be used
     /// for rendering `diagnostic::Label`s in the corresponding source files.
     type FileId = FileId;
@@ -858,14 +852,17 @@ impl<'a, T: SourceWorld> codespan_reporting::files::Files<'a> for CodeSpanReport
 
     /// See [`codespan_reporting::files::Files::line_range`].
     fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
-        self.world.map_source_or_default(id, 0..0, |source| {
-            source
-                .line_to_range(given)
-                .ok_or_else(|| CodespanError::LineTooLarge {
-                    given,
-                    max: source.len_lines(),
-                })
-        })
+        match self.world.source(id).ok() {
+            Some(source) => {
+                source
+                    .line_to_range(given)
+                    .ok_or_else(|| CodespanError::LineTooLarge {
+                        given,
+                        max: source.len_lines(),
+                    })
+            }
+            None => Ok(0..0),
+        }
     }
 }
 
@@ -883,27 +880,27 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
-        self.for_codespan_reporting().name(id)
+        CodeSpanReportWorld::new(self).name(id)
     }
 
     /// The source code of a file.
     fn source(&'a self, id: FileId) -> CodespanResult<Self::Source> {
-        self.for_codespan_reporting().source(id)
+        CodeSpanReportWorld::new(self).source(id)
     }
 
     /// See [`codespan_reporting::files::Files::line_index`].
     fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
-        self.for_codespan_reporting().line_index(id, given)
+        CodeSpanReportWorld::new(self).line_index(id, given)
     }
 
     /// See [`codespan_reporting::files::Files::column_number`].
     fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
-        self.for_codespan_reporting().column_number(id, 0, given)
+        CodeSpanReportWorld::new(self).column_number(id, 0, given)
     }
 
     /// See [`codespan_reporting::files::Files::line_range`].
     fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
-        self.for_codespan_reporting().line_range(id, given)
+        CodeSpanReportWorld::new(self).line_range(id, given)
     }
 }
 
