@@ -1,38 +1,34 @@
 //! Testing utilities
 
 use core::fmt;
-use std::{
-    collections::HashSet,
-    path::Path,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::collections::HashSet;
+use std::io::Write;
+use std::path::Path;
+use std::sync::{atomic::AtomicBool, Arc};
 
-use comemo::Track;
+use itertools::Either;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reflexo::ImmutPath;
 use reflexo_typst::{vfs::FileId, SourceWorld, TypstDocument, TypstHtmlDocument};
 use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
-use tinymist_query::{
-    analysis::Analysis,
-    syntax::{find_source_by_expr, node_ancestors},
-    testing::{TestCaseKind, TestSuites},
-};
+use tinymist_query::analysis::Analysis;
+use tinymist_query::syntax::{cast_include_expr, find_source_by_expr, node_ancestors};
+use tinymist_query::testing::{TestCaseKind, TestSuites};
 use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
-use typst::{
-    diag::{SourceDiagnostic, SourceResult, Warned},
-    ecow::EcoVec,
-    engine::{Engine, Route, Sink, Traced},
-    foundations::{Context, Label, Value},
-    introspection::Introspector,
-    syntax::{ast, LinkedNode, Source, Span},
-    utils::PicoStr,
-    World,
-};
+use typst::diag::SourceDiagnostic;
+use typst::ecow::EcoVec;
+use typst::foundations::{Context, Label};
+use typst::syntax::{ast, LinkedNode, Source, Span};
+use typst::{utils::PicoStr, World};
+use typst_shim::eval::TypstEngine;
 
 use super::project::{start_project, StartProjectResult};
 use crate::world::with_main;
 use crate::{project::*, utils::exit_on_ctrl_c};
+
+const TEST_EVICT_MAX_AGE: usize = 30;
+const PREFIX_LEN: usize = 7;
 
 /// Runs coverage test on a document
 pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
@@ -92,23 +88,12 @@ macro_rules! test_log {
     };
 }
 
-macro_rules! test_info {
-    ($( $arg:tt )*) => {
-        test_log!(Info, $($arg)*)
-    };
-}
+macro_rules! test_info { ($( $arg:tt )*) => { test_log!(Info, $($arg)*) }; }
+macro_rules! test_error { ($( $arg:tt )*) => { test_log!(Error, $($arg)*) }; }
+macro_rules! log_info { ($( $arg:tt )*) => { test_log!(Info, "Info:", $($arg)*) }; }
+macro_rules! log_hint { ($( $arg:tt )*) => { test_log!(Hint, "Hint:", $($arg)*) }; }
 
-macro_rules! test_error {
-    ($( $arg:tt )*) => {
-        test_log!(Error, $($arg)*)
-    };
-}
-
-macro_rules! test_hint {
-    ($( $arg:tt )*) => {
-        test_log!(Hint, $($arg)*)
-    };
-}
+const LOG_PRELUDE: &str = "#import \"/target/testing-log.typ\": *\n#show: main";
 
 /// Runs tests on a document
 pub async fn test_main(args: TestArgs) -> Result<()> {
@@ -123,11 +108,13 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
         .unwrap_or_else(|| std::env::current_dir().map(|p| p.into()))
         .context("cannot find root")?;
 
+    std::fs::create_dir_all(Path::new("target")).context("create target dir")?;
+    write_atomic("target/testing-log.typ", include_str!("testing-log.typ"))
+        .context("write log template")?;
+
     let out_file = if args.watch {
-        use std::io::Write;
         let mut out_file = std::fs::File::create("test-watch.typ").context("create log file")?;
-        writeln!(out_file, "#import \"/target/test-template.typ\": *").context("write log")?;
-        writeln!(out_file, "#show: main").context("write log")?;
+        writeln!(out_file, "{LOG_PRELUDE}").context("write log")?;
         Some(Arc::new(Mutex::new(out_file)))
     } else {
         None
@@ -166,47 +153,43 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
             if is_first {
                 is_first = false;
             } else {
-                test_info!("Info:", "Re-testing...");
+                log_info!("Runs testing again...");
             }
             // Sets is_compiling to track dependencies
             artifact.snap.world.set_is_compiling(true);
             let res = test_once(&analysis, &artifact.world, &config);
             artifact.snap.world.set_is_compiling(false);
+
             if let Err(err) = res {
                 test_error!("Fatal:", "{err}");
             }
-            test_info!("Info:", "Tests finished in {:?}", instant.elapsed());
-            test_hint!("Hint:", "Press 'h' for help");
+            log_info!("Tests finished in {:?}", instant.elapsed());
+            log_hint!("Press 'h' for help");
+
             config.args.update = false;
         }
 
         next(c, i)
     });
 
-    let id = service.compiler.primary.id.clone();
+    let proj_id = service.compiler.primary.id.clone();
     tokio::spawn(async move {
         let mut line = String::new();
         loop {
             line.clear();
             std::io::stdin().read_line(&mut line).unwrap();
             match line.trim() {
-                "h" => {
-                    eprintln!("h/r/u/q: help/run/update/quit");
-                }
                 "r" => {
-                    let _ = intr_tx.send(Interrupt::Compile(id.clone()));
+                    let _ = intr_tx.send(Interrupt::Compile(proj_id.clone()));
                 }
                 "u" => {
                     let mut config = config_update.lock();
                     config.args.update = true;
-                    let _ = intr_tx.send(Interrupt::Compile(id.clone()));
+                    let _ = intr_tx.send(Interrupt::Compile(proj_id.clone()));
                 }
-                "q" => {
-                    std::process::exit(0);
-                }
-                _ => {
-                    println!("Unknown command");
-                }
+                "h" => eprintln!("h/r/u/q: help/run/update/quit"),
+                "q" => std::process::exit(0),
+                line => eprintln!("Unknown command: {line}"),
             }
         }
     });
@@ -225,9 +208,8 @@ fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Resu
 
     let suites =
         tinymist_query::testing::test_suites(&mut ctx, &TypstDocument::from(Arc::new(doc)))
-            .context("failed to find suites")?;
-    test_info!(
-        "Info:",
+            .context("failed to discover tests")?;
+    log_info!(
         "Found {} tests and {} examples",
         suites.tests.len(),
         suites.examples.len()
@@ -236,20 +218,20 @@ fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Resu
     let (cov, result) = tinymist_debug::with_cov(world, |world| {
         let suites = suites.recheck(world);
         let runner = TestRunner::new(config.clone(), &world, &suites);
-        print_diag_or_error(world, runner.run())
+        let result = print_diag_or_error(world, runner.run());
+        comemo::evict(TEST_EVICT_MAX_AGE);
+        result
     });
+    let passed = print_diag_or_error(world, result);
+
     let cov = cov?;
     let cov_path = Path::new("target/coverage.json");
     let res = serde_json::to_string(&cov.to_json(world)).context("coverage")?;
-
-    std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
     write_atomic(cov_path, res).context("write coverage")?;
-
-    test_info!("Info:", "Written coverage to {} ...", cov_path.display());
-    let passed = print_diag_or_error(world, result);
+    log_info!("Written coverage to {} ...", cov_path.display());
 
     if matches!(passed, Ok(true)) {
-        test_info!("Info:", "All test cases passed...");
+        log_info!("All test cases passed...");
     } else {
         test_error!("Fatal:", "Some test cases failed...");
     }
@@ -285,12 +267,15 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn failed_example(&self, name: &str, args: impl fmt::Display) {
-        self.mark_failed("example", name, args);
+    fn put_log(&self, args: fmt::Arguments) {
+        if let Some(file) = &self.config.out_file {
+            writeln!(file.lock(), "{args}").unwrap();
+        }
     }
 
-    fn failed_test(&self, name: &str, args: impl fmt::Display) {
-        self.mark_failed("test", name, args);
+    fn running(&self, kind: &str, name: &str) {
+        test_info!("Running", "{kind}({name})");
+        self.put_log(format_args!("#running-{kind}({name:?})"));
     }
 
     fn mark_failed(&self, kind: &str, name: &str, args: impl fmt::Display) {
@@ -299,43 +284,17 @@ impl<'a> TestRunner<'a> {
         self.failed.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
-    fn passed_example(&self, name: &str) {
-        self.mark_passed("example", name);
-    }
-
-    fn passed_test(&self, name: &str) {
-        self.mark_passed("test", name);
-    }
-
     fn mark_passed(&self, kind: &str, name: &str) {
         test_info!("Passed", "{kind}({name})");
         self.put_log(format_args!("#passed-{kind}({name:?})"));
     }
 
-    fn running(&self, kind: &str, name: &str) {
-        test_info!("Running", "{kind}({name})");
-        self.put_log(format_args!("#running-{kind}({name:?})"));
+    fn failed_example(&self, name: &str, args: impl fmt::Display) {
+        self.mark_failed("example", name, args);
     }
 
-    fn collect_diag<T>(&self, result: Warned<SourceResult<T>>) -> Option<T> {
-        if !result.warnings.is_empty() {
-            self.diagnostics.lock().push(result.warnings);
-        }
-
-        match result.output {
-            Ok(v) => Some(v),
-            Err(e) => {
-                self.diagnostics.lock().push(e);
-                None
-            }
-        }
-    }
-
-    fn put_log(&self, args: fmt::Arguments) {
-        use std::io::Write;
-        if let Some(file) = &self.config.out_file {
-            writeln!(file.lock(), "{args}").unwrap();
-        }
+    fn failed_test(&self, name: &str, args: impl fmt::Display) {
+        self.mark_failed("test", name, args);
     }
 
     /// Runs the tests and returns whether all tests passed.
@@ -345,162 +304,156 @@ impl<'a> TestRunner<'a> {
             self.suites.tests.len(),
             self.suites.examples.len()
         ));
-        rayon::in_place_scope(|s| {
-            s.spawn(|_| {
-                self.suites.tests.par_iter().for_each(|test| {
-                    let name = &test.name;
+
+        let examples = self.suites.examples.par_iter().map(Either::Left);
+        let tests = self.suites.tests.par_iter().map(Either::Right);
+
+        examples.chain(tests).for_each(|case| {
+            let test = match case {
+                Either::Left(test) => {
+                    self.run_example(test);
+                    return;
+                }
+                Either::Right(test) => test,
+            };
+
+            let name = &test.name;
+            let func = &test.function;
+
+            let world = with_main(self.world, test.location);
+            let mut engine = TypstEngine::new(&world);
+
+            // Executes the function
+            match test.kind {
+                TestCaseKind::Test | TestCaseKind::Bench => {
                     self.running("test", name);
-                    let world = with_main(self.world, test.location);
-                    let introspector = Introspector::default();
-                    let traced = Traced::default();
-                    let route = Route::default();
-                    let mut sink = Sink::default();
-                    let engine = &mut Engine {
-                        routines: &typst::ROUTINES,
-                        world: ((&world) as &dyn World).track(),
-                        introspector: introspector.track(),
-                        traced: traced.track(),
-                        sink: sink.track_mut(),
-                        route,
-                    };
-
-                    let func = &test.function;
-
-                    // Runs the benchmark once.
-                    let mut call_once = move || {
-                        let context = Context::default();
-                        let values = Vec::<Value>::default();
-                        func.call(engine, context.track(), values)
-                    };
-
-                    // Executes the function
-                    match test.kind {
-                        TestCaseKind::Test | TestCaseKind::Bench => {
-                            if let Err(err) = call_once() {
-                                self.failed_test(name, format_args!("call error {err:?}"));
-                            } else {
-                                test_info!("Passed", "test({name})");
-                                self.passed_test(name);
-                            }
+                    if let Err(err) = engine.call(func, Context::default()) {
+                        self.diagnostics.lock().push(err);
+                        self.failed_test(name, format_args!("call error"));
+                    } else {
+                        self.mark_passed("test", name);
+                    }
+                }
+                TestCaseKind::Panic => {
+                    self.running("test", name);
+                    match engine.call(func, Context::default()) {
+                        Ok(..) => {
+                            self.failed_test(name, "exited normally, expected panic");
                         }
-                        TestCaseKind::Panic => match call_once() {
-                            Ok(..) => {
-                                self.failed_test(name, "exited normally, expected panic");
+                        Err(err) => {
+                            let all_panic = err.iter().all(|p| p.message.contains("panic"));
+                            if !all_panic {
+                                self.diagnostics.lock().push(err);
+                                self.failed_test(name, "exited with error, expected panic");
+                            } else {
+                                self.mark_passed("test", name);
                             }
-                            Err(err) => {
-                                let has_panic = err.iter().any(|p| p.message.contains("panic"));
-
-                                if !has_panic {
-                                    self.diagnostics.lock().push(err);
-                                    self.failed_test(name, "exited with error, expected panic");
-                                } else {
-                                    test_info!("Passed", "test({name})");
-                                    self.put_log(format_args!("#passed-test({name:?})"));
-                                }
-                            }
-                        },
-                        TestCaseKind::Example => {
-                            let example =
-                                get_example_file(&world, name, test.location, func.span());
-                            match example {
-                                Err(err) => {
-                                    self.failed_test(name, format_args!("not found: {err}"));
-                                }
-                                Ok(example) => self.run_example(&example),
-                            };
                         }
                     }
-                    comemo::evict(30);
-                });
-                self.suites.examples.par_iter().for_each(|test| {
-                    self.run_example(test);
-                    comemo::evict(30);
-                });
-            });
+                }
+                TestCaseKind::Example => {
+                    match get_example_file(&world, name, test.location, func.span()) {
+                        Ok(example) => self.run_example(&example),
+                        Err(err) => self.failed_test(name, format_args!("not found: {err}")),
+                    };
+                }
+            }
         });
 
         {
             let diagnostics = self.diagnostics.into_inner();
             if !diagnostics.is_empty() {
-                let diags = diagnostics
-                    .into_iter()
-                    .flat_map(|e| e.into_iter())
-                    .collect::<EcoVec<_>>();
-                Err(diags)?
+                Err(diagnostics.into_iter().flatten().collect::<EcoVec<_>>())?
             }
         }
         Ok(!self.failed.load(std::sync::atomic::Ordering::SeqCst))
     }
 
     fn run_example(&self, test: &Source) {
-        let example_path = test.id().vpath().as_rooted_path().with_extension("");
-        let example = example_path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default();
-        self.running("example", example);
+        let id = test.id().vpath().as_rooted_path().with_extension("");
+        let name = id.file_name().and_then(|s| s.to_str()).unwrap_or_default();
+        self.running("example", name);
 
-        if !self.examples.lock().insert(example.to_string()) {
-            self.failed_example(example, "duplicate");
+        if !self.examples.lock().insert(name.to_string()) {
+            self.failed_example(name, "duplicate");
             return;
         }
 
         let world = with_main(self.world, test.id());
         let mut has_err = false;
-        let doc = self.collect_diag(typst::compile::<TypstPagedDocument>(&world));
-        has_err |= doc.is_none();
-        if let Err(err) = self.render_paged(example, doc.as_ref()) {
-            self.failed_example(example, format_args!("cannot render paged: {err}"));
-            has_err = true;
-        }
+        let (has_err_, doc) = self.build_example::<TypstPagedDocument>(&world);
+        has_err |= has_err_ || self.render_paged(name, doc.as_ref());
 
         if self.can_html(doc.as_ref()) {
-            let doc = self.collect_diag(typst::compile::<TypstHtmlDocument>(&world));
-            has_err |= doc.is_none();
-
-            if let Err(err) = self.render_html(example, doc.as_ref()) {
-                self.failed_example(example, format_args!("cannot render html: {err}"));
-                has_err = true;
-            }
+            let (has_err_, doc) = self.build_example::<TypstHtmlDocument>(&world);
+            has_err |= has_err_ || self.render_html(name, doc.as_ref());
         }
 
         if has_err {
-            self.failed_example(example, "has error");
+            self.failed_example(name, "has error");
         } else {
-            self.passed_example(example);
+            self.mark_passed("example", name);
         }
     }
 
-    fn render_paged(&self, example: &str, doc: Option<&TypstPagedDocument>) -> Result<()> {
-        let Some(doc) = doc else {
-            return Ok(());
-        };
-        let pixmap = typst_render::render_merged(
-            doc,
-            self.config.args.png.ppi / 72.0,
-            Default::default(),
-            None,
-        );
-        let output = pixmap.encode_png().context_ut("cannot encode pixmap")?;
+    fn build_example<T: typst::Document>(&self, world: &dyn World) -> (bool, Option<T>) {
+        let result = typst::compile::<T>(world);
+        if !result.warnings.is_empty() {
+            self.diagnostics.lock().push(result.warnings);
+        }
 
-        self.update_example(example, &output, "image")
+        match result.output {
+            Ok(v) => (false, Some(v)),
+            Err(e) => {
+                self.diagnostics.lock().push(e);
+                (true, None)
+            }
+        }
     }
 
-    fn render_html(&self, example: &str, doc: Option<&TypstHtmlDocument>) -> Result<()> {
+    fn render_paged(&self, example: &str, doc: Option<&TypstPagedDocument>) -> bool {
         let Some(doc) = doc else {
-            return Ok(());
+            return false;
         };
-        let output = typst_html::html(doc)?.into_bytes();
 
-        self.update_example(example, &output, "html")
+        let ppp = self.config.args.png.ppi / 72.0;
+        let pixmap = typst_render::render_merged(doc, ppp, Default::default(), None);
+        let output = pixmap.encode_png().context_ut("cannot encode pixmap");
+        let output = output.and_then(|output| self.update_example(example, &output, "paged"));
+        self.check_result(example, output, "paged")
+    }
+
+    fn render_html(&self, example: &str, doc: Option<&TypstHtmlDocument>) -> bool {
+        let Some(doc) = doc else {
+            return false;
+        };
+
+        let output = match typst_html::html(doc) {
+            Ok(output) => self.update_example(example, output.as_bytes(), "html"),
+            Err(err) => {
+                self.diagnostics.lock().push(err);
+                Err(error_once!("render error"))
+            }
+        };
+        self.check_result(example, output, "html")
+    }
+
+    fn check_result(&self, example: &str, res: Result<()>, kind: &str) -> bool {
+        if let Err(err) = res {
+            self.failed_example(example, format_args!("cannot render {kind}: {err}"));
+            true
+        } else {
+            false
+        }
     }
 
     fn update_example(&self, example: &str, data: &[u8], kind: &str) -> Result<()> {
-        let ext = if kind == "image" { "png" } else { "html" };
+        let ext = if kind == "paged" { "png" } else { "html" };
         let refs_path = self.config.root.join("refs");
         let path = refs_path.join(kind).join(example).with_extension(ext);
         let tmp_path = &path.with_extension(format!("tmp.{ext}"));
         let hash_path = &path.with_extension("hash");
+        let path_show = path.display();
 
         let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
         let existing_hash = if std::fs::exists(hash_path).context("exists hash ref")? {
@@ -513,33 +466,19 @@ impl<'a> TestRunner<'a> {
         match (self.config.args.update, equal) {
             // Doesn't exist, create it
             (_, None) => {}
-            (_, Some(true)) => {
-                test_info!("Info", "example({example}): {kind} matches");
-            }
+            (_, Some(true)) => log_info!("example({example}): {kind} matches"),
+            (true, Some(false)) => log_info!("example({example}): ref {kind}"),
             (false, Some(false)) => {
                 write_atomic(tmp_path, data).context("write tmp ref")?;
-                self.failed_example(
-                    example,
-                    format_args!("mismatch {kind} at {}", path.display()),
-                );
-                test_hint!(
-                    "Hint",
-                    "example({example}): compare {kind} at {}",
-                    path.display()
-                );
+
+                self.failed_example(example, format_args!("mismatch {kind} at {path_show}"));
+                log_hint!("example({example}): compare {kind} at {path_show}");
                 match path.strip_prefix(&self.config.root) {
-                    Ok(p) => {
-                        self.put_log(format_args!("#mismatch-example({example:?}, {p:?})"));
-                    }
-                    Err(_) => {
-                        self.put_log(format_args!("#mismatch-example({example:?}, none)"));
-                    }
+                    Ok(p) => self.put_log(format_args!("#mismatch-example({example:?}, {p:?})")),
+                    Err(_) => self.put_log(format_args!("#mismatch-example({example:?}, none)")),
                 };
+
                 return Ok(());
-            }
-            (true, Some(false)) => {
-                // eprintln!("   Info example({example}): updating ref {kind}");
-                test_info!("Info", "example({example}): ref {kind}");
             }
         }
 
@@ -581,26 +520,8 @@ fn get_example_file(world: &dyn World, name: &str, id: FileId, span: Span) -> Re
         bail!("example function must not have parameters");
     }
     let included =
-        find_include_expr(name, closure.body()).context("cannot find example function")?;
+        cast_include_expr(name, closure.body()).context("cannot find example function")?;
     find_source_by_expr(world, id, included).context("cannot find example file")
-}
-
-fn find_include_expr<'a>(name: &str, node: ast::Expr<'a>) -> Option<ast::Expr<'a>> {
-    match node {
-        ast::Expr::Include(inc) => Some(inc.source()),
-        ast::Expr::Code(code) => {
-            let exprs = code.body();
-            if exprs.exprs().count() != 1 {
-                eprintln!("example function must have a single inclusion: {name}");
-                return None;
-            }
-            find_include_expr(name, exprs.exprs().next().unwrap())
-        }
-        _ => {
-            eprintln!("example function must have a single inclusion: {name}");
-            None
-        }
-    }
 }
 
 fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
@@ -617,8 +538,6 @@ fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result
         }
     }
 }
-
-const PREFIX_LEN: usize = 7;
 
 enum Level {
     Error,

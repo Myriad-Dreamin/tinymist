@@ -61,7 +61,7 @@ Check #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/crityp"
 
 - Run and collect file coverage using command `tinymist.profileCurrentFileCoverage` in VS Cod(e,ium).
 - Run and collect test coverage using command `tinymist.profileCurrentTestCoverage` in VS Cod(e,ium).
-  - Check #link(<tinymist-test-discovery>)[Test Suites] to learn how tinymist discovers tests.
+  - Check #link(<tinymist-test-discovery>)[Test Discovery] to learn how tinymist discovers tests.
 
 VS Cod(e,ium) will show the overall coverage in the editor.
 
