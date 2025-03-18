@@ -1,5 +1,6 @@
 //! Tinymist coverage support for Typst.
 
+pub use cov::CoverageResult;
 pub use debugger::{
     set_debug_session, with_debug_session, BreakpointKind, DebugSession, DebugSessionHandler,
 };

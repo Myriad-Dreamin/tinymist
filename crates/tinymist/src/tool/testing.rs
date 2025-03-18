@@ -11,6 +11,7 @@ use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reflexo::ImmutPath;
 use reflexo_typst::{vfs::FileId, SourceWorld, TypstDocument, TypstHtmlDocument};
+use tinymist_debug::CoverageResult;
 use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
 use tinymist_query::analysis::Analysis;
 use tinymist_query::syntax::{cast_include_expr, find_source_by_expr, node_ancestors};
@@ -80,6 +81,25 @@ pub struct TestConfigArgs {
     /// The argument to export to PNG.
     #[clap(flatten)]
     pub png: PngExportArgs,
+
+    /// Whether to collect coverage.
+    #[clap(long)]
+    pub coverage: bool,
+
+    /// Style of printing coverage.
+    #[clap(long, default_value = "short")]
+    pub print_coverage: PrintCovStyle,
+}
+
+/// Style of printing coverage.
+#[derive(Debug, Clone, clap::Parser, clap::ValueEnum)]
+pub enum PrintCovStyle {
+    /// Don't print the coverage.
+    Never,
+    /// Prints the coverage in a short format.
+    Short,
+    /// Prints the coverage in a full format.
+    Full,
 }
 
 macro_rules! test_log {
@@ -90,8 +110,8 @@ macro_rules! test_log {
 
 macro_rules! test_info { ($( $arg:tt )*) => { test_log!(Info, $($arg)*) }; }
 macro_rules! test_error { ($( $arg:tt )*) => { test_log!(Error, $($arg)*) }; }
-macro_rules! log_info { ($( $arg:tt )*) => { test_log!(Info, "Info:", $($arg)*) }; }
-macro_rules! log_hint { ($( $arg:tt )*) => { test_log!(Hint, "Hint:", $($arg)*) }; }
+macro_rules! log_info { ($( $arg:tt )*) => { test_log!(Info, "Info", $($arg)*) }; }
+macro_rules! log_hint { ($( $arg:tt )*) => { test_log!(Hint, "Hint", $($arg)*) }; }
 
 const LOG_PRELUDE: &str = "#import \"/target/testing-log.typ\": *\n#show: main";
 
@@ -101,7 +121,6 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 
     // Prepares for the compilation
     let verse = args.compile.resolve()?;
-    let analysis = Analysis::default();
 
     let root = verse.entry_state().root().map(Ok);
     let root = root
@@ -109,10 +128,11 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
         .context("cannot find root")?;
 
     std::fs::create_dir_all(Path::new("target")).context("create target dir")?;
-    write_atomic("target/testing-log.typ", include_str!("testing-log.typ"))
-        .context("write log template")?;
 
     let out_file = if args.watch {
+        write_atomic("target/testing-log.typ", include_str!("testing-log.typ"))
+            .context("write log template")?;
+
         let mut out_file = std::fs::File::create("test-watch.typ").context("create log file")?;
         writeln!(out_file, "{LOG_PRELUDE}").context("write log")?;
         Some(Arc::new(Mutex::new(out_file)))
@@ -120,22 +140,23 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
         None
     };
 
-    let config = TestConfig {
+    let config = TestContext {
         root,
         args: args.config,
         out_file,
+        analysis: Analysis::default(),
     };
 
     if !args.watch {
         let snap = verse.snapshot();
-        return match test_once(&analysis, &snap, &config) {
+        return match test_once(&snap, &config) {
             Ok(true) => Ok(()),
             Ok(false) | Err(..) => std::process::exit(1),
         };
     }
 
-    let config = Arc::new(Mutex::new(config.clone()));
-    let config_update = config.clone();
+    let ctx = Arc::new(Mutex::new(config.clone()));
+    let repl_ctx = ctx.clone();
 
     let mut is_first = true;
     let StartProjectResult {
@@ -144,7 +165,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
         intr_tx,
     } = start_project(verse, None, move |c, mut i, next| {
         if let Interrupt::Compiled(artifact) = &mut i {
-            let mut config = config.lock();
+            let mut config = ctx.lock();
             let instant = std::time::Instant::now();
             // todo: well term support
             // Clear the screen and then move the cursor to the top left corner.
@@ -157,7 +178,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
             }
             // Sets is_compiling to track dependencies
             artifact.snap.world.set_is_compiling(true);
-            let res = test_once(&analysis, &artifact.world, &config);
+            let res = test_once(&artifact.world, &config);
             artifact.snap.world.set_is_compiling(false);
 
             if let Err(err) = res {
@@ -183,11 +204,11 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
                     let _ = intr_tx.send(Interrupt::Compile(proj_id.clone()));
                 }
                 "u" => {
-                    let mut config = config_update.lock();
-                    config.args.update = true;
+                    let mut repl_ctx = repl_ctx.lock();
+                    repl_ctx.args.update = true;
                     let _ = intr_tx.send(Interrupt::Compile(proj_id.clone()));
                 }
-                "h" => eprintln!("h/r/u/q: help/run/update/quit"),
+                "h" => eprintln!("h/r/u/c/q: help/run/update/quit"),
                 "q" => std::process::exit(0),
                 line => eprintln!("Unknown command: {line}"),
             }
@@ -202,12 +223,12 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
     Ok(())
 }
 
-fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Result<bool> {
-    let mut ctx = analysis.snapshot(world.clone());
-    let doc = typst::compile::<TypstPagedDocument>(&ctx.world).output?;
+fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
+    let mut actx = ctx.analysis.snapshot(world.clone());
+    let doc = typst::compile::<TypstPagedDocument>(&actx.world).output?;
 
     let suites =
-        tinymist_query::testing::test_suites(&mut ctx, &TypstDocument::from(Arc::new(doc)))
+        tinymist_query::testing::test_suites(&mut actx, &TypstDocument::from(Arc::new(doc)))
             .context("failed to discover tests")?;
     log_info!(
         "Found {} tests and {} examples",
@@ -215,21 +236,24 @@ fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Resu
         suites.examples.len()
     );
 
-    let (cov, result) = tinymist_debug::with_cov(world, |world| {
-        let suites = suites.recheck(world);
-        let runner = TestRunner::new(config.clone(), &world, &suites);
-        let result = print_diag_or_error(world, runner.run());
-        comemo::evict(TEST_EVICT_MAX_AGE);
+    let result = if ctx.args.coverage {
+        let (cov, result) = tinymist_debug::with_cov(world, |world| {
+            let suites = suites.recheck(world);
+            let runner = TestRunner::new(ctx, &world, &suites);
+            let result = print_diag_or_error(world, runner.run());
+            comemo::evict(TEST_EVICT_MAX_AGE);
+            result
+        });
+        ctx.handle_cov(world, cov?)?;
         result
-    });
+    } else {
+        let suites = suites.recheck(world);
+        let runner = TestRunner::new(ctx, &world, &suites);
+        comemo::evict(TEST_EVICT_MAX_AGE);
+        runner.run()
+    };
+
     let passed = print_diag_or_error(world, result);
-
-    let cov = cov?;
-    let cov_path = Path::new("target/coverage.json");
-    let res = serde_json::to_string(&cov.to_json(world)).context("coverage")?;
-    write_atomic(cov_path, res).context("write coverage")?;
-    log_info!("Written coverage to {} ...", cov_path.display());
-
     if matches!(passed, Ok(true)) {
         log_info!("All test cases passed...");
     } else {
@@ -239,15 +263,37 @@ fn test_once(analysis: &Analysis, world: &LspWorld, config: &TestConfig) -> Resu
     passed
 }
 
-#[derive(Debug, Clone)]
-struct TestConfig {
+#[derive(Clone)]
+struct TestContext {
+    analysis: Analysis,
     root: ImmutPath,
     args: TestConfigArgs,
     out_file: Option<Arc<Mutex<std::fs::File>>>,
 }
 
+impl TestContext {
+    pub fn handle_cov(&self, world: &LspWorld, cov: CoverageResult) -> Result<()> {
+        let cov_path = Path::new("target/coverage.json");
+        let res = serde_json::to_string(&cov.to_json(world)).context("coverage")?;
+        write_atomic(cov_path, res).context("write coverage")?;
+        log_info!("Written coverage to {} ...", cov_path.display());
+
+        const COV_PREFIX: &str = "    \x1b[1;32mCov\x1b[0m ";
+        match self.args.print_coverage {
+            PrintCovStyle::Never => {}
+            PrintCovStyle::Short => {
+                eprintln!("{}", cov.summarize(true, COV_PREFIX))
+            }
+            PrintCovStyle::Full => {
+                eprintln!("{}", cov.summarize(false, COV_PREFIX))
+            }
+        }
+        Ok(())
+    }
+}
+
 struct TestRunner<'a> {
-    config: TestConfig,
+    ctx: &'a TestContext,
     world: &'a dyn World,
     suites: &'a TestSuites,
     diagnostics: Mutex<Vec<EcoVec<SourceDiagnostic>>>,
@@ -256,9 +302,9 @@ struct TestRunner<'a> {
 }
 
 impl<'a> TestRunner<'a> {
-    fn new(config: TestConfig, world: &'a dyn World, suites: &'a TestSuites) -> Self {
+    fn new(ctx: &'a TestContext, world: &'a dyn World, suites: &'a TestSuites) -> Self {
         Self {
-            config,
+            ctx,
             world,
             suites,
             diagnostics: Mutex::new(Vec::new()),
@@ -268,7 +314,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn put_log(&self, args: fmt::Arguments) {
-        if let Some(file) = &self.config.out_file {
+        if let Some(file) = &self.ctx.out_file {
             writeln!(file.lock(), "{args}").unwrap();
         }
     }
@@ -416,7 +462,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let ppp = self.config.args.png.ppi / 72.0;
+        let ppp = self.ctx.args.png.ppi / 72.0;
         let pixmap = typst_render::render_merged(doc, ppp, Default::default(), None);
         let output = pixmap.encode_png().context_ut("cannot encode pixmap");
         let output = output.and_then(|output| self.update_example(example, &output, "paged"));
@@ -449,11 +495,10 @@ impl<'a> TestRunner<'a> {
 
     fn update_example(&self, example: &str, data: &[u8], kind: &str) -> Result<()> {
         let ext = if kind == "paged" { "png" } else { "html" };
-        let refs_path = self.config.root.join("refs");
+        let refs_path = self.ctx.root.join("refs");
         let path = refs_path.join(kind).join(example).with_extension(ext);
         let tmp_path = &path.with_extension(format!("tmp.{ext}"));
         let hash_path = &path.with_extension("hash");
-        let path_show = path.display();
 
         let hash = &format!("siphash128_13:{:x}", tinymist_std::hash::hash128(&data));
         let existing_hash = if std::fs::exists(hash_path).context("exists hash ref")? {
@@ -463,7 +508,7 @@ impl<'a> TestRunner<'a> {
         };
 
         let equal = existing_hash.map(|existing| existing.as_slice() == hash.as_bytes());
-        match (self.config.args.update, equal) {
+        match (self.ctx.args.update, equal) {
             // Doesn't exist, create it
             (_, None) => {}
             (_, Some(true)) => log_info!("example({example}): {kind} matches"),
@@ -471,9 +516,9 @@ impl<'a> TestRunner<'a> {
             (false, Some(false)) => {
                 write_atomic(tmp_path, data).context("write tmp ref")?;
 
-                self.failed_example(example, format_args!("mismatch {kind} at {path_show}"));
-                log_hint!("example({example}): compare {kind} at {path_show}");
-                match path.strip_prefix(&self.config.root) {
+                self.failed_example(example, format_args!("mismatch {kind}"));
+                log_hint!("example({example}): compare {kind} at {}", path.display());
+                match path.strip_prefix(&self.ctx.root) {
                     Ok(p) => self.put_log(format_args!("#mismatch-example({example:?}, {p:?})")),
                     Err(_) => self.put_log(format_args!("#mismatch-example({example:?}, none)")),
                 };
