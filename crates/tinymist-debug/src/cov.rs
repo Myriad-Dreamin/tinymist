@@ -1,12 +1,14 @@
 //! Tinymist coverage support for Typst.
+use core::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 
 use parking_lot::Mutex;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist_analysis::location::PositionEncoding;
 use tinymist_std::debug_loc::LspRange;
 use tinymist_std::hash::FxHashMap;
-use tinymist_world::vfs::FileId;
+use tinymist_world::vfs::{FileId, WorkspaceResolver};
 use tinymist_world::{CompilerFeat, CompilerWorld};
 use typst::diag::FileResult;
 use typst::foundations::func;
@@ -70,6 +72,83 @@ impl CoverageResult {
         }
 
         serde_json::to_value(result).unwrap()
+    }
+
+    /// Summarizes the coverage result.
+    pub fn summarize<'a>(&'a self, short: bool, prefix: &'a str) -> SummarizedCoverage<'a> {
+        SummarizedCoverage {
+            prefix,
+            result: self,
+            short,
+        }
+    }
+}
+
+pub struct SummarizedCoverage<'a> {
+    prefix: &'a str,
+    result: &'a CoverageResult,
+    short: bool,
+}
+
+impl SummarizedCoverage<'_> {
+    fn line(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        name: &str,
+        total: usize,
+        cov: usize,
+        is_summary: bool,
+    ) -> fmt::Result {
+        let pre = self.prefix;
+        let r = if total == 0 {
+            100.0
+        } else {
+            cov as f64 / total as f64 * 100.0
+        };
+        if is_summary {
+            write!(f, "{pre}{name} {cov}/{total} ({r:.2}%)")
+        } else {
+            let r = format!("{r:.2}");
+            writeln!(f, "{pre} {cov:<5} / {total:<5} ({r:>6}%)  {name}")
+        }
+    }
+}
+
+impl fmt::Display for SummarizedCoverage<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ids = self.result.regions.keys().collect::<Vec<_>>();
+        ids.sort_by(|a, b| {
+            a.package()
+                .map(crate::PackageSpecCmp::from)
+                .cmp(&b.package().map(crate::PackageSpecCmp::from))
+                .then_with(|| a.vpath().cmp(b.vpath()))
+        });
+
+        let summary = ids
+            .par_iter()
+            .flat_map(|&id| {
+                let region = self.result.regions.get(id)?;
+                let meta = self.result.meta.get(id)?;
+
+                let hits = region.hits.lock();
+                let region_covered = hits.par_iter().filter(|&&x| x > 0).count();
+
+                Some((id, region_covered, meta.meta.len()))
+            })
+            .collect::<Vec<_>>();
+
+        let total = summary.iter().map(|(_, _, l)| l).sum::<usize>();
+        let covered = summary.iter().map(|(_, c, _)| c).sum::<usize>();
+
+        if !self.short {
+            for (id, covered, total) in summary {
+                let id = format!("{:?}", WorkspaceResolver::display(Some(*id)));
+                self.line(f, &id, total, covered, false)?;
+            }
+        }
+        self.line(f, "Coverage Summary", total, covered, true)?;
+
+        Ok(())
     }
 }
 

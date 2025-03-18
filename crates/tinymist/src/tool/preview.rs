@@ -14,7 +14,6 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use lsp_types::Url;
-use parking_lot::Mutex;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Bytes;
 use reflexo_typst::{error::prelude::*, Error};
@@ -38,13 +37,13 @@ use typst_preview::{
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{
-    CompileHandlerImpl, CompileServerOpts, LspCompiledArtifact, LspInterrupt, LspWorld,
-    ProjectClient, ProjectCompiler, ProjectInsId, ProjectState, WorldProvider,
+    LspCompiledArtifact, LspInterrupt, LspWorld, ProjectClient, ProjectInsId, WorldProvider,
 };
+use crate::tool::project::{start_project, ProjectOpts, StartProjectResult};
 use crate::*;
 use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
-use project::{watch_deps, ProjectPreviewState};
+use project::ProjectPreviewState;
 
 pub use typst_preview::CompileStatus;
 
@@ -854,77 +853,40 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             None
         };
 
-    tokio::spawn(async move {
-        let _ = tokio::signal::ctrl_c().await;
-        log::info!("Ctrl-C received, exiting");
-        std::process::exit(0);
-    });
+    exit_on_ctrl_c();
 
     let verse = args.compile.resolve()?;
     let previewer = PreviewBuilder::new(args.preview);
 
     let (service, handle) = {
-        // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
-        let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
-        let (intr_tx, intr_rx) = tokio::sync::mpsc::unbounded_channel();
+        let preview_state = ProjectPreviewState::default();
+        let opts = ProjectOpts {
+            handle: Some(handle),
+            preview: preview_state.clone(),
+            ..ProjectOpts::default()
+        };
 
-        // todo: unify filesystem watcher
-        let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
-        let fs_intr_tx = intr_tx.clone();
-        tokio::spawn(watch_deps(dep_rx, move |event| {
-            fs_intr_tx.interrupt(LspInterrupt::Fs(event));
-        }));
+        let StartProjectResult {
+            service,
+            intr_tx,
+            mut editor_rx,
+        } = start_project(verse, Some(opts), |compiler, intr, next| {
+            next(compiler, intr)
+        });
 
         // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
-        let preview_state = ProjectPreviewState::default();
-        let config = Config::default();
-
-        // Create the actor
-        let compile_handle = Arc::new(CompileHandlerImpl {
-            preview: preview_state.clone(),
-            is_standalone: true,
-            export: crate::task::ExportTask::new(handle, None, config.export()),
-            editor_tx,
-            client: Box::new(intr_tx.clone()),
-            analysis: Arc::default(),
-
-            status_revision: Mutex::default(),
-            notified_revision: Mutex::default(),
-        });
-
-        let mut compiler = ProjectCompiler::new(
-            verse,
-            dep_tx,
-            CompileServerOpts {
-                handler: compile_handle,
-                enable_watch: true,
-            },
-        );
-        let registered = preview_state.register(&compiler.primary.id, previewer.compile_watcher());
+        let id = service.compiler.primary.id.clone();
+        let registered = preview_state.register(&id, previewer.compile_watcher());
         if !registered {
             tinymist_std::bail!("failed to register preview");
         }
 
         let handle: Arc<PreviewProjectHandler> = Arc::new(PreviewProjectHandler {
-            project_id: compiler.primary.id.clone(),
+            project_id: id,
             client: Box::new(intr_tx),
         });
-
-        compiler.primary.reason.by_entry_update = true;
-        let service = async move {
-            let handler = compiler.handler.clone();
-            handler.on_any_compile_reason(&mut compiler);
-
-            let mut intr_rx = intr_rx;
-            while let Some(intr) = intr_rx.recv().await {
-                log::debug!("Project compiler received: {intr:?}");
-                ProjectState::do_interrupt(&mut compiler, intr);
-            }
-
-            log::info!("Project compiler exited");
-        };
 
         (service, handle)
     };
@@ -993,7 +955,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
     let mut previewer = previewer.build(lsp_tx, handle.clone()).await;
-    tokio::spawn(service);
+    tokio::spawn(service.run());
 
     bind_streams(&mut previewer, websocket_rx);
 

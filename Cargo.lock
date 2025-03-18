@@ -4123,6 +4123,7 @@ dependencies = [
  "comemo",
  "insta",
  "parking_lot",
+ "rayon",
  "serde",
  "serde_json",
  "tinymist-analysis",
