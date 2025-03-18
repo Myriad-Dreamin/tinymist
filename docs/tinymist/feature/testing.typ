@@ -38,17 +38,13 @@ Example Entry File:
 
 Example Output:
 ```
-Found 2 tests and 1 examples
+Running example(example-hello-world)
 Running test(test-it)
 Running test(panic-on-panic)
  Passed test(test-it)
  Passed test(panic-on-panic)
-Running example(example-hello-world
- Failed example(example-hello-world): image mismatch
-   Hint example(example-hello-world): compare image at refs/png/example-hello-world.png
  Passed example(example-hello-world)
-  Info: Written coverage to target/coverage.json ...
- Fatal: Some test cases failed...
+   Info All test cases passed...
 ```
 
 == Benchmarking
@@ -77,6 +73,29 @@ tinymist test tests/main.typ
 
 You can pass same arguments as `typst compile` to `tinymist test`.
 
+== Collecting Coverage with CLI
+
+You can collect coverage using the `--coverage` option.
+
+```bash
+tinymist test tests/main.typ --coverage
+...
+   Info Written coverage to target/coverage.json ...
+    Cov Coverage Summary 9/10 (90.00%)
+   Info All test cases passed...
+```
+
+Use `--print-coverage=full` to print the coverage of each file.
+
+```bash
+tinymist test tests/main.typ --coverage --print-coverage=full
+...
+    Cov  6     / 6     (100.00%)  tests/example-hello-world.typ
+    Cov  3     / 4     ( 75.00%)  tests/main.typ
+    Cov Coverage Summary 9/10 (90.00%)
+   Info All test cases passed...
+```
+
 == Debugging tests with CLI
 
 If any test fails, the CLI will return a non-zero exit code.
@@ -97,8 +116,8 @@ To get image files to diff you can use grep to find the image files to update:
 
 ```bash
 tinymist test tests/main.typ 2> >(grep Hint) > >(grep "compare image")
-   Hint example(example-hello-world): compare image at target/refs/png/example-hello-world.png
-   Hint example(example-other): compare image at target/refs/png/example-other.png
+   Hint example(example-hello-world): compare image at refs/png/example-hello-world.png
+   Hint example(example-other): compare image at refs/png/example-other.png
 ```
 
 You can use your favorite image `diff` tool to compare the images, e.g. `magick compare`.
