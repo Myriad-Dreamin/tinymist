@@ -8,6 +8,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.10 - [2025-03-20]
 
+* Bumped typstfmt to v0.13.0.
+
 ### CLI
 
 * feat: exit if compile errors happen in https://github.com/Myriad-Dreamin/tinymist/pull/1512

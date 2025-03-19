@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.8"
+version = "0.13.10-rc1"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -32,8 +32,8 @@ triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 async-trait = "0.1.77"
 futures = "0.3"
 rayon = "1.10.0"
-tokio = { version = "1.42.0", features = ["macros"] }
-tokio-util = { version = "0.7.13", features = ["compat"] }
+tokio = { version = "1.44.0", features = ["macros"] }
+tokio-util = { version = "0.7.14", features = ["compat"] }
 
 # System
 temp-env = "0.3.0"
@@ -43,7 +43,7 @@ walkdir = "2"
 chrono = "0.4"
 dirs = "6"
 fontdb = "0.21"
-notify = "6"
+notify = "8"
 path-clean = "1.0.1"
 windows-sys = "0.59"
 tempfile = "=3.15.0"
@@ -142,7 +142,7 @@ typst-pdf = "0.13.0"
 typst-syntax = "0.13.0"
 typst-eval = "0.13.0"
 typst-assets = "0.13.0"
-typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.12.1" }
+typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
 typstyle-core = { version = "=0.13.0", default-features = false }
 typlite = { path = "./crates/typlite" }
@@ -186,13 +186,13 @@ tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.2" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.2" }
 typst-shim = { path = "./crates/typst-shim", version = "0.13.2" }
 
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.8", default-features = false }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.8" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.8" }
-tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.8" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.8" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.8" }
-typst-preview = { path = "./crates/typst-preview", version = "0.13.8" }
+tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.10-rc1", default-features = false }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.10-rc1" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.10-rc1" }
+tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.10-rc1" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.10-rc1" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.10-rc1" }
+typst-preview = { path = "./crates/typst-preview", version = "0.13.10-rc1" }
 
 [profile.dev.package.insta]
 opt-level = 3
