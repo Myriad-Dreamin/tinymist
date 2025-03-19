@@ -7,6 +7,7 @@ use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 use reflexo::error::IgnoreLogging;
+use reflexo::CowStr;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
@@ -113,6 +114,9 @@ pub struct Config {
     pub formatter_print_width: Option<u32>,
     /// Sets the indent size (using space) for the formatter.
     pub formatter_indent_size: Option<u32>,
+
+    /// The warnings during configuration update.
+    pub warnings: Vec<CowStr>,
 }
 
 impl Config {
@@ -263,24 +267,40 @@ impl Config {
             serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
         );
 
-        macro_rules! assign_config {
-            ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
-                let v = try_deserialize::<$ty>(update, $bind);
-                self.$($field_path).+ = v.unwrap_or_default();
-            };
-            ($( $field_path:ident ).+ := $bind:literal: $ty:ty = $default_value:expr) => {
-                let v = try_deserialize::<$ty>(update, $bind);
-                self.$($field_path).+ = v.unwrap_or_else(|| $default_value);
+        self.warnings.clear();
+
+        macro_rules! try_deserialize {
+            ($ty:ty, $key:expr) => {
+                update.get($key).and_then(|v| {
+                    <$ty>::deserialize(v)
+                        .inspect_err(|err| {
+                            // Only ignore null returns. Some editors may send null values when
+                            // the configuration is not set, e.g. Zed.
+                            if v.is_null() {
+                                return;
+                            }
+
+                            self.warnings.push(tinymist_l10n::t!(
+                                "tinymist.config.deserializeError",
+                                "failed to deserialize \"{key}\": {err}",
+                                key = $key.debug_l10n(),
+                                err = err.debug_l10n(),
+                            ));
+                        })
+                        .ok()
+                })
             };
         }
 
-        fn try_deserialize<T: serde::de::DeserializeOwned>(
-            map: &Map<String, JsonValue>,
-            key: &str,
-        ) -> Option<T> {
-            T::deserialize(map.get(key)?)
-                .inspect_err(|e| log::warn!("failed to deserialize {key:?}: {e}"))
-                .ok()
+        macro_rules! assign_config {
+            ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
+                let v = try_deserialize!($ty, $bind);
+                self.$($field_path).+ = v.unwrap_or_default();
+            };
+            ($( $field_path:ident ).+ := $bind:literal: $ty:ty = $default_value:expr) => {
+                let v = try_deserialize!($ty, $bind);
+                self.$($field_path).+ = v.unwrap_or_else(|| $default_value);
+            };
         }
 
         assign_config!(color_theme := "colorTheme"?: Option<String>);
@@ -306,11 +326,13 @@ impl Config {
             Some("enable") => true,
             Some("disable") | None => false,
             Some(value) => {
-                tinymist_l10n::bail!(
+                self.warnings.push(tinymist_l10n::t!(
                     "tinymist.config.badCompileStatus",
                     "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}",
                     value = value.debug_l10n(),
-                );
+                ));
+
+                false
             }
         };
 
@@ -321,11 +343,12 @@ impl Config {
             Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
                 Ok(args) => Some(args),
                 Err(err) => {
-                    tinymist_l10n::bail!(
+                    self.warnings.push(tinymist_l10n::t!(
                         "tinymist.config.badHoverPeriscope",
                         "failed to parse hoverPeriscope: {err}",
                         err = err.debug_l10n(),
-                    );
+                    ));
+                    None
                 }
             },
         };
@@ -335,9 +358,9 @@ impl Config {
             }
         }
 
-        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> Result<()> {
+        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> CowStr {
             log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
-            tinymist_l10n::bail!(
+            tinymist_l10n::t!(
                 "tinymist.config.badTypstExtraArgs",
                 "failed to parse typstExtraArgs: {err}, args: {args}",
                 err = err.debug_l10n(),
@@ -349,16 +372,35 @@ impl Config {
             let raw_args = || update.get("typstExtraArgs");
             let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
                 Some(Ok(args)) => args,
-                Some(Err(err)) => return invalid_extra_args(&raw_args(), err),
-                // Even if the list is none, it should be parsed since we have env vars to retrieve.
-                None => Vec::new(),
-            };
+                Some(Err(err)) => {
+                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    None
+                }
+                // Even if the list is none, it should be parsed since we have env vars to
+                // retrieve.
+                None => None,
+            }
+            .unwrap_or_default();
+            let empty_typst_args = typst_args.is_empty();
 
             let args = match CompileOnceArgs::try_parse_from(
                 Some("typst-cli".to_owned()).into_iter().chain(typst_args),
             ) {
                 Ok(args) => args,
-                Err(e) => return invalid_extra_args(&raw_args(), e),
+                Err(err) => {
+                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+
+                    if empty_typst_args {
+                        CompileOnceArgs::default()
+                    } else {
+                        // Still try to parse the arguments to get the environment variables.
+                        CompileOnceArgs::try_parse_from(Some("typst-cli".to_owned()))
+                            .inspect_err(|err| {
+                                log::error!("failed to make default typstExtraArgs: {err}");
+                            })
+                            .unwrap_or_default()
+                    }
+                }
             };
 
             // todo: the command.root may be not absolute
@@ -796,6 +838,11 @@ mod tests {
         temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
     }
 
+    fn good_config(config: &mut Config, update: &JsonValue) {
+        update_config(config, update).expect("not good");
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+    }
+
     #[test]
     fn test_default_encoding() {
         let cc = ConstConfig::default();
@@ -817,7 +864,7 @@ mod tests {
             "typstExtraArgs": ["--root", root_path]
         });
 
-        update_config(&mut config, &update).unwrap();
+        good_config(&mut config, &update);
 
         // Nix specifies this environment variable when testing.
         let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
@@ -856,7 +903,7 @@ mod tests {
             }
         });
 
-        update_config(&mut config, &update).unwrap();
+        good_config(&mut config, &update);
 
         assert_eq!(config.export_pdf, TaskWhen::OnType);
     }
@@ -877,7 +924,7 @@ mod tests {
         // assert!(timestamp(|_| {}).is_none());
         // assert!(timestamp(|config| {
         //     let update = json!({});
-        //     update_config(&mut config, &update).unwrap();
+        //     good_config(&mut config, &update);
         // })
         // .is_none());
 
@@ -885,7 +932,7 @@ mod tests {
             let update = json!({
                 "typstExtraArgs": ["--creation-timestamp", "1234"]
             });
-            update_config(config, &update).unwrap();
+            good_config(config, &update);
         });
         assert!(args_timestamp.is_some());
 
@@ -905,7 +952,37 @@ mod tests {
             "typstExtraArgs": []
         });
 
-        update_config(&mut config, &update).unwrap();
+        good_config(&mut config, &update);
+    }
+
+    #[test]
+    fn test_null_completion() {
+        let mut config = Config::default();
+        let update = json!({
+            "completion": null
+        });
+
+        good_config(&mut config, &update);
+    }
+
+    #[test]
+    fn test_null_root() {
+        let mut config = Config::default();
+        let update = json!({
+            "root": null
+        });
+
+        good_config(&mut config, &update);
+    }
+
+    #[test]
+    fn test_null_extra_args() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": null
+        });
+
+        good_config(&mut config, &update);
     }
 
     #[test]
@@ -913,7 +990,7 @@ mod tests {
         fn opts(update: Option<&JsonValue>) -> CompileFontArgs {
             let mut config = Config::default();
             if let Some(update) = update {
-                update_config(&mut config, update).unwrap();
+                good_config(&mut config, update);
             }
 
             config.font_opts()
@@ -988,13 +1065,10 @@ mod tests {
             let update = json!({
                 "typstExtraArgs": ["main.typ", "main.typ"]
             });
-
-            let err = format!("{}", update_config(&mut config, &update).unwrap_err());
-            assert!(err.contains("typstExtraArgs"), "unexpected error: {err}");
-            assert!(
-                err.contains(r#"String("main.typ")"#),
-                "unexpected error: {err}"
-            );
+            update_config(&mut config, &update).unwrap();
+            let warns = format!("{:?}", config.warnings);
+            assert!(warns.contains("typstExtraArgs"), "warns: {warns}");
+            assert!(warns.contains(r#"String(\"main.typ\")"#), "warns: {warns}");
         }
         {
             let mut config = Config::default();
