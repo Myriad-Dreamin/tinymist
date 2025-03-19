@@ -12,7 +12,7 @@ use typst::ecow::EcoVec;
 use typst::syntax::Span;
 
 use crate::snapshot::CompileSnapshot;
-use crate::{CompilerFeat, EntryReader};
+use crate::{CompilerFeat, CompilerWorld, EntryReader};
 
 type AnyArc = Arc<dyn std::any::Any + Send + Sync>;
 
@@ -218,6 +218,43 @@ pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
+impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
+    pub fn execute<F: CompilerFeat>(world: &CompilerWorld<F>) -> Warned<SourceResult<Arc<D>>> {
+        // todo: create html world once
+        let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
+        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
+
+        let mut world = if is_paged_compilation {
+            world.paged_task()
+        } else if is_html_compilation {
+            world.html_task()
+        } else {
+            Cow::Borrowed(world)
+        };
+
+        world.to_mut().set_is_compiling(true);
+        let compiled = typst::compile::<D>(world.as_ref());
+        world.to_mut().set_is_compiling(false);
+
+        let exclude_html_warnings = if !is_html_compilation {
+            compiled.warnings
+        } else if compiled.warnings.len() == 1
+            && compiled.warnings[0]
+                .message
+                .starts_with("html export is under active development")
+        {
+            EcoVec::new()
+        } else {
+            compiled.warnings
+        };
+
+        Warned {
+            output: compiled.output.map(Arc::new),
+            warnings: exclude_html_warnings,
+        }
+    }
+}
+
 impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
 where
     D: typst::Document + Send + Sync + 'static,
@@ -227,40 +264,7 @@ where
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
         let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
 
-        Ok(enabled.then(|| {
-            // todo: create html world once
-            let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
-            let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
-
-            let mut world = if is_paged_compilation {
-                graph.snap.world.paged_task()
-            } else if is_html_compilation {
-                graph.snap.world.html_task()
-            } else {
-                Cow::Borrowed(&graph.snap.world)
-            };
-
-            world.to_mut().set_is_compiling(true);
-            let compiled = typst::compile::<D>(world.as_ref());
-            world.to_mut().set_is_compiling(false);
-
-            let exclude_html_warnings = if !is_html_compilation {
-                compiled.warnings
-            } else if compiled.warnings.len() == 1
-                && compiled.warnings[0]
-                    .message
-                    .starts_with("html export is under active development")
-            {
-                EcoVec::new()
-            } else {
-                compiled.warnings
-            };
-
-            Warned {
-                output: compiled.output.map(Arc::new),
-                warnings: exclude_html_warnings,
-            }
-        }))
+        Ok(enabled.then(|| CompilationTask::<D>::execute(&graph.snap.world)))
     }
 }
 

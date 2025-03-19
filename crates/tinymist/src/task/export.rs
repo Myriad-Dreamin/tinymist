@@ -1,10 +1,13 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::AtomicUsize;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::{Arc, OnceLock};
 
 use reflexo::ImmutPath;
+use reflexo_typst::CompilationTask;
+use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
@@ -186,17 +189,30 @@ impl ExportTask {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let html_doc = || {
-                Ok(match &doc {
-                    TypstDocument::Html(html_doc) => html_doc,
-                    TypstDocument::Paged(_) => bail!("expected html document, found Paged"),
-                })
+            // todo: check warnings and errors inside
+            let html_once = OnceLock::new();
+            let html_doc = || -> Result<_> {
+                html_once
+                    .get_or_init(|| -> Result<_> {
+                        Ok(match &doc {
+                            TypstDocument::Html(html_doc) => html_doc.clone(),
+                            TypstDocument::Paged(_) => extra_compile_for_export(&snap.world)?,
+                        })
+                    })
+                    .as_ref()
+                    .map_err(|e| e.clone())
             };
+            let page_once = OnceLock::new();
             let paged_doc = || {
-                Ok(match &doc {
-                    TypstDocument::Paged(paged_doc) => paged_doc,
-                    TypstDocument::Html(_) => bail!("expected paged document, found HTML"),
-                })
+                page_once
+                    .get_or_init(|| -> Result<_> {
+                        Ok(match &doc {
+                            TypstDocument::Paged(paged_doc) => paged_doc.clone(),
+                            TypstDocument::Html(_) => extra_compile_for_export(&snap.world)?,
+                        })
+                    })
+                    .as_ref()
+                    .map_err(|e| e.clone())
             };
             let first_page = || {
                 paged_doc()?
@@ -370,6 +386,18 @@ fn log_err<T>(artifact: Result<T>) -> Option<T> {
             log::error!("{err}");
             None
         }
+    }
+}
+
+fn extra_compile_for_export<D: typst::Document + Send + Sync + 'static>(
+    world: &LspWorld,
+) -> Result<Arc<D>> {
+    let res = tokio::task::block_in_place(|| CompilationTask::<D>::execute(world));
+
+    match res.output {
+        Ok(v) => Ok(v),
+        Err(e) if e.is_empty() => bail!("failed to compile: internal error"),
+        Err(e) => bail!("failed to compile: {}", e[0].message),
     }
 }
 
