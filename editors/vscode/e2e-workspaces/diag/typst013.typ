@@ -15,3 +15,7 @@
 --- locate-function ---
 
 #locate((loc) => {})
+
+--- spread-content-math ---
+
+$args(..(a + b))$

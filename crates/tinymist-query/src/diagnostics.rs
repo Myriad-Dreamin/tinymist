@@ -205,6 +205,7 @@ static DEPRECATION_PATTERNS: Lazy<RegexSet> = Lazy::new(|| {
         r"unexpected argument: fill",
         r"type state has no method `display`",
         r"only element functions can be used as selectors",
+        r"cannot spread content",
     ])
     .expect("Invalid regular expressions")
 });
