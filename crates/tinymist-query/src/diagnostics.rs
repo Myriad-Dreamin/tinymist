@@ -5,6 +5,9 @@ use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};
 
+use once_cell::sync::Lazy;
+use regex::RegexSet;
+
 /// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, EcoVec<Diagnostic>>;
 
@@ -196,17 +199,19 @@ trait DiagnosticRefiner {
 
 struct DeprecationRefiner<const MINOR: usize>();
 
+static DEPRECATION_PATTERNS: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        r"unknown variable: style",
+        r"unexpected argument: fill",
+        r"type state has no method `display`",
+        r"only element functions can be used as selectors",
+    ])
+    .expect("Invalid regular expressions")
+});
+
 impl DiagnosticRefiner for DeprecationRefiner<13> {
     fn matches(&self, raw: &TypstDiagnostic) -> bool {
-        let msg = &raw.message;
-        let patterns = [
-            "unknown variable: style",
-            "unexpected argument: fill",
-            "type state has no method `display`",
-            "only element functions can be used as selectors",
-        ];
-
-        patterns.iter().any(|pattern| msg.contains(pattern))
+        DEPRECATION_PATTERNS.is_match(&raw.message)
     }
 
     fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic {
