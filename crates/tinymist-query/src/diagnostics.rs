@@ -64,7 +64,7 @@ fn convert_diagnostic(
         let mut diag = Cow::Borrowed(typst_diagnostic);
 
         // Extend more refiners here by adding their instances.
-        let refiners = &[&Typst0_13DeprecationRefiner {}];
+        let refiners = &[&DeprecationRefiner::<13> {}];
 
         for refiner in refiners {
             if refiner.matches(&diag) {
@@ -188,13 +188,15 @@ fn diagnostic_hints(typst_hints: &[EcoString]) -> Format<impl Iterator<Item = Ec
 }
 
 trait DiagnosticRefiner {
-    fn matches(&self, raw: &TypstDiagnostic) -> bool;
+    fn matches(&self, raw: &TypstDiagnostic) -> bool {
+        false
+    }
     fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic;
 }
 
-struct Typst0_13DeprecationRefiner();
+struct DeprecationRefiner<const MINOR: usize>();
 
-impl DiagnosticRefiner for Typst0_13DeprecationRefiner {
+impl DiagnosticRefiner for DeprecationRefiner<13> {
     fn matches(&self, raw: &TypstDiagnostic) -> bool {
         raw.message.contains("unknown variable: style")
     }
