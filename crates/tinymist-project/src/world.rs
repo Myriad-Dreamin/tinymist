@@ -7,5 +7,5 @@ pub use tinymist_world::entry::*;
 pub use tinymist_world::{font, package, system, vfs};
 pub use tinymist_world::{
     with_main, CompilerUniverse, CompilerWorld, DiagnosticFormat, EntryOpts, EntryState,
-    RevisingUniverse, TaskInputs,
+    RevisingUniverse, SourceWorld, TaskInputs,
 };

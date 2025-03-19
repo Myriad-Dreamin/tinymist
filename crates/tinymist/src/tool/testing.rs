@@ -10,14 +10,14 @@ use itertools::Either;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reflexo::ImmutPath;
-use reflexo_typst::{vfs::FileId, SourceWorld, TypstDocument, TypstHtmlDocument};
+use reflexo_typst::{vfs::FileId, TypstDocument, TypstHtmlDocument};
 use tinymist_debug::CoverageResult;
 use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
 use tinymist_query::analysis::Analysis;
 use tinymist_query::syntax::{cast_include_expr, find_source_by_expr, node_ancestors};
 use tinymist_query::testing::{TestCaseKind, TestSuites};
 use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
-use typst::diag::SourceDiagnostic;
+use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
 use typst::syntax::{ast, LinkedNode, Source, Span};
@@ -25,7 +25,7 @@ use typst::{utils::PicoStr, World};
 use typst_shim::eval::TypstEngine;
 
 use super::project::{start_project, StartProjectResult};
-use crate::world::with_main;
+use crate::world::{with_main, SourceWorld};
 use crate::{project::*, utils::exit_on_ctrl_c};
 
 const TEST_EVICT_MAX_AGE: usize = 30;
@@ -239,7 +239,7 @@ fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
     let result = if ctx.args.coverage {
         let (cov, result) = tinymist_debug::with_cov(world, |world| {
             let suites = suites.recheck(world);
-            let runner = TestRunner::new(ctx, &world, &suites);
+            let runner = TestRunner::new(ctx, world, &suites);
             let result = print_diag_or_error(world, runner.run());
             comemo::evict(TEST_EVICT_MAX_AGE);
             result
@@ -248,7 +248,7 @@ fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
         result
     } else {
         let suites = suites.recheck(world);
-        let runner = TestRunner::new(ctx, &world, &suites);
+        let runner = TestRunner::new(ctx, world, &suites);
         comemo::evict(TEST_EVICT_MAX_AGE);
         runner.run()
     };
@@ -294,7 +294,7 @@ impl TestContext {
 
 struct TestRunner<'a> {
     ctx: &'a TestContext,
-    world: &'a dyn World,
+    world: &'a dyn SourceWorld,
     suites: &'a TestSuites,
     diagnostics: Mutex<Vec<EcoVec<SourceDiagnostic>>>,
     examples: Mutex<HashSet<String>>,
@@ -302,7 +302,7 @@ struct TestRunner<'a> {
 }
 
 impl<'a> TestRunner<'a> {
-    fn new(ctx: &'a TestContext, world: &'a dyn World, suites: &'a TestSuites) -> Self {
+    fn new(ctx: &'a TestContext, world: &'a dyn SourceWorld, suites: &'a TestSuites) -> Self {
         Self {
             ctx,
             world,
@@ -366,7 +366,7 @@ impl<'a> TestRunner<'a> {
             let name = &test.name;
             let func = &test.function;
 
-            let world = with_main(self.world, test.location);
+            let world = with_main(self.world.as_world(), test.location);
             let mut engine = TypstEngine::new(&world);
 
             // Executes the function
@@ -409,7 +409,15 @@ impl<'a> TestRunner<'a> {
         {
             let diagnostics = self.diagnostics.into_inner();
             if !diagnostics.is_empty() {
-                Err(diagnostics.into_iter().flatten().collect::<EcoVec<_>>())?
+                let diagnostics = diagnostics.into_iter().flatten().collect::<EcoVec<_>>();
+                let any_error = diagnostics.iter().any(|d| d.severity == Severity::Error);
+
+                if any_error {
+                    Err(diagnostics)?
+                } else {
+                    print_diagnostics(self.world, diagnostics.iter(), DiagnosticFormat::Human)
+                        .context_ut("print diagnostics")?;
+                }
             }
         }
         Ok(!self.failed.load(std::sync::atomic::Ordering::SeqCst))
@@ -425,7 +433,7 @@ impl<'a> TestRunner<'a> {
             return;
         }
 
-        let world = with_main(self.world, test.id());
+        let world = with_main(self.world.as_world(), test.id());
         let mut has_err = false;
         let (has_err_, doc) = self.build_example::<TypstPagedDocument>(&world);
         has_err |= has_err_ || self.render_paged(name, doc.as_ref());
