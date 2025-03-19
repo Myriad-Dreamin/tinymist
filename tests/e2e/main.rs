@@ -363,6 +363,10 @@ fn e2e() {
         cwd.join("editors/vscode/out/tinymist")
     };
 
+    if !tinymist_binary.exists() {
+        panic!("tinymist binary for e2e tests doesn't exist. Please ensure that tinymist binary to publish is ready on {tinymist_binary:?}. Running scripts/e2e.{{sh/ps1}} should also help this.");
+    }
+
     let root = cwd.join("target/e2e/tinymist");
 
     {
