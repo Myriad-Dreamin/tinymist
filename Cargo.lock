@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "base64",
@@ -3774,7 +3774,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -3904,7 +3904,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "insta",
  "lsp-types",
@@ -4027,7 +4027,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4071,7 +4071,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.13.8",
+ "tinymist-assets 0.13.10-pre-rc1",
  "tinymist-core",
  "tinymist-debug",
  "tinymist-l10n",
@@ -4118,17 +4118,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.8"
+version = "0.13.10-pre-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dcaab40a7f34aec623e9627d766da210bfa30a1a1c919e6781cf8b5094f27b1"
+checksum = "f48929755725e302996ebd9ea172247efbb33b6c205ef426922d8cfd13bbd653"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "divan",
  "tinymist",
@@ -4136,7 +4136,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-core"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4148,7 +4148,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "base64",
  "comemo",
@@ -4167,7 +4167,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "base64",
  "comemo",
@@ -4193,7 +4193,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4237,7 +4237,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "anyhow",
  "base64",
@@ -4292,7 +4292,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "base64",
  "log",
@@ -4684,7 +4684,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "base64",
  "clap",
@@ -4903,7 +4903,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.13.10-pre-rc1"
+version = "0.13.10-rc1"
 dependencies = [
  "clap",
  "comemo",
@@ -4917,7 +4917,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.13.8",
+ "tinymist-assets 0.13.10-pre-rc1",
  "tinymist-std",
  "tokio",
  "typst",
