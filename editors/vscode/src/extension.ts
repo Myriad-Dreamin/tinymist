@@ -32,7 +32,7 @@ import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste
 import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
-import { commandAskAndExport, commandAskAndShow, ExportKind } from "./features/export";
+import { commandShow, exportActivate } from "./features/export";
 
 LanguageState.Client = LanguageClient;
 
@@ -42,6 +42,7 @@ const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.tool, toolActivate],
   [extensionState.features.dragAndDrop, dragAndDropActivate],
   [extensionState.features.copyAndPaste, copyAndPasteActivate],
+  [extensionState.features.export, exportActivate],
   [extensionState.features.task, taskActivate],
   [extensionState.features.testing, testingActivate],
   [extensionState.features.testingDebug, testingDebugActivate],
@@ -203,10 +204,6 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.openInternal", openInternal),
     commands.registerCommand("tinymist.openExternal", openExternal),
 
-    commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
-    commands.registerCommand("tinymist.exportCurrentFile", commandAskAndExport),
-    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
-    commands.registerCommand("tinymist.exportCurrentFileAndShow", commandAskAndShow),
     commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
     commands.registerCommand("tinymist.clearCache", commandClearCache),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
@@ -244,15 +241,6 @@ async function openExternal(target: string): Promise<void> {
   await vscode.env.openExternal(uri);
 }
 
-export async function commandExport(kind: ExportKind, opts?: any): Promise<string | undefined> {
-  const uri = window.activeTextEditor?.document.uri.fsPath;
-  if (!uri) {
-    return;
-  }
-
-  return (await tinymist[`export${kind}`](uri, opts)) || undefined;
-}
-
 async function commandGetCurrentDocumentMetrics(): Promise<any> {
   const activeEditor = window.activeTextEditor;
   if (activeEditor === undefined) {
@@ -284,73 +272,6 @@ async function commandCopyAnsiHighlight(): Promise<void> {
 
   // copy to clipboard
   await vscode.env.clipboard.writeText(res);
-}
-
-/**
- * Implements the functionality for the 'Show PDF' button shown in the editor title
- * if a `.typ` file is opened.
- */
-export async function commandShow(kind: ExportKind, extraOpts?: any): Promise<void> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
-    return;
-  }
-
-  const conf = vscode.workspace.getConfiguration("tinymist");
-  const openIn: string = conf.get("showExportFileIn") || "editorTab";
-
-  // Telling the language server to open the file instead of using
-  // ```
-  // vscode.env.openExternal(exportUri);
-  // ```
-  // , which is buggy.
-  //
-  // See https://github.com/Myriad-Dreamin/tinymist/issues/837
-  // Also see https://github.com/microsoft/vscode/issues/85930
-  const openBySystemDefault = openIn === "systemDefault";
-  if (openBySystemDefault) {
-    extraOpts = extraOpts || {};
-    extraOpts.open = true;
-  }
-
-  // only create pdf if it does not exist yet
-  const exportPath = await commandExport(kind, extraOpts);
-
-  if (exportPath === undefined) {
-    // show error message
-    await window.showErrorMessage(`Failed to export ${kind}`);
-    return;
-  }
-
-  switch (openIn) {
-    case "systemDefault":
-      break;
-    default:
-      vscode.window.showWarningMessage(
-        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
-      );
-    // fall through
-    case "editorTab": {
-      // find and replace exportUri
-      const exportUri = Uri.file(exportPath);
-      const uriToFind = exportUri.toString();
-      findTab: for (const editor of vscode.window.tabGroups.all) {
-        for (const tab of editor.tabs) {
-          if ((tab.input as any)?.uri?.toString() === uriToFind) {
-            await vscode.window.tabGroups.close(tab, true);
-            break findTab;
-          }
-        }
-      }
-
-      // here we can be sure that the pdf exists
-      await commands.executeCommand("vscode.open", exportUri, {
-        viewColumn: ViewColumn.Beside,
-        preserveFocus: true,
-      } as vscode.TextDocumentShowOptions);
-      break;
-    }
-  }
 }
 
 async function commandClearCache(): Promise<void> {

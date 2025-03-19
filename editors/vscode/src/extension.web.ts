@@ -9,6 +9,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   extensionState.features = {
     web: true,
     lsp: false,
+    export: false,
     task: false,
     wordSeparator: true,
     label: false,
