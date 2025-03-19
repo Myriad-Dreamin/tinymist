@@ -58,9 +58,23 @@ type CompResponse = vscode.CompletionList | vscode.CompletionItem[];
 export class Context {
   expect!: typeof import("chai").expect;
 
-  public async suite(name: string, f: (ctx: Suite) => void): Promise<void> {
+  enabled: boolean = !vscode.workspace.workspaceFolders;
+
+  public workspaceCtx(workspace: string): Context {
+    console.log(`Opening workspace ${workspace}`, vscode.workspace.workspaceFolders);
+
+    this.enabled = !!vscode.workspace.workspaceFolders;
+
+    return this;
+  }
+
+  public async suite(name: string, f: (ctx: Suite) => Promise<void>): Promise<void> {
+    if (!this.enabled) {
+      return;
+    }
+
     const ctx = new Suite();
-    f(ctx);
+    await f(ctx);
     try {
       ok(`⌛︎ ${name}`);
       await ctx.run();
@@ -68,6 +82,17 @@ export class Context {
     } catch (e: any) {
       error(`  ✖︎ ${name}\n  ${e?.message || e}  ${e?.stack}`);
       throw e;
+    }
+  }
+
+  async changeWorkspace(workspaceUri: vscode.Uri, reloadSever = true): Promise<void> {
+    const workspaceNum = vscode.workspace.workspaceFolders?.length || 0;
+    const changed = vscode.workspace.updateWorkspaceFolders(0, workspaceNum, { uri: workspaceUri });
+    assert.ok(changed, `Failed to change workspace to ${workspaceUri}`);
+
+    if (reloadSever) {
+      // reload the server
+      await vscode.commands.executeCommand("tinymist.restartServer");
     }
   }
 

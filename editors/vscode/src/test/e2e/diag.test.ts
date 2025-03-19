@@ -15,13 +15,12 @@ export async function getTests(ctx: Context) {
       result[sectionName] = sectionContent;
     }
 
-    if (Object.keys(result).length === 0)
-      return { "default": content };
+    if (Object.keys(result).length === 0) return { default: content };
 
     return result;
   }
 
-  await ctx.suite("diagnostics", (suite) => {
+  await ctx.suite("diagnostics", async (suite) => {
     vscode.window.showInformationMessage("Start all tests.");
     const workspaceUri = ctx.getWorkspace("diag");
     console.log("Start all tests on ", workspaceUri.fsPath);
@@ -106,7 +105,9 @@ export async function getTests(ctx: Context) {
       ctx.expect(diags).to.have.lengthOf(1);
       const diag = diags[0];
       ctx.expect(diag.message).contains("Hint: Cannot read file outside of project root");
-      ctx.expect(diag.message).not.contains("Hint: you can adjust the project root with the --root argument");
+      ctx
+        .expect(diag.message)
+        .not.contains("Hint: you can adjust the project root with the --root argument");
     });
   });
 }
