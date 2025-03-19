@@ -66,6 +66,7 @@ fn convert_diagnostic(
         // Extend more refiners here by adding their instances.
         let refiners = &[&DeprecationRefiner::<13> {}];
 
+        // NOTE: It would be nice to have caching here.
         for refiner in refiners {
             if refiner.matches(&diag) {
                 diag = Cow::Owned(refiner.refine(diag.into_owned()));
