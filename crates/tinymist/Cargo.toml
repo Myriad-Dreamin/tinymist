@@ -92,8 +92,7 @@ default = [
     "cli",
     "html",
     "pdf",
-    # enable it once we upload assets.
-    # "l10n",
+    "l10n",
     "preview",
     "embed-fonts",
     "no-content-hint",
@@ -136,8 +135,7 @@ preview = [
 
 dap = []
 
-# l10n = ["tinymist-assets/l10n"]
-l10n = []
+l10n = ["tinymist-assets/l10n"]
 
 [dev-dependencies]
 temp-env.workspace = true

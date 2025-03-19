@@ -6,6 +6,58 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.10 - [2025-03-20]
+
+* Bumped typstfmt to v0.13.0.
+
+### CLI
+
+* feat: exit if compile errors happen in https://github.com/Myriad-Dreamin/tinymist/pull/1512
+
+### Editor
+
+* feat: paste uri smartly in https://github.com/Myriad-Dreamin/tinymist/pull/1500
+* feat: downgrade some config errors and show warnings in https://github.com/Myriad-Dreamin/tinymist/pull/1538
+
+### Testing
+
+* feat: implements dap-server scaffold in https://github.com/Myriad-Dreamin/tinymist/pull/1517
+* feat: implement debugging console in https://github.com/Myriad-Dreamin/tinymist/pull/1445
+* feat: profile and visualize coverage of the current document in https://github.com/Myriad-Dreamin/tinymist/pull/1490
+* feat: add instrument-based breakpoints support to dap in https://github.com/Myriad-Dreamin/tinymist/pull/1529
+* feat: add test framework with coverage support in https://github.com/Myriad-Dreamin/tinymist/pull/1518
+* docs: update description about testing in https://github.com/Myriad-Dreamin/tinymist/pull/1532
+* fix: example output in https://github.com/Myriad-Dreamin/tinymist/pull/1533
+* feat: watch tests and print test information in https://github.com/Myriad-Dreamin/tinymist/pull/1534
+* feat: pass tests if there are only warnings during testing in https://github.com/Myriad-Dreamin/tinymist/pull/1535
+
+### Localization
+
+* feat: translate all title of tinymist commands using llm in https://github.com/Myriad-Dreamin/tinymist/pull/1501
+* docs: update readme for locales folder in https://github.com/Myriad-Dreamin/tinymist/pull/1502
+* feat: translate rest titles by deepseek v3 in https://github.com/Myriad-Dreamin/tinymist/pull/1503
+* feat: translate all tinymist config text using llm in https://github.com/Myriad-Dreamin/tinymist/pull/1504
+* feat: employ l10n to tinymist-cli and vscode extension in https://github.com/Myriad-Dreamin/tinymist/pull/1505
+* feat: initialize locale as soon as possible in https://github.com/Myriad-Dreamin/tinymist/pull/1507
+* feat: support l10n message with arguments in https://github.com/Myriad-Dreamin/tinymist/pull/1508
+
+### Completion
+
+* fix: revert the explicit detection again in https://github.com/Myriad-Dreamin/tinymist/pull/1525
+
+### Preview
+
+* (Security) Made more strict CORS checks (v2) by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1382
+* feat: use `window/showDocument` to show previewing document in https://github.com/Myriad-Dreamin/tinymist/pull/1450
+
+### Misc
+
+* docs: update roadmap in https://github.com/Myriad-Dreamin/tinymist/pull/1499
+* docs: fix Neovim name casing everywhere by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1520
+* build: fix docs:typ using wrong root dir by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1522
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.8...v0.13.10
+
 ## v0.13.8 - [2025-03-13]
 
 ### Completion
