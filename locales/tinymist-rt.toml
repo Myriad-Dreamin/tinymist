@@ -33,9 +33,17 @@ zh = "compileStatus 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭�
 en = "failed to parse hoverPeriscope: {err}"
 zh = "解析 hoverPeriscope 失败：{err}"
 
+[tinymist.config.badServerConfig]
+en = "bad server configuration: {warning}"
+zh = "服务器配置错误：{warning}"
+
 [tinymist.config.badTypstExtraArgs]
 en = "failed to parse typstExtraArgs: {err}, args: {args}"
 zh = "解析 typstExtraArgs 失败：{err}，参数：{args}"
+
+[tinymist.config.deserializeError]
+en = "failed to deserialize \"{key}\": {err}"
+zh = "配置“{key}”的格式错误：{err}"
 
 [tinymist.config.invalidObject]
 en = "invalid configuration object: {object}"

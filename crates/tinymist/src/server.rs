@@ -3,6 +3,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
@@ -162,27 +163,31 @@ impl ServerState {
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = ServerState::new(client.clone(), config, editor_tx);
+        let mut server = ServerState::new(client.clone(), config, editor_tx);
+
+        if !server.config.warnings.is_empty() {
+            server.show_config_warnings();
+        }
 
         if start {
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
-                service.config.notify_status,
+                server.config.notify_status,
             );
 
-            service
+            server
                 .reload_projects()
                 .log_error("could not restart primary");
 
             #[cfg(feature = "preview")]
-            service.background_preview();
+            server.background_preview();
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
         }
 
-        service
+        server
     }
 
     /// Installs LSP handlers to the language server.
@@ -357,6 +362,31 @@ pub enum ServerEvent {
 }
 
 impl ServerState {
+    /// Shows the configuration warnings to the client.
+    pub fn show_config_warnings(&mut self) {
+        if !self.config.warnings.is_empty() {
+            for warning in self.config.warnings.iter() {
+                self.client.send_lsp_request::<ShowMessageRequest>(
+                    ShowMessageRequestParams {
+                        typ: MessageType::WARNING,
+                        message: tinymist_l10n::t!(
+                            "tinymist.config.badServerConfig",
+                            "bad server configuration: {warning}",
+                            warning = warning.as_ref().into()
+                        )
+                        .into(),
+                        actions: None,
+                    },
+                    |_s, r| {
+                        if let Some(err) = r.error {
+                            log::error!("failed to send warning message: {err:?}");
+                        }
+                    },
+                );
+            }
+        }
+    }
+
     /// Gets the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
         let dg = self.project.primary_id().to_string();

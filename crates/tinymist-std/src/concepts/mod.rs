@@ -1,5 +1,5 @@
 mod takable;
-use std::{path::Path, sync::Arc};
+use std::{borrow::Cow, path::Path, sync::Arc};
 
 pub use takable::*;
 
@@ -23,6 +23,8 @@ pub type ImmutStr = Arc<str>;
 pub type ImmutBytes = Arc<[u8]>;
 /// An immutable path.
 pub type ImmutPath = Arc<Path>;
+/// A copy-on-write static string.
+pub type CowStr = Cow<'static, str>;
 
 /// A trait for converting an `Arc<T>` into `Self`.
 pub trait FromArc<T> {

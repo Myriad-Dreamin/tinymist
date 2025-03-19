@@ -199,6 +199,10 @@ impl ServerState {
             return;
         };
         let _ = this.on_changed_configuration(Config::values_to_map(resp));
+
+        if !this.config.warnings.is_empty() {
+            this.show_config_warnings();
+        }
     }
 }
 
