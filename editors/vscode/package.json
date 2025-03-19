@@ -1057,6 +1057,11 @@
     ],
     "commands": [
       {
+        "command": "tinymist.exportCurrentFile",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentFile%",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.exportCurrentPdf",
         "title": "%extension.tinymist.command.tinymist.exportCurrentPdf%",
         "category": "Typst"
@@ -1076,6 +1081,11 @@
         "title": "%extension.tinymist.command.tinymist.showPdf%",
         "category": "Typst",
         "icon": "$(file-pdf)"
+      },
+      {
+        "command": "tinymist.exportCurrentFileAndShow",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentFileAndShow%",
+        "category": "Typst"
       },
       {
         "command": "tinymist.copyAnsiHighlight",

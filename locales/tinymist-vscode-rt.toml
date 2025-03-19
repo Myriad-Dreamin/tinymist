@@ -3,4 +3,87 @@
 
 [" (Preview)"]
 en = " (Preview)"
-zh = "（预览）"
+zh = " (预览)"
+
+["Export as HTML"]
+en = "Export as HTML"
+zh = "导出为 HTML"
+
+["Export as Markdown"]
+en = "Export as Markdown"
+zh = "导出为 Markdown"
+
+["Export as PDF"]
+en = "Export as PDF"
+zh = "导出为 PDF"
+
+["Export as PNG (and update tasks.json)"]
+en = "Export as PNG (and update tasks.json)"
+zh = "导出为 PNG (并更新 tasks.json)"
+
+["Export as SVG (and update tasks.json)"]
+en = "Export as SVG (and update tasks.json)"
+zh = "导出为 SVG (并更新 tasks.json)"
+
+["Export as Text"]
+en = "Export as Text"
+zh = "导出为纯文本文件"
+
+["Export as a single PNG by merging pages"]
+en = "Export as a single PNG by merging pages"
+zh = "合并页面并导出为单个 PNG"
+
+["Export as a single SVG by merging pages"]
+en = "Export as a single SVG by merging pages"
+zh = "合并页面并导出为单个 SVG"
+
+["Export the first page as a single PNG"]
+en = "Export the first page as a single PNG"
+zh = "导出首页为单个 PNG"
+
+["Export the first page as a single SVG"]
+en = "Export the first page as a single SVG"
+zh = "导出首页为单个 SVG"
+
+["PNG (First Page)"]
+en = "PNG (First Page)"
+zh = "PNG (首页)"
+
+["PNG (Merged)"]
+en = "PNG (Merged)"
+zh = "PNG (合并)"
+
+["PNG (Task)"]
+en = "PNG (Task)"
+zh = "PNG (任务)"
+
+["Pick a method to export and show"]
+en = "Pick a method to export and show"
+
+["Pick a method to export"]
+en = "Pick a method to export"
+zh = "选择导出方式"
+
+["Query current document and export the result as a JSON file"]
+en = "Query current document and export the result as a JSON file"
+zh = "查询当前文档并导出结果为 JSON 文件"
+
+["Query current document and export the result as a YAML file"]
+en = "Query current document and export the result as a YAML file"
+zh = "查询当前文档并导出结果为 YAML 文件"
+
+["Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."]
+en = "Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."
+zh = "查询当前文档并导出结果为文件。我们将会询问一些问题并为您更新 tasks.json 文件。"
+
+["SVG (First Page)"]
+en = "SVG (First Page)"
+zh = "SVG (首页)"
+
+["SVG (Merged)"]
+en = "SVG (Merged)"
+zh = "SVG (合并)"
+
+["SVG (Task)"]
+en = "SVG (Task)"
+zh = "SVG (任务)"

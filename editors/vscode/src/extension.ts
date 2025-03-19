@@ -32,6 +32,7 @@ import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste
 import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
+import { commandAskAndExport, commandAskAndShow, ExportKind } from "./features/export";
 
 LanguageState.Client = LanguageClient;
 
@@ -203,7 +204,9 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.openExternal", openExternal),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
+    commands.registerCommand("tinymist.exportCurrentFile", commandAskAndExport),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
+    commands.registerCommand("tinymist.exportCurrentFileAndShow", commandAskAndShow),
     commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
     commands.registerCommand("tinymist.clearCache", commandClearCache),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
@@ -241,29 +244,13 @@ async function openExternal(target: string): Promise<void> {
   await vscode.env.openExternal(uri);
 }
 
-async function commandExport(
-  mode: "Pdf" | "Html" | "Svg" | "Png",
-  extraOpts?: any,
-): Promise<string | undefined> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
+export async function commandExport(kind: ExportKind, opts?: any): Promise<string | undefined> {
+  const uri = window.activeTextEditor?.document.uri.fsPath;
+  if (!uri) {
     return;
   }
 
-  const uri = activeEditor.document.uri.fsPath;
-
-  const handler = tinymist[`export${mode}`];
-
-  handler(uri, extraOpts);
-
-  const res = await tinymist.executeCommand<string | null>(`tinymist.export${mode}`, [
-    uri,
-    ...(extraOpts ? [extraOpts] : []),
-  ]);
-  if (res === null) {
-    return undefined;
-  }
-  return res;
+  return (await tinymist[`export${kind}`](uri, opts)) || undefined;
 }
 
 async function commandGetCurrentDocumentMetrics(): Promise<any> {
@@ -303,7 +290,7 @@ async function commandCopyAnsiHighlight(): Promise<void> {
  * Implements the functionality for the 'Show PDF' button shown in the editor title
  * if a `.typ` file is opened.
  */
-async function commandShow(kind: "Pdf" | "Html" | "Svg" | "Png", extraOpts?: any): Promise<void> {
+export async function commandShow(kind: ExportKind, extraOpts?: any): Promise<void> {
   const activeEditor = window.activeTextEditor;
   if (activeEditor === undefined) {
     return;
