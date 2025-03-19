@@ -189,9 +189,7 @@ fn diagnostic_hints(typst_hints: &[EcoString]) -> Format<impl Iterator<Item = Ec
 }
 
 trait DiagnosticRefiner {
-    fn matches(&self, raw: &TypstDiagnostic) -> bool {
-        false
-    }
+    fn matches(&self, raw: &TypstDiagnostic) -> bool;
     fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic;
 }
 
