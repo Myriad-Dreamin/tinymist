@@ -197,7 +197,15 @@ struct DeprecationRefiner<const MINOR: usize>();
 
 impl DiagnosticRefiner for DeprecationRefiner<13> {
     fn matches(&self, raw: &TypstDiagnostic) -> bool {
-        raw.message.contains("unknown variable: style")
+        let msg = &raw.message;
+        let patterns = [
+            "unknown variable: style",
+            "unexpected argument: fill",
+            "type state has no method `display`",
+            "only element functions can be used as selectors",
+        ];
+
+        patterns.iter().any(|pattern| msg.contains(pattern))
     }
 
     fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic {
