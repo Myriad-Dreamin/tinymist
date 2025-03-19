@@ -7,28 +7,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/arg_range_math2.typ
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 5,
-    "label": "AA",
-    "labelDetails": {
-     "description": "𝔸"
-    },
-    "sortText": "000",
-    "textEdit": {
-     "newText": "AA",
-     "range": {
-      "end": {
-       "character": 8,
-       "line": 2
-      },
-      "start": {
-       "character": 8,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]

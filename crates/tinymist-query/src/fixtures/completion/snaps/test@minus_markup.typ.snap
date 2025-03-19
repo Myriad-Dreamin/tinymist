@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (37..38)
+description: Completion on / (48..49)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/mode_math2.typ
+input_file: crates/tinymist-query/src/fixtures/completion/minus_markup.typ
 ---
 [
  {
