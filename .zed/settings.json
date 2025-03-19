@@ -1,0 +1,22 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "checkOnSave": {
+          "command": "clippy"
+        }
+      }
+    },
+    "tinymist": {
+      "initialization_options": {
+        "exportPdf": "onSave",
+        "fontPaths": ["assets/fonts"],
+        "outputPath": "$root/target/typst/$name"
+      }
+    }
+  }
+}
