@@ -18,4 +18,5 @@
 
 --- spread-content-math ---
 
+#let args(..body) = body
 $args(..(a + b))$
