@@ -25,7 +25,7 @@ export async function getTests(ctx: Context) {
     vscode.window.showInformationMessage("Start all tests.");
     const workspaceUri = ctx.getWorkspace("diag");
     console.log("Start all tests on ", workspaceUri.fsPath);
-    
+
     suite.addTest("diagnostics works well", async () => {
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "diagnostics.typ");
 
@@ -92,6 +92,21 @@ export async function getTests(ctx: Context) {
           });
         });
       }
+    });
+
+    suite.addTest("out of root diag hints", async () => {
+      const mainUrl = vscode.Uri.joinPath(workspaceUri, "out-of-root.typ");
+
+      const stats = await ctx.diagnostics(1, async () => {
+        await ctx.openDocument(mainUrl);
+      });
+
+      const diags = stats[2];
+
+      ctx.expect(diags).to.have.lengthOf(1);
+      const diag = diags[0];
+      ctx.expect(diag.message).contains("Hint: Cannot read file outside of project root");
+      ctx.expect(diag.message).not.contains("Hint: you can adjust the project root with the --root argument");
     });
   });
 }

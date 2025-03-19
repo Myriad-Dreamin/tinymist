@@ -64,7 +64,8 @@ fn convert_diagnostic(
         let mut diag = Cow::Borrowed(typst_diagnostic);
 
         // Extend more refiners here by adding their instances.
-        let refiners = &[&DeprecationRefiner::<13> {}];
+        let refiners: &[&dyn DiagnosticRefiner] =
+            &[&DeprecationRefiner::<13> {}, &OutOfRootHintRefiner {}];
 
         // NOTE: It would be nice to have caching here.
         for refiner in refiners {
@@ -215,5 +216,22 @@ impl DiagnosticRefiner for DeprecationRefiner<13> {
             r#"or consider migrating your code according to "#,
             r#"[this guide](https://typst.app/blog/2025/typst-0.13/#migrating)."#
         ))
+    }
+}
+
+struct OutOfRootHintRefiner();
+
+impl DiagnosticRefiner for OutOfRootHintRefiner {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool {
+        raw.message.contains("failed to load file (access denied)")
+            && raw
+                .hints
+                .iter()
+                .any(|hint| hint.contains("cannot read file outside of project root"))
+    }
+
+    fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {
+        raw.hints.clear();
+        raw.with_hint("Cannot read file outside of project root.")
     }
 }
