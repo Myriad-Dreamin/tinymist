@@ -207,7 +207,7 @@ impl DiagnosticRefiner for DeprecationRefiner<13> {
             r#"Typst 0.13 has introduced breaking changes. Try downgrading "#,
             r#"Tinymist to v0.12 to use a compatible version of Typst, "#,
             r#"or consider migrating your code according to "#,
-            r#"[this guide](https://typst.app/docs/changelog/0.13.0/#deprecations)."#
+            r#"[this guide](https://typst.app/blog/2025/typst-0.13/#migrating)."#
         ))
     }
 }
