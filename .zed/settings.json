@@ -15,7 +15,7 @@
       "initialization_options": {
         "exportPdf": "onSave",
         "fontPaths": ["assets/fonts"],
-        "outputPath": "$root/target/typst/$name"
+        "outputPath": "$root/target/typst/$dir/$name"
       }
     }
   }
