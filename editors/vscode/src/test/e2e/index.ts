@@ -124,7 +124,7 @@ export class Context {
     cnt: number,
     f: () => Promise<any> = Promise.resolve,
     timeout = 5000,
-  ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][]]> {
+  ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][], vscode.Diagnostic[]]> {
     const diagNow = performance.now();
 
     this.diagTick += 1;
@@ -159,7 +159,7 @@ export class Context {
           console.log(`diagnostics[${tick}] took`, performance.now() - diagNow, "ms");
           diagnosticsHandler.dispose();
           clearTimeout(t);
-          resolve([e, d]);
+          resolve([e, d, diagnostics]);
         }
       });
       f().catch(doReject("error"));

@@ -107,6 +107,19 @@ export async function getTests(ctx: Context) {
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     });
 
+    suite.addTest("typst0.13 diag hints", async () => {
+      const mainUrl = vscode.Uri.joinPath(workspaceUri, "typst013.typ");
+
+      const [_1, _2, diags] = await ctx.diagnostics(1, async () => {
+        await ctx.openDocument(mainUrl);
+        ctx.timeout(400);
+      });
+
+      ctx.expect(diags).to.have.lengthOf(1);
+      const diag = diags[0];
+      ctx.expect(diag.message).contains("Hint: Typst 0.13");
+    });
+
     suite.addTest("restart server", async () => {
       const _mainTyp = await ctx.openDocument(
         vscode.Uri.joinPath(workspaceUri, "completion-base.typ"),
