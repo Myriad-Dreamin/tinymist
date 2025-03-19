@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use tinymist_project::LspWorld;
 use typst::syntax::Span;
 
@@ -25,7 +27,8 @@ impl std::ops::Deref for LocalDiagContext<'_> {
     }
 }
 
-/// Converts a list of Typst diagnostics to LSP diagnostics.
+/// Converts a list of Typst diagnostics to LSP diagnostics,
+/// with potential refinements on the error messages.
 pub fn convert_diagnostics<'a>(
     world: &LspWorld,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
@@ -57,7 +60,22 @@ fn convert_diagnostic(
     ctx: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, Diagnostic)> {
-    let (id, span) = diagnostic_span_id(ctx, typst_diagnostic);
+    let typst_diagnostic = {
+        let mut diag = Cow::Borrowed(typst_diagnostic);
+
+        // Extend more refiners here by adding their instances.
+        let refiners = &[&DeprecationRefiner::<13> {}];
+
+        // NOTE: It would be nice to have caching here.
+        for refiner in refiners {
+            if refiner.matches(&diag) {
+                diag = Cow::Owned(refiner.refine(diag.into_owned()));
+            }
+        }
+        diag
+    };
+
+    let (id, span) = diagnostic_span_id(ctx, &typst_diagnostic);
     let uri = ctx.uri_for_id(id)?;
     let source = ctx.source(id)?;
     let lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
@@ -68,7 +86,8 @@ fn convert_diagnostic(
     let typst_hints = &typst_diagnostic.hints;
     let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
 
-    let tracepoints = diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding)?;
+    let tracepoints =
+        diagnostic_related_information(ctx, &typst_diagnostic, ctx.position_encoding)?;
 
     let diagnostic = Diagnostic {
         range: lsp_range,
@@ -167,4 +186,26 @@ fn diagnostic_hints(typst_hints: &[EcoString]) -> Format<impl Iterator<Item = Ec
         .take(typst_hints.len())
         .interleave(typst_hints.iter().cloned())
         .format("")
+}
+
+trait DiagnosticRefiner {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool;
+    fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic;
+}
+
+struct DeprecationRefiner<const MINOR: usize>();
+
+impl DiagnosticRefiner for DeprecationRefiner<13> {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool {
+        raw.message.contains("unknown variable: style")
+    }
+
+    fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic {
+        raw.with_hint(concat!(
+            r#"Typst 0.13 has introduced breaking changes. Try downgrading "#,
+            r#"Tinymist to v0.12 to use a compatible version of Typst, "#,
+            r#"or consider migrating your code according to "#,
+            r#"[this guide](https://typst.app/blog/2025/typst-0.13/#migrating)."#
+        ))
+    }
 }
