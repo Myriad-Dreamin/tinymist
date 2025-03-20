@@ -17,6 +17,7 @@ import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from 
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { wordPattern } from "./language";
 
 interface ResourceRoutes {
   "/fonts": any;
@@ -456,8 +457,8 @@ export class LanguageState {
    */
 
   /**
-   * The code is borrowed from https://github.com/rust-lang/rust-analyzer/blob/fc98e0657abf3ce07eed513e38274c89bbb2f8ad/editors/code/src/config.ts#L98
-   * Last checked time: 2024-11-14
+   * The code is borrowed from https://github.com/rust-lang/rust-analyzer/commit/00726cf697271617945b02baa932d2915ebce8b7/editors/code/src/config.ts#L98
+   * Last checked time: 2025-03-20
    *
    * Sets up additional language configuration that's impossible to do via a
    * separate language-configuration.json file. See [1] for more information.
@@ -541,12 +542,6 @@ export class LanguageState {
         },
       ];
     }
-
-    // This is different from `wordSeparators`. We need to document difference here.
-    // todo: document difference here.
-    //
-    // https://code.visualstudio.com/api/language-extensions/language-configuration-guide#word-pattern
-    const wordPattern = /(-?\d*.\d\w*)|([^`~!@#$%^&*()=+[{\]}\\|;:'",.<>/?\s]+)/;
 
     console.log("Setting up language configuration", typingContinueCommentsOnNewline);
     this.configureLang = vscode.languages.setLanguageConfiguration("typst", {
