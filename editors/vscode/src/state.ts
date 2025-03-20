@@ -6,6 +6,7 @@ interface ExtensionState {
   features: {
     web: boolean;
     lsp: boolean;
+    export: boolean;
     task: boolean;
     devKit: boolean;
     wordSeparator: boolean;
@@ -33,6 +34,7 @@ export const extensionState: ExtensionState = {
   features: {
     web: false,
     lsp: true,
+    export: true,
     testingDebug: true,
     task: true,
     wordSeparator: true,
