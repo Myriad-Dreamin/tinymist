@@ -1,0 +1,30 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (27..28)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/dot_str_code.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "at",
+    "textEdit": {
+     "newText": "at(${1:})",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 3
+      },
+      "start": {
+       "character": 6,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

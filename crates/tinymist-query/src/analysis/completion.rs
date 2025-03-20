@@ -209,6 +209,11 @@ impl<'a> CompletionCursor<'a> {
         matches!(self.syntax, Some(SyntaxClass::Callee(..)))
     }
 
+    /// Gets the interpret mode at the cursor.
+    pub fn leaf_mode(&self) -> InterpretMode {
+        interpret_mode_at(Some(&self.leaf))
+    }
+
     /// Gets selected node under cursor.
     fn selected_node(&self) -> &Option<SelectedNode<'a>> {
         self.ident_cursor.get_or_init(|| {
@@ -553,7 +558,7 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let surrounding_syntax = self.cursor.surrounding_syntax;
-        let mode = interpret_mode_at(Some(&self.cursor.leaf));
+        let mode = self.cursor.leaf_mode();
 
         // Special completions 2, we should remove them finally
         if matches!(surrounding_syntax, ImportList) {
@@ -595,7 +600,7 @@ impl CompletionPair<'_, '_, '_> {
 
                 self.cursor.from = field.offset(&self.cursor.source)?;
 
-                self.field_access_completions(&target);
+                self.doc_access_completions(&target);
                 return Some(());
             }
             Some(SyntaxContext::ImportPath(path) | SyntaxContext::IncludePath(path)) => {
