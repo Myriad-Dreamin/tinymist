@@ -1316,7 +1316,8 @@
     "check": "tsc --noEmit",
     "format-check": "prettier --check .",
     "format": "prettier --write .",
-    "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+    "test:unit": "vitest",
+    "test": "vitest && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
     "cpr": "^3.0.1",
