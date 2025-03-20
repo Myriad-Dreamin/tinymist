@@ -9,6 +9,7 @@ export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "Text" | 
 export function exportActivate(context: IContext) {
   context.subscriptions.push(
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
+    commands.registerCommand("tinymist.export", commandExport),
     commands.registerCommand("tinymist.exportCurrentFile", commandAskAndExport),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
     commands.registerCommand("tinymist.exportCurrentFileAndShow", commandAskAndShow),
@@ -92,32 +93,27 @@ export const quickExports: QuickExportFormatMeta[] = [
   // },
 ];
 
-export async function commandAskAndExport(): Promise<void> {
-  const picked = await vscode.window.showQuickPick(quickExports, {
-    title: l10nMsg("Pick a method to export"),
-  });
+async function askAndRun<T>(
+  title: string,
+  cb: (meta: QuickExportFormatMeta) => T,
+): Promise<T | undefined> {
+  const picked = await vscode.window.showQuickPick(quickExports, { title });
 
   if (picked === undefined) {
     return;
   }
+}
 
-  console.log("picked", picked);
-
-  await commandExport(picked.exportKind, picked.extraOpts);
+export async function commandAskAndExport(): Promise<string | undefined> {
+  return await askAndRun(l10nMsg("Pick a method to export"), (picked) => {
+    return commandExport(picked.exportKind, picked.extraOpts);
+  });
 }
 
 export async function commandAskAndShow(): Promise<void> {
-  const picked = await vscode.window.showQuickPick(quickExports, {
-    title: l10nMsg("Pick a method to export and show"),
+  return await askAndRun(l10nMsg("Pick a method to export and show"), (picked) => {
+    return commandShow(picked.exportKind, picked.extraOpts);
   });
-
-  if (picked === undefined) {
-    return;
-  }
-
-  console.log("picked", picked);
-
-  await commandShow(picked.exportKind, picked.extraOpts);
 }
 
 export async function commandExport(kind: ExportKind, opts?: any): Promise<string | undefined> {
