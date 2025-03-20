@@ -5,3 +5,7 @@
 // export const wordPattern = /(-?\d*\.\d\w*)|([^`~!@#$%^&*()=+[{\]}\\|;:'",.<>/?\s]+)/;
 export const wordPattern =
   /(-?\d*\.\d\w*)|(-?\d+\.(?:\d\w*)?)|([^`~!@#$%^&*()=+\-[{\]}\\|;:'",.<>/?\s][^`~!@#$%^&*()=+[{\]}\\|;:'",.<>/?\s]*)/;
+
+export const machineChanges = /[\\\/](node_modules|target|\.git)[\\\/]/;
+
+export const mirrorLogRe = /tinymist.*log$/;
