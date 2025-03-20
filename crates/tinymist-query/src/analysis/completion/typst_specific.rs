@@ -205,7 +205,7 @@ impl CompletionPair<'_, '_, '_> {
 
         let mut apply = None;
         if parens && matches!(value, Value::Func(_)) {
-            let mode = interpret_mode_at(Some(&self.cursor.leaf));
+            let mode = self.cursor.leaf_mode();
             let kind_checker = CompletionKindChecker {
                 symbols: HashSet::default(),
                 functions: HashSet::from_iter([Ty::Value(InsTy::new(value.clone()))]),

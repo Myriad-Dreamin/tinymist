@@ -57,7 +57,7 @@ impl CompletionPair<'_, '_, '_> {
             docs: Default::default(),
         };
 
-        let mode = interpret_mode_at(Some(&self.cursor.leaf));
+        let mode = self.cursor.leaf_mode();
 
         previous_decls(self.cursor.leaf.clone(), |node| -> Option<()> {
             match node {
@@ -111,7 +111,7 @@ impl CompletionPair<'_, '_, '_> {
         let default_docs = defines.docs;
         let defines = defines.defines;
 
-        let mode = interpret_mode_at(Some(&self.cursor.leaf));
+        let mode = self.cursor.leaf_mode();
         let surrounding_syntax = self.cursor.surrounding_syntax;
 
         let mut kind_checker = CompletionKindChecker {

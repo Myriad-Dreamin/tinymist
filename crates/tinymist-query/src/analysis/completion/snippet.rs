@@ -76,7 +76,7 @@ impl CompletionPair<'_, '_, '_> {
             return None;
         }
 
-        let cursor_mode = interpret_mode_at(Some(node));
+        let cursor_mode = self.cursor.leaf_mode();
         let is_content = ty.is_content(&());
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
