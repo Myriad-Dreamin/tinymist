@@ -1,0 +1,150 @@
+
+name: tinymist::build::vscode::others
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  RUSTFLAGS: '-Dwarnings'
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+  CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+
+jobs:
+  build_alpine:
+    name: build extension (alpine-x64)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    container:
+      image: rust:alpine
+      volumes:
+        - /usr/local/cargo/registry:/usr/local/cargo/registry
+    env:
+      target: alpine-x64
+      RUST_TARGET: x86_64-unknown-linux-musl
+      RUSTFLAGS: "-Dwarnings -C link-arg=-fuse-ld=lld -C target-feature=-crt-static"
+      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
+    steps:
+      - name: Install dependencies
+        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: yarn install
+      - name: Build typst-preview vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Build tinymist vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./editors/vscode
+      - name: Build tinymist binary
+        run: |
+          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
+      - name: Split debug symbols
+        run: |
+          cd target/$RUST_TARGET/gh-release
+          objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
+          objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
+      - name: Upload split debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.debug
+          path: target/${{ env.RUST_TARGET }}/gh-release/tinymist-${{ env.target }}.debug
+      - name: Copy binary to output directory
+        run: |
+          mkdir -p editors/vscode/out
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "contrib/typst-preview/editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "tinymist-${{ env.target }}"
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}
+          path: tinymist-${{ env.target }}
+      - name: Package typst-preview extension
+        if: fromJson(env.isRelease)
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package extension
+        if: fromJson(env.isRelease)
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
+        working-directory: ./editors/vscode
+      - name: Package typst-preview extension (Nightly)
+        if: fromJson(env.isNightly)
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix --pre-release
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package extension (Nightly)
+        if: fromJson(env.isNightly)
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
+        working-directory: ./editors/vscode
+      
+      - name: Upload typst-preview VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.vsix
+          path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload tinymist VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.vsix
+          path: editors/vscode/tinymist-${{ env.target }}.vsix
+
+  build_web:
+    name: build extension (web)
+    runs-on: ubuntu-latest
+    env:
+      target: web
+      RUST_TARGET: wasm32-unknown-unknown
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "v0.13.1"
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: yarn install
+      - name: Build tinymist vscode extension
+        run: |
+          yarn
+          yarn run compile:web
+        working-directory: ./editors/vscode
+      - name: Build tinymist library
+        run: yarn build
+        working-directory: ./crates/tinymist-core
+      - name: Pack tinymist npm library
+        run: |
+          npm pack > package-name
+          mv $(cat package-name) tinymist-${{ env.target }}.tar.gz
+        working-directory: ./crates/tinymist-core
+      - name: Upload tinymist npm library
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}-npm
+          path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
+      - name: Package extension
+        if: '!fromJson(env.isNightly)'
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
+        working-directory: ./editors/vscode
+      - name: Package extension (Nightly)
+        if: fromJson(env.isNightly)
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
+        working-directory: ./editors/vscode
+      
+      - name: Upload tinymist VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-${{ env.target }}.vsix
+          path: editors/vscode/tinymist-${{ env.target }}.vsix
