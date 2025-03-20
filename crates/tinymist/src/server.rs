@@ -458,11 +458,11 @@ impl ServerState {
             }
 
             if let Some(Some(path)) = open.then_some(res.as_ref()) {
-                log::info!("open with system default apps: {path:?}");
+                log::trace!("open with system default apps: {path:?}");
                 do_open(path).log_error("failed to open with system default apps");
             }
 
-            log::info!("CompileActor: on export end: {path:?} as {res:?}");
+            log::trace!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
         })
     }

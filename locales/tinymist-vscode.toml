@@ -39,6 +39,14 @@ vi = "Dịch vụ ngôn ngữ tích hợp cho Typst"
 zh = "Typst 的集成语言服务"
 zh-TW = "Typst 的集成語言服務"
 
+[extension.tinymist.command.tinymist.exportCurrentFile]
+en = "Export the Opened File as Specified Format"
+zh = "将当前打开的文件导出为指定格式"
+
+[extension.tinymist.command.tinymist.exportCurrentFileAndShow]
+en = "Export the Opened File as Specified Format and Show the Result"
+zh = "将当前打开的文件导出为指定格式并显示结果"
+
 [extension.tinymist.command.tinymist.exportCurrentPdf]
 en = "Export the Opened File as PDF"
 ar = "تصدير الملف المفتوح كملف PDF"

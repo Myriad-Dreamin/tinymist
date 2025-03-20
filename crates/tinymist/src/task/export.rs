@@ -1,6 +1,7 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
 use std::str::FromStr;
+use std::sync::atomic::AtomicUsize;
 use std::{path::PathBuf, sync::Arc};
 
 use reflexo::ImmutPath;
@@ -150,7 +151,11 @@ impl ExportTask {
             bail!("ExportTask({task:?}): output path is a directory: {to:?}");
         }
         let to = to.with_extension(task.extension());
-        log::info!("ExportTask({task:?}): exporting {entry:?} to {to:?}");
+
+        static EXPORT_ID: AtomicUsize = AtomicUsize::new(0);
+        let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        log::info!("ExportTask({export_id}): exporting {entry:?} to {to:?}");
         if let Some(e) = to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
@@ -312,7 +317,7 @@ impl ExportTask {
             .await
             .context("failed to export")?;
 
-        log::info!("ExportTask({task:?}): export complete");
+        log::info!("ExportTask({export_id}): export complete");
         Ok(Some(to))
     }
 }
