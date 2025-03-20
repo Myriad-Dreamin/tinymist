@@ -220,13 +220,13 @@ pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
 impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
     pub fn execute<F: CompilerFeat>(world: &CompilerWorld<F>) -> Warned<SourceResult<Arc<D>>> {
-        // todo: create html world once
         let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
         let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
 
         let mut world = if is_paged_compilation {
             world.paged_task()
         } else if is_html_compilation {
+            // todo: create html world once
             world.html_task()
         } else {
             Cow::Borrowed(world)
