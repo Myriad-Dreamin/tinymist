@@ -113,6 +113,8 @@ jobs:
           perl -0777 -i -pe 's/region: targets.*# region end: targets/region: targets\ntargets = [\"aarch64-apple-darwin\", \"x86_64-pc-windows-msvc\", \"x86_64-unknown-linux-gnu\"]\n# region end: targets/s' dist-workspace.toml
   build_binary:
     needs: [modify_ci_dist]
+    permissions:
+      contents: write
     uses: ./.github/workflows/release.yml
   build_vscode:
     uses: ./.github/workflows/build-vscode.yml
