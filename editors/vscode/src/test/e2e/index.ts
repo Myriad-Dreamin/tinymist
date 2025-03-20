@@ -61,10 +61,17 @@ export class Context {
   enabled: boolean = !vscode.workspace.workspaceFolders;
 
   public workspaceCtx(workspace: string): Context {
-    console.log(`Opening workspace ${workspace}`, vscode.workspace.workspaceFolders);
-
     this.enabled = !!vscode.workspace.workspaceFolders;
-
+    if (this.enabled) {
+      const filePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
+      const fileName = path.basename(filePath);
+      if (fileName !== workspace) {
+        console.log(`Skipping workspace ${workspace}`);
+        this.enabled = false;
+      } else {
+        console.log(`Continue workspace ${workspace}`);
+      }
+    }
     return this;
   }
 
@@ -82,17 +89,6 @@ export class Context {
     } catch (e: any) {
       error(`  ✖︎ ${name}\n  ${e?.message || e}  ${e?.stack}`);
       throw e;
-    }
-  }
-
-  async changeWorkspace(workspaceUri: vscode.Uri, reloadSever = true): Promise<void> {
-    const workspaceNum = vscode.workspace.workspaceFolders?.length || 0;
-    const changed = vscode.workspace.updateWorkspaceFolders(0, workspaceNum, { uri: workspaceUri });
-    assert.ok(changed, `Failed to change workspace to ${workspaceUri}`);
-
-    if (reloadSever) {
-      // reload the server
-      await vscode.commands.executeCommand("tinymist.restartServer");
     }
   }
 
@@ -149,7 +145,9 @@ export class Context {
     cnt: number,
     f: () => Promise<any> = Promise.resolve,
     timeout = 5000,
-  ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][], vscode.Diagnostic[]]> {
+  ): Promise<
+    [vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][], vscode.Diagnostic[]]
+  > {
     const diagNow = performance.now();
 
     this.diagTick += 1;
