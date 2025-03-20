@@ -9,10 +9,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/context_code_init.typ
   "isIncomplete": false,
   "items": [
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "pagebreak",
     "labelDetails": {

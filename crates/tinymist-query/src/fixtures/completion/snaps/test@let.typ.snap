@@ -9,10 +9,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
   "isIncomplete": false,
   "items": [
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aa",
     "labelDetails": {
@@ -76,10 +72,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {
@@ -127,10 +119,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {

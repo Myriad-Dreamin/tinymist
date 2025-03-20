@@ -9,10 +9,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
   "isIncomplete": false,
   "items": [
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aa",
     "labelDetails": {
@@ -34,10 +30,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aab",
     "labelDetails": {
@@ -59,10 +51,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aabc",
     "labelDetails": {
@@ -84,10 +72,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {
@@ -114,10 +98,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
   "isIncomplete": false,
   "items": [
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aabc",
     "labelDetails": {
@@ -139,10 +119,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     }
    },
    {
-    "command": {
-     "command": "tinymist.triggerSuggestAndParameterHints",
-     "title": ""
-    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {
