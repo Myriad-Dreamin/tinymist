@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "strong",
     "labelDetails": {
@@ -30,6 +34,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "strong.bracket",
     "labelDetails": {

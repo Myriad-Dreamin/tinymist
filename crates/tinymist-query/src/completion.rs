@@ -165,6 +165,7 @@ mod tests {
                         sort_text: item.sort_text,
                         kind: item.kind,
                         text_edit: item.text_edit,
+                        command: item.command,
                         ..Default::default()
                     })
                     .collect();

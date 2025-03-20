@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "font",
     "labelDetails": {
@@ -35,6 +39,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "font",
     "labelDetails": {
