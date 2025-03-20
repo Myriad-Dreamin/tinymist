@@ -1,5 +1,7 @@
 //! Completion for field access on nodes.
 
+use typst::syntax::ast::MathTextKind;
+
 use crate::analysis::completion::typst_specific::ValueCompletionInfo;
 
 use super::*;
@@ -14,10 +16,11 @@ impl CompletionPair<'_, '_, '_> {
     fn type_dot_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
         let mode = self.cursor.leaf_mode();
 
-        if !matches!(mode, InterpretMode::Math) {
-            self.type_field_access_completions(target);
+        if matches!(mode, InterpretMode::Math) {
+            return None;
         }
 
+        self.type_field_access_completions(target);
         Some(())
     }
 
@@ -54,12 +57,19 @@ impl CompletionPair<'_, '_, '_> {
         let mode = self.cursor.leaf_mode();
         let valid_field_access_syntax =
             !matches!(mode, InterpretMode::Math) || is_valid_math_field_access(target);
+        let valid_postfix_target =
+            !matches!(mode, InterpretMode::Math) || is_valid_math_postfix(target);
+
+        if !valid_field_access_syntax && !valid_postfix_target {
+            return None;
+        }
 
         if valid_field_access_syntax {
             self.value_field_access_completions(&value, mode);
         }
-
-        self.postfix_completions(target, Ty::Value(InsTy::new(value.clone())));
+        if valid_postfix_target {
+            self.postfix_completions(target, Ty::Value(InsTy::new(value.clone())));
+        }
 
         match value {
             Value::Symbol(symbol) => {
@@ -74,7 +84,9 @@ impl CompletionPair<'_, '_, '_> {
                     }
                 }
 
-                self.ufcs_completions(target);
+                if valid_postfix_target {
+                    self.ufcs_completions(target);
+                }
             }
             Value::Content(content) => {
                 if valid_field_access_syntax {
@@ -82,8 +94,9 @@ impl CompletionPair<'_, '_, '_> {
                         self.value_completion(Some(name.into()), &value, false, None);
                     }
                 }
-
-                self.ufcs_completions(target);
+                if valid_postfix_target {
+                    self.ufcs_completions(target);
+                }
             }
             Value::Dict(dict) if valid_field_access_syntax => {
                 for (name, value) in dict.iter() {
@@ -168,12 +181,32 @@ fn is_func(read: &Value) -> bool {
 }
 
 fn is_valid_math_field_access(target: &SyntaxNode) -> bool {
-    if let Some(fa) = target.cast::<ast::FieldAccess>() {
-        return is_valid_math_field_access(fa.target().to_untyped());
+    if let Some(field_access) = target.cast::<ast::FieldAccess>() {
+        return is_valid_math_field_access(field_access.target().to_untyped());
     }
     if matches!(target.kind(), SyntaxKind::Ident | SyntaxKind::MathIdent) {
         return true;
     }
 
     false
+}
+
+fn is_valid_math_postfix(target: &SyntaxNode) -> bool {
+    fn bad_punc_text(punc: char) -> bool {
+        punc.is_ascii_punctuation() || punc.is_ascii_whitespace()
+    }
+
+    if let Some(target) = target.cast::<ast::MathText>() {
+        return match target.get() {
+            MathTextKind::Character(ch) => !bad_punc_text(ch),
+            MathTextKind::Number(..) => true,
+        };
+    }
+
+    if let Some(target) = target.cast::<ast::Text>() {
+        let target = target.get();
+        return !target.is_empty() && target.chars().all(|ch| !bad_punc_text(ch));
+    }
+
+    true
 }
