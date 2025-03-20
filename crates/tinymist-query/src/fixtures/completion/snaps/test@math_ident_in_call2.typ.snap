@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_ident_in_call2.ty
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "norm",
     "labelDetails": {

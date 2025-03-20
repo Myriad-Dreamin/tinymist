@@ -3,13 +3,16 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (26..27)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/set_block.typ
-snapshot_kind: text
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "block",
     "labelDetails": {

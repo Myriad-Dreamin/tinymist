@@ -3,13 +3,16 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on c( (84..86)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/import.typ
-snapshot_kind: text
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "aab",
     "labelDetails": {
@@ -31,6 +34,10 @@ snapshot_kind: text
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {
@@ -57,6 +64,10 @@ snapshot_kind: text
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "aac",
     "labelDetails": {

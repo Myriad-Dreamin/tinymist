@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/builtin_shadow_existin
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "pagebreak",
     "labelDetails": {

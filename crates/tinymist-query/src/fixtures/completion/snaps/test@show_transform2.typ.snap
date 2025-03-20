@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform2.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "raw",
     "labelDetails": {
@@ -30,6 +34,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform2.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "raw.with",
     "labelDetails": {
@@ -51,6 +59,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform2.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "read",
     "labelDetails": {
@@ -72,6 +84,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform2.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "read.with",
     "labelDetails": {
@@ -93,6 +109,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform2.typ
     }
    },
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 15,
     "label": "replacement",
     "sortText": "228",

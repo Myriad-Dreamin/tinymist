@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "int",
     "sortText": "001",
@@ -27,6 +31,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "int",
     "labelDetails": {
