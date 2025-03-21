@@ -117,6 +117,15 @@ impl ExprScope {
         ExprScope::Lexical(LexicalScope::default())
     }
 
+    pub fn is_empty(&self) -> bool {
+        match self {
+            ExprScope::Lexical(scope) => scope.is_empty(),
+            ExprScope::Module(module) => is_empty_scope(module.scope()),
+            ExprScope::Func(func) => func.scope().is_none_or(is_empty_scope),
+            ExprScope::Type(ty) => is_empty_scope(ty.scope()),
+        }
+    }
+
     pub fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
             ExprScope::Lexical(scope) => {
@@ -944,6 +953,10 @@ impl<T> BinInst<T> {
     pub fn operands(&self) -> [&T; 2] {
         [&self.operands.0, &self.operands.1]
     }
+}
+
+fn is_empty_scope(scope: &typst::foundations::Scope) -> bool {
+    scope.iter().next().is_none()
 }
 
 impl_internable!(
