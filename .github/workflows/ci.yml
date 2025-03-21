@@ -1,0 +1,123 @@
+name: tinymist::ci
+on:
+  push:
+    branches:
+      - main
+      - 'nightly/*'
+    tags:
+      - "*"
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+      - 'nightly/*'
+  workflow_dispatch:
+
+env:
+  RUSTFLAGS: '-Dwarnings'
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+  CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+
+jobs:
+  pre_build:
+    permissions:
+      actions: write
+      contents: read
+    name: Duplicate Actions Detection
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          cancel_others: "true"
+
+  checks:
+    name: Check clippy, formatting, completion, and documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # https://github.com/dtolnay/rust-toolchain/issues/133
+      # https://github.com/rust-lang/rustup/issues/3635
+      # Only needed if your action will run two or more rust
+      # commands concurrently, otherwise rustup will lazily 
+      # install your rust-toolchain.toml when needed:
+      - name: 'Install from rust-toolchain.toml'
+        run: rustup show
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install deps
+        run: yarn install
+      - uses: Swatinem/rust-cache@v2
+      - name: Check and build assets
+        run: |
+          yarn build:preview
+          yarn build:l10n
+      - run: cargo clippy --workspace --all-targets
+      - run: scripts/feature-testing.sh
+      - run: cargo fmt --check --all
+      - run: cargo doc --workspace --no-deps
+      - name: Generate completions
+        run: |
+          mkdir -p completions/{zsh,bash,fish/vendor_completions.d,elvish/lib,nushell/vendor/autoload,powershell}/
+          cargo run -p tinymist -- completion zsh        > completions/zsh/_tinymist
+          cargo run -p tinymist -- completion bash       > completions/bash/tinymist
+          cargo run -p tinymist -- completion fish       > completions/fish/vendor_completions.d/tinymist.fish
+          cargo run -p tinymist -- completion elvish     > completions/elvish/lib/tinymist.elv
+          cargo run -p tinymist -- completion nushell    > completions/nushell/vendor/autoload/tinymist.nu
+          cargo run -p tinymist -- completion powershell > completions/powershell/tinymist.ps1
+      - name: upload completions
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-completion-scripts
+          path: completions
+
+  min-version:
+    name: Check Minimum Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Rust Version
+        run: yarn check-msrv
+      - uses: dtolnay/rust-toolchain@1.83.0 # check-min-version
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace
+  modify_ci_dist:
+    runs-on: "ubuntu-22.04"
+    env:
+      isReleaseOrNightly: ${{ startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dist
+        # we specify bash to get pipefail; it guards against the `curl` command
+        # failing. otherwise `sh` won't catch that `curl` returned non-0
+        shell: bash
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.2/cargo-dist-installer.sh | sh"
+      - name: Cache dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-modify-ci-dist-cache
+          path: ~/.cargo/bin/dist
+      - name: Change Targets
+        if: fromJson(env.isReleaseOrNightly)
+        run: |
+          perl -0777 -i -pe 's/region: targets.*# region end: targets/region: targets\ntargets = [\"aarch64-apple-darwin\", \"x86_64-pc-windows-msvc\", \"x86_64-unknown-linux-gnu\"]\n# region end: targets/s' dist-workspace.toml
+  build_binary:
+    needs: [modify_ci_dist]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+  build_vscode:
+    uses: ./.github/workflows/build-vscode.yml
+  build_vscode_others:
+    uses: ./.github/workflows/build-vscode-others.yml
+ 
