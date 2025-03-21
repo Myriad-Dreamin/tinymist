@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (29..30)
+description: Completion on / (31..32)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/func_self.typ
+input_file: crates/tinymist-query/src/fixtures/completion/func_cluster.typ
 ---
 [
  {
@@ -10,17 +10,17 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_self.typ
   "items": [
    {
     "kind": 3,
-    "label": "flatten",
+    "label": "clusters",
     "textEdit": {
-     "newText": "flatten()${1:}",
+     "newText": "clusters()${1:}",
      "range": {
       "end": {
        "character": 7,
-       "line": 1
+       "line": 2
       },
       "start": {
-       "character": 6,
-       "line": 1
+       "character": 4,
+       "line": 2
       }
      }
     }
