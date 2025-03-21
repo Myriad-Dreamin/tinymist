@@ -363,6 +363,13 @@ export class LanguageState {
   }
 
   /**
+   * Kills all preview tasks. See {@link _GroupDocumentPreviewFeatureCommands} for more information.
+   */
+  async killAllPreview(): Promise<void> {
+    return await tinymist.executeCommand(`tinymist.doKillPreview`, []);
+  }
+
+  /**
    * Scrolls the preview to a specific position. See {@link _GroupDocumentPreviewFeatureCommands}
    * for more information.
    *
@@ -371,6 +378,14 @@ export class LanguageState {
    */
   async scrollPreview(taskId: string, req: ScrollPreviewRequest): Promise<void> {
     return await tinymist.executeCommand(`tinymist.scrollPreview`, [taskId, req]);
+  }
+
+  /**
+   * Scrolls all the preview to some position. See {@link _GroupDocumentPreviewFeatureCommands}
+   * for more information.
+   */
+  async scrollAllPreview(): Promise<void> {
+    return await tinymist.executeCommand(`tinymist.scrollPreview`, []);
   }
 
   /**

@@ -5,6 +5,7 @@ mod outline;
 
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
+    PanelScrollByPositionRequest,
 };
 pub use args::*;
 pub use outline::Outline;
@@ -331,11 +332,11 @@ pub struct ChangeCursorPositionRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResolveSourceLocRequest {
-    filepath: PathBuf,
-    line: u32,
+    pub filepath: PathBuf,
+    pub line: u32,
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    character: u32,
+    pub character: u32,
 }
 
 impl ResolveSourceLocRequest {
@@ -344,12 +345,12 @@ impl ResolveSourceLocRequest {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MemoryFiles {
     pub files: HashMap<PathBuf, String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MemoryFilesShort {
     pub files: Vec<PathBuf>,
     // mtime: Option<u64>,
