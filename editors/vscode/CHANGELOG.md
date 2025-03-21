@@ -8,7 +8,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.10 - [2025-03-20]
 
-* Bumped typstfmt to v0.13.0.
+* Bumped typst to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
+* Bumped typstfmt to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
 
 ### CLI
 
@@ -18,6 +19,19 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * feat: paste uri smartly in https://github.com/Myriad-Dreamin/tinymist/pull/1500
 * feat: downgrade some config errors and show warnings in https://github.com/Myriad-Dreamin/tinymist/pull/1538
+* feat: configure word pattern to exclude words like `-A` in https://github.com/Myriad-Dreamin/tinymist/pull/1552
+
+### Export
+
+* feat: make all export available by commands in https://github.com/Myriad-Dreamin/tinymist/pull/1547
+* feat: export to format regardless of export target in https://github.com/Myriad-Dreamin/tinymist/pull/1549
+* feat: use quick exports in code lens context in https://github.com/Myriad-Dreamin/tinymist/pull/1551
+* test: add vscode e2e testing for export feature in https://github.com/Myriad-Dreamin/tinymist/pull/1553
+
+### Diagnostics
+
+* feat: add diagnostics refiner to provide extra hints from tinymist side by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1539
+* feat: fledge diagnostic hint patterns by updating 2 refiners by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1544
 
 ### Testing
 
@@ -41,9 +55,17 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * feat: initialize locale as soon as possible in https://github.com/Myriad-Dreamin/tinymist/pull/1507
 * feat: support l10n message with arguments in https://github.com/Myriad-Dreamin/tinymist/pull/1508
 
+### Code Analysis
+
+* fix: replace last scope when checking import wildcard in https://github.com/Myriad-Dreamin/tinymist/pull/1563
+
 ### Completion
 
 * fix: revert the explicit detection again in https://github.com/Myriad-Dreamin/tinymist/pull/1525
+* fix: correct bound self checking in https://github.com/Myriad-Dreamin/tinymist/pull/1564
+* feat: forbid bad field access syntax in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1550
+* feat: don't trigger parameter hints when skipping parameters in https://github.com/Myriad-Dreamin/tinymist/pull/1557
+* feat: forbid bad postfix completion in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1556
 
 ### Preview
 
