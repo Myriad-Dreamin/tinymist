@@ -6,6 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## Unreleased
+
+* Bump typstyle to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1567
+
 ## v0.13.10 - [2025-03-20]
 
 * Bumped typst to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
