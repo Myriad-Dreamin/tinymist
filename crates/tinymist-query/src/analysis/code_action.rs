@@ -150,10 +150,25 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
+    /// Whether the equation should be displayed as a separate block.
+    fn math_is_block(equation: ast::Equation) -> bool {
+        let is_space =
+            |node: Option<&SyntaxNode>| node.map(SyntaxNode::kind) == Some(SyntaxKind::Space);
+        let eq = equation.to_untyped();
+
+        let mut nodes = eq.children().skip(1);
+        let mut first = nodes.next();
+        if first.is_some_and(|first| first.is_empty() && matches!(first.kind(), SyntaxKind::Math)) {
+            first = nodes.next();
+        }
+
+        is_space(first) && is_space(eq.children().nth_back(1))
+    }
+
     fn equation_actions(&mut self, node: &LinkedNode) -> Option<()> {
         let equation = node.cast::<ast::Equation>()?;
         let body = equation.body();
-        let is_block = equation.block();
+        let is_block = Self::math_is_block(equation);
 
         let body = node.find(body.span())?;
         let body_range = body.range();
