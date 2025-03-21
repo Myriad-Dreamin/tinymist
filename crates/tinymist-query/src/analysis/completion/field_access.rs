@@ -134,7 +134,16 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            self.value_completion(Some(name.clone()), bind.read(), elem_parens, None);
+            self.value_completion_(
+                bind.read(),
+                ValueCompletionInfo {
+                    label: Some(name.clone()),
+                    parens: elem_parens,
+                    docs: None,
+                    label_details: None,
+                    bound_self: true,
+                },
+            );
         }
 
         if let Some(scope) = value.scope() {
@@ -150,7 +159,7 @@ impl CompletionPair<'_, '_, '_> {
                         parens: elem_parens,
                         docs: None,
                         label_details: None,
-                        bound_self: true,
+                        bound_self: false,
                     },
                 );
             }
