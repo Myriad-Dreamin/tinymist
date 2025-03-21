@@ -14,6 +14,7 @@ import { loadTinymistConfig } from "./config";
 import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
@@ -96,7 +97,10 @@ async function languageActivate(context: IContext) {
   // todo: more general ways to do this.
   const isInterestingNonTypst = (doc: vscode.TextDocument) => {
     return (
-      doc.languageId !== "typst" && (doc.uri.scheme === "file" || doc.uri.scheme === "untitled")
+      doc.languageId !== "typst" &&
+      (doc.uri.scheme === "file" || doc.uri.scheme === "untitled") &&
+      !machineChanges.test(doc.uri.fsPath) &&
+      !mirrorLogRe.test(doc.fileName)
     );
   };
   context.subscriptions.push(
