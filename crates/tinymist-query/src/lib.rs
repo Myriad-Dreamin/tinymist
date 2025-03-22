@@ -9,6 +9,7 @@
 
 mod adt;
 pub mod analysis;
+pub mod cf;
 pub mod docs;
 pub mod package;
 pub mod syntax;
