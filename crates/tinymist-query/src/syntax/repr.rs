@@ -20,6 +20,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(exprs) => self.write_seq(exprs),
+            Expr::Cov(cov) => self.write_expr(&cov.body),
             Expr::Array(elems) => self.write_array(&elems.args),
             Expr::Dict(elems) => self.write_dict(&elems.args),
             Expr::Args(args) => self.write_args(&args.args),
@@ -364,6 +365,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(..) => self.f.write_str("Expr(..)"),
+            Expr::Cov(cov) => self.write_expr(&cov.body),
             Expr::Array(elems) => self.write_array(&elems.args),
             Expr::Dict(elems) => self.write_dict(&elems.args),
             Expr::Args(args) => self.write_args(&args.args),

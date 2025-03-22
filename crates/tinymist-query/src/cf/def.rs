@@ -107,6 +107,7 @@ pub enum CfInstr {
     Ins(Ty),
     Include(NodeId),
     Iter(NodeId),
+    CovPoint(Span),
     Return(Option<NodeId>),
 }
 

@@ -1,5 +1,12 @@
-use std::sync::Arc;
-use std::sync::OnceLock;
+//! Control flow graph construction.
+//!
+//! A document has a root region. The function each also
+//! has a sub region.
+//!
+//! Every region has a list of basic blocks. Each basic block
+//! references a list of nodes.
+
+use std::sync::{Arc, OnceLock};
 
 use rustc_hash::FxHashMap;
 use typst::syntax::Span;
@@ -8,12 +15,8 @@ use super::def::*;
 use super::CfInfo;
 use crate::adt::IndexVec;
 use crate::analysis::SharedContext;
-use crate::syntax::ArgExpr;
-use crate::syntax::Decl;
-use crate::syntax::Expr;
-use crate::syntax::ExprInfo;
-use crate::ty::Interned;
-use crate::ty::Ty;
+use crate::syntax::{ArgExpr, Decl, Expr, ExprInfo};
+use crate::ty::{Interned, Ty};
 
 /// Converts an expression into a control flow graph.
 pub(crate) fn control_flow_of(ctx: Arc<SharedContext>, ei: Arc<ExprInfo>) -> Arc<CfInfo> {
@@ -84,7 +87,15 @@ impl CfWorker<'_> {
     }
 
     fn block<'a>(&mut self, cont: impl Iterator<Item = &'a Expr>) -> BasicBlockId {
-        let block = self.create_block(Vec::new());
+        self.block_with(cont, Vec::new())
+    }
+
+    fn block_with<'a>(
+        &mut self,
+        cont: impl Iterator<Item = &'a Expr>,
+        nodes: Vec<NodeId>,
+    ) -> BasicBlockId {
+        let block = self.create_block(nodes);
         self.cont_to(cont, block);
         block
     }
@@ -107,12 +118,18 @@ impl CfWorker<'_> {
 
         let nodes = std::mem::replace(&mut self.rg.nodes, parent_nodes);
 
-        self.cf
+        let basic_block = self
+            .cf
             .region
             .get_mut(self.rg.region)
             .basic_blocks
-            .get_mut(this)
-            .nodes = nodes;
+            .get_mut(this);
+        if !basic_block.nodes.is_empty() {
+            let mut nodes = nodes;
+            basic_block.nodes.append(&mut nodes);
+        } else {
+            basic_block.nodes = nodes;
+        }
         this
     }
 
@@ -129,6 +146,24 @@ impl CfWorker<'_> {
                 let body = self.block(&mut interned.content.iter());
                 self.create_node(CfNode::detached(CfInstr::Element(CfElement {
                     elem: interned.elem,
+                    body,
+                })))
+            }
+            Expr::Cov(cov) => {
+                let first = self
+                    .this_region()
+                    .nodes
+                    .push(CfNode::detached(CfInstr::CovPoint(cov.first)));
+                let last = self
+                    .this_region()
+                    .nodes
+                    .push(CfNode::detached(CfInstr::CovPoint(cov.last)));
+                let body = self.block_with(&mut [&cov.body].into_iter(), vec![first]);
+                let bb = self.this_region().basic_blocks.get_mut(body);
+                bb.nodes.push(last);
+
+                self.create_node(CfNode::detached(CfInstr::Block(CfBlock {
+                    ty: Ty::Any,
                     body,
                 })))
             }

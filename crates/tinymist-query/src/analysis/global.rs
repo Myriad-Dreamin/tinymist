@@ -75,6 +75,8 @@ pub struct Analysis {
     pub analysis_rev_cache: Arc<Mutex<AnalysisRevCache>>,
     /// The statistics about the analyzers.
     pub stats: Arc<AnalysisStats>,
+    /// Whether to include intrument points during expr lowering.
+    pub with_cov: bool,
 }
 
 impl Analysis {

@@ -72,6 +72,9 @@ impl CfPrinter<'_> {
             write!(f, "loc({:?})", node.span)?;
         }
         match &node.instr {
+            CfInstr::CovPoint(cov) => {
+                write!(f, " = cov")?;
+            }
             CfInstr::Let(cf_let) => {
                 write!(f, ": {}", cf_let.ty.repr_any())?;
                 write!(f, "let {}", cf_let.pattern.repr())?;

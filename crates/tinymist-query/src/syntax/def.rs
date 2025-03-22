@@ -74,6 +74,8 @@ pub enum Expr {
     Return(Option<Interned<Expr>>),
     /// A declaration
     Decl(DeclExpr),
+    /// A coverage block
+    Cov(Interned<CovExpr>),
     /// A star import
     Star,
 }
@@ -964,6 +966,13 @@ impl<T> BinInst<T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CovExpr {
+    pub first: Span,
+    pub last: Span,
+    pub body: Expr,
+}
+
 fn is_empty_scope(scope: &typst::foundations::Scope) -> bool {
     scope.iter().next().is_none()
 }
@@ -992,4 +1001,5 @@ impl_internable!(
     UnInst<Expr>,
     BinInst<Expr>,
     ApplyExpr,
+    CovExpr,
 );

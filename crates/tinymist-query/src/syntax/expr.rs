@@ -87,6 +87,7 @@ pub(crate) fn expr_of(
 
     let (exports, root) = {
         let mut w = ExprWorker {
+            with_cov: ctx.analysis.with_cov,
             fid: source.id(),
             ctx,
             imports,
@@ -255,6 +256,7 @@ pub(crate) struct ExprWorker<'a> {
     buffer: ResolveVec,
     lexical: LexicalContext,
     init_stage: bool,
+    with_cov: bool,
 
     route: &'a mut ExprRoute,
     comment_matcher: DocCommentMatcher,
@@ -340,8 +342,8 @@ impl ExprWorker<'_> {
 
             Equation(equation) => self.check_math(equation.body().to_untyped().children()),
             Math(math) => self.check_math(math.to_untyped().children()),
-            Code(code_block) => self.check_code(code_block.body()),
-            Content(content_block) => self.check_markup(content_block.body()),
+            Code(code_block) => self.check_code_block(code_block),
+            Content(content_block) => self.check_content_block(content_block),
 
             Ident(ident) => self.check_ident(ident),
             MathIdent(math_ident) => self.check_math_ident(math_ident),
@@ -1066,9 +1068,44 @@ impl ExprWorker<'_> {
         self.with_scope(|this| this.check_inline_markup(markup))
     }
 
-    fn check_code(&mut self, code: ast::Code) -> Expr {
+    #[inline]
+    fn cov_body(&mut self, child: &SyntaxNode, instr: Expr) -> Expr {
+        if self.with_cov {
+            let (first, last) = {
+                let mut children = child.children();
+                let first = children
+                    .next()
+                    .map(|s| s.span())
+                    .unwrap_or_else(Span::detached);
+                let last = children
+                    .last()
+                    .map(|s| s.span())
+                    .unwrap_or_else(Span::detached);
+                (first, last)
+            };
+
+            Expr::Cov(Interned::new(CovExpr {
+                first,
+                last,
+                body: instr,
+            }))
+        } else {
+            instr
+        }
+    }
+
+    fn check_content_block(&mut self, bb: ast::ContentBlock) -> Expr {
         self.with_scope(|this| {
-            this.check_in_mode(code.to_untyped().children(), InterpretMode::Code)
+            let instr = this.check_inline_markup(bb.body());
+            this.cov_body(bb.to_untyped(), instr)
+        })
+    }
+
+    fn check_code_block(&mut self, code: ast::CodeBlock) -> Expr {
+        self.with_scope(|this| {
+            let instr =
+                this.check_in_mode(code.body().to_untyped().children(), InterpretMode::Code);
+            this.cov_body(code.to_untyped(), instr)
         })
     }
 
