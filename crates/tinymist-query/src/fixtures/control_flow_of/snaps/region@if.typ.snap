@@ -1,0 +1,21 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: cf.repr(false)
+input_file: crates/tinymist-query/src/fixtures/control_flow_of/if.typ
+---
+document reg0 {
+  reg0 {
+    ^bb0: {
+      %0 = ins bool
+      %2: any = block ^1
+      %4: any = block ^2
+      %5: any = if %0 then %2 else %4
+    }
+    ^bb1: {
+      %1 = ins int
+    }
+    ^bb2: {
+      %3 = ins int
+    }
+  }
+}

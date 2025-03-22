@@ -65,7 +65,13 @@ pub enum Expr {
     /// A for loop
     ForLoop(Interned<ForExpr>),
     /// A type
-    Type(Ty),
+    Ins(Ty),
+    /// Break
+    Break,
+    /// Continue
+    Continue,
+    /// Return
+    Return(Option<Interned<Expr>>),
     /// A declaration
     Decl(DeclExpr),
     /// A star import
@@ -189,7 +195,7 @@ impl ExprScope {
 }
 
 fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
-    Expr::Type(Ty::Select(SelectTy::new(source, name)))
+    Expr::Ins(Ty::Select(SelectTy::new(source, name)))
 }
 
 /// Kind of a definition.
@@ -464,6 +470,12 @@ impl Decl {
             root: Some(def),
             term: val,
         })
+    }
+
+    pub fn repr(&self) -> EcoString {
+        let mut s = EcoString::new();
+        let _ = ExprDescriber::new(&mut s).write_decl(self);
+        s
     }
 }
 
@@ -851,9 +863,6 @@ pub enum UnaryOp {
     /// The (logical) not operation
     /// `not t`
     Not,
-    /// The return operation
-    /// `return t`
-    Return,
     /// The typst context operation
     /// `context t`
     Context,

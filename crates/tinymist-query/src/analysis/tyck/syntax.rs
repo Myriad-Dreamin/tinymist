@@ -37,8 +37,10 @@ impl TypeChecker<'_> {
             Expr::Conditional(conditional) => self.check_conditional(conditional),
             Expr::WhileLoop(while_loop) => self.check_while_loop(while_loop),
             Expr::ForLoop(for_loop) => self.check_for_loop(for_loop),
-            Expr::Type(ty) => self.check_type(ty),
+            Expr::Ins(ty) => self.check_type(ty),
             Expr::Decl(decl) => self.check_decl(decl),
+            Expr::Break | Expr::Continue => Ty::Builtin(BuiltinTy::None),
+            Expr::Return(..) => Ty::Builtin(BuiltinTy::None),
             Expr::Star => self.check_star(),
         })
     }
