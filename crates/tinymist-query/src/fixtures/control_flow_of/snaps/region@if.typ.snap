@@ -7,8 +7,8 @@ document reg0 {
   reg0 {
     ^bb0: {
       %0 = ins bool
-      %2: any = block ^1
-      %4: any = block ^2
+      %2: any = ^bb1
+      %4: any = ^bb2
       %5: any = if %0 then %2 else %4
     }
     ^bb1: {

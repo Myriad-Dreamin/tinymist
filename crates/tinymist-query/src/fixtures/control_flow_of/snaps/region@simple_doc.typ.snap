@@ -6,19 +6,19 @@ input_file: crates/tinymist-query/src/fixtures/control_flow_of/simple_doc.typ
 document reg0 {
   reg0 {
     ^bb0: {
-      %2 = elem(heading, ^1)
+      %2 = elem(heading, ^bb1)
       %3 = ins parbreak
       %4 = undef strong
-      %6: any = block ^3
+      %6: any = ^bb3
       %7 = args(, %6)
       %8: any = apply %4 %7
       %9 = ins parbreak
       %10 = ins text
-      %13 = elem(strong, ^4)
+      %13 = elem(strong, ^bb4)
       %14 = ins text
     }
     ^bb1: {
-      %1: any = block ^2
+      %1: any = ^bb2
     }
     ^bb2: {
       %0 = ins text
@@ -27,7 +27,7 @@ document reg0 {
       %5 = ins text
     }
     ^bb4: {
-      %12: any = block ^5
+      %12: any = ^bb5
     }
     ^bb5: {
       %11 = ins text
