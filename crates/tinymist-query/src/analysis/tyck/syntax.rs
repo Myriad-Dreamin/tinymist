@@ -14,6 +14,7 @@ static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 impl TypeChecker<'_> {
     pub(crate) fn check_syntax(&mut self, expr: &Expr) -> Option<Ty> {
         Some(match expr {
+            Expr::Cov(c) => self.check(&c.body),
             Expr::Block(exprs) => self.check_block(exprs),
             Expr::Array(elems) => self.check_array(elems.span, &elems.args),
             Expr::Dict(elems) => self.check_dict(elems.span, &elems.args),
@@ -37,8 +38,10 @@ impl TypeChecker<'_> {
             Expr::Conditional(conditional) => self.check_conditional(conditional),
             Expr::WhileLoop(while_loop) => self.check_while_loop(while_loop),
             Expr::ForLoop(for_loop) => self.check_for_loop(for_loop),
-            Expr::Type(ty) => self.check_type(ty),
+            Expr::Ins(ty) => self.check_type(ty),
             Expr::Decl(decl) => self.check_decl(decl),
+            Expr::Break | Expr::Continue => Ty::Builtin(BuiltinTy::None),
+            Expr::Return(..) => Ty::Builtin(BuiltinTy::None),
             Expr::Star => self.check_star(),
         })
     }

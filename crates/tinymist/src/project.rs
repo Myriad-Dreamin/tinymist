@@ -172,6 +172,7 @@ impl ServerState {
                 caches: Default::default(),
                 analysis_rev_cache: Arc::default(),
                 stats: Arc::default(),
+                with_cov: false,
             }),
 
             status_revision: Mutex::default(),
