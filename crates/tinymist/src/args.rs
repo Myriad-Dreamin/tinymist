@@ -38,7 +38,6 @@ pub enum Commands {
     #[clap(hide(true))] // still in development
     Cov(CompileOnceArgs),
     /// Test a document and gives summary
-    #[clap(hide(true))] // still in development
     Test(TestArgs),
     /// Runs compile command like `typst-cli compile`
     Compile(CompileArgs),

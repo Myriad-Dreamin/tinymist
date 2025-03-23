@@ -6,77 +6,71 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.10 - [2025-03-20]
+## v0.13.10 - [2025-03-23]
 
 * Bumped typst to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
 * Bumped typstfmt to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
 
 ### CLI
 
-* feat: exit if compile errors happen in https://github.com/Myriad-Dreamin/tinymist/pull/1512
+* Only keeping diagnostics message in the compile command in https://github.com/Myriad-Dreamin/tinymist/pull/1512
+* Added `tinymist test` command with coverage support in https://github.com/Myriad-Dreamin/tinymist/pull/1518 and https://github.com/Myriad-Dreamin/tinymist/pull/1535
+* Allowing to watch tests in https://github.com/Myriad-Dreamin/tinymist/pull/1534
 
 ### Editor
 
-* feat: paste uri smartly in https://github.com/Myriad-Dreamin/tinymist/pull/1500
-* feat: downgrade some config errors and show warnings in https://github.com/Myriad-Dreamin/tinymist/pull/1538
-* feat: configure word pattern to exclude words like `-A` in https://github.com/Myriad-Dreamin/tinymist/pull/1552
-
-### Export
-
-* feat: make all export available by commands in https://github.com/Myriad-Dreamin/tinymist/pull/1547
-* feat: export to format regardless of export target in https://github.com/Myriad-Dreamin/tinymist/pull/1549
-* feat: use quick exports in code lens context in https://github.com/Myriad-Dreamin/tinymist/pull/1551
-* test: add vscode e2e testing for export feature in https://github.com/Myriad-Dreamin/tinymist/pull/1553
-
-### Diagnostics
-
-* feat: add diagnostics refiner to provide extra hints from tinymist side by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1539
-* feat: fledge diagnostic hint patterns by updating 2 refiners by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1544
+* Pasting URI smartly in https://github.com/Myriad-Dreamin/tinymist/pull/1500
+  * If nothing is selected, it will generate a link element in place respecting the markup/math/code mode under the cursor.
+  * If the selected range is a link, it will simply update the link and not generate a string.
+  * Otherwise, the selected range is wrapped as the content of the link element.
+* Downgrading some errors in the configurations and showing warnings by popping up message window in https://github.com/Myriad-Dreamin/tinymist/pull/1538
+  * Previously, if there is an error in the configuration, all the configuration items will have no effect.
+* Configuring word pattern to not matching words like `-A` in https://github.com/Myriad-Dreamin/tinymist/pull/1552
+* Making all export features available by commands in https://github.com/Myriad-Dreamin/tinymist/pull/1547
 
 ### Testing
 
-* feat: implements dap-server scaffold in https://github.com/Myriad-Dreamin/tinymist/pull/1517
-* feat: implement debugging console in https://github.com/Myriad-Dreamin/tinymist/pull/1445
-* feat: profile and visualize coverage of the current document in https://github.com/Myriad-Dreamin/tinymist/pull/1490
-* feat: add instrument-based breakpoints support to dap in https://github.com/Myriad-Dreamin/tinymist/pull/1529
-* feat: add test framework with coverage support in https://github.com/Myriad-Dreamin/tinymist/pull/1518
-* docs: update description about testing in https://github.com/Myriad-Dreamin/tinymist/pull/1532
-* fix: example output in https://github.com/Myriad-Dreamin/tinymist/pull/1533
-* feat: watch tests and print test information in https://github.com/Myriad-Dreamin/tinymist/pull/1534
-* feat: pass tests if there are only warnings during testing in https://github.com/Myriad-Dreamin/tinymist/pull/1535
+* Implemented debugging console in https://github.com/Myriad-Dreamin/tinymist/pull/1517 and https://github.com/Myriad-Dreamin/tinymist/pull/1445
+* Implemented software breakpoint instrumentation in https://github.com/Myriad-Dreamin/tinymist/pull/1529
+* Profiling and visualizing coverage of the current document in https://github.com/Myriad-Dreamin/tinymist/pull/1490
+* Profiling and visualizing test coverage of the current module in https://github.com/Myriad-Dreamin/tinymist/pull/1518, https://github.com/Myriad-Dreamin/tinymist/pull/1532, https://github.com/Myriad-Dreamin/tinymist/pull/1533, and https://github.com/Myriad-Dreamin/tinymist/pull/1535
 
 ### Localization
 
-* feat: translate all title of tinymist commands using llm in https://github.com/Myriad-Dreamin/tinymist/pull/1501
-* docs: update readme for locales folder in https://github.com/Myriad-Dreamin/tinymist/pull/1502
-* feat: translate rest titles by deepseek v3 in https://github.com/Myriad-Dreamin/tinymist/pull/1503
-* feat: translate all tinymist config text using llm in https://github.com/Myriad-Dreamin/tinymist/pull/1504
-* feat: employ l10n to tinymist-cli and vscode extension in https://github.com/Myriad-Dreamin/tinymist/pull/1505
-* feat: initialize locale as soon as possible in https://github.com/Myriad-Dreamin/tinymist/pull/1507
-* feat: support l10n message with arguments in https://github.com/Myriad-Dreamin/tinymist/pull/1508
+* Translated all titles and descriptions of tinymist vscode commands using LLM in https://github.com/Myriad-Dreamin/tinymist/pull/1501, https://github.com/Myriad-Dreamin/tinymist/pull/1502, https://github.com/Myriad-Dreamin/tinymist/pull/1503, and https://github.com/Myriad-Dreamin/tinymist/pull/1504
+* Translated some code lens titles and error messages in tinymist-cli using LLM in https://github.com/Myriad-Dreamin/tinymist/pull/1505, https://github.com/Myriad-Dreamin/tinymist/pull/1507, and https://github.com/Myriad-Dreamin/tinymist/pull/1508
+
+### Export
+
+* (Fix) Allowing HTML export when the server is configured under `paged` export target and vice versa in https://github.com/Myriad-Dreamin/tinymist/pull/1549
+* Added vscode E2E testing for export features in https://github.com/Myriad-Dreamin/tinymist/pull/1553
+
+### Diagnostics
+
+* Added diagnostics refiner to edit or provide hints from tinymist side by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1539 and https://github.com/Myriad-Dreamin/tinymist/pull/1544
 
 ### Code Analysis
 
-* fix: replace last scope when checking import wildcard in https://github.com/Myriad-Dreamin/tinymist/pull/1563
+* (Fix) Correctly checking wildcard import in https://github.com/Myriad-Dreamin/tinymist/pull/1563
 
 ### Completion
 
-* fix: revert the explicit detection again in https://github.com/Myriad-Dreamin/tinymist/pull/1525
-* fix: correct bound self checking in https://github.com/Myriad-Dreamin/tinymist/pull/1564
-* feat: forbid bad field access syntax in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1550
-* feat: don't trigger parameter hints when skipping parameters in https://github.com/Myriad-Dreamin/tinymist/pull/1557
-* feat: forbid bad postfix completion in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1556
+* (Fix) Reverted the explicit detection again in https://github.com/Myriad-Dreamin/tinymist/pull/1525
+* (Fix) Corrected bound self checking in https://github.com/Myriad-Dreamin/tinymist/pull/1564
+* Forbidding bad field access completion in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1550
+* Forbidding bad postfix completion in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/1556
+* Not triggering parameter hints when skipping parameters in https://github.com/Myriad-Dreamin/tinymist/pull/1557
 
 ### Preview
 
 * (Security) Made more strict CORS checks (v2) by @tmistele in https://github.com/Myriad-Dreamin/tinymist/pull/1382
-* feat: use `window/showDocument` to show previewing document in https://github.com/Myriad-Dreamin/tinymist/pull/1450
+* Using `window/showDocument` to show previewing document in https://github.com/Myriad-Dreamin/tinymist/pull/1450
 
 ### Misc
 
-* docs: update roadmap in https://github.com/Myriad-Dreamin/tinymist/pull/1499
-* docs: fix Neovim name casing everywhere by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1520
-* build: fix docs:typ using wrong root dir by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1522
+* Updated roadmap in https://github.com/Myriad-Dreamin/tinymist/pull/1499
+* Fixed Neovim name casing everywhere by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1520
+* Fixed build scripts by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/1522
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.8...v0.13.10
 
