@@ -73,6 +73,21 @@ tinymist test tests/main.typ
 
 You can pass same arguments as `typst compile` to `tinymist test`.
 
+To watch for changes and run tests automatically, use the `--watch` option:
+
+```bash
+tinymist test --watch tests/main.typ
+```
+
+When running in the watch mode, input command lines to control the test runner:
+```
+   Hint Press 'h' for help
+$ h
+h/r/u/c/q: help/run/update/quit
+```
+
+For example, according to the help message, update the reference files using the command `u` (update).
+
 == Collecting Coverage with CLI
 
 You can collect coverage using the `--coverage` option.
