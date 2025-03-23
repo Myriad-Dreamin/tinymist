@@ -102,6 +102,8 @@ async function askAndRun<T>(
   if (picked === undefined) {
     return;
   }
+
+  return cb(picked);
 }
 
 export async function commandAskAndExport(): Promise<string | undefined> {
