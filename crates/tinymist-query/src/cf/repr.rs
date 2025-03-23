@@ -57,6 +57,7 @@ impl CfPrinter<'_> {
         writeln!(f, "^bb{}: {{", id.id)?;
         self.indent += 1;
         for idx in &id.nodes {
+            self.indent(f)?;
             self.node(*idx, reg.nodes.get(*idx), f)?;
             writeln!(f)?;
         }
@@ -66,8 +67,15 @@ impl CfPrinter<'_> {
     }
 
     fn node(&mut self, id: NodeId, node: &CfNode, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.indent(f)?;
         write!(f, "%{id}")?;
+        if self.spaned {
+            write!(f, "loc({:?})", node.span)?;
+        }
+
+        self.node_data(node, f)
+    }
+
+    fn node_data(&mut self, node: &CfNode, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.spaned {
             write!(f, "loc({:?})", node.span)?;
         }
@@ -125,8 +133,10 @@ impl CfPrinter<'_> {
             CfInstr::If(cf_if) => {
                 write!(f, ": {}", cf_if.ty.repr_any())?;
                 write!(f, " = if %{}", cf_if.cond)?;
-                write!(f, " then %{}", cf_if.then)?;
-                write!(f, " else %{}", cf_if.else_)?;
+                write!(f, " then",)?;
+                self.node_data(&cf_if.then, f)?;
+                write!(f, " else",)?;
+                self.node_data(&cf_if.else_, f)?;
             }
             CfInstr::Loop(cf_loop) => {
                 write!(f, ": {}", cf_loop.ty.repr_any())?;

@@ -2,7 +2,7 @@ use core::fmt;
 use std::num::NonZeroUsize;
 
 /// A type that can be used to index into an IndexVec.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct IndexVecIdx<T>(NonZeroUsize, std::marker::PhantomData<T>);
 
 impl<T> IndexVecIdx<T> {
@@ -21,6 +21,12 @@ impl<T> IndexVecIdx<T> {
 impl<T> fmt::Display for IndexVecIdx<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_index())
+    }
+}
+
+impl<T> fmt::Debug for IndexVecIdx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "IndexVecIdx({})", self.as_index())
     }
 }
 

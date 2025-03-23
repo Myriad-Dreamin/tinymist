@@ -108,7 +108,7 @@ impl CfWorker<'_> {
         let parent_nodes = std::mem::take(&mut self.rg.nodes);
 
         while let Some(expr) = cont.next() {
-            self.expr(expr);
+            self.expr_ins(expr);
             if let Some(next) = self.rg.cont.take() {
                 self.create_node(CfNode::detached(CfInstr::Branch(next)));
                 self.cont_to(cont, next);
@@ -133,21 +133,23 @@ impl CfWorker<'_> {
         this
     }
 
-    fn expr(&mut self, ei: &Expr) -> NodeId {
-        match ei {
+    fn expr_ins(&mut self, expr: &Expr) -> NodeId {
+        let expr = self.expr(expr);
+        self.create_node(expr)
+    }
+
+    fn expr(&mut self, expr: &Expr) -> CfNode {
+        match expr {
             Expr::Block(interned) => {
                 let body = self.block(&mut interned.iter());
-                self.create_node(CfNode::detached(CfInstr::Block(CfBlock {
-                    ty: Ty::Any,
-                    body,
-                })))
+                CfNode::detached(CfInstr::Block(CfBlock { ty: Ty::Any, body }))
             }
             Expr::Element(interned) => {
                 let body = self.block(&mut interned.content.iter());
-                self.create_node(CfNode::detached(CfInstr::Element(CfElement {
+                CfNode::detached(CfInstr::Element(CfElement {
                     elem: interned.elem,
                     body,
-                })))
+                }))
             }
             Expr::Cov(cov) => {
                 let first = self
@@ -162,75 +164,63 @@ impl CfWorker<'_> {
                 let bb = self.this_region().basic_blocks.get_mut(body);
                 bb.nodes.push(last);
 
-                self.create_node(CfNode::detached(CfInstr::Block(CfBlock {
-                    ty: Ty::Any,
-                    body,
-                })))
+                CfNode::detached(CfInstr::Block(CfBlock { ty: Ty::Any, body }))
             }
             Expr::Conditional(interned) => {
-                let cond = self.expr(&interned.cond);
-                let then = self.expr(&interned.then);
-                let else_ = self.expr(&interned.else_);
+                let cond = self.expr_ins(&interned.cond);
+                let then = Box::new(self.expr(&interned.then));
+                let else_ = Box::new(self.expr(&interned.else_));
 
-                self.create_node(CfNode::detached(CfInstr::If(CfIf {
+                CfNode::detached(CfInstr::If(CfIf {
                     ty: Ty::Any,
                     cond,
                     then,
                     else_,
-                })))
+                }))
             }
             Expr::Array(interned) => {
                 let args = interned.args.iter().map(|arg| self.arg(arg)).collect();
 
-                self.create_node(CfNode::detached(CfInstr::Array(CfArgs {
-                    ty: Ty::Any,
-                    args,
-                })))
+                CfNode::detached(CfInstr::Array(CfArgs { ty: Ty::Any, args }))
             }
             Expr::Dict(interned) => {
                 let args = interned.args.iter().map(|arg| self.arg(arg)).collect();
 
-                self.create_node(CfNode::detached(CfInstr::Dict(CfArgs {
-                    ty: Ty::Any,
-                    args,
-                })))
+                CfNode::detached(CfInstr::Dict(CfArgs { ty: Ty::Any, args }))
             }
             Expr::Args(interned) => {
                 let args = interned.args.iter().map(|arg| self.arg(arg)).collect();
 
-                self.create_node(CfNode::detached(CfInstr::Args(CfArgs {
-                    ty: Ty::Any,
-                    args,
-                })))
+                CfNode::detached(CfInstr::Args(CfArgs { ty: Ty::Any, args }))
             }
             Expr::Unary(interned) => {
-                let arg = self.expr(&interned.lhs);
-                self.create_node(CfNode::detached(CfInstr::Un(CfUn {
+                let arg = self.expr_ins(&interned.lhs);
+                CfNode::detached(CfInstr::Un(CfUn {
                     ty: Ty::Any,
                     op: interned.op,
                     lhs: arg,
-                })))
+                }))
             }
             Expr::Binary(interned) => {
                 let (lhs, rhs) = &interned.operands;
-                let lhs = self.expr(lhs);
-                let rhs = self.expr(rhs);
-                self.create_node(CfNode::detached(CfInstr::Bin(CfBin {
+                let lhs = self.expr_ins(lhs);
+                let rhs = self.expr_ins(rhs);
+                CfNode::detached(CfInstr::Bin(CfBin {
                     ty: Ty::Any,
                     op: interned.op,
                     lhs,
                     rhs,
-                })))
+                }))
             }
             Expr::Apply(interned) => {
-                let func = self.expr(&interned.callee);
-                let args = self.expr(&interned.args);
+                let func = self.expr_ins(&interned.callee);
+                let args = self.expr_ins(&interned.args);
 
-                self.create_node(CfNode::detached(CfInstr::Apply(CfCall {
+                CfNode::detached(CfInstr::Apply(CfCall {
                     ty: Ty::Any,
                     func,
                     args,
-                })))
+                }))
             }
             Expr::Func(interned) => {
                 let checkpoint = self.create_region();
@@ -239,77 +229,74 @@ impl CfWorker<'_> {
                 let body = self.rg.region;
                 self.restore_region(checkpoint);
 
-                let func = self.create_node(CfNode::detached(CfInstr::Func(CfFunc {
-                    ty: Ty::Any,
-                    body,
-                })));
+                let func = CfNode::detached(CfInstr::Func(CfFunc { ty: Ty::Any, body }));
 
-                self.declare(&interned.decl, func);
+                let idx = self.create_node(func.clone());
+                self.declare(&interned.decl, idx);
                 func
             }
             Expr::Let(interned) => {
-                let init = interned.body.as_ref().map(|expr| self.expr(expr));
-                self.create_node(CfNode::detached(CfInstr::Let(CfLet {
+                let init = interned.body.as_ref().map(|expr| self.expr_ins(expr));
+                CfNode::detached(CfInstr::Let(CfLet {
                     ty: Ty::Any,
                     pattern: interned.pattern.clone(),
                     init,
-                })))
+                }))
             }
             Expr::Show(interned) => {
-                let selector = interned.selector.as_ref().map(|expr| self.expr(expr));
-                let edit = self.expr(&interned.edit);
+                let selector = interned.selector.as_ref().map(|expr| self.expr_ins(expr));
+                let edit = self.expr_ins(&interned.edit);
                 let cont = self.create_cont();
 
-                self.create_node(CfNode::detached(CfInstr::Show(CfShow {
+                CfNode::detached(CfInstr::Show(CfShow {
                     selector,
                     edit,
                     cont,
-                })))
+                }))
             }
             Expr::Set(interned) => {
                 // pub target: Expr,
                 // pub args: Expr,
                 // pub cond: Option<Expr>,
 
-                let target = self.expr(&interned.target);
-                let args = self.expr(&interned.args);
-                let cond = interned.cond.as_ref().map(|expr| self.expr(expr));
+                let target = self.expr_ins(&interned.target);
+                let args = self.expr_ins(&interned.args);
+                let cond = interned.cond.as_ref().map(|expr| self.expr_ins(expr));
                 let cont = self.create_cont();
 
-                let set_cont =
-                    self.create_node(CfNode::detached(CfInstr::Set(CfSet { target, args, cont })));
+                let set_cont = CfNode::detached(CfInstr::Set(CfSet { target, args, cont }));
 
                 if let Some(cond) = cond {
-                    let no_set_cont = self.create_node(CfNode::detached(CfInstr::Branch(cont)));
-                    self.create_node(CfNode::detached(CfInstr::If(CfIf {
+                    let no_set_cont = Box::new(CfNode::detached(CfInstr::Branch(cont)));
+                    CfNode::detached(CfInstr::If(CfIf {
                         ty: Ty::Any,
                         cond,
-                        then: set_cont,
+                        then: Box::new(set_cont),
                         else_: no_set_cont,
-                    })))
+                    }))
                 } else {
                     set_cont
                 }
             }
-            Expr::Import(interned) => self.create_node(CfNode::detached(CfInstr::Meta(ei.clone()))),
+            Expr::Import(interned) => CfNode::detached(CfInstr::Meta(expr.clone())),
             Expr::Include(interned) => {
-                let source = self.expr(&interned.source);
-                self.create_node(CfNode::detached(CfInstr::Include(source)))
+                let source = self.expr_ins(&interned.source);
+                CfNode::detached(CfInstr::Include(source))
             }
             Expr::Select(interned) => {
-                let lhs = self.expr(&interned.lhs);
-                self.create_node(CfNode::detached(CfInstr::Select(CfSelect {
+                let lhs = self.expr_ins(&interned.lhs);
+                CfNode::detached(CfInstr::Select(CfSelect {
                     ty: Ty::Any,
                     lhs,
                     key: interned.key.clone(),
-                })))
+                }))
             }
             Expr::Contextual(interned) => {
                 let bb = self.block([interned.as_ref()].into_iter());
-                self.create_node(CfNode::detached(CfInstr::Contextual(bb)))
+                CfNode::detached(CfInstr::Contextual(bb))
             }
             Expr::ForLoop(interned) => {
-                let iter = self.expr(&interned.iter);
+                let iter = self.expr_ins(&interned.iter);
                 let iter = self.create_node(CfNode::detached(CfInstr::Iter(iter)));
 
                 let loop_cont = self.create_cont();
@@ -331,15 +318,15 @@ impl CfWorker<'_> {
                     .get_mut(loop_label)
                     .nodes = nodes;
 
-                self.create_node(CfNode::detached(CfInstr::Loop(CfLoop {
+                CfNode::detached(CfInstr::Loop(CfLoop {
                     ty: Ty::Any,
                     cond: iter,
                     body: loop_label,
                     cont: Some(loop_cont),
-                })))
+                }))
             }
             Expr::WhileLoop(interned) => {
-                let cond = self.expr(&interned.cond);
+                let cond = self.expr_ins(&interned.cond);
 
                 let loop_cont = self.create_cont();
                 let loop_label = self.create_block(Vec::new());
@@ -357,37 +344,35 @@ impl CfWorker<'_> {
                     .get_mut(loop_label)
                     .nodes = nodes;
 
-                self.create_node(CfNode::detached(CfInstr::Loop(CfLoop {
+                CfNode::detached(CfInstr::Loop(CfLoop {
                     ty: Ty::Any,
                     cond,
                     body: loop_label,
                     cont: Some(loop_cont),
-                })))
+                }))
             }
-            Expr::Break => self.create_node(CfNode::detached(CfInstr::Break(self.rg.loop_label))),
-            Expr::Continue => {
-                self.create_node(CfNode::detached(CfInstr::Continue(self.rg.loop_label)))
-            }
+            Expr::Break => CfNode::detached(CfInstr::Break(self.rg.loop_label)),
+            Expr::Continue => CfNode::detached(CfInstr::Continue(self.rg.loop_label)),
             Expr::Return(it) => {
-                let expr = it.as_ref().map(|expr| self.expr(expr));
-                self.create_node(CfNode::detached(CfInstr::Return(expr)))
+                let expr = it.as_ref().map(|expr| self.expr_ins(expr));
+                CfNode::detached(CfInstr::Return(expr))
             }
             Expr::Decl(interned) => {
-                let existing = self.decls.get(interned);
+                let existing = self.decls.get(interned).copied();
                 if let Some(existing) = existing {
-                    return *existing;
+                    return self.this_region().nodes.get(existing).clone();
                 }
 
-                self.create_node(CfNode::detached(CfInstr::Undef(interned.clone())))
+                CfNode::detached(CfInstr::Undef(interned.clone()))
             }
             Expr::Ref(interned) => {
                 if let Some(root) = &interned.root {
                     self.expr(root)
                 } else {
-                    self.create_node(CfNode::detached(CfInstr::Undef(interned.decl.clone())))
+                    CfNode::detached(CfInstr::Undef(interned.decl.clone()))
                 }
             }
-            Expr::Ins(ty) => self.create_node(CfNode::detached(CfInstr::Ins(ty.clone()))),
+            Expr::Ins(ty) => CfNode::detached(CfInstr::Ins(ty.clone())),
             Expr::ContentRef(interned) => todo!(),
             Expr::Pattern(interned) => todo!(),
             Expr::Star => todo!(),
@@ -396,19 +381,19 @@ impl CfWorker<'_> {
 
     fn arg(&mut self, arg: &ArgExpr) -> CfArg {
         match arg {
-            ArgExpr::Pos(expr) => CfArg::Pos(self.expr(expr)),
+            ArgExpr::Pos(expr) => CfArg::Pos(self.expr_ins(expr)),
             ArgExpr::Named(pair) => {
-                let expr = self.expr(&pair.1);
+                let expr = self.expr_ins(&pair.1);
                 let name = pair.0.clone();
                 CfArg::Named(name, expr)
             }
             ArgExpr::NamedRt(pair) => {
-                let name = self.expr(&pair.0);
-                let expr = self.expr(&pair.1);
+                let name = self.expr_ins(&pair.0);
+                let expr = self.expr_ins(&pair.1);
                 CfArg::NamedRt(name, expr)
             }
             ArgExpr::Spread(expr) => {
-                let expr = self.expr(expr);
+                let expr = self.expr_ins(expr);
                 CfArg::Spread(expr)
             }
         }

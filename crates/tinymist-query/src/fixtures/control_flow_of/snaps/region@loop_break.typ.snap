@@ -11,13 +11,12 @@ document reg0 {
       %2 = ins int
       %3 = array(, %0, %1, %2)
       %4 = iter %3
-      %10: any = loop cond %4 body ^bb2 cont ^bb1
+      %9: any = loop cond %4 body ^bb2 cont ^bb1
     }
     ^bb1: {
       %8 = break ^bb2
     }
     ^bb2: {
-      %9: any = ^bb3
     }
     ^bb3: {
       %5 = undef value

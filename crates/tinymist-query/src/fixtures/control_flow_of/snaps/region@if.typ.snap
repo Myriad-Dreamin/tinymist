@@ -7,15 +7,13 @@ document reg0 {
   reg0 {
     ^bb0: {
       %0 = ins bool
-      %2: any = ^bb1
-      %4: any = ^bb2
-      %5: any = if %0 then %2 else %4
+      %3: any = if %0 then: any = ^bb1 else: any = ^bb2
     }
     ^bb1: {
       %1 = ins int
     }
     ^bb2: {
-      %3 = ins int
+      %2 = ins int
     }
   }
 }

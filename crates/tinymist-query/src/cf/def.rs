@@ -67,6 +67,7 @@ impl FromIndex for BasicBlock {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CfNode {
     pub span: Span,
     pub instr: CfInstr,
@@ -81,6 +82,7 @@ impl CfNode {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum CfInstr {
     Let(CfLet),
     Assign(CfAssign),
@@ -111,17 +113,20 @@ pub enum CfInstr {
     Return(Option<NodeId>),
 }
 
+#[derive(Debug, Clone)]
 pub struct CfLet {
     pub ty: Ty,
     pub pattern: Interned<Pattern>,
     pub init: Option<NodeId>,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfAssign {
     pub lhs: NodeId,
     pub rhs: NodeId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfBin {
     pub ty: Ty,
     pub op: BinaryOp,
@@ -145,12 +150,14 @@ pub enum BinOp {
     Ge,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfUn {
     pub ty: Ty,
     pub op: UnaryOp,
     pub lhs: NodeId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfSelect {
     pub ty: Ty,
     pub lhs: NodeId,
@@ -162,22 +169,26 @@ pub enum UnOp {
     Not,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfCall {
     pub ty: Ty,
     pub func: NodeId,
     pub args: NodeId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfFunc {
     pub ty: Ty,
     pub body: RegionId,
 }
+#[derive(Debug, Clone)]
 
 pub struct CfArgs {
     pub ty: Ty,
     pub args: Vec<CfArg>,
 }
 
+#[derive(Debug, Clone)]
 pub enum CfArg {
     Pos(NodeId),
     Named(Interned<Decl>, NodeId),
@@ -185,12 +196,14 @@ pub enum CfArg {
     Spread(NodeId),
 }
 
+#[derive(Debug, Clone)]
 pub struct CfIf {
     pub ty: Ty,
     pub cond: NodeId,
-    pub then: NodeId,
-    pub else_: NodeId,
+    pub then: Box<CfNode>,
+    pub else_: Box<CfNode>,
 }
+#[derive(Debug, Clone)]
 
 pub struct CfLoop {
     pub ty: Ty,
@@ -199,22 +212,26 @@ pub struct CfLoop {
     pub cont: Option<BasicBlockId>,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfBlock {
     pub ty: Ty,
     pub body: BasicBlockId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfElement {
     pub elem: Element,
     pub body: BasicBlockId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfShow {
     pub selector: Option<NodeId>,
     pub edit: NodeId,
     pub cont: BasicBlockId,
 }
 
+#[derive(Debug, Clone)]
 pub struct CfSet {
     pub target: NodeId,
     pub args: NodeId,

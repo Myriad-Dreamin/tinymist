@@ -11,18 +11,15 @@ document reg0 {
       %2 = ins int
       %3 = array(, %0, %1, %2)
       %4 = iter %3
-      %16: any = loop cond %4 body ^bb2 cont ^bb1
+      %13: any = loop cond %4 body ^bb2 cont ^bb1
     }
     ^bb1: {
       %8 = undef value
       %9 = ins int
       %10 = %8 Geq %9
-      %12: any = ^bb4
-      %13 = ins none
-      %14: any = if %10 then %12 else %13
+      %12: any = if %10 then: any = ^bb4 else = ins none
     }
     ^bb2: {
-      %15: any = ^bb3
     }
     ^bb3: {
       %5 = undef value

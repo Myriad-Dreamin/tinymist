@@ -12,22 +12,19 @@ document reg0 {
       %3 = ins int
       %4 = array(, %1, %2, %3)
       %5 = iter %4
-      %23: any = loop cond %5 body ^bb2 cont ^bb1
+      %20: any = loop cond %5 body ^bb2 cont ^bb1
     }
     ^bb1: {
       %11 = undef value
       %12 = ins int
       %13 = %11 Geq %12
-      %18: any = ^bb5
-      %19 = ins none
-      %20: any = if %13 then %18 else %19
+      %18: any = if %13 then: any = ^bb5 else = ins none
     }
     ^bb2: {
-      %22: any = ^bb3
     }
     ^bb3: {
       %6 = cov
-      %21: any = ^bb4
+      %19: any = ^bb4
       %7 = cov
     }
     ^bb4: {
@@ -37,8 +34,11 @@ document reg0 {
     }
     ^bb5: {
       %14 = cov
-      %15 = break ^bb2
-      %16 = cov
+      %17: any = ^bb6
+      %15 = cov
+    }
+    ^bb6: {
+      %16 = break ^bb2
     }
   }
 }
