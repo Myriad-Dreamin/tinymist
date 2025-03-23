@@ -66,6 +66,14 @@ pub struct TestArgs {
     #[clap(long)]
     pub watch: bool,
 
+    /// Whether to render the dashboard.
+    #[clap(long)]
+    pub dashboard: bool,
+
+    /// Whether not to render the dashboard.
+    #[clap(long)]
+    pub no_dashboard: bool,
+
     /// Whether to log verbose information.
     #[clap(long)]
     pub verbose: bool,
@@ -129,11 +137,15 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 
     std::fs::create_dir_all(Path::new("target")).context("create target dir")?;
 
-    let out_file = if args.watch {
+    let dashboard = (!args.no_dashboard) && (args.dashboard || args.watch);
+
+    let dashboard_path = "target/dashboard.typ";
+    let out_file = if dashboard {
+        test_info!("Info", "Dashboard is available at {dashboard_path}");
         write_atomic("target/testing-log.typ", include_str!("testing-log.typ"))
             .context("write log template")?;
 
-        let mut out_file = std::fs::File::create("test-watch.typ").context("create log file")?;
+        let mut out_file = std::fs::File::create(dashboard_path).context("create log file")?;
         writeln!(out_file, "{LOG_PRELUDE}").context("write log")?;
         Some(Arc::new(Mutex::new(out_file)))
     } else {
@@ -185,6 +197,9 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
                 test_error!("Fatal:", "{err}");
             }
             log_info!("Tests finished in {:?}", instant.elapsed());
+            if dashboard {
+                log_hint!("Dashboard is available at {dashboard_path}");
+            }
             log_hint!("Press 'h' for help");
 
             config.args.update = false;
