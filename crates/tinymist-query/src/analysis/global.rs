@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 use tinymist_project::LspWorld;
 use tinymist_std::debug_loc::DataSource;
 use tinymist_std::hash::{hash128, FxDashMap};
+use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
@@ -37,7 +38,6 @@ use crate::syntax::{
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
-    VersionedDocument,
 };
 
 use super::TypeEnv;
@@ -195,7 +195,7 @@ pub trait PeriscopeProvider {
     fn periscope_at(
         &self,
         _ctx: &mut LocalContext,
-        _doc: VersionedDocument,
+        _doc: &TypstDocument,
         _pos: Position,
     ) -> Option<String> {
         None
@@ -796,7 +796,7 @@ impl SharedContext {
     pub(crate) fn def_of_span(
         self: &Arc<Self>,
         source: &Source,
-        doc: Option<&VersionedDocument>,
+        doc: Option<&TypstDocument>,
         span: Span,
     ) -> Option<Definition> {
         let syntax = self.classify_span(source, span)?;
@@ -814,7 +814,7 @@ impl SharedContext {
     pub(crate) fn def_of_syntax(
         self: &Arc<Self>,
         source: &Source,
-        doc: Option<&VersionedDocument>,
+        doc: Option<&TypstDocument>,
         syntax: SyntaxClass,
     ) -> Option<Definition> {
         definition(self, source, doc, syntax)

@@ -18,6 +18,7 @@ mod upstream;
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use completion::PostfixSnippet;
+use tinymist_project::LspCompileSnapshot;
 pub use upstream::with_vm;
 
 mod diagnostics;
@@ -82,22 +83,12 @@ pub use lsp_typst_boundary::*;
 
 mod prelude;
 
-use tinymist_std::typst::TypstDocument;
 use typst::syntax::Source;
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
 
 pub use typlite::ColorTheme;
-
-/// A compiled document with an self-incremented logical version.
-#[derive(Debug, Clone)]
-pub struct VersionedDocument {
-    /// The version of the document.
-    pub version: usize,
-    /// The compiled document.
-    pub document: TypstDocument,
-}
 
 /// A request handler with given syntax information.
 pub trait SyntaxRequest {
@@ -121,18 +112,14 @@ pub trait SemanticRequest {
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response>;
 }
 
-/// A request handler with given (semantic) analysis context and a versioned
-/// document.
+/// A request handler with given (semantic) analysis context and a project
+/// snapshot.
 pub trait StatefulRequest {
     /// The response type of the request.
     type Response;
 
     /// Request the information from the given context.
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response>;
+    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response>;
 }
 
 use tinymist_analysis::log_debug_ct;

@@ -41,11 +41,7 @@ pub struct CompletionRequest {
 impl StatefulRequest for CompletionRequest {
     type Response = CompletionList;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
         // These trigger characters are for completion on positional arguments,
         // which follows the configuration item
         // `tinymist.completion.triggerOnSnippetPlaceholders`.
@@ -55,7 +51,7 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
-        let document = doc.as_ref().map(|doc| &doc.document);
+        let document = snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
 

@@ -10,7 +10,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_project::{CompileFontArgs, ExportTarget};
+use tinymist_project::{CompileFontArgs, ExportTarget, LspCompileSnapshot};
 use tinymist_std::debug_loc::LspRange;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::PackageSpec;
@@ -29,9 +29,7 @@ pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::syntax::find_module_level_docs;
-use crate::{
-    analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding, VersionedDocument,
-};
+use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
 use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
@@ -122,13 +120,13 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 pub fn compile_doc_for_test(
     ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
-) -> Option<VersionedDocument> {
+) -> LspCompileSnapshot {
     let prev = ctx.world.entry_state();
-    let next = match properties.get("compile")?.trim() {
-        "true" => prev.clone(),
-        "false" => return None,
-        path if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
-        v => panic!("invalid value for 'compile' property: {v}"),
+    let next = match properties.get("compile").map(|s| s.trim()) {
+        Some("true") => prev.clone(),
+        None | Some("false") => return LspCompileSnapshot::from_world(ctx.world.clone()),
+        Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
+        v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
     let mut world = Cow::Borrowed(&ctx.world);
@@ -138,14 +136,12 @@ pub fn compile_doc_for_test(
             ..Default::default()
         }));
     }
-    let mut world = world.into_owned();
-    world.set_is_compiling(true);
+    let mut snap = LspCompileSnapshot::from_world(world.into_owned());
+    snap.world.set_is_compiling(true);
 
-    let doc = typst::compile(&world).output.unwrap();
-    Some(VersionedDocument {
-        version: 0,
-        document: TypstDocument::Paged(Arc::new(doc)),
-    })
+    let doc = typst::compile(&snap.world).output.unwrap();
+    snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
+    snap
 }
 
 pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {

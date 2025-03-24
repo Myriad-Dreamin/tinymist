@@ -98,13 +98,8 @@ pub struct DocumentMetricsRequest {
 impl StatefulRequest for DocumentMetricsRequest {
     type Response = DocumentMetricsResponse;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
-        let doc = doc?;
-        let doc = doc.document;
+    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
+        let doc = snap.success_doc.as_ref()?;
 
         let mut worker = DocumentMetricsWorker {
             ctx,
@@ -113,7 +108,7 @@ impl StatefulRequest for DocumentMetricsRequest {
             font_info: Default::default(),
         };
 
-        worker.work(&doc)?;
+        worker.work(doc)?;
 
         let font_info = worker.compute()?;
         let span_info = SpanInfo {

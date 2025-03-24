@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::diag::print_diagnostics;
+use reflexo_typst::{diag::print_diagnostics, TypstDocument};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -31,7 +31,7 @@ use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard, PeriscopeProvider},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LocalContext, SemanticRequest,
-    StatefulRequest, VersionedDocument,
+    StatefulRequest,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
@@ -351,7 +351,7 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     fn periscope_at(
         &self,
         ctx: &mut LocalContext,
-        doc: VersionedDocument,
+        doc: &TypstDocument,
         pos: TypstPosition,
     ) -> Option<String> {
         self.0.render_marked(ctx, doc, pos)
@@ -671,10 +671,7 @@ impl LspQuerySnapshot {
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
     ) -> Result<CompilerQueryResponse> {
-        let doc = self.snap.success_doc.as_ref().map(|doc| VersionedDocument {
-            version: self.world.revision().get(),
-            document: doc.clone(),
-        });
+        let doc = self.snap.clone();
         self.run_analysis(|ctx| query.request(ctx, doc))
             .map(wrapper)
     }

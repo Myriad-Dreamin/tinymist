@@ -9,7 +9,7 @@ use core::fmt;
 
 use base64::Engine;
 use reflexo_vec2svg::{ExportFeature, SvgExporter, SvgText};
-use tinymist_query::{FramePosition, LocalContext, VersionedDocument};
+use tinymist_query::{FramePosition, LocalContext};
 use tinymist_std::typst::TypstDocument;
 
 struct PeriscopeExportFeature {}
@@ -74,7 +74,7 @@ impl PeriscopeRenderer {
     pub fn render_marked(
         &self,
         ctx: &mut LocalContext,
-        doc: VersionedDocument,
+        doc: &TypstDocument,
         pos: FramePosition,
     ) -> Option<String> {
         let (svg_payload, w, h) = self.render(ctx, doc, pos)?;
@@ -95,10 +95,10 @@ impl PeriscopeRenderer {
     pub fn render(
         &self,
         _ctx: &mut LocalContext,
-        doc: VersionedDocument,
+        doc: &TypstDocument,
         pos: FramePosition,
     ) -> Option<(String, f32, f32)> {
-        match &doc.document {
+        match doc {
             TypstDocument::Paged(paged_doc) => {
                 // todo: svg viewer compatibility
                 type UsingExporter = SvgExporter<PeriscopeExportFeature>;

@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use tinymist_std::typst::TypstDocument;
 use typst::syntax::Span;
 
 use crate::{
@@ -25,15 +26,12 @@ pub struct ReferencesRequest {
 impl StatefulRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
+        let doc = snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let locations = find_references(ctx, &source, doc.as_ref(), syntax)?;
+        let locations = find_references(ctx, &source, doc, syntax)?;
 
         crate::log_debug_ct!("references: {locations:?}");
         Some(locations)
@@ -43,7 +41,7 @@ impl StatefulRequest for ReferencesRequest {
 pub(crate) fn find_references(
     ctx: &mut LocalContext,
     source: &Source,
-    doc: Option<&VersionedDocument>,
+    doc: Option<&TypstDocument>,
     syntax: SyntaxClass<'_>,
 ) -> Option<Vec<LspLocation>> {
     let finding_label = match syntax {
