@@ -227,6 +227,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
+      isNotPrimary: state.isNotPrimary,
     });
   }
 }
