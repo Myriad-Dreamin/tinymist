@@ -191,11 +191,11 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         return doc.uri.toString() === uri.toString();
       }) || (await vscode.workspace.openTextDocument(uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-
+  
     const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
-
+  
     await launchImpl({
       kind,
       context,
@@ -206,7 +206,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       isDev,
     });
   }
-
+  
   /**
    * Ejects the preview panel to the external browser.
    */
@@ -217,10 +217,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       return;
     }
     const { panel, state } = focusingContext;
-
+  
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
-
+  
     await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
@@ -273,7 +273,7 @@ interface OpenPreviewInWebViewArgs {
   /**
    * Additional cleanup routine when the webview panel is disposed.
    */
-  panelDispose: () => void;
+  panelDispose: () => Promise<void>;
 }
 
 /**
@@ -332,7 +332,7 @@ export async function openPreviewInWebView({
     if (extensionState.getFocusingPreviewPanelContext()?.panel === panel) {
       extensionState.mut.focusingPreviewPanelContext = undefined;
     }
-    panelDispose();
+    await panelDispose();
     console.log("killed preview services");
   });
 
@@ -430,9 +430,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         activeEditor: editor,
         dataPlanePort,
         webviewPanel,
-        panelDispose() {
+        async panelDispose() {
           disposes.dispose();
-          tinymist.killPreview(taskId);
+          await tinymist.killPreview(taskId);
         },
       });
       break;
