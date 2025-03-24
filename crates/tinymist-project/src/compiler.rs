@@ -500,7 +500,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             snapshot: None,
             handler,
             compilation: OnceLock::default(),
-            latest_doc: None,
             latest_success_doc: None,
             deps: Default::default(),
             committed_revision: 0,
@@ -636,7 +635,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     }
 
                     // Reset the watch state and document state.
-                    proj.latest_doc = None;
                     proj.latest_success_doc = None;
                 }
 
@@ -805,8 +803,6 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
-    /// The latest compiled document.
-    pub(crate) latest_doc: Option<TypstDocument>,
     /// The latest successly compiled document.
     latest_success_doc: Option<TypstDocument>,
 
@@ -923,9 +919,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         // Update state.
         let doc = artifact.doc.ok();
         self.committed_revision = compiled_revision;
-        self.latest_doc.clone_from(&doc);
         if doc.is_some() {
-            self.latest_success_doc.clone_from(&self.latest_doc);
+            self.latest_success_doc = doc;
         }
 
         // Notify the new file dependencies.
