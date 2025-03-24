@@ -27,8 +27,8 @@ pub struct HoverRequest {
 impl StatefulRequest for HoverRequest {
     type Response = Hover;
 
-    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
-        let doc = snap.success_doc.clone();
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.clone();
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
@@ -396,7 +396,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let snap = LspCompileSnapshot::from_world(ctx.world.clone());
+            let snap = WorldComputeGraph::from_world(ctx.world.clone());
             let result = request.request(ctx, snap);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });

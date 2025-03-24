@@ -34,8 +34,8 @@ pub struct PrepareRenameRequest {
 impl StatefulRequest for PrepareRenameRequest {
     type Response = PrepareRenameResponse;
 
-    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
-        let doc = snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
@@ -140,7 +140,7 @@ mod tests {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
-            let snap = LspCompileSnapshot::from_world(ctx.world.clone());
+            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
             let result = request.request(ctx, snap);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));

@@ -4,11 +4,11 @@ use std::{borrow::Cow, sync::Arc};
 use tinymist_std::error::prelude::*;
 use tinymist_std::{bail, ImmutPath};
 use tinymist_task::ExportTarget;
-use tinymist_world::args::*;
 use tinymist_world::config::CompileFontOpts;
 use tinymist_world::font::system::SystemFontSearcher;
 use tinymist_world::package::{http::HttpRegistry, RegistryPathMapper};
 use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
+use tinymist_world::{args::*, WorldComputeGraph};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
 };
@@ -42,6 +42,8 @@ pub type LspWorld = CompilerWorld<LspCompilerFeat>;
 pub type LspCompileSnapshot = CompileSnapshot<LspCompilerFeat>;
 /// LSP compiled artifact.
 pub type LspCompiledArtifact = CompiledArtifact<LspCompilerFeat>;
+/// LSP compiled artifact.
+pub type LspComputeGraph = Arc<WorldComputeGraph<LspCompilerFeat>>;
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;
 /// Immutable prehashed reference to dictionary.

@@ -36,13 +36,13 @@ pub struct RenameRequest {
 impl StatefulRequest for RenameRequest {
     type Response = WorkspaceEdit;
 
-    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
-        let doc = &snap.success_doc;
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
 
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax.clone())?;
+        let def = ctx.def_of_syntax(&source, doc, syntax.clone())?;
 
         prepare_renaming(ctx, &syntax, &def)?;
 
@@ -93,7 +93,7 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, &source, doc.as_ref(), syntax)?;
+                let references = find_references(ctx, &source, doc, syntax)?;
 
                 let mut edits = HashMap::new();
 
@@ -327,7 +327,7 @@ mod tests {
                 position: find_test_position(&source),
                 new_name: "new_name".to_string(),
             };
-            let snap = LspCompileSnapshot::from_world(ctx.world.clone());
+            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
             let mut result = request.request(ctx, snap);
             // sort the edits to make the snapshot stable

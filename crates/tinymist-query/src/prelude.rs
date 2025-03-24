@@ -17,7 +17,7 @@ pub use lsp_types::{
     SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
 pub use serde_json::Value as JsonValue;
-pub use tinymist_project::LspCompileSnapshot;
+pub use tinymist_project::LspComputeGraph;
 pub use tinymist_std::DefId;
 pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;

@@ -15,7 +15,7 @@ pub struct WillRenameFilesRequest {
 impl StatefulRequest for WillRenameFilesRequest {
     type Response = WorkspaceEdit;
 
-    fn request(self, ctx: &mut LocalContext, _snap: LspCompileSnapshot) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, _graph: LspComputeGraph) -> Option<Self::Response> {
         let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
         self.paths

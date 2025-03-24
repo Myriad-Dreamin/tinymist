@@ -26,8 +26,8 @@ pub struct ReferencesRequest {
 impl StatefulRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
-    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
-        let doc = snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 

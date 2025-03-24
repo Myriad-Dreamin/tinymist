@@ -98,8 +98,8 @@ pub struct DocumentMetricsRequest {
 impl StatefulRequest for DocumentMetricsRequest {
     type Response = DocumentMetricsResponse;
 
-    fn request(self, ctx: &mut LocalContext, snap: LspCompileSnapshot) -> Option<Self::Response> {
-        let doc = snap.success_doc.as_ref()?;
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref()?;
 
         let mut worker = DocumentMetricsWorker {
             ctx,
