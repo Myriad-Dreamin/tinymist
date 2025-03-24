@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { PreviewPanelContext } from "./features/preview";
 
 export type ExtensionContext = vscode.ExtensionContext;
 
@@ -25,9 +26,11 @@ interface ExtensionState {
   mut: {
     focusingFile: string | undefined;
     focusingDoc: vscode.TextDocument | undefined;
+    focusingPreviewPanelContext: PreviewPanelContext | undefined;
   };
   getFocusingFile(): string | undefined;
   getFocusingDoc(): vscode.TextDocument | undefined;
+  getFocusingPreviewPanelContext(): PreviewPanelContext | undefined;
 }
 
 export const extensionState: ExtensionState = {
@@ -53,11 +56,15 @@ export const extensionState: ExtensionState = {
   mut: {
     focusingFile: undefined,
     focusingDoc: undefined,
+    focusingPreviewPanelContext: undefined,
   },
   getFocusingFile() {
     return extensionState.mut.focusingFile;
   },
   getFocusingDoc() {
     return extensionState.mut.focusingDoc;
+  },
+  getFocusingPreviewPanelContext() {
+    return extensionState.mut.focusingPreviewPanelContext;
   },
 };

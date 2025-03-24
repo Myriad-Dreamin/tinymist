@@ -27,6 +27,7 @@ import {
 } from "../lsp";
 import { l10nMsg } from "../l10n";
 import { IContext } from "../context";
+import { extensionState } from "../state";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
@@ -34,12 +35,12 @@ import { IContext } from "../context";
 let launchImpl: typeof launchPreviewLsp;
 
 /**
- * The task corresponding to the active preview panel.
+ * The state corresponding to the focusing preview panel.
  */
-let activePreviewPanelContext: {
+export interface PreviewPanelContext {
   panel: vscode.WebviewPanel;
   state: PersistPreviewState;
-} | undefined;
+}
 
 /**
  * Preload the preview resources to reduce the latency of the first preview.
@@ -210,11 +211,12 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
    * Ejects the preview panel to the external browser.
    */
   async function ejectPreviewPanelLsp() {
-    if (!activePreviewPanelContext) {
+    const focusingContext = extensionState.getFocusingPreviewPanelContext();
+    if (!focusingContext) {
       vscode.window.showWarningMessage("No active preview panel");
       return;
     }
-    const { panel, state } = activePreviewPanelContext;
+    const { panel, state } = focusingContext;
 
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
@@ -314,7 +316,7 @@ export async function openPreviewInWebView({
 
   const updateActivePanel =() => {
     if (panel.active) {
-      activePreviewPanelContext = {
+      extensionState.mut.focusingPreviewPanelContext = {
         panel,
         state: previewState,
       };
@@ -327,8 +329,8 @@ export async function openPreviewInWebView({
 
   // todo: bind Document.onDidDispose, but we did not find a similar way.
   panel.onDidDispose(async () => {
-    if (activePreviewPanelContext?.panel === panel) {
-      activePreviewPanelContext = undefined;
+    if (extensionState.getFocusingPreviewPanelContext()?.panel === panel) {
+      extensionState.mut.focusingPreviewPanelContext = undefined;
     }
     panelDispose();
     console.log("killed preview services");
