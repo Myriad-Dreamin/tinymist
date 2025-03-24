@@ -153,7 +153,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   interface LaunchOpts {
     isBrowsing?: boolean;
     isDev?: boolean;
-    // isDev = false
+    isNotPrimary?: boolean;
   }
 
   /**
@@ -179,6 +179,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         mode,
         isBrowsing: opts?.isBrowsing || false,
         isDev: opts?.isDev || false,
+        isNotPrimary: opts?.isNotPrimary || false,
       }).catch((e) => {
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
@@ -195,6 +196,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
+    const isNotPrimary = opts?.isNotPrimary;
   
     await launchImpl({
       kind,
@@ -204,6 +206,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       mode,
       isBrowsing,
       isDev,
+      isNotPrimary,
     });
   }
   
