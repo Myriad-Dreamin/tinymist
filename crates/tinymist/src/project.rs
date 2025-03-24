@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::{diag::print_diagnostics, TypstDocument};
+use reflexo_typst::{diag::print_diagnostics, TypstDocument, WorldComputeGraph};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -671,8 +671,8 @@ impl LspQuerySnapshot {
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
     ) -> Result<CompilerQueryResponse> {
-        let doc = self.snap.clone();
-        self.run_analysis(|ctx| query.request(ctx, doc))
+        let graph = WorldComputeGraph::new(self.snap.clone());
+        self.run_analysis(|ctx| query.request(ctx, graph))
             .map(wrapper)
     }
 
