@@ -23,6 +23,24 @@ pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
     Some(worker.info)
 }
 
+/// Link information in a source file.
+#[derive(Debug, Default)]
+pub struct LinkInfo {
+    /// The link objects in a source file.
+    pub objects: Vec<LinkObject>,
+}
+
+/// A link object in a source file.
+#[derive(Debug)]
+pub struct LinkObject {
+    /// The range of the link expression.
+    pub range: Range<usize>,
+    /// The span of the link expression.
+    pub span: Span,
+    /// The target of the link.
+    pub target: LinkTarget,
+}
+
 /// A valid link target.
 #[derive(Debug)]
 pub enum LinkTarget {
@@ -46,24 +64,6 @@ impl LinkTarget {
             }
         }
     }
-}
-
-/// A link object in a source file.
-#[derive(Debug)]
-pub struct LinkObject {
-    /// The range of the link expression.
-    pub range: Range<usize>,
-    /// The span of the link expression.
-    pub span: Span,
-    /// The target of the link.
-    pub target: LinkTarget,
-}
-
-/// Link information in a source file.
-#[derive(Debug, Default)]
-pub struct LinkInfo {
-    /// The link objects in a source file.
-    pub objects: Vec<LinkObject>,
 }
 
 struct LinkStrWorker {
