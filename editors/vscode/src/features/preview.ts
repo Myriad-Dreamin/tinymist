@@ -197,7 +197,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     const isDev = opts?.isDev;
 
     await launchImpl({
-      kind: "browser",
+      kind,
       context,
       editor,
       bindDocument,
