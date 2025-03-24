@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/rename.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/rename/module_path_star.typ
-snapshot_kind: text
 ---
 {
  "documentChanges": [
@@ -20,7 +19,7 @@ snapshot_kind: text
   },
   {
    "kind": "rename",
-   "newUri": "new_name.typ",
+   "newUri": "variable.typ/../new_name.typ",
    "oldUri": "variable.typ"
   }
  ]

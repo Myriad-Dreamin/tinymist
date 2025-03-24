@@ -12,6 +12,7 @@ use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::{CompileFontArgs, ExportTarget};
 use tinymist_std::debug_loc::LspRange;
+use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
@@ -150,9 +151,9 @@ pub fn compile_doc_for_test(
 
 pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {
     let root = if cfg!(windows) {
-        PathBuf::from("C:\\")
+        PathBuf::from("C:\\root")
     } else {
-        PathBuf::from("/")
+        PathBuf::from("/root")
     };
     let mut verse = LspUniverseBuilder::build(
         EntryState::new_rooted(root.as_path().into(), None),
@@ -186,6 +187,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         };
 
         let path = path.unwrap_or_else(|| format!("/s{idx}.typ"));
+        let path = path.strip_prefix("/").unwrap_or(path.as_str());
 
         let pw = root.join(Path::new(&path));
         verse
@@ -420,12 +422,12 @@ impl Redact for RedactFields {
                             map.insert(
                                 key.to_owned(),
                                 Value::Object(
-                                    obj.iter().map(|(k, v)| (file_name(k), v.clone())).collect(),
+                                    obj.iter().map(|(k, v)| (file_path(k), v.clone())).collect(),
                                 ),
                             );
                         }
                         "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
-                            map.insert(key.to_owned(), file_name(t.as_str().unwrap()).into());
+                            map.insert(key.to_owned(), file_path(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -462,9 +464,16 @@ impl Redact for RedactFields {
     }
 }
 
-fn file_name(path: &str) -> String {
-    let name = Path::new(path).file_name().unwrap();
-    name.to_str().unwrap().to_owned()
+pub(crate) fn file_path(uri: &str) -> String {
+    let root = if cfg!(windows) {
+        PathBuf::from("C:\\root")
+    } else {
+        PathBuf::from("/root")
+    };
+    let uri = uri.replace("file://", "");
+    let abs_path = Path::new(&uri).strip_prefix(root).map(|s| s.as_os_str());
+    let rel_path = abs_path.unwrap_or_else(|_| Path::new(&uri).file_name().unwrap());
+    unix_slash(Path::new(rel_path.to_str().unwrap()))
 }
 
 pub struct HashRepr<T>(pub T);

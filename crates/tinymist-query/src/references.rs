@@ -169,11 +169,9 @@ impl ReferencesWorker<'_> {
 
 #[cfg(test)]
 mod tests {
-    use tinymist_std::path::unix_slash;
-
     use super::*;
     use crate::syntax::find_module_level_docs;
-    use crate::{tests::*, url_to_path};
+    use crate::tests::*;
 
     #[test]
     fn test() {
@@ -193,8 +191,7 @@ mod tests {
             let mut result = result.map(|v| {
                 v.into_iter()
                     .map(|loc| {
-                        let fp = unix_slash(&url_to_path(loc.uri));
-                        let fp = fp.strip_prefix("C:").unwrap_or(&fp);
+                        let fp = file_path(loc.uri.as_str());
                         format!(
                             "{fp}@{}:{}:{}:{}",
                             loc.range.start.line,

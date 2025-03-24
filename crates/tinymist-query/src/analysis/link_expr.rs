@@ -24,6 +24,7 @@ pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
 }
 
 /// A valid link target.
+#[derive(Debug)]
 pub enum LinkTarget {
     /// A package specification.
     Package(Box<PackageSpec>),
@@ -40,7 +41,7 @@ impl LinkTarget {
             LinkTarget::Url(url) => Some(url.as_ref().clone()),
             LinkTarget::Path(id, path) => {
                 // Avoid creating new ids here.
-                let root = ctx.path_for_id(id.join("/")).ok()?;
+                let root = ctx.path_for_id(id.join("")).ok()?;
                 crate::path_res_to_url(root.join(path).ok()?).ok()
             }
         }
@@ -48,6 +49,7 @@ impl LinkTarget {
 }
 
 /// A link object in a source file.
+#[derive(Debug)]
 pub struct LinkObject {
     /// The range of the link expression.
     pub range: Range<usize>,
@@ -58,7 +60,7 @@ pub struct LinkObject {
 }
 
 /// Link information in a source file.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct LinkInfo {
     /// The link objects in a source file.
     pub objects: Vec<LinkObject>,
