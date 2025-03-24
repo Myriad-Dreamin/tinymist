@@ -1205,6 +1205,12 @@
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
+        "command": "typst-preview.eject",
+        "title": "%extension.tinymist.command.typst-preview.eject%",
+        "description": "Eject the preview panel to browser to get better performance",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "typst-preview.sync",
         "title": "%extension.tinymist.command.typst-preview.sync%",
         "description": "Scroll preview to current cursor position",
@@ -1255,6 +1261,10 @@
         {
           "command": "tinymist.restartServer",
           "when": "ext.tinymistActivated"
+        },
+        {
+          "command": "typst-preview.eject",
+          "when": "activeWebviewPanelId == 'typst-preview'"
         }
       ],
       "editor/title": [
@@ -1266,6 +1276,11 @@
         {
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst",
+          "group": "navigation"
+        },
+        {
+          "command": "typst-preview.eject",
+          "when": "activeWebviewPanelId == 'typst-preview'",
           "group": "navigation"
         }
       ],
