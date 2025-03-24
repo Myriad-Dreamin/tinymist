@@ -66,8 +66,8 @@ impl ExportTask {
         artifact: &LspCompiledArtifact,
         config: &Arc<ExportUserConfig>,
     ) -> Option<()> {
-        let doc = artifact.doc.as_ref().ok()?;
-        let s = artifact.signal;
+        let doc = artifact.doc.as_ref()?;
+        let s = artifact.snap.signal;
 
         let when = config.task.when().unwrap_or_default();
         let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
@@ -82,7 +82,7 @@ impl ExportTask {
             return None;
         }
 
-        let rev = artifact.world.revision().get();
+        let rev = artifact.world().revision().get();
         let fut = self.export_folder.spawn(rev, || {
             let task = config.task.clone();
             let artifact = artifact.clone();
@@ -107,12 +107,12 @@ impl ExportTask {
         }
 
         let editor_tx = self.editor_tx.clone()?;
-        let rev = artifact.world.revision().get();
+        let rev = artifact.world().revision().get();
         let fut = self.count_word_folder.spawn(rev, || {
             let artifact = artifact.clone();
             Box::pin(async move {
-                let id = artifact.snap.id;
-                let doc = artifact.doc.ok()?;
+                let id = artifact.id().clone();
+                let doc = artifact.doc?;
                 let wc =
                     log_err(FutureFolder::compute(move |_| word_count::word_count(&doc)).await);
                 log::debug!("WordCount({id:?}:{rev}): {wc:?}");
@@ -138,10 +138,10 @@ impl ExportTask {
         use reflexo_vec2svg::DefaultExportFeature;
         use ProjectTask::*;
 
-        let CompiledArtifact { snap, doc, .. } = artifact;
+        let CompiledArtifact { graph, doc, .. } = artifact;
 
         // Prepare the output path.
-        let entry = snap.world.entry_state();
+        let entry = graph.snap.world.entry_state();
         let config = task.as_export().unwrap();
         let output = config.output.clone().unwrap_or_default();
         let Some(to) = output.substitute(&entry) else {
@@ -168,7 +168,7 @@ impl ExportTask {
         let _: Option<()> = lock_dir.and_then(|lock_dir| {
             let mut updater = crate::project::update_lock(lock_dir);
 
-            let doc_id = updater.compiled(&snap.world)?;
+            let doc_id = updater.compiled(graph.world())?;
 
             updater.task(ApplyProjectTask {
                 id: doc_id.clone(),
@@ -181,7 +181,7 @@ impl ExportTask {
         });
 
         // Prepare the document.
-        let doc = doc.ok().context("cannot export with compilation errors")?;
+        let doc = doc.context("cannot export with compilation errors")?;
 
         // Prepare data.
         let kind2 = task.clone();
@@ -196,7 +196,7 @@ impl ExportTask {
                     .get_or_init(|| -> Result<_> {
                         Ok(match &doc {
                             TypstDocument::Html(html_doc) => html_doc.clone(),
-                            TypstDocument::Paged(_) => extra_compile_for_export(&snap.world)?,
+                            TypstDocument::Paged(_) => extra_compile_for_export(graph.world())?,
                         })
                     })
                     .as_ref()
@@ -208,7 +208,7 @@ impl ExportTask {
                     .get_or_init(|| -> Result<_> {
                         Ok(match &doc {
                             TypstDocument::Paged(paged_doc) => paged_doc.clone(),
-                            TypstDocument::Html(_) => extra_compile_for_export(&snap.world)?,
+                            TypstDocument::Html(_) => extra_compile_for_export(graph.world())?,
                         })
                     })
                     .as_ref()
@@ -252,7 +252,7 @@ impl ExportTask {
                     one,
                 }) => {
                     let pretty = false;
-                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
+                    let elements = reflexo_typst::query::retrieve(&graph.world(), &selector, doc)
                         .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
@@ -287,7 +287,7 @@ impl ExportTask {
                     TextExport::run_on_doc(doc)?.into_bytes()
                 }
                 ExportMd(ExportMarkdownTask { export: _ }) => {
-                    let conv = Typlite::new(Arc::new(snap.world))
+                    let conv = Typlite::new(Arc::new(graph.world().clone()))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 

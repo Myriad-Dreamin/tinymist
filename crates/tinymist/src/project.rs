@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::{diag::print_diagnostics, TypstDocument, WorldComputeGraph};
+use reflexo_typst::{diag::print_diagnostics, TypstDocument};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -57,7 +57,7 @@ impl ServerState {
     }
 
     /// Snapshots the project for tasks
-    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+    pub fn snapshot(&mut self) -> Result<LspComputeGraph> {
         self.project.snapshot()
     }
 
@@ -240,7 +240,7 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
         compilation: &LspCompiledArtifact,
     ) {
-        let rev = compilation.world.revision().get();
+        let rev = compilation.world().revision().get();
         if self.notified_revision >= rev {
             return;
         }
@@ -262,7 +262,7 @@ impl ProjectInsStateExt {
             return false;
         };
 
-        let last_rev = last_compilation.world.revision();
+        let last_rev = last_compilation.world().revision();
         if last_rev != *revision {
             return false;
         }
@@ -272,8 +272,7 @@ impl ProjectInsStateExt {
             return false;
         }
         self.emitted_reasons.see(self.pending_reasons);
-        let mut last_compilation = last_compilation.clone();
-        last_compilation.snap.signal = pending_reasons.into();
+        let last_compilation = last_compilation.clone().with_signal(pending_reasons.into());
 
         handler.notify_compile(&last_compilation);
         self.pending_reasons = CompileReasons::default();
@@ -297,7 +296,7 @@ impl ProjectState {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+    pub fn snapshot(&mut self) -> Result<LspComputeGraph> {
         Ok(self.compiler.snapshot())
     }
 
@@ -316,7 +315,7 @@ impl ProjectState {
 
     pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
         if let Interrupt::Compiled(compiled) = &intr {
-            let proj = compiler.projects().find(|p| p.id == compiled.id);
+            let proj = compiler.projects().find(|p| &p.id == compiled.id());
             if let Some(proj) = proj {
                 proj.ext
                     .compiled(&proj.verse.revision, proj.handler.as_ref(), compiled);
@@ -440,9 +439,9 @@ impl CompileHandlerImpl {
     }
 
     fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
-        let world = &snap.world;
+        let world = snap.world();
         let dv = ProjVersion {
-            id: snap.id.clone(),
+            id: snap.id().clone(),
             revision: world.revision().get(),
         };
 
@@ -450,11 +449,9 @@ impl CompileHandlerImpl {
         // todo: check all errors in this file
         let valid = !world.entry_state().is_inactive();
         let diagnostics = valid.then(|| {
-            let errors = snap.doc.as_ref().err().into_iter().flatten();
-            let warnings = snap.warnings.as_ref();
             let diagnostics = tinymist_query::convert_diagnostics(
                 world,
-                errors.chain(warnings),
+                snap.diagnostics(),
                 self.analysis.position_encoding,
             );
 
@@ -491,7 +488,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                         break 'vfs_is_clean false;
                     };
 
-                    let last_rev = compilation.world.vfs().revision();
+                    let last_rev = compilation.world().vfs().revision();
                     let deps = compilation.depended_files().clone();
                     s.verse.vfs().is_clean_compile(last_rev.get(), &deps)
                 }
@@ -601,29 +598,23 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     fn notify_compile(&self, snap: &LspCompiledArtifact) {
         {
             let mut n_revs = self.notified_revision.lock();
-            let n_rev = n_revs.entry(snap.id.clone()).or_default();
-            if *n_rev >= snap.world.revision().get() {
+            let n_rev = n_revs.entry(snap.id().clone()).or_default();
+            if *n_rev >= snap.world().revision().get() {
                 log::info!(
                     "Project: already notified for revision {} <= {n_rev}",
-                    snap.world.revision(),
+                    snap.world().revision(),
                 );
                 return;
             }
-            *n_rev = snap.world.revision().get();
+            *n_rev = snap.world().revision().get();
         }
 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
         if self.is_standalone {
             print_diagnostics(
-                &snap.world,
-                snap.doc
-                    .as_ref()
-                    .err()
-                    .cloned()
-                    .iter()
-                    .flatten()
-                    .chain(snap.warnings.iter()),
+                snap.world(),
+                snap.diagnostics(),
                 reflexo_typst::DiagnosticFormat::Human,
             )
             .log_error("failed to print diagnostics");
@@ -635,11 +626,11 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         self.export.signal(snap);
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview.get(&snap.id) {
+        if let Some(inner) = self.preview.get(snap.id()) {
             let snap = snap.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
         } else {
-            log::info!("Project: no preview for {:?}", snap.id);
+            log::info!("Project: no preview for {:?}", snap.id());
         }
     }
 }
@@ -647,13 +638,13 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
 
 pub struct LspQuerySnapshot {
-    pub snap: LspCompileSnapshot,
+    pub snap: LspComputeGraph,
     analysis: Arc<Analysis>,
     rev_lock: AnalysisRevLock,
 }
 
 impl std::ops::Deref for LspQuerySnapshot {
-    type Target = LspCompileSnapshot;
+    type Target = LspComputeGraph;
 
     fn deref(&self) -> &Self::Target {
         &self.snap
@@ -671,7 +662,7 @@ impl LspQuerySnapshot {
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
     ) -> Result<CompilerQueryResponse> {
-        let graph = WorldComputeGraph::new(self.snap.clone());
+        let graph = self.snap.clone();
         self.run_analysis(|ctx| query.request(ctx, graph))
             .map(wrapper)
     }
@@ -685,7 +676,7 @@ impl LspQuerySnapshot {
     }
 
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world;
+        let world = self.snap.world().clone();
         let Some(..) = world.main_id() else {
             log::error!("Project: main file is not set");
             bail!("main file is not set");

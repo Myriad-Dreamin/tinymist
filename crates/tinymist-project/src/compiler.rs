@@ -1,7 +1,6 @@
 //! Project compiler for tinymist.
 
 use core::fmt;
-use std::any::TypeId;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -15,56 +14,59 @@ use tinymist_world::vfs::notify::{
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
-    CompileSnapshot, CompilerFeat, CompilerUniverse, EntryReader, EntryState, ExportSignal,
-    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
+    CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader, EntryState,
+    ExportSignal, FlagTask, ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
-use typst::diag::{SourceDiagnostic, SourceResult, Warned};
 
 /// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
-    /// The used snapshot.
-    pub snap: CompileSnapshot<F>,
+    /// The used compute graph.
+    pub graph: Arc<WorldComputeGraph<F>>,
     /// The diagnostics of the document.
-    pub warnings: EcoVec<SourceDiagnostic>,
+    pub diag: Arc<DiagnosticsTask>,
     /// The compiled document.
-    pub doc: SourceResult<TypstDocument>,
+    pub doc: Option<TypstDocument>,
     /// The depended files.
     pub deps: OnceLock<EcoVec<FileId>>,
 }
 
 impl<F: CompilerFeat> fmt::Display for CompiledArtifact<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rev = self.world.revision();
-        write!(f, "CompiledArtifact({:?}, rev={rev:?})", self.id)
+        let rev = self.graph.snap.world.revision();
+        write!(f, "CompiledArtifact({:?}, rev={rev:?})", self.graph.snap.id)
     }
 }
 
 impl<F: CompilerFeat> std::ops::Deref for CompiledArtifact<F> {
-    type Target = CompileSnapshot<F>;
+    type Target = Arc<WorldComputeGraph<F>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.snap
+        &self.graph
     }
 }
 
 impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
     fn clone(&self) -> Self {
         Self {
-            snap: self.snap.clone(),
+            graph: self.graph.clone(),
             doc: self.doc.clone(),
-            warnings: self.warnings.clone(),
+            diag: self.diag.clone(),
             deps: self.deps.clone(),
         }
     }
 }
 
 impl<F: CompilerFeat> CompiledArtifact<F> {
+    /// Returns the project id.
+    pub fn id(&self) -> &ProjectInsId {
+        &self.graph.snap.id
+    }
+
     /// Returns the last successfully compiled document.
     pub fn success_doc(&self) -> Option<TypstDocument> {
         self.doc
             .as_ref()
-            .ok()
             .cloned()
             .or_else(|| self.snap.success_doc.clone())
     }
@@ -73,7 +75,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     pub fn depended_files(&self) -> &EcoVec<FileId> {
         self.deps.get_or_init(|| {
             let mut deps = EcoVec::default();
-            self.world.iter_dependencies(&mut |f| {
+            self.graph.snap.world.iter_dependencies(&mut |f| {
                 deps.push(f);
             });
 
@@ -82,108 +84,52 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Runs the compiler and returns the compiled document.
-    pub fn from_snapshot(snap: CompileSnapshot<F>) -> CompiledArtifact<F> {
-        let is_html = snap.world.library.features.is_enabled(typst::Feature::Html);
+    pub fn from_graph(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
+        let is_html = graph.library().features.is_enabled(typst::Feature::Html);
 
-        if is_html {
-            Self::from_snapshot_inner::<TypstHtmlDocument>(snap)
+        let _ = graph.provide::<FlagTask<TypstHtmlDocument>>(Ok(FlagTask::flag(is_html)));
+        let _ = graph.provide::<FlagTask<TypstPagedDocument>>(Ok(FlagTask::flag(!is_html)));
+        let doc = if is_html {
+            graph.shared_compile_html().expect("html").map(From::from)
         } else {
-            Self::from_snapshot_inner::<TypstPagedDocument>(snap)
-        }
-    }
-
-    /// Runs the compiler and returns the compiled document.
-    fn from_snapshot_inner<D>(mut snap: CompileSnapshot<F>) -> CompiledArtifact<F>
-    where
-        D: typst::Document + 'static,
-        Arc<D>: Into<TypstDocument>,
-    {
-        snap.world.set_is_compiling(true);
-        let res = ::typst::compile::<D>(&snap.world);
-        snap.world.set_is_compiling(false);
-
-        Self::from_snapshot_result(
-            snap,
-            Warned {
-                output: res.output.map(Arc::new),
-                warnings: res.warnings,
-            },
-        )
-    }
-
-    /// Runs the compiler and returns the compiled document.
-    pub fn from_snapshot_result<D>(
-        snap: CompileSnapshot<F>,
-        res: Warned<SourceResult<Arc<D>>>,
-    ) -> CompiledArtifact<F>
-    where
-        D: typst::Document + 'static,
-        Arc<D>: Into<TypstDocument>,
-    {
-        let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
-
-        let warned = match res.output {
-            Ok(doc) => Ok(Warned {
-                output: doc,
-                warnings: res.warnings,
-            }),
-            Err(diags) => match (res.warnings.is_empty(), diags.is_empty()) {
-                (true, true) => Err(diags),
-                (true, false) => Err(diags),
-                (false, true) => Err(res.warnings),
-                (false, false) => {
-                    let mut warnings = res.warnings;
-                    warnings.extend(diags);
-                    Err(warnings)
-                }
-            },
-        };
-        let (doc, warnings) = match warned {
-            Ok(doc) => (Ok(doc.output.into()), doc.warnings),
-            Err(err) => (Err(err), EcoVec::default()),
-        };
-
-        let exclude_html_warnings = if !is_html_compilation {
-            warnings
-        } else if warnings.len() == 1
-            && warnings[0]
-                .message
-                .starts_with("html export is under active development")
-        {
-            EcoVec::new()
-        } else {
-            warnings
+            graph.shared_compile().expect("paged").map(From::from)
         };
 
         CompiledArtifact {
-            snap,
+            diag: graph.shared_diagnostics().expect("diag"),
+            graph,
             doc,
-            warnings: exclude_html_warnings,
             deps: OnceLock::default(),
         }
     }
 
-    /// Returns error diagnostics.
-    pub fn errors(&self) -> Option<&EcoVec<SourceDiagnostic>> {
-        self.doc.as_ref().err()
+    /// Returns the error count.
+    pub fn error_cnt(&self) -> usize {
+        self.diag.error_cnt()
     }
 
-    /// Returns warning diagnostics.
-    pub fn warnings(&self) -> &EcoVec<SourceDiagnostic> {
-        &self.warnings
+    /// Returns the warning count.
+    pub fn warning_cnt(&self) -> usize {
+        self.diag.warning_cnt()
+    }
+
+    /// Returns the diagnostics.
+    pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
+        self.diag.diagnostics()
     }
 
     /// Returns whether there are any errors.
     pub fn has_errors(&self) -> bool {
-        self.errors().is_some_and(|e| !e.is_empty())
+        self.error_cnt() > 0
     }
 
-    /// Returns whether there are any warnings.
-    pub fn diagnostics(&self) -> impl Iterator<Item = &SourceDiagnostic> {
-        self.errors()
-            .into_iter()
-            .flatten()
-            .chain(self.warnings.iter())
+    /// Sets the signal.
+    pub fn with_signal(mut self, signal: ExportSignal) -> Self {
+        let mut snap = self.snap.clone();
+        snap.signal = signal;
+
+        self.graph = self.graph.snapshot_unsafe(snap);
+        self
     }
 }
 
@@ -315,7 +261,7 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
         match self {
             Interrupt::Compile(id) => write!(f, "Compile({id:?})"),
             Interrupt::Settle(id) => write!(f, "Settle({id:?})"),
-            Interrupt::Compiled(artifact) => write!(f, "Compiled({:?})", artifact.id),
+            Interrupt::Compiled(artifact) => write!(f, "Compiled({:?})", artifact.id()),
             Interrupt::ChangeTask(id, change) => {
                 write!(f, "ChangeTask({id:?}, entry={:?})", change.entry.is_some())
             }
@@ -472,7 +418,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     /// Creates a snapshot of the primary project.
-    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+    pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
         self.primary.snapshot()
     }
 
@@ -590,7 +536,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 proj.reason.see(reason_by_entry_change());
             }
             Interrupt::Compiled(artifact) => {
-                let proj = Self::find_project(&mut self.primary, &mut self.dedicates, &artifact.id);
+                let proj =
+                    Self::find_project(&mut self.primary, &mut self.dedicates, artifact.id());
 
                 let processed = proj.process_compile(artifact);
 
@@ -794,8 +741,8 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub verse: CompilerUniverse<F>,
     /// The reason to compile.
     pub reason: CompileReasons,
-    /// The latest snapshot.
-    snapshot: Option<CompileSnapshot<F>>,
+    /// The latest compute graph (snapshot).
+    snapshot: Option<Arc<WorldComputeGraph<F>>>,
     /// The latest compilation.
     pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
@@ -811,9 +758,9 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Creates a snapshot of the project.
-    pub fn snapshot(&mut self) -> CompileSnapshot<F> {
+    pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
         match self.snapshot.as_ref() {
-            Some(snap) if snap.world.revision() == self.verse.revision => snap.clone(),
+            Some(snap) if snap.world().revision() == self.verse.revision => snap.clone(),
             _ => {
                 let snap = self.make_snapshot();
                 self.snapshot = Some(snap.clone());
@@ -822,9 +769,9 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         }
     }
 
-    fn make_snapshot(&self) -> CompileSnapshot<F> {
+    fn make_snapshot(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.verse.snapshot();
-        CompileSnapshot {
+        let snap = CompileSnapshot {
             id: self.id.clone(),
             world,
             signal: ExportSignal {
@@ -833,7 +780,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 by_fs_events: self.reason.by_fs_events,
             },
             success_doc: self.latest_success_doc.clone(),
-        }
+        };
+        WorldComputeGraph::new(snap)
     }
 
     /// Compile the document once if there is any reason and the entry is
@@ -850,9 +798,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let snap = self.snapshot();
         self.reason = Default::default();
         Some(move || {
-            let compiled = WorldComputeGraph::new(snap);
-            compute(&compiled);
-            compiled
+            compute(&snap);
+            snap
         })
     }
 
@@ -876,33 +823,33 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Compile the document once.
     fn run_compile(
         h: Arc<dyn CompileHandler<F, Ext>>,
-        snap: CompileSnapshot<F>,
+        graph: Arc<WorldComputeGraph<F>>,
     ) -> impl FnOnce() -> CompiledArtifact<F> {
         let start = tinymist_std::time::now();
 
         // todo unwrap main id
-        let id = snap.world.main_id().unwrap();
-        let revision = snap.world.revision().get();
+        let id = graph.world().main_id().unwrap();
+        let revision = graph.world().revision().get();
 
         h.status(
             revision,
-            &snap.id,
+            &graph.snap.id,
             CompileReport::Stage(id, "compiling", start),
         );
 
         move || {
-            let compiled = CompiledArtifact::from_snapshot(snap);
+            let compiled = CompiledArtifact::from_graph(graph);
 
             let elapsed = start.elapsed().unwrap_or_default();
             let rep = match &compiled.doc {
-                Ok(..) => CompileReport::CompileSuccess(id, compiled.warnings.len(), elapsed),
-                Err(err) => CompileReport::CompileError(id, err.len(), elapsed),
+                Some(..) => CompileReport::CompileSuccess(id, compiled.warning_cnt(), elapsed),
+                None => CompileReport::CompileError(id, compiled.error_cnt(), elapsed),
             };
 
             // todo: we need to check revision for really concurrent compilation
             log_compile_report(&rep);
 
-            h.status(revision, &compiled.id, rep);
+            h.status(revision, compiled.id(), rep);
             h.notify_compile(&compiled);
 
             compiled
@@ -917,7 +864,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         }
 
         // Update state.
-        let doc = artifact.doc.ok();
+        let doc = artifact.doc.clone();
         self.committed_revision = compiled_revision;
         if doc.is_some() {
             self.latest_success_doc = doc;
@@ -933,7 +880,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
 
         self.deps = deps.clone();
 
-        let mut world = artifact.snap.world;
+        let mut world = world.clone();
 
         let is_primary = self.id == ProjectInsId("primary".into());
 

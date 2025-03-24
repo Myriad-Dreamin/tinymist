@@ -356,8 +356,8 @@ impl ServerState {
 
             if matches!(query, Completion(..)) {
                 // Prefetch the package index for completion.
-                if snap.world.registry.cached_index().is_none() {
-                    let registry = snap.world.registry.clone();
+                if snap.registry().cached_index().is_none() {
+                    let registry = snap.registry().clone();
                     tokio::spawn(async move {
                         let _ = registry.download_index();
                     });

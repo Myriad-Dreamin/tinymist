@@ -246,7 +246,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let snap = state.snapshot().unwrap();
 
         RUNTIMES.tokio_runtime.block_on(async {
-            let w = snap.world.task(TaskInputs {
+            let w = snap.world().clone().task(TaskInputs {
                 entry: Some(entry),
                 inputs,
             });
@@ -296,9 +296,8 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
                 QueryCommands::PackageDocs(args) => {
                     let pkg = PackageSpec::from_str(&args.id).unwrap();
                     let path = args.path.map(PathBuf::from);
-                    let path = path.unwrap_or_else(|| {
-                        snap.world.registry.resolve(&pkg).unwrap().as_ref().into()
-                    });
+                    let path = path
+                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
 
                     let res = state
                         .resource_package_docs_(PackageInfo {
@@ -315,9 +314,8 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
                 QueryCommands::CheckPackage(args) => {
                     let pkg = PackageSpec::from_str(&args.id).unwrap();
                     let path = args.path.map(PathBuf::from);
-                    let path = path.unwrap_or_else(|| {
-                        snap.world.registry.resolve(&pkg).unwrap().as_ref().into()
-                    });
+                    let path = path
+                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
 
                     state
                         .check_package(PackageInfo {

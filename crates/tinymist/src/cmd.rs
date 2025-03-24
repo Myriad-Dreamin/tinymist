@@ -369,7 +369,7 @@ impl ServerState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = snap.world.registry.determine_latest_version(&spec)?;
+                    let version = snap.registry().determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -378,7 +378,7 @@ impl ServerState {
             let from_source = TemplateSource::Package(spec);
 
             let entry_path = package::init(
-                &snap.world,
+                snap.world(),
                 InitTask {
                     tmpl: from_source.clone(),
                     dir: to_path.clone(),
@@ -412,7 +412,7 @@ impl ServerState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = snap.world.registry.determine_latest_version(&spec)?;
+                    let version = snap.registry().determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -420,7 +420,7 @@ impl ServerState {
 
             let from_source = TemplateSource::Package(spec);
 
-            let entry = package::get_entry(&snap.world, from_source)
+            let entry = package::get_entry(snap.world(), from_source)
                 .map_err(map_string_err("failed to get template entry"))
                 .map_err(internal_error)?;
 
@@ -490,8 +490,8 @@ impl ServerState {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
-                inputs: snap.world.inputs().as_ref().deref().clone(),
-                font_paths: snap.world.font_resolver.font_paths().to_owned(),
+                inputs: snap.world().inputs().as_ref().deref().clone(),
+                font_paths: snap.world().font_resolver.font_paths().to_owned(),
                 rpc_kind: "http".into(),
             })?;
 
@@ -558,7 +558,7 @@ impl ServerState {
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let paths = snap.world.registry.paths();
+            let paths = snap.registry().paths();
             let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
@@ -571,7 +571,7 @@ impl ServerState {
     ) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let paths = snap.world.registry.local_path();
+            let paths = snap.registry().local_path();
             let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
@@ -586,11 +586,10 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let packages =
-                tinymist_query::package::list_package_by_namespace(&snap.world.registry, ns)
-                    .into_iter()
-                    .map(PackageInfo::from)
-                    .collect::<Vec<_>>();
+            let packages = tinymist_query::package::list_package_by_namespace(snap.registry(), ns)
+                .into_iter()
+                .map(PackageInfo::from)
+                .collect::<Vec<_>>();
 
             serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
         })
@@ -662,7 +661,7 @@ impl ServerState {
         let snap = self.query_snapshot().map_err(internal_error)?;
 
         Ok(async move {
-            let world = &snap.world;
+            let world = snap.world();
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
                 let toml_id = tinymist_query::package::get_manifest_id(&info)?;

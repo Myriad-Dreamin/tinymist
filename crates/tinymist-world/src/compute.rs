@@ -12,7 +12,7 @@ use typst::ecow::EcoVec;
 use typst::syntax::Span;
 
 use crate::snapshot::CompileSnapshot;
-use crate::{CompilerFeat, CompilerWorld, EntryReader};
+use crate::{CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
 
 type AnyArc = Arc<dyn std::any::Any + Send + Sync>;
 
@@ -96,10 +96,24 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
 
     /// Clones the graph with the same snapshot.
     pub fn snapshot(&self) -> Arc<Self> {
+        self.snapshot_unsafe(self.snap.clone())
+    }
+
+    /// Clones the graph with the same snapshot. Take care of the consistency by
+    /// your self.
+    pub fn snapshot_unsafe(&self, snap: CompileSnapshot<F>) -> Arc<Self> {
         Arc::new(Self {
-            snap: self.snap.clone(),
+            snap,
             entries: Mutex::new(self.entries.lock().clone()),
         })
+    }
+
+    /// Forks a new snapshot that compiles a different document.
+    // todo: share cache if task doesn't change.
+    pub fn task(&self, inputs: TaskInputs) -> Arc<Self> {
+        let mut snap = self.snap.clone();
+        snap = snap.task(inputs);
+        Self::new(snap)
     }
 
     /// Gets a world computed.
@@ -152,6 +166,18 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
             entries.insert_mut(id, entry.clone());
             entry
         }
+    }
+
+    pub fn world(&self) -> &CompilerWorld<F> {
+        &self.snap.world
+    }
+
+    pub fn registry(&self) -> &Arc<F::Registry> {
+        &self.snap.world.registry
+    }
+
+    pub fn library(&self) -> &typst::Library {
+        &self.snap.world.library
     }
 }
 

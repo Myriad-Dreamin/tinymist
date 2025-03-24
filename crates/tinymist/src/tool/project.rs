@@ -9,6 +9,7 @@ use std::{
 use clap_complete::Shell;
 use parking_lot::Mutex;
 use reflexo::{path::unix_slash, ImmutPath};
+use reflexo_typst::WorldComputeGraph;
 use tinymist_query::analysis::Analysis;
 use tinymist_std::{bail, error::prelude::*};
 use tokio::sync::mpsc;
@@ -137,13 +138,13 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     // Prepares for the compilation
     let universe = (input, lock_dir.clone()).resolve()?;
     let world = universe.snapshot();
-    let snap = CompileSnapshot::from_world(world);
+    let graph = WorldComputeGraph::from_world(world);
 
     // Compiles the project
-    let compiled = CompiledArtifact::from_snapshot(snap);
+    let compiled = CompiledArtifact::from_graph(graph);
 
     let diag = compiled.diagnostics();
-    print_diagnostics(&compiled.world, diag, DiagnosticFormat::Human)
+    print_diagnostics(compiled.world(), diag, DiagnosticFormat::Human)
         .context_ut("print diagnostics")?;
 
     if compiled.has_errors() {
