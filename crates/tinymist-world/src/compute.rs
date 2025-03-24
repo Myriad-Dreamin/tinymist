@@ -89,6 +89,11 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         })
     }
 
+    /// Creates a graph from the world.
+    pub fn from_world(world: CompilerWorld<F>) -> Arc<Self> {
+        Self::new(CompileSnapshot::from_world(world))
+    }
+
     /// Clones the graph with the same snapshot.
     pub fn snapshot(&self) -> Arc<Self> {
         Arc::new(Self {
@@ -219,7 +224,21 @@ pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
 impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
+    pub fn ensure_main<F: CompilerFeat>(world: &CompilerWorld<F>) -> SourceResult<()> {
+        let main_id = world.main_id();
+        let checked = main_id.ok_or_else(|| typst::diag::eco_format!("entry file is not set"));
+        checked.at(Span::detached()).map(|_| ())
+    }
+
     pub fn execute<F: CompilerFeat>(world: &CompilerWorld<F>) -> Warned<SourceResult<Arc<D>>> {
+        let res = Self::ensure_main(world);
+        if let Err(err) = res {
+            return Warned {
+                output: Err(err),
+                warnings: EcoVec::new(),
+            };
+        }
+
         let is_paged_compilation = TypeId::of::<D>() == TypeId::of::<TypstPagedDocument>();
         let is_html_compilation = TypeId::of::<D>() == TypeId::of::<TypstHtmlDocument>();
 
@@ -233,7 +252,7 @@ impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
         };
 
         world.to_mut().set_is_compiling(true);
-        let compiled = typst::compile::<D>(world.as_ref());
+        let compiled = ::typst::compile::<D>(world.as_ref());
         world.to_mut().set_is_compiling(false);
 
         let exclude_html_warnings = if !is_html_compilation {
@@ -346,83 +365,16 @@ impl DiagnosticsTask {
     }
 }
 
-// pub type ErasedVecExportTask<E> = ErasedExportTask<SourceResult<Bytes>, E>;
-// pub type ErasedStrExportTask<E> = ErasedExportTask<SourceResult<String>, E>;
-
-// pub struct ErasedExportTask<T, E> {
-//     _phantom: std::marker::PhantomData<(T, E)>,
-// }
-
-// #[allow(clippy::type_complexity)]
-// struct ErasedExportImpl<F: CompilerFeat, T, E> {
-//     f: Arc<dyn Fn(&Arc<WorldComputeGraph<F>>) -> Result<Option<T>> + Send +
-// Sync>,     _phantom: std::marker::PhantomData<E>,
-// }
-
-// impl<T: Send + Sync + 'static, E: Send + Sync + 'static> ErasedExportTask<T,
-// E> {     #[must_use = "the result must be checked"]
-//     pub fn provide_raw<F: CompilerFeat>(
-//         graph: &Arc<WorldComputeGraph<F>>,
-//         f: impl Fn(&Arc<WorldComputeGraph<F>>) -> Result<Option<T>> + Send +
-// Sync + 'static,     ) -> Result<()> {
-//         let provided = graph.provide::<ConfigTask<ErasedExportImpl<F, T,
-// E>>>(Ok(Arc::new({             ErasedExportImpl {
-//                 f: Arc::new(f),
-//                 _phantom: std::marker::PhantomData,
-//             }
-//         })));
-
-//         if provided.is_err() {
-//             tinymist_std::bail!("already provided")
-//         }
-
-//         Ok(())
-//     }
-
-//     #[must_use = "the result must be checked"]
-//     pub fn provide<F: CompilerFeat, D, C>(graph: &Arc<WorldComputeGraph<F>>)
-// -> Result<()>     where
-//         D: typst::Document + Send + Sync + 'static,
-//         C: WorldComputable<F> + ExportComputation<F, D, Output = T>,
-//     {
-//         Self::provide_raw(graph, OptionDocumentTask::run_export::<F, C>)
-//     }
-// }
-
-// impl<F: CompilerFeat, T: Send + Sync + 'static, E: Send + Sync + 'static>
-// WorldComputable<F>     for ErasedExportTask<T, E>
-// {
-//     type Output = Option<T>;
-
-//     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-//         let conf = graph.must_get::<ConfigTask<ErasedExportImpl<F, T,
-// E>>>()?;         (conf.f)(graph)
-//     }
-// }
-
 impl<F: CompilerFeat> WorldComputeGraph<F> {
     pub fn ensure_main(&self) -> SourceResult<()> {
-        let main_id = self.snap.world.main_id();
-        let checked = main_id.ok_or_else(|| typst::diag::eco_format!("entry file is not set"));
-        checked.at(Span::detached()).map(|_| ())
+        CompilationTask::<TypstPagedDocument>::ensure_main(&self.snap.world)
     }
 
     /// Compile once from scratch.
-    pub fn pure_compile<D: ::typst::Document>(&self) -> Warned<SourceResult<Arc<D>>> {
-        let res = self.ensure_main();
-        if let Err(err) = res {
-            return Warned {
-                output: Err(err),
-                warnings: EcoVec::new(),
-            };
-        }
-
-        let res = ::typst::compile::<D>(&self.snap.world);
-        // compile document
-        Warned {
-            output: res.output.map(Arc::new),
-            warnings: res.warnings,
-        }
+    pub fn pure_compile<D: ::typst::Document + Send + Sync + 'static>(
+        &self,
+    ) -> Warned<SourceResult<Arc<D>>> {
+        CompilationTask::<D>::execute(&self.snap.world)
     }
 
     /// Compile once from scratch.
@@ -431,12 +383,24 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 
     /// Compile to html once from scratch.
-    pub fn compile_html(&self) -> Warned<SourceResult<Arc<::typst::html::HtmlDocument>>> {
+    pub fn compile_html(&self) -> Warned<SourceResult<Arc<TypstHtmlDocument>>> {
         self.pure_compile()
     }
 
-    // With **the compilation state**, query the matches for the selector.
-    // fn query(&mut self, selector: String, document: &TypstDocument) ->
-    // SourceResult<Vec<Content>> {     self.pure_query(world, selector,
-    // document) }
+    /// Compile paged document with cache
+    pub fn shared_compile(self: &Arc<Self>) -> Result<Option<Arc<TypstPagedDocument>>> {
+        let doc = self.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
+        Ok(doc.as_ref().clone())
+    }
+
+    /// Compile HTML document with cache
+    pub fn shared_compile_html(self: &Arc<Self>) -> Result<Option<Arc<TypstHtmlDocument>>> {
+        let doc = self.compute::<OptionDocumentTask<TypstHtmlDocument>>()?;
+        Ok(doc.as_ref().clone())
+    }
+
+    /// Gets the diagnostics from shared compilation.
+    pub fn shared_diagnostics(self: &Arc<Self>) -> Result<Arc<DiagnosticsTask>> {
+        self.compute::<DiagnosticsTask>()
+    }
 }
