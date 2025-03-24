@@ -58,7 +58,7 @@ jobs:
           path: target/announcement.gen.md
       - name: Create GitHub Release
         env:
-          PRERELEASE_FLAG: "${{ (env.isNightly && '--prerelease') || '' }}"
+          PRERELEASE_FLAG: "${{ (fromJson(env.isNightly) && '--prerelease') || '' }}"
           ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
           RELEASE_COMMIT: "${{ github.sha }}"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
