@@ -7,7 +7,6 @@ use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::Result;
-use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
@@ -15,7 +14,8 @@ use tinymist_world::vfs::notify::{
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader, EntryState,
-    ExportSignal, FlagTask, ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
+    ExportSignal, FlagTask, HtmlCompilationTask, PagedCompilationTask, ProjectInsId, TaskInputs,
+    WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
 
@@ -87,8 +87,8 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     pub fn from_graph(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
         let is_html = graph.library().features.is_enabled(typst::Feature::Html);
 
-        let _ = graph.provide::<FlagTask<TypstHtmlDocument>>(Ok(FlagTask::flag(is_html)));
-        let _ = graph.provide::<FlagTask<TypstPagedDocument>>(Ok(FlagTask::flag(!is_html)));
+        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
+        let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
         let doc = if is_html {
             graph.shared_compile_html().expect("html").map(From::from)
         } else {
