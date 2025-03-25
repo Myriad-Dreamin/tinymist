@@ -42,7 +42,7 @@ pub type LspWorld = CompilerWorld<LspCompilerFeat>;
 pub type LspCompileSnapshot = CompileSnapshot<LspCompilerFeat>;
 /// LSP compiled artifact.
 pub type LspCompiledArtifact = CompiledArtifact<LspCompilerFeat>;
-/// LSP compiled artifact.
+/// LSP compute graph.
 pub type LspComputeGraph = Arc<WorldComputeGraph<LspCompilerFeat>>;
 /// LSP interrupt.
 pub type LspInterrupt = Interrupt<LspCompilerFeat>;
