@@ -13,8 +13,15 @@ use tokio::sync::mpsc;
 use crate::project::ProjectInsId;
 use crate::{tool::word_count::WordsCount, LspClient};
 
+#[derive(Debug, Clone)]
+pub struct EditorActorConfig {
+    /// Whether to notify status to the editor.
+    notify_status: bool,
+}
+
 /// The request to the editor actor.
 pub enum EditorRequest {
+    Config(EditorActorConfig),
     /// Publishes diagnostics to the editor.
     Diag(ProjVersion, Option<DiagnosticsMap>),
     /// Updates compile status to the editor.
@@ -30,8 +37,8 @@ pub struct EditorActor {
     client: LspClient,
     /// The channel receiving the [`EditorRequest`].
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
-    /// Whether to notify compile status to the editor.
-    notify_compile_status: bool,
+    /// The configuration of the editor actor.
+    config: EditorActorConfig,
 
     /// Accumulated diagnostics per file.
     /// The outer `HashMap` is indexed by the file's URL.
@@ -54,7 +61,9 @@ impl EditorActor {
             editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
-            notify_compile_status,
+            config: EditorActorConfig {
+                notify_status: notify_compile_status,
+            },
         }
     }
 
@@ -70,6 +79,10 @@ impl EditorActor {
 
         while let Some(req) = self.editor_rx.recv().await {
             match req {
+                EditorRequest::Config(config) => {
+                    log::info!("received config request: {config:?}");
+                    self.config = config;
+                }
                 EditorRequest::Diag(version, diagnostics) => {
                     log::debug!(
                         "received diagnostics from {version:?}: diag({:?})",
@@ -79,16 +92,16 @@ impl EditorActor {
                     self.publish(version.id, diagnostics).await;
                 }
                 EditorRequest::Status(compile_status) => {
-                    log::debug!("received status request: {compile_status:?}");
-                    if self.notify_compile_status && compile_status.id == ProjectInsId::PRIMARY {
+                    log::trace!("received status request: {compile_status:?}");
+                    if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
                         status.status = compile_status.status;
                         status.path = compile_status.path;
                         self.client.send_notification::<StatusAll>(&status);
                     }
                 }
                 EditorRequest::WordCount(id, count) => {
-                    log::debug!("received word count request");
-                    if self.notify_compile_status && id == ProjectInsId::PRIMARY {
+                    log::trace!("received word count request");
+                    if self.config.notify_status && id == ProjectInsId::PRIMARY {
                         status.words_count = Some(count);
                         self.client.send_notification::<StatusAll>(&status);
                     }

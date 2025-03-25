@@ -909,6 +909,23 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_status() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "compileStatus": "enable",
+        });
+        good_config(&mut config, &update);
+        assert!(config.notify_status);
+
+        let update = json!({
+            "compileStatus": "disable",
+        });
+        good_config(&mut config, &update);
+        assert!(!config.notify_status);
+    }
+
+    #[test]
     fn test_config_creation_timestamp() {
         type Timestamp = Option<i64>;
 
