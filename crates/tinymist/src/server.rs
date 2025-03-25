@@ -15,7 +15,7 @@ use typst::syntax::Source;
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp::query::OnEnter;
 use crate::project::{
-    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    update_lock, CompiledArtifact, EntryResolver, LspComputeGraph, LspInterrupt, ProjectInsId,
     ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
 use crate::route::ProjectRouteState;
@@ -396,7 +396,7 @@ impl ServerState {
 
         let snap = self.snapshot()?;
         just_future(async move {
-            let w = &snap.world;
+            let w = snap.world();
 
             let info = ServerInfoResponse {
                 root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
@@ -421,12 +421,12 @@ impl ServerState {
         let lock_dir = self.entry_resolver().resolve_lock(&entry);
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
-            |snap: LspCompileSnapshot| async move {
+            |snap: LspComputeGraph| async move {
                 let mut updater = update_lock(lock_dir);
-                let world = snap.world.clone();
-                let doc_id = updater.compiled(&world)?;
+                let world = snap.world();
+                let doc_id = updater.compiled(world)?;
 
-                updater.update_materials(doc_id.clone(), snap.world.depended_fs_paths());
+                updater.update_materials(doc_id.clone(), world.depended_fs_paths());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
                 updater.commit();
@@ -442,7 +442,7 @@ impl ServerState {
                 ..TaskInputs::default()
             });
 
-            let artifact = CompiledArtifact::from_snapshot(snap.clone());
+            let artifact = CompiledArtifact::from_graph(snap.clone());
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));

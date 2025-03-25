@@ -5,7 +5,7 @@ use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
-use crate::project::LspCompileSnapshot;
+use crate::project::LspComputeGraph;
 use crate::world::font::FontResolver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,9 +43,9 @@ struct FontResourceResult {
 
 impl ServerState {
     /// Get the all valid fonts
-    pub async fn get_font_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
+    pub async fn get_font_resources(snap: LspComputeGraph) -> LspResult<JsonValue> {
         // fonts
-        let resolver = &snap.world.font_resolver;
+        let resolver = &snap.world().font_resolver;
         let font_book = resolver.font_book();
         let mut source_map: HashMap<Arc<DataSource>, u32> = HashMap::new();
         let mut sources: Vec<DataSource> = Vec::new();

@@ -183,26 +183,26 @@ pub struct PreviewCompileView {
 
 impl typst_preview::CompileView for PreviewCompileView {
     fn doc(&self) -> Option<TypstDocument> {
-        self.snap.doc.clone().ok()
+        self.snap.doc.clone()
     }
 
     fn status(&self) -> CompileStatus {
         match self.snap.doc {
-            Ok(_) => CompileStatus::CompileSuccess,
-            Err(_) => CompileStatus::CompileError,
+            Some(_) => CompileStatus::CompileSuccess,
+            None => CompileStatus::CompileError,
         }
     }
 
     fn is_on_saved(&self) -> bool {
-        self.snap.signal.by_fs_events
+        self.snap.snap.signal.by_fs_events
     }
 
     fn is_by_entry_update(&self) -> bool {
-        self.snap.signal.by_entry_update
+        self.snap.snap.signal.by_entry_update
     }
 
     fn resolve_source_span(&self, loc: Location) -> Option<SourceSpanOffset> {
-        let world = &self.snap.world;
+        let world = self.snap.world();
         let Location::Src(loc) = loc;
 
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
@@ -230,7 +230,7 @@ impl typst_preview::CompileView for PreviewCompileView {
         let TypstDocument::Paged(doc) = self.doc()? else {
             return None;
         };
-        let world = &self.snap.world;
+        let world = self.snap.world();
 
         let page = pos.page_no.checked_sub(1)?;
         let page = doc.pages.get(page)?;
@@ -240,7 +240,7 @@ impl typst_preview::CompileView for PreviewCompileView {
     }
 
     fn resolve_document_position(&self, loc: Location) -> Vec<Position> {
-        let world = &self.snap.world;
+        let world = self.snap.world();
         let Location::Src(src_loc) = loc;
 
         let line = src_loc.pos.line as usize;
@@ -265,7 +265,7 @@ impl typst_preview::CompileView for PreviewCompileView {
     }
 
     fn resolve_span(&self, span: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
-        let world = &self.snap.world;
+        let world = self.snap.world();
         let resolve_off =
             |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
 

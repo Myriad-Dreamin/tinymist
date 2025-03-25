@@ -26,16 +26,13 @@ pub struct GotoDefinitionRequest {
 impl StatefulRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
 
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax)?;
+        let def = ctx.def_of_syntax(&source, doc, syntax)?;
 
         let (fid, def_range) = def.location(ctx.shared())?;
         let uri = ctx.uri_for_id(fid).ok()?;

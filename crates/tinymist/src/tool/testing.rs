@@ -189,9 +189,10 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
                 log_info!("Runs testing again...");
             }
             // Sets is_compiling to track dependencies
-            artifact.snap.world.set_is_compiling(true);
-            let res = test_once(&artifact.world, &config);
-            artifact.snap.world.set_is_compiling(false);
+            let mut world = artifact.snap.world.clone();
+            world.set_is_compiling(true);
+            let res = test_once(&world, &config);
+            world.set_is_compiling(false);
 
             if let Err(err) = res {
                 test_error!("Fatal:", "{err}");

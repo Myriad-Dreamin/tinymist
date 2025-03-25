@@ -1,5 +1,6 @@
 //! Linked definition analysis
 
+use tinymist_std::typst::TypstDocument;
 use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
@@ -7,7 +8,6 @@ use typst::model::BibliographyElem;
 use super::{prelude::*, InsTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
-use crate::VersionedDocument;
 
 /// A linked definition in the source code
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -59,7 +59,7 @@ impl Definition {
 pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
-    document: Option<&VersionedDocument>,
+    document: Option<&TypstDocument>,
     syntax: SyntaxClass,
 ) -> Option<Definition> {
     match syntax {
@@ -81,7 +81,7 @@ pub fn definition(
                 _ => return None,
             };
 
-            let introspector = &document?.document.introspector();
+            let introspector = &document?.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }

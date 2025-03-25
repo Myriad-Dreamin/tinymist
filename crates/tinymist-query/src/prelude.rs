@@ -17,6 +17,7 @@ pub use lsp_types::{
     SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
 pub use serde_json::Value as JsonValue;
+pub use tinymist_project::LspComputeGraph;
 pub use tinymist_std::DefId;
 pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;
@@ -35,4 +36,4 @@ pub use crate::lsp_typst_boundary::{
 };
 pub use crate::syntax::{classify_syntax, Decl, DefKind};
 pub(crate) use crate::ty::PathPreference;
-pub use crate::{SemanticRequest, StatefulRequest, VersionedDocument};
+pub use crate::{SemanticRequest, StatefulRequest};
