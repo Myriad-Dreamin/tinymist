@@ -248,19 +248,24 @@ impl HoverWorker<'_> {
         // Preview results
         let provider = self.ctx.analysis.periscope.clone()?;
         let doc = self.doc.as_ref()?;
-        let position = jump_from_cursor(doc, &self.source, self.cursor);
+        let jump = |cursor| {
+            jump_from_cursor(doc, &self.source, cursor)
+                .into_iter()
+                .next()
+        };
+        let position = jump(self.cursor);
         let position = position.or_else(|| {
             for idx in 1..100 {
                 let next_cursor = self.cursor + idx;
                 if next_cursor < self.source.text().len() {
-                    let position = jump_from_cursor(doc, &self.source, next_cursor);
+                    let position = jump(next_cursor);
                     if position.is_some() {
                         return position;
                     }
                 }
                 let prev_cursor = self.cursor.checked_sub(idx);
                 if let Some(prev_cursor) = prev_cursor {
-                    let position = jump_from_cursor(doc, &self.source, prev_cursor);
+                    let position = jump(prev_cursor);
                     if position.is_some() {
                         return position;
                     }
