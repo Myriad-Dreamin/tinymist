@@ -595,42 +595,42 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         self.push_diagnostics(dv, None);
     }
 
-    fn notify_compile(&self, snap: &LspCompiledArtifact) {
+    fn notify_compile(&self, art: &LspCompiledArtifact) {
         {
             let mut n_revs = self.notified_revision.lock();
-            let n_rev = n_revs.entry(snap.id().clone()).or_default();
-            if *n_rev >= snap.world().revision().get() {
+            let n_rev = n_revs.entry(art.id().clone()).or_default();
+            if *n_rev >= art.world().revision().get() {
                 log::info!(
                     "Project: already notified for revision {} <= {n_rev}",
-                    snap.world().revision(),
+                    art.world().revision(),
                 );
                 return;
             }
-            *n_rev = snap.world().revision().get();
+            *n_rev = art.world().revision().get();
         }
 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
         if self.is_standalone {
             print_diagnostics(
-                snap.world(),
-                snap.diagnostics(),
+                art.world(),
+                art.diagnostics(),
                 reflexo_typst::DiagnosticFormat::Human,
             )
             .log_error("failed to print diagnostics");
         }
 
-        self.notify_diagnostics(snap);
+        self.notify_diagnostics(art);
 
-        self.client.interrupt(LspInterrupt::Compiled(snap.clone()));
-        self.export.signal(snap);
+        self.client.interrupt(LspInterrupt::Compiled(art.clone()));
+        self.export.signal(art);
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview.get(snap.id()) {
-            let snap = snap.clone();
-            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
+        if let Some(inner) = self.preview.get(art.id()) {
+            let art = art.clone();
+            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { art }));
         } else {
-            log::info!("Project: no preview for {:?}", snap.id());
+            log::info!("Project: no preview for {:?}", art.id());
         }
     }
 }

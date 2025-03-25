@@ -1,59 +1,125 @@
 //! Document preview tool for Typst
 
-#![allow(missing_docs)]
+pub use compile::{PreviewCompileView, ProjectPreviewHandler};
+pub use http::{make_http_server, HttpServer};
 
-use std::num::NonZeroUsize;
-use std::sync::LazyLock;
-use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
+mod compile;
+mod http;
 
+use std::{collections::HashMap, path::Path, sync::Arc};
+
+use clap::Parser;
 use futures::{SinkExt, StreamExt, TryStreamExt};
-use hyper::header::HeaderValue;
-use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
-use hyper_util::rt::TokioIo;
-use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use lsp_types::Url;
-use reflexo_typst::debug_loc::SourceSpanOffset;
-use reflexo_typst::Bytes;
-use reflexo_typst::{error::prelude::*, Error};
+use reflexo_typst::error::prelude::*;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
-use tinymist_std::typst::TypstDocument;
 use tokio::sync::{mpsc, oneshot};
-use typst::layout::{Abs, Frame, FrameItem, Point, Position, Size};
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
-use typst::visualize::Geometry;
-use typst::World;
 use typst_preview::{
-    frontend_html, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
-    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
-    PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
+    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
 };
-use typst_shim::syntax::LinkedNodeExt;
 
-use crate::project::{
-    LspCompiledArtifact, LspInterrupt, LspWorld, ProjectClient, ProjectInsId, WorldProvider,
-};
+use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
+use crate::project::{ProjectInsId, ProjectPreviewState, WorldProvider};
 use crate::tool::project::{start_project, ProjectOpts, StartProjectResult};
 use crate::*;
-use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
-use project::world::vfs::{notify::MemoryEvent, FileChangeSet};
-use project::ProjectPreviewState;
 
-pub use typst_preview::CompileStatus;
-
+/// The kind of the preview.
 pub enum PreviewKind {
+    /// Previews a specific file.
     Regular,
+    /// Walks through the project and previews the main file related to the
+    /// current focused file.
     Browsing,
+    /// Runs a browsing preview in background.
     Background,
 }
 
+/// CLI Arguments for the preview tool.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PreviewCliArgs {
+    /// Preview arguments
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Compile arguments
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
+
+    /// Data plane server will bind to this address. Note: if it equals to
+    /// `static_file_host`, same address will be used.
+    #[clap(
+        long = "data-plane-host",
+        default_value = "127.0.0.1:23625",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub data_plane_host: String,
+
+    /// Control plane server will bind to this address
+    #[clap(
+        long = "control-plane-host",
+        default_value = "127.0.0.1:23626",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub control_plane_host: String,
+
+    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
+    /// `data_plane_host`, same address will be used.
+    #[clap(
+        long = "host",
+        value_name = "HOST",
+        default_value = "",
+        alias = "static-file-host"
+    )]
+    pub static_file_host: String,
+
+    /// Let it not be the primary instance.
+    #[clap(long = "not-primary", hide(true))]
+    pub not_as_primary: bool,
+
+    /// Open the preview in the browser after compilation. If `--no-open` is
+    /// set, this flag will be ignored.
+    #[clap(long = "open")]
+    pub open: bool,
+
+    /// Don't open the preview in the browser after compilation. If `--open` is
+    /// set as well, this flag will win.
+    #[clap(long = "no-open")]
+    pub no_open: bool,
+}
+
+impl PreviewCliArgs {
+    /// Whether to open the preview in the browser after compilation.
+    pub fn open_in_browser(&self, default: bool) -> bool {
+        !self.no_open && (self.open || default)
+    }
+}
+
+/// Response for starting a preview.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartPreviewResponse {
+    static_server_port: Option<u16>,
+    static_server_addr: Option<String>,
+    data_plane_port: Option<u16>,
+    is_primary: bool,
+}
+
 impl ServerState {
+    /// Starts a background preview instance.
     pub fn background_preview(&mut self) {
         if !self.config.preview.background.enabled {
             return;
@@ -67,7 +133,7 @@ impl ServerState {
             ]
         });
 
-        let res = self.start_preview_inner(args, PreviewKind::Background);
+        let res = self.start_preview(args, PreviewKind::Background);
 
         // todo: looks ugly
         self.client.handle.spawn(async move {
@@ -87,17 +153,12 @@ impl ServerState {
         });
     }
 
-    /// Start a preview instance.
-    pub fn start_preview_inner(
+    /// Starts a preview instance.
+    pub fn start_preview(
         &mut self,
         cli_args: Vec<String>,
         kind: PreviewKind,
-    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
-        use std::path::Path;
-
-        use crate::tool::preview::PreviewCliArgs;
-        use clap::Parser;
-
+    ) -> SchedulableResponse<StartPreviewResponse> {
         // clap parse
         let cli_args = ["preview"]
             .into_iter()
@@ -175,182 +236,6 @@ impl ServerState {
         }
     }
 }
-/// The preview's view of the compiled artifact.
-pub struct PreviewCompileView {
-    /// The artifact and snap.
-    pub snap: LspCompiledArtifact,
-}
-
-impl typst_preview::CompileView for PreviewCompileView {
-    fn doc(&self) -> Option<TypstDocument> {
-        self.snap.doc.clone()
-    }
-
-    fn status(&self) -> CompileStatus {
-        match self.snap.doc {
-            Some(_) => CompileStatus::CompileSuccess,
-            None => CompileStatus::CompileError,
-        }
-    }
-
-    fn is_on_saved(&self) -> bool {
-        self.snap.snap.signal.by_fs_events
-    }
-
-    fn is_by_entry_update(&self) -> bool {
-        self.snap.snap.signal.by_entry_update
-    }
-
-    fn resolve_source_span(&self, loc: Location) -> Option<SourceSpanOffset> {
-        let world = self.snap.world();
-        let Location::Src(loc) = loc;
-
-        let source_id = world.id_for_path(Path::new(&loc.filepath))?;
-
-        let source = world.source(source_id).ok()?;
-        let cursor =
-            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
-
-        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
-            return None;
-        }
-        let span = node.span();
-        // todo: unicode char
-        let offset = cursor.saturating_sub(node.offset());
-
-        Some(SourceSpanOffset { span, offset })
-    }
-
-    // todo: use vec2bbox to handle bbox correctly
-    fn resolve_frame_loc(
-        &self,
-        pos: &reflexo::debug_loc::DocumentPosition,
-    ) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
-        let TypstDocument::Paged(doc) = self.doc()? else {
-            return None;
-        };
-        let world = self.snap.world();
-
-        let page = pos.page_no.checked_sub(1)?;
-        let page = doc.pages.get(page)?;
-
-        let click = Point::new(Abs::pt(pos.x as f64), Abs::pt(pos.y as f64));
-        jump_from_click(world, &page.frame, click)
-    }
-
-    fn resolve_document_position(&self, loc: Location) -> Vec<Position> {
-        let world = self.snap.world();
-        let Location::Src(src_loc) = loc;
-
-        let line = src_loc.pos.line as usize;
-        let column = src_loc.pos.character as usize;
-
-        let doc = self.snap.success_doc();
-        let Some(doc) = doc.as_ref() else {
-            return vec![];
-        };
-
-        let Some(source_id) = world.id_for_path(Path::new(&src_loc.filepath)) else {
-            return vec![];
-        };
-        let Some(source) = world.source(source_id).ok() else {
-            return vec![];
-        };
-        let Some(cursor) = source.line_column_to_byte(line, column) else {
-            return vec![];
-        };
-
-        jump_from_cursor(doc, &source, cursor)
-    }
-
-    fn resolve_span(&self, span: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
-        let world = self.snap.world();
-        let resolve_off =
-            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
-
-        let source = world.source(span.id()?).ok()?;
-        let mut range = source.find(span)?.range();
-        if let Some(off) = offset {
-            if off < range.len() {
-                range.start += off;
-            }
-        }
-
-        // todo: resolve untitled uri.
-        let filepath = world.path_for_id(span.id()?).ok()?.to_err().ok()?;
-        Some(DocToSrcJumpInfo {
-            filepath: filepath.to_string_lossy().to_string(),
-            start: resolve_off(&source, range.start),
-            end: resolve_off(&source, range.end),
-        })
-    }
-}
-
-/// CLI Arguments for the preview tool.
-#[derive(Debug, Clone, clap::Parser)]
-pub struct PreviewCliArgs {
-    /// Preview arguments
-    #[clap(flatten)]
-    pub preview: PreviewArgs,
-
-    /// Compile arguments
-    #[clap(flatten)]
-    pub compile: CompileOnceArgs,
-
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
-
-    /// Data plane server will bind to this address. Note: if it equals to
-    /// `static_file_host`, same address will be used.
-    #[clap(
-        long = "data-plane-host",
-        default_value = "127.0.0.1:23625",
-        value_name = "HOST",
-        hide(true)
-    )]
-    pub data_plane_host: String,
-
-    /// Control plane server will bind to this address
-    #[clap(
-        long = "control-plane-host",
-        default_value = "127.0.0.1:23626",
-        value_name = "HOST",
-        hide(true)
-    )]
-    pub control_plane_host: String,
-
-    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
-    /// `data_plane_host`, same address will be used.
-    #[clap(
-        long = "host",
-        value_name = "HOST",
-        default_value = "",
-        alias = "static-file-host"
-    )]
-    pub static_file_host: String,
-
-    /// Let it not be the primary instance.
-    #[clap(long = "not-primary", hide(true))]
-    pub not_as_primary: bool,
-
-    /// Open the preview in the browser after compilation. If `--no-open` is
-    /// set, this flag will be ignored.
-    #[clap(long = "open")]
-    pub open: bool,
-
-    /// Don't open the preview in the browser after compilation. If `--open` is
-    /// set as well, this flag will win.
-    #[clap(long = "no-open")]
-    pub no_open: bool,
-}
-
-impl PreviewCliArgs {
-    pub fn open_in_browser(&self, default: bool) -> bool {
-        !self.no_open && (self.open || default)
-    }
-}
 
 /// The global state of the preview tool.
 pub struct PreviewState {
@@ -407,77 +292,6 @@ impl PreviewState {
     }
 }
 
-/// Response for starting a preview.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StartPreviewResponse {
-    static_server_port: Option<u16>,
-    static_server_addr: Option<String>,
-    data_plane_port: Option<u16>,
-    is_primary: bool,
-}
-
-pub struct PreviewProjectHandler {
-    pub project_id: ProjectInsId,
-    client: Box<dyn ProjectClient>,
-}
-
-impl PreviewProjectHandler {
-    pub fn flush_compile(&self) {
-        let _ = self.project_id;
-        self.client
-            .interrupt(LspInterrupt::Compile(self.project_id.clone()));
-    }
-
-    pub fn settle(&self) -> Result<(), Error> {
-        self.client
-            .interrupt(LspInterrupt::Settle(self.project_id.clone()));
-        Ok(())
-    }
-
-    pub fn unpin_primary(&self) {
-        self.client.server_event(ServerEvent::UnpinPrimaryByPreview);
-    }
-}
-
-impl EditorServer for PreviewProjectHandler {
-    async fn update_memory_files(
-        &self,
-        files: MemoryFiles,
-        reset_shadow: bool,
-    ) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_inserts(
-            files
-                .files
-                .into_iter()
-                .map(|(path, content)| {
-                    // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok(Bytes::from_string(content)).into())
-                })
-                .collect(),
-        );
-
-        let intr = LspInterrupt::Memory(if reset_shadow {
-            MemoryEvent::Sync(files)
-        } else {
-            MemoryEvent::Update(files)
-        });
-        self.client.interrupt(intr);
-
-        Ok(())
-    }
-
-    async fn remove_shadow_files(&self, files: MemoryFilesShort) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-        self.client
-            .interrupt(LspInterrupt::Memory(MemoryEvent::Update(files)));
-
-        Ok(())
-    }
-}
-
 impl PreviewState {
     /// Start a preview on a given compiler.
     pub fn start(
@@ -489,7 +303,7 @@ impl PreviewState {
         is_primary: bool,
         is_background: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
-        let compile_handler = Arc::new(PreviewProjectHandler {
+        let compile_handler = Arc::new(ProjectPreviewHandler {
             project_id,
             client: Box::new(self.client.clone().to_untyped()),
         });
@@ -520,7 +334,7 @@ impl PreviewState {
         self.client.handle.spawn(async move {
             let mut resp_rx = resp_rx;
             while let Some(resp) = resp_rx.recv().await {
-                use ControlPlaneResponse::*;
+                use typst_preview::ControlPlaneResponse::*;
 
                 match resp {
                     // ignoring compile status per task.
@@ -620,226 +434,6 @@ impl PreviewState {
     }
 }
 
-/// created by `make_http_server`
-pub struct HttpServer {
-    /// The address the server is listening on.
-    pub addr: SocketAddr,
-    /// The sender to shutdown the server.
-    pub shutdown_tx: oneshot::Sender<()>,
-    /// The join handle of the server.
-    pub join: tokio::task::JoinHandle<()>,
-}
-
-/// Create a http server for the previewer.
-pub async fn make_http_server(
-    frontend_html: String,
-    static_file_addr: String,
-    websocket_tx: mpsc::UnboundedSender<HyperWebsocket>,
-) -> HttpServer {
-    use http_body_util::Full;
-    use hyper::body::{Bytes, Incoming};
-    type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
-
-    let listener = tokio::net::TcpListener::bind(&static_file_addr)
-        .await
-        .unwrap();
-    let addr = listener.local_addr().unwrap();
-    log::info!("preview server listening on http://{addr}");
-
-    let frontend_html = hyper::body::Bytes::from(frontend_html);
-    let make_service = move || {
-        let frontend_html = frontend_html.clone();
-        let websocket_tx = websocket_tx.clone();
-        let static_file_addr = static_file_addr.clone();
-        service_fn(move |mut req: hyper::Request<Incoming>| {
-            let frontend_html = frontend_html.clone();
-            let websocket_tx = websocket_tx.clone();
-            let static_file_addr = static_file_addr.clone();
-            async move {
-                // When a user visits a website in a browser, that website can try to connect to
-                // our http / websocket server on `127.0.0.1` which may leak sensitive
-                // information. We could use CORS headers to explicitly disallow
-                // this. However, for Websockets, this does not work. Thus, we
-                // manually check the `Origin` header. Browsers always send this
-                // header for cross-origin requests.
-                //
-                // Important: This does _not_ protect against malicious users that share the
-                // same computer as us (i.e. multi- user systems where the users
-                // don't trust each other). In this case, malicious attackers can _still_
-                // connect to our http / websocket servers (using a browser and
-                // otherwise). And additionally they can impersonate a tinymist
-                // http / websocket server towards a legitimate frontend/html client.
-                // This requires additional protection that may be added in the future.
-                let origin_header = req.headers().get("Origin");
-                if origin_header
-                    .is_some_and(|h| !is_valid_origin(h, &static_file_addr, addr.port()))
-                {
-                    anyhow::bail!(
-                        "Connection with unexpected `Origin` header. Closing connection."
-                    );
-                }
-
-                // Check if the request is a websocket upgrade request.
-                if hyper_tungstenite::is_upgrade_request(&req) {
-                    if origin_header.is_none() {
-                        log::error!("websocket connection is not set `Origin` header, which will be a hard error in the future.");
-                    }
-
-                    let Some((response, websocket)) = hyper_tungstenite::upgrade(&mut req, None)
-                        .log_error("Error in websocket upgrade")
-                    else {
-                        anyhow::bail!("cannot upgrade as websocket connection");
-                    };
-
-                    let _ = websocket_tx.send(websocket);
-
-                    // Return the response so the spawned future can continue.
-                    Ok(response)
-                } else if req.uri().path() == "/" {
-                    // log::debug!("Serve frontend: {mode:?}");
-                    let res = hyper::Response::builder()
-                        .header(hyper::header::CONTENT_TYPE, "text/html")
-                        .body(Full::<Bytes>::from(frontend_html))
-                        .unwrap();
-                    Ok(res)
-                } else {
-                    // jump to /
-                    let res = hyper::Response::builder()
-                        .status(hyper::StatusCode::FOUND)
-                        .header(hyper::header::LOCATION, "/")
-                        .body(Full::<Bytes>::default())
-                        .unwrap();
-                    Ok(res)
-                }
-            }
-        })
-    };
-
-    let (shutdown_tx, rx) = tokio::sync::oneshot::channel();
-    let (final_tx, final_rx) = tokio::sync::oneshot::channel();
-
-    // the graceful watcher
-    let graceful = hyper_util::server::graceful::GracefulShutdown::new();
-
-    let serve_conn = move |server: &Server, graceful: &GracefulShutdown, conn| {
-        let (stream, _peer_addr) = match conn {
-            Ok(conn) => conn,
-            Err(e) => {
-                log::error!("accept error: {e}");
-                return;
-            }
-        };
-
-        let conn = server.serve_connection_with_upgrades(TokioIo::new(stream), make_service());
-        let conn = graceful.watch(conn.into_owned());
-        tokio::spawn(async move {
-            conn.await.log_error("cannot serve http");
-        });
-    };
-
-    let join = tokio::spawn(async move {
-        // when this signal completes, start shutdown
-        let mut signal = std::pin::pin!(final_rx);
-
-        let mut server = Server::new(hyper_util::rt::TokioExecutor::new());
-        server.http1().keep_alive(true);
-
-        loop {
-            tokio::select! {
-                conn = listener.accept() => serve_conn(&server, &graceful, conn),
-                Ok(_) = &mut signal => {
-                    log::info!("graceful shutdown signal received");
-                    break;
-                }
-            }
-        }
-
-        tokio::select! {
-            _ = graceful.shutdown() => {
-                log::info!("Gracefully shutdown!");
-            },
-            _ = tokio::time::sleep(reflexo::time::Duration::from_secs(10)) => {
-                log::info!("Waited 10 seconds for graceful shutdown, aborting...");
-            }
-        }
-    });
-    tokio::spawn(async move {
-        let _ = rx.await;
-        final_tx.send(()).ok();
-        log::info!("Preview server joined");
-    });
-
-    HttpServer {
-        addr,
-        shutdown_tx,
-        join,
-    }
-}
-
-fn is_valid_origin(h: &HeaderValue, static_file_addr: &str, expected_port: u16) -> bool {
-    static GITPOD_ID_AND_HOST: LazyLock<Option<(String, String)>> = LazyLock::new(|| {
-        let workspace_id = std::env::var("GITPOD_WORKSPACE_ID").ok();
-        let cluster_host = std::env::var("GITPOD_WORKSPACE_CLUSTER_HOST").ok();
-        workspace_id.zip(cluster_host)
-    });
-
-    is_valid_origin_impl(h, static_file_addr, expected_port, &GITPOD_ID_AND_HOST)
-}
-
-// Separate function so we can do gitpod-related tests without relying on env
-// vars.
-fn is_valid_origin_impl(
-    origin_header: &HeaderValue,
-    static_file_addr: &str,
-    expected_port: u16,
-    gitpod_id_and_host: &Option<(String, String)>,
-) -> bool {
-    let Ok(Ok(origin_url)) = origin_header.to_str().map(Url::parse) else {
-        return false;
-    };
-
-    // Path is not allowed in Origin headers
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin
-    if origin_url.path() != "/" && origin_url.path() != "" {
-        return false;
-    };
-
-    let expected_origin = {
-        let expected_host = Url::parse(&format!("http://{static_file_addr}")).unwrap();
-        let expected_host = expected_host.host_str().unwrap();
-        // Don't take the port from `static_file_addr` (it may have a dummy port e.g.
-        // `127.0.0.1:0`)
-        format!("http://{expected_host}:{expected_port}")
-    };
-
-    let gitpod_expected_origin = gitpod_id_and_host
-        .as_ref()
-        .map(|(workspace_id, cluster_host)| {
-            format!("https://{expected_port}-{workspace_id}.{cluster_host}")
-        });
-
-    *origin_header == expected_origin
-        // tmistele (PR #1382): The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
-        // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
-        // `Origin` starting with `vscode-webview://` as well. I think that's okay from a security
-        // point of view, because I think malicious websites can't trick browsers into sending
-        // `vscode-webview://...` as `Origin`.
-        || origin_url.scheme() == "vscode-webview"
-        // `code-server` also needs an exception: It opens `http://localhost:8080/proxy/<port>` in
-        // the browser and proxies requests through to tinymist (which runs at `127.0.0.1:<port>`).
-        // Thus, the `Origin` header will be `http://localhost:8080` which doesn't match what
-        // we expect. Thus, just always allow anything from localhost/127.0.0.1
-        // https://github.com/Myriad-Dreamin/tinymist/issues/1350
-        || (
-            matches!(origin_url.host_str(), Some("localhost") | Some("127.0.0.1"))
-            && origin_url.scheme() == "http"
-        )
-        // `gitpod` also needs an exception. It loads `https://<port>-<workspace>.<host>` in the browser
-        // and proxies requests through to tinymist (which runs as `127.0.0.1:<port>`).
-        // We can detect this by looking at the env variables (see `GITPOD_ID_AND_HOST` in `is_valid_origin(..)`)
-        || gitpod_expected_origin.is_some_and(|o| o == *origin_header)
-}
-
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
@@ -883,7 +477,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             tinymist_std::bail!("failed to register preview");
         }
 
-        let handle: Arc<PreviewProjectHandler> = Arc::new(PreviewProjectHandler {
+        let handle: Arc<ProjectPreviewHandler> = Arc::new(ProjectPreviewHandler {
             project_id: id,
             client: Box::new(intr_tx),
         });
@@ -1043,158 +637,6 @@ fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInf
     );
 }
 
-/// Determine where to jump to based on a click in a frame.
-pub fn jump_from_click(
-    world: &LspWorld,
-    frame: &Frame,
-    click: Point,
-) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
-    // Try to find a link first.
-    for (pos, item) in frame.items() {
-        if let FrameItem::Link(_dest, size) = item {
-            if is_in_rect(*pos, *size, click) {
-                // todo: url reaction
-                return None;
-            }
-        }
-    }
-
-    // If there's no link, search for a jump target.
-    for (mut pos, item) in frame.items().rev() {
-        match item {
-            FrameItem::Group(group) => {
-                // TODO: Handle transformation.
-                if let Some(span) = jump_from_click(world, &group.frame, click - pos) {
-                    return Some(span);
-                }
-            }
-
-            FrameItem::Text(text) => {
-                for glyph in &text.glyphs {
-                    let width = glyph.x_advance.at(text.size);
-                    if is_in_rect(
-                        Point::new(pos.x, pos.y - text.size),
-                        Size::new(width, text.size),
-                        click,
-                    ) {
-                        let (span, span_offset) = glyph.span;
-                        let mut span_offset = span_offset as usize;
-                        let Some(id) = span.id() else { continue };
-                        let source = world.source(id).ok()?;
-                        let node = source.find(span)?;
-                        if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText)
-                            && (click.x - pos.x) > width / 2.0
-                        {
-                            span_offset += glyph.range().len();
-                        }
-
-                        let span_offset = SourceSpanOffset {
-                            span,
-                            offset: span_offset,
-                        };
-
-                        return Some((span_offset, span_offset));
-                    }
-
-                    pos.x += width;
-                }
-            }
-
-            FrameItem::Shape(shape, span) => {
-                let Geometry::Rect(size) = shape.geometry else {
-                    continue;
-                };
-                if is_in_rect(pos, size, click) {
-                    let span = (*span).into();
-                    return Some((span, span));
-                }
-            }
-
-            FrameItem::Image(_, size, span) if is_in_rect(pos, *size, click) => {
-                let span = (*span).into();
-                return Some((span, span));
-            }
-
-            _ => {}
-        }
-    }
-
-    None
-}
-
-/// Find the output location in the document for a cursor position.
-fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Vec<Position> {
-    let Some(node) = LinkedNode::new(source.root())
-        .leaf_at_compat(cursor)
-        .filter(|node| node.kind() == SyntaxKind::Text)
-    else {
-        return vec![];
-    };
-
-    let mut p = Point::default();
-
-    let span = node.span();
-    match document {
-        TypstDocument::Paged(paged_doc) => {
-            let mut positions: Vec<Position> = vec![];
-            for (i, page) in paged_doc.pages.iter().enumerate() {
-                let mut min_dis = u64::MAX;
-                if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-                    if let Some(page) = NonZeroUsize::new(i + 1) {
-                        positions.push(Position { page, point: pos });
-                    }
-                }
-            }
-
-            log::info!("jump_from_cursor: {positions:#?}");
-
-            positions
-        }
-        _ => vec![],
-    }
-}
-
-/// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
-        if let FrameItem::Group(group) = item {
-            // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
-                return Some(point + pos);
-            }
-        }
-
-        if let FrameItem::Text(text) = item {
-            for glyph in &text.glyphs {
-                if glyph.span.0 == span {
-                    return Some(pos);
-                }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph
-                        .span
-                        .0
-                        .into_raw()
-                        .get()
-                        .abs_diff(span.into_raw().get());
-                    if dis < *min_dis {
-                        *min_dis = dis;
-                        *p = pos;
-                    }
-                }
-                pos.x += glyph.x_advance.at(text.size);
-            }
-        }
-    }
-
-    None
-}
-
-/// Whether a rectangle with the given size at the given position contains the
-/// click position.
-fn is_in_rect(pos: Point, size: Size, click: Point) -> bool {
-    pos.x <= click.x && pos.x + size.x >= click.x && pos.y <= click.y && pos.y + size.y >= click.y
-}
-
 fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
     previewer.start_data_plane(
         websocket_rx,
@@ -1220,148 +662,4 @@ fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver
                 }))
         },
     );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn check_origin(origin: &'static str, static_file_addr: &str, port: u16) -> bool {
-        is_valid_origin(&HeaderValue::from_static(origin), static_file_addr, port)
-    }
-
-    #[test]
-    fn test_valid_origin_localhost() {
-        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "127.0.0.1:0", 42));
-        assert!(check_origin("http://localhost:42", "127.0.0.1:42", 42));
-        assert!(check_origin("http://localhost:42", "127.0.0.1:0", 42));
-        assert!(check_origin("http://localhost", "127.0.0.1:0", 42));
-
-        assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "localhost:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "localhost:0", 42));
-        assert!(check_origin("http://localhost:42", "localhost:42", 42));
-        assert!(check_origin("http://localhost:42", "localhost:0", 42));
-        assert!(check_origin("http://localhost", "localhost:0", 42));
-    }
-
-    #[test]
-    fn test_invalid_origin_localhost() {
-        assert!(!check_origin("https://huh.io:8080", "127.0.0.1:42", 42));
-        assert!(!check_origin("http://huh.io:8080", "127.0.0.1:42", 42));
-        assert!(!check_origin("https://huh.io:443", "127.0.0.1:42", 42));
-        assert!(!check_origin("http://huh.io:42", "127.0.0.1:0", 42));
-        assert!(!check_origin("http://huh.io", "127.0.0.1:42", 42));
-        assert!(!check_origin("https://huh.io", "127.0.0.1:42", 42));
-
-        assert!(!check_origin("https://huh.io:8080", "localhost:42", 42));
-        assert!(!check_origin("http://huh.io:8080", "localhost:42", 42));
-        assert!(!check_origin("https://huh.io:443", "localhost:42", 42));
-        assert!(!check_origin("http://huh.io:42", "localhost:0", 42));
-        assert!(!check_origin("http://huh.io", "localhost:42", 42));
-        assert!(!check_origin("https://huh.io", "localhost:42", 42));
-    }
-
-    #[test]
-    fn test_invalid_origin_scheme() {
-        assert!(!check_origin("ftp://127.0.0.1:42", "127.0.0.1:42", 42));
-        assert!(!check_origin("ftp://localhost:42", "127.0.0.1:42", 42));
-        assert!(!check_origin("ftp://127.0.0.1:42", "127.0.0.1:0", 42));
-        assert!(!check_origin("ftp://localhost:42", "127.0.0.1:0", 42));
-
-        // The scheme must be specified.
-        assert!(!check_origin("127.0.0.1:42", "127.0.0.1:0", 42));
-        assert!(!check_origin("localhost:42", "127.0.0.1:0", 42));
-        assert!(!check_origin("localhost:42", "127.0.0.1:42", 42));
-        assert!(!check_origin("127.0.0.1:42", "127.0.0.1:42", 42));
-    }
-
-    #[test]
-    fn test_valid_origin_vscode() {
-        assert!(check_origin("vscode-webview://it", "127.0.0.1:42", 42));
-        assert!(check_origin("vscode-webview://it", "127.0.0.1:0", 42));
-    }
-
-    #[test]
-    fn test_origin_manually_binding() {
-        assert!(!check_origin("https://huh.io:8080", "huh.io:42", 42));
-        assert!(!check_origin("http://huh.io:8080", "huh.io:42", 42));
-        assert!(!check_origin("https://huh.io:443", "huh.io:42", 42));
-        assert!(check_origin("http://huh.io:42", "huh.io:0", 42));
-        assert!(!check_origin("http://huh.io", "huh.io:42", 42));
-        assert!(!check_origin("https://huh.io", "huh.io:42", 42));
-
-        assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "huh.io:42", 42));
-        assert!(check_origin("http://127.0.0.1:42", "huh.io:0", 42));
-        assert!(check_origin("http://localhost:42", "huh.io:42", 42));
-        assert!(check_origin("http://localhost:42", "huh.io:0", 42));
-
-        assert!(!check_origin("https://huh2.io:8080", "huh.io:42", 42));
-        assert!(!check_origin("http://huh2.io:8080", "huh.io:42", 42));
-        assert!(!check_origin("https://huh2.io:443", "huh.io:42", 42));
-        assert!(!check_origin("http://huh2.io:42", "huh.io:0", 42));
-        assert!(!check_origin("http://huh2.io", "huh.io:42", 42));
-        assert!(!check_origin("https://huh2.io", "huh.io:42", 42));
-    }
-
-    // https://github.com/Myriad-Dreamin/tinymist/issues/1350
-    // the origin of code-server's proxy
-    #[test]
-    fn test_valid_origin_code_server_proxy() {
-        assert!(check_origin(
-            // The URL has path /proxy/45411 but that is not sent in the Origin header
-            "http://localhost:8080",
-            "127.0.0.1:42",
-            42
-        ));
-        assert!(check_origin("http://localhost", "127.0.0.1:42", 42));
-    }
-
-    // the origin of gitpod
-    #[test]
-    fn test_valid_origin_gitpod_proxy() {
-        fn check_gitpod_origin(
-            origin: &'static str,
-            static_file_addr: &str,
-            port: u16,
-            workspace: &str,
-            cluster_host: &str,
-        ) -> bool {
-            is_valid_origin_impl(
-                &HeaderValue::from_static(origin),
-                static_file_addr,
-                port,
-                &Some((workspace.to_owned(), cluster_host.to_owned())),
-            )
-        }
-
-        let check_gitpod_origin1 = |origin: &'static str| {
-            let explicit =
-                check_gitpod_origin(origin, "127.0.0.1:42", 42, "workspace_id", "gitpod.typ");
-            let implicit =
-                check_gitpod_origin(origin, "127.0.0.1:0", 42, "workspace_id", "gitpod.typ");
-
-            assert_eq!(explicit, implicit, "failed port binding");
-            explicit
-        };
-
-        assert!(check_gitpod_origin1("http://127.0.0.1:42"));
-        assert!(check_gitpod_origin1("http://127.0.0.1:42"));
-        assert!(check_gitpod_origin1("https://42-workspace_id.gitpod.typ"));
-        assert!(!check_gitpod_origin1(
-            // A path is not allowed in Origin header
-            "https://42-workspace_id.gitpod.typ/path"
-        ));
-        assert!(!check_gitpod_origin1(
-            // Gitpod always runs on default port
-            "https://42-workspace_id.gitpod.typ:42"
-        ));
-
-        assert!(!check_gitpod_origin1("https://42-workspace_id2.gitpod.typ"));
-        assert!(!check_gitpod_origin1("http://huh.io"));
-        assert!(!check_gitpod_origin1("https://huh.io"));
-    }
 }

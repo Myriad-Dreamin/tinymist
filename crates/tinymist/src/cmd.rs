@@ -279,12 +279,12 @@ impl ServerState {
 
     /// Starts a preview instance.
     #[cfg(feature = "preview")]
-    pub fn start_preview(
+    pub fn do_start_preview(
         &mut self,
         mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Regular)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Regular)
     }
 
     /// Starts a preview instance for browsing.
@@ -294,7 +294,7 @@ impl ServerState {
         mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 
     /// Starts a preview instance but without arguments. This is used for the
@@ -322,7 +322,7 @@ impl ServerState {
             ];
             default_args.map(ToString::to_string).to_vec()
         });
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 
     /// Kill a preview instance.

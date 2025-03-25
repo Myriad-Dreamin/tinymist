@@ -204,7 +204,7 @@ impl ServerState {
             .with_command("tinymist.startDefaultPreview", State::default_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview)
             // Internal commands
-            .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doStartPreview", State::do_start_preview)
             .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview);
 
