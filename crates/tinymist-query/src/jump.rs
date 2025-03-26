@@ -103,6 +103,10 @@ fn jump_from_cursor_(
     source: &Source,
     cursor: usize,
 ) -> Option<Vec<Position>> {
+    // todo: leaf_at_compat only matches the text before the cursor, but we could
+    // also match a text if it is after the cursor
+    // The case `leaf_at_compat` will match: `Hello|`
+    // FIXME: The case `leaf_at_compat` will not match: `|Hello`
     let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     // todo: When we click on a label or some math operators, we seems likely also
     // be able to jump to some place.
@@ -114,7 +118,7 @@ fn jump_from_cursor_(
     let offset = cursor.saturating_sub(node.offset());
 
     // todo: The cursor may not exact hit at the start of some AST node. For
-    // example, the cursor in the text element `Hell|o`, it is offset by 4 from the
+    // example, the cursor in the text element `Hell|o` is offset by 4 from the
     // node. It seems not pretty if we ignore the offset completely.
     let _ = offset;
 
