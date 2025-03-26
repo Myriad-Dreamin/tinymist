@@ -329,9 +329,14 @@ impl ExportTask {
             })
         });
 
-        tokio::fs::write(&to, data.await??)
-            .await
-            .context("failed to export")?;
+        let write_to = to.clone();
+        let data = data.await??;
+        tokio::task::spawn_blocking(move || -> Result<()> {
+            tinymist_std::fs::paths::write_atomic(write_to, data).context("failed to export")?;
+            Ok(())
+        })
+        .await
+        .context_ut("failed to write exported data")??;
 
         log::info!("ExportTask({export_id}): export complete");
         Ok(Some(to))
