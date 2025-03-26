@@ -124,7 +124,9 @@ jobs:
         run: 7z x -y -oeditors/vscode/out editors/vscode/out/tinymist-${{ matrix.rust-target }}.zip
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Unzip tinymist binary artifact (Linux)
-        run: tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
+        run: |
+          tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
+          mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Rename tinymist binary artifact
         run: mv editors/vscode/out/tinymist-${{ matrix.rust-target }} editors/vscode/out/tinymist
