@@ -64,9 +64,7 @@ pub fn diff(fr: &Path, to: &Path) -> Option<PathBuf> {
         }
     }
 
-    let rename_loc = clean_for_diff(to);
-    let new_path = clean_for_diff(fr);
-    pathdiff::diff_paths(new_path.as_ref(), rename_loc.as_ref())
+    pathdiff::diff_paths(clean_for_diff(fr).as_ref(), clean_for_diff(to).as_ref())
 }
 
 #[cfg(test)]
