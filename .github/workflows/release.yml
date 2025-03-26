@@ -83,7 +83,7 @@ jobs:
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.6/cargo-dist-installer.sh | sh"
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.7/cargo-dist-installer.sh | sh"
       - name: Cache dist
         uses: actions/upload-artifact@v4
         with:
@@ -112,7 +112,7 @@ jobs:
     # Let the initial task tell us to not run (currently very blunt)
     needs:
       - plan
-    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || (fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' && (inputs.targets == 'all' || contains(inputs.targets, join(fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.targets, ''))))) || inputs.tag == 'dry-run' || inputs.tag == 'dry-run' }}
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || (fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' && (inputs.targets == 'all' || contains(inputs.targets, join(fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.targets, ''))))) || inputs.tag == 'dry-run' }}
     strategy:
       fail-fast: false
       # Target platforms/runners are computed by dist in create-release.
@@ -145,6 +145,10 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ join(matrix.targets, '-') }}
+          cache-provider: ${{ matrix.cache_provider }}
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
