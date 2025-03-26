@@ -104,6 +104,8 @@ fn jump_from_cursor_(
     cursor: usize,
 ) -> Option<Vec<Position>> {
     let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+    // todo: When we click on a label or some math operators, we seems likely also
+    // be able to jump to some place.
     if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
         return None;
     };
@@ -111,24 +113,34 @@ fn jump_from_cursor_(
     let span = node.span();
     match document {
         TypstDocument::Paged(paged_doc) => {
+            // We checks whether there are any elements exactly matching the
+            // cursor position.
             let mut positions = vec![];
+
+            // Unluckily, we might not be able to find the exact spans, so we
+            // need to find the closest one at the same time.
             let mut min_page = 0;
             let mut min_point = Point::default();
             let mut min_dis = u64::MAX;
+
             for (idx, page) in paged_doc.pages.iter().enumerate() {
-                let mut t_dis = min_dis;
-                if let Some(point) = find_in_frame(&page.frame, span, &mut t_dis, &mut min_point) {
+                // In a page, we try to find a span closer to the existing found one.
+                let mut p_dis = min_dis;
+
+                if let Some(point) = find_in_frame(&page.frame, span, &mut p_dis, &mut min_point) {
                     if let Some(page) = NonZeroUsize::new(idx + 1) {
                         positions.push(Position { page, point });
                     }
                 }
 
-                if t_dis != min_dis {
+                // In this page, we found a closer span and update.
+                if p_dis != min_dis {
                     min_page = idx;
-                    min_dis = t_dis;
+                    min_dis = p_dis;
                 }
             }
 
+            // If we didn't find any exact span, we add the closest one in the same page.
             if positions.is_empty() && min_dis != u64::MAX {
                 positions.push(Position {
                     page: NonZeroUsize::new(min_page + 1)?,
@@ -157,13 +169,17 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) 
                 if glyph.span.0 == span {
                     return Some(pos);
                 }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph
-                        .span
-                        .0
-                        .into_raw()
-                        .get()
-                        .abs_diff(span.into_raw().get());
+
+                // We at least require that the span is in the same file.
+                let is_same_file = glyph.span.0.id() == span.id();
+                if is_same_file {
+                    // The numbers are not offsets but a unique id on the AST tree which are
+                    // nicely divided.
+                    // FIXME: since typst v0.13.0, the numbers are not only the ids, but also raw
+                    // ranges.
+                    let glyph_num = glyph.span.0.into_raw();
+                    let span_num = span.into_raw().get();
+                    let dis = glyph_num.get().abs_diff(span_num);
                     if dis < *min_dis {
                         *min_dis = dis;
                         *res = pos;
