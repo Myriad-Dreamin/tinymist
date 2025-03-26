@@ -140,6 +140,8 @@ jobs:
   
   announce:
     needs: [prepare-build]
+    permissions:
+      contents: write
     uses: ./.github/workflows/announce.yml
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     with:
