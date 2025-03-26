@@ -154,7 +154,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/release.yml
     with:
-      tag: ${{ (startsWith(github.ref, 'refs/tags/') && fromJson(needs.prepare-build.outputs.tag)) || 'dry-run' }}
+      tag: ${{ (startsWith(github.ref, 'refs/tags/') && fromJson(needs.prepare-build.outputs.tag)) || '' }}
       targets: ${{ (!startsWith(github.ref, 'refs/tags/') && 'aarch64-apple-darwin,x86_64-pc-windows-msvc,x86_64-unknown-linux-gnu') || 'all' }}
   
   build-vscode:
