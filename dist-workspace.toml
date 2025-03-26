@@ -4,9 +4,9 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0-tinymist.2"
+cargo-dist-version = "0.28.0-tinymist.8"
 # A URL to use to install `cargo-dist` (with the installer script)
-cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.2"
+cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -17,6 +17,7 @@ windows-archive = ".zip"
 unix-archive = ".tar.gz"
 # Target platforms to build apps for (Rust target-triple syntax)
 # These targets are determined based on the awesome ruff project...
+# region: targets
 targets = [
     "aarch64-apple-darwin",
     "aarch64-pc-windows-msvc",
@@ -39,6 +40,7 @@ targets = [
     "loongarch64-unknown-linux-gnu",
     "loongarch64-unknown-linux-musl",
 ]
+# region end: targets
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
 auto-includes = false
 # Whether dist should create a Github Release or use an existing draft
@@ -51,6 +53,20 @@ dispatch-releases = true
 install-updater = false
 # Path that installers should place binaries in
 install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+# Whether to cache builds
+cache-builds = true
 
 [dist.github-custom-runners]
+global = "ubuntu-22.04"
 aarch64-pc-windows-msvc = "windows-latest"
+aarch64-unknown-linux-gnu = "ubuntu-22.04"
+aarch64-unknown-linux-musl = "ubuntu-22.04"
+arm-unknown-linux-musleabihf = "ubuntu-22.04"
+armv7-unknown-linux-gnueabihf = "ubuntu-22.04"
+armv7-unknown-linux-musleabihf = "ubuntu-22.04"
+x86_64-unknown-linux-gnu = "ubuntu-22.04"
+x86_64-unknown-linux-musl = "ubuntu-22.04"
+# riscv64gc-unknown-linux-gnu = "ubuntu-22.04"
+riscv64gc-unknown-linux-musl = "ubuntu-22.04"
+loongarch64-unknown-linux-gnu = "ubuntu-22.04"
+loongarch64-unknown-linux-musl = "ubuntu-22.04"

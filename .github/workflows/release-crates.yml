@@ -1,5 +1,8 @@
 name: tinymist::crates::publish
 on:
+  push:
+    tags:
+      - "*"
   workflow_dispatch:
 
 env:
