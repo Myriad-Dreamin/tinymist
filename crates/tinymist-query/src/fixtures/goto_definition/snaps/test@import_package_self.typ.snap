@@ -9,6 +9,6 @@ snapshot_kind: text
   "originSelectionRange": "1:20:1:27",
   "targetRange": "0:0:0:0",
   "targetSelectionRange": "0:0:0:0",
-  "targetUri": "lib.typ"
+  "targetUri": "-/lib.typ"
  }
 ]
