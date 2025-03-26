@@ -75,7 +75,7 @@ jobs:
           name: tinymist-completion-scripts
           path: completions
       - name: Test tinymist
-        run: cargo test --workspace --skip=e2e
+        run: cargo test --workspace -- --skip=e2e
 
   checks-windows:
     name: Check Minimum Rust version and Tests (Windows)
@@ -98,7 +98,7 @@ jobs:
           yarn build:l10n
       - run: cargo check --workspace
       - name: Test tinymist
-        run: cargo test --workspace --skip=e2e
+        run: cargo test --workspace -- --skip=e2e
 
   checks-e2e:
     needs: [build-binary]
@@ -122,7 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test Tinymist (E2E)
-        run: cargo test --workspace --tests e2e
+        run: cargo test --workspace -- e2e
       - name: Upload Tinymist E2E Test Snapshot 
         if: always()
         uses: actions/upload-artifact@v4
