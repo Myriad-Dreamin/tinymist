@@ -101,6 +101,7 @@ jobs:
         run: cargo test --workspace --skip=e2e
 
   checks-e2e:
+    needs: [build-binary]
     strategy:
       matrix:
         include:
