@@ -103,9 +103,10 @@ fn jump_from_cursor_(
     source: &Source,
     cursor: usize,
 ) -> Option<Vec<Position>> {
-    let node = LinkedNode::new(source.root())
-        .leaf_at_compat(cursor)
-        .filter(|node| !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText))?;
+    let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+    if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
+        return None;
+    };
 
     let span = node.span();
     match document {

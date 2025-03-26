@@ -4,6 +4,6 @@ description: "Jump cursor on  */\n$ H e |l l| o W o r l)"
 expression: results
 input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/markup_text.typ
 ---
-1,9.999pt,7.634pt
 nothing
-1,15.125pt,7.634pt
+1,283.354pt,78.500pt
+nothing
