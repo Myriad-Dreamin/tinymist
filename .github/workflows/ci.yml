@@ -121,8 +121,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Download tinymist binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-build-local-${{ matrix.rust-target }}
+          path: editors/vscode/out/tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Test Tinymist (E2E)
-        run: cargo test --workspace -- e2e
+        run: cargo test -p tests -- e2e
       - name: Upload Tinymist E2E Test Snapshot 
         if: always()
         uses: actions/upload-artifact@v4
