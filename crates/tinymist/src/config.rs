@@ -68,7 +68,7 @@ pub struct Config {
     pub customized_show_document: bool,
     /// Whether the configuration can have a default entry path.
     pub has_default_entry_path: bool,
-    /// Whether to notify the compile status to the editor.
+    /// Whether to notify the status to the editor.
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,

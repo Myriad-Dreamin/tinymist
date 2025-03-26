@@ -16,7 +16,7 @@ use crate::{tool::word_count::WordsCount, LspClient};
 #[derive(Debug, Clone)]
 pub struct EditorActorConfig {
     /// Whether to notify status to the editor.
-    notify_status: bool,
+    pub notify_status: bool,
 }
 
 /// The request to the editor actor.
@@ -54,16 +54,14 @@ impl EditorActor {
     pub fn new(
         client: LspClient,
         editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
-        notify_compile_status: bool,
+        notify_status: bool,
     ) -> Self {
         Self {
             client,
             editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
-            config: EditorActorConfig {
-                notify_status: notify_compile_status,
-            },
+            config: EditorActorConfig { notify_status },
         }
     }
 

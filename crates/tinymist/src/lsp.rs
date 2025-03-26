@@ -10,6 +10,7 @@ use tinymist_std::error::{prelude::*, IgnoreLogging};
 pub mod init;
 pub(crate) mod query;
 
+use crate::actor::editor::{EditorActorConfig, EditorRequest};
 use crate::task::FormatterConfig;
 use crate::*;
 
@@ -137,6 +138,14 @@ impl ServerState {
         let new_export_config = self.config.export();
         if old_config.export() != new_export_config {
             self.change_export_config(new_export_config);
+        }
+
+        if old_config.notify_status != self.config.notify_status {
+            self.editor_tx
+                .send(EditorRequest::Config(EditorActorConfig {
+                    notify_status: self.config.notify_status,
+                }))
+                .log_error("could not change editor actor configuration");
         }
 
         if old_config.primary_opts() != self.config.primary_opts() {
