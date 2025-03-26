@@ -9,6 +9,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::CompilationTask;
 use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
+use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
 use tokio::sync::mpsc;
@@ -144,22 +145,22 @@ impl ExportTask {
         let entry = graph.snap.world.entry_state();
         let config = task.as_export().unwrap();
         let output = config.output.clone().unwrap_or_default();
-        let Some(to) = output.substitute(&entry) else {
+        let Some(write_to) = output.substitute(&entry) else {
             return Ok(None);
         };
-        if to.is_relative() {
-            bail!("ExportTask({task:?}): output path is relative: {to:?}");
+        if write_to.is_relative() {
+            bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if to.is_dir() {
-            bail!("ExportTask({task:?}): output path is a directory: {to:?}");
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
-        let to = to.with_extension(task.extension());
+        let write_to = write_to.with_extension(task.extension());
 
         static EXPORT_ID: AtomicUsize = AtomicUsize::new(0);
         let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        log::info!("ExportTask({export_id}): exporting {entry:?} to {to:?}");
-        if let Some(e) = to.parent() {
+        log::info!("ExportTask({export_id}): exporting {entry:?} to {write_to:?}");
+        if let Some(e) = write_to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
             }
@@ -327,14 +328,16 @@ impl ExportTask {
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
             })
-        });
+        })
+        .await??;
 
-        tokio::fs::write(&to, data.await??)
+        let to = write_to.clone();
+        tokio::task::spawn_blocking(move || write_atomic(to, data))
             .await
-            .context("failed to export")?;
+            .context_ut("failed to export")??;
 
         log::info!("ExportTask({export_id}): export complete");
-        Ok(Some(to))
+        Ok(Some(write_to))
     }
 }
 
