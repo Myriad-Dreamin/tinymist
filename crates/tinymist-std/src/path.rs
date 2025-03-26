@@ -1,6 +1,7 @@
 //! Path utilities.
 
-use std::path::{Component, Path};
+use std::borrow::Cow;
+use std::path::{Component, Path, PathBuf};
 
 pub use path_clean::PathClean;
 
@@ -47,6 +48,26 @@ pub fn unix_slash(root: &Path) -> String {
 
 /// Get the path cleaned as a platform-style string.
 pub use path_clean::clean;
+
+/// Construct a relative path from a provided base directory path to the
+/// provided path.
+pub fn diff(fr: &Path, to: &Path) -> Option<PathBuf> {
+    // Because of <https://github.com/Manishearth/pathdiff/issues/8>, we have to clean the path
+    // before diff.
+    fn clean_for_diff(p: &Path) -> Cow<'_, Path> {
+        if p.components()
+            .any(|c| matches!(c, Component::ParentDir | Component::CurDir))
+        {
+            Cow::Owned(p.clean())
+        } else {
+            Cow::Borrowed(p)
+        }
+    }
+
+    let rename_loc = clean_for_diff(to);
+    let new_path = clean_for_diff(fr);
+    pathdiff::diff_paths(new_path.as_ref(), rename_loc.as_ref())
+}
 
 #[cfg(test)]
 mod test {

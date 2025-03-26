@@ -405,7 +405,7 @@ impl ResourcePath {
             inp.to_path_buf()
         } else {
             let cwd = std::env::current_dir().unwrap();
-            pathdiff::diff_paths(inp, &cwd).unwrap()
+            tinymist_std::path::diff(inp, &cwd).unwrap()
         };
         let rel = unix_slash(&rel);
         ResourcePath("file".into(), rel.to_string())
@@ -431,7 +431,7 @@ impl ResourcePath {
         if self.0 == "file" {
             let path = Path::new(&self.1);
             if path.is_absolute() {
-                Some(pathdiff::diff_paths(path, base).unwrap_or_else(|| path.to_owned()))
+                Some(tinymist_std::path::diff(path, base).unwrap_or_else(|| path.to_owned()))
             } else {
                 Some(path.to_owned())
             }

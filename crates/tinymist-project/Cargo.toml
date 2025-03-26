@@ -21,7 +21,6 @@ dirs.workspace = true
 ecow.workspace = true
 log.workspace = true
 parking_lot.workspace = true
-pathdiff.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 rayon.workspace = true
 rpds.workspace = true

@@ -44,7 +44,6 @@ lsp-types.workspace = true
 log.workspace = true
 once_cell.workspace = true
 open.workspace = true
-pathdiff.workspace = true
 parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
