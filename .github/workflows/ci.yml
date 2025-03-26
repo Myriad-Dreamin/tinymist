@@ -127,10 +127,10 @@ jobs:
           name: artifacts-build-local-${{ matrix.rust-target }}
           path: editors/vscode/out
       - name: Unzip tinymist binary artifact (Windows)
-        run: 7z x -y -oeditors/vscode/out editors/vscode/out/artifacts-build-local-${{ matrix.rust-target }}.zip
+        run: 7z x -y -oeditors/vscode/out editors/vscode/out/tinymist-${{ matrix.rust-target }}.zip
         if: matrix.platform == 'win32'
       - name: Unzip tinymist binary artifact (Linux)
-        run: tar -xvf editors/vscode/out/artifacts-build-local-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
+        run: tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
         if: matrix.platform != 'win32'
       - name: List files
         run: ls -la editors/vscode/out
