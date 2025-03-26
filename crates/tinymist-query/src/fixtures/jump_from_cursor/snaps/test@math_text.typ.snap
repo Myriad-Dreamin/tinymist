@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on ..9 */\nHel|lo Wo|rld\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_text.typ
+---
+nothing
+nothing
+nothing
+nothing
+nothing

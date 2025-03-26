@@ -167,3 +167,50 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) 
 fn is_in_rect(pos: Point, size: Size, click: Point) -> bool {
     pos.x <= click.x && pos.x + size.x >= click.x && pos.y <= click.y && pos.y + size.y >= click.y
 }
+
+#[cfg(test)]
+mod tests {
+    use itertools::Itertools;
+
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("jump_from_cursor", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+
+            let graph = compile_doc_for_test(ctx, &properties);
+            let document = graph.snap.success_doc.as_ref().unwrap();
+
+            let cursors = find_test_range_(&source);
+
+            let results = cursors
+                .map(|cursor| {
+                    let points = jump_from_cursor(document, &source, cursor);
+
+                    if points.is_empty() {
+                        return "nothing".to_string();
+                    }
+
+                    points
+                        .iter()
+                        .map(|pos| {
+                            let page = pos.page.get();
+                            let point = pos.point;
+                            format!("{page},{point:?}")
+                        })
+                        .join(";")
+                })
+                .join("\n");
+
+            insta::with_settings!({
+                description => format!("Jump cursor on {})", make_range_annoation(&source)),
+            }, {
+                assert_snapshot!(results);
+            })
+        });
+    }
+}

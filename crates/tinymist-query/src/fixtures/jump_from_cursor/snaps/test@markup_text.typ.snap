@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on  */\n$ H e |l l| o W o r l)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/markup_text.typ
+---
+nothing
+nothing
+nothing
