@@ -113,10 +113,9 @@ fn jump_from_cursor_(
     let span = node.span();
     let offset = cursor.saturating_sub(node.offset());
 
-    // todo: Given a cursor, the cursor may be inside some AST node. For
-    // example, the cursor in the text element `Hell|o`, we will have an offset
-    // inside the text AST node. It seems not pretty if we ignore the offset
-    // completely.
+    // todo: The cursor may not exact hit at the start of some AST node. For
+    // example, the cursor in the text element `Hell|o`, it is offset by 4 from the
+    // node. It seems not pretty if we ignore the offset completely.
     let _ = offset;
 
     match document {
