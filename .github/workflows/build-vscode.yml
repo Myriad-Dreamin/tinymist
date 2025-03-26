@@ -128,9 +128,6 @@ jobs:
           tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
           mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Rename tinymist binary artifact
-        run: mv editors/vscode/out/tinymist-${{ matrix.rust-target }} editors/vscode/out/tinymist
-        if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: List files
         run: ls -l editors/vscode/out
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
