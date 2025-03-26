@@ -23,7 +23,7 @@ use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    PreviewArgs, PreviewBuilder, PreviewMode, PreviewViewport, Previewer, WsMessage,
 };
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -349,6 +349,7 @@ impl PreviewState {
                             send_show_document(&client, &s, &tid);
                         }
                     }
+                    UpdateViewport(pos) => client.send_notification::<ReportViewport>(&pos),
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
                 }
             }
@@ -586,6 +587,13 @@ struct ScrollSource;
 impl Notification for ScrollSource {
     type Params = DocToSrcJumpInfo;
     const METHOD: &'static str = "tinymist/preview/scrollSource";
+}
+
+struct ReportViewport;
+
+impl Notification for ReportViewport {
+    type Params = PreviewViewport;
+    const METHOD: &'static str = "tinymist/preview/updateViewport";
 }
 
 struct NotifDocumentOutline;

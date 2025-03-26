@@ -88,6 +88,11 @@ interface JumpInfo {
   end: [number, number] | null;
 }
 
+interface ViewportInfo {
+  pageNo: number;
+  y: number;
+}
+
 export class LanguageState {
   static Client: typeof LanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
@@ -449,6 +454,11 @@ export class LanguageState {
     // (Optional) The server requests to update the document outline
     client.onNotification("tinymist/documentOutline", async (data: any) => {
       previewProcessOutline(data);
+    });
+
+    // (Required) The server requests to report the current viewport of the preview page.
+    client.onNotification("tinymist/preview/updateViewport", (viewport: ViewportInfo) => {
+      console.log("recv updateViewport request", viewport);
     });
   }
 

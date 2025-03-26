@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
-    Message, WsError,
+    Message, PreviewViewport, WsError,
 };
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
@@ -35,6 +35,17 @@ fn positions_req(event: &'static str, positions: Vec<DocumentPosition>) -> Strin
             .map(|DocumentPosition { page_no, x, y }| format!("{page_no} {x} {y}"))
             .collect::<Vec<_>>()
             .join(",")
+}
+
+/// Parse the position response from the webview, e.g. `outline-sync, 1 0 0`.
+///
+/// Syntax: `event, page_no x? y?`.
+fn viewport_resp(msg: &String) -> PreviewViewport {
+    let location = msg.split(',').nth(1).unwrap();
+    let location = location.split(' ').collect::<Vec<&str>>();
+    let page_no = location[0].parse().unwrap();
+    let y = location.get(1).map(|s| s.parse().unwrap()).unwrap_or(0.);
+    PreviewViewport { page_no, y }
 }
 
 pub struct WebviewActor<
@@ -162,7 +173,11 @@ impl<
                         if let Ok(path) = path {
                             self.render_sender.send(RenderActorRequest::WebviewResolveFrameLoc(path)).log_error("WebViewActor");
                         };
+                    } else if msg.starts_with("update-viewport") {
+                        let pos = viewport_resp(&msg);
+                        self.editor_sender.send(EditorActorRequest::UpdateViewport(pos)).log_error("WebViewActor");
                     } else {
+
                         let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {msg}"))).await;
                         log::info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;

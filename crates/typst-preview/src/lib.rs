@@ -320,6 +320,13 @@ pub struct DocToSrcJumpInfo {
     pub end: Option<(usize, usize)>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewViewport {
+    pub page_no: usize,
+    pub y: f32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
     filepath: PathBuf,
