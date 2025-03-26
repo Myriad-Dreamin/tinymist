@@ -4,9 +4,9 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0-tinymist.5"
+cargo-dist-version = "0.28.0-tinymist.6"
 # A URL to use to install `cargo-dist` (with the installer script)
-cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.5"
+cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.6"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
