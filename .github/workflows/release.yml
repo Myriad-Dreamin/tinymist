@@ -112,7 +112,7 @@ jobs:
     # Let the initial task tell us to not run (currently very blunt)
     needs:
       - plan
-    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || (fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' && (inputs.targets == 'all' || contains(inputs.targets, join(fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.targets, ''))))) || inputs.tag == 'dry-run' }}
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || (fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' && (inputs.targets == 'all' || contains(inputs.targets, join(fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.targets, ''))))) || inputs.tag == 'dry-run' || inputs.tag == 'dry-run' }}
     strategy:
       fail-fast: false
       # Target platforms/runners are computed by dist in create-release.
