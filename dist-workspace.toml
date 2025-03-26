@@ -46,7 +46,7 @@ auto-includes = false
 # Whether dist should create a Github Release or use an existing draft
 create-release = false
 # Which actions to run on pull requests
-pr-run-mode = "skip"
+pr-run-mode = "upload"
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = true
 # Whether to install an updater program
