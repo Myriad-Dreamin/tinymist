@@ -135,7 +135,7 @@ fn jump_from_cursor_(
             let mut min_dis = u64::MAX;
 
             for (idx, page) in paged_doc.pages.iter().enumerate() {
-                // In a page, we try to find a span closer to the existing found one.
+                // In a page, we try to find a closer span than the existing found one.
                 let mut p_dis = min_dis;
 
                 if let Some(point) = find_in_frame(&page.frame, span, &mut p_dis, &mut min_point) {
