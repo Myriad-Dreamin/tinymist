@@ -4,9 +4,9 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0-tinymist.7"
+cargo-dist-version = "0.28.0-tinymist.8"
 # A URL to use to install `cargo-dist` (with the installer script)
-cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.7"
+cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -46,7 +46,7 @@ auto-includes = false
 # Whether dist should create a Github Release or use an existing draft
 create-release = false
 # Which actions to run on pull requests
-pr-run-mode = "upload"
+pr-run-mode = "skip"
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = true
 # Whether to install an updater program

@@ -29,7 +29,7 @@ jobs:
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.7/cargo-dist-installer.sh | sh"
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8/cargo-dist-installer.sh | sh"
       - name: Install parse changelog
         uses: taiki-e/install-action@parse-changelog
       - name: Install Node.js

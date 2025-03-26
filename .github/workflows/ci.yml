@@ -149,7 +149,7 @@ jobs:
       tag: ${{ fromJson(needs.prepare-build.outputs.tag) }}
 
   build-binary:
-    needs: [prepare-build]
+    needs: [prepare-build, announce]
     permissions:
       contents: write
     uses: ./.github/workflows/release.yml
@@ -165,7 +165,7 @@ jobs:
     uses: ./.github/workflows/build-vscode-others.yml
   
   publish-vscode:
-    needs: [build-vscode, build-vscode-others]
+    needs: [build-vscode, build-vscode-others, announce]
     permissions:
       contents: write
     uses: ./.github/workflows/publish-vscode.yml
