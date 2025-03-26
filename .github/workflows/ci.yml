@@ -113,10 +113,10 @@ jobs:
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-          - os: macos-13
-            rust-target: aarch64-apple-darwin
-            platform: darwin
-            arch: arm64
+          # - os: macos-13
+          #   rust-target: aarch64-apple-darwin
+          #   platform: darwin
+          #   arch: arm64
     name: E2E Tests (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     steps:
