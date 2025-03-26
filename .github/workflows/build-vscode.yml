@@ -118,18 +118,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts-build-local-${{ matrix.rust-target }}
-          path: editors/vscode/out
+          path: prebuilts
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Unzip tinymist binary artifact (Windows)
-        run: 7z x -y -oeditors/vscode/out editors/vscode/out/tinymist-${{ matrix.rust-target }}.zip
+        run: 7z x -y -oprebuilts prebuilts/tinymist-${{ matrix.rust-target }}.zip
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Unzip tinymist binary artifact (Linux)
         run: |
-          tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
-          mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
+          tar -xvf prebuilts/tinymist-${{ matrix.rust-target }}.tar.gz -C prebuilts
+          mv prebuilts/tinymist-${{ matrix.rust-target }}/tinymist prebuilts/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: List files
-        run: ls -l editors/vscode/out
+        run: ls -l prebuilts
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       # todo: pdf documentation for all platforms
       - name: Download font assets
