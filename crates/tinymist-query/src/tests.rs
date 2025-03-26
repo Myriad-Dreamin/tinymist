@@ -20,15 +20,15 @@ use tinymist_world::{EntryManager, EntryReader, EntryState, ShadowApi, TaskInput
 use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst_shim::syntax::LinkedNodeExt;
 
+pub use crate::syntax::find_module_level_docs;
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
 pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
 pub use tinymist_world::WorldComputeGraph;
-use typst_shim::syntax::LinkedNodeExt;
 
-use crate::syntax::find_module_level_docs;
 use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
 use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
 
@@ -234,14 +234,19 @@ pub fn find_test_range_(s: &Source) -> Range<usize> {
 }
 
 pub fn find_test_position_after(s: &Source) -> LspPosition {
-    find_test_position_(s, 1)
+    find_test_lsp_pos(s, 1)
 }
 
 pub fn find_test_position(s: &Source) -> LspPosition {
-    find_test_position_(s, 0)
+    find_test_lsp_pos(s, 0)
 }
 
-pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
+pub fn find_test_lsp_pos(s: &Source, offset: usize) -> LspPosition {
+    let node = find_test_typst_pos(s);
+    to_lsp_position(node + offset, PositionEncoding::Utf16, s)
+}
+
+pub fn find_test_typst_pos(s: &Source) -> usize {
     enum AstMatcher {
         MatchAny { prev: bool },
         MatchIdent { prev: bool },
@@ -330,7 +335,19 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         break;
     }
 
-    to_lsp_position(n.offset() + offset, PositionEncoding::Utf16, s)
+    n.offset()
+}
+
+pub fn make_range_annoation(source: &Source) -> String {
+    let range = find_test_range_(source);
+    let range_before = range.start.saturating_sub(10)..range.start;
+    let range_window = range.clone();
+    let range_after = range.end..range.end.saturating_add(10).min(source.text().len());
+
+    let window_before = &source.text()[range_before];
+    let window_line = &source.text()[range_window];
+    let window_after = &source.text()[range_after];
+    format!("{window_before}|{window_line}|{window_after}")
 }
 
 // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||
