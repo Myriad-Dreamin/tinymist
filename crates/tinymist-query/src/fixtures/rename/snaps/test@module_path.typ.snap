@@ -19,7 +19,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/module_path.typ
   },
   {
    "kind": "rename",
-   "newUri": "variable.typ/../new_name.typ",
+   "newUri": "new_name.typ",
    "oldUri": "variable.typ"
   }
  ]

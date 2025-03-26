@@ -21,7 +21,7 @@ impl StatefulRequest for WillRenameFilesRequest {
         self.paths
             .into_iter()
             .map(|(left, right)| {
-                let diff = pathdiff::diff_paths(&right, &left)?;
+                let diff = tinymist_std::path::diff(&right, &left)?;
                 log::info!("did rename diff: {diff:?}");
                 if diff.is_absolute() {
                     log::info!(

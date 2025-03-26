@@ -8,7 +8,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/module_path_non_cano.typ
   {
    "edits": [
     {
-     "newText": "\"../../new_name.typ\" as variable",
+     "newText": "\"new_name.typ\" as variable",
      "range": "0:29:0:51"
     }
    ],
@@ -19,7 +19,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/module_path_non_cano.typ
   },
   {
    "kind": "rename",
-   "newUri": "variable.typ/../../../new_name.typ",
+   "newUri": "new_name.typ",
    "oldUri": "variable.typ"
   }
  ]

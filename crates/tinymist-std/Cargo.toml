@@ -21,6 +21,7 @@ fxhash.workspace = true
 log.workspace = true
 tinymist-analysis.workspace = true
 path-clean.workspace = true
+pathdiff.workspace = true
 parking_lot.workspace = true
 rustc-hash.workspace = true
 serde = { workspace = true, features = ["derive"] }

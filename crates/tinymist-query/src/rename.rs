@@ -60,14 +60,15 @@ impl StatefulRequest for RenameRequest {
                 // todo: rename in untitled files
                 let old_path = ctx.path_for_id(def_fid).ok()?.to_err().ok()?;
 
+                let new_path = Path::new(new_path_str.as_str());
                 let rename_loc = Path::new(ref_path_str.as_str());
-                let diff = pathdiff::diff_paths(Path::new(&new_path_str), rename_loc)?;
+                let diff = tinymist_std::path::diff(new_path, rename_loc)?;
                 if diff.is_absolute() {
-                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path_str}, diff: {diff:?}");
+                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}");
                     return None;
                 }
 
-                let new_path = old_path.join(&diff);
+                let new_path = old_path.join(&diff).clean();
 
                 let old_uri = path_to_url(&old_path).ok()?;
                 let new_uri = path_to_url(&new_path).ok()?;

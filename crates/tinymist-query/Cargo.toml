@@ -45,7 +45,6 @@ lsp-types.workspace = true
 if_chain.workspace = true
 percent-encoding.workspace = true
 unscanny.workspace = true
-pathdiff.workspace = true
 ttf-parser.workspace = true
 rust_iso639.workspace = true
 rust_iso3166.workspace = true

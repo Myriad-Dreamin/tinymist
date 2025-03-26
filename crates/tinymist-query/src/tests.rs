@@ -465,10 +465,12 @@ pub(crate) fn file_path(uri: &str) -> String {
     } else {
         PathBuf::from("/root")
     };
-    let uri = uri.replace("file://", "");
-    let abs_path = Path::new(&uri).strip_prefix(root).map(|s| s.as_os_str());
-    let rel_path = abs_path.unwrap_or_else(|_| Path::new(&uri).file_name().unwrap());
-    unix_slash(Path::new(rel_path.to_str().unwrap()))
+    let uri = lsp_types::Url::parse(uri).unwrap().to_file_path().unwrap();
+    let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
+    let rel_path =
+        abs_path.unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().last().unwrap()));
+
+    unix_slash(&rel_path)
 }
 
 pub struct HashRepr<T>(pub T);
