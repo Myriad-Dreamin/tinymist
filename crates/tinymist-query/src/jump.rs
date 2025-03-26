@@ -187,7 +187,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) 
                     // The numbers are not offsets but a unique id on the AST tree which are
                     // nicely divided.
                     // FIXME: since typst v0.13.0, the numbers are not only the ids, but also raw
-                    // ranges.
+                    // ranges, See [`Span::range`].
                     let glyph_num = glyph.span.0.into_raw();
                     let span_num = span.into_raw().get();
                     let dis = glyph_num.get().abs_diff(span_num);
