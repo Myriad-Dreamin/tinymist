@@ -126,6 +126,9 @@ jobs:
         with:
           name: artifacts-build-local-${{ matrix.rust-target }}
           path: editors/vscode/out/tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+      - name: Change File Permissions
+        run: chmod +x editors/vscode/out/tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+        if : ${{ matrix.platform == 'linux' || matrix.platform == 'darwin' }}
       - name: Test Tinymist (E2E)
         run: cargo test -p tests -- e2e
       - name: Upload Tinymist E2E Test Snapshot 

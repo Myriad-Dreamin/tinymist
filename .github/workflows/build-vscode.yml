@@ -118,8 +118,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: artifacts-build-local-${{ matrix.rust-target }}
-          path: tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+          path: prebuilts/tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Change File Permissions
+        run: chmod +x prebuilts/tinymist${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+        if : ${{ (matrix.platform == 'linux' || matrix.platform == 'darwin') && (fromJson(env.isRelease) || fromJson(env.isNightly)) }}
       # todo: pdf documentation for all platforms
       - name: Download font assets
         # use fonts in stable releases
