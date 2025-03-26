@@ -133,7 +133,7 @@ jobs:
         run: tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
         if: matrix.platform != 'win32'
       - name: List files
-        run: ls -la editors/vscode/out
+        run: ls -l editors/vscode/out
       - name: Test Tinymist (E2E)
         run: cargo test -p tests -- e2e
       - name: Upload Tinymist E2E Test Snapshot 
