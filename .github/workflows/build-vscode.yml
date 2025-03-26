@@ -120,6 +120,15 @@ jobs:
           name: artifacts-build-local-${{ matrix.rust-target }}
           path: prebuilts
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Unzip tinymist binary artifact (Windows)
+        run: 7z x -y -oeditors/vscode/out editors/vscode/out/artifacts-build-local-${{ matrix.rust-target }}.zip
+        if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Unzip tinymist binary artifact (Linux)
+        run: tar -xvf editors/vscode/out/artifacts-build-local-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
+        if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: List files
+        run: ls -la editors/vscode/out
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       # todo: pdf documentation for all platforms
       - name: Download font assets
         # use fonts in stable releases
