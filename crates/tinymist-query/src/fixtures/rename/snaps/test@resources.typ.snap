@@ -23,7 +23,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/resources.typ
   },
   {
    "kind": "rename",
-   "newUri": "lib.typ/../new_name.typ",
+   "newUri": "new_name.typ",
    "oldUri": "lib.typ"
   }
  ]
