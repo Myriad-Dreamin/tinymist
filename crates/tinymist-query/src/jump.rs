@@ -111,6 +111,14 @@ fn jump_from_cursor_(
     };
 
     let span = node.span();
+    let offset = cursor.saturating_sub(node.offset());
+
+    // todo: Given a cursor, the cursor may be inside some AST node. For
+    // example, the cursor in the text element `Hell|o`, we will have an offset
+    // inside the text AST node. It seems not pretty if we ignore the offset
+    // completely.
+    let _ = offset;
+
     match document {
         TypstDocument::Paged(paged_doc) => {
             // We checks whether there are any elements exactly matching the
