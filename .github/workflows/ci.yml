@@ -191,6 +191,7 @@ jobs:
     uses: ./.github/workflows/build-vscode.yml
   
   build-vscode-others:
+    needs: [build-pdf-docs]
     uses: ./.github/workflows/build-vscode-others.yml
   
   publish-vscode:
