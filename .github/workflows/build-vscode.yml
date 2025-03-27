@@ -94,7 +94,7 @@ jobs:
       - name: Download VSC Assets (Preview)
         uses: actions/download-artifact@v4
         with:
-          name: typst-vscode-vscode-m
+          name: typst-preview-vscode-m
           path: contrib/typst-preview/editors/vscode/out
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
 
