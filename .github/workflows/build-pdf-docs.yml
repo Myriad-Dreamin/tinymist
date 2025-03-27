@@ -36,8 +36,12 @@ jobs:
       - name: Build PDF Documentation
         run: |
           prebuilts/tinymist compile --font-path assets/fonts --root . docs/tinymist/ebook.typ tinymist-docs.pdf
+      # todo: this is a bug
+      - name: Move PDF Documentation
+        run: mv docs/tinymist/ebook.pdf tinymist-docs.pdf
       - name: Upload PDF Documentation
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-docs.pdf
           path: tinymist-docs.pdf
+          if-no-files-found: error
