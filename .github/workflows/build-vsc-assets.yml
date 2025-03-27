@@ -1,5 +1,5 @@
 
-name: tinymist::build::pdf-docs
+name: tinymist::build::vsc_assets
 on:
   workflow_call:
 
@@ -13,6 +13,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install deps
+        run: yarn install
+
       - name: Download tinymist binary artifact
         uses: actions/download-artifact@v4
         with:
@@ -37,11 +45,38 @@ jobs:
         run: |
           prebuilts/tinymist compile --font-path assets/fonts --root . docs/tinymist/ebook.typ tinymist-docs.pdf
       # todo: this is a bug
-      - name: Move PDF Documentation
-        run: mv docs/tinymist/ebook.pdf tinymist-docs.pdf
+      - name: Install PDF Documentation
+        run: |
+          mv docs/tinymist/ebook.pdf tinymist-docs.pdf
+          mkdir -p editors/vscode/out/ contrib/html/editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+          cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
       - name: Upload PDF Documentation
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-docs.pdf
           path: tinymist-docs.pdf
           if-no-files-found: error
+
+      - name: Build typst-preview vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Build tinymist vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./editors/vscode
+
+      - name: Pre-bundle tinymist vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-vscode-m
+          path: editors/vscode/out
+      - name: Pre-bundle typst-preview vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-vscode-m
+          path: contrib/typst-preview/editors/vscode/out
+
