@@ -1,8 +1,7 @@
 
-name: tinymist::build::vscode::others
+name: tinymist::build::pdf-docs
 on:
   workflow_call:
-  workflow_dispatch:
 
 env:
   target: x86_64-unknown-linux-gnu
