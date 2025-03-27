@@ -68,7 +68,7 @@ pub struct Config {
     pub customized_show_document: bool,
     /// Whether the configuration can have a default entry path.
     pub has_default_entry_path: bool,
-    /// Whether to notify the compile status to the editor.
+    /// Whether to notify the status to the editor.
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,
@@ -906,6 +906,23 @@ mod tests {
         good_config(&mut config, &update);
 
         assert_eq!(config.export_pdf, TaskWhen::OnType);
+    }
+
+    #[test]
+    fn test_compile_status() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "compileStatus": "enable",
+        });
+        good_config(&mut config, &update);
+        assert!(config.notify_status);
+
+        let update = json!({
+            "compileStatus": "disable",
+        });
+        good_config(&mut config, &update);
+        assert!(!config.notify_status);
     }
 
     #[test]
