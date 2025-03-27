@@ -10,6 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Download tinymist binary artifact
         uses: actions/download-artifact@v4
         with:
