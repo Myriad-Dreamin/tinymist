@@ -1,7 +1,6 @@
 name: tinymist::vscode::pubish
 on:
   workflow_call:
-  workflow_dispatch:
 
 env:
   RUSTFLAGS: '-Dwarnings'

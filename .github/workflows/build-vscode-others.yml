@@ -2,7 +2,6 @@
 name: tinymist::build::vscode::others
 on:
   workflow_call:
-  workflow_dispatch:
 
 env:
   RUSTFLAGS: '-Dwarnings'
@@ -35,6 +34,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install deps
         run: yarn install
+
       - name: Build typst-preview vscode extension
         run: |
           yarn
@@ -45,6 +45,7 @@ jobs:
           yarn
           yarn run compile
         working-directory: ./editors/vscode
+
       - name: Build tinymist binary
         run: |
           cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
@@ -69,6 +70,18 @@ jobs:
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}
+
+      - name: Download PDF Documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Install PDF Documentation
+        run: |
+          mkdir -p editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+
       - name: Package typst-preview extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
@@ -134,6 +147,16 @@ jobs:
         with:
           name: tinymist-${{ env.target }}-npm
           path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
+
+      - name: Download PDF Documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+      - name: Install PDF Documentation
+        run: |
+          mkdir -p editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+
       - name: Package extension
         if: '!fromJson(env.isNightly)'
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix

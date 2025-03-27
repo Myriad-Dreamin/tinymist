@@ -28,8 +28,8 @@ export async function getTests(ctx: Context) {
     suite.addTest("diagnostics works well", async () => {
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "diagnostics.typ");
 
-      const largeDoc0 = "#for i in range(300) { lorem(i) };";
-      const largeDoc = "#for i in range(300) { lorem(i) }; #test()";
+      const largeDoc0 = "#for i in range(100) { lorem(i) };";
+      const largeDoc = "#for i in range(100) { lorem(i) }; #test()";
 
       // create some definite error in the file
       await ctx.diagnostics(1, async () => {

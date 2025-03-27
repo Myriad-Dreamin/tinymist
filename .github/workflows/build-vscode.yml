@@ -1,13 +1,7 @@
 
-name: tinymist::build::vscode::others
+name: tinymist::build::vscode
 on:
   workflow_call:
-  workflow_dispatch:
-
-env:
-  RUSTFLAGS: '-Dwarnings'
-  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-  CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
 
 jobs:
   build:
@@ -66,6 +60,7 @@ jobs:
         with:
           submodules: recursive
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -74,46 +69,7 @@ jobs:
       - name: Install deps
         run: yarn install
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Build typst-preview vscode extension
-        run: |
-          yarn
-          yarn run compile
-        working-directory: ./contrib/typst-preview/editors/vscode
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Build tinymist vscode extension
-        run: |
-          yarn
-          yarn run compile
-        working-directory: ./editors/vscode
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      # https://github.com/dtolnay/rust-toolchain/issues/133
-      # https://github.com/rust-lang/rustup/issues/3635
-      # Only needed if your action will run two or more rust
-      # commands concurrently, otherwise rustup will lazily 
-      # install your rust-toolchain.toml when needed:
-      - name: 'Install from rust-toolchain.toml'
-        run: |
-          rustup show
-          rustup target add ${{ matrix.rust-target }}
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Install llvm
-        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        run: |
-          sudo apt-get update
-          sudo apt-get install llvm
-      - name: Install AArch64 target toolchain
-        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-aarch64-linux-gnu
-      - name: Install ARM target toolchain
-        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        run: |
-          sudo apt-get update
-          sudo apt-get install gcc-arm-linux-gnueabihf
-      - name: Run rust-cache
-        uses: Swatinem/rust-cache@v2
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+
       - name: Download tinymist binary artifact
         uses: actions/download-artifact@v4
         with:
@@ -128,41 +84,33 @@ jobs:
           tar -xvf prebuilts/tinymist-${{ matrix.rust-target }}.tar.gz -C prebuilts
           mv prebuilts/tinymist-${{ matrix.rust-target }}/tinymist prebuilts/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-      # todo: pdf documentation for all platforms
-      - name: Download font assets
-        # use fonts in stable releases
-        run: |
-          mkdir -p assets/fonts/
-          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
-          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
-          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
-        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Build PDF Documentation
-        run: |
-          prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }} compile --font-path assets/fonts --root . docs/tinymist/ebook.typ
-          cp docs/tinymist/ebook.pdf tinymist-docs.pdf
-          mkdir -p contrib/html/editors/vscode/out/ editors/vscode/out/
-          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
-          cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
-        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Upload PDF Documentation
-        if: matrix.rust-target == 'x86_64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-        uses: actions/upload-artifact@v4
+
+      - name: Download VSC Assets
+        uses: actions/download-artifact@v4
         with:
-          name: tinymist-docs.pdf
-          path: tinymist-docs.pdf
+          name: tinymist-vscode-out
+          path: editors/vscode/out
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Download VSC Assets (L10n)
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-vscode-l10n
+          path: editors/vscode
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Download VSC Assets (Preview)
+        uses: actions/download-artifact@v4
+        with:
+          name: typst-preview-vscode-out
+          path: contrib/typst-preview/editors/vscode/out
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+
       - name: Copy binary to output directory
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "editors/vscode/out/"
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "contrib/typst-preview/editors/vscode/out/"
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "tinymist-${{ env.target }}${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}"
-      - name: Upload binary artifact
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinymist-${{ env.target }}
-          path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
+
       - name: Package typst-preview extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
@@ -179,12 +127,13 @@ jobs:
         if: fromJson(env.isNightly)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
         working-directory: ./editors/vscode
-      - name: Test tinymist extension
-        uses: coactions/setup-xvfb@v1
+
+      - name: Upload binary artifact
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+        uses: actions/upload-artifact@v4
         with:
-          run: yarn test
-          working-directory: ./editors/vscode
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest)
+          name: tinymist-${{ env.target }}
+          path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Upload typst-preview VSIX artifact
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
@@ -197,6 +146,19 @@ jobs:
         with:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
+
+      - name: Test tinymist extension
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: yarn test
+          working-directory: ./editors/vscode
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest)
+      - name: Upload Tinymist Testing log
+        if: ${{ always() && ((fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest))}}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-lsp-tests.${{ env.target }}.log
+          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log
 
       # The universal target doesn't bundle the binary. Users of that must install
       # tinymist by themselves.
@@ -217,9 +179,3 @@ jobs:
         with:
           name: tinymist-universal.vsix
           path: editors/vscode/tinymist-universal.vsix
-      - name: Upload Tinymist Testing log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinymist-lsp-tests.${{ env.target }}.log
-          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log
