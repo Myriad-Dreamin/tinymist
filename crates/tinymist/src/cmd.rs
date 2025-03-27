@@ -27,13 +27,16 @@ use crate::tool::package::InitTask;
 /// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
-    creation_timestamp: Option<String>,
     fill: Option<String>,
     ppi: Option<f32>,
     #[serde(default)]
     page: PageSelection,
     /// Whether to open the exported file(s) after the export is done.
     open: Option<bool>,
+    /// The creation timestamp for various outputs (in seconds).
+    creation_timestamp: Option<String>,
+    /// A PDF standard that Typst can enforce conformance with.
+    pdf_standard: Option<Vec<PdfStandard>>,
 }
 
 /// See [`ProjectTask`].
@@ -71,13 +74,14 @@ impl ServerState {
         } else {
             self.config.creation_timestamp()
         };
+        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
 
         let export = self.config.export_task();
         self.export(
             req_id,
             ProjectTask::ExportPdf(ExportPdfTask {
                 export,
-                pdf_standards: vec![],
+                pdf_standards: pdf_standards.unwrap_or_default(),
                 creation_timestamp,
             }),
             opts.open.unwrap_or_default(),

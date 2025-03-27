@@ -2,7 +2,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tinymist_vfs::{system::SystemAccessModel, ImmutDict, Vfs};
-use typst::utils::LazyHash;
+use typst::{utils::LazyHash, Features};
 
 use crate::{
     args::{CompileFontArgs, CompilePackageArgs},
@@ -47,7 +47,7 @@ impl TypstSystemUniverse {
         // todo: enable html
         Ok(Self::new_raw(
             opts.entry.clone().try_into()?,
-            false,
+            Features::default(),
             Some(Arc::new(LazyHash::new(inputs))),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -81,7 +81,7 @@ impl SystemUniverseBuilder {
         // todo: enable html
         TypstSystemUniverse::new_raw(
             entry,
-            false,
+            Features::default(),
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,

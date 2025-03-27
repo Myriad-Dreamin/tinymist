@@ -14,6 +14,7 @@ use tinymist_world::{
 };
 use typst::foundations::{Dict, Str, Value};
 use typst::utils::LazyHash;
+use typst::Features;
 
 use crate::ProjectInput;
 
@@ -62,7 +63,7 @@ impl WorldProvider for CompileOnceArgs {
         let entry = self.entry()?.try_into()?;
         let inputs = self.resolve_inputs().unwrap_or_default();
         let fonts = Arc::new(LspUniverseBuilder::resolve_fonts(self.font.clone())?);
-        let package = LspUniverseBuilder::resolve_package(
+        let packages = LspUniverseBuilder::resolve_package(
             self.cert.as_deref().map(From::from),
             Some(&self.package),
         );
@@ -71,9 +72,10 @@ impl WorldProvider for CompileOnceArgs {
         Ok(LspUniverseBuilder::build(
             entry,
             ExportTarget::Paged,
+            self.resolve_features(),
             inputs,
+            packages,
             fonts,
-            package,
         ))
     }
 
@@ -142,7 +144,7 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             },
             ignore_system_fonts: !proj.system_fonts,
         })?;
-        let package = LspUniverseBuilder::resolve_package(
+        let packages = LspUniverseBuilder::resolve_package(
             // todo: recover certificate path
             None,
             Some(&CompilePackageArgs {
@@ -161,9 +163,11 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
         Ok(LspUniverseBuilder::build(
             entry,
             ExportTarget::Paged,
+            // todo: features
+            Features::default(),
             Arc::new(LazyHash::new(inputs)),
+            packages,
             Arc::new(fonts),
-            package,
         ))
     }
 
@@ -207,19 +211,27 @@ impl LspUniverseBuilder {
     pub fn build(
         entry: EntryState,
         export_target: ExportTarget,
+        features: Features,
         inputs: ImmutDict,
-        font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpRegistry,
+        font_resolver: Arc<TinymistFontResolver>,
     ) -> LspUniverse {
-        let registry = Arc::new(package_registry);
-        let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
+        let package_registry = Arc::new(package_registry);
+        let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
+
+        // todo: typst doesn't allow to merge features
+        let features = if matches!(export_target, ExportTarget::Html) {
+            Features::from_iter([typst::Feature::Html])
+        } else {
+            features
+        };
 
         LspUniverse::new_raw(
             entry,
-            matches!(export_target, ExportTarget::Html),
+            features,
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
-            registry,
+            package_registry,
             font_resolver,
         )
     }

@@ -20,6 +20,7 @@ use tinymist_render::PeriscopeArgs;
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
+use typst::Features;
 use typst_shim::utils::LazyHash;
 
 use super::*;
@@ -410,6 +411,8 @@ impl Config {
                 root_dir: args.root.as_ref().map(|r| r.as_path().into()),
                 font: args.font,
                 package: args.package,
+                pdf_standard: args.pdf_standard,
+                features: args.features,
                 creation_timestamp: args.creation_timestamp,
                 cert: args.cert.as_deref().map(From::from),
             });
@@ -504,7 +507,7 @@ impl Config {
             // },
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export,
-                pdf_standards: vec![],
+                pdf_standards: self.pdf_standards().unwrap_or_default(),
                 creation_timestamp: self.creation_timestamp(),
             }),
             count_words: self.notify_status,
@@ -590,6 +593,17 @@ impl Config {
         }
 
         EMPTY.clone()
+    }
+
+    /// Determines the typst features
+    pub fn typst_features(&self) -> Option<Features> {
+        let features = &self.typst_extra_args.as_ref()?.features;
+        Some(Features::from_iter(features.iter().map(|f| (*f).into())))
+    }
+
+    /// Determines the pdf standards.
+    pub fn pdf_standards(&self) -> Option<Vec<PdfStandard>> {
+        Some(self.typst_extra_args.as_ref()?.pdf_standard.clone())
     }
 
     /// Determines the creation timestamp.
@@ -808,6 +822,12 @@ pub struct TypstExtraArgs {
     pub font: CompileFontArgs,
     /// The package related arguments.
     pub package: CompilePackageArgs,
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with.
+    pub features: Vec<Feature>,
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with.
+    pub pdf_standard: Vec<PdfStandard>,
     /// The creation timestamp for various outputs (in seconds).
     pub creation_timestamp: Option<i64>,
     /// The path to the certification file.

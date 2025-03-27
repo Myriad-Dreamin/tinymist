@@ -124,8 +124,7 @@ impl ServerState {
         entry: Option<ImmutPath>,
     ) -> Result<ProjectInsId> {
         let entry = self.config.entry_resolver.resolve(entry);
-        let enable_html = matches!(self.config.export_target, ExportTarget::Html);
-        self.project.restart_dedicate(dedicate, entry, enable_html)
+        self.project.restart_dedicate(dedicate, entry)
     }
 
     /// Create a fresh [`ProjectState`].
@@ -184,14 +183,14 @@ impl ServerState {
         let inputs = config.inputs();
         let cert_path = config.certification_path();
         let package = config.package_opts();
+        let features = config.typst_features().unwrap_or_default();
 
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         let fonts = config.fonts();
-        let package_registry =
-            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
         let verse =
-            LspUniverseBuilder::build(entry, export_target, inputs, fonts, package_registry);
+            LspUniverseBuilder::build(entry, export_target, features, inputs, packages, fonts);
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
@@ -208,6 +207,7 @@ impl ServerState {
             dep_tx,
             CompileServerOpts {
                 handler: compile_handle,
+                export_target: config.export_target,
                 enable_watch: true,
             },
         );
@@ -337,9 +337,8 @@ impl ProjectState {
         &mut self,
         group: &str,
         entry: EntryState,
-        enable_html: bool,
     ) -> Result<ProjectInsId> {
-        self.compiler.restart_dedicate(group, entry, enable_html)
+        self.compiler.restart_dedicate(group, entry)
     }
 }
 

@@ -141,7 +141,8 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     let graph = WorldComputeGraph::from_world(world);
 
     // Compiles the project
-    let compiled = CompiledArtifact::from_graph(graph);
+    let is_html = matches!(output.task, ProjectTask::ExportHtml(..));
+    let compiled = CompiledArtifact::from_graph(graph, is_html);
 
     let diag = compiled.diagnostics();
     print_diagnostics(compiled.world(), diag, DiagnosticFormat::Human)
@@ -410,6 +411,8 @@ pub(crate) struct ProjectOpts {
     pub config: Config,
     /// The shared preview state.
     pub preview: ProjectPreviewState,
+    /// The export target.
+    pub export_target: ExportTarget,
 }
 
 pub(crate) struct StartProjectResult<F> {
@@ -465,6 +468,7 @@ where
         dep_tx,
         CompileServerOpts {
             handler: compile_handle,
+            export_target: opts.export_target,
             enable_watch: true,
         },
     );
