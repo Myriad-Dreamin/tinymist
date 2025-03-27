@@ -88,13 +88,19 @@ jobs:
       - name: Download VSC Assets
         uses: actions/download-artifact@v4
         with:
-          name: tinymist-vscode-m
-          path: editors/vscode/out/
+          name: tinymist-vscode-out
+          path: editors/vscode/out
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Download VSC Assets (Syntaxes)
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-vscode-syntaxes
+          path: editors/vscode/syntaxes
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Download VSC Assets (Preview)
         uses: actions/download-artifact@v4
         with:
-          name: typst-preview-vscode-m
+          name: typst-preview-vscode-out
           path: contrib/typst-preview/editors/vscode/out
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
 

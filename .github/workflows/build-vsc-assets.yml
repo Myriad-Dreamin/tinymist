@@ -72,11 +72,16 @@ jobs:
       - name: Pre-bundle tinymist vscode extension
         uses: actions/upload-artifact@v4
         with:
-          name: tinymist-vscode-m
+          name: tinymist-vscode-out
           path: editors/vscode/out
+      - name: Pre-bundle tinymist vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-vscode-syntaxes
+          path: editors/vscode/syntaxes
       - name: Pre-bundle typst-preview vscode extension
         uses: actions/upload-artifact@v4
         with:
-          name: typst-preview-vscode-m
+          name: typst-preview-vscode-out
           path: contrib/typst-preview/editors/vscode/out
 
