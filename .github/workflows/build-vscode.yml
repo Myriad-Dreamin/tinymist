@@ -91,11 +91,11 @@ jobs:
           name: tinymist-vscode-out
           path: editors/vscode/out
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Download VSC Assets (Syntaxes)
+      - name: Download VSC Assets (L10n)
         uses: actions/download-artifact@v4
         with:
-          name: tinymist-vscode-syntaxes
-          path: editors/vscode/syntaxes
+          name: tinymist-vscode-l10n
+          path: editors/vscode
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Download VSC Assets (Preview)
         uses: actions/download-artifact@v4
@@ -147,6 +147,19 @@ jobs:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
 
+      - name: Test tinymist extension
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: yarn test
+          working-directory: ./editors/vscode
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest)
+      - name: Upload Tinymist Testing log
+        if: ${{ always() && ((fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest))}}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-lsp-tests.${{ env.target }}.log
+          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log
+
       # The universal target doesn't bundle the binary. Users of that must install
       # tinymist by themselves.
       - name: Remove server binary
@@ -166,16 +179,3 @@ jobs:
         with:
           name: tinymist-universal.vsix
           path: editors/vscode/tinymist-universal.vsix
-
-      - name: Test tinymist extension
-        uses: coactions/setup-xvfb@v1
-        with:
-          run: yarn test
-          working-directory: ./editors/vscode
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest)
-      - name: Upload Tinymist Testing log
-        if: ${{ always() && ((fromJson(env.isRelease) || fromJson(env.isNightly)) && fromJson(env.isTest))}}
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinymist-lsp-tests.${{ env.target }}.log
-          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log

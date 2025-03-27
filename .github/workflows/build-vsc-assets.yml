@@ -74,11 +74,14 @@ jobs:
         with:
           name: tinymist-vscode-out
           path: editors/vscode/out
-      - name: Pre-bundle tinymist vscode extension
+      - name: Pre-bundle tinymist vscode extension (L10n)
         uses: actions/upload-artifact@v4
         with:
-          name: tinymist-vscode-syntaxes
-          path: editors/vscode/syntaxes
+          name: tinymist-vscode-l10n
+          path: |
+            editors/vscode/l10n/**/*
+            editors/vscode/package.nls.json
+            editors/vscode/package.nls.*.json
       - name: Pre-bundle typst-preview vscode extension
         uses: actions/upload-artifact@v4
         with:
