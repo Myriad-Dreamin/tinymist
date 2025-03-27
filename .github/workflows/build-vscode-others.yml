@@ -69,6 +69,18 @@ jobs:
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}
+
+      - name: Download PDF Documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Install PDF Documentation
+        run: |
+          mkdir -p editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+
       - name: Package typst-preview extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
