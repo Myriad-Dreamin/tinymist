@@ -105,6 +105,10 @@ jobs:
     strategy:
       matrix:
         include:
+          - os: windows-2019
+            rust-target: x86_64-pc-windows-msvc
+            platform: win32
+            arch: x64
           - os: windows-latest
             rust-target: x86_64-pc-windows-msvc
             platform: win32
@@ -113,11 +117,19 @@ jobs:
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-          # - os: macos-13
-          #   rust-target: aarch64-apple-darwin
-          #   platform: darwin
-          #   arch: arm64
-    name: E2E Tests (${{ matrix.platform }}-${{ matrix.arch }})
+          - os: ubuntu-latest
+            rust-target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+          - os: macos-13
+            rust-target: x86_64-apple-darwin
+            platform: darwin
+            arch: x64
+          - os: macos-latest
+            rust-target: aarch64-apple-darwin
+            platform: darwin
+            arch: arm64
+    name: E2E Tests (${{ matrix.platform }}-${{ matrix.arch }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -134,15 +146,13 @@ jobs:
           tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
           mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
         if: matrix.platform != 'win32'
-      - name: List files
-        run: ls -l editors/vscode/out
       - name: Test Tinymist (E2E)
         run: cargo test -p tests -- e2e
       - name: Upload Tinymist E2E Test Snapshot 
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-snapshot-${{ matrix.platform }}-${{ matrix.arch }}
+          name: e2e-snapshot-${{ matrix.rust-target }}-${{ matrix.os }}
           path: target/e2e
 
   prepare-build:

@@ -128,9 +128,6 @@ jobs:
           tar -xvf prebuilts/tinymist-${{ matrix.rust-target }}.tar.gz -C prebuilts
           mv prebuilts/tinymist-${{ matrix.rust-target }}/tinymist prebuilts/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: List files
-        run: ls -l prebuilts
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       # todo: pdf documentation for all platforms
       - name: Download font assets
         # use fonts in stable releases
