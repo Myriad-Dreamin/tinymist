@@ -1,0 +1,41 @@
+
+name: tinymist::build::vscode::others
+on:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  target: x86_64-unknown-linux-gnu
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download tinymist binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-build-local-${{ env.target }}
+          path: prebuilts
+      - name: Unzip tinymist binary artifact (Windows)
+        run: 7z x -y -oprebuilts prebuilts/tinymist-${{ env.target }}.zip
+        if: contains(env.target, 'windows')
+      - name: Unzip tinymist binary artifact (Linux)
+        run: |
+          tar -xvf prebuilts/tinymist-${{ env.target }}.tar.gz -C prebuilts
+          mv prebuilts/tinymist-${{ env.target }}/tinymist prebuilts/tinymist
+        if: ${{ !contains(env.target, 'windows') }}
+      - name: Download font assets
+        # use fonts in stable releases
+        run: |
+          mkdir -p assets/fonts/
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
+      - name: Build PDF Documentation
+        run: |
+          prebuilts/tinymist compile --font-path assets/fonts --root . docs/tinymist/ebook.typ tinymist-docs.pdf
+      - name: Upload PDF Documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+          path: tinymist-docs.pdf
