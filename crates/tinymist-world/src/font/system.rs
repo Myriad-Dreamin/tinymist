@@ -9,7 +9,6 @@ use std::{
 use fontdb::Database;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sha2::{Digest, Sha256};
-use tinymist_std::debug_loc::{DataSource, MemoryDataSource};
 use tinymist_std::error::prelude::*;
 use tinymist_vfs::system::LazyFile;
 use typst::{
@@ -22,6 +21,7 @@ use super::{
     BufferFontLoader, FontProfile, FontProfileItem, FontResolverImpl, FontSlot,
     LazyBufferFontLoader, PartialFontBook,
 };
+use crate::debug_loc::{DataSource, FsDataSource, MemoryDataSource};
 use crate::{build_info, config::CompileFontOpts};
 
 #[derive(Debug, Default)]
@@ -185,7 +185,6 @@ impl SystemFontSearcher {
 
     pub fn flush(&mut self) {
         use fontdb::Source;
-        use tinymist_std::debug_loc::FsDataSource;
 
         let face = self.db.faces().collect::<Vec<_>>();
         let info = face.into_par_iter().map(|face| {

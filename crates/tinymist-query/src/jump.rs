@@ -3,7 +3,8 @@
 use std::num::NonZeroUsize;
 
 use tinymist_project::LspWorld;
-use tinymist_std::{debug_loc::SourceSpanOffset, typst::TypstDocument};
+use tinymist_std::typst::TypstDocument;
+use tinymist_world::debug_loc::SourceSpanOffset;
 use typst::{
     layout::{Frame, FrameItem, Point, Position, Size},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
