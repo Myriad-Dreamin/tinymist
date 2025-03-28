@@ -533,6 +533,12 @@ impl LexicalHierarchyWorker {
 
                 (name, kind)
             }
+            SyntaxKind::ListItem => {
+                (EcoString::new(), LexicalKind::Block)
+            }
+            SyntaxKind::EnumItem => {
+                (EcoString::new(), LexicalKind::Block)
+            }
             _ => return Some(None),
         };
 
