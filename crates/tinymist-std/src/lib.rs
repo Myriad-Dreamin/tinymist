@@ -14,8 +14,6 @@ pub use concepts::*;
 pub use error::{ErrKind, Error, Result};
 
 #[cfg(feature = "typst")]
-pub use tinymist_analysis::debug_loc;
-#[cfg(feature = "typst")]
 pub use typst_shim;
 
 #[cfg(feature = "rkyv")]

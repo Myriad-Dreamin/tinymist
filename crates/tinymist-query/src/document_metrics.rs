@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tinymist_std::debug_loc::DataSource;
 use tinymist_std::typst::TypstDocument;
+use tinymist_world::debug_loc::DataSource;
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
