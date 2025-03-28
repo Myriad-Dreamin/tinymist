@@ -17,7 +17,7 @@ use typst::{
     syntax::{FileId, Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
+    Features, Library, World,
 };
 
 use crate::{
@@ -50,10 +50,10 @@ pub struct CompilerUniverse<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
     entry: EntryState,
-    /// Whether to enable HTML features.
-    enable_html: bool,
     /// Additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
+    /// Features enabled for the compiler.
+    pub features: Features,
 
     /// Provides font management for typst compiler.
     pub font_resolver: Arc<F::FontResolver>,
@@ -76,21 +76,21 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     /// + See [`crate::TypstBrowserUniverse::new`] for browser environment.
     pub fn new_raw(
         entry: EntryState,
-        enable_html: bool,
+        features: Features,
         inputs: Option<Arc<LazyHash<Dict>>>,
         vfs: Vfs<F::AccessModel>,
-        registry: Arc<F::Registry>,
+        package_registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
     ) -> Self {
         Self {
             entry,
-            enable_html,
             inputs: inputs.unwrap_or_default(),
+            features,
 
             revision: NonZeroUsize::new(1).expect("initial revision is 1"),
 
             font_resolver,
-            registry,
+            registry: package_registry,
             vfs,
         }
     }
@@ -156,9 +156,9 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn snapshot_with(&self, mutant: Option<TaskInputs>) -> CompilerWorld<F> {
         let w = CompilerWorld {
             entry: self.entry.clone(),
-            enable_html: self.enable_html,
+            features: self.features.clone(),
             inputs: self.inputs.clone(),
-            library: create_library(self.inputs.clone(), self.enable_html),
+            library: create_library(self.inputs.clone(), self.features.clone()),
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
@@ -436,10 +436,10 @@ pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
     entry: EntryState,
-    /// Whether to enable HTML features.
-    enable_html: bool,
     /// Additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
+    /// A selection of in-development features that should be enabled.
+    features: Features,
 
     /// Provides library for typst compiler.
     pub library: Arc<LazyHash<Library>>,
@@ -478,7 +478,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         let library = mutant
             .inputs
             .clone()
-            .map(|inputs| create_library(inputs, self.enable_html));
+            .map(|inputs| create_library(inputs, self.features.clone()));
 
         let root_changed = if let Some(e) = mutant.entry.as_ref() {
             self.entry.workspace_root() != e.workspace_root()
@@ -487,7 +487,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         };
 
         let mut world = CompilerWorld {
-            enable_html: self.enable_html,
+            features: self.features.clone(),
             inputs: mutant.inputs.unwrap_or_else(|| self.inputs.clone()),
             library: library.unwrap_or_else(|| self.library.clone()),
             entry: mutant.entry.unwrap_or_else(|| self.entry.clone()),
@@ -572,14 +572,15 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     pub fn paged_task(&self) -> Cow<'_, CompilerWorld<F>> {
-        let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html);
+        let force_html = self.features.is_enabled(typst::Feature::Html);
+        let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html) || force_html;
 
         if enabled_paged {
             return Cow::Borrowed(self);
         }
 
         let mut world = self.clone();
-        world.library = create_library(world.inputs.clone(), false);
+        world.library = create_library(world.inputs.clone(), self.features.clone());
 
         Cow::Owned(world)
     }
@@ -591,8 +592,12 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             return Cow::Borrowed(self);
         }
 
+        // todo: We need some way to enable html features based on the features but
+        // typst doesn't give one.
+        let features = typst::Features::from_iter([typst::Feature::Html]);
+
         let mut world = self.clone();
-        world.library = create_library(world.inputs.clone(), true);
+        world.library = create_library(world.inputs.clone(), features);
 
         Cow::Owned(world)
     }
@@ -905,13 +910,7 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 }
 
 #[comemo::memoize]
-fn create_library(inputs: Arc<LazyHash<Dict>>, enable_html: bool) -> Arc<LazyHash<Library>> {
-    let features = if enable_html {
-        typst::Features::from_iter([typst::Feature::Html])
-    } else {
-        typst::Features::default()
-    };
-
+fn create_library(inputs: Arc<LazyHash<Dict>>, features: Features) -> Arc<LazyHash<Library>> {
     let lib = typst::Library::builder()
         .with_inputs(inputs.deref().deref().clone())
         .with_features(features)

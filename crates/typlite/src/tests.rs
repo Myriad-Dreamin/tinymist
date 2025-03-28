@@ -25,8 +25,9 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
         EntryState::new_rooted_by_id(cwd.as_path().into(), main.id()),
         ExportTarget::Paged,
         Default::default(),
-        FONT_RESOLVER.clone(),
         Default::default(),
+        Default::default(),
+        FONT_RESOLVER.clone(),
     );
     let main_id = universe.main_id().unwrap();
     universe
