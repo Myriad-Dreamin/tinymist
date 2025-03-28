@@ -6,9 +6,7 @@ export function setupDrag() {
         const dx = e.clientX - lastPos.x;
         const dy = e.clientY - lastPos.y;
 
-        // Scroll the element
-        window.scrollBy(0, -dy);
-        containerElement?.scrollBy(-dx, 0);
+        window.scrollBy(-dx, -dy);
         lastPos = {
             x: e.clientX,
             y: e.clientY,
