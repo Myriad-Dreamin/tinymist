@@ -1,8 +1,10 @@
 //! The debug location that can be used to locate a position in a document or a
 //! file.
 
-use serde::{Deserialize, Serialize};
+pub use lsp_types::PositionEncodingKind;
 pub use typst::layout::Position as TypstPosition;
+
+use serde::{Deserialize, Serialize};
 
 /// A serializable physical position in a document.
 ///
@@ -82,7 +84,6 @@ pub struct FlatSourceLocation {
 /// A resolved file position. The position is encoded in Utf-8, Utf-16 or
 /// Utf-32. The position encoding must be negotiated via some protocol like LSP.
 pub type LspPosition = lsp_types::Position;
-
 /// A resolved file range.
 ///
 /// See [`LspPosition`] for the definition of the position inside a file.

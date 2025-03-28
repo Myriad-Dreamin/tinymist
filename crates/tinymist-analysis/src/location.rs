@@ -6,9 +6,9 @@ use std::ops::Range;
 use typst::syntax::Source;
 
 /// An LSP Position encoded by [`PositionEncoding`].
-type LspPosition = lsp_types::Position;
+type LspPosition = tinymist_world::debug_loc::LspPosition;
 /// An LSP range encoded by [`PositionEncoding`].
-type LspRange = lsp_types::Range;
+type LspRange = tinymist_world::debug_loc::LspRange;
 
 /// What counts as "1 character" for string indexing. We should always prefer
 /// UTF-8, but support UTF-16 as long as it is standard. For more background on
@@ -28,7 +28,7 @@ pub enum PositionEncoding {
     Utf8,
 }
 
-impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
+impl From<PositionEncoding> for tinymist_world::debug_loc::PositionEncodingKind {
     fn from(position_encoding: PositionEncoding) -> Self {
         match position_encoding {
             PositionEncoding::Utf16 => Self::UTF16,
@@ -187,7 +187,7 @@ pub fn to_lsp_range(
 
 #[cfg(test)]
 mod test {
-    use lsp_types::Position;
+    use super::LspPosition as Position;
 
     use super::*;
 

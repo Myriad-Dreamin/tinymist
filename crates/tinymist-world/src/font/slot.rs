@@ -1,10 +1,10 @@
 use core::fmt;
 use std::sync::Arc;
 
-use tinymist_std::debug_loc::DataSource;
 use tinymist_std::QueryRef;
 use typst::text::Font;
 
+use crate::debug_loc::DataSource;
 use crate::font::FontLoader;
 
 type FontSlotInner = QueryRef<Option<Font>, (), Box<dyn FontLoader + Send>>;
