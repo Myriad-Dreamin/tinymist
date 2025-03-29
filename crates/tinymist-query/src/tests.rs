@@ -79,8 +79,13 @@ pub fn run_with_ctx<T>(
         .get("html")
         .map(|v| v.trim() == "true")
         .unwrap_or(true);
+    let with_cov = properties
+        .get("with_cov")
+        .map(|v| v.trim() == "true")
+        .unwrap_or(false);
 
     let mut ctx = Arc::new(Analysis {
+        with_cov,
         remove_html: !supports_html,
         completion_feat: CompletionFeat {
             trigger_on_snippet_placeholders: true,

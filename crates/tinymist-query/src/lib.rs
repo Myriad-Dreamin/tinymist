@@ -42,6 +42,7 @@ pub use will_rename_files::*;
 pub use workspace_label::*;
 
 pub mod analysis;
+pub mod cf;
 pub mod docs;
 pub mod package;
 pub mod syntax;

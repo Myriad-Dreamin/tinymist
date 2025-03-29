@@ -1,0 +1,18 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: cf.repr(false)
+input_file: crates/tinymist-query/src/fixtures/control_flow_of/hello_world.typ
+---
+document reg0 {
+  reg0 {
+    ^bb0: {
+      %2 = elem(heading, ^bb1)
+    }
+    ^bb1: {
+      %1: any = ^bb2
+    }
+    ^bb2: {
+      %0 = ins text
+    }
+  }
+}
