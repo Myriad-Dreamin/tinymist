@@ -5,7 +5,7 @@ pub use std::path::{Path, PathBuf};
 pub use std::sync::{Arc, LazyLock, OnceLock};
 
 pub use ecow::{eco_vec, EcoVec};
-pub use itertools::{Format, Itertools};
+pub use itertools::Itertools;
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
     ColorInformation, ColorPresentation, Diagnostic, DiagnosticRelatedInformation,
