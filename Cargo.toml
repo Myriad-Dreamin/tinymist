@@ -144,7 +144,7 @@ typst-eval = "0.13.1"
 typst-assets = "0.13.1"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.0", default-features = false }
+typstyle-core = { version = "=0.13.2", default-features = false }
 typlite = { path = "./crates/typlite" }
 
 # LSP
@@ -251,7 +251,7 @@ extend-exclude = ["/.git", "fixtures"]
 
 # This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
 # The shortcoming is that you cannot install tinymist from git source then, i.e. `cargo install --git ..`, with this patch.
-# However, it is not suggested to install it in that way. The suggested ways are: 
+# However, it is not suggested to install it in that way. The suggested ways are:
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
 # - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
