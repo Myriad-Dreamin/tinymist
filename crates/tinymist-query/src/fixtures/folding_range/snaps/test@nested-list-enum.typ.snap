@@ -1,0 +1,101 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/nested-list-enum.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 17,
+   "endLine": 2,
+   "startCharacter": 2,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 5,
+   "startCharacter": 4,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 6,
+   "startCharacter": 4,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 6,
+   "startCharacter": 2,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 6,
+   "startCharacter": 0,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 17,
+   "endLine": 10,
+   "startCharacter": 2,
+   "startLine": 10
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 13,
+   "startCharacter": 4,
+   "startLine": 13
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 14,
+   "startCharacter": 4,
+   "startLine": 14
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 14,
+   "startCharacter": 2,
+   "startLine": 11
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 14,
+   "startCharacter": 0,
+   "startLine": 8
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 6,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endLine": 6,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endLine": 14,
+   "startLine": 11
+  },
+  {
+   "collapsedText": "",
+   "endLine": 14,
+   "startLine": 8
+  }
+ ]
+}
