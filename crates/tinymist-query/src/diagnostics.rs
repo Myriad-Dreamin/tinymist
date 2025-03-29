@@ -85,10 +85,7 @@ fn convert_diagnostic(
     let lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
 
     let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
-
-    let typst_message = &typst_diagnostic.message;
-    let typst_hints = &typst_diagnostic.hints;
-    let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
+    let lsp_message = diagnostic_message(&typst_diagnostic);
 
     let tracepoints =
         diagnostic_related_information(ctx, &typst_diagnostic, ctx.position_encoding)?;
@@ -185,11 +182,13 @@ fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
     }
 }
 
-fn diagnostic_hints(typst_hints: &[EcoString]) -> Format<impl Iterator<Item = EcoString> + '_> {
-    iter::repeat(EcoString::from("\n\nHint: "))
-        .take(typst_hints.len())
-        .interleave(typst_hints.iter().cloned())
-        .format("")
+fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
+    let mut message = typst_diagnostic.message.to_string();
+    for hint in &typst_diagnostic.hints {
+        message.push_str("\nHint: ");
+        message.push_str(hint);
+    }
+    message
 }
 
 trait DiagnosticRefiner {
