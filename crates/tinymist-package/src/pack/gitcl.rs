@@ -33,9 +33,10 @@ impl<P: AsRef<str>> PackFs for GitClPack<P> {
         let temp_dir = temp_dir.join("tinymist/package-gitcl");
 
         tinymist_std::fs::paths::temp_dir_in(temp_dir, |temp_dir| {
-            clone(self.url.as_ref(), temp_dir)?;
+            let package_path = temp_dir.join("package");
+            clone(self.url.as_ref(), &package_path)?;
 
-            Ok(DirPack::new(temp_dir).read_all(f))
+            Ok(DirPack::new(package_path).read_all(f))
         })
         .map_err(other)?
     }
