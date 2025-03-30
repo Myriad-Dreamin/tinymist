@@ -9,7 +9,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
 
 > [!NOTE]
-> 
+>
 >   Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
 
 
@@ -27,14 +27,14 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   ```
 - Or manually:
 
-  
+
 ## Finding Executable
 
 To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 
   If you are using the latest version of
   [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
@@ -122,14 +122,14 @@ It is often useful to have a command that opens the current file in the reader.
 
 ```lua
 vim.api.nvim_create_user_command("OpenPdf", function()
-  local filepath = vim.api.nvim_buf_get_name(0)
-  if filepath:match("%.typ$") then
-    os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
-    -- replace open with your preferred pdf viewer
-    -- os.execute("zathura " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
-  end
+    local filepath = vim.api.nvim_buf_get_name(0)
+    if filepath:match("%.typ$") then
+        local pdf_path = filepath:gsub("%.typ$", ".pdf")
+        vim.system({ "open", pdf_path })
+        -- replace open with your preferred pdf viewer
+        -- vim.system({ "zathura", pdf_path })
+    end
 end, {})
-
 ```
 Make sure to change `exportPdf` to "onType" or "onSave".
 
