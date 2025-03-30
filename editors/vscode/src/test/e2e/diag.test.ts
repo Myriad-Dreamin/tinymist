@@ -4,6 +4,13 @@ import * as vscode from "vscode";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
+  // Skip this test on Windows due to unstable
+  // todo: restore this test on Windows
+  if (process.platform === "win32") {
+    console.warn("WARN: Skipping diagnostics test on Windows");
+    return;
+  }
+
   function parseTestFile(content: string): Record<string, string> {
     // 初始化结果对象
     const result: Record<string, string> = {};
@@ -26,13 +33,6 @@ export async function getTests(ctx: Context) {
     console.log("Start all tests on ", workspaceUri.fsPath);
 
     suite.addTest("diagnostics works well", async () => {
-      // Skip this test on Windows due to unstable
-      // todo: restore this test on Windows
-      if (process.platform === "win32") {
-        console.warn("WARN: Skipping diagnostics test on Windows");
-        return;
-      }
-
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "diagnostics.typ");
 
       const largeDoc0 = "#for i in range(100) { lorem(i) };";
@@ -73,12 +73,6 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("typst0.13 diag hints", async () => {
-      // todo: restore this test on Windows
-      if (process.platform === "win32") {
-        console.warn("WARN: Skipping diagnostics test on Windows");
-        return;
-      }
-
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "typst013.typ");
 
       const editor = await ctx.openDocument(mainUrl);
