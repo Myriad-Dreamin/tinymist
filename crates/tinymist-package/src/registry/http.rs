@@ -307,7 +307,7 @@ impl PackageStorage {
     }
 }
 
-fn threaded_http<T: Send + Sync>(
+pub(crate) fn threaded_http<T: Send + Sync>(
     url: &str,
     cert_path: Option<&Path>,
     f: impl FnOnce(Result<Response, reqwest::Error>) -> T + Send + Sync,
