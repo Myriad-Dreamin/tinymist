@@ -12,10 +12,12 @@ pub use dummy::*;
 
 #[cfg(feature = "browser")]
 mod browser;
+#[cfg(feature = "browser")]
 pub use browser::*;
 
 #[cfg(feature = "http-registry")]
 mod http;
+#[cfg(feature = "http-registry")]
 pub use http::*;
 
 /// A trait for package registries.
