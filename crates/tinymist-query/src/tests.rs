@@ -154,6 +154,8 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         EntryState::new_rooted(root.as_path().into(), None),
         ExportTarget::Paged,
         Default::default(),
+        Default::default(),
+        LspUniverseBuilder::resolve_package(None, None),
         Arc::new(
             LspUniverseBuilder::resolve_fonts(CompileFontArgs {
                 ignore_system_fonts: true,
@@ -161,7 +163,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
             })
             .unwrap(),
         ),
-        LspUniverseBuilder::resolve_package(None, None),
     );
     let sources = source.split("-----");
 

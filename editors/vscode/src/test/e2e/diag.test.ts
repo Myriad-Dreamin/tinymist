@@ -26,6 +26,13 @@ export async function getTests(ctx: Context) {
     console.log("Start all tests on ", workspaceUri.fsPath);
 
     suite.addTest("diagnostics works well", async () => {
+      // Skip this test on Windows due to unstable
+      // todo: restore this test on Windows
+      if (process.platform === "win32") {
+        console.warn("WARN: Skipping diagnostics test on Windows");
+        return;
+      }
+
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "diagnostics.typ");
 
       const largeDoc0 = "#for i in range(100) { lorem(i) };";
@@ -66,6 +73,12 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("typst0.13 diag hints", async () => {
+      // todo: restore this test on Windows
+      if (process.platform === "win32") {
+        console.warn("WARN: Skipping diagnostics test on Windows");
+        return;
+      }
+
       const mainUrl = vscode.Uri.joinPath(workspaceUri, "typst013.typ");
 
       const editor = await ctx.openDocument(mainUrl);

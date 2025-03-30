@@ -9,6 +9,7 @@ use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
+use tinymist_task::ProjectTask;
 use tokio::sync::mpsc;
 use typst::syntax::Source;
 
@@ -442,7 +443,8 @@ impl ServerState {
                 ..TaskInputs::default()
             });
 
-            let artifact = CompiledArtifact::from_graph(snap.clone());
+            let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+            let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));

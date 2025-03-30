@@ -8,6 +8,7 @@ use std::sync::{Arc, OnceLock};
 use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::Result;
 use tinymist_std::{typst::TypstDocument, ImmutPath};
+use tinymist_task::ExportTarget;
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
 };
@@ -84,9 +85,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Runs the compiler and returns the compiled document.
-    pub fn from_graph(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
-        let is_html = graph.library().features.is_enabled(typst::Feature::Html);
-
+    pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> CompiledArtifact<F> {
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
         let doc = if is_html {
@@ -355,6 +354,8 @@ pub struct CompileServerOpts<F: CompilerFeat, Ext> {
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
+    /// Specifies the current export target.
+    pub export_target: ExportTarget,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileServerOpts<F, Ext> {
@@ -362,6 +363,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
         Self {
             handler: Arc::new(std::marker::PhantomData),
             enable_watch: false,
+            export_target: ExportTarget::Paged,
         }
     }
 }
@@ -370,6 +372,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
 pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
+    /// Specifies the current export target.
+    export_target: ExportTarget,
     /// Channel for sending interrupts to the compiler actor.
     dep_tx: mpsc::UnboundedSender<NotifyMessage>,
     /// Whether to enable file system watching.
@@ -398,13 +402,20 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         CompileServerOpts {
             handler,
             enable_watch,
+            export_target,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
-        let primary = Self::create_project(ProjectInsId("primary".into()), verse, handler.clone());
+        let primary = Self::create_project(
+            ProjectInsId("primary".into()),
+            verse,
+            export_target,
+            handler.clone(),
+        );
         Self {
             handler,
             dep_tx,
             enable_watch,
+            export_target,
 
             logical_tick: 1,
             dirty_shadow_logical_tick: 0,
@@ -425,7 +436,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     /// Compiles the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
         let snap = self.primary.make_snapshot();
-        ProjectInsState::run_compile(self.handler.clone(), snap)()
+        ProjectInsState::run_compile(self.handler.clone(), snap, self.export_target)()
     }
 
     /// Gets the iterator of all projects.
@@ -436,6 +447,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     fn create_project(
         id: ProjectInsId,
         verse: CompilerUniverse<F>,
+        export_target: ExportTarget,
         handler: Arc<dyn CompileHandler<F, Ext>>,
     ) -> ProjectInsState<F, Ext> {
         ProjectInsState {
@@ -445,6 +457,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             reason: no_reason(),
             snapshot: None,
             handler,
+            export_target,
             compilation: OnceLock::default(),
             latest_success_doc: None,
             deps: Default::default(),
@@ -471,24 +484,20 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     }
 
     /// Restart a dedicate project.
-    pub fn restart_dedicate(
-        &mut self,
-        group: &str,
-        entry: EntryState,
-        enable_html: bool,
-    ) -> Result<ProjectInsId> {
+    pub fn restart_dedicate(&mut self, group: &str, entry: EntryState) -> Result<ProjectInsId> {
         let id = ProjectInsId(group.into());
 
         let verse = CompilerUniverse::<F>::new_raw(
             entry,
-            enable_html,
+            self.primary.verse.features.clone(),
             Some(self.primary.verse.inputs().clone()),
             self.primary.verse.vfs().fork(),
             self.primary.verse.registry.clone(),
             self.primary.verse.font_resolver.clone(),
         );
 
-        let mut proj = Self::create_project(id.clone(), verse, self.handler.clone());
+        let mut proj =
+            Self::create_project(id.clone(), verse, self.export_target, self.handler.clone());
         proj.reason.see(reason_by_entry_change());
 
         self.remove_dedicates(&id);
@@ -739,6 +748,8 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub ext: Ext,
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
+    /// Specifies the current export target.
+    pub export_target: ExportTarget,
     /// The reason to compile.
     pub reason: CompileReasons,
     /// The latest compute graph (snapshot).
@@ -817,13 +828,14 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let snap = self.snapshot();
         self.reason = Default::default();
 
-        Some(Self::run_compile(handler.clone(), snap))
+        Some(Self::run_compile(handler.clone(), snap, self.export_target))
     }
 
     /// Compile the document once.
     fn run_compile(
         h: Arc<dyn CompileHandler<F, Ext>>,
         graph: Arc<WorldComputeGraph<F>>,
+        export_target: ExportTarget,
     ) -> impl FnOnce() -> CompiledArtifact<F> {
         let start = tinymist_std::time::now();
 
@@ -838,7 +850,8 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         );
 
         move || {
-            let compiled = CompiledArtifact::from_graph(graph);
+            let compiled =
+                CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html));
 
             let elapsed = start.elapsed().unwrap_or_default();
             let rep = match &compiled.doc {
