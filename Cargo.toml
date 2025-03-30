@@ -280,9 +280,9 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinym
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9e8f529b6a76fb108b9a70587fa7894bc497ac32" }
-# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9e8f529b6a76fb108b9a70587fa7894bc497ac32" }
-# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9e8f529b6a76fb108b9a70587fa7894bc497ac32" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
