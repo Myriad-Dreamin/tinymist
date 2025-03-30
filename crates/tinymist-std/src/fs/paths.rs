@@ -230,6 +230,9 @@ pub fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Res
 pub fn temp_dir_in<P: AsRef<Path>, T>(path: P, f: impl FnOnce(&Path) -> Result<T>) -> Result<T> {
     let path = path.as_ref();
 
+    std::fs::create_dir_all(path)
+        .with_context(|| format!("failed to create directory for tmpdir `{}`", path.display()))?;
+
     let tmp = TempFileBuilder::new().tempdir_in(path)?;
     f(tmp.path())
 }
