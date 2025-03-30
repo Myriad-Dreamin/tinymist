@@ -183,9 +183,16 @@ impl YamlBib {
 
 #[cfg(test)]
 mod tests {
+    use core::fmt;
     use std::path::Path;
 
     use typst::syntax::{FileId, VirtualPath};
+
+    // This is a workaround for slashes in the path on Windows and Linux
+    // are different
+    fn bib_snap(snap: &impl fmt::Debug) -> String {
+        format!("{snap:?}").replace('\\', "/")
+    }
 
     #[test]
     fn yaml_bib_test() {
@@ -202,8 +209,8 @@ Euclid2:
             FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
         );
         assert_eq!(bib.entries.len(), 2);
-        insta::assert_snapshot!(format!("{:?}", bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63 })"###);
-        insta::assert_snapshot!(format!("{:?}", bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126 })"###);
+        insta::assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63 })"###);
+        insta::assert_snapshot!(bib_snap(&bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126 })"###);
     }
 
     #[test]
