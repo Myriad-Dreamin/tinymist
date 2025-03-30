@@ -26,8 +26,11 @@ tar.workspace = true
 typst.workspace = true
 tinymist-std.workspace = true
 
+toml = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 dirs = { workspace = true, optional = true }
+walkdir = { workspace = true, optional = true }
+fastrand = { workspace = true, optional = true }
 
 js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -39,10 +42,12 @@ insta.workspace = true
 [features]
 
 default = []
+fs-pack = ["walkdir"]
+gitcl-pack = ["toml"]
 http-registry = ["reqwest", "dirs"]
 web = ["wasm-bindgen", "web-sys", "js-sys"]
 browser = ["web"]
-system = ["http-registry"]
+system = ["http-registry", "fs-pack", "gitcl-pack"]
 
 
 [lints]

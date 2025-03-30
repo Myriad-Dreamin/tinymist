@@ -80,6 +80,7 @@ siphasher = "1"
 fxhash = "0.2.1"
 sha2 = "0.10.6"
 nohash-hasher = "0.2.0"
+fastrand = "2.3.0"
 
 # Data Structures
 bitvec = "1"
