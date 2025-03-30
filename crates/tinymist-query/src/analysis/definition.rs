@@ -155,7 +155,7 @@ fn bib_definition(
     crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");
 
     // todo: rename with regard to string format: yaml-key/bib etc.
-    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.span.clone());
+    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.range.clone());
     Some(Definition::new(decl.into(), None))
 }
 

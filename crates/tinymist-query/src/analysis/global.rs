@@ -12,7 +12,7 @@ use tinymist_project::LspWorld;
 use tinymist_std::debug_loc::DataSource;
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
-use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
+use tinymist_world::vfs::{FileId, PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::foundations::{Bytes, Module, Styles};
@@ -24,7 +24,7 @@ use typst_shim::eval::{eval_compat, Eval};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
+    analyze_expr_, analyze_import_, analyze_signature, bib_info, definition, post_type_check,
     AllocStats, AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
     SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
     TypeInfo,
@@ -878,7 +878,8 @@ impl SharedContext {
         let w = &self.world;
         let w = (w as &dyn World).track();
 
-        bib_info(w, span, bib_paths.collect())
+        let fid = span.id()?;
+        analyze_bib(w, bib_paths.collect(), fid)
     }
 
     /// Describe the item under the cursor.
@@ -1260,21 +1261,19 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 }
 
 #[comemo::memoize]
-fn bib_info(
-    w: Tracked<dyn World + '_>,
-    span: Span,
+fn analyze_bib(
+    world: Tracked<dyn World + '_>,
     bib_paths: EcoVec<EcoString>,
+    elem_fid: FileId,
 ) -> Option<Arc<BibInfo>> {
-    let id = span.id()?;
-
     let files = bib_paths
         .iter()
-        .flat_map(|s| {
-            let id = resolve_id_by_path(w.deref(), id, s)?;
-            Some((id, w.file(id).ok()?))
+        .flat_map(|bib_path| {
+            let bib_fid = resolve_id_by_path(world.deref(), elem_fid, bib_path)?;
+            Some((bib_fid, world.file(bib_fid).ok()?))
         })
         .collect::<EcoVec<_>>();
-    analyze_bib(files)
+    bib_info(files)
 }
 
 #[comemo::memoize]
