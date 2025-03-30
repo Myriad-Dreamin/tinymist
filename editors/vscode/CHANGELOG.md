@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## Unreleased
+
+* Bumped typstyle to v0.13.2 by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/1600
+  * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0132---2025-03-28.
+
 ## v0.13.10 - [2025-03-23]
 
 * Bumped typst to v0.13.1 in https://github.com/Myriad-Dreamin/tinymist/pull/1540
@@ -153,7 +158,7 @@ See the [Issue: Preview feature for all editors](https://github.com/Myriad-Dream
 
 ### Preview
 
-* (Fix) Using the background rect to calculate cursor 
+* (Fix) Using the background rect to calculate cursor
 position in the page in https://github.com/Myriad-Dreamin/tinymist/pull/1427
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.2...v0.13.4
@@ -313,7 +318,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * Added support to drag and drop `.xlsx` files by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1100 and https://github.com/Myriad-Dreamin/tinymist/pull/1166
 * Added support to drag and drop `.ods` files by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1217
 * Added more known image extensions to the drop provider in https://github.com/Myriad-Dreamin/tinymist/pull/1308
-  * Added `.avif`, `.jpe`, `.psd`, `.tga`, `.tif`, and `.tiff`, which are copied from the markdown extension. 
+  * Added `.avif`, `.jpe`, `.psd`, `.tga`, `.tif`, and `.tiff`, which are copied from the markdown extension.
 * Added support to paste media files (images, audios, and videos) into typst documents in https://github.com/Myriad-Dreamin/tinymist/pull/1306
 * Canceling codelens if any picker is cancelled in https://github.com/Myriad-Dreamin/tinymist/pull/1314
 
