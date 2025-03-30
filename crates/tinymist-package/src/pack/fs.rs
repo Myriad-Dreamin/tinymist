@@ -36,9 +36,10 @@ impl<P: AsRef<Path>> PackFs for DirPack<P> {
 
         for entry in w {
             let path = entry.path();
-            let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+            let rel_path = path.strip_prefix(self.path.as_ref()).map_err(other)?;
+            let file_path = rel_path.to_string_lossy();
             let pack_file = PackFile::Read(Box::new(File::open(path).map_err(other)?));
-            f(&file_name, pack_file)?;
+            f(&file_path, pack_file)?;
         }
 
         Ok(())
