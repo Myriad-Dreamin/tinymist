@@ -1,73 +1,18 @@
 use std::{fs::File, io::Write};
 
-use ecow::EcoString;
-use typst::syntax::package::PackageManifest;
-
 use super::*;
-
-/// A package in the directory without knowing the specifier.
-#[derive(Clone)]
-pub struct UnknownDirPack<P> {
-    /// The namespace to mount.
-    pub namespace: EcoString,
-    /// The patch storing the package.
-    pub path: P,
-}
-
-impl<P: AsRef<Path>> UnknownDirPack<P> {
-    /// Creates a new `UnknownDirPack` instance.
-    pub fn new(namespace: EcoString, path: P) -> Self {
-        Self { namespace, path }
-    }
-}
-
-impl<P: AsRef<Path>> fmt::Debug for UnknownDirPack<P> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UnknownDirPack({})", self.path.as_ref().display())
-    }
-}
-
-impl<P: AsRef<Path>> PackFs for UnknownDirPack<P> {
-    fn read_all(
-        &mut self,
-        f: &mut (dyn FnMut(&str, PackFile) -> PackageResult<()> + Send + Sync),
-    ) -> PackageResult<()> {
-        // read the typst.toml in the temp_dir
-        let typst_toml = self.path.as_ref().join("typst.toml");
-        if !typst_toml.exists() {
-            Err(other("typst.toml not found in the git repository"))?;
-        }
-        let file = std::fs::read_to_string(&typst_toml).map_err(other)?;
-        // seek the version in the toml file
-        let toml = toml::de::from_str::<PackageManifest>(&file)
-            .map_err(other_io)
-            .map_err(other)?;
-
-        let specifier = PackageSpec {
-            namespace: self.namespace.clone(),
-            name: toml.package.name.clone(),
-            version: toml.package.version,
-        };
-
-        DirPack::new(specifier, self.path.as_ref()).read_all(f)
-    }
-}
-
-impl<P: AsRef<Path>> Pack for UnknownDirPack<P> {}
 
 /// A package in the directory.
 #[derive(Clone)]
 pub struct DirPack<P> {
-    /// The package specifier.
-    pub specifier: PackageSpec,
     /// The patch storing the package.
     pub path: P,
 }
 
 impl<P: AsRef<Path>> DirPack<P> {
     /// Creates a new `DirPack` instance.
-    pub fn new(specifier: PackageSpec, path: P) -> Self {
-        Self { specifier, path }
+    pub fn new(path: P) -> Self {
+        Self { path }
     }
 }
 
