@@ -181,6 +181,7 @@ tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.2" }
 tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.2", default-features = false }
 tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.2", default-features = false }
 tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.2", default-features = false }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.2" }
 tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.2" }
 tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.2" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.2" }

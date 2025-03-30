@@ -1,7 +1,10 @@
+//! Dummy package registry implementation for testing purposes.
+
 use std::{path::Path, sync::Arc};
 
 use super::{PackageError, PackageRegistry, PackageSpec};
 
+/// Dummy package registry that always returns a `NotFound` error.
 #[derive(Default, Debug)]
 pub struct DummyRegistry;
 
