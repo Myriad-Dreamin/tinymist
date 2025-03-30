@@ -8,6 +8,13 @@ pub struct UniversePack {
     pub specifier: PackageSpec,
 }
 
+impl UniversePack {
+    /// Creates a new `UniversePack` instance.
+    pub fn new(specifier: PackageSpec) -> Self {
+        Self { specifier }
+    }
+}
+
 impl PackFs for UniversePack {
     fn read_all(
         &mut self,
