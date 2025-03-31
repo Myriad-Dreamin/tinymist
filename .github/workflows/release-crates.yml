@@ -36,10 +36,10 @@ jobs:
           cargo publish --no-verify -p typst-shim || true
           cargo publish --no-verify -p tinymist-derive || true
           cargo publish --no-verify -p tinymist-l10n || true
-          cargo publish --no-verify -p tinymist-analysis || true
           cargo publish --no-verify -p tinymist-std || true
           cargo publish --no-verify -p tinymist-vfs || true
           cargo publish --no-verify -p tinymist-world || true
+          cargo publish --no-verify -p tinymist-analysis || true
           cargo publish --no-verify -p tinymist-task || true
           cargo publish --no-verify -p tinymist-project || true
           cargo publish --no-verify -p typlite || true
