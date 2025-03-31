@@ -4189,7 +4189,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.13.12-rc12-rc1"
+version = "0.13.12-rc1"
 dependencies = [
  "anyhow",
  "chrono",
