@@ -11,6 +11,7 @@
   templates,
 )
 #import templates: *
+#import "@preview/numbly:0.1.0": numbly
 #import "@preview/zebraw:0.4.5": zebraw-init, zebraw-html
 
 // Metadata
@@ -20,6 +21,7 @@
 #let is-web-target = is-web-target()
 #let sys-is-html-target = ("target" in dictionary(std))
 
+#let part-counter = counter("shiroa-part-counter")
 /// Creates an embedded block typst frame.
 #let div-frame(content, attrs: (:)) = html.elem("div", html.frame(content), attrs: attrs)
 #let span-frame(content, attrs: (:)) = html.elem("span", html.frame(content), attrs: attrs)
@@ -37,10 +39,9 @@
 // Fonts
 #let main-font = (
   "Charter",
-  "Source Han Serif SC",
-  // "Source Han Serif TC",
-  // shiroa's embedded font
   "Libertinus Serif",
+  "Source Han Serif SC",
+  // shiroa's embedded font
 )
 #let code-font = (
   "BlexMono Nerd Font Mono",
@@ -60,7 +61,7 @@
 /// The project function defines how your document looks.
 /// It takes your content and some metadata and formats it.
 /// Go ahead and customize it to your liking!
-#let project(title: "Typst Book", authors: (), kind: "page", body) = {
+#let project(title: "Tinymist Docs", authors: (), kind: "page", body) = {
   // set basic document metadata
   set document(
     author: authors,
@@ -76,6 +77,7 @@
     number-align: center,
     width: page-width,
   ) if not (sys-is-html-target or is-html-target)
+  set page(numbering: "1") if is-pdf-target and not is-main and kind == "page"
 
   // remove margins for web target
   set page(
@@ -226,4 +228,12 @@
   body
 }
 
-#let part-style = heading
+#let part-style(it) = {
+  set text(size: heading-sizes.at(1))
+  set text(weight: "bold")
+  set text(fill: main-color)
+  part-counter.step()
+
+  context heading(numbering: none, [Part #part-counter.display(numbly("{1}. "))#it])
+  counter(heading).update(0)
+}
