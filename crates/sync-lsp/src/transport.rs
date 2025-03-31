@@ -145,7 +145,7 @@ pub fn io_transport<I: BufRead, O: Write>(
             #[cfg(feature = "lsp")]
             let is_exit = matches!(&msg, Message::Lsp(LspMessage::Notification(n)) if n.is_exit());
 
-            log::trace!("sending message {:#?}", msg);
+            log::trace!("sending message {msg:#?}");
             reader_sender
                 .send(msg)
                 .expect("receiver was dropped, failed to send a message");

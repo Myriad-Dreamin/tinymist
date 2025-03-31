@@ -43,7 +43,7 @@ pub fn analyze_call(
     source: Source,
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
-    log::trace!("func call found: {:?}", node);
+    log::trace!("func call found: {node:?}");
     let call = node.cast::<ast::FuncCall>()?;
 
     let callee = call.callee();
