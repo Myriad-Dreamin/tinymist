@@ -539,7 +539,7 @@ pub fn func_signature(func: Func) -> Signature {
             None
         }
         Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
-            for param in func.params().unwrap() {
+            for param in func.params().unwrap_or_default() {
                 add_param(Interned::new(ParamTy {
                     name: param.name.into(),
                     docs: Some(param.docs.into()),
@@ -556,7 +556,10 @@ pub fn func_signature(func: Func) -> Signature {
     let sig_ty = SigTy::new(pos_tys.into_iter(), named_tys, None, rest_ty, ret_ty);
 
     for name in &sig_ty.names.names {
-        param_specs.push(named_specs.get(name).unwrap().clone());
+        let Some(param) = named_specs.get(name) else {
+            continue;
+        };
+        param_specs.push(param.clone());
     }
     if let Some(doc) = rest_spec {
         param_specs.push(doc);
