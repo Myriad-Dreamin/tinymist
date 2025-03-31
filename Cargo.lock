@@ -744,8 +744,8 @@ dependencies = [
  "criterion",
  "ecow",
  "insta",
- "tinymist-project 0.13.12-rc12-rc1",
- "tinymist-std 0.13.12-rc1",
+ "tinymist-project",
+ "tinymist-std",
  "typst",
  "typst-syntax",
 ]
@@ -2965,8 +2965,8 @@ dependencies = [
  "serde_with",
  "siphasher",
  "tiny-skia-path",
- "tinymist-std 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-world 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
  "web-time",
 ]
@@ -2994,9 +2994,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-project 0.13.12-rc12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-task 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-world 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "tinymist-project",
+ "tinymist-task",
+ "tinymist-world",
  "tokio",
  "typst",
  "typst-eval",
@@ -4056,12 +4056,12 @@ dependencies = [
  "tinymist-assets 0.13.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
  "tinymist-debug",
- "tinymist-l10n 0.13.10",
- "tinymist-project 0.13.12-rc12-rc1",
+ "tinymist-l10n",
+ "tinymist-project",
  "tinymist-query",
  "tinymist-render",
- "tinymist-std 0.13.12-rc1",
- "tinymist-task 0.13.12-rc1",
+ "tinymist-std",
+ "tinymist-task",
  "tokio",
  "tokio-util",
  "toml",
@@ -4073,7 +4073,7 @@ dependencies = [
  "typst-pdf",
  "typst-preview",
  "typst-render",
- "typst-shim 0.13.12-rc1",
+ "typst-shim",
  "typst-svg",
  "typst-timing",
  "typstfmt",
@@ -4093,7 +4093,7 @@ dependencies = [
  "regex",
  "serde",
  "strum",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-world",
  "toml",
  "typst",
 ]
@@ -4123,7 +4123,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "reflexo-typst",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-world",
  "vergen",
  "wasm-bindgen",
 ]
@@ -4141,8 +4141,8 @@ dependencies = [
  "serde_json",
  "tinymist-analysis",
  "tinymist-debug",
- "tinymist-std 0.13.12-rc1",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
  "typst-library",
 ]
@@ -4159,8 +4159,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-analysis",
- "tinymist-std 0.13.12-rc1",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
  "typst-library",
 ]
@@ -4168,15 +4168,6 @@ dependencies = [
 [[package]]
 name = "tinymist-derive"
 version = "0.13.12-rc1"
-dependencies = [
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
-name = "tinymist-derive"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
 dependencies = [
  "quote",
  "syn 2.0.100",
@@ -4197,20 +4188,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymist-l10n"
-version = "0.13.10"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "anyhow",
- "clap",
- "ecow",
- "rayon",
- "rustc-hash 2.1.1",
- "serde_json",
- "walkdir",
-]
-
-[[package]]
 name = "tinymist-project"
 version = "0.13.12-rc12-rc1"
 dependencies = [
@@ -4228,41 +4205,11 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "tinymist-derive 0.13.12-rc1",
- "tinymist-l10n 0.13.10",
- "tinymist-std 0.13.12-rc1",
- "tinymist-task 0.13.12-rc1",
- "tinymist-world 0.13.12-rc1",
- "tokio",
- "toml",
- "typst",
- "typst-assets",
-]
-
-[[package]]
-name = "tinymist-project"
-version = "0.13.12-rc12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "comemo",
- "dirs",
- "ecow",
- "log",
- "notify",
- "parking_lot",
- "rayon",
- "rpds",
- "semver",
- "serde",
- "serde_json",
- "tinymist-derive 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-l10n 0.13.10 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-std 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-task 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-world 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "tinymist-derive",
+ "tinymist-l10n",
+ "tinymist-std",
+ "tinymist-task",
+ "tinymist-world",
  "tokio",
  "toml",
  "typst",
@@ -4306,18 +4253,18 @@ dependencies = [
  "siphasher",
  "strum",
  "tinymist-analysis",
- "tinymist-derive 0.13.12-rc1",
- "tinymist-l10n 0.13.10",
- "tinymist-project 0.13.12-rc12-rc1",
- "tinymist-std 0.13.12-rc1",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-derive",
+ "tinymist-l10n",
+ "tinymist-project",
+ "tinymist-std",
+ "tinymist-world",
  "toml",
  "triomphe",
  "ttf-parser",
  "typlite",
  "typst",
  "typst-assets",
- "typst-shim 0.13.12-rc1",
+ "typst-shim",
  "unscanny",
  "walkdir",
  "yaml-rust2",
@@ -4333,7 +4280,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "tinymist-query",
- "tinymist-std 0.13.12-rc1",
+ "tinymist-std",
 ]
 
 [[package]]
@@ -4366,43 +4313,7 @@ dependencies = [
  "siphasher",
  "tempfile",
  "typst",
- "typst-shim 0.13.12-rc1",
- "wasm-bindgen",
- "web-time",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "tinymist-std"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "anyhow",
- "base64",
- "bitvec",
- "comemo",
- "core-foundation",
- "dashmap",
- "ecow",
- "fxhash",
- "js-sys",
- "libc",
- "log",
- "lsp-types",
- "parking_lot",
- "path-clean",
- "pathdiff",
- "rkyv",
- "rustc-hash 2.1.1",
- "same-file",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_with",
- "siphasher",
- "tempfile",
- "typst",
- "typst-shim 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "typst-shim",
  "wasm-bindgen",
  "web-time",
  "windows-sys 0.59.0",
@@ -4427,9 +4338,9 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "tinymist-derive 0.13.12-rc1",
- "tinymist-std 0.13.12-rc1",
- "tinymist-world 0.13.12-rc1",
+ "tinymist-derive",
+ "tinymist-std",
+ "tinymist-world",
  "tokio",
  "toml",
  "typst",
@@ -4438,42 +4349,7 @@ dependencies = [
  "typst-html",
  "typst-pdf",
  "typst-render",
- "typst-shim 0.13.12-rc1",
- "typst-svg",
-]
-
-[[package]]
-name = "tinymist-task"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "comemo",
- "dirs",
- "ecow",
- "log",
- "notify",
- "parking_lot",
- "rayon",
- "rpds",
- "semver",
- "serde",
- "serde_json",
- "serde_yaml",
- "tinymist-derive 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-std 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-world 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tokio",
- "toml",
- "typst",
- "typst-assets",
- "typst-eval",
- "typst-html",
- "typst-pdf",
- "typst-render",
- "typst-shim 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "typst-shim",
  "typst-svg",
 ]
 
@@ -4489,26 +4365,7 @@ dependencies = [
  "nohash-hasher",
  "parking_lot",
  "rpds",
- "tinymist-std 0.13.12-rc1",
- "typst",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "tinymist-vfs"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "comemo",
- "ecow",
- "indexmap 2.8.0",
- "js-sys",
- "log",
- "nohash-hasher",
- "parking_lot",
- "rpds",
- "tinymist-std 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "tinymist-std",
  "typst",
  "wasm-bindgen",
  "web-sys",
@@ -4542,45 +4399,8 @@ dependencies = [
  "sha2",
  "strum",
  "tar",
- "tinymist-std 0.13.12-rc1",
- "tinymist-vfs 0.13.12-rc1",
- "typst",
- "typst-assets",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "tinymist-world"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "codespan-reporting",
- "comemo",
- "dirs",
- "ecow",
- "flate2",
- "fontdb",
- "hex",
- "js-sys",
- "log",
- "lsp-types",
- "parking_lot",
- "rayon",
- "reqwest",
- "rpds",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "serde_with",
- "sha2",
- "strum",
- "tar",
- "tinymist-std 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
- "tinymist-vfs 0.13.12-rc1 (git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff)",
+ "tinymist-std",
+ "tinymist-vfs",
  "typst",
  "typst-assets",
  "wasm-bindgen",
@@ -4853,8 +4673,8 @@ dependencies = [
  "insta",
  "regex",
  "tinymist-analysis",
- "tinymist-project 0.13.12-rc12-rc1",
- "tinymist-std 0.13.12-rc1",
+ "tinymist-project",
+ "tinymist-std",
  "typst",
  "typst-svg",
  "typst-syntax",
@@ -5078,7 +4898,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-assets 0.13.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tinymist-std 0.13.12-rc1",
+ "tinymist-std",
  "tokio",
  "typst",
  "typst-assets",
@@ -5121,18 +4941,6 @@ dependencies = [
 [[package]]
 name = "typst-shim"
 version = "0.13.12-rc1"
-dependencies = [
- "cfg-if",
- "comemo",
- "typst",
- "typst-eval",
- "typst-syntax",
-]
-
-[[package]]
-name = "typst-shim"
-version = "0.13.12-rc1"
-source = "git+https://github.com/Myriad-Dreamin/tinymist.git?rev=bde643e9aad40f9bb5392a1a2b4fc2d188bddcff#bde643e9aad40f9bb5392a1a2b4fc2d188bddcff"
 dependencies = [
  "cfg-if",
  "comemo",

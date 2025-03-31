@@ -290,16 +290,6 @@ reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "
 # reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 # typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.21-rc1" }
 
-typst-shim = { path = "crates/typst-shim" }
-tinymist-analysis = { path = "crates/tinymist-analysis" }
-tinymist-std = { path = "crates/tinymist-std" }
-tinymist-vfs = { path = "crates/tinymist-vfs" }
-tinymist-world = { path = "crates/tinymist-world" }
-tinymist-project = { path = "crates/tinymist-project" }
-tinymist-task = { path = "crates/tinymist-task" }
-
-# If reflexo use the tinymist from git, you should use the following patch.
-# [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
 # typst-shim = { path = "crates/typst-shim" }
 # tinymist-analysis = { path = "crates/tinymist-analysis" }
 # tinymist-std = { path = "crates/tinymist-std" }
@@ -307,3 +297,13 @@ tinymist-task = { path = "crates/tinymist-task" }
 # tinymist-world = { path = "crates/tinymist-world" }
 # tinymist-project = { path = "crates/tinymist-project" }
 # tinymist-task = { path = "crates/tinymist-task" }
+
+# If reflexo use the tinymist from git, you should use the following patch.
+[patch."https://github.com/Myriad-Dreamin/tinymist.git"]
+typst-shim = { path = "crates/typst-shim" }
+tinymist-analysis = { path = "crates/tinymist-analysis" }
+tinymist-std = { path = "crates/tinymist-std" }
+tinymist-vfs = { path = "crates/tinymist-vfs" }
+tinymist-world = { path = "crates/tinymist-world" }
+tinymist-project = { path = "crates/tinymist-project" }
+tinymist-task = { path = "crates/tinymist-task" }
