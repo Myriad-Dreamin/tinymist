@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use reflexo_typst::debug_loc::DataSource;
 use serde::{Deserialize, Serialize};
-use tinymist_std::debug_loc::DataSource;
 use typst::text::{FontStretch, FontStyle, FontWeight};
 
 use super::prelude::*;
