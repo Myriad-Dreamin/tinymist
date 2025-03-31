@@ -41,4 +41,10 @@
   }
 )
 
+#let cond-image(img) = context if shiroa-sys-target() == "html" {
+  html.elem("div", attrs: ("class": "pseudo-image"), html.frame(img))
+} else {
+  align(center, img)
+}
+
 #let note-box = pro-tip

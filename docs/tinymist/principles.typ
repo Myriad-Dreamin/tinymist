@@ -12,27 +12,26 @@ The each actor holds and maintains some resources exclusively. For example, the 
 
 The actors communicate with each other by channels. An actor should own many receivers as its input, and many senders as output. The actor will take input from receivers _sequentially_. For example, when some LSP request or notification is coming as an LSP event, multiple actors serve the event collaboratively, as shown in @fig:actor-serve-lsp-requests.
 
+#let actor-graph = diagram(
+  edge-stroke: 0.85pt,
+  node-corner-radius: 3pt,
+  edge-corner-radius: 4pt,
+  mark-scale: 80%,
+  node((0, 0), [LSP Requests/\ Notifications\ (Channel)], fill: colors.at(0), shape: fletcher.shapes.hexagon),
+  node((2, +1), [RenderActor], fill: colors.at(1)),
+  node((2, 0), align(center)[`CompileServerActor`], fill: colors.at(1)),
+  node((2, -1), [`LspActor` (Main Thread)], fill: colors.at(1)),
+  node((4, 0), [LSP Responses\ (Channel)], fill: colors.at(2), shape: fletcher.shapes.hexagon),
+  edge((0, 0), "r,u,r", "-}>"),
+  edge((2, -1), "r,d,r", "-}>"),
+  edge((2, 0), "rr", "-}>"),
+  edge((2, 1), "r,u,r", "-}>"),
+  edge((2, 0), (2, 1), align(center)[Rendering\ Requests], "-}>"),
+  edge((2, -1), (2, 0), align(center)[Analysis\ Requests], "-}>"),
+)
+
 #figure(
-  align(
-    center,
-    diagram(
-      edge-stroke: 0.85pt,
-      node-corner-radius: 3pt,
-      edge-corner-radius: 4pt,
-      mark-scale: 80%,
-      node((0, 0), [LSP Requests/\ Notifications\ (Channel)], fill: colors.at(0), shape: fletcher.shapes.hexagon),
-      node((2, +1), [RenderActor], fill: colors.at(1)),
-      node((2, 0), align(center)[`CompileServerActor`], fill: colors.at(1)),
-      node((2, -1), [`LspActor` (Main Thread)], fill: colors.at(1)),
-      node((4, 0), [LSP Responses\ (Channel)], fill: colors.at(2), shape: fletcher.shapes.hexagon),
-      edge((0, 0), "r,u,r", "-}>"),
-      edge((2, -1), "r,d,r", "-}>"),
-      edge((2, 0), "rr", "-}>"),
-      edge((2, 1), "r,u,r", "-}>"),
-      edge((2, 0), (2, 1), align(center)[Rendering\ Requests], "-}>"),
-      edge((2, -1), (2, 0), align(center)[Analysis\ Requests], "-}>"),
-    ),
-  ),
+  cond-image(actor-graph),
   caption: [The IO Graph of actors serving a LSP request or notification],
 ) <fig:actor-serve-lsp-requests>
 
@@ -54,48 +53,47 @@ he most critical features are lsp functions, built on the #link("https://github.
 When an analysis request is coming, tinymist _upgrades_ it to a suitable level as needed, as shown in @fig:analysis-upgrading-level. A higher level requires to hold more resources and takes longer time to prepare.
 
 #let pg-node = node.with(corner-radius: 2pt, shape: "rect");
-#figure(
-  align(
-    center,
-    diagram(
-      node-stroke: 1pt,
-      edge-stroke: 1pt,
-      edge("-|>", align(center)[Analysis\ Request], label-pos: 0.1),
-      pg-node((1, 0), [Syntax\ Level]),
-      edge("-|>", []),
-      pg-node((3, 0), [Semantic\ Level]),
-      edge("-|>"),
-      pg-node((5, 0), [Stateful\ Level]),
-      edge((5, 0), (6, 0), "-|>", align(center)[Analysis\ Response], label-pos: 1),
-      for i in (1, 3, 5) {
-        edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
-      },
-      edge(
-        (0.3, 0.4),
-        (0.3, 0),
-        "-|>",
-        align(center)[clone #typst-func("Source")],
-        label-anchor: "center",
-        label-pos: -0.5,
-      ),
-      edge(
-        (2, 0.4),
-        (2, 0),
-        "-|>",
-        align(center)[snapshot ```rs trait World```],
-        label-anchor: "center",
-        label-pos: -0.5,
-      ),
-      edge(
-        (4, 0.4),
-        (4, 0),
-        "-|>",
-        align(center)[acquire #typst-func("Document")],
-        label-anchor: "center",
-        label-pos: -0.5,
-      ),
-    ),
+#let ana-level-graph = diagram(
+  node-stroke: 1pt,
+  edge-stroke: 1pt,
+  edge("-|>", align(center)[Analysis\ Request], label-pos: 0.1),
+  pg-node((1, 0), [Syntax\ Level]),
+  edge("-|>", []),
+  pg-node((3, 0), [Semantic\ Level]),
+  edge("-|>"),
+  pg-node((5, 0), [Stateful\ Level]),
+  edge((5, 0), (6, 0), "-|>", align(center)[Analysis\ Response], label-pos: 1),
+  for i in (1, 3, 5) {
+    edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
+  },
+  edge(
+    (0.3, 0.4),
+    (0.3, 0),
+    "-|>",
+    align(center)[clone #typst-func("Source")],
+    label-anchor: "center",
+    label-pos: -0.5,
   ),
+  edge(
+    (2, 0.4),
+    (2, 0),
+    "-|>",
+    align(center)[snapshot ```rs trait World```],
+    label-anchor: "center",
+    label-pos: -0.5,
+  ),
+  edge(
+    (4, 0.4),
+    (4, 0),
+    "-|>",
+    align(center)[acquire #typst-func("Document")],
+    label-anchor: "center",
+    label-pos: -0.5,
+  ),
+)
+
+#figure(
+  cond-image(ana-level-graph),
   caption: [The analyzer upgrades the level to acquire necessary resources],
 ) <fig:analysis-upgrading-level>
 
