@@ -56,8 +56,8 @@
 //!                      ^ SurroundingSyntax::Regular
 //! ```
 
-use crate::debug_loc::SourceSpanOffset;
 use serde::{Deserialize, Serialize};
+use tinymist_world::debug_loc::SourceSpanOffset;
 use typst::syntax::Span;
 
 use crate::prelude::*;

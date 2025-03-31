@@ -983,7 +983,7 @@ impl ServerState {
             writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
             o
         });
-        log::debug!("math shaping text: {text}", text = math_shaping_text);
+        log::debug!("math shaping text: {math_shaping_text}");
 
         let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
 
