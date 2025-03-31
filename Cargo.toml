@@ -177,14 +177,14 @@ insta = { version = "1.39", features = ["glob"] }
 # Our Own Crates
 tinymist-assets = { version = "=0.13.10" }
 
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.2" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.2", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.2", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.2", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.2" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.2" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.2" }
-typst-shim = { path = "./crates/typst-shim", version = "0.13.2" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.12-rc1" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.12-rc1", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.12-rc1", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.12-rc1", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.12-rc1" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.12-rc1" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.12-rc1" }
+typst-shim = { path = "./crates/typst-shim", version = "0.13.12-rc1" }
 
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.10", default-features = false }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.10" }
