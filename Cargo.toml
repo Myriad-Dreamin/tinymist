@@ -183,13 +183,13 @@ tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.12-rc1", defau
 tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.12-rc1", default-features = false }
 tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.12-rc1" }
 tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.12-rc1" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.12-rc1" }
 typst-shim = { path = "./crates/typst-shim", version = "0.13.12-rc1" }
 
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.10", default-features = false }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.10" }
 tinymist = { path = "./crates/tinymist/", version = "0.13.10" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.10" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.10" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.10" }
 tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.10" }
 typst-preview = { path = "./crates/typst-preview", version = "0.13.10" }
@@ -280,9 +280,9 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinym
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "eefcd83b0b5e352fa611f5751eb87a73a557c451" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "337cdf35c1a8752219a64c79a1593d38fe6fd718" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "337cdf35c1a8752219a64c79a1593d38fe6fd718" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "337cdf35c1a8752219a64c79a1593d38fe6fd718" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
