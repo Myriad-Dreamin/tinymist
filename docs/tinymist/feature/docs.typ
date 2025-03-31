@@ -169,12 +169,24 @@ $ sum f(x) = 10 $
 
 The docstring tells that there is an associated example in the docstring. It will be rendered as a code block following the rendered result when possible:
 
-#rect(width: 100%)[
+#let example = [
   ```typ
   $ sum f(x) = 10 $
   ```
   $ sum f(x) = 10 $
 ]
+
+#context if shiroa-sys-target() == "html" {
+  html.elem(
+    "div",
+    attrs: (
+      style: "border: 1px solid #ccc; border-radius: 4px; padding: 0.5em;",
+    ),
+    example,
+  )
+} else {
+  rect(width: 100%, example)
+}
 
 === Type Annotations in Docstrings
 
