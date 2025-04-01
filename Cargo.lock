@@ -3891,10 +3891,10 @@ version = "0.13.10"
 dependencies = [
  "insta",
  "lsp-types",
- "reflexo",
  "serde",
  "serde_json",
  "sync-ls",
+ "tinymist-std",
 ]
 
 [[package]]

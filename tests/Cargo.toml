@@ -9,9 +9,9 @@ name = "tinymist-e2e-tests"
 path = "e2e/main.rs"
 
 [dev-dependencies]
-sync-ls.workspace = true
+sync-ls = { workspace = true, default-features = false, features = ["lsp"] }
 lsp-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-reflexo.workspace = true
+tinymist-std.workspace = true
 insta.workspace = true

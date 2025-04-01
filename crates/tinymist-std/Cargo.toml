@@ -16,7 +16,7 @@ base64.workspace = true
 bitvec.workspace = true
 comemo.workspace = true
 dashmap.workspace = true
-ecow.workspace = true
+ecow = { workspace = true, features = ["serde"] }
 fxhash.workspace = true
 log.workspace = true
 path-clean.workspace = true
