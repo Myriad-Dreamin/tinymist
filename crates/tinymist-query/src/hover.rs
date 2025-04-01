@@ -4,7 +4,9 @@ use tinymist_std::typst::TypstDocument;
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
+use crate::analysis::get_bib_elem_and_info;
 use crate::analysis::get_link_exprs_in;
+use crate::analysis::render_citation_string;
 use crate::jump_from_cursor;
 use crate::prelude::*;
 use crate::upstream::{route_of_value, truncated_repr, Tooltip};
@@ -125,14 +127,30 @@ impl HoverWorker<'_> {
         use Decl::*;
         match def.decl.as_ref() {
             Label(..) => {
-                self.def.push(format!("Label: {}\n", def.name()));
-                // todo: type repr
+                self.def.push(format!("Label: `{}`\n", def.name()));
                 if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
-                    self.def.push(truncated_repr(&val).into());
+                    self.def
+                        .push(format!("```typc\n{}\n```", truncated_repr(&val)));
                 }
             }
             BibEntry(..) => {
-                self.def.push(format!("Bibliography: @{}", def.name()));
+                if (|| {
+                    let doc = self.doc.as_ref()?;
+                    let support_html = !self.ctx.shared.analysis.remove_html;
+                    let (bib_elem, bib_info) = get_bib_elem_and_info(self.ctx, doc.introspector())?;
+                    let style = bib_elem.style(Default::default()).derived;
+                    let details =
+                        render_citation_string(&bib_info, &style, def.name(), support_html)?;
+                    self.def
+                        .push(format!("Bibliography: `@{}` {}", def.name(), details.0));
+                    self.def.push(details.1);
+                    Some(())
+                })()
+                .is_none()
+                {
+                    // fallback: no additional infomation
+                    self.def.push(format!("Bibliography: `@{}`", def.name()));
+                }
             }
             _ => {
                 let sym_docs = self.ctx.def_docs(&def);

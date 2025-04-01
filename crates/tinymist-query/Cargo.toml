@@ -21,6 +21,7 @@ dashmap.workspace = true
 dirs.workspace = true
 ena.workspace = true
 ecow.workspace = true
+hayagriva.workspace = true
 if_chain.workspace = true
 itertools.workspace = true
 indexmap.workspace = true
@@ -54,7 +55,6 @@ typst-shim.workspace = true
 unscanny.workspace = true
 walkdir.workspace = true
 yaml-rust2.workspace = true
-
 
 [dev-dependencies]
 insta.workspace = true
