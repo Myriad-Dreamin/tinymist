@@ -151,7 +151,7 @@ typlite = { path = "./crates/typlite" }
 crossbeam-channel = "0.5.12"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 dapts = "0.0.6"
-sync-ls = { path = "./crates/sync-lsp", features = ["clap"] }
+sync-ls = { path = "./crates/sync-lsp" }
 
 # CLI
 clap = { version = "4.5", features = ["derive", "env", "unicode"] }
