@@ -286,6 +286,7 @@ export class LanguageState {
   exportText = exportCommand("tinymist.exportText");
   exportQuery = exportCommand("tinymist.exportQuery");
   exportAnsiHighlight = exportCommand("tinymist.exportAnsiHighlight");
+  exportAst = exportCommand("tinymist.exportAst");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
