@@ -121,10 +121,6 @@ jobs:
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-          - os: macos-13
-            rust-target: x86_64-apple-darwin
-            platform: darwin
-            arch: x64
           - os: macos-latest
             rust-target: aarch64-apple-darwin
             platform: darwin
