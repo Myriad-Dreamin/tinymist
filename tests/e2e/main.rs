@@ -345,7 +345,7 @@ fn replay_log(tinymist_binary: &Path, root: &Path) -> String {
     // let sorted_res
     let sorted_res = sort_and_redact_value(res);
     let c = serde_json::to_string_pretty(&sorted_res).unwrap();
-    let hash = reflexo::hash::hash128(&c);
+    let hash = tinymist_std::hash::hash128(&c);
     std::fs::write(root.join("result_sorted.json"), c).unwrap();
 
     format!("siphash128_13:{:x}", hash)

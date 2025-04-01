@@ -13,5 +13,5 @@ sync-ls.workspace = true
 lsp-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-reflexo.workspace = true
+tinymist-std.workspace = true
 insta.workspace = true
