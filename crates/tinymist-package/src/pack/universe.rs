@@ -33,3 +33,4 @@ impl PackFs for UniversePack {
 }
 
 impl Pack for UniversePack {}
+impl PackExt for UniversePack {}

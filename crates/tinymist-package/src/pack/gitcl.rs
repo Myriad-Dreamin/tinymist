@@ -43,6 +43,7 @@ impl<P: AsRef<str>> PackFs for GitClPack<P> {
 }
 
 impl<P: AsRef<str>> Pack for GitClPack<P> {}
+impl<P: AsRef<str>> PackExt for GitClPack<P> {}
 
 fn clone(url: &str, dst: &Path) -> io::Result<()> {
     let mut cmd = gitcl();

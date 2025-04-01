@@ -15,6 +15,7 @@ mod fs;
 mod gitcl;
 mod http;
 mod memory;
+mod ops;
 mod release;
 mod tarball;
 mod universe;
@@ -23,6 +24,7 @@ pub use fs::*;
 pub use gitcl::*;
 pub use http::*;
 pub use memory::*;
+pub use ops::*;
 pub use release::*;
 pub use tarball::*;
 pub use universe::*;
@@ -78,13 +80,17 @@ pub enum PackSpecifier {
 }
 
 /// The pack trait is used to hold a package.
-pub trait Pack: PackFs {
-    // /// The package specifier.
-    // fn specifier(&self) -> &PackageSpec;
-    // /// Reads the version from the package.
-    // fn version(&self) -> Option<EcoString>;
-    // /// Reads the manifest from the package.
-    // fn manifest(&self) -> io::Result<Arc<PackageManifest>>;
+pub trait Pack: PackFs {}
+
+/// The pack trait extension.
+pub trait PackExt: Pack {
+    /// Filter the package files to read by a function.
+    fn filter(&mut self, f: impl Fn(&str) -> bool + Send + Sync) -> impl Pack
+    where
+        Self: std::marker::Sized,
+    {
+        FilterPack { src: self, f }
+    }
 }
 
 /// The pack trait is used to hold a package.

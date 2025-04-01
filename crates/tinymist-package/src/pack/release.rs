@@ -28,3 +28,4 @@ impl PackFs for GitHubReleasePack {
 }
 
 impl Pack for GitHubReleasePack {}
+impl PackExt for GitHubReleasePack {}

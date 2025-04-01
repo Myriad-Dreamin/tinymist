@@ -58,3 +58,4 @@ impl<S: AsRef<str>> PackFs for HttpPack<S> {
 }
 
 impl<S: AsRef<str>> Pack for HttpPack<S> {}
+impl<P: AsRef<str>> PackExt for HttpPack<P> {}
