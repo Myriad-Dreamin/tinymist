@@ -44,3 +44,6 @@ impl<R: Read> PackFs for TarballPack<R> {
         Ok(())
     }
 }
+
+impl<R: Read> Pack for TarballPack<R> {}
+impl<R: Read> PackExt for TarballPack<R> {}

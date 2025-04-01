@@ -5,7 +5,7 @@ use ecow::EcoString;
 use super::*;
 
 /// A package in the directory.
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct MapPack {
     /// The files storing the package.
     pub files: HashMap<EcoString, ImmutBytes>,
@@ -33,6 +33,7 @@ impl PackFs for MapPack {
 }
 
 impl Pack for MapPack {}
+impl PackExt for MapPack {}
 
 impl CloneIntoPack for MapPack {
     fn clone_into_pack(&mut self, pack: &mut impl PackFs) -> std::io::Result<()> {
