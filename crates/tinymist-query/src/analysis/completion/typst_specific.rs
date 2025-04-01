@@ -92,7 +92,7 @@ impl CompletionPair<'_, '_, '_> {
         let Some(document) = self.worker.document else {
             return;
         };
-        let (labels, split) = analyze_labels(document);
+        let (labels, split) = analyze_labels(&self.worker.ctx.shared, document);
 
         let head = &self.cursor.text[..self.cursor.from];
         let at = head.ends_with('@');

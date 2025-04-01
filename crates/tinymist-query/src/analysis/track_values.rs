@@ -11,6 +11,8 @@ use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
 use typst::World;
 use typst_shim::eval::Vm;
 
+use super::{get_bib_elem_and_info, render_citation_string, SharedContext};
+
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
     if let Some(parent) = node.parent() {
@@ -109,7 +111,7 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
+pub fn analyze_labels(ctx: &SharedContext, document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.
@@ -142,13 +144,30 @@ pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let split = output.len();
 
     // Bibliography keys.
-    for (label, detail) in BibliographyElem::keys(document.introspector().track()) {
-        output.push(DynLabel {
-            label,
-            label_desc: detail.clone(),
-            detail: detail.clone(),
-            bib_title: detail,
-        });
+    if let Some((bib_elem, bib_info)) = get_bib_elem_and_info(ctx, document.introspector()) {
+        let style = bib_elem.style(Default::default()).derived;
+        for (label, detail) in BibliographyElem::keys(document.introspector().track()) {
+            let details =
+                render_citation_string(&bib_info, &style, label.resolve().as_str(), false)
+                    .map(|details| eco_format!("{} {}", details.0, details.1))
+                    .or(detail.clone());
+            output.push(DynLabel {
+                label,
+                label_desc: detail.clone(),
+                detail: details,
+                bib_title: detail,
+            });
+        }
+    } else {
+        // fallback
+        for (label, detail) in BibliographyElem::keys(document.introspector().track()) {
+            output.push(DynLabel {
+                label,
+                label_desc: detail.clone(),
+                detail: detail.clone(),
+                bib_title: detail,
+            });
+        }
     }
 
     (output, split)

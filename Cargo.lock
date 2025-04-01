@@ -4230,6 +4230,7 @@ dependencies = [
  "ecow",
  "ena",
  "hashbrown 0.14.5",
+ "hayagriva",
  "hex",
  "if_chain",
  "indexmap 2.8.0",
