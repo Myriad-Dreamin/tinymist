@@ -1,20 +1,20 @@
 use std::{collections::HashMap, io::Cursor};
 
+use ecow::EcoString;
+
 use super::*;
 
 /// A package in the directory.
 #[derive(Debug, Clone)]
 pub struct MapPack {
-    /// The package specifier.
-    pub specifier: PackageSpec,
     /// The files storing the package.
-    pub files: HashMap<String, ImmutBytes>,
+    pub files: HashMap<EcoString, ImmutBytes>,
 }
 
 impl MapPack {
     /// Creates a new `MapPack` instance.
-    pub fn new(specifier: PackageSpec, files: HashMap<String, ImmutBytes>) -> Self {
-        Self { specifier, files }
+    pub fn new(files: HashMap<EcoString, ImmutBytes>) -> Self {
+        Self { files }
     }
 }
 
@@ -33,3 +33,22 @@ impl PackFs for MapPack {
 }
 
 impl Pack for MapPack {}
+
+impl CloneIntoPack for MapPack {
+    fn clone_into_pack(&mut self, pack: &mut impl PackFs) -> std::io::Result<()> {
+        pack.read_all(&mut |path, file| {
+            let data = match file {
+                PackFile::Read(mut reader) => {
+                    let mut dst = Vec::new();
+                    std::io::copy(&mut reader, &mut dst).map_err(other)?;
+                    ImmutBytes::from(dst)
+                }
+                PackFile::Data(data) => data.into_inner(),
+            };
+            self.files.insert(path.into(), data);
+            Ok(())
+        })
+        .map_err(other_io)?;
+        Ok(())
+    }
+}

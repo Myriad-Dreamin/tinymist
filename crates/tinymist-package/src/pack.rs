@@ -90,7 +90,7 @@ pub trait Pack: PackFs {
 /// The pack trait is used to hold a package.
 pub trait CloneIntoPack: fmt::Debug {
     /// Clones the pack into a new pack.
-    fn clone_into_pack(&self, pack: &mut impl PackFs) -> std::io::Result<()>;
+    fn clone_into_pack(&mut self, pack: &mut impl PackFs) -> std::io::Result<()>;
 }
 
 /// The package is a trait that can be used to create a package.
