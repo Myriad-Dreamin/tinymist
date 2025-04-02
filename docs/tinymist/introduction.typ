@@ -125,11 +125,15 @@ Tinymist is localized in multiple languages. You can contribute to the localizat
 
 == Maintainers
 
-Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ")[MAINTAINERS.typ]. Or programmatically by `yarn maintainers`
+Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS]. Or programmatically by `yarn maintainers`
 
 #note-box[
   You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
 ]
+
+== Sponsoring
+
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS] and find their personal pages.
 
 == Acknowledgements
 
