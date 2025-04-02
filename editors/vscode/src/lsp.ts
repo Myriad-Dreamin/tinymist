@@ -88,9 +88,13 @@ interface JumpInfo {
   end: [number, number] | null;
 }
 
-interface ViewportInfo {
+export interface PreviewViewport {
   pageNo: number;
-  y: number;
+  y: number
+}
+interface PreviewViewportUpdate {
+  taskId: string;
+  viewport: PreviewViewport;
 }
 
 export class LanguageState {
@@ -100,13 +104,13 @@ export class LanguageState {
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => {};
+  clientPromiseResolve = (_client: LanguageClient) => { };
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => {};
+    this.clientPromiseResolve = (_client: LanguageClient) => { };
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -457,8 +461,8 @@ export class LanguageState {
     });
 
     // (Required) The server requests to report the current viewport of the preview page.
-    client.onNotification("tinymist/preview/updateViewport", (viewport: ViewportInfo) => {
-      console.log("recv updateViewport request", viewport);
+    client.onNotification("tinymist/preview/updateViewport", (req: PreviewViewportUpdate) => {
+      extensionState.setPreviewViewport(req.taskId, req.viewport);
     });
   }
 

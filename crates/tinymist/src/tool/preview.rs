@@ -14,7 +14,7 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use lsp_types::notification::Notification;
 use lsp_types::Url;
 use reflexo_typst::error::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
@@ -349,7 +349,12 @@ impl PreviewState {
                             send_show_document(&client, &s, &tid);
                         }
                     }
-                    UpdateViewport(pos) => client.send_notification::<ReportViewport>(&pos),
+                    UpdateViewport(pos) => {
+                        client.send_notification::<ReportViewport>(&PreviewViewportUpdate {
+                            task_id: tid.clone(),
+                            viewport: pos,
+                        })
+                    }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
                 }
             }
@@ -589,10 +594,17 @@ impl Notification for ScrollSource {
     const METHOD: &'static str = "tinymist/preview/scrollSource";
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewViewportUpdate {
+    pub task_id: String,
+    pub viewport: PreviewViewport,
+}
+
 struct ReportViewport;
 
 impl Notification for ReportViewport {
-    type Params = PreviewViewport;
+    type Params = PreviewViewportUpdate;
     const METHOD: &'static str = "tinymist/preview/updateViewport";
 }
 
