@@ -1,9 +1,9 @@
 //! Tinymist LSP commands
 
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::path::PathBuf;
 
-use lsp_types::*;
+use lsp_types::TextDocumentIdentifier;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::RequestId;
@@ -14,14 +14,16 @@ use tinymist_project::{
     ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
 };
 use tinymist_query::package::PackageInfo;
-use tinymist_query::LocalContextGuard;
+use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::syntax::{LinkedNode, Source};
 use world::TaskInputs;
 
 use super::*;
 use crate::lsp::query::{run_query, LspClientExt};
+use crate::tool::ast::AstRepr;
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].
@@ -56,8 +58,8 @@ struct QueryOpts {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HighlightRangeOpts {
-    range: Option<Range>,
+struct ExportSyntaxRangeOpts {
+    range: Option<LspRange>,
 }
 
 /// Here are implemented the handlers for each command.
@@ -212,8 +214,45 @@ impl ServerState {
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
-        let opts = get_arg_or_default!(args[1] as HighlightRangeOpts);
+        let opts = get_arg_or_default!(args[1] as ExportSyntaxRangeOpts);
 
+        let output = self.select_range(path, opts.range, |source, range| {
+            let mut text_in_range = source.text();
+            if let Some(range) = range {
+                text_in_range = text_in_range
+                    .get(range)
+                    .ok_or_else(|| internal_error("cannot get text in range"))?;
+            }
+
+            typst_ansi_hl::Highlighter::default()
+                .for_discord()
+                .with_soft_limit(2000)
+                .highlight(text_in_range)
+                .map_err(|e| internal_error(format!("cannot highlight: {e}")))
+        })?;
+
+        just_ok(JsonValue::String(output))
+    }
+
+    /// Export a range of the current file's AST.
+    pub fn export_ast(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as ExportSyntaxRangeOpts);
+
+        let output = self.select_range(path, opts.range, |source, range| {
+            let linked_node = LinkedNode::new(source.root());
+            Ok(format!("{}", AstRepr(linked_node, range)))
+        })?;
+
+        just_ok(JsonValue::String(output))
+    }
+
+    fn select_range<T>(
+        &mut self,
+        path: PathBuf,
+        range: Option<LspRange>,
+        f: impl Fn(Source, Option<Range<usize>>) -> LspResult<T>,
+    ) -> LspResult<T> {
         let s = self
             .query_source(path.into(), Ok)
             .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
@@ -221,28 +260,14 @@ impl ServerState {
         // todo: cannot select syntax-sensitive data well
         // let node = LinkedNode::new(s.root());
 
-        let range = opts
-            .range
+        let range = range
             .map(|r| {
                 tinymist_query::to_typst_range(r, self.const_config().position_encoding, &s)
                     .ok_or_else(|| internal_error("cannoet convert range"))
             })
             .transpose()?;
 
-        let mut text_in_range = s.text();
-        if let Some(range) = range {
-            text_in_range = text_in_range
-                .get(range)
-                .ok_or_else(|| internal_error("cannot get text in range"))?;
-        }
-
-        let output = typst_ansi_hl::Highlighter::default()
-            .for_discord()
-            .with_soft_limit(2000)
-            .highlight(text_in_range)
-            .map_err(|e| internal_error(format!("cannot highlight: {e}")))?;
-
-        just_ok(JsonValue::String(output))
+        f(s, range)
     }
 
     /// Clear all cached resources.

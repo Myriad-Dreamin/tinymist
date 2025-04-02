@@ -237,6 +237,10 @@ vi = "Sao chép dưới dạng mã ANSI"
 zh = "复制为 ANSI 代码"
 zh-TW = "複製為 ANSI 代碼"
 
+[extension.tinymist.command.tinymist.viewAst]
+en = "View the AST of the current file"
+zh = "查看当前文件的 AST"
+
 [extension.tinymist.command.tinymist.showLog]
 en = "Tinymist: Show Log"
 ar = "Tinymist: عرض السجل"

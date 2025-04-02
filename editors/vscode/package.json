@@ -1101,6 +1101,11 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.viewAst",
+        "title": "%extension.tinymist.command.tinymist.viewAst%",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.showLog",
         "title": "%extension.tinymist.command.tinymist.showLog%",
         "description": "Show log of the language server",

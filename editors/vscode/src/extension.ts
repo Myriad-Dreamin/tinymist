@@ -19,7 +19,7 @@ import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
-import { activeTypstEditor } from "./util";
+import { activeTypstEditor, isTypstDocument } from "./util";
 import { LanguageClient } from "vscode-languageclient/node";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
@@ -151,11 +151,11 @@ async function languageActivate(context: IContext) {
 
   // Find first document to focus
   const editor = window.activeTextEditor;
-  if (editor?.document.languageId === "typst" && editor.document.uri.fsPath) {
+  if (isTypstDocument(editor?.document)) {
     commandActivateDoc(editor.document);
   } else {
     window.visibleTextEditors.forEach((editor) => {
-      if (editor.document.languageId === "typst" && editor.document.uri.fsPath) {
+      if (isTypstDocument(editor.document)) {
         commandActivateDoc(editor.document);
       }
     });
@@ -166,12 +166,11 @@ async function languageActivate(context: IContext) {
       if (editor?.document.isUntitled) {
         return;
       }
-      const langId = editor?.document.languageId;
       // todo: plaintext detection
       // if (langId === "plaintext") {
       //     console.log("plaintext", langId, editor?.document.uri.fsPath);
       // }
-      if (langId !== "typst") {
+      if (!isTypstDocument(editor?.document)) {
         // console.log("not typst", langId, editor?.document.uri.fsPath);
         return commandActivateDoc(undefined);
       }
@@ -181,7 +180,7 @@ async function languageActivate(context: IContext) {
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-        if (doc.languageId === "typst") {
+        if (isTypstDocument(doc)) {
           return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
         } else {
           return commandActivateDoc(undefined);
@@ -212,6 +211,7 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.clearCache", commandClearCache),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
+    commands.registerCommand("tinymist.viewAst", commandViewAst(context)),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
@@ -260,6 +260,14 @@ async function commandGetCurrentDocumentMetrics(): Promise<any> {
   return res;
 }
 
+async function getNonEmptySelection(editor: TextEditor): Promise<any> {
+  if (editor.selection.isEmpty) {
+    return undefined;
+  }
+
+  return (await tinymist.clientPromise).code2ProtocolConverter.asRange(editor.selection);
+}
+
 async function commandCopyAnsiHighlight(): Promise<void> {
   const editor = activeTypstEditor();
   if (editor === undefined) {
@@ -267,7 +275,7 @@ async function commandCopyAnsiHighlight(): Promise<void> {
   }
 
   const res = await tinymist.exportAnsiHighlight(editor.document.uri.fsPath, {
-    range: editor.selection,
+    range: await getNonEmptySelection(editor),
   });
 
   if (res === null) {
@@ -276,6 +284,86 @@ async function commandCopyAnsiHighlight(): Promise<void> {
 
   // copy to clipboard
   await vscode.env.clipboard.writeText(res);
+}
+
+function commandViewAst(ctx: IContext) {
+  const scheme = "tinymist-ast";
+  const uri = `${scheme}://viewAst/ast.typ`;
+
+  const AstDoc = new (class implements vscode.TextDocumentContentProvider {
+    readonly uri = vscode.Uri.parse(uri);
+    readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
+    constructor() {
+      vscode.workspace.onDidChangeTextDocument(
+        this.onDidChangeTextDocument,
+        this,
+        ctx.subscriptions,
+      );
+      vscode.window.onDidChangeActiveTextEditor(
+        this.onDidChangeActiveTextEditor,
+        this,
+        ctx.subscriptions,
+      );
+      vscode.window.onDidChangeTextEditorSelection(
+        this.onDidChangeTextSelection,
+        this,
+        ctx.subscriptions,
+      );
+    }
+
+    emitChange() {
+      this.eventEmitter.fire(this.uri);
+    }
+
+    private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent) {
+      if (isTypstDocument(event.document)) {
+        // We need to order this after language server updates, but there's no API for that.
+        // Hence, good old sleep().
+        setTimeout(() => this.emitChange(), 10);
+      }
+    }
+
+    private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined) {
+      if (editor && isTypstDocument(editor.document)) {
+        this.emitChange();
+      }
+    }
+
+    private onDidChangeTextSelection(event: vscode.TextEditorSelectionChangeEvent) {
+      if (isTypstDocument(event.textEditor.document)) {
+        this.emitChange();
+      }
+    }
+
+    async provideTextDocumentContent(
+      _uri: vscode.Uri,
+      _ct: vscode.CancellationToken,
+    ): Promise<string> {
+      const editor = ctx.currentActiveEditor();
+      if (!editor) return "No active editor, change selection to view AST.";
+
+      const res = await tinymist.exportAst(editor.document.uri.fsPath, {
+        range: (await tinymist.clientPromise).code2ProtocolConverter.asRange(editor.selection),
+      });
+
+      return res || "Failed";
+    }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+      return this.eventEmitter.event;
+    }
+  })();
+
+  ctx.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(scheme, AstDoc));
+
+  return async () => {
+    const document = await vscode.workspace.openTextDocument(AstDoc.uri);
+    setTimeout(() => AstDoc.emitChange(), 10);
+    void (await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Two,
+      preserveFocus: true,
+    }));
+  };
 }
 
 async function commandClearCache(): Promise<void> {

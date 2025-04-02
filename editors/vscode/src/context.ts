@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { isTypstDocument } from "./util";
 
 /**
  * The active editor owning *typst language document* to track.
@@ -17,8 +18,7 @@ export class IContext {
     // Tracks the active editor owning *typst language document*.
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
-        const langId = editor?.document.languageId;
-        if (langId === "typst") {
+        if (isTypstDocument(editor?.document)) {
           activeEditor = editor;
         } else if (editor === undefined || activeEditor?.document.isClosed) {
           activeEditor = undefined;
@@ -30,6 +30,10 @@ export class IContext {
   // todo: remove me
   static currentActiveEditor(): vscode.TextEditor | undefined {
     return activeEditor;
+  }
+
+  currentActiveEditor(): vscode.TextEditor | undefined {
+    return IContext.currentActiveEditor();
   }
 
   registerFileLevelCommand(command: IFileLevelCommand) {
