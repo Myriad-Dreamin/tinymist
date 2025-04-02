@@ -133,7 +133,7 @@ Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/b
 
 == Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS] and find their personal pages. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
 == Acknowledgements
 

@@ -184,7 +184,7 @@ Get list of maintainers from [MAINTAINERS](https://github.com/Myriad-Dreamin/tin
 
 ## Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go [MAINTAINERS](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and find their personal pages. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go [MAINTAINERS](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
 
 ## Acknowledgements
 
