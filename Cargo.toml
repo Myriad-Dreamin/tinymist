@@ -41,6 +41,7 @@ open = { version = "5.1.3" }
 parking_lot = "0.12.1"
 walkdir = "2"
 chrono = "0.4"
+time = "0.3"
 dirs = "6"
 fontdb = "0.21"
 notify = "6"

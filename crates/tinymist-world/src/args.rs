@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tinymist_std::{bail, error::prelude::*};
@@ -209,11 +208,6 @@ fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
 pub fn parse_source_date_epoch(raw: &str) -> Result<i64, String> {
     raw.parse()
         .map_err(|err| format!("timestamp must be decimal integer ({err})"))
-}
-
-/// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
-pub fn convert_source_date_epoch(seconds: i64) -> Result<chrono::DateTime<Utc>, String> {
-    DateTime::from_timestamp(seconds, 0).ok_or_else(|| "timestamp out of range".to_string())
 }
 
 macro_rules! display_possible_values {
