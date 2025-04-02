@@ -54,6 +54,7 @@ default = []
 browser-embedded-fonts = ["typst-assets/fonts"]
 http-registry = ["reqwest"]
 web = [
+    "chrono/wasmbind",
     "wasm-bindgen",
     "web-sys",
     "js-sys",
