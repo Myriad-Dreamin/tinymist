@@ -125,7 +125,7 @@ Tinymist is localized in multiple languages. You can contribute to the localizat
 
 == Maintainers
 
-Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS]. Or programmatically by `yarn maintainers`
+Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page]. Or programmatically by `yarn maintainers`
 
 #note-box[
   You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
@@ -133,7 +133,7 @@ Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/b
 
 == Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[MAINTAINERS] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
 == Acknowledgements
 
