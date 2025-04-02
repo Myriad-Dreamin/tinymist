@@ -22,3 +22,6 @@ pub fn now() -> Time {
 pub fn now() -> Time {
     Time::UNIX_EPOCH
 }
+
+#[cfg(feature = "system")]
+pub use chrono;

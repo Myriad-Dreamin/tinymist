@@ -14,7 +14,6 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true

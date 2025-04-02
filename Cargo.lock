@@ -4192,7 +4192,6 @@ name = "tinymist-project"
 version = "0.13.12-rc1"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "comemo",
  "dirs",
@@ -4223,7 +4222,6 @@ dependencies = [
  "anyhow",
  "base64",
  "biblatex",
- "chrono",
  "comemo",
  "dashmap",
  "dirs",
@@ -4290,6 +4288,7 @@ dependencies = [
  "anyhow",
  "base64",
  "bitvec",
+ "chrono",
  "comemo",
  "core-foundation",
  "dashmap",
@@ -4324,7 +4323,6 @@ name = "tinymist-task"
 version = "0.13.12-rc1"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "comemo",
  "dirs",
@@ -4376,7 +4374,6 @@ name = "tinymist-world"
 version = "0.13.12-rc1"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "codespan-reporting",
  "comemo",
