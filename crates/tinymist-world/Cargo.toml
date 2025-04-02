@@ -15,6 +15,10 @@ rust-version.workspace = true
 [dependencies]
 
 anyhow.workspace = true
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+    "clock",
+] }
 clap.workspace = true
 codespan-reporting.workspace = true
 comemo.workspace = true
@@ -48,7 +52,7 @@ web-sys = { workspace = true, optional = true, features = ["console"] }
 
 default = []
 browser-embedded-fonts = ["typst-assets/fonts"]
-http-registry = ["dep:reqwest"]
+http-registry = ["reqwest"]
 web = [
     "wasm-bindgen",
     "web-sys",
@@ -59,8 +63,8 @@ web = [
 ]
 browser = ["tinymist-vfs/browser", "web"]
 system = [
-    "dep:dirs",
-    "dep:fontdb",
+    "dirs",
+    "fontdb",
     "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",

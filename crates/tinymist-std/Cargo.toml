@@ -14,7 +14,6 @@ repository.workspace = true
 anyhow.workspace = true
 base64.workspace = true
 bitvec.workspace = true
-chrono = { workspace = true, optional = true }
 comemo.workspace = true
 dashmap.workspace = true
 ecow = { workspace = true, features = ["serde"] }
@@ -30,6 +29,7 @@ serde_json.workspace = true
 serde_with.workspace = true
 siphasher.workspace = true
 web-time.workspace = true
+time.workspace = true
 lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
 same-file = { workspace = true, optional = true }
@@ -77,7 +77,7 @@ rkyv-validation = ["rkyv/validation"]
 
 __web = ["wasm-bindgen", "js-sys"]
 web = ["__web"]
-system = ["tempfile", "same-file", "chrono"]
+system = ["tempfile", "same-file"]
 bi-hash = []
 
 [lints]

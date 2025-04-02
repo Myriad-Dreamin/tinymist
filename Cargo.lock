@@ -4288,7 +4288,6 @@ dependencies = [
  "anyhow",
  "base64",
  "bitvec",
- "chrono",
  "comemo",
  "core-foundation",
  "dashmap",
@@ -4311,6 +4310,7 @@ dependencies = [
  "serde_with",
  "siphasher",
  "tempfile",
+ "time",
  "typst",
  "typst-shim",
  "wasm-bindgen",
@@ -4374,6 +4374,7 @@ name = "tinymist-world"
 version = "0.13.12-rc1"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "codespan-reporting",
  "comemo",

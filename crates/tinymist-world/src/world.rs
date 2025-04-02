@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
 };
 
-use chrono::{DateTime, Datelike, Local};
+use chrono::{DateTime, Datelike, Duration, Local};
 use tinymist_std::error::prelude::*;
 use tinymist_vfs::{
     FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
@@ -708,11 +708,12 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// If this function returns `None`, Typst's `datetime` function will
     /// return an error.
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        // todo: typst respects creation_timestamp, but we don't...
         let now = self.now.get_or_init(|| tinymist_std::time::now().into());
 
         let naive = match offset {
             None => now.naive_local(),
-            Some(o) => now.naive_utc() + chrono::Duration::try_hours(o)?,
+            Some(o) => now.naive_utc() + Duration::try_hours(o)?,
         };
 
         Datetime::from_ymd(
