@@ -65,6 +65,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'yarn'
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Install deps
         run: yarn install
