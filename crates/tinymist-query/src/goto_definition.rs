@@ -34,9 +34,9 @@ impl StatefulRequest for GotoDefinitionRequest {
 
         let def = ctx.def_of_syntax(&source, doc, syntax)?;
 
-        let (fid, def_range) = def.location(ctx.shared())?;
+        let (fid, name_range) = def.location(ctx.shared())?;
         let uri = ctx.uri_for_id(fid).ok()?;
-        let range = ctx.to_lsp_range_(def_range, fid)?;
+        let range = ctx.to_lsp_range_(name_range, fid)?;
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),

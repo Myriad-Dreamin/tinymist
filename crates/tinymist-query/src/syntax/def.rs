@@ -408,6 +408,7 @@ impl Decl {
         matches!(
             self,
             Self::Func(..)
+                | Self::BibEntry(..)
                 | Self::Closure(..)
                 | Self::Var(..)
                 | Self::Label(..)
@@ -440,6 +441,7 @@ impl Decl {
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Self::Module(ModuleDecl { fid, .. }) => Some(*fid),
+            Self::BibEntry(NameRangeDecl { at, .. }) => Some(at.0),
             that => that.span().id(),
         }
     }
@@ -450,10 +452,17 @@ impl Decl {
         if !self.is_def() {
             return None;
         }
+        if let Decl::BibEntry(decl) = self {
+            return Some(decl.at.1.clone());
+        }
 
-        let fid = self.file_id()?;
-        let src = ctx.source_by_id(fid).ok()?;
-        src.range(self.span())
+        let span = self.span();
+        if let Some(range) = span.range() {
+            return Some(range.clone());
+        }
+
+        let src = ctx.source_by_id(self.file_id()?).ok()?;
+        src.range(span)
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
