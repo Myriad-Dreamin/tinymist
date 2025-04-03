@@ -43,6 +43,11 @@ impl Definition {
         Some((fid, range))
     }
 
+    /// Gets file location of the definition.
+    pub fn file_id(&self) -> Option<TypstFileId> {
+        self.decl.file_id()
+    }
+
     /// The range of the name of the definition.
     pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
         self.decl.name_range(ctx)

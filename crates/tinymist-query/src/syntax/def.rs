@@ -438,6 +438,7 @@ impl Decl {
         }
     }
 
+    /// Gets file location of the declaration.
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Self::Module(ModuleDecl { fid, .. }) => Some(*fid),
@@ -446,14 +447,14 @@ impl Decl {
         }
     }
 
-    // todo: name range
-    /// The range of the name of the definition.
+    /// Gets name range of the declaration.
     pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
-        if !self.is_def() {
-            return None;
-        }
         if let Decl::BibEntry(decl) = self {
             return Some(decl.at.1.clone());
+        }
+
+        if !self.is_def() {
+            return None;
         }
 
         let span = self.span();
