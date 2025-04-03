@@ -62,7 +62,7 @@ pub(crate) fn prepare_renaming(
     def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
     let name = def.name().clone();
-    let (def_fid, _def_range) = def.location(ctx.shared()).clone()?;
+    let (def_fid, _name_range) = def.location(ctx.shared()).clone()?;
 
     if WorkspaceResolver::is_package_file(def_fid) {
         crate::log_debug_ct!(

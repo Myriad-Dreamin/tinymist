@@ -39,9 +39,8 @@ impl Definition {
     // todo: cache
     pub(crate) fn location(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
         let fid = self.decl.file_id()?;
-        let span = self.decl.span();
-        let range = (!span.is_detached()).then(|| ctx.source_by_id(fid).ok()?.range(span));
-        Some((fid, range.flatten().unwrap_or_default()))
+        let range = self.decl.name_range(ctx).unwrap_or_default();
+        Some((fid, range))
     }
 
     /// The range of the name of the definition.
@@ -155,7 +154,7 @@ fn bib_definition(
     crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");
 
     // todo: rename with regard to string format: yaml-key/bib etc.
-    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.range.clone());
+    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.name_range.clone());
     Some(Definition::new(decl.into(), None))
 }
 
