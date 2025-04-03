@@ -397,10 +397,15 @@ impl Decl {
         Self::Generated(GeneratedDecl(def_id))
     }
 
-    pub fn bib_entry(name: Interned<str>, fid: TypstFileId, range: Range<usize>) -> Self {
+    pub fn bib_entry(
+        name: Interned<str>,
+        fid: TypstFileId,
+        name_range: Range<usize>,
+        range: Option<Range<usize>>,
+    ) -> Self {
         Self::BibEntry(NameRangeDecl {
             name,
-            at: Box::new((fid, range)),
+            at: Box::new((fid, name_range, range)),
         })
     }
 
@@ -464,6 +469,15 @@ impl Decl {
 
         let src = ctx.source_by_id(self.file_id()?).ok()?;
         src.range(span)
+    }
+
+    /// Gets full range of the declaration.
+    pub fn full_range(&self) -> Option<Range<usize>> {
+        if let Decl::BibEntry(decl) = self {
+            return decl.at.2.clone();
+        }
+
+        None
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
@@ -582,7 +596,7 @@ impl fmt::Debug for SpannedDecl {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
     name: Interned<str>,
-    at: Box<(TypstFileId, Range<usize>)>,
+    at: Box<(TypstFileId, Range<usize>, Option<Range<usize>>)>,
 }
 
 impl NameRangeDecl {

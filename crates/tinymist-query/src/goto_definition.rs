@@ -34,15 +34,15 @@ impl StatefulRequest for GotoDefinitionRequest {
 
         let def = ctx.def_of_syntax(&source, doc, syntax)?;
 
-        let (fid, name_range) = def.location(ctx.shared())?;
-        let uri = ctx.uri_for_id(fid).ok()?;
-        let range = ctx.to_lsp_range_(name_range, fid)?;
+        let fid = def.file_id()?;
+        let name_range = def.name_range(ctx.shared()).unwrap_or_default();
+        let full_range = def.full_range().unwrap_or_else(|| name_range.clone());
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
-            target_uri: uri,
-            target_range: range,
-            target_selection_range: range,
+            target_uri: ctx.uri_for_id(fid).ok()?,
+            target_range: ctx.to_lsp_range_(full_range, fid)?,
+            target_selection_range: ctx.to_lsp_range_(name_range, fid)?,
         }]));
 
         crate::log_debug_ct!("goto_definition: {fid:?} {res:?}");

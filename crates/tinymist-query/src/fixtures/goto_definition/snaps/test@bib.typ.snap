@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/goto_definition/bib.typ
 [
  {
   "originSelectionRange": "2:20:2:33",
-  "targetRange": "0:9:0:21",
+  "targetRange": "0:0:6:11",
   "targetSelectionRange": "0:9:0:21",
   "targetUri": "references.bib"
  }
