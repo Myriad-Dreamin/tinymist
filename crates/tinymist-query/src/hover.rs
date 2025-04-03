@@ -6,7 +6,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_bib_elem_and_info;
 use crate::analysis::get_link_exprs_in;
-use crate::analysis::render_citation_string;
+use crate::bib::{render_citation_string, RenderedBibCitation};
 use crate::jump_from_cursor;
 use crate::prelude::*;
 use crate::upstream::{route_of_value, truncated_repr, Tooltip};
@@ -134,21 +134,15 @@ impl HoverWorker<'_> {
                 }
             }
             BibEntry(..) => {
-                if (|| {
-                    let doc = self.doc.as_ref()?;
-                    let support_html = !self.ctx.shared.analysis.remove_html;
-                    let (bib_elem, bib_info) = get_bib_elem_and_info(self.ctx, doc.introspector())?;
-                    let style = bib_elem.style(Default::default()).derived;
-                    let details =
-                        render_citation_string(&bib_info, &style, def.name(), support_html)?;
-                    self.def
-                        .push(format!("Bibliography: `@{}` {}", def.name(), details.0));
-                    self.def.push(details.1);
-                    Some(())
-                })()
-                .is_none()
-                {
-                    // fallback: no additional infomation
+                if let Some(details) = try_get_bib_details(&self.doc, self.ctx, def.name()) {
+                    self.def.push(format!(
+                        "Bibliography: `@{}` {}",
+                        def.name(),
+                        details.citation
+                    ));
+                    self.def.push(details.bib_item);
+                } else {
+                    // fallback: no additional information
                     self.def.push(format!("Bibliography: `@{}`", def.name()));
                 }
             }
@@ -299,6 +293,18 @@ impl HoverWorker<'_> {
         self.preview.push(preview_content);
         Some(())
     }
+}
+
+fn try_get_bib_details(
+    doc: &Option<TypstDocument>,
+    ctx: &LocalContext,
+    name: &str,
+) -> Option<RenderedBibCitation> {
+    let doc = doc.as_ref()?;
+    let support_html = !ctx.shared.analysis.remove_html;
+    let (bib_elem, bib_info) = get_bib_elem_and_info(ctx, doc.introspector())?;
+    let style = bib_elem.style(Default::default()).derived;
+    render_citation_string(&bib_info, &style, name, support_html)
 }
 
 fn push_result_ty(
