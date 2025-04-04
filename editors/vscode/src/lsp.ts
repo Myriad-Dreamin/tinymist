@@ -90,7 +90,7 @@ interface JumpInfo {
 
 export interface PreviewViewport {
   pageNo: number;
-  y: number
+  y: number;
 }
 interface PreviewViewportUpdate {
   taskId: string;
@@ -104,13 +104,13 @@ export class LanguageState {
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => { };
+  clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => { };
+    this.clientPromiseResolve = (_client: LanguageClient) => {};
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });

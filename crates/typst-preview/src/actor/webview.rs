@@ -45,7 +45,13 @@ fn viewport_resp(msg: &String) -> PreviewViewport {
     let location = location.split(' ').collect::<Vec<&str>>();
     let page_no = location[0].parse().unwrap();
     let y = location.get(1).map(|s| s.parse().unwrap()).unwrap_or(0.);
-    PreviewViewport { page_no, y }
+    PreviewViewport {
+        pos: DocumentPosition { page_no, x: 0., y },
+        sx: 1.,
+        sy: 1.,
+        width: 0.,
+        height: 0.,
+    }
 }
 
 pub struct WebviewActor<

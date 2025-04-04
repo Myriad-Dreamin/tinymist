@@ -320,11 +320,32 @@ pub struct DocToSrcJumpInfo {
     pub end: Option<(usize, usize)>,
 }
 
+/// The viewport state in the document.
+///
+/// From the model of transformation, we store:
+/// - tx, ty: the translation of the viewport as [`Self::pos`].
+/// - sx, sy: the scale of the viewport.
+/// - kx, ky: this is not stored.
+///
+/// The viewport will be exactly restored by applying the transformation matrix
+/// if the window size is unchanged.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewViewport {
-    pub page_no: usize,
-    pub y: f32,
+    /// The left-top position in the view of the viewport.
+    #[serde(flatten)]
+    pub pos: DocumentPosition,
+    /// The x-scale of the viewport.
+    pub sx: f32,
+    /// The y-scale of the viewport.
+    pub sy: f32,
+
+    /// The width of the viewport. It can be zero if it is not available at the
+    /// time capturing the viewport.
+    pub width: f32,
+    /// The height of the viewport. It can be zero if it is not available at the
+    /// time capturing the viewport.
+    pub height: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
