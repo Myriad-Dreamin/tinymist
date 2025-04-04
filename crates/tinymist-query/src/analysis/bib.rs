@@ -1,29 +1,38 @@
-use typst::foundations::Bytes;
+use indexmap::IndexMap;
+use typst::{foundations::Bytes, model::CslStyle};
 use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 use super::prelude::*;
 
-pub(crate) fn bib_info(files: EcoVec<(TypstFileId, Bytes)>) -> Option<Arc<BibInfo>> {
+pub(crate) fn bib_info(
+    csl_style: CslStyle,
+    files: impl Iterator<Item = (TypstFileId, Bytes)>,
+) -> Option<Arc<BibInfo>> {
     let mut worker = BibWorker {
-        info: BibInfo::default(),
+        info: BibInfo {
+            csl_style,
+            entries: IndexMap::new(),
+        },
     };
 
     // We might have multiple bib/yaml files
-    for (file_id, content) in files.clone() {
+    for (file_id, content) in files {
         worker.analyze_path(file_id, content);
     }
 
     let info = Arc::new(worker.info);
 
-    crate::log_debug_ct!("bib analysis: {files:?} -> {info:?}");
+    crate::log_debug_ct!("bib analysis: {info:?}");
     Some(info)
 }
 
 /// The bibliography information.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BibInfo {
+    /// The using CSL style.
+    pub csl_style: CslStyle,
     /// The bibliography entries.
-    pub entries: indexmap::IndexMap<String, BibEntry>,
+    pub entries: IndexMap<String, BibEntry>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +40,7 @@ pub struct BibEntry {
     pub file_id: TypstFileId,
     pub name_range: Range<usize>,
     pub range: Range<usize>,
+    pub raw_entry: Option<hayagriva::Entry>,
 }
 
 struct BibWorker {
@@ -42,14 +52,27 @@ impl BibWorker {
         let file_extension = file_id.vpath().as_rooted_path().extension()?.to_str()?;
         let content = std::str::from_utf8(&content).ok()?;
 
-        match file_extension.to_lowercase().as_str() {
-            "yml" | "yaml" => self.yaml_bib(file_id, content),
+        // Reparse the content to get all entries
+        let bib = match file_extension.to_lowercase().as_str() {
+            "yml" | "yaml" => {
+                self.yaml_bib(file_id, content);
+
+                hayagriva::io::from_yaml_str(content).ok()?
+            }
             "bib" => {
                 let bibliography = biblatex::RawBibliography::parse(content).ok()?;
-                self.tex_bib(file_id, bibliography)
+                self.tex_bib(file_id, bibliography);
+
+                hayagriva::io::from_biblatex_str(content).ok()?
             }
             _ => return None,
         };
+
+        for entry in bib {
+            if let Some(stored_entry) = self.info.entries.get_mut(entry.key()) {
+                stored_entry.raw_entry = Some(entry);
+            }
+        }
 
         Some(())
     }
@@ -66,6 +89,7 @@ impl BibWorker {
                 file_id,
                 name_range: name.span,
                 range: entry.span,
+                raw_entry: None,
             };
             self.info.entries.insert(name.v.to_owned(), entry);
         }
@@ -172,6 +196,7 @@ impl YamlBib {
                 file_id,
                 name_range,
                 range,
+                raw_entry: None,
             };
             Some((name.value, entry))
         };
@@ -209,8 +234,8 @@ Euclid2:
             FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
         );
         assert_eq!(bib.entries.len(), 2);
-        insta::assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63 })"###);
-        insta::assert_snapshot!(bib_snap(&bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126 })"###);
+        insta::assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63, raw_entry: None })"###);
+        insta::assert_snapshot!(bib_snap(&bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126, raw_entry: None })"###);
     }
 
     #[test]
