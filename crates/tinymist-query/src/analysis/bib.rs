@@ -1,20 +1,13 @@
 use indexmap::IndexMap;
-use typst::{
-    foundations::{Bytes, Packed, StyleChain},
-    model::{BibliographyElem, CslStyle},
-};
+use typst::{foundations::Bytes, model::CslStyle};
 use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 use super::prelude::*;
 
 pub(crate) fn bib_info(
-    bib_elem: &Packed<BibliographyElem>,
+    csl_style: CslStyle,
     files: impl Iterator<Item = (TypstFileId, Bytes)>,
 ) -> Option<Arc<BibInfo>> {
-    // todo: it doesn't respect the style chain which can be get from
-    // `analyze_expr`
-    let csl_style = bib_elem.style(StyleChain::default()).derived;
-
     let mut worker = BibWorker {
         info: BibInfo {
             csl_style,

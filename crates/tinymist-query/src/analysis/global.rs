@@ -18,7 +18,7 @@ use tinymist_world::debug_loc::DataSource;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
-use typst::foundations::{Bytes, IntoValue, Module, Styles};
+use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
 use typst::model::BibliographyElem;
@@ -1265,6 +1265,10 @@ fn analyze_bib(
 ) -> Option<Arc<BibInfo>> {
     let bib_elem = BibliographyElem::find(introspector).ok()?;
 
+    // todo: it doesn't respect the style chain which can be get from
+    // `analyze_expr`
+    let csl_style = bib_elem.style(StyleChain::default()).derived;
+
     let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
         return None;
     };
@@ -1277,7 +1281,7 @@ fn analyze_bib(
             Some((bib_fid, world.file(bib_fid).ok()?))
         });
 
-    bib_info(&bib_elem, files)
+    bib_info(csl_style, files)
 }
 
 #[comemo::memoize]
