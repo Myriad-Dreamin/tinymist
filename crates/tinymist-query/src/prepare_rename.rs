@@ -47,7 +47,7 @@ impl StatefulRequest for PrepareRenameRequest {
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
         let def = ctx.def_of_syntax(&source, doc, syntax.clone())?;
 
-        let (name, range) = prepare_renaming(ctx, &syntax, &def)?;
+        let (name, range) = prepare_renaming(&syntax, &def)?;
 
         Some(PrepareRenameResponse::RangeWithPlaceholder {
             range: range.unwrap_or(origin_selection_range),
@@ -57,12 +57,11 @@ impl StatefulRequest for PrepareRenameRequest {
 }
 
 pub(crate) fn prepare_renaming(
-    ctx: &mut LocalContext,
     deref_target: &SyntaxClass,
     def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
     let name = def.name().clone();
-    let (def_fid, _name_range) = def.location(ctx.shared()).clone()?;
+    let def_fid = def.file_id()?;
 
     if WorkspaceResolver::is_package_file(def_fid) {
         crate::log_debug_ct!(

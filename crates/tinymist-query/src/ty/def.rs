@@ -536,7 +536,6 @@ impl InsTy {
                     Value::Func(func) => func.span(),
                     Value::Args(args) => args.span,
                     Value::Content(content) => content.span(),
-                    // todo: module might have file id
                     _ => return None,
                 })
             })
@@ -966,9 +965,9 @@ impl SigTy {
     pub fn matches<'a>(
         &'a self,
         args: &'a SigTy,
-        withs: Option<&'a Vec<Interned<crate::analysis::SigTy>>>,
+        with: Option<&'a Vec<Interned<crate::analysis::SigTy>>>,
     ) -> impl Iterator<Item = (&'a Ty, &'a Ty)> + 'a {
-        let with_len = withs
+        let with_len = with
             .map(|w| w.iter().map(|w| w.positional_params().len()).sum::<usize>())
             .unwrap_or(0);
 
@@ -985,7 +984,7 @@ impl SigTy {
                 0
             };
 
-        let arg_pos = withs
+        let arg_pos = with
             .into_iter()
             .flat_map(|w| w.iter().rev().map(|w| w.positional_params()))
             .flatten()
@@ -995,7 +994,7 @@ impl SigTy {
         let arg_stream = arg_pos.chain(arg_rest.into_iter().cycle()).take(max_len);
 
         let pos = sig_stream.zip(arg_stream);
-        let common_ifaces = withs
+        let common_ifaces = with
             .map(|args_all| args_all.iter().rev())
             .into_iter()
             .flatten()
@@ -1445,9 +1444,9 @@ mod tests {
         fn matches(
             sig: Interned<SigTy>,
             args: Interned<SigTy>,
-            withs: Option<Vec<Interned<ArgsTy>>>,
+            with: Option<Vec<Interned<ArgsTy>>>,
         ) -> String {
-            let res = sig.matches(&args, withs.as_ref()).collect::<Vec<_>>();
+            let res = sig.matches(&args, with.as_ref()).collect::<Vec<_>>();
             format!("{res:?}")
         }
 
