@@ -1,48 +1,45 @@
+use indexmap::IndexMap;
 use typst::{
-    foundations::{Bytes, IntoValue, Packed},
-    introspection::Introspector,
-    model::BibliographyElem,
+    foundations::{Bytes, Packed, StyleChain},
+    model::{BibliographyElem, CslStyle},
 };
 use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
-use super::{prelude::*, SharedContext};
+use super::prelude::*;
 
-pub(crate) fn get_bib_elem_and_info(
-    ctx: &SharedContext,
-    introspector: &Introspector,
-) -> Option<(Packed<BibliographyElem>, Arc<BibInfo>)> {
-    let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
-        return None;
-    };
+pub(crate) fn bib_info(
+    bib_elem: &Packed<BibliographyElem>,
+    files: impl Iterator<Item = (TypstFileId, Bytes)>,
+) -> Option<Arc<BibInfo>> {
+    // todo: it doesn't respect the style chain which can be get from
+    // `analyze_expr`
+    let csl_style = bib_elem.style(StyleChain::default()).derived;
 
-    let bib_paths = paths.into_iter().flat_map(|path| path.cast().ok());
-    let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
-
-    Some((bib_elem, bib_info))
-}
-
-pub(crate) fn bib_info(files: EcoVec<(TypstFileId, Bytes)>) -> Option<Arc<BibInfo>> {
     let mut worker = BibWorker {
-        info: BibInfo::default(),
+        info: BibInfo {
+            csl_style,
+            entries: IndexMap::new(),
+        },
     };
 
     // We might have multiple bib/yaml files
-    for (file_id, content) in files.clone() {
+    for (file_id, content) in files {
         worker.analyze_path(file_id, content);
     }
 
     let info = Arc::new(worker.info);
 
-    crate::log_debug_ct!("bib analysis: {files:?} -> {info:?}");
+    crate::log_debug_ct!("bib analysis: {info:?}");
     Some(info)
 }
 
 /// The bibliography information.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BibInfo {
+    /// The using CSL style.
+    pub csl_style: CslStyle,
     /// The bibliography entries.
-    pub entries: indexmap::IndexMap<String, BibEntry>,
+    pub entries: IndexMap<String, BibEntry>,
 }
 
 #[derive(Debug, Clone)]
