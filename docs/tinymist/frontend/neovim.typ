@@ -104,13 +104,18 @@ It is often useful to have a command that opens the current file in the reader.
 vim.api.nvim_create_user_command("OpenPdf", function()
   local filepath = vim.api.nvim_buf_get_name(0)
   if filepath:match("%.typ$") then
-    os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
+    local pdf_path = filepath:gsub("%.typ$", ".pdf")
+    vim.system({ "open", pdf_path })
     -- replace open with your preferred pdf viewer
-    -- os.execute("zathura " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
+    -- vim.system({ "zathura", pdf_path })
+
+    -- For Neovim versions prior to 0.9.5, `os.execute` can be used instead.
+    -- (This will be a blocking call -- see https://github.com/Myriad-Dreamin/tinymist/issues/1606)
+    -- os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
   end
 end, {})
-
 ```
+
 Make sure to change `exportPdf` to "onType" or "onSave".
 
 === Working with Multiple-Files Projects
