@@ -15,13 +15,13 @@ use crate::{
 };
 
 use super::webview::WebviewActorRequest;
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DocToSrcJumpResolveRequest {
     /// Span id in hex-format.
     pub span: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PanelScrollByPositionRequest {
     position: DocumentPosition,
 }
@@ -116,7 +116,7 @@ pub struct EditorActor<T> {
     span_interner: SpanInterner,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "event")]
 pub enum ControlPlaneMessage {
     #[serde(rename = "changeCursorPosition")]

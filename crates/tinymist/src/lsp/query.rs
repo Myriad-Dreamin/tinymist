@@ -80,6 +80,8 @@ impl ServerState {
     pub(crate) fn hover(&mut self, req_id: RequestId, params: HoverParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'h');
+
+        self.implicit_position = Some(position);
         run_query!(req_id, self.Hover(path, position))
     }
 
@@ -230,6 +232,7 @@ impl ServerState {
             .and_then(|c| c.trigger_character.as_ref())
             .and_then(|c| c.chars().next());
 
+        self.implicit_position = Some(position);
         run_query!(
             req_id,
             self.Completion(path, position, explicit, trigger_character)
@@ -242,6 +245,8 @@ impl ServerState {
         params: SignatureHelpParams,
     ) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
+
+        self.implicit_position = Some(position);
         run_query!(req_id, self.SignatureHelp(path, position))
     }
 
