@@ -60,7 +60,9 @@ impl Iface<'_> {
         crate::log_debug_ct!("iface shape: {self:?}");
 
         match self {
-            Iface::Array(..) | Iface::Tuple(..) => None,
+            Iface::Array(..) | Iface::Tuple(..) => {
+                select_scope(Some(Type::of::<typst::foundations::Array>().scope()), key)
+            }
             Iface::Dict(dict) => dict.field_by_name(key).cloned(),
             Iface::Content { val, .. } => select_scope(Some(val.scope()), key),
             // todo: distinguish TypeType and Type
@@ -123,23 +125,14 @@ impl BoundChecker for IfaceCheckDriver<'_> {
 
 impl IfaceCheckDriver<'_> {
     fn array_as_iface(&self) -> bool {
-        // matches!(
-        // self.ctx.sig_kind,
-        // SigSurfaceKind::DictIface | SigSurfaceKind::ArrayOrDict
-        // )
         true
     }
 
     fn dict_as_iface(&self) -> bool {
-        // matches!(
-        // self.ctx.sig_kind,
-        // SigSurfaceKind::DictIface | SigSurfaceKind::ArrayOrDict
-        // )
         true
     }
 
     fn value_as_iface(&self) -> bool {
-        // matches!(self.ctx.sig_kind, SigSurfaceKind::Func)
         true
     }
 
@@ -171,8 +164,8 @@ impl IfaceCheckDriver<'_> {
                 self.checker
                     .check(Iface::Dict(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
             }
-            // // todo: deduplicate checking early
             Ty::Value(ins_ty) => {
+                // todo: deduplicate checking early
                 if self.value_as_iface() {
                     match &ins_ty.val {
                         Value::Module(val) => {
@@ -191,7 +184,41 @@ impl IfaceCheckDriver<'_> {
                             self.checker
                                 .check(Iface::Func { val: func, at }, &mut self.ctx, pol);
                         }
-                        _ => {}
+                        Value::None
+                        | Value::Auto
+                        | Value::Bool(_)
+                        | Value::Int(_)
+                        | Value::Float(_)
+                        | Value::Length(..)
+                        | Value::Angle(..)
+                        | Value::Ratio(..)
+                        | Value::Relative(..)
+                        | Value::Fraction(..)
+                        | Value::Color(..)
+                        | Value::Gradient(..)
+                        | Value::Tiling(..)
+                        | Value::Symbol(..)
+                        | Value::Version(..)
+                        | Value::Str(..)
+                        | Value::Bytes(..)
+                        | Value::Label(..)
+                        | Value::Datetime(..)
+                        | Value::Decimal(..)
+                        | Value::Duration(..)
+                        | Value::Content(..)
+                        | Value::Styles(..)
+                        | Value::Array(..)
+                        | Value::Args(..)
+                        | Value::Dyn(..) => {
+                            self.checker.check(
+                                Iface::Type {
+                                    val: &ins_ty.val.ty(),
+                                    at,
+                                },
+                                &mut self.ctx,
+                                pol,
+                            );
+                        }
                     }
                 }
             }
@@ -226,7 +253,7 @@ impl IfaceCheckDriver<'_> {
                         .check(Iface::Module { val: m.fid, at }, &mut self.ctx, pol);
                 }
             }
-            // Ty::Func(sig) if self.value_as_iface() => {
+            // Ty::Func(..) if self.value_as_iface() => {
             //     self.checker.check(Iface::Type(sig), &mut self.ctx, pol);
             // }
             // Ty::Array(sig) if self.array_as_sig() => {
@@ -246,6 +273,26 @@ impl IfaceCheckDriver<'_> {
             Ty::Array(sig) if self.array_as_iface() => {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Iface::Array(sig), &mut self.ctx, pol);
+            }
+            Ty::Dict(..) => {
+                self.checker.check(
+                    Iface::Type {
+                        val: &Type::of::<typst::foundations::Dict>(),
+                        at,
+                    },
+                    &mut self.ctx,
+                    pol,
+                );
+            }
+            Ty::Tuple(..) | Ty::Array(..) => {
+                self.checker.check(
+                    Iface::Type {
+                        val: &Type::of::<typst::foundations::Array>(),
+                        at,
+                    },
+                    &mut self.ctx,
+                    pol,
+                );
             }
             Ty::Var(..) => at.bounds(pol, self),
             _ if at.has_bounds() => at.bounds(pol, self),
