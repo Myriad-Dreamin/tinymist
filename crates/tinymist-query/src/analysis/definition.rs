@@ -41,13 +41,11 @@ impl Definition {
     }
 
     /// Gets name range of the definition.
-    // todo: cache
     pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
         self.decl.name_range(ctx)
     }
 
     /// Gets full range of the definition.
-    // todo: cache
     pub fn full_range(&self) -> Option<Range<usize>> {
         self.decl.full_range()
     }
