@@ -1,4 +1,7 @@
-use typst::model::CslStyle;
+use hayagriva::{
+    BibliographyDriver, BibliographyRequest, BufWriteFormat, CitationItem, CitationRequest,
+    ElemChildren,
+};
 
 use crate::analysis::BibInfo;
 
@@ -10,15 +13,9 @@ pub(crate) struct RenderedBibCitation {
 /// Render the citation string in the bib with given CSL style.
 pub(crate) fn render_citation_string(
     bib_info: &BibInfo,
-    style: &CslStyle,
     key: &str,
     support_html: bool,
 ) -> Option<RenderedBibCitation> {
-    use hayagriva::{
-        BibliographyDriver, BibliographyRequest, BufWriteFormat, CitationItem, CitationRequest,
-        ElemChildren,
-    };
-
     let entry = bib_info.entries.get(key)?;
     let raw_entry = entry.raw_entry.as_ref()?;
 
@@ -27,12 +24,12 @@ pub(crate) fn render_citation_string(
     let locales = &[];
     driver.citation(CitationRequest::from_items(
         vec![CitationItem::with_entry(raw_entry)],
-        style.get(),
+        bib_info.csl_style.get(),
         locales,
     ));
 
     let result = driver.finish(BibliographyRequest {
-        style: style.get(),
+        style: bib_info.csl_style.get(),
         locale: None, // todo: get locale from CiteElem
         locale_files: locales,
     });

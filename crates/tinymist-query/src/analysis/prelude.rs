@@ -4,7 +4,6 @@ pub use std::ops::Range;
 pub use std::path::Path;
 pub use std::sync::{Arc, LazyLock};
 
-pub use comemo::Track;
 pub use ecow::*;
 pub use typst::foundations::{Func, Value};
 pub use typst::syntax::ast::{self, AstNode};

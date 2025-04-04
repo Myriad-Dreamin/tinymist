@@ -5,7 +5,6 @@ use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
 
 use super::{prelude::*, InsTy, SharedContext};
-use crate::analysis::get_bib_elem_and_info;
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
 
@@ -169,7 +168,7 @@ fn bib_definition(
     introspector: &Introspector,
     key: &str,
 ) -> Option<Definition> {
-    let bib_info = get_bib_elem_and_info(ctx, introspector)?.1;
+    let bib_info = ctx.analyze_bib(introspector)?;
 
     let entry = bib_info.entries.get(key)?;
     crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");

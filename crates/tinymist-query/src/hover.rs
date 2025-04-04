@@ -4,7 +4,6 @@ use tinymist_std::typst::TypstDocument;
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::analysis::get_bib_elem_and_info;
 use crate::analysis::get_link_exprs_in;
 use crate::bib::{render_citation_string, RenderedBibCitation};
 use crate::jump_from_cursor;
@@ -302,9 +301,8 @@ fn try_get_bib_details(
 ) -> Option<RenderedBibCitation> {
     let doc = doc.as_ref()?;
     let support_html = !ctx.shared.analysis.remove_html;
-    let (bib_elem, bib_info) = get_bib_elem_and_info(ctx, doc.introspector())?;
-    let style = bib_elem.style(Default::default()).derived;
-    render_citation_string(&bib_info, &style, name, support_html)
+    let bib_info = ctx.analyze_bib(doc.introspector())?;
+    render_citation_string(&bib_info, name, support_html)
 }
 
 fn push_result_ty(
