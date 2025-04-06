@@ -1,3 +1,5 @@
+pub use tinymist_world::args::{ExportTarget, OutputFormat, PdfStandard, TaskWhen};
+
 use core::fmt;
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroUsize;
@@ -5,7 +7,6 @@ use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::{path::Path, str::FromStr};
 
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::prelude::*;
 use tinymist_std::path::{unix_slash, PathClean};
@@ -97,74 +98,6 @@ impl fmt::Display for Id {
     }
 }
 
-macro_rules! display_possible_values {
-    ($ty:ty) => {
-        impl fmt::Display for $ty {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.to_possible_value()
-                    .expect("no values are skipped")
-                    .get_name()
-                    .fmt(f)
-            }
-        }
-    };
-}
-
-/// When to export an output file.
-///
-/// By default, a `tinymist compile` only provides input information and
-/// doesn't change the `when` field. However, you can still specify a `when`
-/// argument to override the default behavior for specific tasks.
-///
-/// ## Examples
-///
-/// ```bash
-/// tinymist compile --when onSave main.typ
-/// alias typst="tinymist compile --when=onSave"
-/// typst compile main.typ
-/// ```
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash, ValueEnum, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[clap(rename_all = "camelCase")]
-pub enum TaskWhen {
-    /// Never watch to run task.
-    #[default]
-    Never,
-    /// Run task on saving the document, i.e. on `textDocument/didSave` events.
-    OnSave,
-    /// Run task on typing, i.e. on `textDocument/didChange` events.
-    OnType,
-    /// *DEPRECATED* Run task when a document has a title and on saved, which is
-    /// useful to filter out template files.
-    ///
-    /// Note: this is deprecating.
-    OnDocumentHasTitle,
-}
-
-impl TaskWhen {
-    /// Returns `true` if the task should never be run automatically.
-    pub fn is_never(&self) -> bool {
-        matches!(self, TaskWhen::Never)
-    }
-}
-
-display_possible_values!(TaskWhen);
-
-/// Which format to use for the generated output file.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
-pub enum OutputFormat {
-    /// Export to PDF.
-    Pdf,
-    /// Export to PNG.
-    Png,
-    /// Export to SVG.
-    Svg,
-    /// Export to HTML.
-    Html,
-}
-
-display_possible_values!(OutputFormat);
-
 /// The path pattern that could be substituted.
 ///
 /// # Examples
@@ -235,37 +168,6 @@ impl PathPattern {
         Some(Path::new(path.as_str()).clean().into())
     }
 }
-
-/// Specifies the current export target.
-///
-/// The design of this configuration is not yet finalized and for this reason it
-/// is guarded behind the html feature. Visit the HTML documentation page for
-/// more details.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportTarget {
-    /// The current export target is for PDF, PNG, and SVG export.
-    #[default]
-    Paged,
-    /// The current export target is for Html export.
-    Html,
-}
-
-/// A PDF standard that Typst can enforce conformance with.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
-#[allow(non_camel_case_types)]
-pub enum PdfStandard {
-    /// PDF 1.7.
-    #[value(name = "1.7")]
-    #[serde(rename = "1.7")]
-    V_1_7,
-    /// PDF/A-2b.
-    #[value(name = "a-2b")]
-    #[serde(rename = "a-2b")]
-    A_2b,
-}
-
-display_possible_values!(PdfStandard);
 
 /// Implements parsing of page ranges (`1-3`, `4`, `5-`, `-2`), used by the
 /// `CompileCommand.pages` argument, through the `FromStr` trait instead of a
@@ -405,7 +307,7 @@ impl ResourcePath {
             inp.to_path_buf()
         } else {
             let cwd = std::env::current_dir().unwrap();
-            pathdiff::diff_paths(inp, &cwd).unwrap()
+            tinymist_std::path::diff(inp, &cwd).unwrap()
         };
         let rel = unix_slash(&rel);
         ResourcePath("file".into(), rel.to_string())
@@ -431,7 +333,7 @@ impl ResourcePath {
         if self.0 == "file" {
             let path = Path::new(&self.1);
             if path.is_absolute() {
-                Some(pathdiff::diff_paths(path, base).unwrap_or_else(|| path.to_owned()))
+                Some(tinymist_std::path::diff(path, base).unwrap_or_else(|| path.to_owned()))
             } else {
                 Some(path.to_owned())
             }

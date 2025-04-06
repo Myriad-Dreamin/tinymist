@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_bold2.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "bold",
     "labelDetails": {

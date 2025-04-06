@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { writeFile } from "fs/promises";
 import { tinymist } from "../lsp";
 import { extensionState, ExtensionContext } from "../state";
-import { activeTypstEditor, base64Encode, loadHTMLFile } from "../util";
+import { activeTypstEditor, base64Encode, isTypstDocument, loadHTMLFile } from "../util";
 import { IContext } from "../context";
 
 const USER_PACKAGE_VERSION = "0.0.1";
@@ -48,7 +48,7 @@ const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
   },
 };
 
-export function toolFeatureActivate(context: IContext) {
+export function toolActivate(context: IContext) {
   const toolView = new ToolViewProvider();
 
   context.subscriptions.push(
@@ -422,7 +422,7 @@ export async function editorToolAt(
           if (disposed) {
             return;
           }
-          if (!event.textEditor || event.textEditor.document.languageId !== "typst") {
+          if (!isTypstDocument(event.textEditor.document)) {
             return;
           }
           version += 1;

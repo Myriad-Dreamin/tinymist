@@ -36,15 +36,13 @@ pub struct RenameRequest {
 impl StatefulRequest for RenameRequest {
     type Response = WorkspaceEdit;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
+
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax.clone())?;
+        let def = ctx.def_of_syntax(&source, doc, syntax.clone())?;
 
         prepare_renaming(ctx, &syntax, &def)?;
 
@@ -62,14 +60,15 @@ impl StatefulRequest for RenameRequest {
                 // todo: rename in untitled files
                 let old_path = ctx.path_for_id(def_fid).ok()?.to_err().ok()?;
 
+                let new_path = Path::new(new_path_str.as_str());
                 let rename_loc = Path::new(ref_path_str.as_str());
-                let diff = pathdiff::diff_paths(Path::new(&new_path_str), rename_loc)?;
+                let diff = tinymist_std::path::diff(new_path, rename_loc)?;
                 if diff.is_absolute() {
-                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path_str}, diff: {diff:?}");
+                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}");
                     return None;
                 }
 
-                let new_path = old_path.join(&diff);
+                let new_path = old_path.join(&diff).clean();
 
                 let old_uri = path_to_url(&old_path).ok()?;
                 let new_uri = path_to_url(&new_path).ok()?;
@@ -95,7 +94,7 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, &source, doc.as_ref(), syntax)?;
+                let references = find_references(ctx, &source, doc, syntax)?;
 
                 let mut edits = HashMap::new();
 
@@ -321,16 +320,17 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("rename", &|world, path| {
-            let source = world.source_by_path(&path).unwrap();
+        snapshot_testing("rename", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let request = RenameRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
                 new_name: "new_name".to_string(),
             };
+            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
-            let mut result = request.request(world, None);
+            let mut result = request.request(ctx, snap);
             // sort the edits to make the snapshot stable
             if let Some(r) = result.as_mut().and_then(|r| r.changes.as_mut()) {
                 for edits in r.values_mut() {

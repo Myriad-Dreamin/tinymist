@@ -39,6 +39,14 @@ vi = "Dịch vụ ngôn ngữ tích hợp cho Typst"
 zh = "Typst 的集成语言服务"
 zh-TW = "Typst 的集成語言服務"
 
+[extension.tinymist.command.tinymist.exportCurrentFile]
+en = "Export the Opened File as Specified Format"
+zh = "将当前打开的文件导出为指定格式"
+
+[extension.tinymist.command.tinymist.exportCurrentFileAndShow]
+en = "Export the Opened File as Specified Format and Show the Result"
+zh = "将当前打开的文件导出为指定格式并显示结果"
+
 [extension.tinymist.command.tinymist.exportCurrentPdf]
 en = "Export the Opened File as PDF"
 ar = "تصدير الملف المفتوح كملف PDF"
@@ -228,6 +236,10 @@ uk = "Копіювати як ANSI-код"
 vi = "Sao chép dưới dạng mã ANSI"
 zh = "复制为 ANSI 代码"
 zh-TW = "複製為 ANSI 代碼"
+
+[extension.tinymist.command.tinymist.viewAst]
+en = "View the AST of the current file"
+zh = "查看当前文件的 AST"
 
 [extension.tinymist.command.tinymist.showLog]
 en = "Tinymist: Show Log"
@@ -884,6 +896,44 @@ uk = "Typst Preview: Попередній перегляд відкритого 
 vi = "Typst Preview: Xem trước tệp đã mở trong trình duyệt và chế độ trình chiếu"
 zh = "Typst 预览：在浏览器和幻灯片模式下预览已打开的文件"
 zh-TW = "Typst 預覽：在瀏覽器和幻燈片模式下預覽已打開的文件"
+
+[extension.tinymist.command.typst-preview.eject]
+en = "Typst Preview: Eject Preview Panel"
+ar = "Typst Preview: إخراج لوحة المعاينة"
+bg = "Typst Preview: Изхвърляне на панела за преглед"
+ca = "Typst Preview: Expulsar el panell de previsualització"
+cs = "Typst Preview: Vysunout panel náhledu"
+da = "Typst Preview: Skub preview-panelet ud"
+de = "Typst Preview: Vorschaufenster auswerfen"
+el = "Typst Preview: Εξαγωγή του πλαισίου προεπισκόπησης"
+es = "Typst Preview: Expulsar el panel de vista previa"
+et = "Typst Preview: Eemalda eelvaate paneel"
+eu = "Typst Preview: Kanporatu aurrebistaren panela"
+fi = "Typst Preview: Poista esikatselupaneeli"
+fr = "Typst Preview: Éjecter le panneau d'aperçu"
+gl = "Typst Preview: Expulsar o panel de vista previa"
+he = "Typst Preview: פלט את לוח התצוגה המקדימה"
+hu = "Typst Preview: Előnézeti panel kidobása"
+is = "Typst Preview: Spyrja út forsýningarspjaldið"
+it = "Typst Preview: Espelli il pannello di anteprima"
+ja = "Typst Preview: プレビュー・パネルを排出"
+la = "Typst Preview: Praevideo tabulam eicere"
+nb = "Typst Preview: Løs ut forhåndsvisningspanelet"
+nl = "Typst Preview: Voorbeeldpaneel uitwerpen"
+nn = "Typst Preview: Løys ut førehandsvisingspanelet"
+pl = "Typst Preview: Wyłącz panel podglądu"
+pt-PT = "Typst Preview: Ejetar o painel de pré-visualização"
+ro = "Typst Preview: Scoate panoul de previzualizare"
+ru = "Typst Preview: Отключить панель предпросмотра"
+sl = "Typst Preview: Odstrani ploščo za predogled"
+sq = "Typst Preview: Nxjerr panelin e parapamjes"
+sr = "Typst Preview: Извади панел за преглед"
+sv = "Typst Preview: Stäng av förhandsgranskningspanelen"
+tr = "Typst Preview: Önizleme Panelini Çıkart"
+uk = "Typst Preview: Відключити панель попереднього перегляду"
+vi = "Typst Preview: Đẩy bảng xem trước ra"
+zh = "Typst 预览：弹出预览面板"
+zh-TW = "Typst 預覽：彈出預覽面板"
 
 [extension.tinymist.command.typst-preview.sync]
 en = "Typst Preview: Sync Preview with Current Cursor"

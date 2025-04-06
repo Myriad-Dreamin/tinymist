@@ -142,7 +142,7 @@ impl ServerState {
 
         if self.pinning_by_user
             || (self.pinning_by_preview && !self.pinning_by_browsing_preview)
-            || self.config.compile.has_default_entry_path
+            || self.config.has_default_entry_path
         {
             return Ok(false);
         }
@@ -212,7 +212,7 @@ impl ServerState {
 
     pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
         let proj_input = matches!(
-            self.config.project_resolution,
+            self.entry_resolver().project_resolution,
             ProjectResolutionKind::LockDatabase
         )
         .then(|| {

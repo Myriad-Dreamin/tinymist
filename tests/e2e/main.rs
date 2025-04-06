@@ -345,7 +345,7 @@ fn replay_log(tinymist_binary: &Path, root: &Path) -> String {
     // let sorted_res
     let sorted_res = sort_and_redact_value(res);
     let c = serde_json::to_string_pretty(&sorted_res).unwrap();
-    let hash = reflexo::hash::hash128(&c);
+    let hash = tinymist_std::hash::hash128(&c);
     std::fs::write(root.join("result_sorted.json"), c).unwrap();
 
     format!("siphash128_13:{:x}", hash)
@@ -363,6 +363,10 @@ fn e2e() {
         cwd.join("editors/vscode/out/tinymist")
     };
 
+    if !tinymist_binary.exists() {
+        panic!("tinymist binary for e2e tests doesn't exist. Please ensure that tinymist binary to publish is ready on {tinymist_binary:?}. Running scripts/e2e.{{sh/ps1}} should also help this.");
+    }
+
     let root = cwd.join("target/e2e/tinymist");
 
     {
@@ -373,7 +377,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:ce179598883927533514674aa7930054");
+        insta::assert_snapshot!(hash, @"siphash128_13:94308cd99e254c72703bcc3e1386a80");
     }
 
     {
@@ -384,7 +388,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:60813619e4478214e898a3d277ac031b");
+        insta::assert_snapshot!(hash, @"siphash128_13:3cce756a8b70867a8041cfab6f4337ef");
     }
 }
 

@@ -15,77 +15,77 @@ Let us take reading files from physical file system as example of processing com
 #let pg-hori-sep = 1.5
 #let pg-vert-sep = 0.7
 #let pg-adjust = 18pt
-#figure(
-  align(
-    center,
-    move(
-      dx: pg-adjust,
-      diagram(
-        edge-stroke: 0.85pt,
-        node-corner-radius: 3pt,
-        edge-corner-radius: 4pt,
-        mark-scale: 80%,
-        node((pg-hori-sep, +pg-vert-sep), [SystemAccessModel], fill: colors.at(1)),
-        node((pg-hori-sep, 0), align(center)[`NotifyAccessModel`], fill: colors.at(1)),
-        node((pg-hori-sep, -pg-vert-sep), [MemoryAccessModel], fill: colors.at(1)),
-        node((0, 0), align(center)[`NotifyActor`], fill: colors.at(0)),
-        node((0, -pg-vert-sep), align(center)[`LspActor`], fill: colors.at(0)),
-        edge((0, 0), (pg-hori-sep, 0), "-}>"),
-        edge((0, -pg-vert-sep), (pg-hori-sep, -pg-vert-sep), "-}>"),
-        edge(
-          (-1, -pg-vert-sep),
-          (0, -pg-vert-sep),
-          "-}>",
-          [didChange, \ didOpen, etc.],
-          label-anchor: "center",
-          label-pos: 0,
-        ),
-        edge(
-          (-0.8, pg-vert-sep),
-          (0, pg-vert-sep),
-          (0, 0),
-          "-}>",
-          [readFile\ readDir, etc.],
-          label-anchor: "center",
-          label-pos: 0,
-        ),
-        edge((-1, pg-vert-sep), (pg-hori-sep, pg-vert-sep), "-}>"),
-        edge((pg-hori-sep, 0), (pg-hori-sep, pg-vert-sep), "-}>"),
-        edge((pg-hori-sep, -pg-vert-sep), (pg-hori-sep, 0), "-}>"),
-        edge(
-          (pg-hori-sep * 1.59, -pg-vert-sep * 1.6),
-          (pg-hori-sep, -pg-vert-sep * 1.6),
-          (pg-hori-sep, -pg-vert-sep),
-          "-}>",
-          [sourceOf(path)],
-          label-pos: 0.2,
-        ),
-        for i in (-1, 0, 1) {
-          edge(
-            (pg-hori-sep * 1.2, i * pg-vert-sep),
-            (pg-hori-sep * 1.7, i * pg-vert-sep),
-            "-}>",
-            [source],
-            label-pos: 1,
-          )
-        },
-        node(
-          (-1.3, 0),
-          rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Input Sources]),
-        ),
-        node(
-          (pg-hori-sep + 1.45, 0),
-          rotate(
-            90deg,
-            move(
-              dy: pg-adjust * 2,
-              rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Compiler World],
-            ),
-          ),
+
+#let sys-graph = move(
+  dx: pg-adjust,
+  diagram(
+    edge-stroke: 0.85pt,
+    node-corner-radius: 3pt,
+    edge-corner-radius: 4pt,
+    mark-scale: 80%,
+    node((pg-hori-sep, +pg-vert-sep), [SystemAccessModel], fill: colors.at(1)),
+    node((pg-hori-sep, 0), align(center)[`NotifyAccessModel`], fill: colors.at(1)),
+    node((pg-hori-sep, -pg-vert-sep), [MemoryAccessModel], fill: colors.at(1)),
+    node((0, 0), align(center)[`NotifyActor`], fill: colors.at(0)),
+    node((0, -pg-vert-sep), align(center)[`LspActor`], fill: colors.at(0)),
+    edge((0, 0), (pg-hori-sep, 0), "-}>"),
+    edge((0, -pg-vert-sep), (pg-hori-sep, -pg-vert-sep), "-}>"),
+    edge(
+      (-1, -pg-vert-sep),
+      (0, -pg-vert-sep),
+      "-}>",
+      [didChange, \ didOpen, etc.],
+      label-anchor: "center",
+      label-pos: 0,
+    ),
+    edge(
+      (-0.8, pg-vert-sep),
+      (0, pg-vert-sep),
+      (0, 0),
+      "-}>",
+      [readFile\ readDir, etc.],
+      label-anchor: "center",
+      label-pos: 0,
+    ),
+    edge((-1, pg-vert-sep), (pg-hori-sep, pg-vert-sep), "-}>"),
+    edge((pg-hori-sep, 0), (pg-hori-sep, pg-vert-sep), "-}>"),
+    edge((pg-hori-sep, -pg-vert-sep), (pg-hori-sep, 0), "-}>"),
+    edge(
+      (pg-hori-sep * 1.59, -pg-vert-sep * 1.6),
+      (pg-hori-sep, -pg-vert-sep * 1.6),
+      (pg-hori-sep, -pg-vert-sep),
+      "-}>",
+      [sourceOf(path)],
+      label-pos: 0.2,
+    ),
+    for i in (-1, 0, 1) {
+      edge(
+        (pg-hori-sep * 1.2, i * pg-vert-sep),
+        (pg-hori-sep * 1.7, i * pg-vert-sep),
+        "-}>",
+        [source],
+        label-pos: 1,
+      )
+    },
+    node(
+      (-1.3, 0),
+      rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Input Sources]),
+    ),
+    node(
+      (pg-hori-sep + 1.45, 0),
+      rotate(
+        90deg,
+        move(
+          dy: pg-adjust * 2,
+          rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Compiler World],
         ),
       ),
     ),
   ),
+);
+
+#figure(
+  cond-image(sys-graph),
   caption: [The overlay virtual file system (VFS)],
 ) <fig:overlay-vfs>
 

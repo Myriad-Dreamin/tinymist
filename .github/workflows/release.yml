@@ -39,6 +39,18 @@ permissions:
 # If there's a prerelease-style suffix to the version, then the release(s)
 # will be marked as a prerelease.
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release Tag
+        required: true
+        default: dry-run
+        type: string
+      targets:
+        description: Targets to build
+        required: true
+        default: all
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -46,11 +58,16 @@ on:
         required: true
         default: dry-run
         type: string
+      targets:
+        description: Targets to build
+        required: true
+        default: all
+        type: string
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
       tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
@@ -66,7 +83,7 @@ jobs:
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.26.1-tinymist.6/cargo-dist-installer.sh | sh"
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8/cargo-dist-installer.sh | sh"
       - name: Cache dist
         uses: actions/upload-artifact@v4
         with:
@@ -95,7 +112,7 @@ jobs:
     # Let the initial task tell us to not run (currently very blunt)
     needs:
       - plan
-    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') || inputs.tag == 'dry-run' }}
+    if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || (fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') || (inputs.targets == 'all' || contains(inputs.targets, join(fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.targets, '')))) || inputs.tag == 'dry-run' }}
     strategy:
       fail-fast: false
       # Target platforms/runners are computed by dist in create-release.
@@ -128,6 +145,10 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
+      - uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ join(matrix.targets, '-') }}
+          cache-provider: ${{ matrix.cache_provider }}
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
@@ -171,7 +192,7 @@ jobs:
     needs:
       - plan
       - build-local-artifacts
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -221,7 +242,7 @@ jobs:
     if: ${{ always() && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.build-local-artifacts.result == 'skipped' || needs.build-local-artifacts.result == 'success') }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-22.04"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
@@ -283,7 +304,7 @@ jobs:
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
     if: ${{ always() && needs.host.result == 'success' }}
-    runs-on: "ubuntu-20.04"
+    runs-on: "ubuntu-22.04"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:

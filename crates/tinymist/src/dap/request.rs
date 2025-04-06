@@ -108,7 +108,7 @@ impl ServerState {
             inputs: input.inputs,
         };
 
-        let snapshot = self.project.snapshot().unwrap().task(input);
+        let snapshot = self.project.snapshot().unwrap().snap.clone().task(input);
         let world = &snapshot.world;
 
         let main = world

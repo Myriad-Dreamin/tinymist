@@ -9,7 +9,7 @@ use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
 use crate::project::ProjectPreviewState;
-use crate::tool::preview::{HttpServer, PreviewProjectHandler};
+use crate::tool::preview::{HttpServer, ProjectPreviewHandler};
 
 pub struct PreviewTab {
     /// Task ID
@@ -21,7 +21,7 @@ pub struct PreviewTab {
     /// Control plane message sender
     pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     /// Compile handler
-    pub compile_handler: Arc<PreviewProjectHandler>,
+    pub compile_handler: Arc<ProjectPreviewHandler>,
     /// Whether this tab is primary
     pub is_primary: bool,
     /// Whether this tab is background

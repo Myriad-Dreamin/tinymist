@@ -4,7 +4,7 @@ description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.13.2"
+version = "0.13.12-rc1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -26,6 +26,7 @@ fontdb = { workspace = true, optional = true }
 hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true
+lsp-types.workspace = true
 parking_lot.workspace = true
 rayon.workspace = true
 reqwest = { workspace = true, optional = true }

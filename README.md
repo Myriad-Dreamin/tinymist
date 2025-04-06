@@ -6,8 +6,8 @@ Tinymist [ˈtaɪni mɪst] is an integrated language service for [Typst](https://
 It contains:
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist//feature/language.html).
-  - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html).
+  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist/feature/language.html).
+  - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html).
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
 ## Features
@@ -65,9 +65,9 @@ Language service (LSP) features:
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or other options).
-- Compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
-- Provides code lenses for exporting to PDF/SVG/PNG/etc.
+- Compiles to PDF on save (configurable to as-you-type, or other options). Check [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html).
+- Also compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
+- Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
@@ -90,12 +90,12 @@ The release cycle is as follows:
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
-- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist//frontend/vscode.html)
-- [Neovim](https://myriad-dreamin.github.io/tinymist//frontend/neovim.html)
-- [Emacs](https://myriad-dreamin.github.io/tinymist//frontend/emacs.html)
-- [Sublime Text](https://myriad-dreamin.github.io/tinymist//frontend/sublime-text.html)
-- [Helix](https://myriad-dreamin.github.io/tinymist//frontend/helix.html)
-- [Zed](https://myriad-dreamin.github.io/tinymist//frontend/zed.html)
+- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist/frontend/vscode.html)
+- [Neovim](https://myriad-dreamin.github.io/tinymist/frontend/neovim.html)
+- [Emacs](https://myriad-dreamin.github.io/tinymist/frontend/emacs.html)
+- [Sublime Text](https://myriad-dreamin.github.io/tinymist/frontend/sublime-text.html)
+- [Helix](https://myriad-dreamin.github.io/tinymist/frontend/helix.html)
+- [Zed](https://myriad-dreamin.github.io/tinymist/frontend/zed.html)
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 
@@ -134,11 +134,11 @@ Nightly Channel:
 
 ## Roadmap
 
-### In Short Term
+### Short Terms
 
 To encourage contributions, we create many [Pull Requests](https://github.com/Myriad-Dreamin/tinymist/pulls) in draft to navigate short-term plans. They give you a hint of what or where to start in this large repository.
 
-### In Long Term
+### Long Terms
 
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
@@ -175,12 +175,16 @@ Tinymist is localized in multiple languages. You can contribute to the localizat
 
 ## Maintainers
 
-Get list of maintainers from [MAINTAINERS.typ](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ). Or programmatically by `yarn maintainers`
+Get list of maintainers from [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md). Or programmatically by `yarn maintainers`
 
 > [!NOTE]
 > 
 >   You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
 
+
+## Sponsoring
+
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
 
 ## Acknowledgements
 

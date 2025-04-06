@@ -6,11 +6,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use tinymist_std::debug_loc::DataSource;
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
 use super::{BufferFontLoader, FontProfile, FontSlot, PartialFontBook};
+use crate::debug_loc::DataSource;
 use crate::Bytes;
 
 /// A FontResolver can resolve a font by index.

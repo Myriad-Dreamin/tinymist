@@ -10,6 +10,7 @@ use tinymist_std::error::{prelude::*, IgnoreLogging};
 pub mod init;
 pub(crate) mod query;
 
+use crate::actor::editor::{EditorActorConfig, EditorRequest};
 use crate::task::FormatterConfig;
 use crate::*;
 
@@ -139,8 +140,16 @@ impl ServerState {
             self.change_export_config(new_export_config);
         }
 
-        if old_config.compile.primary_opts() != self.config.compile.primary_opts() {
-            self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
+        if old_config.notify_status != self.config.notify_status {
+            self.editor_tx
+                .send(EditorRequest::Config(EditorActorConfig {
+                    notify_status: self.config.notify_status,
+                }))
+                .log_error("could not change editor actor configuration");
+        }
+
+        if old_config.primary_opts() != self.config.primary_opts() {
+            self.config.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
             self.reload_projects()
                 .log_error("could not restart primary");
         }
@@ -199,6 +208,10 @@ impl ServerState {
             return;
         };
         let _ = this.on_changed_configuration(Config::values_to_map(resp));
+
+        if !this.config.warnings.is_empty() {
+            this.show_config_warnings();
+        }
     }
 }
 

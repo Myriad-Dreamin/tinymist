@@ -44,7 +44,6 @@ lsp-types.workspace = true
 log.workspace = true
 once_cell.workspace = true
 open.workspace = true
-pathdiff.workspace = true
 parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
@@ -56,7 +55,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 strum.workspace = true
-sync-ls.workspace = true
+sync-ls = { workspace = true, features = ["lsp", "server"] }
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-std.workspace = true
@@ -92,8 +91,7 @@ default = [
     "cli",
     "html",
     "pdf",
-    # enable it once we upload assets.
-    # "l10n",
+    "l10n",
     "preview",
     "embed-fonts",
     "no-content-hint",
@@ -134,10 +132,9 @@ preview = [
     "hyper-tungstenite",
 ]
 
-dap = []
+dap = ["sync-ls/dap"]
 
-# l10n = ["tinymist-assets/l10n"]
-l10n = []
+l10n = ["tinymist-assets/l10n"]
 
 [dev-dependencies]
 temp-env.workspace = true

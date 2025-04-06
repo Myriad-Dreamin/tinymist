@@ -3,6 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use tinymist_vfs::browser::ProxyAccessModel;
 use typst::foundations::Dict as TypstDict;
 use typst::utils::LazyHash;
+use typst::Features;
 
 use crate::entry::EntryState;
 use crate::font::FontResolverImpl;
@@ -48,7 +49,7 @@ impl TypstBrowserUniverse {
         // todo: enable html
         Self::new_raw(
             EntryState::new_rooted(root_dir.into(), None),
-            false,
+            Features::default(),
             inputs,
             vfs,
             registry,

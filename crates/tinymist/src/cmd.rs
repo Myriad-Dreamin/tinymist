@@ -1,9 +1,9 @@
 //! Tinymist LSP commands
 
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::path::PathBuf;
 
-use lsp_types::*;
+use lsp_types::TextDocumentIdentifier;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::RequestId;
@@ -14,26 +14,31 @@ use tinymist_project::{
     ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
 };
 use tinymist_query::package::PackageInfo;
-use tinymist_query::LocalContextGuard;
+use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::syntax::{LinkedNode, Source};
 use world::TaskInputs;
 
 use super::*;
 use crate::lsp::query::{run_query, LspClientExt};
+use crate::tool::ast::AstRepr;
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
-    creation_timestamp: Option<String>,
     fill: Option<String>,
     ppi: Option<f32>,
     #[serde(default)]
     page: PageSelection,
     /// Whether to open the exported file(s) after the export is done.
     open: Option<bool>,
+    /// The creation timestamp for various outputs (in seconds).
+    creation_timestamp: Option<String>,
+    /// A PDF standard that Typst can enforce conformance with.
+    pdf_standard: Option<Vec<PdfStandard>>,
 }
 
 /// See [`ProjectTask`].
@@ -53,8 +58,8 @@ struct QueryOpts {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HighlightRangeOpts {
-    range: Option<Range>,
+struct ExportSyntaxRangeOpts {
+    range: Option<LspRange>,
 }
 
 /// Here are implemented the handlers for each command.
@@ -69,15 +74,16 @@ impl ServerState {
                     .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
             )
         } else {
-            self.config.compile.determine_creation_timestamp()
+            self.config.creation_timestamp()
         };
+        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
 
         let export = self.config.export_task();
         self.export(
             req_id,
             ProjectTask::ExportPdf(ExportPdfTask {
                 export,
-                pdf_standards: vec![],
+                pdf_standards: pdf_standards.unwrap_or_default(),
                 creation_timestamp,
             }),
             opts.open.unwrap_or_default(),
@@ -208,8 +214,45 @@ impl ServerState {
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
-        let opts = get_arg_or_default!(args[1] as HighlightRangeOpts);
+        let opts = get_arg_or_default!(args[1] as ExportSyntaxRangeOpts);
 
+        let output = self.select_range(path, opts.range, |source, range| {
+            let mut text_in_range = source.text();
+            if let Some(range) = range {
+                text_in_range = text_in_range
+                    .get(range)
+                    .ok_or_else(|| internal_error("cannot get text in range"))?;
+            }
+
+            typst_ansi_hl::Highlighter::default()
+                .for_discord()
+                .with_soft_limit(2000)
+                .highlight(text_in_range)
+                .map_err(|e| internal_error(format!("cannot highlight: {e}")))
+        })?;
+
+        just_ok(JsonValue::String(output))
+    }
+
+    /// Export a range of the current file's AST.
+    pub fn export_ast(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as ExportSyntaxRangeOpts);
+
+        let output = self.select_range(path, opts.range, |source, range| {
+            let linked_node = LinkedNode::new(source.root());
+            Ok(format!("{}", AstRepr(linked_node, range)))
+        })?;
+
+        just_ok(JsonValue::String(output))
+    }
+
+    fn select_range<T>(
+        &mut self,
+        path: PathBuf,
+        range: Option<LspRange>,
+        f: impl Fn(Source, Option<Range<usize>>) -> LspResult<T>,
+    ) -> LspResult<T> {
         let s = self
             .query_source(path.into(), Ok)
             .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
@@ -217,28 +260,14 @@ impl ServerState {
         // todo: cannot select syntax-sensitive data well
         // let node = LinkedNode::new(s.root());
 
-        let range = opts
-            .range
+        let range = range
             .map(|r| {
                 tinymist_query::to_typst_range(r, self.const_config().position_encoding, &s)
                     .ok_or_else(|| internal_error("cannoet convert range"))
             })
             .transpose()?;
 
-        let mut text_in_range = s.text();
-        if let Some(range) = range {
-            text_in_range = text_in_range
-                .get(range)
-                .ok_or_else(|| internal_error("cannot get text in range"))?;
-        }
-
-        let output = typst_ansi_hl::Highlighter::default()
-            .for_discord()
-            .with_soft_limit(2000)
-            .highlight(text_in_range)
-            .map_err(|e| internal_error(format!("cannot highlight: {e}")))?;
-
-        just_ok(JsonValue::String(output))
+        f(s, range)
     }
 
     /// Clear all cached resources.
@@ -279,12 +308,12 @@ impl ServerState {
 
     /// Starts a preview instance.
     #[cfg(feature = "preview")]
-    pub fn start_preview(
+    pub fn do_start_preview(
         &mut self,
         mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Regular)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Regular)
     }
 
     /// Starts a preview instance for browsing.
@@ -294,7 +323,7 @@ impl ServerState {
         mut args: Vec<JsonValue>,
     ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 
     /// Starts a preview instance but without arguments. This is used for the
@@ -322,7 +351,7 @@ impl ServerState {
             ];
             default_args.map(ToString::to_string).to_vec()
         });
-        self.start_preview_inner(cli_args, crate::tool::preview::PreviewKind::Browsing)
+        self.start_preview(cli_args, crate::tool::preview::PreviewKind::Browsing)
     }
 
     /// Kill a preview instance.
@@ -377,7 +406,7 @@ impl ServerState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = snap.world.registry.determine_latest_version(&spec)?;
+                    let version = snap.registry().determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -386,7 +415,7 @@ impl ServerState {
             let from_source = TemplateSource::Package(spec);
 
             let entry_path = package::init(
-                &snap.world,
+                snap.world(),
                 InitTask {
                     tmpl: from_source.clone(),
                     dir: to_path.clone(),
@@ -420,7 +449,7 @@ impl ServerState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = snap.world.registry.determine_latest_version(&spec)?;
+                    let version = snap.registry().determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -428,7 +457,7 @@ impl ServerState {
 
             let from_source = TemplateSource::Package(spec);
 
-            let entry = package::get_entry(&snap.world, from_source)
+            let entry = package::get_entry(snap.world(), from_source)
                 .map_err(map_string_err("failed to get template entry"))
                 .map_err(internal_error)?;
 
@@ -498,8 +527,8 @@ impl ServerState {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
-                inputs: snap.world.inputs().as_ref().deref().clone(),
-                font_paths: snap.world.font_resolver.font_paths().to_owned(),
+                inputs: snap.world().inputs().as_ref().deref().clone(),
+                font_paths: snap.world().font_resolver.font_paths().to_owned(),
                 rpc_kind: "http".into(),
             })?;
 
@@ -566,7 +595,7 @@ impl ServerState {
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let paths = snap.world.registry.paths();
+            let paths = snap.registry().paths();
             let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
@@ -579,7 +608,7 @@ impl ServerState {
     ) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let paths = snap.world.registry.local_path();
+            let paths = snap.registry().local_path();
             let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
@@ -594,11 +623,10 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let packages =
-                tinymist_query::package::list_package_by_namespace(&snap.world.registry, ns)
-                    .into_iter()
-                    .map(PackageInfo::from)
-                    .collect::<Vec<_>>();
+            let packages = tinymist_query::package::list_package_by_namespace(snap.registry(), ns)
+                .into_iter()
+                .map(PackageInfo::from)
+                .collect::<Vec<_>>();
 
             serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
         })
@@ -670,7 +698,7 @@ impl ServerState {
         let snap = self.query_snapshot().map_err(internal_error)?;
 
         Ok(async move {
-            let world = &snap.world;
+            let world = snap.world();
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
                 let toml_id = tinymist_query::package::get_manifest_id(&info)?;

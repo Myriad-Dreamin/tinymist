@@ -41,11 +41,7 @@ pub struct CompletionRequest {
 impl StatefulRequest for CompletionRequest {
     type Response = CompletionList;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
         // These trigger characters are for completion on positional arguments,
         // which follows the configuration item
         // `tinymist.completion.triggerOnSnippetPlaceholders`.
@@ -55,7 +51,7 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
-        let document = doc.as_ref().map(|doc| &doc.document);
+        let document = graph.snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
 
@@ -77,12 +73,9 @@ impl StatefulRequest for CompletionRequest {
         // - <https://github.com/microsoft/vscode/issues/130953>
         // - <https://github.com/microsoft/vscode/commit/0984071fe0d8a3c157a1ba810c244752d69e5689>
         // Checks the previous text to filter out letter explicit completions.
-        let explicit = self.explicit
-            && (self.trigger_character.is_none() && {
-                let prev_text = &source.text()[..cursor];
-                let prev_char = prev_text.chars().next_back();
-                prev_char.is_none_or(|c| !c.is_alphabetic())
-            });
+        //
+        // Second try is failed.
+        let explicit = false;
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
         let mut worker = CompletionWorker::new(ctx, document, explicit, self.trigger_character)?;
@@ -137,7 +130,7 @@ mod tests {
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
 
-            let doc = compile_doc_for_test(ctx, &properties);
+            let graph = compile_doc_for_test(ctx, &properties);
 
             for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
                 // split first char
@@ -168,6 +161,7 @@ mod tests {
                         sort_text: item.sort_text,
                         kind: item.kind,
                         text_edit: item.text_edit,
+                        command: item.command,
                         ..Default::default()
                     })
                     .collect();
@@ -190,7 +184,7 @@ mod tests {
                     trigger_character,
                 };
                 let result = request
-                    .request(ctx, doc.clone())
+                    .request(ctx, graph.clone())
                     .map(|list| CompletionList {
                         is_incomplete: list.is_incomplete,
                         items: get_items(list.items),

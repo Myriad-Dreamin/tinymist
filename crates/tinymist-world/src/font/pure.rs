@@ -1,7 +1,7 @@
-use tinymist_std::debug_loc::{DataSource, MemoryDataSource};
 use typst::foundations::Bytes;
 use typst::text::{FontBook, FontInfo};
 
+use crate::debug_loc::{DataSource, MemoryDataSource};
 use crate::font::{BufferFontLoader, FontResolverImpl, FontSlot};
 
 /// memory font builder.

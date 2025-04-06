@@ -1,0 +1,91 @@
+
+name: tinymist::build::vsc_assets
+on:
+  workflow_call:
+
+env:
+  target: x86_64-unknown-linux-gnu
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - name: Install deps
+        run: yarn install
+
+      - name: Download tinymist binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-build-local-${{ env.target }}
+          path: prebuilts
+      - name: Unzip tinymist binary artifact (Windows)
+        run: 7z x -y -oprebuilts prebuilts/tinymist-${{ env.target }}.zip
+        if: contains(env.target, 'windows')
+      - name: Unzip tinymist binary artifact (Linux)
+        run: |
+          tar -xvf prebuilts/tinymist-${{ env.target }}.tar.gz -C prebuilts
+          mv prebuilts/tinymist-${{ env.target }}/tinymist prebuilts/tinymist
+        if: ${{ !contains(env.target, 'windows') }}
+      - name: Download font assets
+        # use fonts in stable releases
+        run: |
+          mkdir -p assets/fonts/
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
+      - name: Build PDF Documentation
+        run: |
+          prebuilts/tinymist compile --font-path assets/fonts --root . docs/tinymist/ebook.typ tinymist-docs.pdf
+      # todo: this is a bug
+      - name: Install PDF Documentation
+        run: |
+          mv docs/tinymist/ebook.pdf tinymist-docs.pdf
+          mkdir -p editors/vscode/out/ contrib/html/editors/vscode/out/
+          cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
+          cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
+      - name: Upload PDF Documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-docs.pdf
+          path: tinymist-docs.pdf
+          if-no-files-found: error
+
+      - name: Build typst-preview vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Build tinymist vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./editors/vscode
+
+      - name: Pre-bundle tinymist vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-vscode-out
+          path: editors/vscode/out
+      - name: Pre-bundle tinymist vscode extension (L10n)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-vscode-l10n
+          path: |
+            editors/vscode/l10n/**/*
+            editors/vscode/package.nls.json
+            editors/vscode/package.nls.*.json
+      - name: Pre-bundle typst-preview vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-vscode-out
+          path: contrib/typst-preview/editors/vscode/out
+

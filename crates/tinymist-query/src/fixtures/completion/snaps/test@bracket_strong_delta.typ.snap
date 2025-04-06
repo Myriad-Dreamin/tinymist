@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong_delta.t
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "delta",
     "labelDetails": {

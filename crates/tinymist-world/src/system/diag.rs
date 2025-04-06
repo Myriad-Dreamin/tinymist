@@ -11,9 +11,9 @@ use tinymist_std::Result;
 use tinymist_vfs::FileId;
 use typst::diag::{eco_format, Severity, SourceDiagnostic};
 use typst::syntax::Span;
-use typst::{World, WorldExt};
+use typst::WorldExt;
 
-use crate::{DiagnosticFormat, SourceWorld};
+use crate::{CodeSpanReportWorld, DiagnosticFormat, SourceWorld};
 
 /// Get stderr with color support if desirable.
 fn color_stream() -> StandardStream {
@@ -25,12 +25,12 @@ fn color_stream() -> StandardStream {
 }
 
 /// Print diagnostic messages to the terminal.
-pub fn print_diagnostics<'d, 'files, W: SourceWorld>(
-    world: &'files W,
+pub fn print_diagnostics<'d, 'files>(
+    world: &'files dyn SourceWorld,
     errors: impl Iterator<Item = &'d SourceDiagnostic>,
     diagnostic_format: DiagnosticFormat,
 ) -> Result<(), codespan_reporting::files::Error> {
-    let world = world.for_codespan_reporting();
+    let world = CodeSpanReportWorld::new(world);
 
     let mut w = match diagnostic_format {
         DiagnosticFormat::Human => color_stream(),
@@ -77,6 +77,6 @@ pub fn print_diagnostics<'d, 'files, W: SourceWorld>(
 }
 
 /// Create a label for a span.
-fn label<W: World>(world: &W, span: Span) -> Option<Label<FileId>> {
+fn label(world: &dyn SourceWorld, span: Span) -> Option<Label<FileId>> {
     Some(Label::primary(span.id()?, world.range(span)?))
 }

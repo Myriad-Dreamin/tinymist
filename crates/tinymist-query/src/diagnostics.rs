@@ -1,7 +1,12 @@
+use std::borrow::Cow;
+
 use tinymist_project::LspWorld;
 use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};
+
+use once_cell::sync::Lazy;
+use regex::RegexSet;
 
 /// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, EcoVec<Diagnostic>>;
@@ -25,7 +30,8 @@ impl std::ops::Deref for LocalDiagContext<'_> {
     }
 }
 
-/// Converts a list of Typst diagnostics to LSP diagnostics.
+/// Converts a list of Typst diagnostics to LSP diagnostics,
+/// with potential refinements on the error messages.
 pub fn convert_diagnostics<'a>(
     world: &LspWorld,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
@@ -57,18 +63,32 @@ fn convert_diagnostic(
     ctx: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, Diagnostic)> {
-    let (id, span) = diagnostic_span_id(ctx, typst_diagnostic);
+    let typst_diagnostic = {
+        let mut diag = Cow::Borrowed(typst_diagnostic);
+
+        // Extend more refiners here by adding their instances.
+        let refiners: &[&dyn DiagnosticRefiner] =
+            &[&DeprecationRefiner::<13> {}, &OutOfRootHintRefiner {}];
+
+        // NOTE: It would be nice to have caching here.
+        for refiner in refiners {
+            if refiner.matches(&diag) {
+                diag = Cow::Owned(refiner.refine(diag.into_owned()));
+            }
+        }
+        diag
+    };
+
+    let (id, span) = diagnostic_span_id(ctx, &typst_diagnostic);
     let uri = ctx.uri_for_id(id)?;
     let source = ctx.source(id)?;
     let lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
 
     let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
+    let lsp_message = diagnostic_message(&typst_diagnostic);
 
-    let typst_message = &typst_diagnostic.message;
-    let typst_hints = &typst_diagnostic.hints;
-    let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
-
-    let tracepoints = diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding)?;
+    let tracepoints =
+        diagnostic_related_information(ctx, &typst_diagnostic, ctx.position_encoding)?;
 
     let diagnostic = Diagnostic {
         range: lsp_range,
@@ -162,9 +182,60 @@ fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
     }
 }
 
-fn diagnostic_hints(typst_hints: &[EcoString]) -> Format<impl Iterator<Item = EcoString> + '_> {
-    iter::repeat(EcoString::from("\n\nHint: "))
-        .take(typst_hints.len())
-        .interleave(typst_hints.iter().cloned())
-        .format("")
+fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
+    let mut message = typst_diagnostic.message.to_string();
+    for hint in &typst_diagnostic.hints {
+        message.push_str("\nHint: ");
+        message.push_str(hint);
+    }
+    message
+}
+
+trait DiagnosticRefiner {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool;
+    fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic;
+}
+
+struct DeprecationRefiner<const MINOR: usize>();
+
+static DEPRECATION_PATTERNS: Lazy<RegexSet> = Lazy::new(|| {
+    RegexSet::new([
+        r"unknown variable: style",
+        r"unexpected argument: fill",
+        r"type state has no method `display`",
+        r"only element functions can be used as selectors",
+    ])
+    .expect("Invalid regular expressions")
+});
+
+impl DiagnosticRefiner for DeprecationRefiner<13> {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool {
+        DEPRECATION_PATTERNS.is_match(&raw.message)
+    }
+
+    fn refine(&self, raw: TypstDiagnostic) -> TypstDiagnostic {
+        raw.with_hint(concat!(
+            r#"Typst 0.13 has introduced breaking changes. Try downgrading "#,
+            r#"Tinymist to v0.12 to use a compatible version of Typst, "#,
+            r#"or consider migrating your code according to "#,
+            r#"[this guide](https://typst.app/blog/2025/typst-0.13/#migrating)."#
+        ))
+    }
+}
+
+struct OutOfRootHintRefiner();
+
+impl DiagnosticRefiner for OutOfRootHintRefiner {
+    fn matches(&self, raw: &TypstDiagnostic) -> bool {
+        raw.message.contains("failed to load file (access denied)")
+            && raw
+                .hints
+                .iter()
+                .any(|hint| hint.contains("cannot read file outside of project root"))
+    }
+
+    fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {
+        raw.hints.clear();
+        raw.with_hint("Cannot read file outside of project root.")
+    }
 }

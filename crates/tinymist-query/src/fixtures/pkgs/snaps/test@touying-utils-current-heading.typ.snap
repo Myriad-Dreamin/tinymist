@@ -3,13 +3,16 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (78..79)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-heading.typ
-snapshot_kind: text
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "depth",
     "labelDetails": {
@@ -31,6 +34,10 @@ snapshot_kind: text
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "hierachical",
     "labelDetails": {
@@ -52,6 +59,10 @@ snapshot_kind: text
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "level",
     "labelDetails": {

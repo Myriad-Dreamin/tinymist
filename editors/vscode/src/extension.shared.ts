@@ -40,6 +40,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.triggerSuggestAndParameterHints = true;
   config.triggerParameterHints = true;
   config.supportHtmlInMarkdown = true;
+  config.customizedShowDocument = true;
   // Sets shared features
   extensionState.features.preview = !isWeb && config.previewFeature === "enable";
   extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";

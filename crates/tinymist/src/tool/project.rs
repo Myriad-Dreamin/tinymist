@@ -3,13 +3,18 @@
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use clap_complete::Shell;
+use parking_lot::Mutex;
 use reflexo::{path::unix_slash, ImmutPath};
-use reflexo_typst::{diag::print_diagnostics, DiagnosticFormat};
+use reflexo_typst::WorldComputeGraph;
+use tinymist_query::analysis::Analysis;
 use tinymist_std::{bail, error::prelude::*};
+use tokio::sync::mpsc;
 
+use crate::{actor::editor::EditorRequest, world::system::print_diagnostics, Config};
 use crate::{project::*, task::ExportTask};
 
 /// Arguments for project compilation.
@@ -107,41 +112,6 @@ impl LockFileExt for LockFile {
 }
 
 /// Runs project compilation(s)
-pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
-    // Prepares for the compilation
-    let universe = args.resolve()?;
-    let world = universe.snapshot();
-
-    let result = Ok(()).and_then(|_| -> Result<()> {
-        let res =
-            tinymist_debug::collect_coverage::<tinymist_std::typst::TypstPagedDocument, _>(&world)?;
-        let cov_path = Path::new("target/coverage.json");
-        let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
-
-        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
-        std::fs::write(cov_path, res).context("write coverage")?;
-
-        Ok(())
-    });
-
-    print_diag_or_error(&world, result)
-}
-
-fn print_diag_or_error(world: &LspWorld, result: Result<()>) -> Result<()> {
-    if let Err(e) = result {
-        if let Some(diagnostics) = e.diagnostics() {
-            print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                .context_ut("print diagnostics")?;
-            bail!("");
-        }
-
-        return Err(e);
-    }
-
-    Ok(())
-}
-
-/// Runs project compilation(s)
 pub async fn compile_main(args: CompileArgs) -> Result<()> {
     // Identifies the input and output
     let input = args.compile.declare.to_input();
@@ -168,13 +138,14 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     // Prepares for the compilation
     let universe = (input, lock_dir.clone()).resolve()?;
     let world = universe.snapshot();
-    let snap = CompileSnapshot::from_world(world);
+    let graph = WorldComputeGraph::from_world(world);
 
     // Compiles the project
-    let compiled = CompiledArtifact::from_snapshot(snap);
+    let is_html = matches!(output.task, ProjectTask::ExportHtml(..));
+    let compiled = CompiledArtifact::from_graph(graph, is_html);
 
     let diag = compiled.diagnostics();
-    print_diagnostics(&compiled.world, diag, DiagnosticFormat::Human)
+    print_diagnostics(compiled.world(), diag, DiagnosticFormat::Human)
         .context_ut("print diagnostics")?;
 
     if compiled.has_errors() {
@@ -428,4 +399,123 @@ pub fn task_main(args: TaskCommands) -> Result<()> {
             }
         }
     })
+}
+
+#[derive(Default)]
+pub(crate) struct ProjectOpts {
+    /// The tokio runtime handle.
+    pub handle: Option<tokio::runtime::Handle>,
+    /// The shared preview state.
+    pub analysis: Arc<Analysis>,
+    /// The shared config.
+    pub config: Config,
+    /// The shared preview state.
+    pub preview: ProjectPreviewState,
+    /// The export target.
+    pub export_target: ExportTarget,
+}
+
+pub(crate) struct StartProjectResult<F> {
+    pub service: WatchService<F>,
+    pub intr_tx: mpsc::UnboundedSender<LspInterrupt>,
+    pub editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
+}
+
+// todo: This is only extracted from the `tinymist preview` command, and we need
+// to abstract it in future.
+/// Start a project with the given universe.
+pub(crate) fn start_project<F>(
+    verse: LspUniverse,
+    opts: Option<ProjectOpts>,
+    intr_handler: F,
+) -> StartProjectResult<F>
+where
+    F: FnMut(
+        &mut LspProjectCompiler,
+        Interrupt<LspCompilerFeat>,
+        fn(&mut LspProjectCompiler, Interrupt<LspCompilerFeat>),
+    ),
+{
+    let opts = opts.unwrap_or_default();
+    let handle = opts.handle.unwrap_or_else(tokio::runtime::Handle::current);
+
+    // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
+    let (editor_tx, editor_rx) = mpsc::unbounded_channel();
+    let (intr_tx, intr_rx) = tokio::sync::mpsc::unbounded_channel();
+
+    // todo: unify filesystem watcher
+    let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+    let fs_intr_tx = intr_tx.clone();
+    handle.spawn(watch_deps(dep_rx, move |event| {
+        fs_intr_tx.interrupt(LspInterrupt::Fs(event));
+    }));
+
+    // Create the actor
+    let compile_handle = Arc::new(CompileHandlerImpl {
+        preview: opts.preview,
+        is_standalone: true,
+        export: crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export()),
+        editor_tx,
+        client: Box::new(intr_tx.clone()),
+
+        analysis: opts.analysis,
+        status_revision: Mutex::default(),
+        notified_revision: Mutex::default(),
+    });
+
+    let mut compiler = ProjectCompiler::new(
+        verse,
+        dep_tx,
+        CompileServerOpts {
+            handler: compile_handle,
+            export_target: opts.export_target,
+            enable_watch: true,
+        },
+    );
+
+    compiler.primary.reason.by_entry_update = true;
+
+    StartProjectResult {
+        service: WatchService {
+            compiler,
+            intr_rx,
+            intr_handler,
+        },
+        intr_tx,
+        editor_rx,
+    }
+}
+
+pub(crate) struct WatchService<F> {
+    pub compiler: LspProjectCompiler,
+    intr_rx: tokio::sync::mpsc::UnboundedReceiver<LspInterrupt>,
+    intr_handler: F,
+}
+
+impl<F> WatchService<F>
+where
+    F: FnMut(
+            &mut LspProjectCompiler,
+            Interrupt<LspCompilerFeat>,
+            fn(&mut LspProjectCompiler, Interrupt<LspCompilerFeat>),
+        ) + Send
+        + 'static,
+{
+    pub async fn run(self) {
+        let Self {
+            mut compiler,
+            mut intr_rx,
+            mut intr_handler,
+        } = self;
+
+        let handler = compiler.handler.clone();
+        handler.on_any_compile_reason(&mut compiler);
+
+        while let Some(intr) = intr_rx.recv().await {
+            log::debug!("Project compiler received: {intr:?}");
+            intr_handler(&mut compiler, intr, ProjectState::do_interrupt);
+        }
+
+        log::info!("Project compiler exited");
+    }
 }

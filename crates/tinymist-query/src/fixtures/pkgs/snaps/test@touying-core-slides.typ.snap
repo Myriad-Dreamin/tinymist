@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "config",
     "labelDetails": {
@@ -30,6 +34,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "repeat",
     "labelDetails": {
@@ -51,6 +59,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "repeat",
     "labelDetails": {

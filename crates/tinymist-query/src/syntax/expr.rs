@@ -264,13 +264,20 @@ impl ExprWorker<'_> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
-            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+            ExprScope::empty(),
         ));
         let len = self.lexical.scopes.len();
         let result = f(self);
         self.lexical.scopes.truncate(len);
         self.lexical.last = self.lexical.scopes.pop().unwrap();
         result
+    }
+
+    fn push_scope(&mut self, scope: ExprScope) {
+        let last = std::mem::replace(&mut self.lexical.last, scope);
+        if !last.is_empty() {
+            self.lexical.scopes.push(last);
+        }
     }
 
     #[must_use]
@@ -280,7 +287,7 @@ impl ExprWorker<'_> {
         }
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
-            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+            ExprScope::empty(),
         ));
         self.lexical_scope_unchecked()
     }
@@ -717,7 +724,7 @@ impl ExprWorker<'_> {
             match imports {
                 ast::Imports::Wildcard => {
                     crate::log_debug_ct!("checking wildcard: {mod_expr:?}");
-                    self.lexical.scopes.push(scope);
+                    self.push_scope(scope);
                 }
                 ast::Imports::Items(items) => {
                     let module = Expr::Decl(mod_var.clone());

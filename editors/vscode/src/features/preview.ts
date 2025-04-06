@@ -17,6 +17,7 @@ import {
   LaunchInWebViewTask,
   LaunchInBrowserTask,
   getPreviewHtml,
+  ejectPreviewPanelCompat,
 } from "./preview-compat";
 import {
   PanelScrollOrCursorMoveRequest,
@@ -26,11 +27,20 @@ import {
 } from "../lsp";
 import { l10nMsg } from "../l10n";
 import { IContext } from "../context";
+import { extensionState } from "../state";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
  */
 let launchImpl: typeof launchPreviewLsp;
+
+/**
+ * The state corresponding to the focusing preview panel.
+ */
+export interface PreviewPanelContext {
+  panel: vscode.WebviewPanel;
+  state: PersistPreviewState;
+}
 
 /**
  * Preload the preview resources to reduce the latency of the first preview.
@@ -94,6 +104,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
+    vscode.commands.registerCommand("typst-preview.eject", isCompat ? ejectPreviewPanelCompat : ejectPreviewPanelLsp),
     vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
     vscode.commands.registerCommand(
       "typst-preview.revealDocument",
@@ -142,7 +153,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   interface LaunchOpts {
     isBrowsing?: boolean;
     isDev?: boolean;
-    // isDev = false
+    isNotPrimary?: boolean;
   }
 
   /**
@@ -168,10 +179,56 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         mode,
         isBrowsing: opts?.isBrowsing || false,
         isDev: opts?.isDev || false,
+        isNotPrimary: opts?.isNotPrimary || false,
       }).catch((e) => {
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
     };
+  }
+
+  async function launchForURI(uri: vscode.Uri, kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
+    const doc =
+      vscode.workspace.textDocuments.find((doc) => {
+        return doc.uri.toString() === uri.toString();
+      }) || (await vscode.workspace.openTextDocument(uri));
+    const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
+  
+    const bindDocument = editor.document;
+    const isBrowsing = opts?.isBrowsing;
+    const isDev = opts?.isDev;
+    const isNotPrimary = opts?.isNotPrimary;
+  
+    await launchImpl({
+      kind,
+      context,
+      editor,
+      bindDocument,
+      mode,
+      isBrowsing,
+      isDev,
+      isNotPrimary,
+    });
+  }
+  
+  /**
+   * Ejects the preview panel to the external browser.
+   */
+  async function ejectPreviewPanelLsp() {
+    const focusingContext = extensionState.getFocusingPreviewPanelContext();
+    if (!focusingContext) {
+      vscode.window.showWarningMessage("No active preview panel");
+      return;
+    }
+    const { panel, state } = focusingContext;
+  
+    // Close the preview panel, basically kill the previous preview task.
+    panel.dispose();
+  
+    await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
+      isBrowsing: state.isBrowsing,
+      isDev: state.isDev,
+      isNotPrimary: state.isNotPrimary,
+    });
   }
 }
 
@@ -220,7 +277,7 @@ interface OpenPreviewInWebViewArgs {
   /**
    * Additional cleanup routine when the webview panel is disposed.
    */
-  panelDispose: () => void;
+  panelDispose: () => Promise<void>;
 }
 
 /**
@@ -253,20 +310,38 @@ export async function openPreviewInWebView({
           },
         );
 
+  const previewState: PersistPreviewState = {
+    mode: task.mode,
+    isNotPrimary: !!task.isNotPrimary,
+    isBrowsing: !!task.isBrowsing,
+    isDev: !!task.isDev,
+    uri: activeEditor.document.uri.toString(),
+  };
+
+  const updateActivePanel =() => {
+    if (panel.active) {
+      extensionState.mut.focusingPreviewPanelContext = {
+        panel,
+        state: previewState,
+      };
+    }
+  };
+
+  // NOTE: To avoid missing the auto revealing of webview initialization.
+  updateActivePanel();
+  panel.onDidChangeViewState(updateActivePanel);
+
   // todo: bind Document.onDidDispose, but we did not find a similar way.
   panel.onDidDispose(async () => {
-    panelDispose();
+    if (extensionState.getFocusingPreviewPanelContext()?.panel === panel) {
+      extensionState.mut.focusingPreviewPanelContext = undefined;
+    }
+    await panelDispose();
     console.log("killed preview services");
   });
 
   // Determines arguments for the preview HTML.
   const previewMode = task.mode === "doc" ? "Doc" : "Slide";
-  const previewState: PersistPreviewState = {
-    mode: task.mode,
-    isNotPrimary: !!task.isNotPrimary,
-    isBrowsing: !!task.isBrowsing,
-    uri: activeEditor.document.uri.toString(),
-  };
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
 
   // Substitutes arguments in the HTML content.
@@ -359,9 +434,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         activeEditor: editor,
         dataPlanePort,
         webviewPanel,
-        panelDispose() {
+        async panelDispose() {
           disposes.dispose();
-          tinymist.killPreview(taskId);
+          await tinymist.killPreview(taskId);
         },
       });
       break;
@@ -754,6 +829,7 @@ interface PersistPreviewState {
   mode: "doc" | "slide";
   isNotPrimary: boolean;
   isBrowsing: boolean;
+  isDev: boolean;
   uri: string;
 }
 
@@ -785,6 +861,7 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPre
     const mode = state.mode;
     const isNotPrimary = state.isNotPrimary;
     const isBrowsing = state.isBrowsing;
+    const isDev = state.isDev;
 
     await launchImpl({
       kind: "webview",
@@ -794,6 +871,7 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPre
       mode,
       webviewPanel,
       isBrowsing,
+      isDev,
       isNotPrimary,
     });
   }

@@ -1,0 +1,4 @@
+{
+  "tinymist.outputPath": "$root/target/typst/$dir/$name",
+  "tinymist.systemFonts": false
+}

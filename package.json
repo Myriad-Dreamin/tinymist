@@ -21,7 +21,7 @@
     "extract:l10n:ts": "cargo run --release --bin tinymist-l10n -- --kind ts --dir ./editors/vscode --output ./locales/tinymist-vscode-rt.toml",
     "extract:l10n:rs": "cargo run --release --bin tinymist-l10n -- --kind rs --dir ./crates --output ./locales/tinymist-rt.toml && rimraf ./crates/tinymist-assets/src/tinymist-rt.toml && cpr ./locales/tinymist-rt.toml ./crates/tinymist-assets/src/tinymist-rt.toml",
     "maintainers": "typst query MAINTAINERS.typ \"<maintainer-meta>\" --pretty --one --field value --input=action=help",
-    "docs": "shiroa serve --font-path assets/fonts -w . docs/tinymist",
+    "docs": "shiroa serve --font-path assets/fonts -w . docs/tinymist --mode=static-html",
     "docs:pdf": "cargo run --bin tinymist --release -- compile --font-path assets/fonts --root . docs/tinymist/ebook.typ",
     "docs:typ": "node scripts/link-docs.mjs",
     "docs:rs": "cargo doc --workspace --document-private-items --no-deps",

@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
 import { IContext } from "../context";
-import { testingCovFeatureActivate } from "./testing/coverage";
+import { testingCovActivate } from "./testing/coverage";
 
-export function testingFeatureActivate(context: IContext) {
+export function testingActivate(context: IContext) {
   const testController = vscode.tests.createTestController(
     "tinymist-tests",
     "Typst Tests (Tinymist)",
   );
 
-  testingCovFeatureActivate(context, testController);
+  testingCovActivate(context, testController);
 }

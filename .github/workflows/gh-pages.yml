@@ -49,11 +49,12 @@ jobs:
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
       - name: Download & install shiroa
         run: |
-          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.3.0/shiroa-installer.sh | sh
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.3.1-rc1/shiroa-installer.sh | sh
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'yarn'
       - name: Install deps
         run: yarn install
       - name: Build Preview Html
@@ -61,7 +62,7 @@ jobs:
           yarn build:preview
       - name: Build Book
         run: |
-          shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist
+          shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist --mode=static-html
       - name: Build Cargo Docs
         run: |
           cargo doc --workspace --no-deps

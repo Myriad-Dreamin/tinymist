@@ -176,6 +176,8 @@ impl Notification {
             }),
         }
     }
+
+    #[cfg(feature = "server")]
     pub(crate) fn is_exit(&self) -> bool {
         self.method == "exit"
     }

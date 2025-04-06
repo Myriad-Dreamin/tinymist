@@ -3,19 +3,21 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
+use tinymist_task::ProjectTask;
 use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
 use crate::lsp::query::OnEnter;
 use crate::project::{
-    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    update_lock, CompiledArtifact, EntryResolver, LspComputeGraph, LspInterrupt, ProjectInsId,
     ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
 use crate::route::ProjectRouteState;
@@ -117,7 +119,11 @@ impl ServerState {
             editor_tx,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(
+                &config,
+                watchers,
+                client.cast(|s| &mut s.preview),
+            ),
             #[cfg(feature = "dap")]
             debug: crate::dap::DebugState::default(),
             ever_focusing_by_activities: false,
@@ -141,14 +147,9 @@ impl ServerState {
         &self.config.const_config
     }
 
-    /// Gets the compile configuration.
-    pub fn compile_config(&self) -> &CompileConfig {
-        &self.config.compile
-    }
-
     /// Gets the entry resolver.
     pub fn entry_resolver(&self) -> &EntryResolver {
-        &self.compile_config().entry_resolver
+        &self.config.entry_resolver
     }
 
     /// Whether the main file is pinning.
@@ -162,32 +163,36 @@ impl ServerState {
 
     /// The entry point for the language server.
     pub fn main(client: TypedLspClient<Self>, config: Config, start: bool) -> Self {
-        log::info!("LanguageState: initialized with config {config:?}");
+        log::info!("ServerState: initialized with config {config:?}");
 
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = ServerState::new(client.clone(), config, editor_tx);
+        let mut server = ServerState::new(client.clone(), config, editor_tx);
+
+        if !server.config.warnings.is_empty() {
+            server.show_config_warnings();
+        }
 
         if start {
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
-                service.config.compile.notify_status,
+                server.config.notify_status,
             );
 
-            service
+            server
                 .reload_projects()
                 .log_error("could not restart primary");
 
             #[cfg(feature = "preview")]
-            service.background_preview();
+            server.background_preview();
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
         }
 
-        service
+        server
     }
 
     /// Installs LSP handlers to the language server.
@@ -204,7 +209,7 @@ impl ServerState {
             .with_command("tinymist.startDefaultPreview", State::default_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview)
             // Internal commands
-            .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doStartPreview", State::do_start_preview)
             .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview);
 
@@ -264,6 +269,7 @@ impl ServerState {
             .with_command_("tinymist.exportMarkdown", State::export_markdown)
             .with_command_("tinymist.exportQuery", State::export_query)
             .with_command("tinymist.exportAnsiHighlight", State::export_ansi_hl)
+            .with_command("tinymist.exportAst", State::export_ast)
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
@@ -382,6 +388,31 @@ pub enum ServerEvent {
 }
 
 impl ServerState {
+    /// Shows the configuration warnings to the client.
+    pub fn show_config_warnings(&mut self) {
+        if !self.config.warnings.is_empty() {
+            for warning in self.config.warnings.iter() {
+                self.client.send_lsp_request::<ShowMessageRequest>(
+                    ShowMessageRequestParams {
+                        typ: MessageType::WARNING,
+                        message: tinymist_l10n::t!(
+                            "tinymist.config.badServerConfig",
+                            "bad server configuration: {warning}",
+                            warning = warning.as_ref().into()
+                        )
+                        .into(),
+                        actions: None,
+                    },
+                    |_s, r| {
+                        if let Some(err) = r.error {
+                            log::error!("failed to send warning message: {err:?}");
+                        }
+                    },
+                );
+            }
+        }
+    }
+
     /// Gets the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
         let dg = self.project.primary_id().to_string();
@@ -391,7 +422,7 @@ impl ServerState {
 
         let snap = self.snapshot()?;
         just_future(async move {
-            let w = &snap.world;
+            let w = snap.world();
 
             let info = ServerInfoResponse {
                 root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
@@ -413,15 +444,15 @@ impl ServerState {
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, task, open } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
+        let lock_dir = self.entry_resolver().resolve_lock(&entry);
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
-            |snap: LspCompileSnapshot| async move {
+            |snap: LspComputeGraph| async move {
                 let mut updater = update_lock(lock_dir);
-                let world = snap.world.clone();
-                let doc_id = updater.compiled(&world)?;
+                let world = snap.world();
+                let doc_id = updater.compiled(world)?;
 
-                updater.update_materials(doc_id.clone(), snap.world.depended_fs_paths());
+                updater.update_materials(doc_id.clone(), world.depended_fs_paths());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
                 updater.commit();
@@ -437,7 +468,8 @@ impl ServerState {
                 ..TaskInputs::default()
             });
 
-            let artifact = CompiledArtifact::from_snapshot(snap.clone());
+            let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+            let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
@@ -453,11 +485,11 @@ impl ServerState {
             }
 
             if let Some(Some(path)) = open.then_some(res.as_ref()) {
-                log::info!("open with system default apps: {path:?}");
+                log::trace!("open with system default apps: {path:?}");
                 do_open(path).log_error("failed to open with system default apps");
             }
 
-            log::info!("CompileActor: on export end: {path:?} as {res:?}");
+            log::trace!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
         })
     }

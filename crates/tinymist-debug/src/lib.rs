@@ -1,114 +1,116 @@
 //! Tinymist coverage support for Typst.
 
+pub use cov::CoverageResult;
+pub use debugger::{
+    set_debug_session, with_debug_session, BreakpointKind, DebugSession, DebugSessionHandler,
+};
+
 mod cov;
+mod debugger;
 mod instrument;
 
-use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use debugger::BreakpointInstr;
 use parking_lot::Mutex;
-use tinymist_analysis::location::PositionEncoding;
-use tinymist_std::debug_loc::LspRange;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
 use tinymist_world::{print_diagnostics, CompilerFeat, CompilerWorld};
 use typst::diag::EcoString;
 use typst::syntax::package::PackageVersion;
-use typst::syntax::FileId;
 use typst::utils::LazyHash;
-use typst::{Library, World, WorldExt};
+use typst::Library;
 
 use cov::*;
 use instrument::InstrumentWorld;
-
-/// The coverage result.
-pub struct CoverageResult {
-    /// The coverage meta.
-    pub meta: FxHashMap<FileId, Arc<InstrumentMeta>>,
-    /// The coverage map.
-    pub regions: FxHashMap<FileId, CovRegion>,
-}
-
-impl CoverageResult {
-    /// Converts the coverage result to JSON.
-    pub fn to_json<F: CompilerFeat>(&self, w: &CompilerWorld<F>) -> serde_json::Value {
-        let lsp_position_encoding = PositionEncoding::Utf16;
-
-        let mut result = VscodeCoverage::new();
-
-        for (file_id, region) in &self.regions {
-            let file_path = w
-                .path_for_id(*file_id)
-                .unwrap()
-                .as_path()
-                .to_str()
-                .unwrap()
-                .to_string();
-
-            let mut details = vec![];
-
-            let meta = self.meta.get(file_id).unwrap();
-
-            let Ok(typst_source) = w.source(*file_id) else {
-                continue;
-            };
-
-            let hits = region.hits.lock();
-            for (idx, (span, _kind)) in meta.meta.iter().enumerate() {
-                let Some(typst_range) = w.range(*span) else {
-                    continue;
-                };
-
-                let rng = tinymist_analysis::location::to_lsp_range(
-                    typst_range,
-                    &typst_source,
-                    lsp_position_encoding,
-                );
-
-                details.push(VscodeFileCoverageDetail {
-                    executed: hits[idx] > 0,
-                    location: rng,
-                });
-            }
-
-            result.insert(file_path, details);
-        }
-
-        serde_json::to_value(result).unwrap()
-    }
-}
 
 /// Collects the coverage of a single execution.
 pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
+    let (cov, result) = with_cov(base, |instr| {
+        if let Err(e) = typst::compile::<D>(&instr).output {
+            print_diagnostics(instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
+                .context_ut("failed to print diagnostics")?;
+            bail!("");
+        }
+
+        Ok(())
+    });
+
+    result?;
+    cov
+}
+
+/// Collects the coverage with a callback.
+pub fn with_cov<F: CompilerFeat, T>(
+    base: &CompilerWorld<F>,
+    mut f: impl FnMut(&InstrumentWorld<F, CovInstr>) -> Result<T>,
+) -> (Result<CoverageResult>, Result<T>) {
     let instr = InstrumentWorld {
         base,
         library: instrument_library(&base.library),
-        instr: CoverageInstrumenter::default(),
+        instr: CovInstr::default(),
         instrumented: Mutex::new(FxHashMap::default()),
     };
 
     let _cov_lock = cov::COVERAGE_LOCK.lock();
 
-    if let Err(e) = typst::compile::<D>(&instr).output {
-        print_diagnostics(&instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
-            .context_ut("failed to print diagnostics")?;
-        bail!("");
-    }
+    let result = f(&instr);
 
     let meta = std::mem::take(instr.instr.map.lock().deref_mut());
     let CoverageMap { regions, .. } = std::mem::take(cov::COVERAGE_MAP.lock().deref_mut());
 
-    Ok(CoverageResult { meta, regions })
+    (Ok(CoverageResult { meta, regions }), result)
+}
+
+/// The world for debugging.
+pub type DebuggerWorld<'a, F> = InstrumentWorld<'a, F, BreakpointInstr>;
+/// Creates a world for debugging.
+pub fn instr_breakpoints<F: CompilerFeat>(base: &CompilerWorld<F>) -> DebuggerWorld<'_, F> {
+    InstrumentWorld {
+        base,
+        library: instrument_library(&base.library),
+        instr: BreakpointInstr::default(),
+        instrumented: Mutex::new(FxHashMap::default()),
+    }
 }
 
 #[comemo::memoize]
 fn instrument_library(library: &Arc<LazyHash<Library>>) -> Arc<LazyHash<Library>> {
+    use debugger::breakpoints::*;
+
     let mut library = library.as_ref().clone();
 
-    library.global.scope_mut().define_func::<__cov_pc>();
+    let scope = library.global.scope_mut();
+    scope.define_func::<__cov_pc>();
+    scope.define_func::<__breakpoint_call_start>();
+    scope.define_func::<__breakpoint_call_end>();
+    scope.define_func::<__breakpoint_function>();
+    scope.define_func::<__breakpoint_break>();
+    scope.define_func::<__breakpoint_continue>();
+    scope.define_func::<__breakpoint_return>();
+    scope.define_func::<__breakpoint_block_start>();
+    scope.define_func::<__breakpoint_block_end>();
+    scope.define_func::<__breakpoint_show_start>();
+    scope.define_func::<__breakpoint_show_end>();
+    scope.define_func::<__breakpoint_doc_start>();
+    scope.define_func::<__breakpoint_doc_end>();
+
+    scope.define_func::<__breakpoint_call_start_handle>();
+    scope.define_func::<__breakpoint_call_end_handle>();
+    scope.define_func::<__breakpoint_function_handle>();
+    scope.define_func::<__breakpoint_break_handle>();
+    scope.define_func::<__breakpoint_continue_handle>();
+    scope.define_func::<__breakpoint_return_handle>();
+    scope.define_func::<__breakpoint_block_start_handle>();
+    scope.define_func::<__breakpoint_block_end_handle>();
+    scope.define_func::<__breakpoint_show_start_handle>();
+    scope.define_func::<__breakpoint_show_end_handle>();
+    scope.define_func::<__breakpoint_doc_start_handle>();
+    scope.define_func::<__breakpoint_doc_end_handle>();
+
     Arc::new(library)
 }
 
@@ -130,16 +132,4 @@ impl<'a> From<&'a PackageSpec> for PackageSpecCmp<'a> {
             version: &spec.version,
         }
     }
-}
-
-/// The coverage result in the format of the VSCode coverage data.
-pub type VscodeCoverage = HashMap<String, Vec<VscodeFileCoverageDetail>>;
-
-/// Converts the coverage result to the VSCode coverage data.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct VscodeFileCoverageDetail {
-    /// Whether the location is being executed
-    pub executed: bool,
-    /// The location of the coverage.
-    pub location: LspRange,
 }

@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/set_param.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "fill",
     "labelDetails": {

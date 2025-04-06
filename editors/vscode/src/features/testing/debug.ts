@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from "vscode";
 import { IContext } from "../../context";
 import { DebugAdapterExecutableFactory } from "../../dap";
+import { isTypstDocument } from "../../util";
 
 export const TYPST_DEBUGGER_TYPE = "myriaddreamin.typst-debugger";
 
@@ -99,7 +100,7 @@ class TypstConfigurationProvider implements vscode.DebugConfigurationProvider {
     // if launch.json is missing or empty
     if (!config.type && !config.request && !config.name) {
       const editor = vscode.window.activeTextEditor;
-      if (editor && editor.document.languageId === "typst") {
+      if (isTypstDocument(editor?.document)) {
         config.type = TYPST_DEBUGGER_TYPE;
         config.name = "Launch";
         config.request = "launch";

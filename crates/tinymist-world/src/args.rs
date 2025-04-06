@@ -1,10 +1,11 @@
+use core::fmt;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use chrono::{DateTime, Utc};
-use clap::{builder::ValueParser, ArgAction, Parser};
+use clap::{builder::ValueParser, ArgAction, Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 use tinymist_std::{bail, error::prelude::*};
 use tinymist_vfs::ImmutDict;
@@ -61,6 +62,19 @@ pub struct CompileOnceArgs {
     #[clap(long = "root", value_name = "DIR")]
     pub root: Option<PathBuf>,
 
+    /// Font related arguments.
+    #[clap(flatten)]
+    pub font: CompileFontArgs,
+
+    /// Package related arguments.
+    #[clap(flatten)]
+    pub package: CompilePackageArgs,
+
+    /// Enables in-development features that may be changed or removed at any
+    /// time.
+    #[arg(long = "features", value_delimiter = ',', env = "TYPST_FEATURES")]
+    pub features: Vec<Feature>,
+
     /// Add a string key-value pair visible through `sys.inputs`
     #[clap(
         long = "input",
@@ -69,14 +83,6 @@ pub struct CompileOnceArgs {
         value_parser = ValueParser::new(parse_input_pair),
     )]
     pub inputs: Vec<(String, String)>,
-
-    /// Font related arguments.
-    #[clap(flatten)]
-    pub font: CompileFontArgs,
-
-    /// Package related arguments.
-    #[clap(flatten)]
-    pub package: CompilePackageArgs,
 
     /// The document's creation date formatted as a UNIX timestamp (in seconds).
     ///
@@ -90,6 +96,11 @@ pub struct CompileOnceArgs {
     )]
     pub creation_timestamp: Option<i64>,
 
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with.
+    #[arg(long = "pdf-standard", value_delimiter = ',')]
+    pub pdf_standard: Vec<PdfStandard>,
+
     /// Path to CA certificate file for network access, especially for
     /// downloading typst packages.
     #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
@@ -97,6 +108,10 @@ pub struct CompileOnceArgs {
 }
 
 impl CompileOnceArgs {
+    pub fn resolve_features(&self) -> typst::Features {
+        typst::Features::from_iter(self.features.iter().map(|f| (*f).into()))
+    }
+
     pub fn resolve_inputs(&self) -> Option<ImmutDict> {
         if self.inputs.is_empty() {
             return None;
@@ -199,4 +214,123 @@ pub fn parse_source_date_epoch(raw: &str) -> Result<i64, String> {
 /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
 pub fn convert_source_date_epoch(seconds: i64) -> Result<chrono::DateTime<Utc>, String> {
     DateTime::from_timestamp(seconds, 0).ok_or_else(|| "timestamp out of range".to_string())
+}
+
+macro_rules! display_possible_values {
+    ($ty:ty) => {
+        impl fmt::Display for $ty {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.to_possible_value()
+                    .expect("no values are skipped")
+                    .get_name()
+                    .fmt(f)
+            }
+        }
+    };
+}
+
+/// When to export an output file.
+///
+/// By default, a `tinymist compile` only provides input information and
+/// doesn't change the `when` field. However, you can still specify a `when`
+/// argument to override the default behavior for specific tasks.
+///
+/// ## Examples
+///
+/// ```bash
+/// tinymist compile --when onSave main.typ
+/// alias typst="tinymist compile --when=onSave"
+/// typst compile main.typ
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[clap(rename_all = "camelCase")]
+pub enum TaskWhen {
+    /// Never watch to run task.
+    #[default]
+    Never,
+    /// Run task on saving the document, i.e. on `textDocument/didSave` events.
+    OnSave,
+    /// Run task on typing, i.e. on `textDocument/didChange` events.
+    OnType,
+    /// *DEPRECATED* Run task when a document has a title and on saved, which is
+    /// useful to filter out template files.
+    ///
+    /// Note: this is deprecating.
+    OnDocumentHasTitle,
+}
+
+impl TaskWhen {
+    /// Returns `true` if the task should never be run automatically.
+    pub fn is_never(&self) -> bool {
+        matches!(self, TaskWhen::Never)
+    }
+}
+
+display_possible_values!(TaskWhen);
+
+/// Which format to use for the generated output file.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+pub enum OutputFormat {
+    /// Export to PDF.
+    Pdf,
+    /// Export to PNG.
+    Png,
+    /// Export to SVG.
+    Svg,
+    /// Export to HTML.
+    Html,
+}
+
+display_possible_values!(OutputFormat);
+
+/// Specifies the current export target.
+///
+/// The design of this configuration is not yet finalized and for this reason it
+/// is guarded behind the html feature. Visit the HTML documentation page for
+/// more details.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportTarget {
+    /// The current export target is for PDF, PNG, and SVG export.
+    #[default]
+    Paged,
+    /// The current export target is for HTML export.
+    Html,
+}
+
+/// A PDF standard that Typst can enforce conformance with.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
+pub enum PdfStandard {
+    /// PDF 1.7.
+    #[value(name = "1.7")]
+    #[serde(rename = "1.7")]
+    V_1_7,
+    /// PDF/A-2b.
+    #[value(name = "a-2b")]
+    #[serde(rename = "a-2b")]
+    A_2b,
+    /// PDF/A-3b.
+    #[value(name = "a-3b")]
+    #[serde(rename = "a-3b")]
+    A_3b,
+}
+
+display_possible_values!(PdfStandard);
+
+/// An in-development feature that may be changed or removed at any time.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, ValueEnum)]
+pub enum Feature {
+    Html,
+}
+
+display_possible_values!(Feature);
+
+impl From<Feature> for typst::Feature {
+    fn from(f: Feature) -> typst::Feature {
+        match f {
+            Feature::Html => typst::Feature::Html,
+        }
+    }
 }

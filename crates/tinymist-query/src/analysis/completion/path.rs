@@ -78,7 +78,7 @@ impl CompletionPair<'_, '_, '_> {
                     .parent()
                     .unwrap_or(Path::new("/"));
                 let path = path.vpath().as_rooted_path();
-                let w = pathdiff::diff_paths(path, base)?;
+                let w = tinymist_std::path::diff(path, base)?;
                 unix_slash(&w).into()
             };
             crate::log_debug_ct!("compl_label: {label:?}");

@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.8",
+  "version": "0.13.10",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -774,6 +774,10 @@
         "language": "typst",
         "scopeName": "source.typst",
         "path": "./out/typst.tmLanguage.json",
+        "tokenTypes": {
+          "punctuation.definition.string.begin.math.typst": "other",
+          "punctuation.definition.string.end.math.typst": "other"
+        },
         "balancedBracketScopes": [
           "meta.expr",
           "meta.brace",
@@ -795,6 +799,10 @@
         "language": "typst-code",
         "scopeName": "source.typst-code",
         "path": "./out/typst-code.tmLanguage.json",
+        "tokenTypes": {
+          "punctuation.definition.string.begin.math.typst": "other",
+          "punctuation.definition.string.end.math.typst": "other"
+        },
         "balancedBracketScopes": [
           "meta.expr",
           "meta.brace",
@@ -1057,6 +1065,11 @@
     ],
     "commands": [
       {
+        "command": "tinymist.exportCurrentFile",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentFile%",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.exportCurrentPdf",
         "title": "%extension.tinymist.command.tinymist.exportCurrentPdf%",
         "category": "Typst"
@@ -1078,8 +1091,18 @@
         "icon": "$(file-pdf)"
       },
       {
+        "command": "tinymist.exportCurrentFileAndShow",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentFileAndShow%",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.copyAnsiHighlight",
         "title": "%extension.tinymist.command.tinymist.copyAnsiHighlight%",
+        "category": "Typst"
+      },
+      {
+        "command": "tinymist.viewAst",
+        "title": "%extension.tinymist.command.tinymist.viewAst%",
         "category": "Typst"
       },
       {
@@ -1150,6 +1173,11 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.profileCurrentTestCoverage",
+        "title": "Profile coverage of the current test module",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.syncLabel",
         "title": "%extension.tinymist.command.tinymist.syncLabel%",
         "icon": "$(extensions-sync-enabled)",
@@ -1188,6 +1216,12 @@
         "description": "Launch typst-preview server in slide mode and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.eject",
+        "title": "%extension.tinymist.command.typst-preview.eject%",
+        "description": "Eject the preview panel to browser to get better performance",
+        "icon": "$(link-external)"
       },
       {
         "command": "typst-preview.sync",
@@ -1240,6 +1274,10 @@
         {
           "command": "tinymist.restartServer",
           "when": "ext.tinymistActivated"
+        },
+        {
+          "command": "typst-preview.eject",
+          "when": "activeWebviewPanelId == 'typst-preview'"
         }
       ],
       "editor/title": [
@@ -1251,6 +1289,11 @@
         {
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst",
+          "group": "navigation"
+        },
+        {
+          "command": "typst-preview.eject",
+          "when": "activeWebviewPanelId == 'typst-preview'",
           "group": "navigation"
         }
       ],
@@ -1301,7 +1344,8 @@
     "check": "tsc --noEmit",
     "format-check": "prettier --check .",
     "format": "prettier --write .",
-    "test": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+    "test:unit": "vitest",
+    "test": "vitest && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
     "cpr": "^3.0.1",

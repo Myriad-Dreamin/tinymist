@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.13.2"
+version = "0.13.12-rc1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -16,11 +16,11 @@ base64.workspace = true
 bitvec.workspace = true
 comemo.workspace = true
 dashmap.workspace = true
-ecow.workspace = true
+ecow = { workspace = true, features = ["serde"] }
 fxhash.workspace = true
 log.workspace = true
-tinymist-analysis.workspace = true
 path-clean.workspace = true
+pathdiff.workspace = true
 parking_lot.workspace = true
 rustc-hash.workspace = true
 serde = { workspace = true, features = ["derive"] }

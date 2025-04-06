@@ -66,6 +66,10 @@ where
 }
 
 impl<F: CompilerFeat, I: Instrumenter> SourceWorld for InstrumentWorld<'_, F, I> {
+    fn as_world(&self) -> &dyn typst::World {
+        self
+    }
+
     fn path_for_id(&self, id: FileId) -> FileResult<PathResolution> {
         self.base.path_for_id(id)
     }

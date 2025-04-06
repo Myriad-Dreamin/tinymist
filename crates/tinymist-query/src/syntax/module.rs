@@ -31,7 +31,7 @@ pub fn construct_module_dependencies(
             Err(err) => {
                 static WARN_ONCE: Once = Once::new();
                 WARN_ONCE.call_once(|| {
-                    log::warn!("construct_module_dependencies: {err:?}", err = err);
+                    log::warn!("construct_module_dependencies: {err:?}");
                 });
                 continue;
             }
