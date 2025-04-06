@@ -275,7 +275,7 @@ impl CompletionPair<'_, '_, '_> {
                     None => modifier.into(),
                 };
 
-                self.symbol_completions(label, symbol);
+                self.symbol_completions(label, &modified);
             }
         }
     }
