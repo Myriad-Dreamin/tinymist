@@ -76,7 +76,7 @@ pub struct ServerState {
     pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
-    /// The client focusing file.
+    /// The client focusing position.
     pub implicit_position: Option<LspPosition>,
     /// The client ever focused implicitly by activities.
     pub ever_focusing_by_activities: bool,
