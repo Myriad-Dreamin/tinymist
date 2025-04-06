@@ -251,20 +251,20 @@ impl CompletionPair<'_, '_, '_> {
     }
 
     pub fn symbol_completions(&mut self, label: EcoString, symbol: &Symbol) {
-        let is_stepless = self.cursor.ctx.analysis.completion_feat.is_stepless();
-        if is_stepless {
-            self.symbol_var_completions(symbol, Some(&label));
-        }
-
         let ch = symbol.get();
         let kind = CompletionKind::Symbol(ch);
         self.push_completion(Completion {
             kind,
-            label,
+            label: label.clone(),
             label_details: Some(symbol_label_detail(ch)),
             detail: Some(symbol_detail(ch)),
             ..Completion::default()
         });
+
+        let is_stepless = self.cursor.ctx.analysis.completion_feat.is_stepless();
+        if is_stepless {
+            self.symbol_var_completions(symbol, Some(&label));
+        }
     }
 
     pub fn symbol_var_completions(&mut self, symbol: &Symbol, prefix: Option<&str>) {
