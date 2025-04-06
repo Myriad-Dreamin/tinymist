@@ -169,19 +169,6 @@ If you are interested by any above features, please feel free to send Issues to 
 
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
 
-## Localization
-
-Tinymist is localized in multiple languages. You can contribute to the localization of Tinymist by translating or correcting the locale files in the [locales](./locales) folder. This is also a good start of contributing to the project.
-
-## Maintainers
-
-Get list of maintainers from [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md). Or programmatically by `yarn maintainers`
-
-> [!NOTE]
-> 
->   You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
-
-
 ## Sponsoring
 
 Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
