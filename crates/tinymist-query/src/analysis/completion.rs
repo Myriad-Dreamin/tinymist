@@ -85,6 +85,9 @@ pub struct CompletionFeat {
     #[serde(default)]
     pub trigger_suggest_and_parameter_hints: bool,
 
+    /// The Way to complete symbols.
+    pub symbol: Option<SymbolCompletionWay>,
+
     /// Whether to enable postfix completion.
     pub postfix: Option<bool>,
     /// Whether to enable ufcs completion.
@@ -129,6 +132,22 @@ impl CompletionFeat {
             .as_ref()
             .unwrap_or(&DEFAULT_POSTFIX_SNIPPET)
     }
+
+    pub(crate) fn is_stepless(&self) -> bool {
+        matches!(self.symbol, Some(SymbolCompletionWay::Stepless))
+    }
+}
+
+/// Whether to make symbol completion stepless. For example, `$ar|$` will be
+/// completed to `$arrow.r$`. Hint: Restarting the editor is required to change
+/// this setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SymbolCompletionWay {
+    /// Complete symbols step by step
+    Step,
+    /// Complete symbols steplessly
+    Stepless,
 }
 
 /// The struct describing how a completion worker views the editor's cursor.

@@ -213,15 +213,15 @@ impl CompletionPair<'_, '_, '_> {
         let rb = if is_content_block { "" } else { ")" };
 
         // we don't check literal type here for faster completion
-        for (name, ty) in defines.defines {
+        for (name, ty) in &defines.defines {
             // todo: filter ty
             if name.is_empty() {
                 continue;
             }
 
-            kind_checker.check(&ty);
+            kind_checker.check(ty);
 
-            if kind_checker.symbols.iter().min().copied().is_some() {
+            if !kind_checker.symbols.is_empty() {
                 continue;
             }
             if kind_checker.functions.is_empty() {
@@ -242,7 +242,7 @@ impl CompletionPair<'_, '_, '_> {
                     .map(From::from),
                 ..Default::default()
             };
-            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter().copied());
 
             crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
 
