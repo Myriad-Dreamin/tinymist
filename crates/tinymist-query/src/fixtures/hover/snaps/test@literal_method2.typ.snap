@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/literal_method2.typ
+---
+{
+ "contents": "```typc\nlet len(\n  self: array,\n) = int;\n```\n\n---\n\nThe number of values in the array.\n\n# Positional Parameters\n\n## self\n\n```typc\ntype: array\n```\n\n\n\n---\n\n[Open docs](https://typst.app/docs/reference/foundations/array/#definitions-len)",
+ "range": "0:22:0:25"
+}
