@@ -271,7 +271,7 @@ impl CompletionPair<'_, '_, '_> {
         for modifier in symbol.modifiers() {
             if let Ok(modified) = symbol.clone().modified(modifier) {
                 let label = match &prefix {
-                    Some(prefix) => eco_format!("{prefix}.{modified}"),
+                    Some(prefix) => eco_format!("{prefix}.{modifier}"),
                     None => modifier.into(),
                 };
 
