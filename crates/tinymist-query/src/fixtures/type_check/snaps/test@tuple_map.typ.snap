@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 "f" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
 "" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
 "x" = Type(int)
-"b" = (Type(str), )
+"b" = (Type(array) | ((Type(array) | Type(str)), ))
 =====
 5..6 -> @a
 9..13 -> (1, )
@@ -19,6 +19,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 33..34 -> @x
 42..43 -> @b
 46..47 -> @a
-46..51 -> @v"a".map
-46..54 -> (Type(str), )
+46..51 -> (Func(map) | (Func(map) | @v"a".map))
+46..54 -> (Type(array) | ((Type(array) | Type(str)), ))
 52..53 -> @f

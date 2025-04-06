@@ -10,5 +10,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_at.typ
 9..18 -> (1, 2, 3, )
 25..26 -> @b
 29..30 -> @a
-29..33 -> @v"a".at
-29..36 -> 2
+29..33 -> (Func(at) | (Func(at) | @v"a".at))
+29..36 -> (Any | 2)
