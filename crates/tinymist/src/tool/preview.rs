@@ -425,9 +425,27 @@ impl PreviewState {
         just_future(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
     }
 
+    /// Kill all preview tasks.
+    pub fn kill_all(&self) -> AnySchedulableResponse {
+        let (tx, rx) = oneshot::channel();
+
+        let sent = self.preview_tx.send(PreviewRequest::KillAll(tx));
+        sent.map_err(|_| internal_error("failed to send kill request"))?;
+
+        just_future(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
+    }
+
     /// Scroll the preview to a given position.
     pub fn scroll(&self, task_id: String, req: ControlPlaneMessage) -> AnySchedulableResponse {
         let sent = self.preview_tx.send(PreviewRequest::Scroll(task_id, req));
+        sent.map_err(|_| internal_error("failed to send scroll request"))?;
+
+        just_ok(JsonValue::Null)
+    }
+
+    /// Scroll all preview panels to a given position.
+    pub fn scroll_all(&self, req: ControlPlaneMessage) -> AnySchedulableResponse {
+        let sent = self.preview_tx.send(PreviewRequest::ScrollAll(req));
         sent.map_err(|_| internal_error("failed to send scroll request"))?;
 
         just_ok(JsonValue::Null)

@@ -134,15 +134,20 @@ impl ServerState {
 
     /// Focuses main file to the given path.
     pub fn focus_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
+        if new_entry.as_deref() != self.focusing.as_deref() {
+            self.implicit_position = None;
+        }
+
+        self.focusing = new_entry.clone();
+
         if self.pinning_by_user
             || (self.pinning_by_preview && !self.pinning_by_browsing_preview)
             || self.config.has_default_entry_path
         {
-            self.focusing = new_entry;
             return Ok(false);
         }
 
-        self.change_main_file(new_entry.clone())
+        self.change_main_file(new_entry)
     }
 
     /// This is used for tracking activating document status if a client is not

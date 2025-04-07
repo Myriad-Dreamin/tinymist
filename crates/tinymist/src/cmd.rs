@@ -359,6 +359,10 @@ impl ServerState {
     pub fn kill_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let task_id = get_arg!(args[0] as String);
 
+        if args.is_empty() {
+            return self.preview.kill_all();
+        }
+
         self.preview.kill(task_id)
     }
 
@@ -366,6 +370,10 @@ impl ServerState {
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use typst_preview::ControlPlaneMessage;
+
+        if args.is_empty() {
+            return self.preview.scroll_all(self.infer_pos()?);
+        }
 
         let task_id = get_arg!(args[0] as String);
         let req = get_arg!(args[1] as ControlPlaneMessage);

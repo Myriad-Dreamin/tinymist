@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
+use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
 use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
@@ -75,6 +76,8 @@ pub struct ServerState {
     pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
+    /// The client focusing position.
+    pub implicit_position: Option<LspPosition>,
     /// The client ever focused implicitly by activities.
     pub ever_focusing_by_activities: bool,
     /// The client ever sent manual focusing request.
@@ -133,6 +136,7 @@ impl ServerState {
             pinning_by_preview: false,
             pinning_by_browsing_preview: false,
             focusing: None,
+            implicit_position: None,
             formatter,
             user_action: UserActionTask,
         }
@@ -354,6 +358,26 @@ impl ServerState {
         }
 
         Ok(())
+    }
+
+    #[cfg(feature = "preview")]
+    pub(crate) fn infer_pos(&self) -> LspResult<typst_preview::ControlPlaneMessage> {
+        use typst_preview::{ControlPlaneMessage, ResolveSourceLocRequest};
+
+        let focus_file = self.focusing.as_ref();
+        let focus_file = focus_file.ok_or_else(|| invalid_request("no focusing file"))?;
+
+        let focus_location = self.implicit_position.as_ref();
+        let focus_location =
+            focus_location.ok_or_else(|| invalid_request("no focusing location"))?;
+
+        Ok(ControlPlaneMessage::ResolveSourceLoc(
+            ResolveSourceLocRequest {
+                filepath: focus_file.as_ref().to_owned(),
+                line: focus_location.line,
+                character: focus_location.character,
+            },
+        ))
     }
 }
 
