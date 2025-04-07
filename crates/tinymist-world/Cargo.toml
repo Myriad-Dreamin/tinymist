@@ -15,7 +15,7 @@ rust-version.workspace = true
 [dependencies]
 
 anyhow.workspace = true
-chrono = { workspace = true, default-features = false, features = [
+chrono = { workspace = true, default-features = false, optional = true, features = [
     "std",
     "clock",
 ] }
@@ -54,6 +54,7 @@ default = []
 browser-embedded-fonts = ["typst-assets/fonts"]
 http-registry = ["reqwest"]
 web = [
+    "chrono",
     "chrono/wasmbind",
     "wasm-bindgen",
     "web-sys",
@@ -66,6 +67,7 @@ browser = ["tinymist-vfs/browser", "web"]
 system = [
     "dirs",
     "fontdb",
+    "chrono",
     "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",

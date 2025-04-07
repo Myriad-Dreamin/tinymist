@@ -6,7 +6,6 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
 };
 
-use chrono::{DateTime, Datelike, Duration, Local};
 use tinymist_std::error::prelude::*;
 use tinymist_vfs::{
     FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
@@ -432,6 +431,11 @@ fn is_revision_changed(a: Option<NonZeroUsize>, b: Option<NonZeroUsize>) -> bool
     a.is_none() || b.is_none() || a != b
 }
 
+#[cfg(any(feature = "web", feature = "system"))]
+type NowStorage = chrono::DateTime<chrono::Local>;
+#[cfg(not(any(feature = "web", feature = "system")))]
+type NowStorage = tinymist_std::time::UtcDateTime;
+
 pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
@@ -455,7 +459,7 @@ pub struct CompilerWorld<F: CompilerFeat> {
     source_db: SourceDb,
     /// The current datetime if requested. This is stored here to ensure it is
     /// always the same within one compilation. Reset between compilations.
-    now: OnceLock<DateTime<Local>>,
+    now: OnceLock<NowStorage>,
 }
 
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
@@ -707,7 +711,9 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     ///
     /// If this function returns `None`, Typst's `datetime` function will
     /// return an error.
+    #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        use chrono::{Datelike, Duration};
         // todo: typst respects creation_timestamp, but we don't...
         let now = self.now.get_or_init(|| tinymist_std::time::now().into());
 
@@ -721,6 +727,31 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             naive.month().try_into().ok()?,
             naive.day().try_into().ok()?,
         )
+    }
+
+    /// Get the current date.
+    ///
+    /// If no offset is specified, the local date should be chosen. Otherwise,
+    /// the UTC date should be chosen with the corresponding offset in hours.
+    ///
+    /// If this function returns `None`, Typst's `datetime` function will
+    /// return an error.
+    #[cfg(not(any(feature = "web", feature = "system")))]
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        use tinymist_std::time::{now, to_typst_time, Duration};
+        // todo: typst respects creation_timestamp, but we don't...
+        let now = self.now.get_or_init(|| now().into());
+
+        let now = offset
+            .and_then(|offset| {
+                let dur = Duration::from_secs(offset.checked_mul(3600)? as u64)
+                    .try_into()
+                    .ok()?;
+                now.checked_add(dur)
+            })
+            .unwrap_or(*now);
+
+        Some(to_typst_time(now))
     }
 }
 
