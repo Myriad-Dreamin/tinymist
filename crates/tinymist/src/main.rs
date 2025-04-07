@@ -5,12 +5,12 @@ mod args;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
 use futures::future::MaybeDone;
-use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
 use sync_ls::transport::{with_stdio_transport, MirrorArgs};
@@ -53,7 +53,7 @@ impl Default for Runtimes {
     }
 }
 
-static RUNTIMES: Lazy<Runtimes> = Lazy::new(Runtimes::default);
+static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 /// The main entry point.
 fn main() -> Result<()> {

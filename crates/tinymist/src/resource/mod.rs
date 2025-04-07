@@ -5,7 +5,6 @@ mod prelude {
 
     pub use std::collections::HashMap;
 
-    pub use once_cell::sync::Lazy;
     pub use reflexo_vec2svg::ir::{GlyphItem, GlyphRef};
     pub use reflexo_vec2svg::{DefaultExportFeature, SvgTask, SvgText};
     pub use serde::{Deserialize, Serialize};

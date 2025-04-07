@@ -1,11 +1,10 @@
 use core::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use clap::Parser;
 use itertools::Itertools;
 use lsp_types::*;
-use once_cell::sync::{Lazy, OnceCell};
 use reflexo::error::IgnoreLogging;
 use reflexo::CowStr;
 use reflexo_typst::{ImmutPath, TypstDict};
@@ -97,7 +96,7 @@ pub struct Config {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Arc<TinymistFontResolver>>>,
+    pub fonts: OnceLock<Derived<Arc<TinymistFontResolver>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
 
@@ -533,7 +532,7 @@ impl Config {
             opts.font_paths.clone_from(paths);
         }
 
-        let root = OnceCell::new();
+        let root = OnceLock::new();
         for path in opts.font_paths.iter_mut() {
             if path.is_relative() {
                 if let Some(root) = root.get_or_init(|| self.entry_resolver.root(None)) {
@@ -586,7 +585,7 @@ impl Config {
     }
 
     fn user_inputs(&self) -> ImmutDict {
-        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
+        static EMPTY: LazyLock<ImmutDict> = LazyLock::new(ImmutDict::default);
 
         if let Some(extras) = &self.typst_extra_args {
             return extras.inputs.clone();
@@ -852,7 +851,6 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tinymist_project::PathPattern;
 
     fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
         temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))

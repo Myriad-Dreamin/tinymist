@@ -5,7 +5,6 @@ use typst::syntax::Span;
 
 use crate::{prelude::*, LspWorldExt};
 
-use once_cell::sync::Lazy;
 use regex::RegexSet;
 
 /// Stores diagnostics for files.
@@ -198,7 +197,7 @@ trait DiagnosticRefiner {
 
 struct DeprecationRefiner<const MINOR: usize>();
 
-static DEPRECATION_PATTERNS: Lazy<RegexSet> = Lazy::new(|| {
+static DEPRECATION_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"unknown variable: style",
         r"unexpected argument: fill",

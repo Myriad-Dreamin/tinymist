@@ -1,3 +1,4 @@
+use std::sync::LazyLock;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
@@ -85,7 +86,7 @@ struct FontItem {
 
 type ResourceSymbolMap = BTreeMap<String, ResourceSymbolItem>;
 
-static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
+static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
     use SymCategory::*;
 
     HashMap::from_iter([
