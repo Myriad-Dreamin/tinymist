@@ -438,27 +438,32 @@ impl CompileHandlerImpl {
     }
 
     fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
-        let world = snap.world();
         let dv = ProjVersion {
             id: snap.id().clone(),
-            revision: world.revision().get(),
+            revision: snap.world().revision().get(),
         };
-
         // todo: better way to remove diagnostics
-        // todo: check all errors in this file
-        let valid = !world.entry_state().is_inactive();
-        let diagnostics = valid.then(|| {
-            let diagnostics = tinymist_query::convert_diagnostics(
-                world,
-                snap.diagnostics(),
-                self.analysis.position_encoding,
-            );
+        let valid = !snap.world().entry_state().is_inactive();
+        if !valid {
+            self.push_diagnostics(dv, None);
+            return;
+        }
+
+        let snap = snap.clone();
+        let editor_tx = self.editor_tx.clone();
+        let enc = self.analysis.position_encoding;
+        rayon::spawn(move || {
+            let world = snap.world();
+
+            // todo: check all errors in this file
+            let diagnostics = tinymist_query::check_doc(world, snap.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
-            diagnostics
-        });
 
-        self.push_diagnostics(dv, diagnostics);
+            editor_tx
+                .send(EditorRequest::Diag(dv, Some(diagnostics)))
+                .log_error("failed to send diagnostics");
+        });
     }
 }
 
@@ -619,8 +624,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             .log_error("failed to print diagnostics");
         }
 
-        self.notify_diagnostics(art);
-
         self.client.interrupt(LspInterrupt::Compiled(art.clone()));
         self.export.signal(art);
 
@@ -631,6 +634,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         } else {
             log::info!("Project: no preview for {:?}", art.id());
         }
+
+        self.notify_diagnostics(art);
     }
 }
 

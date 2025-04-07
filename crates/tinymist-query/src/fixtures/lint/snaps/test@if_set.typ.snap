@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/if_set.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "This set statement doesn't take effect.\nHint: consider changing parent to `set text(red) if (false)`",
+   "range": "1:2:1:15",
+   "relatedInformation": [],
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

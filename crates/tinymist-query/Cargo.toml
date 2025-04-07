@@ -48,6 +48,7 @@ tinymist-analysis.workspace = true
 tinymist-derive.workspace = true
 tinymist-std.workspace = true
 tinymist-l10n.workspace = true
+tinymist-lint.workspace = true
 typst.workspace = true
 typst-shim.workspace = true
 unscanny.workspace = true

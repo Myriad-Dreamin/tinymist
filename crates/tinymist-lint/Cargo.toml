@@ -1,0 +1,31 @@
+[package]
+name = "tinymist-lint"
+description = "A linter for Typst."
+categories = ["compilers"]
+keywords = ["api", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+typst-library.workspace = true
+typst.workspace = true
+tinymist-std.workspace = true
+tinymist-analysis.workspace = true
+tinymist-world = { workspace = true, features = ["system"] }
+parking_lot.workspace = true
+comemo.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true
