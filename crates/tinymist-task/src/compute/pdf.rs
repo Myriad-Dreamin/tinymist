@@ -23,8 +23,6 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
             .map(|ts| ts.to_utc_datetime().context("timestamp is out of range"))
             .transpose()?
             .unwrap_or_else(tinymist_std::time::utc_now);
-        // todo: this seems different from `Timestamp::new_local` which also embeds the
-        // timezone information.
         let timestamp = Timestamp::new_utc(tinymist_std::time::to_typst_time(creation_timestamp));
 
         let standards = PdfStandards::new(
