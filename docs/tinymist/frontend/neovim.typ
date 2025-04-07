@@ -106,15 +106,14 @@ vim.api.nvim_create_user_command("OpenPdf", function()
   if filepath:match("%.typ$") then
     local pdf_path = filepath:gsub("%.typ$", ".pdf")
     vim.system({ "open", pdf_path })
-    -- replace open with your preferred pdf viewer
-    -- vim.system({ "zathura", pdf_path })
-
-    -- For Neovim versions prior to 0.9.5, `os.execute` can be used instead.
-    -- (This will be a blocking call -- see https://github.com/Myriad-Dreamin/tinymist/issues/1606)
-    -- os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
   end
 end, {})
 ```
+
+#note-box[
+  For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/1606")[Issues \#1606] for more information.
+]
+
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 
