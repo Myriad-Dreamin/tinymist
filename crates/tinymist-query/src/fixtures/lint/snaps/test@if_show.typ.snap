@@ -1,13 +1,13 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/lint/show_set.typ
+input_file: crates/tinymist-query/src/fixtures/lint/if_show.typ
 ---
 {
  "s0.typ": [
   {
-   "message": "This set statement takes no effect.",
-   "range": "1:2:1:15",
+   "message": "This show statement takes no effect.",
+   "range": "1:2:1:17",
    "relatedInformation": [],
    "severity": 1,
    "source": "typst"

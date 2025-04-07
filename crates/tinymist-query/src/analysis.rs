@@ -616,7 +616,10 @@ mod lint_tests {
                 result.iter(),
                 ctx.position_encoding(),
             );
-            let result = result.into_iter().collect::<BTreeMap<_, _>>();
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_path_(&k), v))
+                .collect::<BTreeMap<_, _>>();
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

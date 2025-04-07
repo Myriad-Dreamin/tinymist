@@ -28,22 +28,24 @@ impl SourceLinter {
         }
     }
 
-    fn lint(self, node: &SyntaxNode) -> DiagnosticVec {
-        if let Some(expr) = node.cast() {
+    fn lint(mut self, node: &SyntaxNode) -> DiagnosticVec {
+        if let Some(markup) = node.cast::<ast::Markup>() {
+            self.exprs(markup.exprs());
+        } else if let Some(expr) = node.cast() {
             self.expr(expr);
         }
 
         self.diag
     }
 
-    fn exprs<'a>(&self, exprs: impl Iterator<Item = ast::Expr<'a>>) -> Option<()> {
+    fn exprs<'a>(&mut self, exprs: impl Iterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs {
             self.expr(expr);
         }
         Some(())
     }
 
-    fn exprs_untyped(&self, to_untyped: &SyntaxNode) -> Option<()> {
+    fn exprs_untyped(&mut self, to_untyped: &SyntaxNode) -> Option<()> {
         for expr in to_untyped.children() {
             if let Some(expr) = expr.cast() {
                 self.expr(expr);
@@ -52,7 +54,7 @@ impl SourceLinter {
         Some(())
     }
 
-    fn expr(&self, node: ast::Expr) -> Option<()> {
+    fn expr(&mut self, node: ast::Expr) -> Option<()> {
         match node {
             ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
             ast::Expr::Code(expr) => self.exprs(expr.body().exprs()),
@@ -124,62 +126,62 @@ impl SourceLinter {
         }
     }
 
-    fn ident(&self, _expr: ast::Ident<'_>) -> Option<()> {
+    fn ident(&mut self, _expr: ast::Ident<'_>) -> Option<()> {
         Some(())
     }
 
-    fn math_ident(&self, _expr: ast::MathIdent<'_>) -> Option<()> {
+    fn math_ident(&mut self, _expr: ast::MathIdent<'_>) -> Option<()> {
         Some(())
     }
 
-    fn import(&self, _expr: ast::ModuleImport<'_>) -> Option<()> {
+    fn import(&mut self, _expr: ast::ModuleImport<'_>) -> Option<()> {
         Some(())
     }
 
-    fn include(&self, _expr: ast::ModuleInclude<'_>) -> Option<()> {
+    fn include(&mut self, _expr: ast::ModuleInclude<'_>) -> Option<()> {
         Some(())
     }
 
-    fn array(&self, expr: ast::Array<'_>) -> Option<()> {
+    fn array(&mut self, expr: ast::Array<'_>) -> Option<()> {
         self.exprs_untyped(expr.to_untyped())
     }
 
-    fn dict(&self, expr: ast::Dict<'_>) -> Option<()> {
+    fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
         self.exprs_untyped(expr.to_untyped())
     }
 
-    fn unary(&self, expr: ast::Unary<'_>) -> Option<()> {
+    fn unary(&mut self, expr: ast::Unary<'_>) -> Option<()> {
         self.expr(expr.expr())
     }
 
-    fn binary(&self, expr: ast::Binary<'_>) -> Option<()> {
+    fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
         self.expr(expr.lhs());
         self.expr(expr.rhs())
     }
 
-    fn field_access(&self, expr: ast::FieldAccess<'_>) -> Option<()> {
+    fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
         self.expr(expr.target())
     }
 
-    fn func_call(&self, expr: ast::FuncCall<'_>) -> Option<()> {
+    fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
         self.exprs_untyped(expr.args().to_untyped());
         self.expr(expr.callee())
     }
 
-    fn closure(&self, expr: ast::Closure<'_>) -> Option<()> {
+    fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
         self.exprs_untyped(expr.params().to_untyped());
         self.expr(expr.body())
     }
 
-    fn let_binding(&self, expr: ast::LetBinding<'_>) -> Option<()> {
+    fn let_binding(&mut self, expr: ast::LetBinding<'_>) -> Option<()> {
         self.expr(expr.init()?)
     }
 
-    fn destruct_assign(&self, expr: ast::DestructAssignment<'_>) -> Option<()> {
+    fn destruct_assign(&mut self, expr: ast::DestructAssignment<'_>) -> Option<()> {
         self.expr(expr.value())
     }
 
-    fn set(&self, expr: ast::SetRule<'_>) -> Option<()> {
+    fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
         if let Some(target) = expr.condition() {
             self.expr(target);
         }
@@ -187,38 +189,135 @@ impl SourceLinter {
         self.expr(expr.target())
     }
 
-    fn show(&self, expr: ast::ShowRule<'_>) -> Option<()> {
+    fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
         if let Some(target) = expr.selector() {
             self.expr(target);
         }
-        self.expr(expr.transform())
+        let transform = expr.transform();
+        match transform {
+            ast::Expr::Code(..) | ast::Expr::Content(..) => self.buggy_set(transform),
+            _ => None,
+        };
+
+        self.expr(transform)
     }
 
-    fn contextual(&self, expr: ast::Contextual<'_>) -> Option<()> {
+    fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
         self.expr(expr.body())
     }
 
-    fn conditional(&self, expr: ast::Conditional<'_>) -> Option<()> {
-        self.exprs_untyped(expr.to_untyped())
-    }
+    fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
+        self.expr(expr.condition());
 
-    fn while_loop(&self, expr: ast::WhileLoop<'_>) -> Option<()> {
-        self.exprs_untyped(expr.to_untyped())
-    }
+        let if_body = expr.if_body();
+        self.buggy_set(if_body);
+        self.expr(if_body);
 
-    fn for_loop(&self, expr: ast::ForLoop<'_>) -> Option<()> {
-        self.exprs_untyped(expr.to_untyped())
-    }
+        if let Some(else_body) = expr.else_body() {
+            self.buggy_set(else_body);
+            self.expr(else_body);
+        }
 
-    fn loop_break(&self, _expr: ast::LoopBreak<'_>) -> Option<()> {
         Some(())
     }
 
-    fn loop_continue(&self, _expr: ast::LoopContinue<'_>) -> Option<()> {
+    fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
+        self.expr(expr.condition());
+        let body = expr.body();
+        self.buggy_set(body);
+        self.expr(body)
+    }
+
+    fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
+        self.expr(expr.iterable());
+        let body = expr.body();
+        self.buggy_set(body);
+        self.expr(body)
+    }
+
+    fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
         Some(())
     }
 
-    fn func_return(&self, _expr: ast::FuncReturn<'_>) -> Option<()> {
+    fn loop_continue(&mut self, _expr: ast::LoopContinue<'_>) -> Option<()> {
         Some(())
     }
+
+    fn func_return(&mut self, _expr: ast::FuncReturn<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn buggy_set(&mut self, expr: ast::Expr) -> Option<()> {
+        if self.only_set(expr) {
+            let sets = match expr {
+                ast::Expr::Code(block) => block
+                    .body()
+                    .exprs()
+                    .filter(|it| is_show_set(*it))
+                    .collect::<Vec<_>>(),
+                ast::Expr::Content(block) => block
+                    .body()
+                    .exprs()
+                    .filter(|it| is_show_set(*it))
+                    .collect::<Vec<_>>(),
+                _ => return None,
+            };
+
+            for set in sets {
+                match set {
+                    ast::Expr::Set(..) => {
+                        self.diag.push(SourceDiagnostic::error(
+                            set.span(),
+                            "This set statement takes no effect.",
+                        ));
+                    }
+                    ast::Expr::Show(..) => {
+                        self.diag.push(SourceDiagnostic::error(
+                            set.span(),
+                            "This show statement takes no effect.",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            return None;
+        }
+
+        Some(())
+    }
+
+    fn only_set(&mut self, expr: ast::Expr) -> bool {
+        let mut has_set = false;
+
+        match expr {
+            ast::Expr::Code(block) => {
+                for it in block.body().exprs() {
+                    if is_show_set(it) {
+                        has_set = true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
+            ast::Expr::Content(block) => {
+                for it in block.body().exprs() {
+                    if is_show_set(it) {
+                        has_set = true;
+                    } else if !it.to_untyped().kind().is_trivia() {
+                        return false;
+                    }
+                }
+            }
+            _ => {
+                return false;
+            }
+        }
+
+        has_set
+    }
+}
+
+fn is_show_set(it: ast::Expr) -> bool {
+    matches!(it, ast::Expr::Set(..) | ast::Expr::Show(..))
 }

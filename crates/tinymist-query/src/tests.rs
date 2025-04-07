@@ -477,12 +477,16 @@ impl Redact for RedactFields {
 }
 
 pub(crate) fn file_path(uri: &str) -> String {
+    file_path_(&lsp_types::Url::parse(uri).unwrap())
+}
+
+pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
     let root = if cfg!(windows) {
         PathBuf::from("C:\\root")
     } else {
         PathBuf::from("/root")
     };
-    let uri = lsp_types::Url::parse(uri).unwrap().to_file_path().unwrap();
+    let uri = uri.to_file_path().unwrap();
     let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
     let rel_path =
         abs_path.unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().last().unwrap()));

@@ -3,4 +3,14 @@ source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lint/show_set2.typ
 ---
-{}
+{
+ "s0.typ": [
+  {
+   "message": "This set statement takes no effect.",
+   "range": "1:2:1:15",
+   "relatedInformation": [],
+   "severity": 1,
+   "source": "typst"
+  }
+ ]
+}

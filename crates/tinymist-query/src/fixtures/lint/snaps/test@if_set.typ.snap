@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/lint/show_set.typ
+input_file: crates/tinymist-query/src/fixtures/lint/if_set.typ
 ---
 {
  "s0.typ": [
