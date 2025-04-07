@@ -1,11 +1,11 @@
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
 use lsp_types::Url;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use tinymist_project::LspWorld;
@@ -1009,7 +1009,7 @@ impl SharedContext {
 }
 
 // Needed by recursive computation
-type DeferredCompute<T> = Arc<OnceCell<T>>;
+type DeferredCompute<T> = Arc<OnceLock<T>>;
 
 #[derive(Clone)]
 struct IncrCacheMap<K, V> {
@@ -1142,9 +1142,9 @@ pub struct AnalysisGlobalCaches {
 #[derive(Default)]
 pub struct AnalysisLocalCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisLocalCache>,
-    completion_files: OnceCell<Vec<TypstFileId>>,
-    root_files: OnceCell<Vec<TypstFileId>>,
-    module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
+    completion_files: OnceLock<Vec<TypstFileId>>,
+    root_files: OnceLock<Vec<TypstFileId>>,
+    module_deps: OnceLock<HashMap<TypstFileId, ModuleDependency>>,
 }
 
 /// A local cache for module-level analysis results of a module.
@@ -1153,8 +1153,8 @@ pub struct AnalysisLocalCaches {
 /// change.
 #[derive(Default)]
 pub struct ModuleAnalysisLocalCache {
-    expr_stage: OnceCell<Arc<ExprInfo>>,
-    type_check: OnceCell<Arc<TypeInfo>>,
+    expr_stage: OnceLock<Arc<ExprInfo>>,
+    type_check: OnceLock<Arc<TypeInfo>>,
 }
 
 /// A revision-managed (per input change) cache for all level of analysis

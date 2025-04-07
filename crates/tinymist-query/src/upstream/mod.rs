@@ -1,8 +1,7 @@
-use std::{collections::HashMap, fmt::Write};
+use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
 use ecow::{eco_format, EcoString};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
@@ -105,7 +104,7 @@ impl GroupData {
     }
 }
 
-static GROUPS: Lazy<Vec<GroupData>> = Lazy::new(|| {
+static GROUPS: LazyLock<Vec<GroupData>> = LazyLock::new(|| {
     let mut groups: Vec<GroupData> = yaml::from_str(include_str!("groups.yml")).unwrap();
     for group in &mut groups {
         if group.filter.is_empty() {
@@ -170,7 +169,7 @@ fn resolve_known(head: &str, base: &str) -> Option<String> {
     })
 }
 
-static LIBRARY: Lazy<Library> = Lazy::new(Library::default);
+static LIBRARY: LazyLock<Library> = LazyLock::new(Library::default);
 
 /// Extract a module from another module.
 #[track_caller]
@@ -274,7 +273,7 @@ impl PartialEq for CatKey {
 impl Eq for CatKey {}
 
 // todo: category of types
-static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
+static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
     // todo: this is a false positive for clippy on LazyHash
     #[allow(clippy::mutable_key_type)]
     let mut map = HashMap::new();

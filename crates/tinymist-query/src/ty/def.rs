@@ -5,11 +5,10 @@
 use core::fmt;
 use std::{
     hash::{Hash, Hasher},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use ecow::EcoString;
-use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -283,7 +282,7 @@ pub struct TypeSource {
     /// A name node with span
     pub name_node: SyntaxNode,
     /// A lazy evaluated name
-    pub name_repr: OnceCell<StrRef>,
+    pub name_repr: OnceLock<StrRef>,
     /// Attached documentation
     pub doc: StrRef,
 }
@@ -509,7 +508,7 @@ impl InsTy {
             val,
             syntax: Some(Interned::new(TypeSource {
                 name_node: name,
-                name_repr: OnceCell::new(),
+                name_repr: OnceLock::new(),
                 doc: "".into(),
             })),
         })
@@ -520,7 +519,7 @@ impl InsTy {
             val,
             syntax: Some(Interned::new(TypeSource {
                 name_node: SyntaxNode::default(),
-                name_repr: OnceCell::new(),
+                name_repr: OnceLock::new(),
                 doc: doc.into(),
             })),
         })

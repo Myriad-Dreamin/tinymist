@@ -10,10 +10,10 @@ pub use actor::editor::{
 pub use args::*;
 pub use outline::Outline;
 
+use std::sync::OnceLock;
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
 use futures::sink::SinkExt;
-use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::{DocumentPosition, SourceSpanOffset};
 use reflexo_typst::Error;
 use serde::{Deserialize, Serialize};
@@ -197,7 +197,7 @@ pub struct PreviewBuilder {
     webview_conn: BroadcastChannel<WebviewActorRequest>,
     doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
 
-    compile_watcher: OnceCell<Arc<CompileWatcher>>,
+    compile_watcher: OnceLock<Arc<CompileWatcher>>,
 }
 
 impl PreviewBuilder {
@@ -209,7 +209,7 @@ impl PreviewBuilder {
             editor_conn: mpsc::unbounded_channel(),
             webview_conn: broadcast::channel(32),
             doc_sender: Arc::new(parking_lot::RwLock::new(None)),
-            compile_watcher: OnceCell::new(),
+            compile_watcher: OnceLock::new(),
         }
     }
 

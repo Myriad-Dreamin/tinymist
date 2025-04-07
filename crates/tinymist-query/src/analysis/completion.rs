@@ -7,7 +7,6 @@ use std::ops::Range;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
@@ -890,8 +889,8 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     &s[rng]
 }
 
-static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
 
 /// Adds numbering to placeholders in snippets
 fn to_lsp_snippet(typst_snippet: &str) -> EcoString {

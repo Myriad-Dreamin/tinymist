@@ -8,7 +8,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::{CompileFontArgs, ExportTarget, LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
@@ -353,7 +352,7 @@ pub fn make_range_annoation(source: &Source) -> String {
 
 // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||
 // RedactFields::from_iter(["uri"]));
-pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
+pub static REDACT_LOC: LazyLock<RedactFields> = LazyLock::new(|| {
     RedactFields::from_iter([
         "location",
         "contents",

@@ -1,8 +1,8 @@
 use core::fmt;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use ecow::{eco_format, EcoString};
-use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::{CastInfo, Regex};
@@ -36,31 +36,33 @@ pub enum PathPreference {
 
 impl PathPreference {
     pub fn ext_matcher(&self) -> &'static RegexSet {
+        type RegSet = LazyLock<RegexSet>;
+
         fn make_regex(patterns: &[&str]) -> RegexSet {
             let patterns = patterns.iter().map(|pattern| format!("(?i)^{pattern}$"));
             RegexSet::new(patterns).unwrap()
         }
 
-        static SOURCE_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["typ", "typc"]));
-        static WASM_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["wasm"]));
-        static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
+        static SOURCE_REGSET: RegSet = RegSet::new(|| make_regex(&["typ", "typc"]));
+        static WASM_REGSET: RegSet = RegSet::new(|| make_regex(&["wasm"]));
+        static IMAGE_REGSET: RegSet = RegSet::new(|| {
             make_regex(&[
                 "ico", "bmp", "png", "webp", "jpg", "jpeg", "jfif", "tiff", "gif", "svg", "svgz",
             ])
         });
-        static JSON_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["json", "jsonc", "json5"]));
-        static YAML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml"]));
-        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["xml"]));
-        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["toml"]));
-        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csv"]));
-        static BIB_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["yaml", "yml", "bib"]));
-        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["csl"]));
-        static RAW_THEME_REGSET: Lazy<RegexSet> = Lazy::new(|| make_regex(&["tmTheme", "xml"]));
-        static RAW_SYNTAX_REGSET: Lazy<RegexSet> =
-            Lazy::new(|| make_regex(&["tmLanguage", "sublime-syntax"]));
+        static JSON_REGSET: RegSet = RegSet::new(|| make_regex(&["json", "jsonc", "json5"]));
+        static YAML_REGSET: RegSet = RegSet::new(|| make_regex(&["yaml", "yml"]));
+        static XML_REGSET: RegSet = RegSet::new(|| make_regex(&["xml"]));
+        static TOML_REGSET: RegSet = RegSet::new(|| make_regex(&["toml"]));
+        static CSV_REGSET: RegSet = RegSet::new(|| make_regex(&["csv"]));
+        static BIB_REGSET: RegSet = RegSet::new(|| make_regex(&["yaml", "yml", "bib"]));
+        static CSL_REGSET: RegSet = RegSet::new(|| make_regex(&["csl"]));
+        static RAW_THEME_REGSET: RegSet = RegSet::new(|| make_regex(&["tmTheme", "xml"]));
+        static RAW_SYNTAX_REGSET: RegSet =
+            RegSet::new(|| make_regex(&["tmLanguage", "sublime-syntax"]));
 
-        static ALL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r".*"]).unwrap());
-        static ALL_SPECIAL_REGSET: Lazy<RegexSet> = Lazy::new(|| {
+        static ALL_REGSET: RegSet = RegSet::new(|| RegexSet::new([r".*"]).unwrap());
+        static ALL_SPECIAL_REGSET: RegSet = RegSet::new(|| {
             RegexSet::new({
                 let patterns = SOURCE_REGSET.patterns();
                 let patterns = patterns.iter().chain(WASM_REGSET.patterns());
@@ -501,7 +503,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             Ty::from_cast_info(&param.input),
         ])),
         ("link", "dest") => {
-            static LINK_DEST_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static LINK_DEST_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 flow_union!(
                     literally(RefLabel),
                     Ty::Builtin(BuiltinTy::Type(Type::of::<foundations::Str>())),
@@ -515,7 +517,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             Some(LINK_DEST_TYPE.clone())
         }
         ("bibliography", "path" | "sources") => {
-            static BIB_PATH_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static BIB_PATH_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 let bib_path_ty = literally(Path(PathPreference::Bibliography));
                 Ty::iter_union([bib_path_ty.clone(), Ty::Array(bib_path_ty.into())])
             });
@@ -524,13 +526,13 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
             // todo: the dict can be completed, but we have bugs...
-            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static FONT_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 Ty::iter_union([literally(TextFont), Ty::Array(literally(TextFont).into())])
             });
             Some(FONT_TYPE.clone())
         }
         ("text", "feature") => {
-            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static FONT_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 Ty::iter_union([
                     // todo: the key can only be the text feature
                     Ty::Builtin(BuiltinTy::Type(Type::of::<foundations::Dict>())),
@@ -540,7 +542,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             Some(FONT_TYPE.clone())
         }
         ("text", "costs") => {
-            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static FONT_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 Ty::Dict(flow_record!(
                     "hyphenation" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
                     "runt" => literally(BuiltinTy::Type(Type::of::<Ratio>())),
@@ -554,7 +556,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ("text", "region") => Some(literally(TextRegion)),
         ("text" | "stack", "dir") => Some(literally(Dir)),
         ("par", "first-line-indent") => {
-            static FIRST_LINE_INDENT: Lazy<Ty> = Lazy::new(|| {
+            static FIRST_LINE_INDENT: LazyLock<Ty> = LazyLock::new(|| {
                 Ty::iter_union([
                     literally(Length),
                     Ty::Dict(RecordTy::new(vec![
@@ -581,7 +583,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         }
         ("block" | "box" | "rect" | "square" | "highlight", "radius") => Some(literally(Radius)),
         ("grid" | "table", "columns" | "rows" | "gutter" | "column-gutter" | "row-gutter") => {
-            static COLUMN_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static COLUMN_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
                     Ty::Value(InsTy::new(Value::Type(Type::of::<i64>()))),
@@ -592,7 +594,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
             Some(COLUMN_TYPE.clone())
         }
         ("pattern" | "tiling", "size") => {
-            static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
+            static PATTERN_SIZE_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
                     Ty::Array(Ty::Builtin(Length).into()),
@@ -613,7 +615,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
     }
 }
 
-static FLOW_STROKE_DASH_TYPE: Lazy<Ty> = Lazy::new(|| {
+static FLOW_STROKE_DASH_TYPE: LazyLock<Ty> = LazyLock::new(|| {
     flow_union!(
         "solid",
         "dotted",
@@ -633,7 +635,7 @@ static FLOW_STROKE_DASH_TYPE: Lazy<Ty> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_STROKE_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_STROKE_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "paint" => literally(Color),
         "thickness" => literally(Length),
@@ -644,7 +646,7 @@ pub static FLOW_STROKE_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_MARGIN_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_MARGIN_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -658,7 +660,7 @@ pub static FLOW_MARGIN_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_INSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_INSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -670,7 +672,7 @@ pub static FLOW_INSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_OUTSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_OUTSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -682,7 +684,7 @@ pub static FLOW_OUTSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_RADIUS_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -696,7 +698,7 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_TEXT_FONT_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
+pub static FLOW_TEXT_FONT_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "name" => literally(TextFont),
         "covers" => flow_union!("latin-in-cjk", BuiltinTy::Type(Type::of::<Regex>())),
