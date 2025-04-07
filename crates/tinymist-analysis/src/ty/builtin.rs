@@ -109,7 +109,7 @@ impl PathPreference {
 }
 
 impl Ty {
-    pub(crate) fn from_cast_info(ty: &CastInfo) -> Ty {
+    pub fn from_cast_info(ty: &CastInfo) -> Ty {
         match &ty {
             CastInfo::Any => Ty::Any,
             CastInfo::Value(val, doc) => Ty::Value(InsTy::new_doc(val.clone(), *doc)),
@@ -120,7 +120,7 @@ impl Ty {
         }
     }
 
-    pub(crate) fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
+    pub fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
         use typst::foundations::func::Repr;
         match func.inner() {
             Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {

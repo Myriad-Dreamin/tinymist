@@ -8,6 +8,9 @@ use comemo::{Track, Tracked};
 use lsp_types::Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
+use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::ty::term_value;
+use tinymist_analysis::{analyze_expr_, analyze_import_};
 use tinymist_project::LspWorld;
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
@@ -24,10 +27,9 @@ use typst_shim::eval::{eval_compat, Eval};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_expr_, analyze_import_, analyze_signature, bib_info, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
-    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
-    TypeInfo,
+    analyze_signature, bib_info, definition, post_type_check, AnalysisStats, BibInfo,
+    CompletionFeat, Definition, PathPreference, QueryStatGuard, SemanticTokenCache,
+    SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty, TypeInfo,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
@@ -147,7 +149,7 @@ impl Analysis {
 
     /// Report the statistics of the allocation.
     pub fn report_alloc_stats(&self) -> String {
-        AllocStats::report(self)
+        AllocStats::report()
     }
 
     /// Get configured trigger suggest command.
@@ -781,7 +783,7 @@ impl SharedContext {
             return cached;
         }
 
-        let res = crate::analysis::term_value(val);
+        let res = term_value(val);
 
         self.analysis
             .caches

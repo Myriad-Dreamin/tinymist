@@ -1,4 +1,3 @@
-pub use core::fmt;
 pub use std::collections::{BTreeMap, HashMap};
 pub use std::hash::{Hash, Hasher};
 pub use std::ops::Range;
@@ -14,7 +13,7 @@ pub use typst::World;
 pub use typst_shim::syntax::LinkedNodeExt;
 pub use typst_shim::utils::LazyHash;
 
-pub(crate) use super::StrRef;
 pub(crate) use super::{LocalContext, ToFunc};
 pub(crate) use crate::adt::interner::Interned;
 pub use crate::ty::Ty;
+pub(crate) use crate::StrRef;

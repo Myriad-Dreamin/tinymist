@@ -10,10 +10,10 @@ use typst::diag::StrResult;
 use typst::syntax::package::PackageSpec;
 use typst::syntax::FileId;
 
+use crate::adt::interner::Interned;
 use crate::docs::file_id_repr;
 use crate::package::{get_manifest_id, PackageInfo};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
-use crate::ty::Interned;
 use crate::LocalContext;
 
 use super::DefDocs;

@@ -10,6 +10,7 @@ use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
+use tinymist_analysis::{analyze_labels, func_signature, DynLabel};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -27,9 +28,7 @@ use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{
-    analyze_labels, func_signature, BuiltinTy, DynLabel, LocalContext, PathPreference, Ty,
-};
+use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
     EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,

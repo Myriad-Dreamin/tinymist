@@ -7,16 +7,13 @@ use std::{
 use ecow::eco_format;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
+use crate::{adt::interner::Interned, StrRef};
+use crate::{adt::snapshot_map::SnapshotMap, analysis::SharedContext};
 use crate::{
-    adt::snapshot_map::SnapshotMap,
-    analysis::SharedContext,
     docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, UntypedDefDocs, VarDocsT},
     prelude::*,
     syntax::{Decl, DefKind},
-    ty::{
-        BuiltinTy, DynTypeBounds, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeVar,
-        TypeVarBounds,
-    },
+    ty::{BuiltinTy, DynTypeBounds, InsTy, PackageId, SigTy, Ty, TypeVar, TypeVarBounds},
 };
 
 use super::DeclExpr;
@@ -35,6 +32,7 @@ pub struct DocString {
 }
 
 impl DocString {
+    /// Gets the docstring as a variable doc
     pub fn as_var(&self) -> VarDoc {
         VarDoc {
             docs: self.docs.clone().unwrap_or_default(),

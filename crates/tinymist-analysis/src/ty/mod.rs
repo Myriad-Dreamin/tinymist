@@ -1,8 +1,11 @@
 //! Types and type operations for Typst.
 
+#![allow(missing_docs)]
+
 mod apply;
 mod bound;
 mod builtin;
+mod convert;
 mod def;
 mod describe;
 mod iface;
@@ -13,14 +16,16 @@ mod sig;
 mod simplify;
 mod subst;
 
-pub(crate) use apply::*;
-pub(crate) use bound::*;
-pub(crate) use builtin::*;
+pub use apply::*;
+pub use bound::*;
+pub use builtin::*;
+pub use convert::*;
 pub use def::*;
-pub(crate) use iface::*;
-pub(crate) use mutate::*;
-pub(crate) use select::*;
-pub(crate) use sig::*;
+pub use iface::*;
+pub use mutate::*;
+pub use select::*;
+pub use sig::*;
+
 use typst::foundations::{self, Func, Module, Value};
 use typst::syntax::FileId;
 

@@ -12,7 +12,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};
 
 use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
-use crate::analysis::analyze_expr;
+use crate::analyze_expr;
 
 /// Describe the item under the cursor.
 ///

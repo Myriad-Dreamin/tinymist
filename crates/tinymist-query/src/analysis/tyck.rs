@@ -15,13 +15,11 @@ use crate::{
 };
 
 mod apply;
-mod convert;
 mod docs;
 mod select;
 mod syntax;
 
 pub(crate) use apply::*;
-pub(crate) use convert::*;
 pub(crate) use select::*;
 
 #[derive(Default)]

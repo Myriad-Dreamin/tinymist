@@ -17,10 +17,9 @@ use typst::{
     syntax::{ast, FileId, Span, SyntaxKind, SyntaxNode},
 };
 
-use super::{BoundPred, PackageId};
+use super::{BoundPred, BuiltinTy, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    analysis::BuiltinTy,
     docs::UntypedDefDocs,
     syntax::{DeclExpr, UnaryOp},
 };
@@ -142,7 +141,7 @@ impl Ty {
         matches!(self, Ty::Dict(..))
     }
 
-    pub(crate) fn union(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
+    pub fn union(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
         Some(match (lhs, rhs) {
             (Some(lhs), Some(rhs)) => Ty::from_types([lhs, rhs].into_iter()),
             (Some(ty), None) | (None, Some(ty)) => ty,
@@ -231,11 +230,11 @@ impl Ty {
         }
     }
 
-    pub(crate) fn satisfy<T: TyCtx>(&self, ctx: &T, f: impl FnMut(&Ty, bool)) {
+    pub fn satisfy<T: TyCtx>(&self, ctx: &T, f: impl FnMut(&Ty, bool)) {
         self.bounds(true, &mut BoundPred::new(ctx, f));
     }
 
-    pub(crate) fn is_content<T: TyCtx>(&self, ctx: &T) -> bool {
+    pub fn is_content<T: TyCtx>(&self, ctx: &T) -> bool {
         let mut res = false;
         self.satisfy(ctx, |ty: &Ty, _pol| {
             res = res || {
@@ -561,7 +560,7 @@ pub struct ParamAttrs {
 }
 
 impl ParamAttrs {
-    pub(crate) fn positional() -> ParamAttrs {
+    pub fn positional() -> ParamAttrs {
         ParamAttrs {
             positional: true,
             named: false,
@@ -570,7 +569,7 @@ impl ParamAttrs {
         }
     }
 
-    pub(crate) fn named() -> ParamAttrs {
+    pub fn named() -> ParamAttrs {
         ParamAttrs {
             positional: false,
             named: true,
@@ -579,7 +578,7 @@ impl ParamAttrs {
         }
     }
 
-    pub(crate) fn variadic() -> ParamAttrs {
+    pub fn variadic() -> ParamAttrs {
         ParamAttrs {
             positional: true,
             named: false,
@@ -835,7 +834,7 @@ impl SigTy {
         })
     }
 
-    pub(crate) fn with_body(mut self, res_ty: Ty) -> Self {
+    pub fn with_body(mut self, res_ty: Ty) -> Self {
         self.body = Some(res_ty);
         self
     }
@@ -964,7 +963,7 @@ impl SigTy {
     pub fn matches<'a>(
         &'a self,
         args: &'a SigTy,
-        with: Option<&'a Vec<Interned<crate::analysis::SigTy>>>,
+        with: Option<&'a Vec<Interned<SigTy>>>,
     ) -> impl Iterator<Item = (&'a Ty, &'a Ty)> + 'a {
         let with_len = with
             .map(|w| w.iter().map(|w| w.positional_params().len()).sum::<usize>())

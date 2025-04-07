@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, ops::Range};
 
 use serde::{Deserialize, Serialize};
 use tinymist_derive::DeclEnum;
+use tinymist_std::DefId;
 use tinymist_world::package::PackageSpec;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
@@ -11,7 +12,6 @@ use typst::{
 
 use crate::{
     adt::interner::impl_internable,
-    analysis::SharedContext,
     prelude::*,
     ty::{InsTy, Interned, SelectTy, Ty, TypeVar},
 };
@@ -73,13 +73,13 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub(crate) fn repr(&self) -> EcoString {
+    pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_expr(self);
         s
     }
 
-    pub(crate) fn span(&self) -> Span {
+    pub fn span(&self) -> Span {
         match self {
             Expr::Decl(decl) => decl.span(),
             Expr::Select(select) => select.span,
@@ -88,7 +88,7 @@ impl Expr {
         }
     }
 
-    pub(crate) fn file_id(&self) -> Option<TypstFileId> {
+    pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Expr::Decl(decl) => decl.file_id(),
             _ => self.span().id(),
@@ -409,7 +409,7 @@ impl Decl {
         })
     }
 
-    pub(crate) fn is_def(&self) -> bool {
+    pub fn is_def(&self) -> bool {
         matches!(
             self,
             Self::Func(..)
@@ -450,25 +450,6 @@ impl Decl {
             Self::BibEntry(NameRangeDecl { at, .. }) => Some(at.0),
             that => that.span().id(),
         }
-    }
-
-    /// Gets name range of the declaration.
-    pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
-        if let Decl::BibEntry(decl) = self {
-            return Some(decl.at.1.clone());
-        }
-
-        if !self.is_def() {
-            return None;
-        }
-
-        let span = self.span();
-        if let Some(range) = span.range() {
-            return Some(range.clone());
-        }
-
-        let src = ctx.source_by_id(self.file_id()?).ok()?;
-        src.range(span)
     }
 
     /// Gets full range of the declaration.
@@ -595,8 +576,8 @@ impl fmt::Debug for SpannedDecl {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
-    name: Interned<str>,
-    at: Box<(TypstFileId, Range<usize>, Option<Range<usize>>)>,
+    pub name: Interned<str>,
+    pub at: Box<(TypstFileId, Range<usize>, Option<Range<usize>>)>,
 }
 
 impl NameRangeDecl {
@@ -724,7 +705,7 @@ impl fmt::Display for Pattern {
 }
 
 impl Pattern {
-    pub(crate) fn repr(&self) -> EcoString {
+    pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_pattern(self);
         s

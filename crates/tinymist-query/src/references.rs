@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::typst::TypstDocument;
 use typst::syntax::Span;
 
@@ -7,7 +8,7 @@ use crate::{
     analysis::{Definition, SearchCtx},
     prelude::*,
     syntax::{get_index_info, RefExpr, SyntaxClass},
-    ty::Interned,
+    StrRef,
 };
 
 /// The [`textDocument/references`] request is sent from the client to the
@@ -73,7 +74,7 @@ struct ReferencesWorker<'a> {
     ctx: SearchCtx<'a>,
     references: Vec<LspLocation>,
     def: Definition,
-    module_path: OnceLock<Interned<str>>,
+    module_path: OnceLock<StrRef>,
 }
 
 impl ReferencesWorker<'_> {
@@ -148,7 +149,7 @@ impl ReferencesWorker<'_> {
     }
 
     // todo: references of package
-    fn module_path(&self) -> &Interned<str> {
+    fn module_path(&self) -> &StrRef {
         self.module_path.get_or_init(|| {
             self.def
                 .decl

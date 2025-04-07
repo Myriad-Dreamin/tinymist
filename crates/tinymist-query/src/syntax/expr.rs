@@ -1,9 +1,12 @@
+#![allow(missing_docs)]
+
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
+use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Type, Value},
@@ -17,7 +20,7 @@ use crate::{
     analysis::{QueryStatGuard, SharedContext},
     prelude::*,
     syntax::{find_module_level_docs, resolve_id_by_path, DefKind},
-    ty::{BuiltinTy, InsTy, Interned, Ty},
+    ty::{BuiltinTy, InsTy, Ty},
 };
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};

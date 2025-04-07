@@ -1,5 +1,6 @@
 //! Semantic tokens (highlighting) support for LSP.
 
+use std::collections::HashMap;
 use std::{
     num::NonZeroUsize,
     ops::Range,
@@ -7,7 +8,6 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use hashbrown::HashMap;
 use lsp_types::SemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use parking_lot::Mutex;

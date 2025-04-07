@@ -1,7 +1,7 @@
 //! Hybrid analysis for function calls.
 
 use super::prelude::*;
-use super::{Signature, StrRef};
+use super::Signature;
 use crate::analysis::{analyze_signature, PrimarySignature, SignatureTarget};
 
 /// Describes kind of a parameter.
