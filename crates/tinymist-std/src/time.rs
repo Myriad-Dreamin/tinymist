@@ -2,6 +2,10 @@
 
 pub use std::time::SystemTime as Time;
 pub use time::UtcDateTime;
+
+#[cfg(not(feature = "web"))]
+pub use std::time::{Duration, Instant};
+#[cfg(feature = "web")]
 pub use web_time::{Duration, Instant};
 
 /// Returns the current datetime in utc (UTC+0).
