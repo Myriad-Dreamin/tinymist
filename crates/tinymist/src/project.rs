@@ -28,11 +28,8 @@ use parking_lot::Mutex;
 use reflexo::{hash::FxHashMap, path::unix_slash};
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
-use tinymist_query::{
-    analysis::{Analysis, AnalysisRevLock, LocalContextGuard, PeriscopeProvider},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LocalContext, SemanticRequest,
-    StatefulRequest,
-};
+use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
+use tinymist_query::{CompilerQueryRequest, DiagnosticsMap, LocalContext};
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
@@ -303,14 +300,7 @@ impl ProjectState {
     /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<LspQuerySnapshot> {
         let snap = self.snapshot()?;
-        let analysis = self.analysis.clone();
-        let rev_lock = analysis.lock_revision(q);
-
-        Ok(LspQuerySnapshot {
-            snap,
-            analysis,
-            rev_lock,
-        })
+        Ok(self.analysis.clone().query_snapshot(snap, q))
     }
 
     pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
@@ -640,53 +630,3 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 }
 
 pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
-
-pub struct LspQuerySnapshot {
-    pub snap: LspComputeGraph,
-    analysis: Arc<Analysis>,
-    rev_lock: AnalysisRevLock,
-}
-
-impl std::ops::Deref for LspQuerySnapshot {
-    type Target = LspComputeGraph;
-
-    fn deref(&self) -> &Self::Target {
-        &self.snap
-    }
-}
-
-impl LspQuerySnapshot {
-    pub fn task(mut self, inputs: TaskInputs) -> Self {
-        self.snap = self.snap.task(inputs);
-        self
-    }
-
-    pub fn run_stateful<T: StatefulRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        let graph = self.snap.clone();
-        self.run_analysis(|ctx| query.request(ctx, graph))
-            .map(wrapper)
-    }
-
-    pub fn run_semantic<T: SemanticRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
-    }
-
-    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world().clone();
-        let Some(..) = world.main_id() else {
-            log::error!("Project: main file is not set");
-            bail!("main file is not set");
-        };
-
-        let mut analysis = self.analysis.snapshot_(world, self.rev_lock);
-        Ok(f(&mut analysis))
-    }
-}

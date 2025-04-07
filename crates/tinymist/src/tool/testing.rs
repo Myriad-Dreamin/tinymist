@@ -240,7 +240,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 }
 
 fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
-    let mut actx = ctx.analysis.snapshot(world.clone());
+    let mut actx = ctx.analysis.enter(world.clone());
     let doc = typst::compile::<TypstPagedDocument>(&actx.world).output?;
 
     let suites =

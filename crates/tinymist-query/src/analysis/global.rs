@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_project::LspWorld;
+use tinymist_project::{LspComputeGraph, LspWorld};
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
@@ -24,6 +24,7 @@ use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{eval_compat, Eval};
 
+use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
@@ -41,8 +42,6 @@ use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
 };
-
-use super::TypeEnv;
 
 macro_rules! interned_str {
     ($name:ident, $value:expr) => {
@@ -80,13 +79,13 @@ pub struct Analysis {
 }
 
 impl Analysis {
-    /// Get a snapshot of the analysis data.
-    pub fn snapshot(&self, world: LspWorld) -> LocalContextGuard {
-        self.snapshot_(world, self.lock_revision(None))
+    /// Enters the analysis context.
+    pub fn enter(&self, world: LspWorld) -> LocalContextGuard {
+        self.enter_(world, self.lock_revision(None))
     }
 
-    /// Get a snapshot of the analysis data.
-    pub fn snapshot_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
+    /// Enters the analysis context.
+    pub(crate) fn enter_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
         let lifetime = self.caches.lifetime.fetch_add(1, Ordering::SeqCst);
         let slot = self
             .analysis_rev_cache
@@ -94,7 +93,7 @@ impl Analysis {
             .find_revision(world.revision(), &lg);
         let tokens = lg.tokens.take();
         LocalContextGuard {
-            rev_lock: lg,
+            _rev_lock: lg,
             local: LocalContext {
                 tokens,
                 caches: AnalysisLocalCaches::default(),
@@ -108,7 +107,21 @@ impl Analysis {
         }
     }
 
-    /// Lock the revision in *main thread*.
+    /// Gets a snapshot for language queries.
+    pub fn query_snapshot(
+        self: Arc<Self>,
+        snap: LspComputeGraph,
+        req: Option<&CompilerQueryRequest>,
+    ) -> LspQuerySnapshot {
+        let rev_lock = self.lock_revision(req);
+        LspQuerySnapshot {
+            snap,
+            analysis: self,
+            rev_lock,
+        }
+    }
+
+    /// Locks the revision in *main thread*.
     #[must_use]
     pub fn lock_revision(&self, req: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
         let mut grid = self.analysis_rev_cache.lock();
@@ -209,7 +222,7 @@ pub struct LocalContextGuard {
     /// The guarded local context
     pub local: LocalContext,
     /// The revision lock
-    pub rev_lock: AnalysisRevLock,
+    _rev_lock: AnalysisRevLock,
 }
 
 impl Deref for LocalContextGuard {
