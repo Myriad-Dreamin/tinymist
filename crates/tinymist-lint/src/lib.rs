@@ -1,7 +1,7 @@
 //! A linter for Typst.
 
 use typst::{
-    diag::SourceDiagnostic,
+    diag::{eco_format, EcoString, SourceDiagnostic},
     ecow::EcoVec,
     syntax::{
         ast::{self, AstNode},
@@ -195,7 +195,9 @@ impl SourceLinter {
         }
         let transform = expr.transform();
         match transform {
-            ast::Expr::Code(..) | ast::Expr::Content(..) => self.buggy_set(transform),
+            ast::Expr::Code(..) | ast::Expr::Content(..) => {
+                self.buggy_show(transform, BuggyShowLoc::Show(expr))
+            }
             _ => None,
         };
 
@@ -210,11 +212,11 @@ impl SourceLinter {
         self.expr(expr.condition());
 
         let if_body = expr.if_body();
-        self.buggy_set(if_body);
+        self.buggy_show(if_body, BuggyShowLoc::IfTrue(expr));
         self.expr(if_body);
 
         if let Some(else_body) = expr.else_body() {
-            self.buggy_set(else_body);
+            self.buggy_show(else_body, BuggyShowLoc::IfFalse(expr));
             self.expr(else_body);
         }
 
@@ -224,14 +226,14 @@ impl SourceLinter {
     fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
         self.expr(expr.condition());
         let body = expr.body();
-        self.buggy_set(body);
+        self.buggy_show(body, BuggyShowLoc::While(expr));
         self.expr(body)
     }
 
     fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
         self.expr(expr.iterable());
         let body = expr.body();
-        self.buggy_set(body);
+        self.buggy_show(body, BuggyShowLoc::For(expr));
         self.expr(body)
     }
 
@@ -247,7 +249,7 @@ impl SourceLinter {
         Some(())
     }
 
-    fn buggy_set(&mut self, expr: ast::Expr) -> Option<()> {
+    fn buggy_show(&mut self, expr: ast::Expr, loc: BuggyShowLoc) -> Option<()> {
         if self.only_set(expr) {
             let sets = match expr {
                 ast::Expr::Code(block) => block
@@ -263,22 +265,18 @@ impl SourceLinter {
                 _ => return None,
             };
 
-            for set in sets {
-                match set {
-                    ast::Expr::Set(..) => {
-                        self.diag.push(SourceDiagnostic::warning(
-                            set.span(),
-                            "This set statement doesn't take effect.",
-                        ));
-                    }
-                    ast::Expr::Show(..) => {
-                        self.diag.push(SourceDiagnostic::warning(
-                            set.span(),
-                            "This show statement doesn't take effect.",
-                        ));
-                    }
-                    _ => {}
+            for (idx, set) in sets.iter().enumerate() {
+                let msg = match set {
+                    ast::Expr::Set(..) => "This set statement doesn't take effect.",
+                    ast::Expr::Show(..) => "This show statement doesn't take effect.",
+                    _ => continue,
+                };
+                let mut warning = SourceDiagnostic::warning(set.span(), msg);
+                if idx == 0 {
+                    warning.hint(loc.hint(*set));
                 }
+
+                self.diag.push(warning);
             }
 
             return None;
@@ -315,6 +313,79 @@ impl SourceLinter {
         }
 
         has_set
+    }
+}
+
+enum BuggyShowLoc<'a> {
+    Show(ast::ShowRule<'a>),
+    IfTrue(ast::Conditional<'a>),
+    IfFalse(ast::Conditional<'a>),
+    While(ast::WhileLoop<'a>),
+    For(ast::ForLoop<'a>),
+}
+impl BuggyShowLoc<'_> {
+    fn hint(&self, show_set: ast::Expr<'_>) -> EcoString {
+        match self {
+            BuggyShowLoc::Show(show_parent) => {
+                if let ast::Expr::Show(show) = show_set {
+                    eco_format!(
+                        "consider changing parent to `show {}: it => {{ {}; it }}`",
+                        match show_parent.selector() {
+                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            None => "".into(),
+                        },
+                        show.to_untyped().clone().into_text()
+                    )
+                } else {
+                    eco_format!(
+                        "consider changing parent to `show {}: {}`",
+                        match show_parent.selector() {
+                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            None => "".into(),
+                        },
+                        show_set.to_untyped().clone().into_text()
+                    )
+                }
+            }
+            BuggyShowLoc::IfTrue(conditional) | BuggyShowLoc::IfFalse(conditional) => {
+                let neg = if matches!(self, BuggyShowLoc::IfTrue(..)) {
+                    ""
+                } else {
+                    "not "
+                };
+                if let ast::Expr::Show(show) = show_set {
+                    eco_format!(
+                        "consider changing parent to `show {}: if {neg}({}) {{ .. }}`",
+                        match show.selector() {
+                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            None => "".into(),
+                        },
+                        conditional.condition().to_untyped().clone().into_text()
+                    )
+                } else {
+                    eco_format!(
+                        "consider changing parent to `{} if {neg}({})`",
+                        show_set.to_untyped().clone().into_text(),
+                        conditional.condition().to_untyped().clone().into_text()
+                    )
+                }
+            }
+            BuggyShowLoc::While(w) => {
+                eco_format!(
+                    "consider changing parent to `show: it => if {} {{ {}; it }}`",
+                    w.condition().to_untyped().clone().into_text(),
+                    show_set.to_untyped().clone().into_text()
+                )
+            }
+            BuggyShowLoc::For(f) => {
+                eco_format!(
+                    "consider changing parent to `show: {}.fold(it => it, (style-it, {}) => it => {{ {}; style-it(it) }})`",
+                    f.iterable().to_untyped().clone().into_text(),
+                    f.pattern().to_untyped().clone().into_text(),
+                    show_set.to_untyped().clone().into_text()
+                )
+            }
+        }
     }
 }
 

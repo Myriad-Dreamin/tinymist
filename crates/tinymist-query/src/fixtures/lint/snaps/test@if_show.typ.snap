@@ -6,10 +6,10 @@ input_file: crates/tinymist-query/src/fixtures/lint/if_show.typ
 {
  "s0.typ": [
   {
-   "message": "This show statement takes no effect.",
+   "message": "This show statement doesn't take effect.\nHint: consider changing parent to `show : if (false) { .. }`",
    "range": "1:2:1:17",
    "relatedInformation": [],
-   "severity": 1,
+   "severity": 2,
    "source": "typst"
   }
  ]
