@@ -1,4 +1,6 @@
-use crate::analysis::func_signature;
+use typst::syntax::Span;
+
+use crate::func_signature;
 
 use super::*;
 

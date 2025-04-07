@@ -55,6 +55,31 @@ impl Definition {
     }
 }
 
+trait HasNameRange {
+    /// Gets name range of the item.
+    fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>>;
+}
+
+impl HasNameRange for Decl {
+    fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
+        if let Decl::BibEntry(decl) = self {
+            return Some(decl.at.1.clone());
+        }
+
+        if !self.is_def() {
+            return None;
+        }
+
+        let span = self.span();
+        if let Some(range) = span.range() {
+            return Some(range.clone());
+        }
+
+        let src = ctx.source_by_id(self.file_id()?).ok()?;
+        src.range(span)
+    }
+}
+
 // todo: field definition
 /// Finds the definition of a symbol.
 pub fn definition(

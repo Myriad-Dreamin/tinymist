@@ -3,11 +3,8 @@ use tinymist_std::hash::hash128;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::foundations::Repr;
 
-use crate::{
-    analysis::{is_plain_value, term_value},
-    ty::prelude::*,
-    upstream::truncated_repr_,
-};
+use super::{is_plain_value, term_value};
+use crate::{ty::prelude::*, upstream::truncated_repr_};
 
 impl Ty {
     /// Describe the given type.

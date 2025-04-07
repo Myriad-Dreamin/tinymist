@@ -46,7 +46,7 @@ pub mod docs;
 pub mod package;
 pub mod syntax;
 pub mod testing;
-pub mod ty;
+pub use tinymist_analysis::{ty, upstream};
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
@@ -81,14 +81,16 @@ mod semantic_tokens_delta;
 mod semantic_tokens_full;
 mod signature_help;
 mod symbol;
-mod upstream;
 mod will_rename_files;
 mod workspace_label;
 
 use typst::syntax::Source;
 
-use tinymist_analysis::log_debug_ct;
+use tinymist_analysis::{adt::interner::Interned, log_debug_ct};
 use tinymist_project::LspComputeGraph;
+
+/// A reference to the interned string
+pub(crate) type StrRef = Interned<str>;
 
 /// A request handler with given syntax information.
 pub trait SyntaxRequest {

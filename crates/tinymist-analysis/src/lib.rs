@@ -1,8 +1,19 @@
 //! Tinymist Analysis
 
+pub mod adt;
+pub mod docs;
 pub mod location;
-mod prelude;
+mod sig;
+pub mod stats;
 pub mod syntax;
+pub mod ty;
+pub mod upstream;
+
+pub use sig::*;
+pub use track_values::*;
+
+mod prelude;
+mod track_values;
 
 /// Completely disabled log
 #[macro_export]

@@ -4086,15 +4086,31 @@ dependencies = [
 name = "tinymist-analysis"
 version = "0.13.10"
 dependencies = [
+ "comemo",
+ "dashmap",
  "ecow",
+ "ena",
+ "hashbrown 0.14.5",
+ "if_chain",
  "insta",
+ "itertools 0.13.0",
  "log",
+ "lsp-types",
+ "parking_lot",
  "regex",
+ "rpds",
+ "rustc-hash 2.1.1",
  "serde",
+ "serde_yaml",
  "strum",
+ "tinymist-derive",
+ "tinymist-std",
  "tinymist-world",
  "toml",
+ "triomphe",
  "typst",
+ "typst-shim",
+ "unscanny",
 ]
 
 [[package]]
@@ -4226,7 +4242,6 @@ dependencies = [
  "dirs",
  "ecow",
  "ena",
- "hashbrown 0.14.5",
  "hex",
  "if_chain",
  "indexmap 2.8.0",
@@ -4255,7 +4270,6 @@ dependencies = [
  "tinymist-std",
  "tinymist-world",
  "toml",
- "triomphe",
  "ttf-parser",
  "typlite",
  "typst",

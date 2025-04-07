@@ -34,8 +34,6 @@ mod tyck;
 pub(crate) use crate::ty::*;
 pub(crate) use post_tyck::*;
 pub(crate) use tyck::*;
-pub mod track_values;
-pub use track_values::*;
 mod prelude;
 
 mod global;

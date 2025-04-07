@@ -1,6 +1,6 @@
 //! Infer more than the principal type of some expression.
 
-use hashbrown::HashSet;
+use std::collections::HashSet;
 use tinymist_derive::BindTyCtx;
 
 use super::{prelude::*, DynTypeBounds, ParamAttrs, ParamTy, SharedContext};

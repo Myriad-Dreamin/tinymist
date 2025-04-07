@@ -9,13 +9,13 @@ use typst::{
     syntax::Span,
 };
 
+use crate::adt::interner::Interned;
 use crate::{
     analysis::{get_link_exprs, LinkObject, LinkTarget},
     find_references,
     prelude::*,
     prepare_renaming,
     syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
-    ty::Interned,
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to

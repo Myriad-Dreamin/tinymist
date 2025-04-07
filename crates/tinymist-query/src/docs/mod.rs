@@ -4,16 +4,15 @@ mod convert;
 mod def;
 mod module;
 mod package;
-mod tidy;
 
 use tinymist_std::path::unix_slash;
 use typst::syntax::FileId;
 
 pub(crate) use convert::convert_docs;
-pub use def::*;
+pub(crate) use def::*;
 pub use module::*;
 pub use package::*;
-pub(crate) use tidy::*;
+pub use tinymist_analysis::docs::*;
 
 fn file_id_repr(fid: FileId) -> String {
     if let Some(spec) = fid.package() {

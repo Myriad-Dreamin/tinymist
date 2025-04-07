@@ -1,3 +1,5 @@
+//! Functions from typst-ide
+
 use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
@@ -354,6 +356,7 @@ pub(crate) fn urlify(title: &str) -> EcoString {
         .collect()
 }
 
+/// Get the route of a value.
 pub fn route_of_value(val: &Value) -> Option<&'static String> {
     // ROUTE_MAPS.get(&CatKey::Func(k.clone()))
     let key = match val {
@@ -396,6 +399,7 @@ pub fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -
     detail
 }
 
+/// Get the representation but truncated to a certain size.
 pub fn truncated_repr_<const SZ_LIMIT: usize>(value: &Value) -> EcoString {
     use typst::foundations::Repr;
 
@@ -416,6 +420,7 @@ pub fn truncated_repr_<const SZ_LIMIT: usize>(value: &Value) -> EcoString {
     }
 }
 
+/// Get the representation but truncated to a certain size.
 pub fn truncated_repr(value: &Value) -> EcoString {
     const _10MB: usize = 100 * 1024 * 1024;
     truncated_repr_::<_10MB>(value)

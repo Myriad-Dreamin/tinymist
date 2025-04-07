@@ -341,8 +341,7 @@ impl<T: Display + Internable + ?Sized> Display for Interned<T> {
     }
 }
 
-pub(crate) static MAPS: Mutex<EcoVec<(&'static str, usize, Arc<AllocStats>)>> =
-    Mutex::new(EcoVec::new());
+pub static MAPS: Mutex<EcoVec<(&'static str, usize, Arc<AllocStats>)>> = Mutex::new(EcoVec::new());
 
 pub struct InternStorage<T: ?Sized> {
     alloc: OnceLock<Arc<AllocStats>>,
@@ -407,6 +406,6 @@ macro_rules! _impl_internable {
 }
 
 pub use crate::_impl_internable as impl_internable;
-use crate::analysis::AllocStats;
+use crate::stats::AllocStats;
 
 impl_internable!(str,);
