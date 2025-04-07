@@ -266,15 +266,15 @@ impl SourceLinter {
             for set in sets {
                 match set {
                     ast::Expr::Set(..) => {
-                        self.diag.push(SourceDiagnostic::error(
+                        self.diag.push(SourceDiagnostic::warning(
                             set.span(),
-                            "This set statement takes no effect.",
+                            "This set statement doesn't take effect.",
                         ));
                     }
                     ast::Expr::Show(..) => {
-                        self.diag.push(SourceDiagnostic::error(
+                        self.diag.push(SourceDiagnostic::warning(
                             set.span(),
-                            "This show statement takes no effect.",
+                            "This show statement doesn't take effect.",
                         ));
                     }
                     _ => {}
