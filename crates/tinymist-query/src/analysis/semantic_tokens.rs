@@ -660,7 +660,7 @@ fn token_from_term(t: &Ty, modifier: &mut ModifierSet) -> TokenType {
 fn token_from_decl_expr(expr: &Expr, term: Option<&Ty>, modifier: &mut ModifierSet) -> TokenType {
     use crate::syntax::Decl::*;
     match expr {
-        Expr::Type(term) => token_from_term(term, modifier),
+        Expr::Ins(term) => token_from_term(term, modifier),
         Expr::Decl(decl) => match decl.as_ref() {
             Func(..) => TokenType::Function,
             Var(..) => TokenType::Interpolated,

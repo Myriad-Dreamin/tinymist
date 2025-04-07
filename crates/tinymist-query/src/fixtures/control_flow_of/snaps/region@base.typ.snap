@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: cf.repr(false)
+input_file: crates/tinymist-query/src/fixtures/control_flow_of/base.typ
+---
+document reg0 {
+  reg0 {
+    ^bb0: {
+    }
+  }
+}

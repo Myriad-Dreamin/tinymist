@@ -460,6 +460,25 @@ mod type_describe_tests {
 }
 
 #[cfg(test)]
+mod cf_tests {
+
+    use crate::cf::control_flow_of;
+    use crate::tests::*;
+
+    #[test]
+    fn region() {
+        snapshot_testing("control_flow_of", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let ei = ctx.shared_().expr_stage(&source);
+
+            let cf = control_flow_of(ctx.shared_(), ei);
+            assert_snapshot!(cf.repr(false));
+        });
+    }
+}
+
+#[cfg(test)]
 mod signature_tests {
 
     use core::fmt;

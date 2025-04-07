@@ -154,9 +154,12 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 
     let config = TestContext {
         root,
-        args: args.config,
         out_file,
-        analysis: Analysis::default(),
+        analysis: Analysis {
+            with_cov: args.config.coverage,
+            ..Analysis::default()
+        },
+        args: args.config,
     };
 
     if !args.watch {

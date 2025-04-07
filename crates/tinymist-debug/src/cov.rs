@@ -274,8 +274,8 @@ impl InstrumentWorker {
     fn visit_node(&mut self, node: &SyntaxNode) {
         if let Some(expr) = node.cast::<ast::Expr>() {
             match expr {
-                ast::Expr::Code(..) => {
-                    self.instrument_block(node);
+                ast::Expr::Code(..) | ast::Expr::Content(..) => {
+                    self.instrument_block(expr.to_untyped());
                     return;
                 }
                 ast::Expr::While(while_expr) => {
@@ -357,7 +357,6 @@ impl InstrumentWorker {
                 | ast::Expr::Float(..)
                 | ast::Expr::Numeric(..)
                 | ast::Expr::Str(..)
-                | ast::Expr::Content(..)
                 | ast::Expr::Parenthesized(..)
                 | ast::Expr::Array(..)
                 | ast::Expr::Dict(..)
@@ -467,29 +466,33 @@ mod tests {
         let __cov_show_body = elem => {
         __cov_pc(1);
         {
-            if __eligible(elem.base) and elem.at("t", default: none) == [+] {
+            if __eligible(elem.base) and elem.at("t", default: none) == {
         __cov_pc(2);
+        [+]
+        __cov_pc(3);
+        } {
+        __cov_pc(4);
         {
               $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
             }
-        __cov_pc(3);
+        __cov_pc(5);
         } else {
-        __cov_pc(4);
+        __cov_pc(6);
         {
               elem
             }
-        __cov_pc(5);
+        __cov_pc(7);
         }
           }
-        __cov_pc(6);
+        __cov_pc(8);
         }
-        __it => {__cov_pc(7);
+        __it => {__cov_pc(9);
         if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
 
 
           document
         }
-        __cov_pc(8);
+        __cov_pc(10);
         }
         "###);
     }

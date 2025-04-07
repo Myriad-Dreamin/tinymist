@@ -20,6 +20,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(exprs) => self.write_seq(exprs),
+            Expr::Cov(cov) => self.write_expr(&cov.body),
             Expr::Array(elems) => self.write_array(&elems.args),
             Expr::Dict(elems) => self.write_dict(&elems.args),
             Expr::Args(args) => self.write_args(&args.args),
@@ -41,7 +42,10 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
             Expr::Conditional(if_expr) => self.write_conditional(if_expr),
             Expr::WhileLoop(while_expr) => self.write_while_loop(while_expr),
             Expr::ForLoop(for_expr) => self.write_for_loop(for_expr),
-            Expr::Type(ty) => self.write_type(ty),
+            Expr::Break => self.f.write_str("break"),
+            Expr::Continue => self.f.write_str("continue"),
+            Expr::Return(ret) => self.write_return(ret.as_ref()),
+            Expr::Ins(ty) => self.write_type(ty),
             Expr::Decl(decl) => self.write_decl(decl),
             Expr::Star => self.write_star(),
         }
@@ -318,6 +322,15 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    fn write_return(&mut self, ret: Option<&Interned<Expr>>) -> fmt::Result {
+        if let Some(val) = ret {
+            write!(self.f, "return ")?;
+            self.write_expr(val)
+        } else {
+            self.f.write_str("return")
+        }
+    }
+
     fn write_type(&mut self, ty: &Ty) -> fmt::Result {
         let formatted = ty.describe();
         let formatted = formatted.as_deref().unwrap_or("any");
@@ -352,6 +365,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(..) => self.f.write_str("Expr(..)"),
+            Expr::Cov(cov) => self.write_expr(&cov.body),
             Expr::Array(elems) => self.write_array(&elems.args),
             Expr::Dict(elems) => self.write_dict(&elems.args),
             Expr::Args(args) => self.write_args(&args.args),
@@ -371,7 +385,10 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
             Expr::Conditional(..) | Expr::WhileLoop(..) | Expr::ForLoop(..) => {
                 self.f.write_str("Expr(..)")
             }
-            Expr::Type(ty) => self.write_type(ty),
+            Expr::Break => self.f.write_str("break"),
+            Expr::Continue => self.f.write_str("continue"),
+            Expr::Return(ret) => self.write_return(ret.as_ref()),
+            Expr::Ins(ty) => self.write_type(ty),
             Expr::Decl(decl) => self.write_decl(decl),
             Expr::Star => self.f.write_str("*"),
         }
@@ -517,10 +534,6 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
                 self.f.write_str("not ")?;
                 self.write_expr(&unary.lhs)
             }
-            Return => {
-                self.f.write_str("return ")?;
-                self.write_expr(&unary.lhs)
-            }
             Context => {
                 self.f.write_str("context ")?;
                 self.write_expr(&unary.lhs)
@@ -597,6 +610,15 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         self.f.write_str("include(")?;
         self.write_expr(&include.source)?;
         self.f.write_str(")")
+    }
+
+    fn write_return(&mut self, ret: Option<&Interned<Expr>>) -> fmt::Result {
+        if let Some(val) = ret {
+            write!(self.f, "return ")?;
+            self.write_expr(val)
+        } else {
+            self.f.write_str("return")
+        }
     }
 
     fn write_type(&mut self, ty: &Ty) -> fmt::Result {

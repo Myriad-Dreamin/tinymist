@@ -11,6 +11,11 @@ use crate::{
 
 impl Ty {
     /// Describe the given type.
+    pub fn repr_any(&self) -> EcoString {
+        self.repr().unwrap_or_else(|| EcoString::inline("any"))
+    }
+
+    /// Describe the given type.
     pub fn repr(&self) -> Option<EcoString> {
         let mut worker = TypeDescriber {
             repr: true,

@@ -1,0 +1,44 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: cf.repr(false)
+input_file: crates/tinymist-query/src/fixtures/control_flow_of/loop_if_break_cov.typ
+---
+document reg0 {
+  reg0 {
+    ^bb0: {
+      %0 = ins parbreak
+      %1 = ins int
+      %2 = ins int
+      %3 = ins int
+      %4 = array(, %1, %2, %3)
+      %5 = iter %4
+      %20: any = loop cond %5 body ^bb2 cont ^bb1
+    }
+    ^bb1: {
+      %11 = undef value
+      %12 = ins int
+      %13 = %11 Geq %12
+      %18: any = if %13 then: any = ^bb5 else = ins none
+    }
+    ^bb2: {
+    }
+    ^bb3: {
+      %6 = cov
+      %19: any = ^bb4
+      %7 = cov
+    }
+    ^bb4: {
+      %8 = undef value
+      %9 = array(, %8)
+      %10 = branch ^bb1
+    }
+    ^bb5: {
+      %14 = cov
+      %17: any = ^bb6
+      %15 = cov
+    }
+    ^bb6: {
+      %16 = break ^bb2
+    }
+  }
+}

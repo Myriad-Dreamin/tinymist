@@ -87,6 +87,7 @@ pub(crate) fn expr_of(
 
     let (exports, root) = {
         let mut w = ExprWorker {
+            with_cov: ctx.analysis.with_cov,
             fid: source.id(),
             ctx,
             imports,
@@ -255,6 +256,7 @@ pub(crate) struct ExprWorker<'a> {
     buffer: ResolveVec,
     lexical: LexicalContext,
     init_stage: bool,
+    with_cov: bool,
 
     route: &'a mut ExprRoute,
     comment_matcher: DocCommentMatcher,
@@ -330,18 +332,18 @@ impl ExprWorker<'_> {
     fn do_check(&mut self, m: ast::Expr) -> Expr {
         use ast::Expr::*;
         match m {
-            None(_) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
-            Auto(..) => Expr::Type(Ty::Builtin(BuiltinTy::Auto)),
-            Bool(bool) => Expr::Type(Ty::Value(InsTy::new(Value::Bool(bool.get())))),
-            Int(int) => Expr::Type(Ty::Value(InsTy::new(Value::Int(int.get())))),
-            Float(float) => Expr::Type(Ty::Value(InsTy::new(Value::Float(float.get())))),
-            Numeric(numeric) => Expr::Type(Ty::Value(InsTy::new(Value::numeric(numeric.get())))),
-            Str(s) => Expr::Type(Ty::Value(InsTy::new(Value::Str(s.get().into())))),
+            None(_) => Expr::Ins(Ty::Builtin(BuiltinTy::None)),
+            Auto(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Auto)),
+            Bool(bool) => Expr::Ins(Ty::Value(InsTy::new(Value::Bool(bool.get())))),
+            Int(int) => Expr::Ins(Ty::Value(InsTy::new(Value::Int(int.get())))),
+            Float(float) => Expr::Ins(Ty::Value(InsTy::new(Value::Float(float.get())))),
+            Numeric(numeric) => Expr::Ins(Ty::Value(InsTy::new(Value::numeric(numeric.get())))),
+            Str(s) => Expr::Ins(Ty::Value(InsTy::new(Value::Str(s.get().into())))),
 
             Equation(equation) => self.check_math(equation.body().to_untyped().children()),
             Math(math) => self.check_math(math.to_untyped().children()),
-            Code(code_block) => self.check_code(code_block.body()),
-            Content(content_block) => self.check_markup(content_block.body()),
+            Code(code_block) => self.check_code_block(code_block),
+            Content(content_block) => self.check_content_block(content_block),
 
             Ident(ident) => self.check_ident(ident),
             MathIdent(math_ident) => self.check_math_ident(math_ident),
@@ -369,44 +371,44 @@ impl ExprWorker<'_> {
             Conditional(conditional) => self.check_conditional(conditional),
             While(while_loop) => self.check_while_loop(while_loop),
             For(for_loop) => self.check_for_loop(for_loop),
-            Break(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
-            Continue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
-            Return(func_return) => Expr::Unary(UnInst::new(
-                UnaryOp::Return,
+            Break(..) => Expr::Break,
+            Continue(..) => Expr::Continue,
+            Return(func_return) => Expr::Return(
                 func_return
                     .body()
-                    .map_or_else(none_expr, |body| self.check(body)),
-            )),
+                    .map(|body| self.check(body))
+                    .map(Interned::new),
+            ),
 
-            Text(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Text(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::text::TextElem,
             >())))),
-            MathText(t) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some({
+            MathText(t) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some({
                 match t.get() {
                     MathTextKind::Character(..) => Element::of::<typst::foundations::SymbolElem>(),
                     MathTextKind::Number(..) => Element::of::<typst::foundations::SymbolElem>(),
                 }
             })))),
-            Raw(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Raw(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::text::RawElem,
             >())))),
-            Link(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Link(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::model::LinkElem,
             >())))),
-            Space(..) => Expr::Type(Ty::Builtin(BuiltinTy::Space)),
-            Linebreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Space(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Space)),
+            Linebreak(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 LinebreakElem,
             >())))),
-            Parbreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Parbreak(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 ParbreakElem,
             >())))),
-            Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            Escape(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::text::TextElem,
             >())))),
-            Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+            Shorthand(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Type(Type::of::<
                 typst::foundations::Symbol,
             >()))),
-            SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            SmartQuote(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::text::SmartQuoteElem,
             >())))),
 
@@ -436,11 +438,10 @@ impl ExprWorker<'_> {
                 self.check_element::<TermsElem>(eco_vec![term, description])
             }
 
-            MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
+            MathAlignPoint(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Content(Some(Element::of::<
                 typst::math::AlignPointElem,
-            >(
-            ))))),
-            MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Type(Type::of::<
+            >())))),
+            MathShorthand(..) => Expr::Ins(Ty::Builtin(BuiltinTy::Type(Type::of::<
                 typst::foundations::Symbol,
             >()))),
             MathDelimited(math_delimited) => {
@@ -452,7 +453,7 @@ impl ExprWorker<'_> {
                 let top = attach.top().unwrap_or_default().to_untyped().clone();
                 self.check_math([base, bottom, top].iter())
             }
-            MathPrimes(..) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
+            MathPrimes(..) => Expr::Ins(Ty::Builtin(BuiltinTy::None)),
             MathFrac(frac) => {
                 let num = frac.num().to_untyped().clone();
                 let denom = frac.denom().to_untyped().clone();
@@ -670,7 +671,7 @@ impl ExprWorker<'_> {
         self.resolve_as(mod_ref.clone());
 
         let fid = mod_expr.as_ref().and_then(|mod_expr| match mod_expr {
-            Expr::Type(Ty::Value(v)) => match &v.val {
+            Expr::Ins(Ty::Value(v)) => match &v.val {
                 Value::Module(m) => m.file_id(),
                 _ => None,
             },
@@ -694,7 +695,7 @@ impl ExprWorker<'_> {
             Some(ExprScope::Lexical(self.exports_of(*fid)))
         } else {
             match &mod_expr {
-                Some(Expr::Type(Ty::Value(v))) => match &v.val {
+                Some(Expr::Ins(Ty::Value(v))) => match &v.val {
                     Value::Module(m) => Some(ExprScope::Module(m.clone())),
                     Value::Func(func) => {
                         if func.scope().is_some() {
@@ -748,14 +749,14 @@ impl ExprWorker<'_> {
                 .analyze_expr(source.to_untyped())
                 .into_iter()
                 .find_map(|(v, _)| match v {
-                    Value::Str(s) => Some(Expr::Type(Ty::Value(InsTy::new(Value::Str(s))))),
+                    Value::Str(s) => Some(Expr::Ins(Ty::Value(InsTy::new(Value::Str(s))))),
                     _ => None,
                 })
         })?;
 
         crate::log_debug_ct!("checking import source: {src_expr:?}");
         let const_res = match &src_expr {
-            Expr::Type(Ty::Value(val)) => {
+            Expr::Ins(Ty::Value(val)) => {
                 self.check_import_source_val(source, &val.val, Some(&src_expr), is_import)
             }
             Expr::Decl(decl) if matches!(decl.as_ref(), Decl::Module { .. }) => {
@@ -780,10 +781,10 @@ impl ExprWorker<'_> {
                     Some(fid) => Some(Expr::Decl(
                         Decl::module(m.name().unwrap().into(), fid).into(),
                     )),
-                    None => Some(Expr::Type(Ty::Value(InsTy::new(Value::Module(m))))),
+                    None => Some(Expr::Ins(Ty::Value(InsTy::new(Value::Module(m))))),
                 }
             }
-            (_, Some(v)) => Some(Expr::Type(Ty::Value(InsTy::new(v)))),
+            (_, Some(v)) => Some(Expr::Ins(Ty::Value(InsTy::new(v)))),
             (Some(s), _) => self.check_import_source_val(source, &s, Some(src_expr), true),
             (None, None) => None,
         }
@@ -799,7 +800,7 @@ impl ExprWorker<'_> {
         match &src {
             _ if src.scope().is_some() => src_expr
                 .cloned()
-                .or_else(|| Some(Expr::Type(Ty::Value(InsTy::new(src.clone()))))),
+                .or_else(|| Some(Expr::Ins(Ty::Value(InsTy::new(src.clone()))))),
             Value::Str(s) => self.check_import_by_str(source, s.as_str(), is_import),
             _ => None,
         }
@@ -1067,9 +1068,44 @@ impl ExprWorker<'_> {
         self.with_scope(|this| this.check_inline_markup(markup))
     }
 
-    fn check_code(&mut self, code: ast::Code) -> Expr {
+    #[inline]
+    fn cov_body(&mut self, child: &SyntaxNode, instr: Expr) -> Expr {
+        if self.with_cov {
+            let (first, last) = {
+                let mut children = child.children();
+                let first = children
+                    .next()
+                    .map(|s| s.span())
+                    .unwrap_or_else(Span::detached);
+                let last = children
+                    .last()
+                    .map(|s| s.span())
+                    .unwrap_or_else(Span::detached);
+                (first, last)
+            };
+
+            Expr::Cov(Interned::new(CovExpr {
+                first,
+                last,
+                body: instr,
+            }))
+        } else {
+            instr
+        }
+    }
+
+    fn check_content_block(&mut self, bb: ast::ContentBlock) -> Expr {
         self.with_scope(|this| {
-            this.check_in_mode(code.to_untyped().children(), InterpretMode::Code)
+            let instr = this.check_inline_markup(bb.body());
+            this.cov_body(bb.to_untyped(), instr)
+        })
+    }
+
+    fn check_code_block(&mut self, code: ast::CodeBlock) -> Expr {
+        self.with_scope(|this| {
+            let instr =
+                this.check_in_mode(code.body().to_untyped().children(), InterpretMode::Code);
+            this.cov_body(code.to_untyped(), instr)
         })
     }
 
@@ -1254,7 +1290,7 @@ impl ExprWorker<'_> {
     fn fold_expr_and_val(&mut self, src: ConcolicExpr) -> Option<Expr> {
         crate::log_debug_ct!("folding cc: {src:?}");
         match src {
-            (None, Some(val)) => Some(Expr::Type(val)),
+            (None, Some(val)) => Some(Expr::Ins(val)),
             (expr, _) => self.fold_expr(expr),
         }
     }
@@ -1327,7 +1363,7 @@ fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
 }
 
 fn none_expr() -> Expr {
-    Expr::Type(Ty::Builtin(BuiltinTy::None))
+    Expr::Ins(Ty::Builtin(BuiltinTy::None))
 }
 
 #[cfg(test)]
