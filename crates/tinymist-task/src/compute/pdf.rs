@@ -1,8 +1,7 @@
+use tinymist_std::time::ToUtcDateTime;
 pub use typst_pdf::pdf;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
 
-use tinymist_world::args::convert_source_date_epoch;
-use typst::foundations::Datetime;
 use typst_pdf::{PdfOptions, PdfStandards, Timestamp};
 
 use super::*;
@@ -19,13 +18,14 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
         doc: &Arc<TypstPagedDocument>,
         config: &ExportPdfTask,
     ) -> Result<Bytes> {
-        // todo: timestamp world.now()
         let creation_timestamp = config
             .creation_timestamp
-            .map(convert_source_date_epoch)
-            .transpose()
-            .context_ut("prepare pdf creation timestamp")?
-            .unwrap_or_else(chrono::Utc::now);
+            .map(|ts| ts.to_utc_datetime().context("timestamp is out of range"))
+            .transpose()?
+            .unwrap_or_else(tinymist_std::time::utc_now);
+        // todo: this seems different from `Timestamp::new_local` which also embeds the
+        // timezone information.
+        let timestamp = Timestamp::new_utc(tinymist_std::time::to_typst_time(creation_timestamp));
 
         let standards = PdfStandards::new(
             &config
@@ -45,23 +45,10 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
         Ok(Bytes::new(typst_pdf::pdf(
             doc,
             &PdfOptions {
-                timestamp: convert_datetime(creation_timestamp),
+                timestamp: Some(timestamp),
                 standards,
                 ..Default::default()
             },
         )?))
     }
-}
-
-/// Convert [`chrono::DateTime`] to [`Timestamp`]
-pub fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
-    use chrono::{Datelike, Timelike};
-    Some(Timestamp::new_utc(Datetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    )?))
 }

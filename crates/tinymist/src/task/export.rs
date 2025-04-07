@@ -6,24 +6,22 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 
 use reflexo::ImmutPath;
-use reflexo_typst::CompilationTask;
+use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
 use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
+use tinymist_task::{get_page_selection, ExportTarget, PdfExport, TextExport};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
-use typst_pdf::PdfOptions;
 
 use super::{FutureFolder, SyncTaskFactory};
 use crate::project::{
-    convert_source_date_epoch, ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask,
-    ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask,
-    ExportTask as ProjectExportTask, ExportTextTask, LspCompiledArtifact, ProjectTask, QueryTask,
-    TaskWhen,
+    ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask, ExportMarkdownTask,
+    ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask, ExportTextTask,
+    LspCompiledArtifact, ProjectTask, QueryTask, TaskWhen,
 };
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
@@ -186,7 +184,7 @@ impl ExportTask {
 
         // Prepare data.
         let kind2 = task.clone();
-        let data = FutureFolder::compute(move |_| -> Result<Vec<u8>> {
+        let data = FutureFolder::compute(move |_| -> Result<Bytes> {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
@@ -222,28 +220,9 @@ impl ExportTask {
                     .context("no first page to export")
             };
             Ok(match kind2 {
-                Preview(..) => vec![],
+                Preview(..) => Bytes::new([]),
                 // todo: more pdf flags
-                ExportPdf(ExportPdfTask {
-                    creation_timestamp, ..
-                }) => {
-                    // todo: timestamp world.now()
-                    let creation_timestamp = creation_timestamp
-                        .map(convert_source_date_epoch)
-                        .transpose()
-                        .context_ut("parse pdf creation timestamp")?
-                        .unwrap_or_else(chrono::Utc::now);
-
-                    // todo: Some(pdf_uri.as_str())
-                    typst_pdf::pdf(
-                        paged_doc()?,
-                        &PdfOptions {
-                            timestamp: convert_datetime(creation_timestamp),
-                            ..PdfOptions::default()
-                        },
-                    )
-                    .map_err(|e| anyhow::anyhow!("failed to convert to pdf: {e:?}"))?
-                }
+                ExportPdf(config) => PdfExport::run(&graph, paged_doc()?, &config)?,
                 Query(QueryTask {
                     export: _,
                     output_extension: _,
@@ -271,37 +250,37 @@ impl ExportTask {
                         let Some(value) = mapped.first() else {
                             bail!("no such field found for element");
                         };
-                        serialize(value, &format, pretty).map(String::into_bytes)?
+                        serialize(value, &format, pretty).map(Bytes::from_string)?
                     } else {
-                        serialize(&mapped, &format, pretty).map(String::into_bytes)?
+                        serialize(&mapped, &format, pretty).map(Bytes::from_string)?
                     }
                 }
-                ExportHtml(ExportHtmlTask { export: _ }) => typst_html::html(html_doc()?)
-                    .map_err(|e| format!("export error: {e:?}"))
-                    .context_ut("failed to export to html")?
-                    .into_bytes(),
-                ExportSvgHtml(ExportHtmlTask { export: _ }) => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?)
-                        .into_bytes()
-                }
+                ExportHtml(ExportHtmlTask { export: _ }) => Bytes::from_string(
+                    typst_html::html(html_doc()?)
+                        .map_err(|e| format!("export error: {e:?}"))
+                        .context_ut("failed to export to html")?,
+                ),
+                ExportSvgHtml(ExportHtmlTask { export: _ }) => Bytes::from_string(
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?),
+                ),
                 ExportText(ExportTextTask { export: _ }) => {
-                    TextExport::run_on_doc(doc)?.into_bytes()
+                    Bytes::from_string(TextExport::run_on_doc(doc)?)
                 }
                 ExportMd(ExportMarkdownTask { export: _ }) => {
                     let conv = Typlite::new(Arc::new(graph.world().clone()))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 
-                    conv.as_bytes().to_owned()
+                    Bytes::from_string(conv)
                 }
                 ExportSvg(ExportSvgTask { export }) => {
                     let (is_first, merged_gap) = get_page_selection(&export)?;
 
-                    if is_first {
-                        typst_svg::svg(first_page()?).into_bytes()
+                    Bytes::from_string(if is_first {
+                        typst_svg::svg(first_page()?)
                     } else {
-                        typst_svg::svg_merged(paged_doc()?, merged_gap).into_bytes()
-                    }
+                        typst_svg::svg_merged(paged_doc()?, merged_gap)
+                    })
                 }
                 ExportPng(ExportPngTask { export, ppi, fill }) => {
                     let ppi = ppi.to_f32();
@@ -323,9 +302,11 @@ impl ExportTask {
                         typst_render::render_merged(paged_doc()?, ppi / 72., merged_gap, Some(fill))
                     };
 
-                    pixmap
-                        .encode_png()
-                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+                    Bytes::new(
+                        pixmap
+                            .encode_png()
+                            .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
+                    )
                 }
             })
         })
@@ -509,5 +490,71 @@ mod tests {
             ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
 
         assert!(needs_run);
+    }
+
+    use chrono::{DateTime, Utc};
+    use tinymist_std::time::*;
+
+    /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+    pub fn convert_source_date_epoch(seconds: i64) -> Result<DateTime<Utc>, String> {
+        DateTime::from_timestamp(seconds, 0).ok_or_else(|| "timestamp out of range".to_string())
+    }
+
+    /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+    pub fn convert_system_time(seconds: i64) -> Result<Time, String> {
+        if seconds < 0 {
+            return Err("negative timestamp since unix epoch".to_string());
+        }
+
+        Time::UNIX_EPOCH
+            .checked_add(Duration::new(seconds as u64, 0))
+            .ok_or_else(|| "timestamp out of range".to_string())
+    }
+
+    #[test]
+    fn test_timestamp_chrono() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_source_date_epoch(timestamp).unwrap();
+        assert_eq!(date_time.timestamp(), timestamp);
+    }
+
+    #[test]
+    fn test_timestamp_system() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_system_time(timestamp).unwrap();
+        assert_eq!(
+            date_time
+                .duration_since(Time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            timestamp as u64
+        );
+    }
+
+    use typst::foundations::Datetime as TypstDatetime;
+
+    fn convert_datetime_chrono(date_time: DateTime<Utc>) -> Option<TypstDatetime> {
+        use chrono::{Datelike, Timelike};
+        TypstDatetime::from_ymd_hms(
+            date_time.year(),
+            date_time.month().try_into().ok()?,
+            date_time.day().try_into().ok()?,
+            date_time.hour().try_into().ok()?,
+            date_time.minute().try_into().ok()?,
+            date_time.second().try_into().ok()?,
+        )
+    }
+
+    #[test]
+    fn test_timestamp_pdf() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_source_date_epoch(timestamp).unwrap();
+        assert_eq!(date_time.timestamp(), timestamp);
+        let chrono_pdf_ts = convert_datetime_chrono(date_time).unwrap();
+
+        let timestamp = 1_000_000_000;
+        let date_time = convert_system_time(timestamp).unwrap();
+        let system_pdf_ts = tinymist_std::time::to_typst_time(date_time.into());
+        assert_eq!(chrono_pdf_ts, system_pdf_ts);
     }
 }

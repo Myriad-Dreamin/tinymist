@@ -28,7 +28,8 @@ serde_repr.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
 siphasher.workspace = true
-web-time.workspace = true
+web-time = { workspace = true, optional = true }
+time.workspace = true
 lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
 same-file = { workspace = true, optional = true }
@@ -74,7 +75,7 @@ typst = ["dep:typst", "dep:typst-shim"]
 rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]
 
-__web = ["wasm-bindgen", "js-sys"]
+__web = ["wasm-bindgen", "js-sys", "web-time"]
 web = ["__web"]
 system = ["tempfile", "same-file"]
 bi-hash = []
