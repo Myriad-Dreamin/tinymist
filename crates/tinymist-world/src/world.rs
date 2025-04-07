@@ -756,7 +756,6 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Duration};
-        // todo: typst respects creation_timestamp, but we don't...
         let now = self.now.get_or_init(|| tinymist_std::time::now().into());
 
         let naive = match offset {
