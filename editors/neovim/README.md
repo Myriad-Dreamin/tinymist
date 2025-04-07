@@ -132,7 +132,7 @@ end, {})
 
 > [!NOTE]
 > 
->   For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issues \#1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
+>   For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue \#1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 
 
 
