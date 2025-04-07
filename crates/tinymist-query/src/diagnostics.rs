@@ -13,15 +13,29 @@ pub type DiagnosticsMap = HashMap<Url, EcoVec<Diagnostic>>;
 type TypstDiagnostic = typst::diag::SourceDiagnostic;
 type TypstSeverity = typst::diag::Severity;
 
+/// Converts a list of Typst diagnostics to LSP diagnostics,
+/// with potential refinements on the error messages.
+pub fn check_doc<'a>(
+    world: &LspWorld,
+    errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
+    position_encoding: PositionEncoding,
+) -> DiagnosticsMap {
+    CheckDocWorker::new(world, position_encoding)
+        .check()
+        .convert(errors)
+}
+
 /// Context for converting Typst diagnostics to LSP diagnostics.
-struct LocalDiagContext<'a> {
+pub(crate) struct CheckDocWorker<'a> {
     /// The world surface for Typst compiler.
     pub world: &'a LspWorld,
     /// The position encoding for the source.
     pub position_encoding: PositionEncoding,
+    /// Results
+    pub results: DiagnosticsMap,
 }
 
-impl std::ops::Deref for LocalDiagContext<'_> {
+impl std::ops::Deref for CheckDocWorker<'_> {
     type Target = LspWorld;
 
     fn deref(&self) -> &Self::Target {
@@ -29,37 +43,43 @@ impl std::ops::Deref for LocalDiagContext<'_> {
     }
 }
 
-/// Converts a list of Typst diagnostics to LSP diagnostics,
-/// with potential refinements on the error messages.
-pub fn convert_diagnostics<'a>(
-    world: &LspWorld,
-    errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
-    position_encoding: PositionEncoding,
-) -> DiagnosticsMap {
-    let ctx = LocalDiagContext {
-        world,
-        position_encoding,
-    };
-
-    let kvs = errors
-        .into_iter()
-        .flat_map(|error| {
-            convert_diagnostic(&ctx, error)
-                .map_err(move |conversion_err| {
-                    log::error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
-                })
-        });
-
-    let mut lookup = HashMap::new();
-    for (key, val) in kvs {
-        lookup.entry(key).or_insert_with(EcoVec::new).push(val);
+impl<'w> CheckDocWorker<'w> {
+    /// Creates a new `CheckDocWorker` instance.
+    pub fn new(world: &'w LspWorld, position_encoding: PositionEncoding) -> Self {
+        Self {
+            world,
+            position_encoding,
+            results: DiagnosticsMap::default(),
+        }
     }
 
-    lookup
+    /// Runs code check on the document.
+    pub fn check(self) -> Self {
+        self
+    }
+
+    /// Converts a list of Typst diagnostics to LSP diagnostics.
+    pub fn convert<'a>(
+        mut self,
+        errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
+    ) -> DiagnosticsMap {
+        for diag in errors {
+            match convert_diagnostic(&self, diag) {
+                Ok((uri, diagnostic)) => {
+                    self.results.entry(uri).or_default().push(diagnostic);
+                }
+                Err(error) => {
+                    log::error!("Failed to convert Typst diagnostic: {error:?}");
+                }
+            }
+        }
+
+        self.results
+    }
 }
 
 fn convert_diagnostic(
-    ctx: &LocalDiagContext,
+    ctx: &CheckDocWorker,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, Diagnostic)> {
     let typst_diagnostic = {
@@ -102,7 +122,7 @@ fn convert_diagnostic(
 }
 
 fn tracepoint_to_relatedinformation(
-    ctx: &LocalDiagContext,
+    ctx: &CheckDocWorker,
     tracepoint: &Spanned<Tracepoint>,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
@@ -127,7 +147,7 @@ fn tracepoint_to_relatedinformation(
 }
 
 fn diagnostic_related_information(
-    project: &LocalDiagContext,
+    project: &CheckDocWorker,
     typst_diagnostic: &TypstDiagnostic,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Vec<DiagnosticRelatedInformation>> {
@@ -145,7 +165,7 @@ fn diagnostic_related_information(
 }
 
 fn diagnostic_span_id(
-    ctx: &LocalDiagContext,
+    ctx: &CheckDocWorker,
     typst_diagnostic: &TypstDiagnostic,
 ) -> (TypstFileId, Span) {
     iter::once(typst_diagnostic.span)
