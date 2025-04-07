@@ -189,6 +189,7 @@ tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.10", default
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.10" }
 tinymist = { path = "./crates/tinymist/", version = "0.13.10" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.10" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.10" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.10" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.10" }
 tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.10" }
