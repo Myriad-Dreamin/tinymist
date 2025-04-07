@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
 use tinymist_project::LspWorld;
-use typst::syntax::Span;
+use tinymist_world::vfs::WorkspaceResolver;
+use typst::{diag::SourceDiagnostic, syntax::Span};
 
 use crate::{prelude::*, LspWorldExt};
 
@@ -22,7 +23,7 @@ pub fn check_doc<'a>(
 ) -> DiagnosticsMap {
     CheckDocWorker::new(world, position_encoding)
         .check()
-        .convert(errors)
+        .convert_all(errors)
 }
 
 /// Context for converting Typst diagnostics to LSP diagnostics.
@@ -54,27 +55,48 @@ impl<'w> CheckDocWorker<'w> {
     }
 
     /// Runs code check on the document.
-    pub fn check(self) -> Self {
-        self
-    }
+    pub fn check(mut self) -> Self {
+        for dep in self.world.depended_files() {
+            if WorkspaceResolver::is_package_file(dep) {
+                continue;
+            }
 
-    /// Converts a list of Typst diagnostics to LSP diagnostics.
-    pub fn convert<'a>(
-        mut self,
-        errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
-    ) -> DiagnosticsMap {
-        for diag in errors {
-            match convert_diagnostic(&self, diag) {
-                Ok((uri, diagnostic)) => {
-                    self.results.entry(uri).or_default().push(diagnostic);
-                }
-                Err(error) => {
-                    log::error!("Failed to convert Typst diagnostic: {error:?}");
+            let Ok(source) = self.world.source(dep) else {
+                continue;
+            };
+            let res = lint_source(&source);
+            if !res.is_empty() {
+                for diag in res {
+                    self.handle(&diag);
                 }
             }
         }
 
+        self
+    }
+
+    /// Converts a list of Typst diagnostics to LSP diagnostics.
+    pub fn convert_all<'a>(
+        mut self,
+        errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
+    ) -> DiagnosticsMap {
+        for diag in errors {
+            self.handle(diag);
+        }
+
         self.results
+    }
+
+    /// Converts a list of Typst diagnostics to LSP diagnostics.
+    pub fn handle(&mut self, diag: &TypstDiagnostic) {
+        match convert_diagnostic(self, diag) {
+            Ok((uri, diagnostic)) => {
+                self.results.entry(uri).or_default().push(diagnostic);
+            }
+            Err(error) => {
+                log::error!("Failed to convert Typst diagnostic: {error:?}");
+            }
+        }
     }
 }
 
@@ -257,4 +279,9 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
         raw.hints.clear();
         raw.with_hint("Cannot read file outside of project root.")
     }
+}
+
+#[comemo::memoize]
+fn lint_source(source: &Source) -> EcoVec<SourceDiagnostic> {
+    tinymist_lint::lint_source(source)
 }

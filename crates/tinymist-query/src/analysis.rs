@@ -613,7 +613,7 @@ mod lint_tests {
             let result = tinymist_lint::lint_source(&source);
             let result =
                 crate::diagnostics::CheckDocWorker::new(&ctx.world, ctx.position_encoding())
-                    .convert(result.iter());
+                    .convert_all(result.iter());
             let result = result
                 .into_iter()
                 .map(|(k, v)| (file_path_(&k), v))
