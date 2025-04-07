@@ -598,3 +598,26 @@ mod call_info_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod lint_tests {
+    use std::collections::BTreeMap;
+
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("lint", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = tinymist_lint::lint_source(&source);
+            let result = crate::diagnostics::convert_diagnostics(
+                &ctx.world,
+                result.iter(),
+                ctx.position_encoding(),
+            );
+            let result = result.into_iter().collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}

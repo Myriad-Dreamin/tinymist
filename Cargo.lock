@@ -4284,6 +4284,7 @@ dependencies = [
  "tinymist-analysis",
  "tinymist-derive",
  "tinymist-l10n",
+ "tinymist-lint",
  "tinymist-project",
  "tinymist-std",
  "tinymist-world",
