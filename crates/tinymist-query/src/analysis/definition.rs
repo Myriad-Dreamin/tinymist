@@ -354,7 +354,7 @@ fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> O
 }
 
 struct DefResolver {
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
 }
 
 impl DefResolver {

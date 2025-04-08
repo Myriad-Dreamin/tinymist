@@ -32,8 +32,8 @@ pub(crate) fn expr_of(
     source: Source,
     route: &mut ExprRoute,
     guard: QueryStatGuard,
-    prev: Option<Arc<ExprInfo>>,
-) -> Arc<ExprInfo> {
+    prev: Option<ExprInfo>,
+) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
 
     route.insert(source.id(), None);
@@ -76,8 +76,18 @@ pub(crate) fn expr_of(
     let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
     let docstrings = docstrings_base.clone();
 
-    let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let exprs = exprs_base.clone();
+    let exprs_base: Arc<
+        parking_lot::lock_api::Mutex<
+            parking_lot::RawMutex,
+            HashMap<Span, Expr, rustc_hash::FxBuildHasher>,
+        >,
+    > = Arc::new(Mutex::new(FxHashMap::default()));
+    let exprs: Arc<
+        parking_lot::lock_api::Mutex<
+            parking_lot::RawMutex,
+            HashMap<Span, Expr, rustc_hash::FxBuildHasher>,
+        >,
+    > = exprs_base.clone();
 
     let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
     let imports = imports_base.clone();
@@ -120,7 +130,7 @@ pub(crate) fn expr_of(
         (root_scope, root)
     };
 
-    let info = ExprInfo {
+    let info = ExprInfoRepr {
         fid: source.id(),
         revision,
         source: source.clone(),
@@ -135,11 +145,22 @@ pub(crate) fn expr_of(
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
     route.remove(&info.fid);
-    Arc::new(info)
+    ExprInfo(Arc::new(LazyHash::new(info)))
+}
+
+#[derive(Debug, Clone, Hash)]
+pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
+
+impl Deref for ExprInfo {
+    type Target = Arc<LazyHash<ExprInfoRepr>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Debug)]
-pub struct ExprInfo {
+pub struct ExprInfoRepr {
     pub fid: TypstFileId,
     pub revision: usize,
     pub source: Source,
@@ -152,19 +173,22 @@ pub struct ExprInfo {
     pub root: Expr,
 }
 
-impl std::hash::Hash for ExprInfo {
+impl std::hash::Hash for ExprInfoRepr {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.revision.hash(state);
         self.source.hash(state);
         self.exports.hash(state);
         self.root.hash(state);
+        let mut resolves = self.resolves.iter().collect::<Vec<_>>();
+        resolves.sort_by_key(|(fid, _)| fid.into_raw());
+        resolves.hash(state);
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
     }
 }
 
-impl ExprInfo {
+impl ExprInfoRepr {
     pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
         if decl.is_def() {
             return Some(Expr::Decl(decl.clone()));

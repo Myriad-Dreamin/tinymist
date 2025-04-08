@@ -25,13 +25,13 @@ pub(crate) use select::*;
 #[derive(Default)]
 pub struct TypeEnv {
     visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
-    exprs: FxHashMap<TypstFileId, Option<Arc<ExprInfo>>>,
+    exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
 }
 
 /// Type checking at the source unit level.
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
     env: &mut TypeEnv,
 ) -> Arc<TypeInfo> {
     let mut info = TypeInfo::default();
@@ -82,7 +82,7 @@ type CallCacheDesc = (
 
 pub(crate) struct TypeChecker<'a> {
     ctx: Arc<SharedContext>,
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
 
     info: TypeInfo,
     module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,

@@ -90,7 +90,7 @@ pub fn run_with_ctx<T>(
         },
         ..Analysis::default()
     })
-    .snapshot(world);
+    .enter(world);
 
     ctx.test_package_list(|| {
         vec![(

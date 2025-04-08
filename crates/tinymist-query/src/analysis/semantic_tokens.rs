@@ -309,7 +309,7 @@ pub(crate) struct Tokenizer {
     pos_offset: usize,
     output: Vec<SemanticToken>,
     source: Source,
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
     encoding: PositionEncoding,
 
     allow_multiline_token: bool,
@@ -320,7 +320,7 @@ pub(crate) struct Tokenizer {
 impl Tokenizer {
     pub fn new(
         source: Source,
-        ei: Arc<ExprInfo>,
+        ei: ExprInfo,
         allow_multiline_token: bool,
         encoding: PositionEncoding,
     ) -> Self {

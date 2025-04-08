@@ -12,6 +12,7 @@ pub use completion::{CompletionRequest, PostfixSnippet};
 pub use typlite::ColorTheme;
 pub use upstream::with_vm;
 
+pub use check::*;
 pub use code_action::*;
 pub use code_context::*;
 pub use code_lens::*;
@@ -55,6 +56,7 @@ mod adt;
 mod lsp_typst_boundary;
 mod prelude;
 
+mod check;
 mod code_action;
 mod code_context;
 mod code_lens;
