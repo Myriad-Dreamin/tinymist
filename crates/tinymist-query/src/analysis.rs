@@ -179,8 +179,8 @@ impl LspQuerySnapshot {
             bail!("main file is not set");
         };
 
-        let mut analysis = self.analysis.enter_(world, self.rev_lock);
-        Ok(f(&mut analysis))
+        let mut ctx = self.analysis.enter_(world, self.rev_lock);
+        Ok(f(&mut ctx))
     }
 }
 
@@ -671,9 +671,7 @@ mod lint_tests {
             let source = ctx.source_by_path(&path).unwrap();
 
             let result = tinymist_lint::lint_source(&source);
-            let result =
-                crate::diagnostics::CheckDocWorker::new(&ctx.world, ctx.position_encoding())
-                    .convert_all(result.iter());
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
                 .map(|(k, v)| (file_path_(&k), v))

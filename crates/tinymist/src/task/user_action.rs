@@ -177,7 +177,8 @@ async fn trace_main(
     let timings = writer.into_inner().unwrap();
 
     let handle = &state.project;
-    let diagnostics = tinymist_query::check_doc(w, diags.iter(), handle.analysis.position_encoding);
+    let diagnostics =
+        tinymist_query::convert_diagnostics(w, diags.iter(), handle.analysis.position_encoding);
 
     let rpc_kind = rpc_kind.as_str();
 

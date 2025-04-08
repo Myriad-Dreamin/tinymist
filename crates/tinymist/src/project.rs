@@ -29,7 +29,9 @@ use reflexo::{hash::FxHashMap, path::unix_slash};
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
-use tinymist_query::{CompilerQueryRequest, DiagnosticsMap, LocalContext};
+use tinymist_query::{
+    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest,
+};
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
@@ -441,12 +443,15 @@ impl CompileHandlerImpl {
 
         let snap = snap.clone();
         let editor_tx = self.editor_tx.clone();
-        let enc = self.analysis.position_encoding;
+        let analysis = self.analysis.clone();
         rayon::spawn(move || {
-            let world = snap.world();
+            let world = snap.world().clone();
+            let mut ctx = analysis.enter(world);
 
             // todo: check all errors in this file
-            let diagnostics = tinymist_query::check_doc(world, snap.diagnostics(), enc);
+            let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
+                return;
+            };
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
