@@ -420,13 +420,16 @@ mod tests {
         snapshot_testing("hover", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let graph = compile_doc_for_test(ctx, &properties);
+
             let request = HoverRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let snap = WorldComputeGraph::from_world(ctx.world.clone());
-            let result = request.request(ctx, snap);
+            let result = request.request(ctx, graph);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

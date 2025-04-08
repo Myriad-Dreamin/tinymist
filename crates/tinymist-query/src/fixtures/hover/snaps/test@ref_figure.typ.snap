@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/ref_figure.typ
+---
+{
+ "contents": "Ref: `fig:test1`\n\n\n---\n\n```typc\nfigure(\n  body: [Test1],\n  placement: none,\n  scope: \"column\",\n  caption: none,\n  kind: image,\n  supplement: [Figure],\n  numbering: \"1\",\n  gap: 0.65em,\n  outlined: true,\n  counter: counter(figure.where(kind: image)),\n)\n```",
+ "range": "4:21:4:31"
+}
