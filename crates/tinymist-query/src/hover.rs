@@ -126,23 +126,25 @@ impl HoverWorker<'_> {
         use Decl::*;
         match def.decl.as_ref() {
             Label(..) => {
-                self.def.push(format!("Label: `{}`\n", def.name()));
                 if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                    self.def.push(format!("Ref: `{}`\n", def.name()));
                     self.def
                         .push(format!("```typc\n{}\n```", truncated_repr(&val)));
+                } else {
+                    self.def.push(format!("Label: `{}`\n", def.name()));
                 }
             }
             BibEntry(..) => {
                 if let Some(details) = try_get_bib_details(&self.doc, self.ctx, def.name()) {
                     self.def.push(format!(
-                        "Bibliography: `@{}` {}",
+                        "Bibliography: `{}` {}",
                         def.name(),
                         details.citation
                     ));
                     self.def.push(details.bib_item);
                 } else {
                     // fallback: no additional information
-                    self.def.push(format!("Bibliography: `@{}`", def.name()));
+                    self.def.push(format!("Bibliography: `{}`", def.name()));
                 }
             }
             _ => {
