@@ -12,7 +12,7 @@ use typst::{
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
-    Library, World,
+    Category, Library, World,
 };
 
 mod tooltip;
@@ -309,11 +309,7 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
 
                         crate::log_debug_ct!("func: {func:?} -> {cat:?}");
 
-                        let route = if let Some(parent_name) = &parent_name {
-                            format!("reference/{}/{parent_name}/#definitions-{name}", cat.name())
-                        } else {
-                            format!("reference/{}/{name}/", cat.name())
-                        };
+                        let route = format_route(parent_name.as_deref(), name, &cat);
 
                         map.insert(CatKey::Func(func.clone()), route);
                     }
@@ -325,11 +321,7 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
                     if let Some(cat) = cat {
                         crate::log_debug_ct!("type: {t:?} -> {cat:?}");
 
-                        let route = if let Some(parent_name) = &parent_name {
-                            format!("reference/{}/{parent_name}/#definitions-{name}", cat.name())
-                        } else {
-                            format!("reference/{}/{name}/", cat.name())
-                        };
+                        let route = format_route(parent_name.as_deref(), &name, &cat);
                         map.insert(CatKey::Type(*t), route);
                     }
                     scope_to_finds.push((t.scope(), Some(name), cat));
@@ -343,6 +335,15 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
     }
     map
 });
+
+fn format_route(parent_name: Option<&str>, name: &str, cat: &Category) -> String {
+    match parent_name {
+        Some(parent_name) if parent_name != cat.name() => {
+            format!("reference/{}/{parent_name}/#definitions-{name}", cat.name())
+        }
+        Some(_) | None => format!("reference/{}/{name}/", cat.name()),
+    }
+}
 
 /// Turn a title into an URL fragment.
 pub(crate) fn urlify(title: &str) -> EcoString {
@@ -751,36 +752,35 @@ mod tests {
         https://typst.app/docs/reference/layout/skew/
         https://typst.app/docs/reference/layout/stack/
         https://typst.app/docs/reference/layout/v/
+        https://typst.app/docs/reference/math/accent/
         https://typst.app/docs/reference/math/attach/#functions-attach
         https://typst.app/docs/reference/math/attach/#functions-limits
         https://typst.app/docs/reference/math/attach/#functions-scripts
+        https://typst.app/docs/reference/math/binom/
+        https://typst.app/docs/reference/math/cancel/
+        https://typst.app/docs/reference/math/cases/
+        https://typst.app/docs/reference/math/class/
+        https://typst.app/docs/reference/math/equation/
+        https://typst.app/docs/reference/math/frac/
         https://typst.app/docs/reference/math/lr/#functions-abs
         https://typst.app/docs/reference/math/lr/#functions-lr
         https://typst.app/docs/reference/math/lr/#functions-mid
         https://typst.app/docs/reference/math/lr/#functions-norm
         https://typst.app/docs/reference/math/lr/#functions-round
-        https://typst.app/docs/reference/math/math/#definitions-accent
-        https://typst.app/docs/reference/math/math/#definitions-binom
-        https://typst.app/docs/reference/math/math/#definitions-cancel
-        https://typst.app/docs/reference/math/math/#definitions-cases
-        https://typst.app/docs/reference/math/math/#definitions-class
-        https://typst.app/docs/reference/math/math/#definitions-equation
-        https://typst.app/docs/reference/math/math/#definitions-frac
-        https://typst.app/docs/reference/math/math/#definitions-mat
-        https://typst.app/docs/reference/math/math/#definitions-op
-        https://typst.app/docs/reference/math/math/#definitions-primes
-        https://typst.app/docs/reference/math/math/#definitions-stretch
-        https://typst.app/docs/reference/math/math/#definitions-text
-        https://typst.app/docs/reference/math/math/#definitions-vec
+        https://typst.app/docs/reference/math/mat/
+        https://typst.app/docs/reference/math/op/
+        https://typst.app/docs/reference/math/primes/
         https://typst.app/docs/reference/math/roots/#functions-root
         https://typst.app/docs/reference/math/roots/#functions-sqrt
         https://typst.app/docs/reference/math/sizes/#functions-display
         https://typst.app/docs/reference/math/sizes/#functions-inline
         https://typst.app/docs/reference/math/sizes/#functions-script
         https://typst.app/docs/reference/math/sizes/#functions-sscript
+        https://typst.app/docs/reference/math/stretch/
         https://typst.app/docs/reference/math/styles/#functions-bold
         https://typst.app/docs/reference/math/styles/#functions-italic
         https://typst.app/docs/reference/math/styles/#functions-upright
+        https://typst.app/docs/reference/math/text/
         https://typst.app/docs/reference/math/underover/#functions-overbrace
         https://typst.app/docs/reference/math/underover/#functions-overbracket
         https://typst.app/docs/reference/math/underover/#functions-overline
@@ -797,6 +797,7 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
         https://typst.app/docs/reference/math/variants/#functions-serif
+        https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
         https://typst.app/docs/reference/model/cite/
         https://typst.app/docs/reference/model/document/
@@ -833,7 +834,7 @@ mod tests {
         https://typst.app/docs/reference/model/table/#definitions-vline
         https://typst.app/docs/reference/model/terms/
         https://typst.app/docs/reference/model/terms/#definitions-item
-        https://typst.app/docs/reference/pdf/pdf/#definitions-embed
+        https://typst.app/docs/reference/pdf/embed/
         https://typst.app/docs/reference/text/highlight/
         https://typst.app/docs/reference/text/linebreak/
         https://typst.app/docs/reference/text/lorem/
