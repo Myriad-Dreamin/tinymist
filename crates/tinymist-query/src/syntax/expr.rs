@@ -32,8 +32,8 @@ pub(crate) fn expr_of(
     source: Source,
     route: &mut ExprRoute,
     guard: QueryStatGuard,
-    prev: Option<Arc<ExprInfo>>,
-) -> Arc<ExprInfo> {
+    prev: Option<ExprInfo>,
+) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
 
     route.insert(source.id(), None);
@@ -120,7 +120,7 @@ pub(crate) fn expr_of(
         (root_scope, root)
     };
 
-    let info = ExprInfo {
+    let info = ExprInfoRepr {
         fid: source.id(),
         revision,
         source: source.clone(),
@@ -135,11 +135,22 @@ pub(crate) fn expr_of(
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
     route.remove(&info.fid);
-    Arc::new(info)
+    ExprInfo(Arc::new(LazyHash::new(info)))
+}
+
+#[derive(Debug, Clone, Hash)]
+pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
+
+impl Deref for ExprInfo {
+    type Target = Arc<LazyHash<ExprInfoRepr>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Debug)]
-pub struct ExprInfo {
+pub struct ExprInfoRepr {
     pub fid: TypstFileId,
     pub revision: usize,
     pub source: Source,
@@ -152,7 +163,7 @@ pub struct ExprInfo {
     pub root: Expr,
 }
 
-impl std::hash::Hash for ExprInfo {
+impl std::hash::Hash for ExprInfoRepr {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.revision.hash(state);
         self.source.hash(state);
@@ -164,7 +175,7 @@ impl std::hash::Hash for ExprInfo {
     }
 }
 
-impl ExprInfo {
+impl ExprInfoRepr {
     pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
         if decl.is_def() {
             return Some(Expr::Decl(decl.clone()));

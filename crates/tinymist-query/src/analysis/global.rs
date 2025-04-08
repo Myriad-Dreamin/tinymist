@@ -443,12 +443,12 @@ impl LocalContext {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+    pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<ExprInfo> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage(&mut self, source: &Source) -> ExprInfo {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().expr_stage;
         cache.get_or_init(|| self.shared.expr_stage(source)).clone()
@@ -705,12 +705,12 @@ impl SharedContext {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<ExprInfo> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
         self.expr_stage_(source, &mut route)
     }
@@ -720,7 +720,7 @@ impl SharedContext {
         self: &Arc<Self>,
         source: &Source,
         route: &mut ExprRoute,
-    ) -> Arc<ExprInfo> {
+    ) -> ExprInfo {
         use crate::syntax::expr_of;
         let guard = self.query_stat(source.id(), "expr_stage");
         self.slot.expr_stage.compute(hash128(&source), |prev| {
@@ -1168,7 +1168,7 @@ pub struct AnalysisLocalCaches {
 /// change.
 #[derive(Default)]
 pub struct ModuleAnalysisLocalCache {
-    expr_stage: OnceLock<Arc<ExprInfo>>,
+    expr_stage: OnceLock<ExprInfo>,
     type_check: OnceLock<Arc<TypeInfo>>,
 }
 
@@ -1256,7 +1256,7 @@ impl Drop for AnalysisRevLock {
 #[derive(Default, Clone)]
 struct AnalysisRevSlot {
     revision: usize,
-    expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
+    expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
 }
 
