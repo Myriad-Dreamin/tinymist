@@ -125,7 +125,7 @@ impl FontResolverImpl {
         }
     }
 
-    pub fn append_font(&mut self, info: FontInfo, slot: FontSlot) {
+    pub fn append_font(&self, info: FontInfo, slot: FontSlot) {
         let mut font_book = self.partial_book.lock().unwrap();
         font_book.push((None, info, slot));
     }
