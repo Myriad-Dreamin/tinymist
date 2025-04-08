@@ -76,8 +76,18 @@ pub(crate) fn expr_of(
     let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
     let docstrings = docstrings_base.clone();
 
-    let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let exprs = exprs_base.clone();
+    let exprs_base: Arc<
+        parking_lot::lock_api::Mutex<
+            parking_lot::RawMutex,
+            HashMap<Span, Expr, rustc_hash::FxBuildHasher>,
+        >,
+    > = Arc::new(Mutex::new(FxHashMap::default()));
+    let exprs: Arc<
+        parking_lot::lock_api::Mutex<
+            parking_lot::RawMutex,
+            HashMap<Span, Expr, rustc_hash::FxBuildHasher>,
+        >,
+    > = exprs_base.clone();
 
     let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
     let imports = imports_base.clone();
@@ -169,6 +179,9 @@ impl std::hash::Hash for ExprInfoRepr {
         self.source.hash(state);
         self.exports.hash(state);
         self.root.hash(state);
+        let mut resolves = self.resolves.iter().collect::<Vec<_>>();
+        resolves.sort_by_key(|(fid, _)| fid.into_raw());
+        resolves.hash(state);
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
