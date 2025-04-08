@@ -1,17 +1,11 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    num::NonZeroUsize,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
-use super::{BufferFontLoader, FontProfile, FontSlot, PartialFontBook};
+use super::{FontProfile, FontSlot};
 use crate::debug_loc::DataSource;
-use crate::Bytes;
 
 /// A FontResolver can resolve a font by index.
 /// It also reuse FontBook for font-related query.
@@ -47,7 +41,6 @@ pub trait FontResolver {
 pub struct FontResolverImpl {
     font_paths: Vec<PathBuf>,
     book: LazyHash<FontBook>,
-    partial_book: Arc<Mutex<PartialFontBook>>,
     fonts: Vec<FontSlot>,
     profile: FontProfile,
 }
@@ -56,15 +49,34 @@ impl FontResolverImpl {
     pub fn new(
         font_paths: Vec<PathBuf>,
         book: FontBook,
-        partial_book: Arc<Mutex<PartialFontBook>>,
         fonts: Vec<FontSlot>,
         profile: FontProfile,
     ) -> Self {
         Self {
             font_paths,
             book: LazyHash::new(book),
-            partial_book,
             fonts,
+            profile,
+        }
+    }
+
+    pub fn new_with_fonts(
+        font_paths: Vec<PathBuf>,
+        profile: FontProfile,
+        fonts: impl Iterator<Item = (FontInfo, FontSlot)>,
+    ) -> Self {
+        let mut book = FontBook::new();
+        let mut slots = Vec::<FontSlot>::new();
+
+        for (info, slot) in fonts {
+            book.push(info);
+            slots.push(slot);
+        }
+
+        Self {
+            font_paths,
+            book: LazyHash::new(book),
+            fonts: slots,
             profile,
         }
     }
@@ -85,16 +97,20 @@ impl FontResolverImpl {
         &self.font_paths
     }
 
-    pub fn partial_resolved(&self) -> bool {
-        self.partial_book.lock().unwrap().partial_hit
-    }
-
     pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
         let slots_with_index = self.fonts.iter().enumerate();
 
         slots_with_index.flat_map(|(idx, slot)| {
             let maybe_font = slot.get_uninitialized().flatten();
             maybe_font.map(|font| (idx, font))
+        })
+    }
+
+    pub fn get_fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
+        self.fonts.iter().enumerate().map(|(idx, slot)| {
+            let info = self.book.info(idx).unwrap();
+
+            (info, slot)
         })
     }
 
@@ -106,104 +122,6 @@ impl FontResolverImpl {
             }
         }
         None
-    }
-
-    pub fn modify_font_data(&mut self, idx: usize, buffer: Bytes) {
-        let mut font_book = self.partial_book.lock().unwrap();
-        for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
-            let buffer = buffer.clone();
-            let modify_idx = if i > 0 { None } else { Some(idx) };
-
-            font_book.push((
-                modify_idx,
-                info,
-                FontSlot::new(Box::new(BufferFontLoader {
-                    buffer: Some(buffer),
-                    index: i as u32,
-                })),
-            ));
-        }
-    }
-
-    pub fn append_font(&self, info: FontInfo, slot: FontSlot) {
-        let mut font_book = self.partial_book.lock().unwrap();
-        font_book.push((None, info, slot));
-    }
-
-    pub fn rebuild(&mut self) {
-        let mut partial_book = self.partial_book.lock().unwrap();
-        if !partial_book.partial_hit {
-            return;
-        }
-        partial_book.revision += 1;
-
-        let mut new_book = FontBook::default();
-
-        let mut font_changes = HashMap::new();
-        let mut new_fonts = vec![];
-        for (idx, info, slot) in partial_book.changes.drain(..) {
-            if let Some(idx) = idx {
-                font_changes.insert(idx, (info, slot));
-            } else {
-                new_fonts.push((info, slot));
-            }
-        }
-        partial_book.partial_hit = false;
-
-        for (i, slot_ref) in self.fonts.iter_mut().enumerate() {
-            if let Some((info, slot)) = font_changes.remove(&i) {
-                new_book.push(info);
-                *slot_ref = slot;
-            } else {
-                new_book.push(self.book.info(i).unwrap().clone());
-            }
-        }
-
-        for (info, slot) in new_fonts {
-            new_book.push(info);
-            self.fonts.push(slot);
-        }
-
-        self.book = LazyHash::new(new_book);
-    }
-
-    pub fn clone_and_rebuild(&self) -> Self {
-        let partial_book = self.partial_book.lock().unwrap();
-        let mut book = FontBook::default();
-
-        let mut font_changes = HashMap::new();
-        let mut new_fonts = vec![];
-        for (idx, info, slot) in &partial_book.changes {
-            if let Some(idx) = idx {
-                font_changes.insert(*idx, (info.clone(), slot.clone()));
-            } else {
-                new_fonts.push((info.clone(), slot.clone()));
-            }
-        }
-
-        let mut fonts = vec![];
-        for (i, slot_ref) in self.fonts.iter().enumerate() {
-            if let Some((info, slot)) = font_changes.remove(&i) {
-                book.push(info);
-                fonts.push(slot);
-            } else {
-                book.push(self.book.info(i).unwrap().clone());
-                fonts.push(slot_ref.clone());
-            }
-        }
-
-        for (info, slot) in new_fonts {
-            book.push(info);
-            fonts.push(slot);
-        }
-
-        Self {
-            font_paths: self.font_paths.clone(),
-            book: LazyHash::new(book),
-            partial_book: Arc::new(Mutex::new(PartialFontBook::default())),
-            fonts,
-            profile: self.profile.clone(),
-        }
     }
 
     pub fn add_glyph_packs(&mut self) {
@@ -232,5 +150,34 @@ impl fmt::Display for FontResolverImpl {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "system")]
+    #[test]
+    fn get_fonts_from_system_universe() {
+        use clap::Parser as _;
+
+        use crate::args::CompileOnceArgs;
+
+        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
+        let mut verse = args
+            .resolve_system()
+            .expect("failed to resolve system universe");
+
+        let fonts: Vec<_> = verse.font_resolver.get_fonts().collect();
+
+        let new_resolver = FontResolverImpl::new_with_fonts(
+            vec![],
+            Default::default(),
+            fonts
+                .into_iter()
+                .map(|(info, slot)| (info.clone(), slot.clone())),
+        );
+        verse.increment_revision(|verse| verse.set_fonts(Arc::new(new_resolver)));
     }
 }

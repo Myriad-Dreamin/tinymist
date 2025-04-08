@@ -466,12 +466,6 @@ impl Default for BrowserFontSearcher {
 
 impl From<BrowserFontSearcher> for FontResolverImpl {
     fn from(value: BrowserFontSearcher) -> Self {
-        FontResolverImpl::new(
-            vec![],
-            value.book,
-            value.partial_book,
-            value.fonts,
-            value.profile,
-        )
+        FontResolverImpl::new(vec![], value.book, value.fonts, value.profile)
     }
 }

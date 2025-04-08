@@ -22,7 +22,6 @@ impl From<MemoryFontBuilder> for FontResolverImpl {
         FontResolverImpl::new(
             Vec::new(),
             searcher.book,
-            Default::default(),
             searcher.fonts,
             Default::default(),
         )

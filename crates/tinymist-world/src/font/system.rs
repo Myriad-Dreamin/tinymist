@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
 };
 
 use fontdb::Database;
@@ -19,7 +18,7 @@ use typst::{
 
 use super::{
     BufferFontLoader, FontProfile, FontProfileItem, FontResolverImpl, FontSlot,
-    LazyBufferFontLoader, PartialFontBook,
+    LazyBufferFontLoader,
 };
 use crate::debug_loc::{DataSource, FsDataSource, MemoryDataSource};
 use crate::{build_info, config::CompileFontOpts};
@@ -336,7 +335,6 @@ impl From<SystemFontSearcher> for FontResolverImpl {
         FontResolverImpl::new(
             searcher.font_paths,
             searcher.book,
-            Arc::new(Mutex::new(PartialFontBook::default())),
             searcher.fonts,
             searcher.profile_rebuilder.profile,
         )
