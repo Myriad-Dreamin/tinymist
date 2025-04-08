@@ -137,7 +137,7 @@ impl FontResolverImpl {
         }
         partial_book.revision += 1;
 
-        let mut book = FontBook::default();
+        let mut new_book = FontBook::default();
 
         let mut font_changes = HashMap::new();
         let mut new_fonts = vec![];
@@ -148,32 +148,23 @@ impl FontResolverImpl {
                 new_fonts.push((info, slot));
             }
         }
-        partial_book.changes.clear();
         partial_book.partial_hit = false;
 
-        let mut font_slots = Vec::new();
-        font_slots.append(&mut self.fonts);
-        self.fonts.clear();
-
-        for (i, slot_ref) in font_slots.iter_mut().enumerate() {
-            let (info, slot) = if let Some((_, v)) = font_changes.remove_entry(&i) {
-                v
+        for (i, slot_ref) in self.fonts.iter_mut().enumerate() {
+            if let Some((info, slot)) = font_changes.remove(&i) {
+                new_book.push(info);
+                *slot_ref = slot;
             } else {
-                book.push(self.book.info(i).unwrap().clone());
-                continue;
-            };
-
-            book.push(info);
-            *slot_ref = slot;
+                new_book.push(self.book.info(i).unwrap().clone());
+            }
         }
 
-        for (info, slot) in new_fonts.drain(..) {
-            book.push(info);
-            font_slots.push(slot);
+        for (info, slot) in new_fonts {
+            new_book.push(info);
+            self.fonts.push(slot);
         }
 
-        self.book = LazyHash::new(book);
-        self.fonts = font_slots;
+        self.book = LazyHash::new(new_book);
     }
 
     pub fn add_glyph_packs(&mut self) {
