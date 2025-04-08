@@ -10,22 +10,23 @@ use crate::font::FontLoader;
 type FontSlotInner = QueryRef<Option<Font>, (), Box<dyn FontLoader + Send>>;
 
 /// Lazy Font Reference, load as needed.
+#[derive(Clone)]
 pub struct FontSlot {
-    inner: FontSlotInner,
+    inner: Arc<FontSlotInner>,
     pub description: Option<Arc<DataSource>>,
 }
 
 impl FontSlot {
     pub fn with_value(f: Option<Font>) -> Self {
         Self {
-            inner: FontSlotInner::with_value(f),
+            inner: Arc::new(FontSlotInner::with_value(f)),
             description: None,
         }
     }
 
     pub fn new(f: Box<dyn FontLoader + Send>) -> Self {
         Self {
-            inner: FontSlotInner::with_context(f),
+            inner: Arc::new(FontSlotInner::with_context(f)),
             description: None,
         }
     }

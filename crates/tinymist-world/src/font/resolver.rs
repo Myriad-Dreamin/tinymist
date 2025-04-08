@@ -167,6 +167,45 @@ impl FontResolverImpl {
         self.book = LazyHash::new(new_book);
     }
 
+    pub fn clone_and_rebuild(&self) -> Self {
+        let partial_book = self.partial_book.lock().unwrap();
+        let mut book = FontBook::default();
+
+        let mut font_changes = HashMap::new();
+        let mut new_fonts = vec![];
+        for (idx, info, slot) in &partial_book.changes {
+            if let Some(idx) = idx {
+                font_changes.insert(*idx, (info.clone(), slot.clone()));
+            } else {
+                new_fonts.push((info.clone(), slot.clone()));
+            }
+        }
+
+        let mut fonts = vec![];
+        for (i, slot_ref) in self.fonts.iter().enumerate() {
+            if let Some((info, slot)) = font_changes.remove(&i) {
+                book.push(info);
+                fonts.push(slot);
+            } else {
+                book.push(self.book.info(i).unwrap().clone());
+                fonts.push(slot_ref.clone());
+            }
+        }
+
+        for (info, slot) in new_fonts {
+            book.push(info);
+            fonts.push(slot);
+        }
+
+        Self {
+            font_paths: self.font_paths.clone(),
+            book: LazyHash::new(book),
+            partial_book: Arc::new(Mutex::new(PartialFontBook::default())),
+            fonts,
+            profile: self.profile.clone(),
+        }
+    }
+
     pub fn add_glyph_packs(&mut self) {
         todo!()
     }
