@@ -151,30 +151,23 @@ impl CompletionPair<'_, '_, '_> {
         };
 
         // we don't check literal type here for faster completion
-        for (name, ty) in defines {
+        for (name, ty) in &defines {
             if name.is_empty() {
                 continue;
             }
 
-            kind_checker.check(&ty);
+            kind_checker.check(ty);
             if !filter(&kind_checker) {
                 continue;
             }
 
-            if let Some(ch) = kind_checker.symbols.iter().min().copied() {
-                // todo: describe all chars
-                let kind = CompletionKind::Symbol(ch);
-                self.push_completion(Completion {
-                    kind,
-                    label: name,
-                    label_details: Some(symbol_label_detail(ch)),
-                    detail: Some(symbol_detail(ch)),
-                    ..Completion::default()
-                });
+            // todo: describe all chars
+            if let Some(sym) = kind_checker.symbols.iter().min_by_key(|s| s.get()) {
+                self.symbol_completions(name.clone(), sym);
                 continue;
             }
 
-            let docs = default_docs.get(&name).cloned();
+            let docs = default_docs.get(name).cloned();
 
             let label_details = ty.describe().or_else(|| Some("any".into()));
 
@@ -182,16 +175,17 @@ impl CompletionPair<'_, '_, '_> {
             let detail = docs.or_else(|| label_details.clone());
 
             if !kind_checker.functions.is_empty() {
-                let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+                let fn_feat =
+                    FnCompletionFeat::default().check(kind_checker.functions.iter().copied());
                 crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
-                self.func_completion(mode, fn_feat, name, label_details, detail, parens);
+                self.func_completion(mode, fn_feat, name.clone(), label_details, detail, parens);
                 continue;
             }
 
-            let kind = type_to_completion_kind(&ty);
+            let kind = type_to_completion_kind(ty);
             self.push_completion(Completion {
                 kind,
-                label: name,
+                label: name.clone(),
                 label_details,
                 detail,
                 ..Completion::default()
