@@ -1,11 +1,12 @@
 //! A linter for Typst.
 
+use tinymist_analysis::syntax::ExprInfo;
 use typst::{
     diag::{eco_format, EcoString, SourceDiagnostic},
     ecow::EcoVec,
     syntax::{
         ast::{self, AstNode},
-        Source, SyntaxNode,
+        SyntaxNode,
     },
 };
 
@@ -13,8 +14,8 @@ use typst::{
 type DiagnosticVec = EcoVec<SourceDiagnostic>;
 
 /// Lints a Typst source and returns a vector of diagnostics.
-pub fn lint_source(source: &Source) -> DiagnosticVec {
-    SourceLinter::new().lint(source.root())
+pub fn lint_source(expr: &ExprInfo) -> DiagnosticVec {
+    SourceLinter::new().lint(expr.source.root())
 }
 
 struct SourceLinter {

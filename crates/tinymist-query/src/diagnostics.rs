@@ -4,7 +4,7 @@ use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::{diag::SourceDiagnostic, syntax::Span};
 
-use crate::{analysis::Analysis, prelude::*, LspWorldExt};
+use crate::{analysis::Analysis, prelude::*, syntax::ExprInfo, LspWorldExt};
 
 use regex::RegexSet;
 
@@ -56,7 +56,8 @@ impl<'w> DiagWorker<'w> {
             let Ok(source) = self.ctx.world.source(dep) else {
                 continue;
             };
-            let res = lint_source(&source);
+            let expr = self.ctx.expr_stage(&source);
+            let res = lint_file(&expr);
             if !res.is_empty() {
                 for diag in res {
                     self.handle(&diag);
@@ -245,6 +246,6 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
 }
 
 #[comemo::memoize]
-fn lint_source(source: &Source) -> EcoVec<SourceDiagnostic> {
+fn lint_file(source: &ExprInfo) -> EcoVec<SourceDiagnostic> {
     tinymist_lint::lint_source(source)
 }
