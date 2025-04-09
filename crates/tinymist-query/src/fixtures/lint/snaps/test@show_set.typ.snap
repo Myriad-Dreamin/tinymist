@@ -8,7 +8,6 @@ input_file: crates/tinymist-query/src/fixtures/lint/show_set.typ
   {
    "message": "This set statement doesn't take effect.\nHint: consider changing parent to `show : set text(red)`",
    "range": "1:2:1:15",
-   "relatedInformation": [],
    "severity": 2,
    "source": "typst"
   }
