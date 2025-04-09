@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/return_loop2.typ
+---
+{}

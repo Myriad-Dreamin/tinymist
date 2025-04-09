@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/discard_for3.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "This show statement doesn't take effect.\nHint: consider changing parent to `show: range(10).fold(it => it, (style-it, i) => it => { show: it => it; style-it(it) })`",
+   "range": "1:2:1:16",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}
