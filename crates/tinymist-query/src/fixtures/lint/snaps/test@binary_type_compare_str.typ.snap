@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/binary_type_compare_str.typ
 {
  "s0.typ": [
   {
-   "message": "comparison of type with string is not allowed\nHint: This will be a hard error since typst v0.14",
+   "message": "comparing strings with types is deprecated\nHint: compare with the literal type instead\nHint: this comparison will always return `false` since typst v0.14",
    "range": "0:11:0:28",
    "severity": 2,
    "source": "typst"
