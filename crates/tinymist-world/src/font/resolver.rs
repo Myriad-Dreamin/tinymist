@@ -39,10 +39,10 @@ pub trait FontResolver {
 #[derive(Debug)]
 /// The default FontResolver implementation.
 pub struct FontResolverImpl {
-    font_paths: Vec<PathBuf>,
-    book: LazyHash<FontBook>,
-    fonts: Vec<FontSlot>,
-    profile: FontProfile,
+    pub(crate) font_paths: Vec<PathBuf>,
+    pub(crate) book: LazyHash<FontBook>,
+    pub(crate) fonts: Vec<FontSlot>,
+    pub(crate) profile: FontProfile,
 }
 
 impl FontResolverImpl {

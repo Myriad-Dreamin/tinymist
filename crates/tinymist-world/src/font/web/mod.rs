@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use js_sys::ArrayBuffer;
 use tinymist_std::error::prelude::*;
 use typst::foundations::Bytes;
@@ -8,9 +6,7 @@ use typst::text::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::{
-    BufferFontLoader, FontLoader, FontProfile, FontResolverImpl, FontSlot, PartialFontBook,
-};
+use super::{BufferFontLoader, FontLoader, FontProfile, FontResolverImpl, FontSlot};
 use crate::font::cache::FontInfoCache;
 use crate::font::info::typst_typographic_family;
 
@@ -376,10 +372,8 @@ impl FontLoader for WebFontLoader {
 
 /// Searches for fonts.
 pub struct BrowserFontSearcher {
-    pub book: FontBook,
-    pub fonts: Vec<FontSlot>,
+    pub fonts: Vec<(FontInfo, FontSlot)>,
     pub profile: FontProfile,
-    pub partial_book: Arc<Mutex<PartialFontBook>>,
 }
 
 impl BrowserFontSearcher {
@@ -390,10 +384,8 @@ impl BrowserFontSearcher {
             ..Default::default()
         };
         let mut searcher = Self {
-            book: FontBook::new(),
             fonts: vec![],
             profile,
-            partial_book: Arc::new(Mutex::new(PartialFontBook::default())),
         };
 
         if cfg!(feature = "browser-embedded-fonts") {
@@ -407,10 +399,11 @@ impl BrowserFontSearcher {
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
-            for font in Font::iter(buffer) {
-                self.book.push(font.info().clone());
-                self.fonts.push(FontSlot::with_value(Some(font)));
-            }
+
+            self.fonts.extend(
+                Font::iter(buffer)
+                    .map(|font| (font.info().clone(), FontSlot::with_value(Some(font)))),
+            );
         }
     }
 
@@ -421,18 +414,19 @@ impl BrowserFontSearcher {
             let (font_ref, font_blob_loader, font_info) = font_builder.font_web_to_typst(&v)?;
 
             for (i, info) in font_info.into_iter().enumerate() {
-                self.book.push(info.clone());
-
                 let index = self.fonts.len();
-                self.fonts.push(FontSlot::new(Box::new(WebFontLoader {
-                    font: WebFont {
-                        info,
-                        context: font_ref.clone(),
-                        blob: font_blob_loader.clone(),
-                        index: index as u32,
-                    },
-                    index: i as u32,
-                })))
+                self.fonts.push((
+                    info.clone(),
+                    FontSlot::new(Box::new(WebFontLoader {
+                        font: WebFont {
+                            info,
+                            context: font_ref.clone(),
+                            blob: font_blob_loader.clone(),
+                            index: index as u32,
+                        },
+                        index: i as u32,
+                    })),
+                ))
             }
         }
 
@@ -441,14 +435,19 @@ impl BrowserFontSearcher {
 
     pub fn add_font_data(&mut self, buffer: Bytes) {
         for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
-            self.book.push(info);
-
             let buffer = buffer.clone();
-            self.fonts.push(FontSlot::new(Box::new(BufferFontLoader {
-                buffer: Some(buffer),
-                index: i as u32,
-            })))
+            self.fonts.push((
+                info,
+                FontSlot::new(Box::new(BufferFontLoader {
+                    buffer: Some(buffer),
+                    index: i as u32,
+                })),
+            ))
         }
+    }
+
+    pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>) -> ()) {
+        func(&mut self.fonts);
     }
 
     pub async fn add_glyph_pack(&mut self) -> Result<()> {
@@ -466,6 +465,33 @@ impl Default for BrowserFontSearcher {
 
 impl From<BrowserFontSearcher> for FontResolverImpl {
     fn from(value: BrowserFontSearcher) -> Self {
-        FontResolverImpl::new(vec![], value.book, value.fonts, value.profile)
+        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = value.fonts.into_iter().unzip();
+
+        let book = FontBook::from_infos(info.into_iter());
+
+        FontResolverImpl::new(vec![], book, slots, value.profile)
+    }
+}
+
+impl From<FontResolverImpl> for BrowserFontSearcher {
+    fn from(value: FontResolverImpl) -> Self {
+        let slots = value.fonts;
+        let book = value.book;
+
+        let fonts = slots
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    book.info(idx).expect("font should be in font book").clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        Self {
+            fonts,
+            profile: value.profile,
+        }
     }
 }

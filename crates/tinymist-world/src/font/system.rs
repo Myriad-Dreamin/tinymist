@@ -79,10 +79,7 @@ impl FontProfileRebuilder {
 /// Searches for fonts.
 #[derive(Debug)]
 pub struct SystemFontSearcher {
-    db: Database,
-
-    pub book: FontBook,
-    pub fonts: Vec<FontSlot>,
+    pub fonts: Vec<(FontInfo, FontSlot)>,
     pub font_paths: Vec<PathBuf>,
     profile_rebuilder: FontProfileRebuilder,
 }
@@ -93,12 +90,9 @@ impl SystemFontSearcher {
         let mut profile_rebuilder = FontProfileRebuilder::default();
         "v1beta".clone_into(&mut profile_rebuilder.profile.version);
         profile_rebuilder.profile.build_info = build_info::VERSION.to_string();
-        let db = Database::new();
 
         Self {
             font_paths: vec![],
-            db,
-            book: FontBook::new(),
             fonts: vec![],
             profile_rebuilder,
         }
@@ -125,13 +119,11 @@ impl SystemFontSearcher {
                 let _ = self.search_file(&path);
             }
         }
+
         // Source2: add the fonts from system paths.
         if !opts.no_system_fonts {
             self.search_system();
         }
-
-        // flush source1 and source2 before adding source3
-        self.flush();
 
         // Source3: add the fonts in memory.
         self.add_memory_fonts(opts.with_embedded_fonts.into_par_iter().map(|font_data| {
@@ -182,10 +174,10 @@ impl SystemFontSearcher {
         // eprintln!("profile_rebuilder init took {:?}", end - begin);
     }
 
-    pub fn flush(&mut self) {
+    pub fn add_fonts_in_fontdb(&mut self, db: &Database) {
         use fontdb::Source;
 
-        let face = self.db.faces().collect::<Vec<_>>();
+        let face = db.faces().collect::<Vec<_>>();
         let info = face.into_par_iter().map(|face| {
             let path = match &face.source {
                 Source::File(path) | Source::SharedFile(path, _) => path,
@@ -194,8 +186,7 @@ impl SystemFontSearcher {
                 Source::Binary(_) => unreachable!(),
             };
 
-            let info = self
-                .db
+            let info = db
                 .with_face_data(face.id, FontInfo::new)
                 .expect("database must contain this font");
 
@@ -213,26 +204,17 @@ impl SystemFontSearcher {
         });
 
         for face in info.collect::<Vec<_>>() {
-            let Some((info, slot)) = face else {
-                continue;
-            };
-
-            self.book.push(info);
-            self.fonts.push(slot);
+            if let Some((info, slot)) = face {
+                self.fonts.push((info, slot));
+            }
         }
-
-        self.db = Database::new();
     }
 
     /// Add an in-memory font.
     pub fn add_memory_font(&mut self, data: Bytes) {
-        if !self.db.is_empty() {
-            panic!("dirty font search state, please flush the searcher before adding memory fonts");
-        }
-
         for (index, info) in FontInfo::iter(&data).enumerate() {
-            self.book.push(info.clone());
-            self.fonts.push(
+            self.fonts.push((
+                info,
                 FontSlot::new_boxed(BufferFontLoader {
                     buffer: Some(data.clone()),
                     index: index as u32,
@@ -240,21 +222,12 @@ impl SystemFontSearcher {
                 .describe(DataSource::Memory(MemoryDataSource {
                     name: "<memory>".to_owned(),
                 })),
-            );
+            ));
         }
     }
 
-    // /// Add an in-memory font.
-    // pub fn add_memory_font(&mut self, data: Bytes) {
-    //     self.add_memory_fonts([data].into_par_iter());
-    // }
-
     /// Adds in-memory fonts.
     pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
-        if !self.db.is_empty() {
-            panic!("dirty font search state, please flush the searcher before adding memory fonts");
-        }
-
         let loaded = data.flat_map(|data| {
             FontInfo::iter(&data)
                 .enumerate()
@@ -274,13 +247,19 @@ impl SystemFontSearcher {
         });
 
         for (info, slot) in loaded.collect::<Vec<_>>() {
-            self.book.push(info);
-            self.fonts.push(slot);
+            self.fonts.push((info, slot));
         }
     }
 
+    pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>) -> ()) {
+        func(&mut self.fonts);
+    }
+
     pub fn search_system(&mut self) {
-        self.db.load_system_fonts();
+        let mut db = Database::new();
+        db.load_system_fonts();
+
+        self.add_fonts_in_fontdb(&db);
     }
 
     fn record_path(&mut self, path: &Path) {
@@ -298,15 +277,24 @@ impl SystemFontSearcher {
     /// Search for all fonts in a directory recursively.
     pub fn search_dir(&mut self, path: impl AsRef<Path>) {
         self.record_path(path.as_ref());
-        self.db.load_fonts_dir(path);
+
+        let mut db = Database::new();
+        db.load_fonts_dir(path);
+
+        self.add_fonts_in_fontdb(&db);
     }
 
     /// Index the fonts in the file at the given path.
     pub fn search_file(&mut self, path: impl AsRef<Path>) -> FileResult<()> {
         self.record_path(path.as_ref());
-        self.db
-            .load_font_file(path.as_ref())
-            .map_err(|e| FileError::from_io(e, path.as_ref()))
+
+        let mut db = Database::new();
+        db.load_font_file(path.as_ref())
+            .map_err(|e| FileError::from_io(e, path.as_ref()))?;
+
+        self.add_fonts_in_fontdb(&db);
+
+        Ok(())
     }
 }
 
@@ -332,11 +320,43 @@ impl From<SystemFontSearcher> for FontResolverImpl {
         //             info.index().unwrap_or_default(),
         //         )));
         // }
+
+        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = searcher.fonts.into_iter().unzip();
+
+        let book = FontBook::from_infos(info.into_iter());
+
         FontResolverImpl::new(
             searcher.font_paths,
-            searcher.book,
-            searcher.fonts,
+            book,
+            slots,
             searcher.profile_rebuilder.profile,
         )
+    }
+}
+
+impl From<FontResolverImpl> for SystemFontSearcher {
+    fn from(resolver: FontResolverImpl) -> Self {
+        let slots = resolver.fonts;
+        let book = resolver.book;
+
+        let fonts = slots
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    book.info(idx).expect("font should be in font book").clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        let mut profile_rebuilder = FontProfileRebuilder::default();
+        profile_rebuilder.profile = resolver.profile;
+
+        Self {
+            fonts,
+            font_paths: resolver.font_paths,
+            profile_rebuilder,
+        }
     }
 }

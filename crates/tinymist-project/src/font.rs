@@ -178,11 +178,15 @@ impl fmt::Display for TinymistFontResolver {
 
 impl From<SystemFontSearcher> for TinymistFontResolver {
     fn from(searcher: SystemFontSearcher) -> Self {
+        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = searcher.fonts.into_iter().unzip();
+
+        let book = FontBook::from_infos(info.into_iter());
+
         TinymistFontResolver::new(
             searcher.font_paths,
-            searcher.book,
+            book,
             Arc::new(Mutex::new(PartialFontBook::default())),
-            searcher.fonts,
+            slots,
         )
     }
 }
