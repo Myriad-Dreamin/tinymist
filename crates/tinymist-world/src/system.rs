@@ -59,7 +59,7 @@ impl TypstSystemUniverse {
     fn resolve_fonts(opts: CompileOpts) -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(opts.into())?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 }
 
@@ -98,7 +98,7 @@ impl SystemUniverseBuilder {
             no_system_fonts: args.ignore_system_fonts,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 
     /// Resolve package registry from given options.

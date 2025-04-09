@@ -98,6 +98,89 @@ impl SystemFontSearcher {
         }
     }
 
+    /// Create a new system searcher with fonts in a FontResolverImpl.
+    pub fn from_resolver(resolver: FontResolverImpl) -> Self {
+        let fonts = resolver
+            .fonts
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        let mut profile_rebuilder = FontProfileRebuilder::default();
+        profile_rebuilder.profile = resolver.profile;
+
+        Self {
+            fonts,
+            font_paths: resolver.font_paths,
+            profile_rebuilder,
+        }
+    }
+
+    /// Create a new system searcher with fonts cloned from a FontResolverImpl.
+    /// Since FontSlot only holds QueryRef to font data, cloning is cheap.
+    pub fn new_with_resolver(resolver: &FontResolverImpl) -> Self {
+        let fonts = resolver
+            .fonts
+            .iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot.clone(),
+                )
+            })
+            .collect();
+
+        let mut profile_rebuilder = FontProfileRebuilder::default();
+        profile_rebuilder.profile = resolver.profile.clone();
+
+        Self {
+            fonts,
+            font_paths: resolver.font_paths.clone(),
+            profile_rebuilder,
+        }
+    }
+
+    /// Build a FontResolverImpl.
+    pub fn build(self) -> FontResolverImpl {
+        // let profile_item = match
+        // self.profile_rebuilder.search_file(path.as_ref()) {
+        //     Some(profile_item) => profile_item,
+        //     None => return,
+        // };
+
+        // for info in profile_item.info.iter() {
+        //     self.book.push(info.info.clone());
+        //     self.fonts
+        //         .push(FontSlot::new_boxed(LazyBufferFontLoader::new(
+        //             LazyFile::new(path.as_ref().to_owned()),
+        //             info.index().unwrap_or_default(),
+        //         )));
+        // }
+
+        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = self.fonts.into_iter().unzip();
+
+        let book = FontBook::from_infos(info.into_iter());
+
+        FontResolverImpl::new(self.font_paths, book, slots, self.profile_rebuilder.profile)
+    }
+}
+
+impl SystemFontSearcher {
     /// Resolve fonts from given options.
     pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> Result<()> {
         if opts
@@ -301,62 +384,5 @@ impl SystemFontSearcher {
 impl Default for SystemFontSearcher {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl From<SystemFontSearcher> for FontResolverImpl {
-    fn from(searcher: SystemFontSearcher) -> Self {
-        // let profile_item = match
-        // self.profile_rebuilder.search_file(path.as_ref()) {
-        //     Some(profile_item) => profile_item,
-        //     None => return,
-        // };
-
-        // for info in profile_item.info.iter() {
-        //     self.book.push(info.info.clone());
-        //     self.fonts
-        //         .push(FontSlot::new_boxed(LazyBufferFontLoader::new(
-        //             LazyFile::new(path.as_ref().to_owned()),
-        //             info.index().unwrap_or_default(),
-        //         )));
-        // }
-
-        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = searcher.fonts.into_iter().unzip();
-
-        let book = FontBook::from_infos(info.into_iter());
-
-        FontResolverImpl::new(
-            searcher.font_paths,
-            book,
-            slots,
-            searcher.profile_rebuilder.profile,
-        )
-    }
-}
-
-impl From<FontResolverImpl> for SystemFontSearcher {
-    fn from(resolver: FontResolverImpl) -> Self {
-        let slots = resolver.fonts;
-        let book = resolver.book;
-
-        let fonts = slots
-            .into_iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    book.info(idx).expect("font should be in font book").clone(),
-                    slot,
-                )
-            })
-            .collect();
-
-        let mut profile_rebuilder = FontProfileRebuilder::default();
-        profile_rebuilder.profile = resolver.profile;
-
-        Self {
-            fonts,
-            font_paths: resolver.font_paths,
-            profile_rebuilder,
-        }
     }
 }

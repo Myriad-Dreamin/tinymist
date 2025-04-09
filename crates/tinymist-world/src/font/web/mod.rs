@@ -377,7 +377,7 @@ pub struct BrowserFontSearcher {
 }
 
 impl BrowserFontSearcher {
-    /// Create a new, empty system searcher.
+    /// Create a new, empty browser searcher.
     pub fn new() -> Self {
         let profile = FontProfile {
             version: "v1beta".to_owned(),
@@ -395,6 +395,66 @@ impl BrowserFontSearcher {
         searcher
     }
 
+    /// Create a new browser searcher with fonts in a FontResolverImpl.
+    pub fn from_resolver(resolver: FontResolverImpl) -> Self {
+        let fonts = resolver
+            .fonts
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        Self {
+            fonts,
+            profile: resolver.profile,
+        }
+    }
+
+    /// Create a new browser searcher with fonts cloned from a FontResolverImpl.
+    /// Since FontSlot only holds QueryRef to font data, cloning is cheap.
+    pub fn new_with_resolver(resolver: &FontResolverImpl) -> Self {
+        let fonts = resolver
+            .fonts
+            .iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot.clone(),
+                )
+            })
+            .collect();
+
+        Self {
+            fonts,
+            profile: resolver.profile.clone(),
+        }
+    }
+
+    /// Build a FontResolverImpl.
+    pub fn build(self) -> FontResolverImpl {
+        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = self.fonts.into_iter().unzip();
+
+        let book = FontBook::from_infos(info.into_iter());
+
+        FontResolverImpl::new(vec![], book, slots, self.profile)
+    }
+}
+
+impl BrowserFontSearcher {
     /// Add fonts that are embedded in the binary.
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
@@ -460,38 +520,5 @@ impl BrowserFontSearcher {
 impl Default for BrowserFontSearcher {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl From<BrowserFontSearcher> for FontResolverImpl {
-    fn from(value: BrowserFontSearcher) -> Self {
-        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = value.fonts.into_iter().unzip();
-
-        let book = FontBook::from_infos(info.into_iter());
-
-        FontResolverImpl::new(vec![], book, slots, value.profile)
-    }
-}
-
-impl From<FontResolverImpl> for BrowserFontSearcher {
-    fn from(value: FontResolverImpl) -> Self {
-        let slots = value.fonts;
-        let book = value.book;
-
-        let fonts = slots
-            .into_iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    book.info(idx).expect("font should be in font book").clone(),
-                    slot,
-                )
-            })
-            .collect();
-
-        Self {
-            fonts,
-            profile: value.profile,
-        }
     }
 }
