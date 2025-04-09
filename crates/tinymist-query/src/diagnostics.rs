@@ -247,5 +247,5 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
 
 #[comemo::memoize]
 fn lint_file(source: &ExprInfo) -> EcoVec<SourceDiagnostic> {
-    tinymist_lint::lint_source(source)
+    tinymist_lint::lint_file(source)
 }
