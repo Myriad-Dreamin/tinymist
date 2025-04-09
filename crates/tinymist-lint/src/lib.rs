@@ -2,30 +2,34 @@
 
 use tinymist_analysis::syntax::ExprInfo;
 use typst::{
-    diag::{eco_format, EcoString, SourceDiagnostic},
+    diag::{eco_format, EcoString, SourceDiagnostic, Tracepoint},
     ecow::EcoVec,
     syntax::{
         ast::{self, AstNode},
-        SyntaxNode,
+        Span, Spanned, SyntaxNode,
     },
 };
 
 /// A type alias for a vector of diagnostics.
 type DiagnosticVec = EcoVec<SourceDiagnostic>;
 
-/// Lints a Typst source and returns a vector of diagnostics.
-pub fn lint_source(expr: &ExprInfo) -> DiagnosticVec {
-    SourceLinter::new().lint(expr.source.root())
+/// Performs linting check on syntax and returns a vector of diagnostics.
+pub fn lint_file(expr: &ExprInfo) -> DiagnosticVec {
+    ExprLinter::new().lint(expr.source.root())
 }
 
-struct SourceLinter {
+struct ExprLinter {
     diag: DiagnosticVec,
+    loop_info: Option<LoopInfo>,
+    func_info: Option<FuncInfo>,
 }
 
-impl SourceLinter {
+impl ExprLinter {
     fn new() -> Self {
         Self {
             diag: EcoVec::new(),
+            loop_info: None,
+            func_info: None,
         }
     }
 
@@ -39,54 +43,488 @@ impl SourceLinter {
         self.diag
     }
 
-    fn exprs<'a>(&mut self, exprs: impl Iterator<Item = ast::Expr<'a>>) -> Option<()> {
+    fn with_loop_info<F>(&mut self, span: Span, f: F) -> Option<()>
+    where
+        F: FnOnce(&mut Self) -> Option<()>,
+    {
+        let old = self.loop_info.take();
+        self.loop_info = Some(LoopInfo {
+            span,
+            has_break: false,
+            has_continue: false,
+        });
+        f(self);
+        self.loop_info = old;
+        Some(())
+    }
+
+    fn with_func_info<F>(&mut self, span: Span, f: F) -> Option<()>
+    where
+        F: FnOnce(&mut Self) -> Option<()>,
+    {
+        let old = self.func_info.take();
+        self.func_info = Some(FuncInfo {
+            span,
+            is_contextual: false,
+            has_return: false,
+            has_return_value: false,
+            parent_loop: self.loop_info.clone(),
+        });
+        f(self);
+        self.loop_info = self.func_info.take().expect("func info").parent_loop;
+        self.func_info = old;
+        Some(())
+    }
+
+    fn late_func_return(&mut self, f: impl FnOnce(LateFuncLinter) -> Option<()>) -> Option<()> {
+        let func_info = self.func_info.as_ref().expect("func info").clone();
+        f(LateFuncLinter {
+            linter: self,
+            func_info,
+            return_block_info: None,
+        })
+    }
+
+    fn bad_branch_stmt(&mut self, expr: &SyntaxNode, name: &str) -> Option<()> {
+        let parent_loop = self
+            .func_info
+            .as_ref()
+            .map(|info| (info.parent_loop.as_ref(), info));
+
+        let mut diag = SourceDiagnostic::warning(
+            expr.span(),
+            eco_format!("`{name}` statement in a non-loop context"),
+        );
+        if let Some((Some(loop_info), func_info)) = parent_loop {
+            diag.trace.push(Spanned::new(
+                Tracepoint::Show(EcoString::inline("loop")),
+                loop_info.span,
+            ));
+            diag.trace
+                .push(Spanned::new(Tracepoint::Call(None), func_info.span));
+        }
+        self.diag.push(diag);
+
+        Some(())
+    }
+
+    #[inline(always)]
+    fn buggy_block_expr(&mut self, expr: ast::Expr, loc: BuggyBlockLoc) -> Option<()> {
+        self.buggy_block(Block::from(expr)?, loc)
+    }
+
+    fn buggy_block(&mut self, block: Block, loc: BuggyBlockLoc) -> Option<()> {
+        if self.only_show(block) {
+            let mut first = true;
+            for set in block.iter() {
+                let msg = match set {
+                    ast::Expr::Set(..) => "This set statement doesn't take effect.",
+                    ast::Expr::Show(..) => "This show statement doesn't take effect.",
+                    _ => continue,
+                };
+                let mut warning = SourceDiagnostic::warning(set.span(), msg);
+                if first {
+                    first = false;
+                    warning.hint(loc.hint(set));
+                }
+                self.diag.push(warning);
+            }
+
+            return None;
+        }
+
+        Some(())
+    }
+
+    fn only_show(&mut self, block: Block) -> bool {
+        let mut has_set = false;
+
+        for it in block.iter() {
+            if is_show_set(it) {
+                has_set = true;
+            } else if matches!(it, ast::Expr::Break(..) | ast::Expr::Continue(..)) {
+                return has_set;
+            } else if !it.to_untyped().kind().is_trivia() {
+                return false;
+            }
+        }
+
+        has_set
+    }
+}
+
+impl DataFlowVisitor for ExprLinter {
+    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs {
             self.expr(expr);
         }
         Some(())
     }
 
-    fn exprs_untyped(&mut self, to_untyped: &SyntaxNode) -> Option<()> {
-        for expr in to_untyped.children() {
-            if let Some(expr) = expr.cast() {
-                self.expr(expr);
-            }
+    fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
+        if let Some(target) = expr.condition() {
+            self.expr(target);
+        }
+        self.exprs(expr.args().to_untyped().exprs());
+        self.expr(expr.target())
+    }
+
+    fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
+        if let Some(target) = expr.selector() {
+            self.expr(target);
+        }
+        let transform = expr.transform();
+        self.buggy_block_expr(transform, BuggyBlockLoc::Show(expr));
+        self.expr(transform)
+    }
+
+    fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
+        self.expr(expr.condition());
+
+        let if_body = expr.if_body();
+        self.buggy_block_expr(if_body, BuggyBlockLoc::IfTrue(expr));
+        self.expr(if_body);
+
+        if let Some(else_body) = expr.else_body() {
+            self.buggy_block_expr(else_body, BuggyBlockLoc::IfFalse(expr));
+            self.expr(else_body);
+        }
+
+        Some(())
+    }
+
+    fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
+        self.with_loop_info(expr.span(), |this| {
+            this.expr(expr.condition());
+            let body = expr.body();
+            this.buggy_block_expr(body, BuggyBlockLoc::While(expr));
+            this.expr(body)
+        })
+    }
+
+    fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
+        self.with_loop_info(expr.span(), |this| {
+            this.expr(expr.iterable());
+            let body = expr.body();
+            this.buggy_block_expr(body, BuggyBlockLoc::For(expr));
+            this.expr(body)
+        })
+    }
+
+    fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
+        self.with_func_info(expr.span(), |this| {
+            this.loop_info = None;
+            this.func_info
+                .as_mut()
+                .expect("contextual function info")
+                .is_contextual = true;
+            this.expr(expr.body());
+            this.late_func_return(|mut this| this.late_contextual(expr))
+        })
+    }
+
+    fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
+        self.with_func_info(expr.span(), |this| {
+            this.loop_info = None;
+            this.exprs(expr.params().to_untyped().exprs());
+            this.expr(expr.body());
+            this.late_func_return(|mut this| this.late_closure(expr))
+        })
+    }
+
+    fn loop_break(&mut self, expr: ast::LoopBreak<'_>) -> Option<()> {
+        if let Some(info) = &mut self.loop_info {
+            info.has_break = true;
+        } else {
+            self.bad_branch_stmt(expr.to_untyped(), "break");
         }
         Some(())
     }
 
-    fn expr(&mut self, node: ast::Expr) -> Option<()> {
-        match node {
+    fn loop_continue(&mut self, expr: ast::LoopContinue<'_>) -> Option<()> {
+        if let Some(info) = &mut self.loop_info {
+            info.has_continue = true;
+        } else {
+            self.bad_branch_stmt(expr.to_untyped(), "continue");
+        }
+        Some(())
+    }
+
+    fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
+        if let Some(info) = &mut self.func_info {
+            info.has_return = true;
+            info.has_return_value = expr.body().is_some();
+        } else {
+            self.diag.push(SourceDiagnostic::warning(
+                expr.span(),
+                "`return` statement in a non-function context",
+            ));
+        }
+        Some(())
+    }
+}
+
+struct LateFuncLinter<'a> {
+    linter: &'a mut ExprLinter,
+    func_info: FuncInfo,
+    return_block_info: Option<ReturnBlockInfo>,
+}
+
+impl LateFuncLinter<'_> {
+    fn late_closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
+        if !self.func_info.has_return {
+            return Some(());
+        }
+        self.expr(expr.body())
+    }
+
+    fn late_contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
+        if !self.func_info.has_return {
+            return Some(());
+        }
+        self.expr(expr.body())
+    }
+
+    fn join(&mut self, parent: Option<ReturnBlockInfo>) {
+        if let Some(parent) = parent {
+            match &mut self.return_block_info {
+                Some(info) => {
+                    if info.return_value == parent.return_value {
+                        return;
+                    }
+
+                    // Merge the two return block info
+                    *info = parent.merge(std::mem::take(info));
+                }
+                info @ None => {
+                    *info = Some(parent);
+                }
+            }
+        }
+    }
+}
+
+impl DataFlowVisitor for LateFuncLinter<'_> {
+    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
+        for expr in exprs.rev() {
+            self.expr(expr);
+        }
+        Some(())
+    }
+
+    fn block<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
+        self.exprs(exprs)
+    }
+
+    fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
+        self.return_block_info = Some(ReturnBlockInfo {
+            return_value: false,
+            return_none: false,
+            warned: false,
+        });
+        Some(())
+    }
+
+    fn loop_continue(&mut self, _expr: ast::LoopContinue<'_>) -> Option<()> {
+        self.return_block_info = Some(ReturnBlockInfo {
+            return_value: false,
+            return_none: false,
+            warned: false,
+        });
+        Some(())
+    }
+
+    fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
+        if expr.body().is_some() {
+            self.return_block_info = Some(ReturnBlockInfo {
+                return_value: true,
+                return_none: false,
+                warned: false,
+            });
+        } else {
+            self.return_block_info = Some(ReturnBlockInfo {
+                return_value: false,
+                return_none: true,
+                warned: false,
+            });
+        }
+        Some(())
+    }
+
+    fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
+        let ident = expr.name().map(ast::Expr::Ident).into_iter();
+        let params = expr.params().to_untyped().exprs();
+        // the body is ignored in the return stmt analysis
+        let _body = expr.body().once();
+        self.exprs(ident.chain(params))
+    }
+
+    fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
+        // the body is ignored in the return stmt analysis
+        let _body = expr.body();
+        Some(())
+    }
+
+    fn equation(&mut self, expr: ast::Equation<'_>) -> Option<()> {
+        self.value(ast::Expr::Equation(expr));
+        Some(())
+    }
+
+    fn array(&mut self, expr: ast::Array<'_>) -> Option<()> {
+        self.value(ast::Expr::Array(expr));
+        Some(())
+    }
+
+    fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
+        self.value(ast::Expr::Dict(expr));
+        Some(())
+    }
+
+    fn func_call(&mut self, _expr: ast::FuncCall<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn let_binding(&mut self, _expr: ast::LetBinding<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn destruct_assign(&mut self, _expr: ast::DestructAssignment<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
+        let if_body = expr.if_body();
+        let else_body = expr.else_body();
+
+        let parent = self.return_block_info.clone();
+        self.exprs(if_body.once());
+        let if_branch = std::mem::replace(&mut self.return_block_info, parent.clone());
+        self.exprs(else_body.into_iter());
+        // else_branch
+        self.join(if_branch);
+
+        Some(())
+    }
+
+    fn value(&mut self, expr: ast::Expr) -> Option<()> {
+        let ri = self.return_block_info.as_mut()?;
+        if ri.warned {
+            return None;
+        }
+        if matches!(expr, ast::Expr::None(..)) || expr.to_untyped().kind().is_trivia() {
+            return None;
+        }
+
+        if ri.return_value {
+            ri.warned = true;
+            let diag = SourceDiagnostic::warning(
+                expr.span(),
+                eco_format!(
+                    "This {} is implicitly discarded by function return",
+                    expr.to_untyped().kind().name()
+                ),
+            );
+            let diag = match expr {
+                ast::Expr::Show(..) | ast::Expr::Set(..) => diag,
+                expr if expr.hash() => diag.with_hint(eco_format!(
+                    "consider ignoring the value explicitly using underscore: `let _ = {}`",
+                    expr.to_untyped().clone().into_text()
+                )),
+                _ => diag,
+            };
+            self.linter.diag.push(diag);
+        } else if ri.return_none && matches!(expr, ast::Expr::Show(..) | ast::Expr::Set(..)) {
+            ri.warned = true;
+            let diag = SourceDiagnostic::warning(
+                expr.span(),
+                eco_format!(
+                    "This {} is implicitly discarded by function return",
+                    expr.to_untyped().kind().name()
+                ),
+            );
+            self.linter.diag.push(diag);
+        }
+
+        Some(())
+    }
+
+    fn field_access(&mut self, _expr: ast::FieldAccess<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
+        self.value(ast::Expr::Show(expr));
+        Some(())
+    }
+
+    fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
+        self.value(ast::Expr::Set(expr));
+        Some(())
+    }
+
+    fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
+        self.expr(expr.body())
+    }
+
+    fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
+        self.expr(expr.body())
+    }
+
+    fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
+        self.value(ast::Expr::Include(expr));
+        Some(())
+    }
+}
+
+#[derive(Clone, Default)]
+struct ReturnBlockInfo {
+    return_value: bool,
+    return_none: bool,
+    warned: bool,
+}
+
+impl ReturnBlockInfo {
+    fn merge(self, other: Self) -> Self {
+        Self {
+            return_value: self.return_value && other.return_value,
+            return_none: self.return_none && other.return_none,
+            warned: self.warned && other.warned,
+        }
+    }
+}
+
+trait DataFlowVisitor {
+    fn expr(&mut self, expr: ast::Expr) -> Option<()> {
+        match expr {
             ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
-            ast::Expr::Code(expr) => self.exprs(expr.body().exprs()),
-            ast::Expr::Content(expr) => self.exprs(expr.body().exprs()),
-            ast::Expr::Equation(expr) => self.exprs(expr.body().exprs()),
+            ast::Expr::Code(expr) => self.block(expr.body().exprs()),
+            ast::Expr::Content(expr) => self.block(expr.body().exprs()),
             ast::Expr::Math(expr) => self.exprs(expr.exprs()),
 
-            ast::Expr::Text(..) => None,
-            ast::Expr::Space(..) => None,
-            ast::Expr::Linebreak(..) => None,
-            ast::Expr::Parbreak(..) => None,
-            ast::Expr::Escape(..) => None,
-            ast::Expr::Shorthand(..) => None,
-            ast::Expr::SmartQuote(..) => None,
-            ast::Expr::Raw(..) => None,
-            ast::Expr::Link(..) => None,
+            ast::Expr::Text(..) => self.value(expr),
+            ast::Expr::Space(..) => self.value(expr),
+            ast::Expr::Linebreak(..) => self.value(expr),
+            ast::Expr::Parbreak(..) => self.value(expr),
+            ast::Expr::Escape(..) => self.value(expr),
+            ast::Expr::Shorthand(..) => self.value(expr),
+            ast::Expr::SmartQuote(..) => self.value(expr),
+            ast::Expr::Raw(..) => self.value(expr),
+            ast::Expr::Link(..) => self.value(expr),
 
-            ast::Expr::Label(..) => None,
-            ast::Expr::Ref(..) => None,
-            ast::Expr::None(..) => None,
-            ast::Expr::Auto(..) => None,
-            ast::Expr::Bool(..) => None,
-            ast::Expr::Int(..) => None,
-            ast::Expr::Float(..) => None,
-            ast::Expr::Numeric(..) => None,
-            ast::Expr::Str(..) => None,
-            ast::Expr::MathText(..) => None,
-            ast::Expr::MathShorthand(..) => None,
-            ast::Expr::MathAlignPoint(..) => None,
-            ast::Expr::MathPrimes(..) => None,
-            ast::Expr::MathRoot(..) => None,
+            ast::Expr::Label(..) => self.value(expr),
+            ast::Expr::Ref(..) => self.value(expr),
+            ast::Expr::None(..) => self.value(expr),
+            ast::Expr::Auto(..) => self.value(expr),
+            ast::Expr::Bool(..) => self.value(expr),
+            ast::Expr::Int(..) => self.value(expr),
+            ast::Expr::Float(..) => self.value(expr),
+            ast::Expr::Numeric(..) => self.value(expr),
+            ast::Expr::Str(..) => self.value(expr),
+            ast::Expr::MathText(..) => self.value(expr),
+            ast::Expr::MathShorthand(..) => self.value(expr),
+            ast::Expr::MathAlignPoint(..) => self.value(expr),
+            ast::Expr::MathPrimes(..) => self.value(expr),
+            ast::Expr::MathRoot(..) => self.value(expr),
 
             ast::Expr::Strong(content) => self.exprs(content.body().exprs()),
             ast::Expr::Emph(content) => self.exprs(content.body().exprs()),
@@ -94,16 +532,14 @@ impl SourceLinter {
             ast::Expr::List(content) => self.exprs(content.body().exprs()),
             ast::Expr::Enum(content) => self.exprs(content.body().exprs()),
             ast::Expr::Term(content) => {
-                self.exprs(content.term().exprs());
-                self.exprs(content.description().exprs())
+                self.exprs(content.term().exprs().chain(content.description().exprs()))
             }
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
-            ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => {
-                self.exprs_untyped(node.to_untyped())
-            }
+            ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
 
             ast::Expr::Ident(expr) => self.ident(expr),
             ast::Expr::MathIdent(expr) => self.math_ident(expr),
+            ast::Expr::Equation(expr) => self.equation(expr),
             ast::Expr::Array(expr) => self.array(expr),
             ast::Expr::Dict(expr) => self.dict(expr),
             ast::Expr::Unary(expr) => self.unary(expr),
@@ -127,6 +563,21 @@ impl SourceLinter {
         }
     }
 
+    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
+        for expr in exprs {
+            self.expr(expr);
+        }
+        Some(())
+    }
+
+    fn block<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
+        self.exprs(exprs)
+    }
+
+    fn value(&mut self, _expr: ast::Expr) -> Option<()> {
+        Some(())
+    }
+
     fn ident(&mut self, _expr: ast::Ident<'_>) -> Option<()> {
         Some(())
     }
@@ -143,12 +594,16 @@ impl SourceLinter {
         Some(())
     }
 
+    fn equation(&mut self, expr: ast::Equation<'_>) -> Option<()> {
+        self.exprs(expr.body().exprs())
+    }
+
     fn array(&mut self, expr: ast::Array<'_>) -> Option<()> {
-        self.exprs_untyped(expr.to_untyped())
+        self.exprs(expr.to_untyped().exprs())
     }
 
     fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
-        self.exprs_untyped(expr.to_untyped())
+        self.exprs(expr.to_untyped().exprs())
     }
 
     fn unary(&mut self, expr: ast::Unary<'_>) -> Option<()> {
@@ -156,8 +611,7 @@ impl SourceLinter {
     }
 
     fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
-        self.expr(expr.lhs());
-        self.expr(expr.rhs())
+        self.exprs([expr.lhs(), expr.rhs()].into_iter())
     }
 
     fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
@@ -165,13 +619,14 @@ impl SourceLinter {
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
-        self.exprs_untyped(expr.args().to_untyped());
-        self.expr(expr.callee())
+        self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()))
     }
 
     fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
-        self.exprs_untyped(expr.params().to_untyped());
-        self.expr(expr.body())
+        let ident = expr.name().map(ast::Expr::Ident).into_iter();
+        let params = expr.params().to_untyped().exprs();
+        let body = expr.body().once();
+        self.exprs(ident.chain(params).chain(body))
     }
 
     fn let_binding(&mut self, expr: ast::LetBinding<'_>) -> Option<()> {
@@ -183,26 +638,15 @@ impl SourceLinter {
     }
 
     fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
-        if let Some(target) = expr.condition() {
-            self.expr(target);
-        }
-        self.exprs_untyped(expr.args().to_untyped());
-        self.expr(expr.target())
+        let cond = expr.condition().into_iter();
+        let args = expr.args().to_untyped().exprs();
+        self.exprs(cond.chain(args).chain(expr.target().once()))
     }
 
     fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
-        if let Some(target) = expr.selector() {
-            self.expr(target);
-        }
+        let selector = expr.selector().into_iter();
         let transform = expr.transform();
-        match transform {
-            ast::Expr::Code(..) | ast::Expr::Content(..) => {
-                self.buggy_show(transform, BuggyShowLoc::Show(expr))
-            }
-            _ => None,
-        };
-
-        self.expr(transform)
+        self.exprs(selector.chain(transform.once()))
     }
 
     fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
@@ -210,32 +654,22 @@ impl SourceLinter {
     }
 
     fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
-        self.expr(expr.condition());
-
-        let if_body = expr.if_body();
-        self.buggy_show(if_body, BuggyShowLoc::IfTrue(expr));
-        self.expr(if_body);
-
-        if let Some(else_body) = expr.else_body() {
-            self.buggy_show(else_body, BuggyShowLoc::IfFalse(expr));
-            self.expr(else_body);
-        }
-
-        Some(())
+        let cond = expr.condition().once();
+        let if_body = expr.if_body().once();
+        let else_body = expr.else_body().into_iter();
+        self.exprs(cond.chain(if_body).chain(else_body))
     }
 
     fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
-        self.expr(expr.condition());
-        let body = expr.body();
-        self.buggy_show(body, BuggyShowLoc::While(expr));
-        self.expr(body)
+        let cond = expr.condition().once();
+        let body = expr.body().once();
+        self.exprs(cond.chain(body))
     }
 
     fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
-        self.expr(expr.iterable());
-        let body = expr.body();
-        self.buggy_show(body, BuggyShowLoc::For(expr));
-        self.expr(body)
+        let iterable = expr.iterable().once();
+        let body = expr.body().once();
+        self.exprs(iterable.chain(body))
     }
 
     fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
@@ -246,88 +680,91 @@ impl SourceLinter {
         Some(())
     }
 
-    fn func_return(&mut self, _expr: ast::FuncReturn<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn buggy_show(&mut self, expr: ast::Expr, loc: BuggyShowLoc) -> Option<()> {
-        if self.only_set(expr) {
-            let sets = match expr {
-                ast::Expr::Code(block) => block
-                    .body()
-                    .exprs()
-                    .filter(|it| is_show_set(*it))
-                    .collect::<Vec<_>>(),
-                ast::Expr::Content(block) => block
-                    .body()
-                    .exprs()
-                    .filter(|it| is_show_set(*it))
-                    .collect::<Vec<_>>(),
-                _ => return None,
-            };
-
-            for (idx, set) in sets.iter().enumerate() {
-                let msg = match set {
-                    ast::Expr::Set(..) => "This set statement doesn't take effect.",
-                    ast::Expr::Show(..) => "This show statement doesn't take effect.",
-                    _ => continue,
-                };
-                let mut warning = SourceDiagnostic::warning(set.span(), msg);
-                if idx == 0 {
-                    warning.hint(loc.hint(*set));
-                }
-
-                self.diag.push(warning);
-            }
-
-            return None;
-        }
-
-        Some(())
-    }
-
-    fn only_set(&mut self, expr: ast::Expr) -> bool {
-        let mut has_set = false;
-
-        match expr {
-            ast::Expr::Code(block) => {
-                for it in block.body().exprs() {
-                    if is_show_set(it) {
-                        has_set = true;
-                    } else {
-                        return false;
-                    }
-                }
-            }
-            ast::Expr::Content(block) => {
-                for it in block.body().exprs() {
-                    if is_show_set(it) {
-                        has_set = true;
-                    } else if !it.to_untyped().kind().is_trivia() {
-                        return false;
-                    }
-                }
-            }
-            _ => {
-                return false;
-            }
-        }
-
-        has_set
+    fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
+        self.expr(expr.body()?)
     }
 }
 
-enum BuggyShowLoc<'a> {
+trait ExprsUntyped {
+    fn exprs(&self) -> impl DoubleEndedIterator<Item = ast::Expr<'_>>;
+}
+
+impl ExprsUntyped for ast::Expr<'_> {
+    fn exprs(&self) -> impl DoubleEndedIterator<Item = ast::Expr<'_>> {
+        self.to_untyped().exprs()
+    }
+}
+
+impl ExprsUntyped for SyntaxNode {
+    fn exprs(&self) -> impl DoubleEndedIterator<Item = ast::Expr<'_>> {
+        self.children().filter_map(SyntaxNode::cast)
+    }
+}
+
+trait ExprsOnce<'a> {
+    fn once(self) -> impl DoubleEndedIterator<Item = ast::Expr<'a>>;
+}
+
+impl<'a> ExprsOnce<'a> for ast::Expr<'a> {
+    fn once(self) -> impl DoubleEndedIterator<Item = ast::Expr<'a>> {
+        std::iter::once(self)
+    }
+}
+
+#[derive(Clone)]
+struct LoopInfo {
+    span: Span,
+    has_break: bool,
+    has_continue: bool,
+}
+
+#[derive(Clone)]
+struct FuncInfo {
+    span: Span,
+    is_contextual: bool,
+    has_return: bool,
+    has_return_value: bool,
+    parent_loop: Option<LoopInfo>,
+}
+
+#[derive(Clone, Copy)]
+enum Block<'a> {
+    Code(ast::Code<'a>),
+    Markup(ast::Markup<'a>),
+}
+
+impl<'a> Block<'a> {
+    fn from(expr: ast::Expr<'a>) -> Option<Self> {
+        Some(match expr {
+            ast::Expr::Code(block) => Block::Code(block.body()),
+            ast::Expr::Content(block) => Block::Markup(block.body()),
+            _ => return None,
+        })
+    }
+
+    #[inline(always)]
+    fn iter(&self) -> impl Iterator<Item = ast::Expr<'a>> {
+        let (x, y) = match self {
+            Block::Code(block) => (Some(block.exprs()), None),
+            Block::Markup(block) => (None, Some(block.exprs())),
+        };
+
+        x.into_iter().flatten().chain(y.into_iter().flatten())
+    }
+}
+
+enum BuggyBlockLoc<'a> {
     Show(ast::ShowRule<'a>),
     IfTrue(ast::Conditional<'a>),
     IfFalse(ast::Conditional<'a>),
     While(ast::WhileLoop<'a>),
     For(ast::ForLoop<'a>),
 }
-impl BuggyShowLoc<'_> {
+
+impl BuggyBlockLoc<'_> {
     fn hint(&self, show_set: ast::Expr<'_>) -> EcoString {
         match self {
-            BuggyShowLoc::Show(show_parent) => {
+            BuggyBlockLoc::Show(show_parent) => {
                 if let ast::Expr::Show(show) = show_set {
                     eco_format!(
                         "consider changing parent to `show {}: it => {{ {}; it }}`",
@@ -348,8 +785,8 @@ impl BuggyShowLoc<'_> {
                     )
                 }
             }
-            BuggyShowLoc::IfTrue(conditional) | BuggyShowLoc::IfFalse(conditional) => {
-                let neg = if matches!(self, BuggyShowLoc::IfTrue(..)) {
+            BuggyBlockLoc::IfTrue(conditional) | BuggyBlockLoc::IfFalse(conditional) => {
+                let neg = if matches!(self, BuggyBlockLoc::IfTrue(..)) {
                     ""
                 } else {
                     "not "
@@ -371,14 +808,14 @@ impl BuggyShowLoc<'_> {
                     )
                 }
             }
-            BuggyShowLoc::While(w) => {
+            BuggyBlockLoc::While(w) => {
                 eco_format!(
                     "consider changing parent to `show: it => if {} {{ {}; it }}`",
                     w.condition().to_untyped().clone().into_text(),
                     show_set.to_untyped().clone().into_text()
                 )
             }
-            BuggyShowLoc::For(f) => {
+            BuggyBlockLoc::For(f) => {
                 eco_format!(
                     "consider changing parent to `show: {}.fold(it => it, (style-it, {}) => it => {{ {}; style-it(it) }})`",
                     f.iterable().to_untyped().clone().into_text(),

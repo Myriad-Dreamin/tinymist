@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/break_func_for.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "`break` statement in a non-loop context",
+   "range": "1:16:1:21",
+   "relatedInformation": [
+    {
+     "message": "error occurred while applying show rule to this loop"
+    },
+    {
+     "message": "error occurred in this function call"
+    }
+   ],
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

@@ -671,7 +671,7 @@ mod lint_tests {
             let source = ctx.source_by_path(&path).unwrap();
             let expr = ctx.expr_stage(&source);
 
-            let result = tinymist_lint::lint_source(&expr);
+            let result = tinymist_lint::lint_file(&expr);
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()

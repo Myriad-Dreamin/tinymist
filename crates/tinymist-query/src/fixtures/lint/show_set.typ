@@ -1,4 +1,3 @@
-
 #show: {
   set text(red)
 }

@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/break_top.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "`break` statement in a non-loop context",
+   "range": "0:1:0:6",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}
