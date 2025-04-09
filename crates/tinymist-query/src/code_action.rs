@@ -80,3 +80,29 @@ impl SemanticRequest for CodeActionRequest {
         (!worker.actions.is_empty()).then_some(worker.actions)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("code_action", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let request = CodeActionRequest {
+                path: path.clone(),
+                range: find_test_range(&source),
+            };
+
+            let result = request.request(ctx);
+
+            insta::with_settings!({
+                description => format!("Code Action on {})", make_range_annoation(&source)),
+            }, {
+                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            })
+        });
+    }
+}
