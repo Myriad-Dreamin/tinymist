@@ -4,8 +4,8 @@ use typst::foundations::{Element, Type};
 
 use super::*;
 use crate::analysis::ParamAttrs;
-use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedDefDocs};
-use crate::syntax::{def::*, DocString, VarDoc};
+use crate::docs::{DocString, SignatureDocsT, TypelessParamDocs, UntypedDefDocs, VarDoc};
+use crate::syntax::def::*;
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);

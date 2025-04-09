@@ -1,6 +1,11 @@
 use core::fmt;
-use std::{collections::BTreeMap, ops::Range};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, Range},
+    sync::Arc,
+};
 
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::DeclEnum;
 use tinymist_std::DefId;
@@ -8,15 +13,125 @@ use tinymist_world::package::PackageSpec;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
     syntax::{Span, SyntaxNode},
+    utils::LazyHash,
 };
 
 use crate::{
     adt::interner::impl_internable,
+    docs::DocString,
     prelude::*,
     ty::{InsTy, Interned, SelectTy, Ty, TypeVar},
 };
 
 use super::{ExprDescriber, ExprPrinter};
+
+#[derive(Debug, Clone, Hash)]
+pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
+
+impl ExprInfo {
+    pub fn new(repr: ExprInfoRepr) -> Self {
+        Self(Arc::new(LazyHash::new(repr)))
+    }
+}
+
+impl Deref for ExprInfo {
+    type Target = Arc<LazyHash<ExprInfoRepr>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
+pub struct ExprInfoRepr {
+    pub fid: TypstFileId,
+    pub revision: usize,
+    pub source: Source,
+    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    pub module_docstring: Arc<DocString>,
+    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    pub exprs: FxHashMap<Span, Expr>,
+    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+    pub exports: Arc<LazyHash<LexicalScope>>,
+    pub root: Expr,
+}
+
+impl std::hash::Hash for ExprInfoRepr {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.revision.hash(state);
+        self.source.hash(state);
+        self.exports.hash(state);
+        self.root.hash(state);
+        let mut resolves = self.resolves.iter().collect::<Vec<_>>();
+        resolves.sort_by_key(|(fid, _)| fid.into_raw());
+        resolves.hash(state);
+        let mut imports = self.imports.iter().collect::<Vec<_>>();
+        imports.sort_by_key(|(fid, _)| *fid);
+        imports.hash(state);
+    }
+}
+
+impl ExprInfoRepr {
+    pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
+        if decl.is_def() {
+            return Some(Expr::Decl(decl.clone()));
+        }
+        let resolved = self.resolves.get(&decl.span())?;
+        Some(Expr::Ref(resolved.clone()))
+    }
+
+    pub fn get_refs(
+        &self,
+        decl: Interned<Decl>,
+    ) -> impl Iterator<Item = (&Span, &Interned<RefExpr>)> {
+        let of = Some(Expr::Decl(decl.clone()));
+        self.resolves
+            .iter()
+            .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
+                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
+                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
+                (Decl::Label(..), _) => false,
+                _ => r.decl == decl || r.root == of,
+            })
+    }
+
+    pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
+        let of = Expr::Decl(decl.clone());
+        self.exports
+            .get(decl.name())
+            .is_some_and(|export| match export {
+                Expr::Ref(ref_expr) => ref_expr.root == Some(of),
+                exprt => *exprt == of,
+            })
+    }
+
+    #[allow(dead_code)]
+    fn show(&self) {
+        use std::io::Write;
+        let vpath = self
+            .fid
+            .vpath()
+            .resolve(Path::new("target/exprs/"))
+            .unwrap();
+        let root = vpath.with_extension("root.expr");
+        std::fs::create_dir_all(root.parent().unwrap()).unwrap();
+        std::fs::write(root, format!("{}", self.root)).unwrap();
+        let scopes = vpath.with_extension("scopes.expr");
+        std::fs::create_dir_all(scopes.parent().unwrap()).unwrap();
+        {
+            let mut scopes = std::fs::File::create(scopes).unwrap();
+            for (span, expr) in self.exprs.iter() {
+                writeln!(scopes, "{span:?} -> {expr}").unwrap();
+            }
+        }
+        let imports = vpath.with_extension("imports.expr");
+        std::fs::create_dir_all(imports.parent().unwrap()).unwrap();
+        std::fs::write(imports, format!("{:#?}", self.imports)).unwrap();
+        let exports = vpath.with_extension("exports.expr");
+        std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
+        std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
