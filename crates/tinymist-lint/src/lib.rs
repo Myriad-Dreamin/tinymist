@@ -178,9 +178,12 @@ impl Linter {
             }
 
             if lhs.is_type(self.tctx()) && (other_is_str || rhs.is_str(self.tctx())) {
-                let msg = "comparison of type with string is not allowed";
+                let msg = "comparing strings with types is deprecated";
                 let diag = SourceDiagnostic::warning(expr.span(), msg);
-                let diag = diag.with_hint("This will be a hard error since typst v0.14");
+                let diag = diag.with_hints([
+                    "compare with the literal type instead".into(),
+                    "this comparison will always return `false` since typst v0.14".into(),
+                ]);
                 self.diag.push(diag);
             }
         }
