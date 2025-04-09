@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    ops::Deref,
-    sync::{LazyLock, OnceLock},
-};
+use std::{collections::BTreeMap, ops::Deref, sync::LazyLock};
 
 use ecow::eco_format;
 use typst::foundations::{IntoValue, Module, Str, Type};
@@ -10,66 +6,13 @@ use typst::foundations::{IntoValue, Module, Str, Type};
 use crate::{adt::interner::Interned, StrRef};
 use crate::{adt::snapshot_map::SnapshotMap, analysis::SharedContext};
 use crate::{
-    docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, UntypedDefDocs, VarDocsT},
+    docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, DocString, VarDoc},
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{BuiltinTy, DynTypeBounds, InsTy, PackageId, SigTy, Ty, TypeVar, TypeVarBounds},
 };
 
 use super::DeclExpr;
-
-/// The documentation string of an item
-#[derive(Debug, Clone, Default)]
-pub struct DocString {
-    /// The documentation of the item
-    pub docs: Option<EcoString>,
-    /// The typing on definitions
-    pub var_bounds: HashMap<DeclExpr, TypeVarBounds>,
-    /// The variable doc associated with the item
-    pub vars: BTreeMap<StrRef, VarDoc>,
-    /// The type of the resultant type
-    pub res_ty: Option<Ty>,
-}
-
-impl DocString {
-    /// Gets the docstring as a variable doc
-    pub fn as_var(&self) -> VarDoc {
-        VarDoc {
-            docs: self.docs.clone().unwrap_or_default(),
-            ty: self.res_ty.clone(),
-        }
-    }
-
-    /// Get the documentation of a variable associated with the item
-    pub fn get_var(&self, name: &StrRef) -> Option<&VarDoc> {
-        self.vars.get(name)
-    }
-
-    /// Get the type of a variable associated with the item
-    pub fn var_ty(&self, name: &StrRef) -> Option<&Ty> {
-        self.get_var(name).and_then(|v| v.ty.as_ref())
-    }
-}
-
-/// The documentation string of a variable associated with some item.
-#[derive(Debug, Clone, Default)]
-pub struct VarDoc {
-    /// The documentation of the variable
-    pub docs: EcoString,
-    /// The type of the variable
-    pub ty: Option<Ty>,
-}
-
-impl VarDoc {
-    /// Convert the variable doc to an untyped version
-    pub fn to_untyped(&self) -> Arc<UntypedDefDocs> {
-        Arc::new(UntypedDefDocs::Variable(VarDocsT {
-            docs: self.docs.clone(),
-            return_ty: (),
-            def_docs: OnceLock::new(),
-        }))
-    }
-}
 
 pub(crate) fn compute_docstring(
     ctx: &Arc<SharedContext>,
