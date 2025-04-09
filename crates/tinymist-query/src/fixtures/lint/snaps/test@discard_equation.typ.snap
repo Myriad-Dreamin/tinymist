@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_equation.typ
 {
  "s0.typ": [
   {
-   "message": "This equation is discarded implicitly by function return",
+   "message": "This equation is implicitly discarded by function return",
    "range": "1:2:1:11",
    "severity": 2,
    "source": "typst"

@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_hello.typ
 {
  "s0.typ": [
   {
-   "message": "This text is discarded implicitly by function return",
+   "message": "This text is implicitly discarded by function return",
    "range": "1:19:1:24",
    "severity": 2,
    "source": "typst"

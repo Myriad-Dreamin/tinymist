@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_array.typ
 {
  "s0.typ": [
   {
-   "message": "This array is discarded implicitly by function return\nHint: consider ignore the value explicitly using wildcard syntax: `let _ = (1, 2)`",
+   "message": "This array is implicitly discarded by function return\nHint: consider ignoring the value explicitly using underscore: `let _ = (1, 2)`",
    "range": "1:3:1:9",
    "severity": 2,
    "source": "typst"
