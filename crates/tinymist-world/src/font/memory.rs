@@ -58,12 +58,11 @@ impl MemoryFontSearcher {
             let desc = desc.map(Arc::new);
 
             (0..count)
-                .into_iter()
                 .flat_map(|index| {
                     let info = FontInfo::new(&data, index)?;
                     let mut slot = FontSlot::new(BufferFontLoader {
                         buffer: Some(data.clone()),
-                        index: index as u32,
+                        index,
                     });
                     if let Some(desc) = desc.clone() {
                         slot = slot.with_describe_arc(desc);
