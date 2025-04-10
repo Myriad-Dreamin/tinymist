@@ -10,8 +10,7 @@ use crate::font::{BufferFontLoader, FontResolverImpl, FontSlot};
 /// A memory font searcher.
 #[derive(Debug)]
 pub struct MemoryFontSearcher {
-    pub book: FontBook,
-    pub fonts: Vec<FontSlot>,
+    pub fonts: Vec<(FontInfo, FontSlot)>,
 }
 
 impl Default for MemoryFontSearcher {
@@ -23,10 +22,7 @@ impl Default for MemoryFontSearcher {
 impl MemoryFontSearcher {
     /// Creates an in-memory searcher.
     pub fn new() -> Self {
-        Self {
-            book: FontBook::new(),
-            fonts: vec![],
-        }
+        Self { fonts: vec![] }
     }
 
     /// Adds an in-memory font.
@@ -47,10 +43,7 @@ impl MemoryFontSearcher {
     /// Note: if you would like to reuse font resources across builds, use
     /// [`Self::extend_bytes`] instead.
     pub fn extend(&mut self, items: impl IntoIterator<Item = (FontInfo, FontSlot)>) {
-        for (info, slot) in items.into_iter() {
-            self.book.push(info);
-            self.fonts.push(slot);
-        }
+        self.fonts.extend(items);
     }
 
     /// Adds a number of font data to the font resolver. The builder will reuse
@@ -86,7 +79,9 @@ impl MemoryFontSearcher {
 
     /// Builds a FontResolverImpl.
     pub fn build(self) -> FontResolverImpl {
-        FontResolverImpl::new(Vec::new(), self.book, self.fonts)
+        let slots = self.fonts.iter().map(|(_, slot)| slot.clone()).collect();
+        let book = FontBook::from_infos(self.fonts.into_iter().map(|(info, _)| info));
+        FontResolverImpl::new(Vec::new(), book, slots)
     }
 }
 
