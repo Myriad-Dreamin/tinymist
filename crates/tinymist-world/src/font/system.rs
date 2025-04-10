@@ -10,7 +10,7 @@ use typst::foundations::Bytes;
 use typst::text::FontInfo;
 
 use super::memory::MemoryFontSearcher;
-use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader, ReusableFontResolver};
+use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader};
 use crate::config::CompileFontOpts;
 use crate::debug_loc::{DataSource, FsDataSource};
 
@@ -31,15 +31,6 @@ impl SystemFontSearcher {
     pub fn new() -> Self {
         Self {
             base: MemoryFontSearcher::default(),
-            font_paths: vec![],
-            db: Database::new(),
-        }
-    }
-
-    /// Creates a system searcher, also reuses the previous font resources.
-    pub fn reuse(resolver: impl ReusableFontResolver) -> Self {
-        Self {
-            base: MemoryFontSearcher::reuse(resolver),
             font_paths: vec![],
             db: Database::new(),
         }
@@ -108,7 +99,7 @@ impl SystemFontSearcher {
             Some((info, slot))
         });
 
-        self.base.extend(info.collect::<Vec<_>>().into_iter());
+        self.base.extend(info.collect::<Vec<_>>());
         self.db = Database::new();
     }
 
@@ -171,9 +162,6 @@ impl Default for SystemFontSearcher {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use super::*;
 
     #[test]
     fn edit_fonts() {
@@ -186,8 +174,9 @@ mod tests {
             .resolve_system()
             .expect("failed to resolve system universe");
 
-        let new_fonts = SystemFontSearcher::reuse(verse.font_resolver.clone()).build();
+        // todo: a good way to edit fonts
+        let new_fonts = verse.font_resolver.clone();
 
-        verse.increment_revision(|verse| verse.set_fonts(Arc::new(new_fonts)));
+        verse.increment_revision(|verse| verse.set_fonts(new_fonts));
     }
 }
