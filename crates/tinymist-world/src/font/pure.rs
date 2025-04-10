@@ -19,12 +19,7 @@ impl Default for MemoryFontBuilder {
 
 impl From<MemoryFontBuilder> for FontResolverImpl {
     fn from(searcher: MemoryFontBuilder) -> Self {
-        FontResolverImpl::new(
-            Vec::new(),
-            searcher.book,
-            searcher.fonts,
-            Default::default(),
-        )
+        FontResolverImpl::new(Vec::new(), searcher.book, searcher.fonts)
     }
 }
 

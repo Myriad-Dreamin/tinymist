@@ -240,7 +240,6 @@ impl LspUniverseBuilder {
     pub fn only_embedded_fonts() -> Result<TinymistFontResolver> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
-            font_profile_cache_path: Default::default(),
             font_paths: vec![],
             no_system_fonts: true,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
@@ -252,7 +251,6 @@ impl LspUniverseBuilder {
     pub fn resolve_fonts(args: CompileFontArgs) -> Result<TinymistFontResolver> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
-            font_profile_cache_path: Default::default(),
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),

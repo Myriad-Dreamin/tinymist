@@ -4,7 +4,7 @@ use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
-use super::{FontProfile, FontSlot};
+use super::FontSlot;
 use crate::debug_loc::DataSource;
 
 /// A FontResolver can resolve a font by index.
@@ -42,27 +42,19 @@ pub struct FontResolverImpl {
     pub(crate) font_paths: Vec<PathBuf>,
     pub(crate) book: LazyHash<FontBook>,
     pub(crate) fonts: Vec<FontSlot>,
-    pub(crate) profile: FontProfile,
 }
 
 impl FontResolverImpl {
-    pub fn new(
-        font_paths: Vec<PathBuf>,
-        book: FontBook,
-        fonts: Vec<FontSlot>,
-        profile: FontProfile,
-    ) -> Self {
+    pub fn new(font_paths: Vec<PathBuf>, book: FontBook, fonts: Vec<FontSlot>) -> Self {
         Self {
             font_paths,
             book: LazyHash::new(book),
             fonts,
-            profile,
         }
     }
 
     pub fn new_with_fonts(
         font_paths: Vec<PathBuf>,
-        profile: FontProfile,
         fonts: impl Iterator<Item = (FontInfo, FontSlot)>,
     ) -> Self {
         let mut book = FontBook::new();
@@ -77,7 +69,6 @@ impl FontResolverImpl {
             font_paths,
             book: LazyHash::new(book),
             fonts: slots,
-            profile,
         }
     }
 
@@ -87,10 +78,6 @@ impl FontResolverImpl {
 
     pub fn is_empty(&self) -> bool {
         self.fonts.is_empty()
-    }
-
-    pub fn profile(&self) -> &FontProfile {
-        &self.profile
     }
 
     pub fn font_paths(&self) -> &[PathBuf] {
@@ -178,7 +165,6 @@ mod tests {
 
         let new_resolver = FontResolverImpl::new_with_fonts(
             vec![],
-            Default::default(),
             fonts
                 .into_iter()
                 .map(|(info, slot)| (info.clone(), slot.clone())),

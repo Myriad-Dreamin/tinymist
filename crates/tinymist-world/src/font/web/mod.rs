@@ -6,7 +6,7 @@ use typst::text::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::{BufferFontLoader, FontLoader, FontProfile, FontResolverImpl, FontSlot};
+use super::{BufferFontLoader, FontLoader, FontResolverImpl, FontSlot};
 use crate::font::cache::FontInfoCache;
 use crate::font::info::typst_typographic_family;
 
@@ -373,20 +373,12 @@ impl FontLoader for WebFontLoader {
 /// Searches for fonts.
 pub struct BrowserFontSearcher {
     pub fonts: Vec<(FontInfo, FontSlot)>,
-    pub profile: FontProfile,
 }
 
 impl BrowserFontSearcher {
     /// Create a new, empty browser searcher.
     pub fn new() -> Self {
-        let profile = FontProfile {
-            version: "v1beta".to_owned(),
-            ..Default::default()
-        };
-        let mut searcher = Self {
-            fonts: vec![],
-            profile,
-        };
+        let mut searcher = Self { fonts: vec![] };
 
         if cfg!(feature = "browser-embedded-fonts") {
             searcher.add_embedded();
@@ -413,10 +405,7 @@ impl BrowserFontSearcher {
             })
             .collect();
 
-        Self {
-            fonts,
-            profile: resolver.profile,
-        }
+        Self { fonts }
     }
 
     /// Create a new browser searcher with fonts cloned from a FontResolverImpl.
@@ -438,19 +427,16 @@ impl BrowserFontSearcher {
             })
             .collect();
 
-        Self {
-            fonts,
-            profile: resolver.profile.clone(),
-        }
+        Self { fonts }
     }
 
     /// Build a FontResolverImpl.
     pub fn build(self) -> FontResolverImpl {
         let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = self.fonts.into_iter().unzip();
 
-        let book = FontBook::from_infos(info.into_iter());
+        let book = FontBook::from_infos(info);
 
-        FontResolverImpl::new(vec![], book, slots, self.profile)
+        FontResolverImpl::new(vec![], book, slots)
     }
 }
 
@@ -506,7 +492,7 @@ impl BrowserFontSearcher {
         }
     }
 
-    pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>) -> ()) {
+    pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
         func(&mut self.fonts);
     }
 
