@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use tinymist_analysis::ty::TypeInfo;
 use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::{diag::SourceDiagnostic, syntax::Span};
@@ -57,7 +58,8 @@ impl<'w> DiagWorker<'w> {
                 continue;
             };
             let expr = self.ctx.expr_stage(&source);
-            let res = lint_file(&expr);
+            let ti = self.ctx.type_check(&source);
+            let res = lint_file(&expr, ti);
             if !res.is_empty() {
                 for diag in res {
                     self.handle(&diag);
@@ -246,6 +248,6 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
 }
 
 #[comemo::memoize]
-fn lint_file(source: &ExprInfo) -> EcoVec<SourceDiagnostic> {
-    tinymist_lint::lint_file(source)
+fn lint_file(source: &ExprInfo, ti: Arc<TypeInfo>) -> EcoVec<SourceDiagnostic> {
+    tinymist_lint::lint_file(source, ti)
 }

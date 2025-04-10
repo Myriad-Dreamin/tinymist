@@ -248,10 +248,47 @@ impl Ty {
         });
         res
     }
+
+    pub fn is_str<T: TyCtx>(&self, ctx: &T) -> bool {
+        let mut res = false;
+        self.satisfy(ctx, |ty: &Ty, _pol| {
+            res = res || {
+                match ty {
+                    Ty::Value(v) => is_str_builtin_type(&v.val.ty()),
+                    Ty::Builtin(BuiltinTy::Type(v)) => is_str_builtin_type(v),
+                    _ => false,
+                }
+            }
+        });
+        res
+    }
+
+    pub fn is_type<T: TyCtx>(&self, ctx: &T) -> bool {
+        let mut res = false;
+        self.satisfy(ctx, |ty: &Ty, _pol| {
+            res = res || {
+                match ty {
+                    Ty::Value(v) => is_type_builtin_type(&v.val.ty()),
+                    Ty::Builtin(BuiltinTy::Type(ty)) => is_type_builtin_type(ty),
+                    Ty::Builtin(BuiltinTy::TypeType(..)) => true,
+                    _ => false,
+                }
+            }
+        });
+        res
+    }
 }
 
 fn is_content_builtin_type(ty: &Type) -> bool {
     *ty == Type::of::<Content>() || *ty == Type::of::<typst::foundations::Symbol>()
+}
+
+fn is_str_builtin_type(ty: &Type) -> bool {
+    *ty == Type::of::<typst::foundations::Str>()
+}
+
+fn is_type_builtin_type(ty: &Type) -> bool {
+    *ty == Type::of::<Type>()
 }
 
 /// A function parameter type
@@ -1193,6 +1230,14 @@ pub struct TypeInfo {
     pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
+}
+
+impl Hash for TypeInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.valid.hash(state);
+        self.fid.hash(state);
+        self.revision.hash(state);
+    }
 }
 
 impl TyCtx for TypeInfo {
