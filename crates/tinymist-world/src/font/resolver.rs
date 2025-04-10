@@ -64,15 +64,15 @@ pub trait FontResolver {
 pub struct FontResolverImpl {
     pub(crate) font_paths: Vec<PathBuf>,
     pub(crate) book: LazyHash<FontBook>,
-    pub(crate) fonts: Vec<FontSlot>,
+    pub(crate) slots: Vec<FontSlot>,
 }
 
 impl FontResolverImpl {
-    pub fn new(font_paths: Vec<PathBuf>, book: FontBook, fonts: Vec<FontSlot>) -> Self {
+    pub fn new(font_paths: Vec<PathBuf>, book: FontBook, slots: Vec<FontSlot>) -> Self {
         Self {
             font_paths,
             book: LazyHash::new(book),
-            fonts,
+            slots,
         }
     }
 
@@ -91,16 +91,16 @@ impl FontResolverImpl {
         Self {
             font_paths,
             book: LazyHash::new(book),
-            fonts: slots,
+            slots,
         }
     }
 
     pub fn len(&self) -> usize {
-        self.fonts.len()
+        self.slots.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.fonts.is_empty()
+        self.slots.is_empty()
     }
 
     pub fn font_paths(&self) -> &[PathBuf] {
@@ -108,7 +108,7 @@ impl FontResolverImpl {
     }
 
     pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
-        let slots_with_index = self.fonts.iter().enumerate();
+        let slots_with_index = self.slots.iter().enumerate();
 
         slots_with_index.flat_map(|(idx, slot)| {
             let maybe_font = slot.get_uninitialized().flatten();
@@ -117,7 +117,7 @@ impl FontResolverImpl {
     }
 
     pub fn get_fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
-        self.fonts.iter().enumerate().map(|(idx, slot)| {
+        self.slots.iter().enumerate().map(|(idx, slot)| {
             let info = self.book.info(idx).unwrap();
 
             (info, slot)
@@ -126,7 +126,7 @@ impl FontResolverImpl {
 
     pub fn describe_font(&self, font: &Font) -> Option<Arc<DataSource>> {
         let f = Some(Some(font.clone()));
-        for slot in &self.fonts {
+        for slot in &self.slots {
             if slot.get_uninitialized() == f {
                 return slot.description.clone();
             }
@@ -136,7 +136,7 @@ impl FontResolverImpl {
 
     /// Describe a font by id.
     pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
-        self.fonts[id].description.clone()
+        self.slots[id].description.clone()
     }
 
     pub fn add_glyph_packs(&mut self) {
@@ -150,7 +150,7 @@ impl FontResolver for FontResolverImpl {
     }
 
     fn font(&self, idx: usize) -> Option<Font> {
-        self.fonts[idx].get_or_init()
+        self.slots[idx].get_or_init()
     }
 
     fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
@@ -160,7 +160,7 @@ impl FontResolver for FontResolverImpl {
 
 impl fmt::Display for FontResolverImpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (idx, slot) in self.fonts.iter().enumerate() {
+        for (idx, slot) in self.slots.iter().enumerate() {
             writeln!(f, "{:?} -> {:?}", idx, slot.get_uninitialized())?;
         }
 

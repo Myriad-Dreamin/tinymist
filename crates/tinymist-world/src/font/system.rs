@@ -42,7 +42,7 @@ impl SystemFontSearcher {
     /// Create a new system searcher with fonts in a FontResolverImpl.
     pub fn from_resolver(resolver: FontResolverImpl) -> Self {
         let fonts = resolver
-            .fonts
+            .slots
             .into_iter()
             .enumerate()
             .map(|(idx, slot)| {
@@ -68,7 +68,7 @@ impl SystemFontSearcher {
     /// Since FontSlot only holds QueryRef to font data, cloning is cheap.
     pub fn new_with_resolver(resolver: &FontResolverImpl) -> Self {
         let fonts = resolver
-            .fonts
+            .slots
             .iter()
             .enumerate()
             .map(|(idx, slot)| {
