@@ -122,16 +122,24 @@ mod system {
     use super::*;
     use crate::font::system::SystemFontSearcher;
 
+    /// Searches system fonts once.
+    ///
+    /// Note: this searcher doesn't check that system fonts are changed.
     pub struct SystemFontsOnce;
 
     impl FontSearchOp for SystemFontsOnce {
         fn load(&self) -> Vec<(FontInfo, FontSlot)> {
             let mut searcher = SystemFontSearcher::new();
+            searcher.search_system();
             searcher.flush();
             searcher.base.fonts
         }
     }
 
+    /// Searches system fonts.
+    ///
+    /// Note: this searcher will always search the system fonts, which is a
+    /// heavy operation.
     pub struct SystemFonts;
 
     impl FontSearchOp for SystemFonts {
@@ -159,11 +167,24 @@ mod tests {
     fn test_incr_font_searcher() {
         let mut searcher = IncrFontSearcher::default();
 
-        pub struct TestSystemFonts;
+        // Initial build
+        searcher.push_op(StaticAssets(vec![]));
+        searcher.push_op(TestSystemFontsOnce);
+        searcher.build();
+
+        // Incremental build
+        let _ = searcher.set_op(0, StaticAssets(vec![]));
+        searcher.build();
+
+        if !LOAD_ONCE.load(std::sync::atomic::Ordering::SeqCst) {
+            panic!("system fonts not loaded");
+        }
+
+        pub struct TestSystemFontsOnce;
 
         static LOAD_ONCE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-        impl FontSearchOp for TestSystemFonts {
+        impl FontSearchOp for TestSystemFontsOnce {
             fn hash(&self) -> u128 {
                 SystemFontsOnce.hash()
             }
@@ -176,19 +197,6 @@ mod tests {
 
                 SystemFontsOnce.load()
             }
-        }
-
-        // Initial build
-        searcher.push_op(StaticAssets(vec![]));
-        searcher.push_op(TestSystemFonts);
-        searcher.build();
-
-        // Incremental build
-        let _ = searcher.set_op(0, StaticAssets(vec![]));
-        searcher.build();
-
-        if !LOAD_ONCE.load(std::sync::atomic::Ordering::SeqCst) {
-            panic!("system fonts not loaded");
         }
     }
 }
