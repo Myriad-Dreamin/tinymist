@@ -7,37 +7,60 @@ use typst::utils::LazyHash;
 use super::FontSlot;
 use crate::debug_loc::DataSource;
 
-/// A FontResolver can resolve a font by index.
-/// It also reuse FontBook for font-related query.
-/// The index is the index of the font in the `FontBook.infos`.
+/// A [`FontResolver`] can resolve a font by index.
+/// It also provides FontBook for typst to query fonts.
 pub trait FontResolver {
+    /// An optionally implemented revision function for users, e.g. the `World`.
+    ///
+    /// A user of [`FontResolver`] will differentiate the `prev` and `next`
+    /// revisions to determine if the underlying state of fonts has changed.
+    ///
+    /// - If either `prev` or `next` is `None`, the world's revision is always
+    ///   increased.
+    /// - Otherwise, the world's revision is increased if `prev != next`.
+    ///
+    /// If the revision of fonts is changed, the world will invalidate all
+    /// related caches and increase its revision.
     fn revision(&self) -> Option<NonZeroUsize> {
         None
     }
 
+    /// The font book interface for typst.
     fn font_book(&self) -> &LazyHash<FontBook>;
-    fn font(&self, idx: usize) -> Option<Font>;
 
+    /// The index parameter is the index of the font in the `FontBook.infos`.
+    fn font(&self, index: usize) -> Option<Font>;
+
+    /// Gets a font by its info.
+    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        self.default_get_by_info(info)
+    }
+
+    /// The default implementation of [`FontResolver::get_by_info`].
     fn default_get_by_info(&self, info: &FontInfo) -> Option<Font> {
-        // todo: font alternative
+        // The selected font should at least has the first codepoint in the
+        // coverage. We achieve it by querying the font book with `alternative_text`.
+        // todo: better font alternative
         let mut alternative_text = 'c';
         if let Some(codepoint) = info.coverage.iter().next() {
             alternative_text = std::char::from_u32(codepoint).unwrap();
         };
 
-        let idx = self
+        let index = self
             .font_book()
             .select_fallback(Some(info), info.variant, &alternative_text.to_string())
             .unwrap();
-        self.font(idx)
-    }
-    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
-        self.default_get_by_info(info)
+        self.font(index)
     }
 }
 
-#[derive(Debug)]
 /// The default FontResolver implementation.
+///
+/// This is constructed by:
+/// - The [`crate::font::system::SystemFontSearcher`] on operating systems.
+/// - The [`crate::font::web::BrowserFontSearcher`] on browsers.
+/// - Otherwise, [`crate::font::pure::MemoryFontBuilder`] in memory.
+#[derive(Debug)]
 pub struct FontResolverImpl {
     pub(crate) font_paths: Vec<PathBuf>,
     pub(crate) book: LazyHash<FontBook>,
