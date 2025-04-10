@@ -15,6 +15,7 @@
 //! [`profile`] crates for more details.
 
 pub mod cache;
+pub(crate) mod incr;
 pub(crate) mod info;
 pub(crate) mod loader;
 pub(crate) mod profile;

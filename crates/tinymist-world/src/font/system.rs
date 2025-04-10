@@ -18,7 +18,7 @@ use crate::debug_loc::{DataSource, FsDataSource};
 #[derive(Debug)]
 pub struct SystemFontSearcher {
     /// The base font searcher.
-    base: MemoryFontSearcher,
+    pub base: MemoryFontSearcher,
     /// Records user-specific font path when loading from directory or file for
     /// debug.
     pub font_paths: Vec<PathBuf>,
