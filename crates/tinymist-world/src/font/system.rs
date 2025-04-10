@@ -17,29 +17,29 @@ use super::{BufferFontLoader, FontResolverImpl, FontSlot, LazyBufferFontLoader};
 use crate::config::CompileFontOpts;
 use crate::debug_loc::{DataSource, FsDataSource, MemoryDataSource};
 
-/// Searches for fonts.
+/// Searches for fonts in system.
 #[derive(Debug)]
 pub struct SystemFontSearcher {
-    /// Store `FontInfo` and `FontSlot` in order.
+    /// Stores `FontInfo` and `FontSlot` in order.
     pub fonts: Vec<(FontInfo, FontSlot)>,
-    /// Recorded font path when loading from directory or file.
+    /// Records user-specific font path when loading from directory or file for
+    /// debug.
     pub font_paths: Vec<PathBuf>,
-
-    /// Store font data loaded from file
+    /// Stores font data loaded from file
     db: Database,
 }
 
 impl SystemFontSearcher {
-    /// Create a new, empty system searcher.
+    /// Creates a system searcher.
     pub fn new() -> Self {
         Self {
-            font_paths: vec![],
             fonts: vec![],
+            font_paths: vec![],
             db: Database::new(),
         }
     }
 
-    /// Create a new system searcher with fonts in a FontResolverImpl.
+    /// Creates a new system searcher with fonts in a FontResolverImpl.
     pub fn from_resolver(resolver: FontResolverImpl) -> Self {
         let fonts = resolver
             .slots

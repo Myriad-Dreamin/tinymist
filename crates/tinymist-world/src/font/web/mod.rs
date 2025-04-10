@@ -226,13 +226,6 @@ fn infer_info_from_web_font(
 }
 
 impl FontBuilder {
-    // fn to_f64(&self, field: &str, val: &JsValue) -> Result<f64, JsValue> {
-    //     Ok(val
-    //         .as_f64()
-    //         .ok_or_else(|| JsValue::from_str(&format!("expected f64 for {}, got
-    // {:?}", field, val)))         .unwrap())
-    // }
-
     fn to_string(&self, field: &str, val: &JsValue) -> Result<String> {
         Ok(val
             .as_string()
@@ -494,12 +487,6 @@ impl BrowserFontSearcher {
 
     pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
         func(&mut self.fonts);
-    }
-
-    pub async fn add_glyph_pack(&mut self) -> Result<()> {
-        Err(error_once!(
-            "BrowserFontSearcher.add_glyph_pack is not implemented"
-        ))
     }
 }
 
