@@ -94,7 +94,7 @@ impl<T: ReusableFontResolver> ReusableFontResolver for Arc<T> {
 /// - The [`crate::font::system::SystemFontSearcher`] on operating systems.
 /// - The [`crate::font::web::BrowserFontSearcher`] on browsers.
 /// - Otherwise, [`crate::font::pure::MemoryFontBuilder`] in memory.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FontResolverImpl {
     pub(crate) font_paths: Vec<PathBuf>,
     pub(crate) book: LazyHash<FontBook>,

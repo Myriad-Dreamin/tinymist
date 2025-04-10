@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rayon::iter::ParallelIterator;
+use rayon::iter::{FromParallelIterator, IntoParallelIterator, ParallelIterator};
 use typst::foundations::Bytes;
 use typst::text::{FontBook, FontInfo};
 
@@ -82,6 +82,33 @@ impl MemoryFontSearcher {
         let slots = self.fonts.iter().map(|(_, slot)| slot.clone()).collect();
         let book = FontBook::from_infos(self.fonts.into_iter().map(|(info, _)| info));
         FontResolverImpl::new(Vec::new(), book, slots)
+    }
+}
+
+impl FromParallelIterator<Bytes> for MemoryFontSearcher {
+    fn from_par_iter<I>(par_iter: I) -> Self
+    where
+        I: IntoParallelIterator<Item = Bytes>,
+    {
+        let mut searcher = Self::new();
+        searcher.extend_bytes(par_iter.into_par_iter().map(|data| {
+            (
+                data,
+                Some(DataSource::Memory(MemoryDataSource {
+                    name: "<memory>".to_owned(),
+                })),
+            )
+        }));
+        searcher
+    }
+}
+
+impl FromParallelIterator<&'static [u8]> for MemoryFontSearcher {
+    fn from_par_iter<I>(par_iter: I) -> Self
+    where
+        I: IntoParallelIterator<Item = &'static [u8]>,
+    {
+        Self::from_par_iter(par_iter.into_par_iter().map(Bytes::new))
     }
 }
 
