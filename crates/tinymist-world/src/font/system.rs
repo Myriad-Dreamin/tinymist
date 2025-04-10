@@ -10,7 +10,7 @@ use typst::foundations::Bytes;
 use typst::text::FontInfo;
 
 use super::memory::MemoryFontSearcher;
-use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader};
+use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader, ReusableFontResolver};
 use crate::config::CompileFontOpts;
 use crate::debug_loc::{DataSource, FsDataSource};
 
@@ -37,7 +37,7 @@ impl SystemFontSearcher {
     }
 
     /// Creates a system searcher, also reuses the previous font resources.
-    pub fn reuse(resolver: FontResolverImpl) -> Self {
+    pub fn reuse(resolver: impl ReusableFontResolver) -> Self {
         Self {
             base: MemoryFontSearcher::reuse(resolver),
             font_paths: vec![],
@@ -186,14 +186,8 @@ mod tests {
             .resolve_system()
             .expect("failed to resolve system universe");
 
-        let fonts: Vec<_> = verse.font_resolver.fonts().collect();
+        let new_fonts = SystemFontSearcher::reuse(verse.font_resolver.clone()).build();
 
-        let new_resolver = FontResolverImpl::new_with_fonts(
-            vec![],
-            fonts
-                .into_iter()
-                .map(|(info, slot)| (info.clone(), slot.clone())),
-        );
-        verse.increment_revision(|verse| verse.set_fonts(Arc::new(new_resolver)));
+        verse.increment_revision(|verse| verse.set_fonts(Arc::new(new_fonts)));
     }
 }

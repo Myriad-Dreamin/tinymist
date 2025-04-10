@@ -43,9 +43,14 @@ impl FontSlot {
 
     /// Attaches a description to the font slot.
     pub fn with_describe(self, desc: DataSource) -> Self {
+        self.with_describe_arc(Arc::new(desc))
+    }
+
+    /// Attaches a description to the font slot.
+    pub fn with_describe_arc(self, desc: Arc<DataSource>) -> Self {
         Self {
             inner: self.inner,
-            description: Some(Arc::new(desc)),
+            description: Some(desc),
         }
     }
 

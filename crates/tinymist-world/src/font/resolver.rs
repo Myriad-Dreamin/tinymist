@@ -28,6 +28,11 @@ pub trait FontResolver {
     /// The font book interface for typst.
     fn font_book(&self) -> &LazyHash<FontBook>;
 
+    /// Gets the font slot by index.
+    /// The index parameter is the index of the font in the `FontBook.infos`.
+    fn slot(&self, index: usize) -> Option<&FontSlot>;
+
+    /// Gets the font by index.
     /// The index parameter is the index of the font in the `FontBook.infos`.
     fn font(&self, index: usize) -> Option<Font>;
 
@@ -51,6 +56,35 @@ pub trait FontResolver {
             .select_fallback(Some(info), info.variant, &alternative_text.to_string())
             .unwrap();
         self.font(index)
+    }
+}
+
+impl<T: FontResolver> FontResolver for Arc<T> {
+    fn font_book(&self) -> &LazyHash<FontBook> {
+        self.as_ref().font_book()
+    }
+
+    fn slot(&self, index: usize) -> Option<&FontSlot> {
+        self.as_ref().slot(index)
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.as_ref().font(index)
+    }
+
+    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        self.as_ref().get_by_info(info)
+    }
+}
+
+pub trait ReusableFontResolver: FontResolver {
+    /// Reuses the font resolver.
+    fn slots(&self) -> impl Iterator<Item = FontSlot>;
+}
+
+impl<T: ReusableFontResolver> ReusableFontResolver for Arc<T> {
+    fn slots(&self) -> impl Iterator<Item = FontSlot> {
+        self.as_ref().slots()
     }
 }
 
@@ -160,6 +194,10 @@ impl FontResolver for FontResolverImpl {
         &self.book
     }
 
+    fn slot(&self, idx: usize) -> Option<&FontSlot> {
+        self.slots.get(idx)
+    }
+
     fn font(&self, idx: usize) -> Option<Font> {
         self.slots[idx].get_or_init()
     }
@@ -176,5 +214,11 @@ impl fmt::Display for FontResolverImpl {
         }
 
         Ok(())
+    }
+}
+
+impl ReusableFontResolver for FontResolverImpl {
+    fn slots(&self) -> impl Iterator<Item = FontSlot> {
+        self.slots.iter().cloned()
     }
 }
