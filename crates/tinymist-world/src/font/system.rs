@@ -79,8 +79,13 @@ impl FontProfileRebuilder {
 /// Searches for fonts.
 #[derive(Debug)]
 pub struct SystemFontSearcher {
+    /// Store `FontInfo` and `FontSlot` in order.
     pub fonts: Vec<(FontInfo, FontSlot)>,
+    /// Recorded font path when loading from directory or file.
     pub font_paths: Vec<PathBuf>,
+
+    /// Store font data loaded from file
+    db: Database,
     profile_rebuilder: FontProfileRebuilder,
 }
 
@@ -94,6 +99,7 @@ impl SystemFontSearcher {
         Self {
             font_paths: vec![],
             fonts: vec![],
+            db: Database::new(),
             profile_rebuilder,
         }
     }
@@ -122,6 +128,7 @@ impl SystemFontSearcher {
         Self {
             fonts,
             font_paths: resolver.font_paths,
+            db: Database::new(),
             profile_rebuilder,
         }
     }
@@ -151,6 +158,7 @@ impl SystemFontSearcher {
         Self {
             fonts,
             font_paths: resolver.font_paths.clone(),
+            db: Database::new(),
             profile_rebuilder,
         }
     }
@@ -208,6 +216,9 @@ impl SystemFontSearcher {
             self.search_system();
         }
 
+        // Flush font db before adding fonts in memory
+        self.flush();
+
         // Source3: add the fonts in memory.
         self.add_memory_fonts(opts.with_embedded_fonts.into_par_iter().map(|font_data| {
             match font_data {
@@ -257,10 +268,10 @@ impl SystemFontSearcher {
         // eprintln!("profile_rebuilder init took {:?}", end - begin);
     }
 
-    pub fn add_fonts_in_fontdb(&mut self, db: &Database) {
+    pub fn flush(&mut self) {
         use fontdb::Source;
 
-        let face = db.faces().collect::<Vec<_>>();
+        let face = self.db.faces().collect::<Vec<_>>();
         let info = face.into_par_iter().map(|face| {
             let path = match &face.source {
                 Source::File(path) | Source::SharedFile(path, _) => path,
@@ -269,7 +280,8 @@ impl SystemFontSearcher {
                 Source::Binary(_) => unreachable!(),
             };
 
-            let info = db
+            let info = self
+                .db
                 .with_face_data(face.id, FontInfo::new)
                 .expect("database must contain this font");
 
@@ -291,10 +303,16 @@ impl SystemFontSearcher {
                 self.fonts.push((info, slot));
             }
         }
+
+        self.db = Database::new();
     }
 
     /// Add an in-memory font.
     pub fn add_memory_font(&mut self, data: Bytes) {
+        if !self.db.is_empty() {
+            panic!("dirty font search state, please flush the searcher before adding memory fonts");
+        }
+
         for (index, info) in FontInfo::iter(&data).enumerate() {
             self.fonts.push((
                 info,
@@ -311,6 +329,10 @@ impl SystemFontSearcher {
 
     /// Adds in-memory fonts.
     pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
+        if !self.db.is_empty() {
+            panic!("dirty font search state, please flush the searcher before adding memory fonts");
+        }
+
         let loaded = data.flat_map(|data| {
             FontInfo::iter(&data)
                 .enumerate()
@@ -339,10 +361,7 @@ impl SystemFontSearcher {
     }
 
     pub fn search_system(&mut self) {
-        let mut db = Database::new();
-        db.load_system_fonts();
-
-        self.add_fonts_in_fontdb(&db);
+        self.db.load_system_fonts();
     }
 
     fn record_path(&mut self, path: &Path) {
@@ -361,23 +380,16 @@ impl SystemFontSearcher {
     pub fn search_dir(&mut self, path: impl AsRef<Path>) {
         self.record_path(path.as_ref());
 
-        let mut db = Database::new();
-        db.load_fonts_dir(path);
-
-        self.add_fonts_in_fontdb(&db);
+        self.db.load_fonts_dir(path);
     }
 
     /// Index the fonts in the file at the given path.
     pub fn search_file(&mut self, path: impl AsRef<Path>) -> FileResult<()> {
         self.record_path(path.as_ref());
 
-        let mut db = Database::new();
-        db.load_font_file(path.as_ref())
-            .map_err(|e| FileError::from_io(e, path.as_ref()))?;
-
-        self.add_fonts_in_fontdb(&db);
-
-        Ok(())
+        self.db
+            .load_font_file(path.as_ref())
+            .map_err(|e| FileError::from_io(e, path.as_ref()))
     }
 }
 
