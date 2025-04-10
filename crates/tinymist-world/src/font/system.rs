@@ -151,11 +151,11 @@ impl SystemFontSearcher {
                 .expect("database must contain this font");
 
             info.map(|info| {
-                let slot = FontSlot::new_boxed(LazyBufferFontLoader::new(
+                let slot = FontSlot::new(LazyBufferFontLoader::new(
                     LazyFile::new(path.clone()),
                     face.index,
                 ))
-                .describe(DataSource::Fs(FsDataSource {
+                .with_describe(DataSource::Fs(FsDataSource {
                     path: path.to_str().unwrap_or_default().to_owned(),
                 }));
 
@@ -178,11 +178,11 @@ impl SystemFontSearcher {
         for (index, info) in FontInfo::iter(&data).enumerate() {
             self.fonts.push((
                 info,
-                FontSlot::new_boxed(BufferFontLoader {
+                FontSlot::new(BufferFontLoader {
                     buffer: Some(data.clone()),
                     index: index as u32,
                 })
-                .describe(DataSource::Memory(MemoryDataSource {
+                .with_describe(DataSource::Memory(MemoryDataSource {
                     name: "<memory>".to_owned(),
                 })),
             ));
@@ -201,13 +201,15 @@ impl SystemFontSearcher {
                 .map(|(index, info)| {
                     (
                         info,
-                        FontSlot::new_boxed(BufferFontLoader {
+                        FontSlot::new(BufferFontLoader {
                             buffer: Some(data.clone()),
                             index: index as u32,
                         })
-                        .describe(DataSource::Memory(MemoryDataSource {
-                            name: "<memory>".to_owned(),
-                        })),
+                        .with_describe(DataSource::Memory(
+                            MemoryDataSource {
+                                name: "<memory>".to_owned(),
+                            },
+                        )),
                     )
                 })
                 .collect::<Vec<_>>()

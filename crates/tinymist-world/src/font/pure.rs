@@ -37,11 +37,11 @@ impl MemoryFontBuilder {
         for (index, info) in FontInfo::iter(&data).enumerate() {
             self.book.push(info.clone());
             self.fonts.push(
-                FontSlot::new_boxed(BufferFontLoader {
+                FontSlot::new(BufferFontLoader {
                     buffer: Some(data.clone()),
                     index: index as u32,
                 })
-                .describe(DataSource::Memory(MemoryDataSource {
+                .with_describe(DataSource::Memory(MemoryDataSource {
                     name: "<memory>".to_owned(),
                 })),
             );

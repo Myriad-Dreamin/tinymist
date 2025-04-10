@@ -448,7 +448,7 @@ impl BrowserFontSearcher {
 
             self.fonts.extend(
                 Font::iter(buffer)
-                    .map(|font| (font.info().clone(), FontSlot::with_value(Some(font)))),
+                    .map(|font| (font.info().clone(), FontSlot::new_loaded(Some(font)))),
             );
         }
     }
@@ -463,7 +463,7 @@ impl BrowserFontSearcher {
                 let index = self.fonts.len();
                 self.fonts.push((
                     info.clone(),
-                    FontSlot::new(Box::new(WebFontLoader {
+                    FontSlot::new(WebFontLoader {
                         font: WebFont {
                             info,
                             context: font_ref.clone(),
@@ -471,7 +471,7 @@ impl BrowserFontSearcher {
                             index: index as u32,
                         },
                         index: i as u32,
-                    })),
+                    }),
                 ))
             }
         }
@@ -484,10 +484,10 @@ impl BrowserFontSearcher {
             let buffer = buffer.clone();
             self.fonts.push((
                 info,
-                FontSlot::new(Box::new(BufferFontLoader {
+                FontSlot::new(BufferFontLoader {
                     buffer: Some(buffer),
                     index: i as u32,
-                })),
+                }),
             ))
         }
     }
