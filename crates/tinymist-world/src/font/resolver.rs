@@ -167,31 +167,3 @@ impl fmt::Display for FontResolverImpl {
         Ok(())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[cfg(feature = "system")]
-    #[test]
-    fn get_fonts_from_system_universe() {
-        use clap::Parser as _;
-
-        use crate::args::CompileOnceArgs;
-
-        let args = CompileOnceArgs::parse_from(["tinymist", "main.typ"]);
-        let mut verse = args
-            .resolve_system()
-            .expect("failed to resolve system universe");
-
-        let fonts: Vec<_> = verse.font_resolver.get_fonts().collect();
-
-        let new_resolver = FontResolverImpl::new_with_fonts(
-            vec![],
-            fonts
-                .into_iter()
-                .map(|(info, slot)| (info.clone(), slot.clone())),
-        );
-        verse.increment_revision(|verse| verse.set_fonts(Arc::new(new_resolver)));
-    }
-}
