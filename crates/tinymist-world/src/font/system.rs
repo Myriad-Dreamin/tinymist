@@ -137,7 +137,7 @@ impl SystemFontSearcher {
         use fontdb::Source;
 
         let face = self.db.faces().collect::<Vec<_>>();
-        let info = face.into_par_iter().map(|face| {
+        let info = face.into_par_iter().flat_map(|face| {
             let path = match &face.source {
                 Source::File(path) | Source::SharedFile(path, _) => path,
                 // We never add binary sources to the database, so there
@@ -145,27 +145,19 @@ impl SystemFontSearcher {
                 Source::Binary(_) => unreachable!(),
             };
 
-            let info = self
-                .db
-                .with_face_data(face.id, FontInfo::new)
-                .expect("database must contain this font");
+            let info = self.db.with_face_data(face.id, FontInfo::new)??;
+            let slot = FontSlot::new(LazyBufferFontLoader::new(
+                LazyFile::new(path.clone()),
+                face.index,
+            ))
+            .with_describe(DataSource::Fs(FsDataSource {
+                path: path.to_str().unwrap_or_default().to_owned(),
+            }));
 
-            info.map(|info| {
-                let slot = FontSlot::new(LazyBufferFontLoader::new(
-                    LazyFile::new(path.clone()),
-                    face.index,
-                ))
-                .with_describe(DataSource::Fs(FsDataSource {
-                    path: path.to_str().unwrap_or_default().to_owned(),
-                }));
-
-                (info, slot)
-            })
+            Some((info, slot))
         });
 
-        // todo: we can simplify it?
-        self.fonts
-            .extend(info.collect::<Vec<_>>().into_iter().flatten());
+        self.fonts.extend(info.collect::<Vec<_>>().into_iter());
         self.db = Database::new();
     }
 
@@ -215,9 +207,7 @@ impl SystemFontSearcher {
                 .collect::<Vec<_>>()
         });
 
-        for (info, slot) in loaded.collect::<Vec<_>>() {
-            self.fonts.push((info, slot));
-        }
+        self.fonts.extend(loaded.collect::<Vec<_>>().into_iter());
     }
 
     pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
