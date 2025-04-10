@@ -245,7 +245,7 @@ impl LspUniverseBuilder {
             no_system_fonts: true,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 
     /// Resolve fonts from given options.
@@ -257,7 +257,7 @@ impl LspUniverseBuilder {
             no_system_fonts: args.ignore_system_fonts,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 
     /// Resolve package registry from given options.

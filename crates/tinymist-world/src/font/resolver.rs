@@ -124,6 +124,11 @@ impl FontResolverImpl {
         None
     }
 
+    /// Describe a font by id.
+    pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
+        self.fonts[id].description.clone()
+    }
+
     pub fn add_glyph_packs(&mut self) {
         todo!()
     }
