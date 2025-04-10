@@ -18,7 +18,7 @@ use typst::Features;
 
 use crate::ProjectInput;
 
-use crate::font::TinymistFontResolver;
+use crate::world::font::FontResolverImpl;
 use crate::{CompiledArtifact, Interrupt};
 
 /// Compiler feature for LSP universe and worlds without typst.ts to implement
@@ -27,8 +27,8 @@ use crate::{CompiledArtifact, Interrupt};
 pub struct LspCompilerFeat;
 
 impl CompilerFeat for LspCompilerFeat {
-    /// Uses [`TinymistFontResolver`] directly.
-    type FontResolver = TinymistFontResolver;
+    /// Uses [`FontResolverImpl`] directly.
+    type FontResolver = FontResolverImpl;
     /// It accesses a physical file system.
     type AccessModel = SystemAccessModel;
     /// It performs native HTTP requests for fetching package data.
@@ -214,7 +214,7 @@ impl LspUniverseBuilder {
         features: Features,
         inputs: ImmutDict,
         package_registry: HttpRegistry,
-        font_resolver: Arc<TinymistFontResolver>,
+        font_resolver: Arc<FontResolverImpl>,
     ) -> LspUniverse {
         let package_registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
@@ -237,7 +237,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub fn only_embedded_fonts() -> Result<TinymistFontResolver> {
+    pub fn only_embedded_fonts() -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
             font_paths: vec![],
@@ -248,7 +248,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub fn resolve_fonts(args: CompileFontArgs) -> Result<TinymistFontResolver> {
+    pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
             font_paths: args.font_paths,
