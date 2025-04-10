@@ -4,7 +4,7 @@ use typst::text::{FontBook, FontInfo};
 use crate::debug_loc::{DataSource, MemoryDataSource};
 use crate::font::{BufferFontLoader, FontResolverImpl, FontSlot};
 
-/// A memory font builder.
+/// A memory font searcher.
 #[derive(Debug)]
 pub struct MemoryFontSearcher {
     pub book: FontBook,
@@ -24,7 +24,7 @@ impl From<MemoryFontSearcher> for FontResolverImpl {
 }
 
 impl MemoryFontSearcher {
-    /// Create a new, empty in-memory searcher.
+    /// Creates a in-memory searcher.
     pub fn new() -> Self {
         Self {
             book: FontBook::new(),
@@ -32,7 +32,7 @@ impl MemoryFontSearcher {
         }
     }
 
-    /// Add an in-memory font.
+    /// Adds an in-memory font.
     pub fn add_memory_font(&mut self, data: Bytes) {
         for (index, info) in FontInfo::iter(&data).enumerate() {
             self.book.push(info.clone());

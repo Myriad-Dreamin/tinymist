@@ -68,6 +68,7 @@ pub struct FontResolverImpl {
 }
 
 impl FontResolverImpl {
+    /// Creates a new font resolver.
     pub fn new(font_paths: Vec<PathBuf>, book: FontBook, slots: Vec<FontSlot>) -> Self {
         Self {
             font_paths,
@@ -95,35 +96,44 @@ impl FontResolverImpl {
         }
     }
 
+    /// Gets the number of fonts in the resolver.
     pub fn len(&self) -> usize {
         self.slots.len()
     }
 
+    /// Tests whether the resolver doesn't hold any fonts.
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
 
+    /// Gets the user-specified font paths.
     pub fn font_paths(&self) -> &[PathBuf] {
         &self.font_paths
     }
 
-    pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
-        let slots_with_index = self.slots.iter().enumerate();
+    /// Returns an iterator over all fonts in the resolver.
+    #[deprecated(note = "use `fonts` instead")]
+    pub fn get_fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
+        self.fonts()
+    }
 
-        slots_with_index.flat_map(|(idx, slot)| {
+    /// Returns an iterator over all fonts in the resolver.
+    pub fn fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
+        self.slots.iter().enumerate().map(|(idx, slot)| {
+            let info = self.book.info(idx).unwrap();
+            (info, slot)
+        })
+    }
+
+    /// Returns an iterator over all loaded fonts in the resolver.
+    pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
+        self.slots.iter().enumerate().flat_map(|(idx, slot)| {
             let maybe_font = slot.get_uninitialized().flatten();
             maybe_font.map(|font| (idx, font))
         })
     }
 
-    pub fn get_fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
-        self.slots.iter().enumerate().map(|(idx, slot)| {
-            let info = self.book.info(idx).unwrap();
-
-            (info, slot)
-        })
-    }
-
+    /// Describes the source of a font.
     pub fn describe_font(&self, font: &Font) -> Option<Arc<DataSource>> {
         let f = Some(Some(font.clone()));
         for slot in &self.slots {
@@ -134,13 +144,9 @@ impl FontResolverImpl {
         None
     }
 
-    /// Describe a font by id.
+    /// Describes the source of a font by id.
     pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
         self.slots[id].description.clone()
-    }
-
-    pub fn add_glyph_packs(&mut self) {
-        todo!()
     }
 }
 

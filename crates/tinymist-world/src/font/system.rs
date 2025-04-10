@@ -280,7 +280,7 @@ mod tests {
             .resolve_system()
             .expect("failed to resolve system universe");
 
-        let fonts: Vec<_> = verse.font_resolver.get_fonts().collect();
+        let fonts: Vec<_> = verse.font_resolver.fonts().collect();
 
         let new_resolver = FontResolverImpl::new_with_fonts(
             vec![],
