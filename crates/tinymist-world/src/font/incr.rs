@@ -79,13 +79,9 @@ impl IncrFontSearcher {
                 let new_range = base_len..base_len + range.len();
                 next.insert(search_key, new_range);
             } else {
-                let mut new_range = base.fonts.len()..base.fonts.len();
                 let new_fonts = op.load();
-                for (info, slot) in new_fonts {
-                    let index = base.fonts.len();
-                    base.fonts.push((info, slot));
-                    new_range.end += 1;
-                }
+                let mut new_range = base.fonts.len()..base.fonts.len() + new_fonts.len();
+                base.extend(new_fonts);
                 next.insert(search_key, new_range);
             }
         }
