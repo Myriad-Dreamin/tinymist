@@ -1,27 +1,24 @@
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
+use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 use fontdb::Database;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tinymist_std::error::prelude::*;
 use tinymist_vfs::system::LazyFile;
-use typst::{
-    diag::{FileError, FileResult},
-    foundations::Bytes,
-    text::{FontBook, FontInfo},
-};
+use typst::diag::{FileError, FileResult};
+use typst::foundations::Bytes;
+use typst::text::FontInfo;
 
-use super::{BufferFontLoader, FontResolverImpl, FontSlot, LazyBufferFontLoader};
+use super::memory::MemoryFontSearcher;
+use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader};
 use crate::config::CompileFontOpts;
-use crate::debug_loc::{DataSource, FsDataSource, MemoryDataSource};
+use crate::debug_loc::{DataSource, FsDataSource};
 
 /// Searches for fonts in system.
 #[derive(Debug)]
 pub struct SystemFontSearcher {
-    /// Stores `FontInfo` and `FontSlot` in order.
-    pub fonts: Vec<(FontInfo, FontSlot)>,
+    /// The base font searcher.
+    base: MemoryFontSearcher,
     /// Records user-specific font path when loading from directory or file for
     /// debug.
     pub font_paths: Vec<PathBuf>,
@@ -33,70 +30,24 @@ impl SystemFontSearcher {
     /// Creates a system searcher.
     pub fn new() -> Self {
         Self {
-            fonts: vec![],
+            base: MemoryFontSearcher::default(),
             font_paths: vec![],
             db: Database::new(),
         }
     }
 
-    /// Creates a new system searcher with fonts in a FontResolverImpl.
-    pub fn from_resolver(resolver: FontResolverImpl) -> Self {
-        let fonts = resolver
-            .slots
-            .into_iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    resolver
-                        .book
-                        .info(idx)
-                        .expect("font should be in font book")
-                        .clone(),
-                    slot,
-                )
-            })
-            .collect();
-
+    /// Creates a system searcher, also reuses the previous font resources.
+    pub fn reuse(resolver: FontResolverImpl) -> Self {
         Self {
-            fonts,
-            font_paths: resolver.font_paths,
+            base: MemoryFontSearcher::reuse(resolver),
+            font_paths: vec![],
             db: Database::new(),
         }
     }
 
-    /// Create a new system searcher with fonts cloned from a FontResolverImpl.
-    /// Since FontSlot only holds QueryRef to font data, cloning is cheap.
-    pub fn new_with_resolver(resolver: &FontResolverImpl) -> Self {
-        let fonts = resolver
-            .slots
-            .iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    resolver
-                        .book
-                        .info(idx)
-                        .expect("font should be in font book")
-                        .clone(),
-                    slot.clone(),
-                )
-            })
-            .collect();
-
-        Self {
-            fonts,
-            font_paths: resolver.font_paths.clone(),
-            db: Database::new(),
-        }
-    }
-
-    /// Build a FontResolverImpl.
+    /// Builds a FontResolverImpl.
     pub fn build(self) -> FontResolverImpl {
-        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = self.fonts.into_iter().unzip();
-
-        let book = FontBook::from_infos(info);
-
-        FontResolverImpl::new(self.font_paths, book, slots)
+        self.base.build().with_font_paths(self.font_paths)
     }
 }
 
@@ -157,7 +108,7 @@ impl SystemFontSearcher {
             Some((info, slot))
         });
 
-        self.fonts.extend(info.collect::<Vec<_>>().into_iter());
+        self.base.extend(info.collect::<Vec<_>>().into_iter());
         self.db = Database::new();
     }
 
@@ -167,18 +118,7 @@ impl SystemFontSearcher {
             panic!("dirty font search state, please flush the searcher before adding memory fonts");
         }
 
-        for (index, info) in FontInfo::iter(&data).enumerate() {
-            self.fonts.push((
-                info,
-                FontSlot::new(BufferFontLoader {
-                    buffer: Some(data.clone()),
-                    index: index as u32,
-                })
-                .with_describe(DataSource::Memory(MemoryDataSource {
-                    name: "<memory>".to_owned(),
-                })),
-            ));
-        }
+        self.base.add_memory_font(data);
     }
 
     /// Adds in-memory fonts.
@@ -187,31 +127,7 @@ impl SystemFontSearcher {
             panic!("dirty font search state, please flush the searcher before adding memory fonts");
         }
 
-        let loaded = data.flat_map(|data| {
-            FontInfo::iter(&data)
-                .enumerate()
-                .map(|(index, info)| {
-                    (
-                        info,
-                        FontSlot::new(BufferFontLoader {
-                            buffer: Some(data.clone()),
-                            index: index as u32,
-                        })
-                        .with_describe(DataSource::Memory(
-                            MemoryDataSource {
-                                name: "<memory>".to_owned(),
-                            },
-                        )),
-                    )
-                })
-                .collect::<Vec<_>>()
-        });
-
-        self.fonts.extend(loaded.collect::<Vec<_>>().into_iter());
-    }
-
-    pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
-        func(&mut self.fonts);
+        self.base.add_memory_fonts(data);
     }
 
     pub fn search_system(&mut self) {

@@ -148,6 +148,11 @@ impl FontResolverImpl {
     pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
         self.slots[id].description.clone()
     }
+
+    pub fn with_font_paths(mut self, font_paths: Vec<PathBuf>) -> Self {
+        self.font_paths = font_paths;
+        self
+    }
 }
 
 impl FontResolver for FontResolverImpl {
