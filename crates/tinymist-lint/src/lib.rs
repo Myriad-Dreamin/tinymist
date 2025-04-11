@@ -195,6 +195,36 @@ impl Linter {
             ty: self.ti.type_of_span(expr.span()),
         }
     }
+
+    fn check_variable_font<'a>(&mut self, args: impl IntoIterator<Item = ast::Arg<'a>>) {
+        let gen_diag = |span| {
+            SourceDiagnostic::warning(
+                span,
+                "variable font is not supported by typst yet",
+            ).with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185")
+        };
+
+        for arg in args {
+            if let ast::Arg::Named(arg) = arg {
+                if arg.name().as_str() == "font" {
+                    if let Some(str) = arg.expr().to_untyped().cast::<ast::Str>() {
+                        if str.get().ends_with("VF") {
+                            self.diag.push(gen_diag(arg.span()));
+                        }
+                    }
+                    if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
+                        for item in array.items() {
+                            if let Some(str) = item.to_untyped().cast::<ast::Str>() {
+                                if str.get().ends_with("VF") {
+                                    self.diag.push(gen_diag(arg.span()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl DataFlowVisitor for Linter {
@@ -210,6 +240,11 @@ impl DataFlowVisitor for Linter {
             self.expr(target);
         }
         self.exprs(expr.args().to_untyped().exprs());
+
+        if expr.target().to_untyped().text() == "text" {
+            self.check_variable_font(expr.args().items());
+        }
+
         self.expr(expr.target())
     }
 
@@ -310,6 +345,14 @@ impl DataFlowVisitor for Linter {
     fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
         self.check_type_compare(expr);
         self.exprs([expr.lhs(), expr.rhs()].into_iter())
+    }
+
+    fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
+        // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with "VF"
+        if expr.callee().to_untyped().text() == "text" {
+            self.check_variable_font(expr.args().items());
+        }
+        Some(())
     }
 }
 
