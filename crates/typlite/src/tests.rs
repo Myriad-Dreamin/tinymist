@@ -5,14 +5,14 @@ use std::sync::{LazyLock, OnceLock};
 
 use regex::Regex;
 use tinymist_project::{
-    font::TinymistFontResolver, CompileFontArgs, EntryState, ExportTarget, LspUniverseBuilder,
+    font::FontResolverImpl, CompileFontArgs, EntryState, ExportTarget, LspUniverseBuilder,
 };
 use typst_syntax::Source;
 
 use super::*;
 
 fn conv_(s: &str, for_docs: bool) -> EcoString {
-    static FONT_RESOLVER: LazyLock<Arc<TinymistFontResolver>> = LazyLock::new(|| {
+    static FONT_RESOLVER: LazyLock<Arc<FontResolverImpl>> = LazyLock::new(|| {
         Arc::new(
             LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
                 .expect("cannot resolve default fonts"),

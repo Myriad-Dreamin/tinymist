@@ -23,11 +23,11 @@ use typst::Features;
 use typst_shim::utils::LazyHash;
 
 use super::*;
-use crate::project::font::TinymistFontResolver;
 use crate::project::{
     EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
     ProjectTask, TaskWhen,
 };
+use crate::world::font::FontResolverImpl;
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
@@ -96,7 +96,7 @@ pub struct Config {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceLock<Derived<Arc<TinymistFontResolver>>>,
+    pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
 
@@ -554,7 +554,7 @@ impl Config {
     }
 
     /// Determines the font resolver.
-    pub fn fonts(&self) -> Arc<TinymistFontResolver> {
+    pub fn fonts(&self) -> Arc<FontResolverImpl> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let opts = self.font_opts();

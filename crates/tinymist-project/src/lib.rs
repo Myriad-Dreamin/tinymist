@@ -6,8 +6,6 @@ mod entry;
 mod model;
 
 #[cfg(feature = "lsp")]
-pub mod font;
-#[cfg(feature = "lsp")]
 mod lock;
 #[cfg(feature = "lsp")]
 mod lsp;

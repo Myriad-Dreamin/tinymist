@@ -9,36 +9,55 @@ use crate::font::FontLoader;
 
 type FontSlotInner = QueryRef<Option<Font>, (), Box<dyn FontLoader + Send>>;
 
-/// Lazy Font Reference, load as needed.
+/// A font slot holds a reference to a font resource. It can be created from
+/// - either a callback to load the font lazily, using [`Self::new`] or
+///   [`Self::new_boxed`],
+/// - or a loaded font, using [`Self::new_loaded`].
+#[derive(Clone)]
 pub struct FontSlot {
-    inner: FontSlotInner,
+    inner: Arc<FontSlotInner>,
     pub description: Option<Arc<DataSource>>,
 }
 
 impl FontSlot {
-    pub fn with_value(f: Option<Font>) -> Self {
+    /// Creates a font slot to load.
+    pub fn new<F: FontLoader + Send + 'static>(f: F) -> Self {
+        Self::new_boxed(Box::new(f))
+    }
+
+    /// Creates a font slot from a boxed font loader trait object.
+    pub fn new_boxed(f: Box<dyn FontLoader + Send>) -> Self {
         Self {
-            inner: FontSlotInner::with_value(f),
+            inner: Arc::new(FontSlotInner::with_context(f)),
             description: None,
         }
     }
 
-    pub fn new(f: Box<dyn FontLoader + Send>) -> Self {
+    /// Creates a font slot with a loaded font.
+    pub fn new_loaded(f: Option<Font>) -> Self {
         Self {
-            inner: FontSlotInner::with_context(f),
+            inner: Arc::new(FontSlotInner::with_value(f)),
             description: None,
         }
     }
 
-    pub fn new_boxed<F: FontLoader + Send + 'static>(f: F) -> Self {
-        Self::new(Box::new(f))
+    /// Attaches a description to the font slot.
+    pub fn with_describe(self, desc: DataSource) -> Self {
+        self.with_describe_arc(Arc::new(desc))
     }
 
-    pub fn describe(self, desc: DataSource) -> Self {
+    /// Attaches a description to the font slot.
+    pub fn with_describe_arc(self, desc: Arc<DataSource>) -> Self {
         Self {
             inner: self.inner,
-            description: Some(Arc::new(desc)),
+            description: Some(desc),
         }
+    }
+
+    /// Gets or make the font load result.
+    pub fn get_or_init(&self) -> Option<Font> {
+        let res = self.inner.compute_with_context(|mut c| Ok(c.load()));
+        res.unwrap().clone()
     }
 
     /// Gets the reference to the font load result (possible uninitialized).
@@ -50,12 +69,6 @@ impl FontSlot {
             .get_uninitialized()
             .cloned()
             .map(|e| e.ok().flatten())
-    }
-
-    /// Gets or make the font load result.
-    pub fn get_or_init(&self) -> Option<Font> {
-        let res = self.inner.compute_with_context(|mut c| Ok(c.load()));
-        res.unwrap().clone()
     }
 }
 
