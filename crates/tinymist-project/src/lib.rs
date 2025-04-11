@@ -6,8 +6,6 @@ mod entry;
 mod model;
 
 #[cfg(feature = "lsp")]
-pub mod font;
-#[cfg(feature = "lsp")]
 mod lock;
 #[cfg(feature = "lsp")]
 mod lsp;
@@ -20,6 +18,7 @@ pub use args::*;
 pub use compiler::*;
 pub use entry::*;
 pub use model::*;
+pub use world::*;
 
 #[cfg(feature = "lsp")]
 pub use lock::*;
@@ -27,8 +26,6 @@ pub use lock::*;
 pub use lsp::*;
 #[cfg(feature = "system")]
 pub use watch::*;
-#[cfg(feature = "system")]
-pub use world::*;
 
 pub use tinymist_world::{CompileSnapshot, ExportSignal, ProjectInsId};
 
