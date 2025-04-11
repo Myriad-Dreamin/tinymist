@@ -4221,6 +4221,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymist-package"
+version = "0.13.10"
+dependencies = [
+ "base64",
+ "comemo",
+ "dirs",
+ "ecow",
+ "fastrand",
+ "flate2",
+ "insta",
+ "js-sys",
+ "log",
+ "parking_lot",
+ "rayon",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tar",
+ "tinymist-std",
+ "toml",
+ "typst",
+ "walkdir",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "tinymist-project"
 version = "0.13.12-rc1"
 dependencies = [
@@ -4428,6 +4455,7 @@ dependencies = [
  "sha2",
  "strum",
  "tar",
+ "tinymist-package",
  "tinymist-std",
  "tinymist-vfs",
  "typst",
