@@ -1,9 +1,8 @@
 //! Linked definition analysis
 
 use tinymist_std::typst::TypstDocument;
-use typst::foundations::{IntoValue, Label, Selector, Type};
+use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
-use typst::model::BibliographyElem;
 
 use super::{prelude::*, InsTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
@@ -169,13 +168,7 @@ fn bib_definition(
     introspector: &Introspector,
     key: &str,
 ) -> Option<Definition> {
-    let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
-        return None;
-    };
-
-    let bib_paths = paths.into_iter().flat_map(|path| path.cast().ok());
-    let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
+    let bib_info = ctx.analyze_bib(introspector)?;
 
     let entry = bib_info.entries.get(key)?;
     crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");

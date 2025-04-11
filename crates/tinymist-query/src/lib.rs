@@ -56,6 +56,7 @@ mod adt;
 mod lsp_typst_boundary;
 mod prelude;
 
+mod bib;
 mod check;
 mod code_action;
 mod code_context;

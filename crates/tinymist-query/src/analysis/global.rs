@@ -15,11 +15,13 @@ use tinymist_project::{LspComputeGraph, LspWorld};
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
-use tinymist_world::vfs::{FileId, PathResolution, WorkspaceResolver};
+use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
-use typst::foundations::{Bytes, Module, Styles};
+use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
+use typst::introspection::Introspector;
 use typst::layout::Position;
+use typst::model::BibliographyElem;
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{eval_compat, Eval};
@@ -884,17 +886,11 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(
-        &self,
-        span: Span,
-        bib_paths: impl Iterator<Item = EcoString>,
-    ) -> Option<Arc<BibInfo>> {
-        use comemo::Track;
-        let w = &self.world;
-        let w = (w as &dyn World).track();
+    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+        let world = &self.world;
+        let world = (world as &dyn World).track();
 
-        let fid = span.id()?;
-        analyze_bib(w, bib_paths.collect(), fid)
+        analyze_bib(world, introspector.track())
     }
 
     /// Describe the item under the cursor.
@@ -1278,17 +1274,27 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    bib_paths: EcoVec<EcoString>,
-    elem_fid: FileId,
+    introspector: Tracked<Introspector>,
 ) -> Option<Arc<BibInfo>> {
-    let files = bib_paths
-        .iter()
-        .flat_map(|bib_path| {
-            let bib_fid = resolve_id_by_path(world.deref(), elem_fid, bib_path)?;
+    let bib_elem = BibliographyElem::find(introspector).ok()?;
+
+    // todo: it doesn't respect the style chain which can be get from
+    // `analyze_expr`
+    let csl_style = bib_elem.style(StyleChain::default()).derived;
+
+    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
+        return None;
+    };
+    let elem_fid = bib_elem.span().id()?;
+    let files = paths
+        .into_iter()
+        .flat_map(|path| path.cast().ok())
+        .flat_map(|bib_path: EcoString| {
+            let bib_fid = resolve_id_by_path(world.deref(), elem_fid, &bib_path)?;
             Some((bib_fid, world.file(bib_fid).ok()?))
-        })
-        .collect::<EcoVec<_>>();
-    bib_info(files)
+        });
+
+    bib_info(csl_style, files)
 }
 
 #[comemo::memoize]

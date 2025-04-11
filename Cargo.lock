@@ -4260,6 +4260,7 @@ dependencies = [
  "dirs",
  "ecow",
  "ena",
+ "hayagriva",
  "hex",
  "if_chain",
  "indexmap 2.8.0",

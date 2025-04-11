@@ -5,6 +5,7 @@ use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_link_exprs_in;
+use crate::bib::{render_citation_string, RenderedBibCitation};
 use crate::jump_from_cursor;
 use crate::prelude::*;
 use crate::upstream::{route_of_value, truncated_repr, Tooltip};
@@ -125,14 +126,26 @@ impl HoverWorker<'_> {
         use Decl::*;
         match def.decl.as_ref() {
             Label(..) => {
-                self.def.push(format!("Label: {}\n", def.name()));
-                // todo: type repr
                 if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
-                    self.def.push(truncated_repr(&val).into());
+                    self.def.push(format!("Ref: `{}`\n", def.name()));
+                    self.def
+                        .push(format!("```typc\n{}\n```", truncated_repr(&val)));
+                } else {
+                    self.def.push(format!("Label: `{}`\n", def.name()));
                 }
             }
             BibEntry(..) => {
-                self.def.push(format!("Bibliography: @{}", def.name()));
+                if let Some(details) = try_get_bib_details(&self.doc, self.ctx, def.name()) {
+                    self.def.push(format!(
+                        "Bibliography: `{}` {}",
+                        def.name(),
+                        details.citation
+                    ));
+                    self.def.push(details.bib_item);
+                } else {
+                    // fallback: no additional information
+                    self.def.push(format!("Bibliography: `{}`", def.name()));
+                }
             }
             _ => {
                 let sym_docs = self.ctx.def_docs(&def);
@@ -283,6 +296,17 @@ impl HoverWorker<'_> {
     }
 }
 
+fn try_get_bib_details(
+    doc: &Option<TypstDocument>,
+    ctx: &LocalContext,
+    name: &str,
+) -> Option<RenderedBibCitation> {
+    let doc = doc.as_ref()?;
+    let support_html = !ctx.shared.analysis.remove_html;
+    let bib_info = ctx.analyze_bib(doc.introspector())?;
+    render_citation_string(&bib_info, name, support_html)
+}
+
 fn push_result_ty(
     name: &str,
     ty_repr: Option<&(EcoString, EcoString, EcoString)>,
@@ -396,13 +420,16 @@ mod tests {
         snapshot_testing("hover", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let graph = compile_doc_for_test(ctx, &properties);
+
             let request = HoverRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let snap = WorldComputeGraph::from_world(ctx.world.clone());
-            let result = request.request(ctx, snap);
+            let result = request.request(ctx, graph);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }
