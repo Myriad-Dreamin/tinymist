@@ -1,5 +1,6 @@
 export function setupDrag() {
     let lastPos = { x: 0, y: 0 };
+    let moved = false;
     let containerElement: HTMLElement | null = null;
     const mouseMoveHandler = function (e: MouseEvent) {
         // How far the mouse has been moved
@@ -11,13 +12,16 @@ export function setupDrag() {
             x: e.clientX,
             y: e.clientY,
         };
+        moved = true;
     };
     const mouseUpHandler = function () {
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
         if (!containerElement) return;
+        if (!moved) {
+          document.getSelection()?.removeAllRanges();
+        }
         containerElement.style.cursor = 'grab';
-        containerElement.style.removeProperty('user-select');
     };
     const mouseDownHandler = function (e: MouseEvent) {
         lastPos = {
@@ -30,8 +34,9 @@ export function setupDrag() {
         if (elementUnderMouse !== null && elementUnderMouse.classList.contains('tsel')) {
             return;
         }
+        e.preventDefault();
         containerElement.style.cursor = 'grabbing';
-        containerElement.style.userSelect = 'none';
+        moved = false;
 
         document.addEventListener('mousemove', mouseMoveHandler);
         document.addEventListener('mouseup', mouseUpHandler);
