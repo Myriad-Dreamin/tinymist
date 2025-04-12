@@ -195,6 +195,47 @@ impl Linter {
             ty: self.ti.type_of_span(expr.span()),
         }
     }
+
+    fn check_variable_font<'a>(&mut self, args: impl IntoIterator<Item = ast::Arg<'a>>) {
+        for arg in args {
+            if let ast::Arg::Named(arg) = arg {
+                if arg.name().as_str() == "font" {
+                    self.check_variable_font_object(arg.expr().to_untyped());
+                    if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
+                        for item in array.items() {
+                            self.check_variable_font_object(item.to_untyped());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
+        if let Some(font_dict) = expr.cast::<ast::Dict>() {
+            for item in font_dict.items() {
+                if let ast::DictItem::Named(arg) = item {
+                    if arg.name().as_str() == "name" {
+                        self.check_variable_font_str(arg.expr().to_untyped());
+                    }
+                }
+            }
+        }
+
+        self.check_variable_font_str(expr)
+    }
+    fn check_variable_font_str(&mut self, expr: &SyntaxNode) -> Option<()> {
+        if !expr.cast::<ast::Str>()?.get().ends_with("VF") {
+            return None;
+        }
+
+        let diag =
+            SourceDiagnostic::warning(expr.span(), "variable font is not supported by typst yet");
+        let diag = diag.with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185");
+        self.diag.push(diag);
+
+        Some(())
+    }
 }
 
 impl DataFlowVisitor for Linter {
@@ -210,6 +251,11 @@ impl DataFlowVisitor for Linter {
             self.expr(target);
         }
         self.exprs(expr.args().to_untyped().exprs());
+
+        if expr.target().to_untyped().text() == "text" {
+            self.check_variable_font(expr.args().items());
+        }
+
         self.expr(expr.target())
     }
 
@@ -310,6 +356,15 @@ impl DataFlowVisitor for Linter {
     fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
         self.check_type_compare(expr);
         self.exprs([expr.lhs(), expr.rhs()].into_iter())
+    }
+
+    fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
+        // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
+        // "VF"
+        if expr.callee().to_untyped().text() == "text" {
+            self.check_variable_font(expr.args().items());
+        }
+        Some(())
     }
 }
 
