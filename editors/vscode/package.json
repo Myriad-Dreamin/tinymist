@@ -446,7 +446,7 @@
           "title": "%extension.tinymist.config.tinymist.formatterMode.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.formatterMode.desc%",
           "type": "string",
-          "default": "disable",
+          "default": "typstyle",
           "enum": [
             "disable",
             "typstyle",
