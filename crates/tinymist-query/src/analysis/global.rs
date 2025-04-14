@@ -11,13 +11,16 @@ use rustc_hash::FxHashMap;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
+use tinymist_lint::LintInfo;
 use tinymist_project::{LspComputeGraph, LspWorld};
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
-use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
+use typst::diag::{
+    eco_format, At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult,
+};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
@@ -463,6 +466,10 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
+    pub(crate) fn lint(&mut self, source: &Source) -> EcoVec<SourceDiagnostic> {
+        self.shared.lint(source).diagnostics
+    }
+
     /// Get the type check information of a source file.
     pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeInfo> {
         let cache = &self.caches.modules.entry(id).or_default().type_check;
@@ -759,21 +766,24 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let guard = self.query_stat(source.id(), "type_check");
         self.slot.type_check.compute(hash128(&ei), |prev| {
-            let cache_hit = prev.and_then(|prev| {
-                // todo: recursively check changed scheme type
-                if prev.revision != ei.revision {
-                    return None;
-                }
-
-                Some(prev)
-            });
-
-            if let Some(prev) = cache_hit {
-                return prev.clone();
+            // todo: recursively check changed scheme type
+            if let Some(cache_hint) = prev.filter(|prev| prev.revision == ei.revision) {
+                return cache_hint;
             }
 
             guard.miss();
             type_check(self.clone(), ei, route)
+        })
+    }
+
+    /// Get the lint result of a source file.
+    pub(crate) fn lint(self: &Arc<Self>, source: &Source) -> LintInfo {
+        let ei = self.expr_stage(source);
+        let ti = self.type_check(source);
+        let guard = self.query_stat(source.id(), "lint");
+        self.slot.lint.compute(hash128(&(&ei, &ti)), |_prev| {
+            guard.miss();
+            tinymist_lint::lint_file(&self.world, &ei, ti)
         })
     }
 
@@ -1180,6 +1190,7 @@ impl RevisionManagerLike for AnalysisRevCache {
     fn gc(&mut self, rev: usize) {
         self.manager.gc(rev);
 
+        // todo: the following code are time consuming.
         {
             let mut max_ei = FxHashMap::default();
             let es = self.default_slot.expr_stage.global.lock();
@@ -1198,6 +1209,16 @@ impl RevisionManagerLike for AnalysisRevCache {
                 *rev = (*rev).max(r.1.revision);
             }
             ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
+        }
+
+        {
+            let mut max_li = FxHashMap::default();
+            let ts = self.default_slot.lint.global.lock();
+            for r in ts.iter() {
+                let rev: &mut usize = max_li.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            ts.retain(|_, r| r.1.revision == *max_li.get(&r.1.fid).unwrap_or(&0));
         }
     }
 }
@@ -1222,6 +1243,7 @@ impl AnalysisRevCache {
                     revision: slot.revision,
                     expr_stage: slot.data.expr_stage.crawl(revision.get()),
                     type_check: slot.data.type_check.crawl(revision.get()),
+                    lint: slot.data.lint.crawl(revision.get()),
                 })
                 .unwrap_or_else(|| self.default_slot.clone())
         })
@@ -1254,6 +1276,7 @@ struct AnalysisRevSlot {
     revision: usize,
     expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
+    lint: IncrCacheMap<u128, LintInfo>,
 }
 
 impl Drop for AnalysisRevSlot {

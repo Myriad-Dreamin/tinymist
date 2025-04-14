@@ -669,10 +669,8 @@ mod lint_tests {
     fn test() {
         snapshot_testing("lint", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
-            let expr = ctx.expr_stage(&source);
-            let ti = ctx.type_check(&source);
 
-            let result = tinymist_lint::lint_file(&expr, ti);
+            let result = ctx.lint(&source);
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()

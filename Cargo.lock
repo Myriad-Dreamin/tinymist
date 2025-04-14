@@ -4206,16 +4206,12 @@ dependencies = [
 name = "tinymist-lint"
 version = "0.13.10"
 dependencies = [
- "base64",
  "comemo",
  "insta",
- "parking_lot",
  "rayon",
- "serde",
- "serde_json",
  "tinymist-analysis",
+ "tinymist-project",
  "tinymist-std",
- "tinymist-world",
  "typst",
  "typst-library",
 ]

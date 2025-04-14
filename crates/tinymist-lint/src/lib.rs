@@ -6,33 +6,52 @@ use tinymist_analysis::{
     syntax::ExprInfo,
     ty::{Ty, TyCtx, TypeInfo},
 };
+use tinymist_project::LspWorld;
 use typst::{
     diag::{eco_format, EcoString, SourceDiagnostic, Tracepoint},
     ecow::EcoVec,
     syntax::{
         ast::{self, AstNode},
-        Span, Spanned, SyntaxNode,
+        FileId, Span, Spanned, SyntaxNode,
     },
 };
 
 /// A type alias for a vector of diagnostics.
 type DiagnosticVec = EcoVec<SourceDiagnostic>;
 
-/// Performs linting check on file and returns a vector of diagnostics.
-pub fn lint_file(expr: &ExprInfo, ti: Arc<TypeInfo>) -> DiagnosticVec {
-    Linter::new(ti).lint(expr.source.root())
+/// The lint information about a file.
+#[derive(Debug, Clone)]
+pub struct LintInfo {
+    /// The revision of expression information
+    pub revision: usize,
+    /// The belonging file id
+    pub fid: FileId,
+    /// The diagnostics
+    pub diagnostics: DiagnosticVec,
 }
 
-struct Linter {
+/// Performs linting check on file and returns a vector of diagnostics.
+pub fn lint_file(world: &LspWorld, expr: &ExprInfo, ti: Arc<TypeInfo>) -> LintInfo {
+    let diagnostics = Linter::new(world, ti).lint(expr.source.root());
+    LintInfo {
+        revision: expr.revision,
+        fid: expr.fid,
+        diagnostics,
+    }
+}
+
+struct Linter<'w> {
+    world: &'w LspWorld,
     ti: Arc<TypeInfo>,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 }
 
-impl Linter {
-    fn new(ti: Arc<TypeInfo>) -> Self {
+impl<'w> Linter<'w> {
+    fn new(world: &'w LspWorld, ti: Arc<TypeInfo>) -> Self {
         Self {
+            world,
             ti,
             diag: EcoVec::new(),
             loop_info: None,
@@ -229,6 +248,8 @@ impl Linter {
             return None;
         }
 
+        let _ = self.world;
+
         let diag =
             SourceDiagnostic::warning(expr.span(), "variable font is not supported by typst yet");
         let diag = diag.with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185");
@@ -238,7 +259,7 @@ impl Linter {
     }
 }
 
-impl DataFlowVisitor for Linter {
+impl DataFlowVisitor for Linter<'_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs {
             self.expr(expr);
@@ -368,13 +389,13 @@ impl DataFlowVisitor for Linter {
     }
 }
 
-struct LateFuncLinter<'a> {
-    linter: &'a mut Linter,
+struct LateFuncLinter<'a, 'b> {
+    linter: &'a mut Linter<'b>,
     func_info: FuncInfo,
     return_block_info: Option<ReturnBlockInfo>,
 }
 
-impl LateFuncLinter<'_> {
+impl LateFuncLinter<'_, '_> {
     fn late_closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
         if !self.func_info.has_return {
             return Some(());
@@ -408,7 +429,7 @@ impl LateFuncLinter<'_> {
     }
 }
 
-impl DataFlowVisitor for LateFuncLinter<'_> {
+impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs.rev() {
             self.expr(expr);

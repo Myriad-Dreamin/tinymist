@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
-use tinymist_analysis::ty::TypeInfo;
 use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
-use typst::{diag::SourceDiagnostic, syntax::Span};
+use typst::syntax::Span;
 
-use crate::{analysis::Analysis, prelude::*, syntax::ExprInfo, LspWorldExt};
+use crate::{analysis::Analysis, prelude::*, LspWorldExt};
 
 use regex::RegexSet;
 
@@ -57,13 +56,9 @@ impl<'w> DiagWorker<'w> {
             let Ok(source) = self.ctx.world.source(dep) else {
                 continue;
             };
-            let expr = self.ctx.expr_stage(&source);
-            let ti = self.ctx.type_check(&source);
-            let res = lint_file(&expr, ti);
-            if !res.is_empty() {
-                for diag in res {
-                    self.handle(&diag);
-                }
+
+            for diag in self.ctx.lint(&source) {
+                self.handle(&diag);
             }
         }
 
@@ -245,9 +240,4 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
         raw.hints.clear();
         raw.with_hint("Cannot read file outside of project root.")
     }
-}
-
-#[comemo::memoize]
-fn lint_file(source: &ExprInfo, ti: Arc<TypeInfo>) -> EcoVec<SourceDiagnostic> {
-    tinymist_lint::lint_file(source, ti)
 }
