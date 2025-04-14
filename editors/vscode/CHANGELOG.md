@@ -8,8 +8,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## Unreleased
 
-* Bumped typstyle to v0.13.2 by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/1600
-  * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0132---2025-03-28.
+* Bumped typstyle from v0.13.1 to v0.13.3
+  * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0133---2025-04-10.
 
 ## v0.13.10 - [2025-03-23]
 

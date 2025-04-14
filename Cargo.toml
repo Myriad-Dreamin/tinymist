@@ -145,7 +145,7 @@ typst-eval = "0.13.1"
 typst-assets = "0.13.1"
 typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.2", default-features = false }
+typstyle-core = { version = "=0.13.3", default-features = false }
 typlite = { path = "./crates/typlite" }
 
 # LSP
