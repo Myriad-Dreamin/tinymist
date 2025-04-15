@@ -4427,6 +4427,7 @@ dependencies = [
  "tar",
  "tinymist-std",
  "tinymist-vfs",
+ "ttf-parser",
  "typst",
  "typst-assets",
  "wasm-bindgen",

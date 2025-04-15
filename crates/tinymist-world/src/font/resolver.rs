@@ -1,106 +1,176 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    num::NonZeroUsize,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use typst::text::{Font, FontBook, FontInfo};
 use typst::utils::LazyHash;
 
-use super::{BufferFontLoader, FontProfile, FontSlot, PartialFontBook};
+use super::FontSlot;
 use crate::debug_loc::DataSource;
-use crate::Bytes;
 
-/// A FontResolver can resolve a font by index.
-/// It also reuse FontBook for font-related query.
-/// The index is the index of the font in the `FontBook.infos`.
+/// A [`FontResolver`] can resolve a font by index.
+/// It also provides FontBook for typst to query fonts.
 pub trait FontResolver {
+    /// An optionally implemented revision function for users, e.g. the `World`.
+    ///
+    /// A user of [`FontResolver`] will differentiate the `prev` and `next`
+    /// revisions to determine if the underlying state of fonts has changed.
+    ///
+    /// - If either `prev` or `next` is `None`, the world's revision is always
+    ///   increased.
+    /// - Otherwise, the world's revision is increased if `prev != next`.
+    ///
+    /// If the revision of fonts is changed, the world will invalidate all
+    /// related caches and increase its revision.
     fn revision(&self) -> Option<NonZeroUsize> {
         None
     }
 
+    /// The font book interface for typst.
     fn font_book(&self) -> &LazyHash<FontBook>;
-    fn font(&self, idx: usize) -> Option<Font>;
 
+    /// Gets the font slot by index.
+    /// The index parameter is the index of the font in the `FontBook.infos`.
+    fn slot(&self, index: usize) -> Option<&FontSlot>;
+
+    /// Gets the font by index.
+    /// The index parameter is the index of the font in the `FontBook.infos`.
+    fn font(&self, index: usize) -> Option<Font>;
+
+    /// Gets a font by its info.
+    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        self.default_get_by_info(info)
+    }
+
+    /// The default implementation of [`FontResolver::get_by_info`].
     fn default_get_by_info(&self, info: &FontInfo) -> Option<Font> {
-        // todo: font alternative
+        // The selected font should at least has the first codepoint in the
+        // coverage. We achieve it by querying the font book with `alternative_text`.
+        // todo: better font alternative
         let mut alternative_text = 'c';
         if let Some(codepoint) = info.coverage.iter().next() {
             alternative_text = std::char::from_u32(codepoint).unwrap();
         };
 
-        let idx = self
+        let index = self
             .font_book()
             .select_fallback(Some(info), info.variant, &alternative_text.to_string())
             .unwrap();
-        self.font(idx)
-    }
-    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
-        self.default_get_by_info(info)
+        self.font(index)
     }
 }
 
-#[derive(Debug)]
+impl<T: FontResolver> FontResolver for Arc<T> {
+    fn font_book(&self) -> &LazyHash<FontBook> {
+        self.as_ref().font_book()
+    }
+
+    fn slot(&self, index: usize) -> Option<&FontSlot> {
+        self.as_ref().slot(index)
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.as_ref().font(index)
+    }
+
+    fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
+        self.as_ref().get_by_info(info)
+    }
+}
+
+pub trait ReusableFontResolver: FontResolver {
+    /// Reuses the font resolver.
+    fn slots(&self) -> impl Iterator<Item = FontSlot>;
+}
+
+impl<T: ReusableFontResolver> ReusableFontResolver for Arc<T> {
+    fn slots(&self) -> impl Iterator<Item = FontSlot> {
+        self.as_ref().slots()
+    }
+}
+
 /// The default FontResolver implementation.
+///
+/// This is constructed by:
+/// - The [`crate::font::system::SystemFontSearcher`] on operating systems.
+/// - The [`crate::font::web::BrowserFontSearcher`] on browsers.
+/// - Otherwise, [`crate::font::pure::MemoryFontBuilder`] in memory.
+#[derive(Debug)]
 pub struct FontResolverImpl {
-    font_paths: Vec<PathBuf>,
-    book: LazyHash<FontBook>,
-    partial_book: Arc<Mutex<PartialFontBook>>,
-    fonts: Vec<FontSlot>,
-    profile: FontProfile,
+    pub(crate) font_paths: Vec<PathBuf>,
+    pub(crate) book: LazyHash<FontBook>,
+    pub(crate) slots: Vec<FontSlot>,
 }
 
 impl FontResolverImpl {
-    pub fn new(
-        font_paths: Vec<PathBuf>,
-        book: FontBook,
-        partial_book: Arc<Mutex<PartialFontBook>>,
-        fonts: Vec<FontSlot>,
-        profile: FontProfile,
-    ) -> Self {
+    /// Creates a new font resolver.
+    pub fn new(font_paths: Vec<PathBuf>, book: FontBook, slots: Vec<FontSlot>) -> Self {
         Self {
             font_paths,
             book: LazyHash::new(book),
-            partial_book,
-            fonts,
-            profile,
+            slots,
         }
     }
 
+    pub fn new_with_fonts(
+        font_paths: Vec<PathBuf>,
+        fonts: impl Iterator<Item = (FontInfo, FontSlot)>,
+    ) -> Self {
+        let mut book = FontBook::new();
+        let mut slots = Vec::<FontSlot>::new();
+
+        for (info, slot) in fonts {
+            book.push(info);
+            slots.push(slot);
+        }
+
+        Self {
+            font_paths,
+            book: LazyHash::new(book),
+            slots,
+        }
+    }
+
+    /// Gets the number of fonts in the resolver.
     pub fn len(&self) -> usize {
-        self.fonts.len()
+        self.slots.len()
     }
 
+    /// Tests whether the resolver doesn't hold any fonts.
     pub fn is_empty(&self) -> bool {
-        self.fonts.is_empty()
+        self.slots.is_empty()
     }
 
-    pub fn profile(&self) -> &FontProfile {
-        &self.profile
-    }
-
+    /// Gets the user-specified font paths.
     pub fn font_paths(&self) -> &[PathBuf] {
         &self.font_paths
     }
 
-    pub fn partial_resolved(&self) -> bool {
-        self.partial_book.lock().unwrap().partial_hit
+    /// Returns an iterator over all fonts in the resolver.
+    #[deprecated(note = "use `fonts` instead")]
+    pub fn get_fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
+        self.fonts()
     }
 
-    pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
-        let slots_with_index = self.fonts.iter().enumerate();
+    /// Returns an iterator over all fonts in the resolver.
+    pub fn fonts(&self) -> impl Iterator<Item = (&FontInfo, &FontSlot)> {
+        self.slots.iter().enumerate().map(|(idx, slot)| {
+            let info = self.book.info(idx).unwrap();
+            (info, slot)
+        })
+    }
 
-        slots_with_index.flat_map(|(idx, slot)| {
+    /// Returns an iterator over all loaded fonts in the resolver.
+    pub fn loaded_fonts(&self) -> impl Iterator<Item = (usize, Font)> + '_ {
+        self.slots.iter().enumerate().flat_map(|(idx, slot)| {
             let maybe_font = slot.get_uninitialized().flatten();
             maybe_font.map(|font| (idx, font))
         })
     }
 
+    /// Describes the source of a font.
     pub fn describe_font(&self, font: &Font) -> Option<Arc<DataSource>> {
         let f = Some(Some(font.clone()));
-        for slot in &self.fonts {
+        for slot in &self.slots {
             if slot.get_uninitialized() == f {
                 return slot.description.clone();
             }
@@ -108,76 +178,14 @@ impl FontResolverImpl {
         None
     }
 
-    pub fn modify_font_data(&mut self, idx: usize, buffer: Bytes) {
-        let mut font_book = self.partial_book.lock().unwrap();
-        for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
-            let buffer = buffer.clone();
-            let modify_idx = if i > 0 { None } else { Some(idx) };
-
-            font_book.push((
-                modify_idx,
-                info,
-                FontSlot::new(Box::new(BufferFontLoader {
-                    buffer: Some(buffer),
-                    index: i as u32,
-                })),
-            ));
-        }
+    /// Describes the source of a font by id.
+    pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
+        self.slots[id].description.clone()
     }
 
-    pub fn append_font(&mut self, info: FontInfo, slot: FontSlot) {
-        let mut font_book = self.partial_book.lock().unwrap();
-        font_book.push((None, info, slot));
-    }
-
-    pub fn rebuild(&mut self) {
-        let mut partial_book = self.partial_book.lock().unwrap();
-        if !partial_book.partial_hit {
-            return;
-        }
-        partial_book.revision += 1;
-
-        let mut book = FontBook::default();
-
-        let mut font_changes = HashMap::new();
-        let mut new_fonts = vec![];
-        for (idx, info, slot) in partial_book.changes.drain(..) {
-            if let Some(idx) = idx {
-                font_changes.insert(idx, (info, slot));
-            } else {
-                new_fonts.push((info, slot));
-            }
-        }
-        partial_book.changes.clear();
-        partial_book.partial_hit = false;
-
-        let mut font_slots = Vec::new();
-        font_slots.append(&mut self.fonts);
-        self.fonts.clear();
-
-        for (i, slot_ref) in font_slots.iter_mut().enumerate() {
-            let (info, slot) = if let Some((_, v)) = font_changes.remove_entry(&i) {
-                v
-            } else {
-                book.push(self.book.info(i).unwrap().clone());
-                continue;
-            };
-
-            book.push(info);
-            *slot_ref = slot;
-        }
-
-        for (info, slot) in new_fonts.drain(..) {
-            book.push(info);
-            font_slots.push(slot);
-        }
-
-        self.book = LazyHash::new(book);
-        self.fonts = font_slots;
-    }
-
-    pub fn add_glyph_packs(&mut self) {
-        todo!()
+    pub fn with_font_paths(mut self, font_paths: Vec<PathBuf>) -> Self {
+        self.font_paths = font_paths;
+        self
     }
 }
 
@@ -186,8 +194,12 @@ impl FontResolver for FontResolverImpl {
         &self.book
     }
 
+    fn slot(&self, idx: usize) -> Option<&FontSlot> {
+        self.slots.get(idx)
+    }
+
     fn font(&self, idx: usize) -> Option<Font> {
-        self.fonts[idx].get_or_init()
+        self.slots[idx].get_or_init()
     }
 
     fn get_by_info(&self, info: &FontInfo) -> Option<Font> {
@@ -197,10 +209,16 @@ impl FontResolver for FontResolverImpl {
 
 impl fmt::Display for FontResolverImpl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (idx, slot) in self.fonts.iter().enumerate() {
+        for (idx, slot) in self.slots.iter().enumerate() {
             writeln!(f, "{:?} -> {:?}", idx, slot.get_uninitialized())?;
         }
 
         Ok(())
+    }
+}
+
+impl ReusableFontResolver for FontResolverImpl {
+    fn slots(&self) -> impl Iterator<Item = FontSlot> {
+        self.slots.iter().cloned()
     }
 }
