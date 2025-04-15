@@ -1538,3 +1538,27 @@ zh = "将当前预览文件声明为 typst-lsp 或 tinymist 的入口点。这�
 [extension.tinymist.config.tinymist.preview.pinPreviewFile.deprecation]
 en = "This setting is deprecated and no longer needed. The extension will always pin the previewed file as the entrypoint for the language server."
 zh = "此设置已弃用，不再需要。扩展程序将始终将预览的文件固定为语言服务器的入口点。"
+
+[extension.tinymist.config.tinymist.lint.enabled.title]
+en = "Enable Lint Checks"
+zh = "启用代码检查"
+
+[extension.tinymist.config.tinymist.lint.enabled.desc]
+en = "Enable or disable lint checks. Note: restarting the editor is required to change this setting."
+zh = "启用或禁用代码检查。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.lint.when.title]
+en = "When to perform lint checks"
+zh = "何时执行代码检查"
+
+[extension.tinymist.config.tinymist.lint.when.desc]
+en = "Configure when to perform lint checks. Note: restarting the editor is required to change this setting."
+zh = "配置何时执行代码检查。注意：更改此设置需要重新启动编辑器。"
+
+[extension.tinymist.config.tinymist.lint.when.string.enum.onSave]
+en = "Perform lint checks on save"
+zh = "保存文件时执行代码检查"
+
+[extension.tinymist.config.tinymist.lint.when.string.enum.onType]
+en = "Perform lint checks on type"
+zh = "标记文件时执行代码检查"
