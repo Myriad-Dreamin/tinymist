@@ -383,8 +383,8 @@
           ],
           "default": "onSave",
           "enumDescriptions": [
-            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onSave%",
-            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onType%"
+            "%extension.tinymist.config.tinymist.lint.when.string.enum.onSave%",
+            "%extension.tinymist.config.tinymist.lint.when.string.enum.onType%"
           ]
         },
         "tinymist.typingContinueCommentsOnNewline": {
