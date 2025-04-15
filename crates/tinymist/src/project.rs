@@ -161,6 +161,7 @@ impl ServerState {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
                 },
+                lint: config.lint.when(),
                 periscope: periscope_args.map(|args| {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
@@ -429,36 +430,54 @@ impl CompileHandlerImpl {
             .log_error("failed to send diagnostics");
     }
 
-    fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
+    fn notify_diagnostics(&self, art: &LspCompiledArtifact) {
         let dv = ProjVersion {
-            id: snap.id().clone(),
-            revision: snap.world().revision().get(),
+            id: art.id().clone(),
+            revision: art.world().revision().get(),
         };
         // todo: better way to remove diagnostics
-        let valid = !snap.world().entry_state().is_inactive();
+        let valid = !art.world().entry_state().is_inactive();
         if !valid {
             self.push_diagnostics(dv, None);
             return;
         }
 
-        let snap = snap.clone();
-        let editor_tx = self.editor_tx.clone();
-        let analysis = self.analysis.clone();
-        rayon::spawn(move || {
-            let world = snap.world().clone();
-            let mut ctx = analysis.enter(world);
+        let should_lint = art
+            .snap
+            .signal
+            .should_run_task_dyn(self.analysis.lint, art.doc.as_ref())
+            .unwrap_or_default();
 
-            // todo: check all errors in this file
-            let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
-                return;
-            };
+        if !should_lint {
+            let enc = self.analysis.position_encoding;
+            let diagnostics =
+                tinymist_query::convert_diagnostics(art.world(), art.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
-            editor_tx
+            self.editor_tx
                 .send(EditorRequest::Diag(dv, Some(diagnostics)))
                 .log_error("failed to send diagnostics");
-        });
+        } else {
+            let snap = art.clone();
+            let editor_tx = self.editor_tx.clone();
+            let analysis = self.analysis.clone();
+            rayon::spawn(move || {
+                let world = snap.world().clone();
+                let mut ctx = analysis.enter(world);
+
+                // todo: check all errors in this file
+                let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
+                    return;
+                };
+
+                log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+
+                editor_tx
+                    .send(EditorRequest::Diag(dv, Some(diagnostics)))
+                    .log_error("failed to send diagnostics");
+            });
+        }
     }
 }
 

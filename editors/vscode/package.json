@@ -367,6 +367,26 @@
             "%extension.tinymist.config.tinymist.semanticTokens.string.enum.disable%"
           ]
         },
+        "tinymist.lint.enabled": {
+          "title": "%extension.tinymist.config.tinymist.lint.enabled.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.enabled.desc%",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.lint.when": {
+          "title": "%extension.tinymist.config.tinymist.lint.when.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.when.desc%",
+          "type": "string",
+          "enum": [
+            "onSave",
+            "onType"
+          ],
+          "default": "onSave",
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.lint.when.string.enum.onSave%",
+            "%extension.tinymist.config.tinymist.lint.when.string.enum.onType%"
+          ]
+        },
         "tinymist.typingContinueCommentsOnNewline": {
           "title": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.desc%",

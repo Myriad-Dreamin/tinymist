@@ -90,6 +90,8 @@ pub struct Config {
     pub completion: CompletionFeat,
     /// Tinymist's preview features.
     pub preview: PreviewFeat,
+    /// When to trigger the lint checks.
+    pub lint: LintFeat,
 
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
@@ -318,6 +320,7 @@ impl Config {
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
         assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
+        assign_config!(lint := "preview"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
@@ -786,6 +789,26 @@ pub struct PreviewFeat {
     /// The background preview options.
     #[serde(default)]
     pub background: BackgroundPreviewOpts,
+}
+
+/// The lint features.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct LintFeat {
+    /// Whether to enable linting.
+    pub enabled: Option<bool>,
+    /// When to trigger the lint checks.
+    pub when: Option<TaskWhen>,
+}
+
+impl LintFeat {
+    /// When to trigger the lint checks.
+    pub fn when(&self) -> TaskWhen {
+        if matches!(self.enabled, Some(false)) {
+            return TaskWhen::Never;
+        }
+
+        self.when.unwrap_or(TaskWhen::OnSave)
+    }
 }
 
 /// Options for browsing preview.

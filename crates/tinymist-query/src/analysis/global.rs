@@ -12,7 +12,7 @@ use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
 use tinymist_lint::LintInfo;
-use tinymist_project::{LspComputeGraph, LspWorld};
+use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{hash128, FxDashMap};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
@@ -69,6 +69,8 @@ pub struct Analysis {
     pub completion_feat: CompletionFeat,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
+    /// When to trigger the lint.
+    pub lint: TaskWhen,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
