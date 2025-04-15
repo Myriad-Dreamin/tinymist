@@ -3,12 +3,12 @@ use typst::text::Font;
 
 use crate::Bytes;
 
-/// A FontLoader would help load a font from somewhere.
+/// A FontLoader helps load a font from somewhere.
 pub trait FontLoader {
     fn load(&mut self) -> Option<Font>;
 }
 
-/// Load font from a buffer.
+/// Loads font from a buffer.
 pub struct BufferFontLoader {
     pub buffer: Option<Bytes>,
     pub index: u32,
@@ -20,6 +20,7 @@ impl FontLoader for BufferFontLoader {
     }
 }
 
+/// Loads font from a reader.
 pub struct LazyBufferFontLoader<R> {
     pub read: Option<R>,
     pub index: u32,
