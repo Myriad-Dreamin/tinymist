@@ -20,6 +20,9 @@ mod http;
 #[cfg(feature = "http-registry")]
 pub use http::*;
 
+/// The default Typst registry.
+pub const DEFAULT_REGISTRY: &str = "https://packages.typst.org";
+
 /// A trait for package registries.
 pub trait PackageRegistry {
     /// A function to be called when the registry is reset.

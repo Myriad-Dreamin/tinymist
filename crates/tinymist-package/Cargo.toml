@@ -43,11 +43,22 @@ insta.workspace = true
 
 default = []
 fs-pack = ["walkdir"]
-gitcl-pack = ["toml"]
+gitcl-pack = ["toml", "tinymist-std/system"]
+http-pack = ["http-registry"]
+release-pack = ["http-pack"]
+universe-pack = ["http-pack"]
 http-registry = ["reqwest", "dirs"]
 web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
 browser = ["web"]
-system = ["http-registry", "fs-pack", "gitcl-pack", "tinymist-std/system"]
+system = [
+    "http-registry",
+    "fs-pack",
+    "gitcl-pack",
+    "http-pack",
+    "release-pack",
+    "universe-pack",
+    "tinymist-std/system",
+]
 
 
 [lints]

@@ -11,13 +11,18 @@ use tinymist_std::{ImmutBytes, ImmutPath};
 use typst::diag::{PackageError, PackageResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
+#[cfg(feature = "fs-pack")]
 mod fs;
+#[cfg(feature = "gitcl-pack")]
 mod gitcl;
+#[cfg(feature = "http-pack")]
 mod http;
 mod memory;
 mod ops;
+#[cfg(feature = "release-pack")]
 mod release;
 mod tarball;
+#[cfg(feature = "universe-pack")]
 mod universe;
 
 pub use fs::*;
