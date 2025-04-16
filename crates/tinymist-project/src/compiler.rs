@@ -189,7 +189,6 @@ impl fmt::Display for CompileReportMsg<'_> {
         match self.0.status {
             Suspend => write!(f, "suspended"),
             Compiling => write!(f, "compiling"),
-            // Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
             CompileSuccess(Res { diag, elapsed }) => {
                 if diag == 0 {
                     write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
@@ -582,9 +581,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     if entry.is_inactive() {
                         log::info!("ProjectCompiler: removing diag");
                         self.handler.status(proj.verse.revision.get(), {
-                            let id = proj.id.clone();
                             CompileReport {
-                                id,
+                                id: proj.id.clone(),
                                 compiling_id: None,
                                 page_count: 0,
                                 status: CompileStatusEnum::Suspend,
@@ -858,20 +856,17 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             let compiled =
                 CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html));
 
-            let elapsed = start.elapsed().unwrap_or_default();
+            let res = CompileStatusResult {
+                diag: (compiled.warning_cnt() + compiled.error_cnt()) as u32,
+                elapsed: start.elapsed().unwrap_or_default(),
+            };
             let rep = CompileReport {
                 id: compiled.id().clone(),
                 compiling_id: Some(id),
                 page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
                 status: match &compiled.doc {
-                    Some(..) => CompileStatusEnum::CompileSuccess(CompileStatusResult {
-                        diag: compiled.warning_cnt() as u32,
-                        elapsed,
-                    }),
-                    None => CompileStatusEnum::CompileError(CompileStatusResult {
-                        diag: compiled.error_cnt() as u32,
-                        elapsed,
-                    }),
+                    Some(..) => CompileStatusEnum::CompileSuccess(res),
+                    None => CompileStatusEnum::CompileError(res),
                 },
             };
 

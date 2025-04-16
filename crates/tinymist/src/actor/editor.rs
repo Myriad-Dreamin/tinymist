@@ -95,12 +95,21 @@ impl EditorActor {
                 EditorRequest::Status(compile_status) => {
                     log::trace!("received status request: {compile_status:?}");
                     if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
+                        use tinymist_project::CompileStatusEnum::*;
+
                         status.path = compile_status
                             .compiling_id
-                            .map(|s| unix_slash(s.vpath().as_rooted_path()))
-                            .unwrap_or_default();
+                            .map_or(String::default(), |fid| {
+                                unix_slash(fid.vpath().as_rooted_path())
+                            });
                         status.page_count = compile_status.page_count;
-                        status.status = (&compile_status.status).into();
+                        status.status = match &compile_status.status {
+                            Compiling => CompileStatusEnum::Compiling,
+                            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
+                            ExportError { .. } | CompileError { .. } => {
+                                CompileStatusEnum::CompileError
+                            }
+                        };
                         self.client.send_notification::<StatusAll>(&status);
                     }
                 }
