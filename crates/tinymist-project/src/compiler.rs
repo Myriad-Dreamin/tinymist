@@ -158,21 +158,21 @@ pub enum CompileStatusEnum {
         /// The number of warnings occur.
         warnings: u32,
         /// Used time
-        duration: tinymist_std::time::Duration,
+        elapsed: tinymist_std::time::Duration,
     },
     /// The project failed to compile.
     CompileError {
         /// The number of errors occur.
         errors: u32,
         /// Used time
-        duration: tinymist_std::time::Duration,
+        elapsed: tinymist_std::time::Duration,
     },
     /// The project failed to export.
     ExportError {
         /// The number of errors occur.
         errors: u32,
         /// Used time
-        duration: tinymist_std::time::Duration,
+        elapsed: tinymist_std::time::Duration,
     },
 }
 
@@ -196,20 +196,20 @@ impl fmt::Display for CompileReportMsg<'_> {
             Suspend => write!(f, "suspended"),
             Compiling => write!(f, "compiling"),
             // Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
-            CompileSuccess { warnings, duration } => {
+            CompileSuccess { warnings, elapsed } => {
                 if warnings == 0 {
-                    write!(f, "{input:?}: compilation succeeded in {duration:?}")
+                    write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
                 } else {
                     write!(
                         f,
-                        "{input:?}: compilation succeeded with {warnings} warnings in {duration:?}",
+                        "{input:?}: compilation succeeded with {warnings} warnings in {elapsed:?}",
                     )
                 }
             }
-            CompileError { errors, duration } | ExportError { errors, duration } => {
+            CompileError { errors, elapsed } | ExportError { errors, elapsed } => {
                 write!(
                     f,
-                    "{input:?}: compilation failed with {errors} errors after {duration:?}"
+                    "{input:?}: compilation failed with {errors} errors after {elapsed:?}"
                 )
             }
         }
@@ -865,23 +865,18 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html));
 
             let elapsed = start.elapsed().unwrap_or_default();
-            let rep = match &compiled.doc {
-                Some(..) => CompileReport {
-                    id: compiled.id().clone(),
-                    compiling_id: Some(id),
-                    page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
-                    status: CompileStatusEnum::CompileSuccess {
+            let rep = CompileReport {
+                id: compiled.id().clone(),
+                compiling_id: Some(id),
+                page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
+                status: match &compiled.doc {
+                    Some(..) => CompileStatusEnum::CompileSuccess {
                         warnings: compiled.warning_cnt() as u32,
-                        duration: elapsed,
+                        elapsed,
                     },
-                },
-                None => CompileReport {
-                    id: compiled.id().clone(),
-                    compiling_id: Some(id),
-                    page_count: 0,
-                    status: CompileStatusEnum::CompileError {
+                    None => CompileStatusEnum::CompileError {
                         errors: compiled.error_cnt() as u32,
-                        duration: elapsed,
+                        elapsed,
                     },
                 },
             };
