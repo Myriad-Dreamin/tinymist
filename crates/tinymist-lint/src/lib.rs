@@ -112,6 +112,7 @@ impl<'w> Linter<'w> {
             linter: self,
             func_info,
             return_block_info: None,
+            expr_context: ExprContext::Block,
         })
     }
 
@@ -393,6 +394,7 @@ struct LateFuncLinter<'a, 'b> {
     linter: &'a mut Linter<'b>,
     func_info: FuncInfo,
     return_block_info: Option<ReturnBlockInfo>,
+    expr_context: ExprContext,
 }
 
 impl LateFuncLinter<'_, '_> {
@@ -408,6 +410,16 @@ impl LateFuncLinter<'_, '_> {
             return Some(());
         }
         self.expr(expr.body())
+    }
+
+    fn expr_ctx<F>(&mut self, ctx: ExprContext, f: F) -> Option<()>
+    where
+        F: FnOnce(&mut Self) -> Option<()>,
+    {
+        let old = std::mem::replace(&mut self.expr_context, ctx);
+        f(self);
+        self.expr_context = old;
+        Some(())
     }
 
     fn join(&mut self, parent: Option<ReturnBlockInfo>) {
@@ -438,7 +450,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn block<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        self.exprs(exprs)
+        self.expr_ctx(ExprContext::Block, |this| this.exprs(exprs))
     }
 
     fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
@@ -490,6 +502,20 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
         Some(())
     }
 
+    fn field_access(&mut self, _expr: ast::FieldAccess<'_>) -> Option<()> {
+        Some(())
+    }
+
+    fn unary(&mut self, expr: ast::Unary<'_>) -> Option<()> {
+        self.expr_ctx(ExprContext::Expr, |this| this.expr(expr.expr()))
+    }
+
+    fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
+        self.expr_ctx(ExprContext::Expr, |this| {
+            this.exprs([expr.lhs(), expr.rhs()].into_iter())
+        })
+    }
+
     fn equation(&mut self, expr: ast::Equation<'_>) -> Option<()> {
         self.value(ast::Expr::Equation(expr));
         Some(())
@@ -502,6 +528,11 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
 
     fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
         self.value(ast::Expr::Dict(expr));
+        Some(())
+    }
+
+    fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
+        self.value(ast::Expr::Include(expr));
         Some(())
     }
 
@@ -532,6 +563,11 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn value(&mut self, expr: ast::Expr) -> Option<()> {
+        match self.expr_context {
+            ExprContext::Block => {}
+            ExprContext::Expr => return None,
+        }
+
         let ri = self.return_block_info.as_mut()?;
         if ri.warned {
             return None;
@@ -573,10 +609,6 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
         Some(())
     }
 
-    fn field_access(&mut self, _expr: ast::FieldAccess<'_>) -> Option<()> {
-        Some(())
-    }
-
     fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
         self.value(ast::Expr::Show(expr));
         Some(())
@@ -593,11 +625,6 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
 
     fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
         self.expr(expr.body())
-    }
-
-    fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
-        self.value(ast::Expr::Include(expr));
-        Some(())
     }
 }
 
@@ -972,6 +999,11 @@ impl BuggyBlockLoc<'_> {
             }
         }
     }
+}
+
+enum ExprContext {
+    Block,
+    Expr,
 }
 
 fn is_show_set(it: ast::Expr) -> bool {
