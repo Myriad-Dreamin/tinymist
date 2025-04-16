@@ -5,8 +5,10 @@ use std::collections::HashMap;
 
 use lsp_types::notification::{Notification, PublishDiagnostics as PublishDiagnosticsBase};
 use lsp_types::{Diagnostic, Url};
+use reflexo::path::unix_slash;
 use reflexo_typst::typst::prelude::{eco_vec, EcoVec};
 use serde::{Deserialize, Serialize};
+use tinymist_project::CompileReport;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
 
@@ -25,7 +27,7 @@ pub enum EditorRequest {
     /// Publishes diagnostics to the editor.
     Diag(ProjVersion, Option<DiagnosticsMap>),
     /// Updates compile status to the editor.
-    Status(CompileStatus),
+    Status(CompileReport),
     /// Updastes words count status to the editor.
     WordCount(ProjectInsId, WordsCount),
 }
@@ -72,6 +74,7 @@ impl EditorActor {
         let mut status = StatusAll {
             status: CompileStatusEnum::Compiling,
             path: "".to_owned(),
+            page_count: 0,
             words_count: None,
         };
 
@@ -92,8 +95,12 @@ impl EditorActor {
                 EditorRequest::Status(compile_status) => {
                     log::trace!("received status request: {compile_status:?}");
                     if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
-                        status.status = compile_status.status;
-                        status.path = compile_status.path;
+                        status.path = compile_status
+                            .compiling_id
+                            .map(|s| unix_slash(s.vpath().as_rooted_path()))
+                            .unwrap_or_default();
+                        status.page_count = compile_status.page_count;
+                        status.status = (&compile_status.status).into();
                         self.client.send_notification::<StatusAll>(&status);
                     }
                 }
@@ -182,18 +189,6 @@ pub struct ProjVersion {
 }
 
 /// The compilation status of a project.
-#[derive(Debug, Clone)]
-pub struct CompileStatus {
-    /// The project ID.
-    pub id: ProjectInsId,
-    /// The file getting compiled.
-    // todo: eco string
-    pub path: String,
-    /// The status of the compilation.
-    pub status: CompileStatusEnum,
-}
-
-/// The compilation status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CompileStatusEnum {
@@ -205,6 +200,17 @@ pub enum CompileStatusEnum {
     CompileError,
 }
 
+impl From<&tinymist_project::CompileStatusEnum> for CompileStatusEnum {
+    fn from(value: &tinymist_project::CompileStatusEnum) -> Self {
+        use tinymist_project::CompileStatusEnum::*;
+        match value {
+            Compiling => CompileStatusEnum::Compiling,
+            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
+            ExportError { .. } | CompileError { .. } => CompileStatusEnum::CompileError,
+        }
+    }
+}
+
 /// All the status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,6 +219,8 @@ struct StatusAll {
     pub status: CompileStatusEnum,
     /// The file getting compiled.
     pub path: String,
+    /// The number of pages in the compiled document, zero if failed.
+    pub page_count: u32,
     /// The word count of the project.
     pub words_count: Option<WordsCount>,
 }
