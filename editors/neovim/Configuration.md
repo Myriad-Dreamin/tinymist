@@ -93,7 +93,7 @@ The extension can format Typst files using typstfmt or typstyle.
   - `disable`: Formatter is not activated.
   - `typstyle`: Use typstyle formatter.
   - `typstfmt`: Use typstfmt formatter.
-- **Default**: `"disable"`
+- **Default**: `"typstyle"`
 
 ## `formatterPrintWidth`
 
