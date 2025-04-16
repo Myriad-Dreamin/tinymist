@@ -186,26 +186,17 @@ impl fmt::Display for CompileReportMsg<'_> {
         use CompileStatusResult as Res;
 
         let input = WorkspaceResolver::display(self.0.compiling_id);
-        match self.0.status {
-            Suspend => write!(f, "suspended"),
-            Compiling => write!(f, "compiling"),
-            CompileSuccess(Res { diag, elapsed }) => {
-                if diag == 0 {
-                    write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
-                } else {
-                    write!(
-                        f,
-                        "{input:?}: compilation succeeded with {diag} warnings in {elapsed:?}",
-                    )
-                }
+        let (stage, Res { diag, elapsed }) = match &self.0.status {
+            Suspend => return f.write_str("suspended"),
+            Compiling => return f.write_str("compiling"),
+            CompileSuccess(Res { diag: 0, elapsed }) => {
+                return write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
             }
-            CompileError(Res { diag, elapsed }) | ExportError(Res { diag, elapsed }) => {
-                write!(
-                    f,
-                    "{input:?}: compilation failed with {diag} errors after {elapsed:?}"
-                )
-            }
-        }
+            CompileSuccess(res) => ("compilation succeeded", res),
+            CompileError(res) => ("compilation failed", res),
+            ExportError(res) => ("export failed", res),
+        };
+        write!(f, "{input:?}: {stage} with {diag} warnings in {elapsed:?}")
     }
 }
 
