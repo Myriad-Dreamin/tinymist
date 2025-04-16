@@ -400,7 +400,7 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         self.view_changed = true;
 
         // Resets the cache if the workspace root has changed.
-        let root_changed = self.inner.entry.workspace_root() == state.workspace_root();
+        let root_changed = self.inner.entry.workspace_root() != state.workspace_root();
         if root_changed {
             log::info!("resetting shadow root_changed");
             self.vfs().reset_cache();
