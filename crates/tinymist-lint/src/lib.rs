@@ -416,6 +416,10 @@ impl LateFuncLinter<'_, '_> {
     where
         F: FnOnce(&mut Self) -> Option<()>,
     {
+        let ctx = match ctx {
+            ExprContext::Block if self.expr_context != ExprContext::Block => ExprContext::BlockExpr,
+            a => a,
+        };
         let old = std::mem::replace(&mut self.expr_context, ctx);
         f(self);
         self.expr_context = old;
@@ -565,6 +569,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     fn value(&mut self, expr: ast::Expr) -> Option<()> {
         match self.expr_context {
             ExprContext::Block => {}
+            ExprContext::BlockExpr => return None,
             ExprContext::Expr => return None,
         }
 
@@ -1001,7 +1006,9 @@ impl BuggyBlockLoc<'_> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ExprContext {
+    BlockExpr,
     Block,
     Expr,
 }
