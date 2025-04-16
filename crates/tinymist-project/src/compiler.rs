@@ -146,34 +146,27 @@ pub struct CompileReport {
 }
 
 /// The compilation status of a project.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub enum CompileStatusEnum {
     /// The project is suspended.
     Suspend,
     /// The project is compiling.
     Compiling,
     /// The project compiled successfully.
-    CompileSuccess {
-        /// The number of warnings occur.
-        warnings: u32,
-        /// Used time
-        elapsed: tinymist_std::time::Duration,
-    },
+    CompileSuccess(CompileStatusResult),
     /// The project failed to compile.
-    CompileError {
-        /// The number of errors occur.
-        errors: u32,
-        /// Used time
-        elapsed: tinymist_std::time::Duration,
-    },
+    CompileError(CompileStatusResult),
     /// The project failed to export.
-    ExportError {
-        /// The number of errors occur.
-        errors: u32,
-        /// Used time
-        elapsed: tinymist_std::time::Duration,
-    },
+    ExportError(CompileStatusResult),
+}
+
+/// The compilation status result of a project.
+#[derive(Debug, Clone)]
+pub struct CompileStatusResult {
+    /// The number of errors or warnings occur.
+    diag: u32,
+    /// Used time
+    elapsed: tinymist_std::time::Duration,
 }
 
 #[allow(missing_docs)]
@@ -190,26 +183,27 @@ pub struct CompileReportMsg<'a>(&'a CompileReport);
 impl fmt::Display for CompileReportMsg<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use CompileStatusEnum::*;
+        use CompileStatusResult as Res;
 
         let input = WorkspaceResolver::display(self.0.compiling_id);
         match self.0.status {
             Suspend => write!(f, "suspended"),
             Compiling => write!(f, "compiling"),
             // Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
-            CompileSuccess { warnings, elapsed } => {
-                if warnings == 0 {
+            CompileSuccess(Res { diag, elapsed }) => {
+                if diag == 0 {
                     write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
                 } else {
                     write!(
                         f,
-                        "{input:?}: compilation succeeded with {warnings} warnings in {elapsed:?}",
+                        "{input:?}: compilation succeeded with {diag} warnings in {elapsed:?}",
                     )
                 }
             }
-            CompileError { errors, elapsed } | ExportError { errors, elapsed } => {
+            CompileError(Res { diag, elapsed }) | ExportError(Res { diag, elapsed }) => {
                 write!(
                     f,
-                    "{input:?}: compilation failed with {errors} errors after {elapsed:?}"
+                    "{input:?}: compilation failed with {diag} errors after {elapsed:?}"
                 )
             }
         }
@@ -870,14 +864,14 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 compiling_id: Some(id),
                 page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
                 status: match &compiled.doc {
-                    Some(..) => CompileStatusEnum::CompileSuccess {
-                        warnings: compiled.warning_cnt() as u32,
+                    Some(..) => CompileStatusEnum::CompileSuccess(CompileStatusResult {
+                        diag: compiled.warning_cnt() as u32,
                         elapsed,
-                    },
-                    None => CompileStatusEnum::CompileError {
-                        errors: compiled.error_cnt() as u32,
+                    }),
+                    None => CompileStatusEnum::CompileError(CompileStatusResult {
+                        diag: compiled.error_cnt() as u32,
                         elapsed,
-                    },
+                    }),
                 },
             };
 
