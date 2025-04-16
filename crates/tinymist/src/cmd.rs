@@ -279,7 +279,7 @@ impl ServerState {
 
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = if args.get(0).map_or(true, |v| v.is_null()) {
+        let entry = if args.first().is_none_or(|v| v.is_null()) {
             None
         } else {
             get_arg!(args[0] as Option<PathBuf>).map(From::from)
