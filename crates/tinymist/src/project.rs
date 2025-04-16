@@ -25,7 +25,7 @@ pub use tinymist_project::*;
 use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
-use reflexo::{hash::FxHashMap, path::unix_slash};
+use reflexo::hash::FxHashMap;
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
@@ -38,7 +38,7 @@ use tokio::sync::mpsc;
 use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
 use super::ServerState;
-use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
+use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 use crate::task::ExportUserConfig;
 use crate::{Config, ServerEvent};
@@ -546,10 +546,10 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
     }
 
-    fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport) {
+    fn status(&self, revision: usize, rep: CompileReport) {
         {
             let mut n_revs = self.status_revision.lock();
-            let n_rev = n_revs.entry(id.clone()).or_default();
+            let n_rev = n_revs.entry(rep.id.clone()).or_default();
             if *n_rev > revision {
                 log::info!("Project: outdated status for revision {revision} <= {n_rev}");
                 return;
@@ -557,50 +557,27 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             *n_rev = revision;
         }
 
-        // todo: seems to duplicate with CompileStatus
-        let status = match rep {
-            CompileReport::Suspend => {
-                let dv = ProjVersion {
-                    id: id.clone(),
-                    revision,
-                };
-                self.push_diagnostics(dv, None);
-                CompileStatusEnum::CompileSuccess
-            }
-            CompileReport::Stage(_, _, _) => CompileStatusEnum::Compiling,
-            CompileReport::CompileSuccess(_, _, _) => CompileStatusEnum::CompileSuccess,
-            CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                CompileStatusEnum::CompileError
-            }
-        };
-
-        let this = &self;
-        this.editor_tx
-            .send(EditorRequest::Status(CompileStatus {
-                id: id.clone(),
-                path: rep
-                    .compiling_id()
-                    .map(|s| unix_slash(s.vpath().as_rooted_path()))
-                    .unwrap_or_default(),
-                status,
-            }))
-            .unwrap();
+        if matches!(rep.status, tinymist_project::CompileStatusEnum::Suspend) {
+            let dv = ProjVersion {
+                id: rep.id.clone(),
+                revision,
+            };
+            self.push_diagnostics(dv, None);
+        }
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = this.preview.get(id) {
+        if let Some(inner) = self.preview.get(&rep.id) {
+            use tinymist_project::CompileStatusEnum::*;
             use typst_preview::CompileStatus;
 
-            let status = match rep {
-                CompileReport::Suspend => CompileStatus::CompileSuccess,
-                CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
-                CompileReport::CompileSuccess(_, _, _) => CompileStatus::CompileSuccess,
-                CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                    CompileStatus::CompileError
-                }
-            };
-
-            inner.status(status);
+            inner.status(match &rep.status {
+                Compiling => CompileStatus::Compiling,
+                Suspend | CompileSuccess { .. } => CompileStatus::CompileSuccess,
+                ExportError { .. } | CompileError { .. } => CompileStatus::CompileError,
+            });
         }
+
+        self.editor_tx.send(EditorRequest::Status(rep)).unwrap();
     }
 
     fn notify_removed(&self, id: &ProjectInsId) {
