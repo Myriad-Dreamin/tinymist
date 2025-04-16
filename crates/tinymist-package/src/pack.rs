@@ -25,13 +25,18 @@ mod tarball;
 #[cfg(feature = "universe-pack")]
 mod universe;
 
+#[cfg(feature = "fs-pack")]
 pub use fs::*;
+#[cfg(feature = "gitcl-pack")]
 pub use gitcl::*;
+#[cfg(feature = "http-pack")]
 pub use http::*;
 pub use memory::*;
 pub use ops::*;
+#[cfg(feature = "release-pack")]
 pub use release::*;
 pub use tarball::*;
+#[cfg(feature = "universe-pack")]
 pub use universe::*;
 
 /// The pack file is the knownn file type in the package.
