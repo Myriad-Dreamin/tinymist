@@ -6,7 +6,7 @@ use tinymist_std::{bail, ImmutPath};
 use tinymist_task::ExportTarget;
 use tinymist_world::config::CompileFontOpts;
 use tinymist_world::font::system::SystemFontSearcher;
-use tinymist_world::package::{http::HttpRegistry, RegistryPathMapper};
+use tinymist_world::package::{registry::HttpRegistry, RegistryPathMapper};
 use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
 use tinymist_world::{args::*, WorldComputeGraph};
 use tinymist_world::{

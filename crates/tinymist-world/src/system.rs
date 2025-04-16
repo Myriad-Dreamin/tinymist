@@ -8,7 +8,7 @@ use crate::{
     args::{CompileFontArgs, CompilePackageArgs},
     config::{CompileFontOpts, CompileOpts},
     font::{system::SystemFontSearcher, FontResolverImpl},
-    package::{http::HttpRegistry, RegistryPathMapper},
+    package::{registry::HttpRegistry, RegistryPathMapper},
     EntryState,
 };
 
