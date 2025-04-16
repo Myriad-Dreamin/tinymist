@@ -279,7 +279,11 @@ impl ServerState {
 
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+        let entry = if args.get(0).map_or(true, |v| v.is_null()) {
+            None
+        } else {
+            get_arg!(args[0] as Option<PathBuf>).map(From::from)
+        };
 
         let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
