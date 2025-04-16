@@ -6,10 +6,93 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## Unreleased
+## v0.13.12 - [2025-04-16]
 
-* Bumped typstyle from v0.13.1 to v0.13.3
+* Bumped typstyle from v0.13.1 to v0.13.3 in https://github.com/Myriad-Dreamin/tinymist/pull/1651
   * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0133---2025-04-10.
+* Bumped world crates to 0.13.12-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1608
+* todo: hard disable targets to build on CI in https://github.com/Myriad-Dreamin/tinymist/pull/1613
+
+### Server
+
+* feat: hot update editor actor config in https://github.com/Myriad-Dreamin/tinymist/pull/1584
+* feat: support `--feature` and `--pdf-standard` in `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/1596
+
+### Compiler
+
+* fix: remove system time deps from crates in https://github.com/Myriad-Dreamin/tinymist/pull/1621
+* fix: bad root change cause incorrect vfs cache frequently in https://github.com/Myriad-Dreamin/tinymist/pull/1661
+
+### Editor
+
+* feat: provide AST view in https://github.com/Myriad-Dreamin/tinymist/pull/1617
+* feat: reasonable default values for settings for formatterMode by @kaerbr in https://github.com/Myriad-Dreamin/tinymist/pull/1655
+* feat: refactor and add page count for the status bar format in https://github.com/Myriad-Dreamin/tinymist/pull/1666
+
+### Export
+
+* feat: use atomic file writing for export by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1586
+
+### Code Analysis
+
+* fix: resolve relative path in subfolders in https://github.com/Myriad-Dreamin/tinymist/pull/1574
+* fix: correct rename on unix platforms caused by pathdiff#8 in https://github.com/Myriad-Dreamin/tinymist/pull/1587
+* fix: correct `jump_from_cursor` and add tests in https://github.com/Myriad-Dreamin/tinymist/pull/1589
+* fix: tolerate the fact that plugin functions don't have params in https://github.com/Myriad-Dreamin/tinymist/pull/1605
+* fix: math quote are not strings in https://github.com/Myriad-Dreamin/tinymist/pull/1618
+* feat: check field of literals in https://github.com/Myriad-Dreamin/tinymist/pull/1619
+* fix: correct `name_range` impl in https://github.com/Myriad-Dreamin/tinymist/pull/1623
+
+### Linting (New)
+
+* feat: lint on bug-like show/set rules in https://github.com/Myriad-Dreamin/tinymist/pull/1634
+* feat: lint ignored statements before `break/continue/return` in https://github.com/Myriad-Dreamin/tinymist/pull/1637
+* feat: simple lint types comparing with strings in https://github.com/Myriad-Dreamin/tinymist/pull/1643
+* feat(lint): add warning for vf font by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1649
+* dev: pass world to linter in https://github.com/Myriad-Dreamin/tinymist/pull/1650
+* feat: allow to disable lint or lint on save in https://github.com/Myriad-Dreamin/tinymist/pull/1658
+* feat: resolve roots of typst packages in https://github.com/Myriad-Dreamin/tinymist/pull/1663
+* feat: clean up log and watch lints in https://github.com/Myriad-Dreamin/tinymist/pull/1659
+* fix: value used by exprs are warned in https://github.com/Myriad-Dreamin/tinymist/pull/1664
+
+### Definition
+
+* feat: resolve full ranges of bib items in https://github.com/Myriad-Dreamin/tinymist/pull/1627
+
+### Folding Range
+
+* feat: fold list and enum items by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1598
+
+### Diagnostics
+
+* feat: remove extra linebreak in diagnostic message by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/1599
+
+### Document Highlighting
+
+* fix: don't highlight breaks in contextual in https://github.com/Myriad-Dreamin/tinymist/pull/1635
+
+### Hover
+
+* fix: bad route to reference pages in https://github.com/Myriad-Dreamin/tinymist/pull/1641
+* feat: show rendered bibliography in bib hover and improve label hover by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/1611
+
+### Preview
+
+* feat: eject preview panel to browser by @seven-mile in https://github.com/Myriad-Dreamin/tinymist/pull/1575
+* fix: allow drag preview horizontally by @zica87 in https://github.com/Myriad-Dreamin/tinymist/pull/1597
+* feat: scroll or kill all preview panels in https://github.com/Myriad-Dreamin/tinymist/pull/1451
+* fix: in preview, click on empty area now clears selection by @zica87 in https://github.com/Myriad-Dreamin/tinymist/pull/1644
+
+### Misc
+
+* feat(ci): vscode extensions use binaries built by cargo-dist in https://github.com/Myriad-Dreamin/tinymist/pull/1560
+* feat: run e2e tests on major platforms in https://github.com/Myriad-Dreamin/tinymist/pull/1590
+* feat: build pdf docs for all platforms in https://github.com/Myriad-Dreamin/tinymist/pull/1592
+* feat: use html export to render docs in https://github.com/Myriad-Dreamin/tinymist/pull/1610
+* docs: add sponsoring section to readme in https://github.com/Myriad-Dreamin/tinymist/pull/1620
+* docs: Update Neovim config to use non-blocking system call by @ptdewey in https://github.com/Myriad-Dreamin/tinymist/pull/1607
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.10...v0.13.12
 
 ## v0.13.10 - [2025-03-23]
 
