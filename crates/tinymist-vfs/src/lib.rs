@@ -228,11 +228,11 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
         let mut m = self.managed.lock();
         for id in file_ids {
             let Some(entry) = m.entries.get_mut(id) else {
-                log::info!("Vfs(dirty, {id:?}): file id not found");
+                log::debug!("Vfs(dirty, {id:?}): file id not found");
                 return false;
             };
             if entry.changed_at > rev {
-                log::info!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
+                log::debug!("Vfs(dirty, {id:?}): rev {rev:?} => {:?}", entry.changed_at);
                 return false;
             }
             log::debug!(

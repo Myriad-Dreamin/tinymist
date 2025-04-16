@@ -157,7 +157,7 @@ impl ExportTask {
         static EXPORT_ID: AtomicUsize = AtomicUsize::new(0);
         let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        log::info!("ExportTask({export_id}): exporting {entry:?} to {write_to:?}");
+        log::debug!("ExportTask({export_id}): exporting {entry:?} to {write_to:?}");
         if let Some(e) = write_to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
@@ -317,7 +317,7 @@ impl ExportTask {
             .await
             .context_ut("failed to export")??;
 
-        log::info!("ExportTask({export_id}): export complete");
+        log::debug!("ExportTask({export_id}): export complete");
         Ok(Some(write_to))
     }
 }

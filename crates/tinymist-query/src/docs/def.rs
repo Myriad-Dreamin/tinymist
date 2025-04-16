@@ -16,7 +16,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     // Must use raw result as type aliases contain the source information.
     let mut srcs = ty.sources();
     srcs.sort();
-    log::info!("check variable docs of ty: {ty:?} => {srcs:?}");
+    log::debug!("check variable docs of ty: {ty:?} => {srcs:?}");
     let doc_source = srcs.into_iter().next()?;
 
     // todo people can easily forget to simplify the type which is not good. we

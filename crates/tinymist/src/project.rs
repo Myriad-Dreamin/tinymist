@@ -447,6 +447,10 @@ impl CompileHandlerImpl {
             .signal
             .should_run_task_dyn(self.analysis.lint, art.doc.as_ref())
             .unwrap_or_default();
+        log::info!(
+            "Project: should_lint: {should_lint:?}, signal: {:?}",
+            art.snap.signal
+        );
 
         if !should_lint {
             let enc = self.analysis.position_encoding;
@@ -646,7 +650,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let art = art.clone();
             inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { art }));
         } else {
-            log::info!("Project: no preview for {:?}", art.id());
+            log::debug!("Project: no preview for {:?}", art.id());
         }
 
         self.notify_diagnostics(art);
