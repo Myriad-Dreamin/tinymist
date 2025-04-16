@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use tinymist_l10n::DebugL10n;
 use tinymist_std::error::prelude::*;
+use tinymist_std::hash::FxDashMap;
 use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
 use typst::syntax::VirtualPath;
@@ -34,6 +37,8 @@ pub struct EntryResolver {
     pub roots: Vec<ImmutPath>,
     /// Default entry path from the configuration.
     pub entry: Option<ImmutPath>,
+    /// The path to the typst.toml files.
+    pub typst_toml_cache: Arc<FxDashMap<ImmutPath, Option<ImmutPath>>>,
 }
 
 impl EntryResolver {
@@ -53,6 +58,38 @@ impl EntryResolver {
             if !self.roots.is_empty() {
                 log::warn!("entry is not in any set root directory");
             }
+
+            let typst_toml_cache = &self.typst_toml_cache;
+
+            match typst_toml_cache.get(entry).map(|r| r.clone()) {
+                // In the case that the file is out of workspace, it is believed to not edited
+                // frequently. When we check the package root of such files and didn't find it
+                // previously, we quickly return None to avoid heavy IO frequently.
+                //
+                // todo: we avoid heavy io for the case when no root is set, but people should
+                // restart the server to refresh the cache
+                Some(None) => return None,
+                Some(Some(cached)) => {
+                    let cached = cached.clone();
+                    if cached.join("typst.toml").exists() {
+                        return Some(cached.clone());
+                    }
+                    typst_toml_cache.remove(entry);
+                }
+                None => {}
+            };
+
+            // cache miss, check the file system
+            // todo: heavy io here?
+            for ancestor in entry.ancestors() {
+                let typst_toml = ancestor.join("typst.toml");
+                if typst_toml.exists() {
+                    let ancestor: ImmutPath = ancestor.into();
+                    typst_toml_cache.insert(entry.clone(), Some(ancestor.clone()));
+                    return Some(ancestor);
+                }
+            }
+            typst_toml_cache.insert(entry.clone(), None);
 
             if let Some(parent) = entry.parent() {
                 return Some(parent.into());
