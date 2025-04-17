@@ -57,9 +57,9 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - Or finally with the builtin lsp protocol:
 
   ```lua
-  vim.lsp.config['tinymist'] = {
-      cmd = {'tinymist'},
-      filetypes = {'typst'}
+  vim.lsp.config["tinymist"] = {
+      cmd = { "tinymist" },
+      filetypes = { "typst" },
       settings = {
           -- ...
       }
