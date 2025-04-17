@@ -182,6 +182,7 @@ require("lspconfig")["tinymist"].setup {
     end,
 }
 ```
+
 Note that `vim.v.null` should be used instead of `nil` in the `arguments` table when unpinning. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/1595", "issue #1595").
 
 For Neovim versions prior to 0.11.0, `vim.lsp.buf.execute_command` should be used instead:
