@@ -133,35 +133,9 @@ Tinymist cannot know the main file of a multiple-files project if you don't tell
 
 The solution is a bit internal, which should get further improvement, but you can pin a main file by command.
 
-Using `vim.lsp.config`:
 ```lua
-vim.lsp.config["tinymist"] = {
-    cmd = { "tinymist" },
-    filetypes = { "typst" },
-    settings = {}
-    on_attach = function(client, bufnr)
-        vim.keymap.set("n", "<leader>tp", function()
-            client:exec_cmd({
-                title = "pin",
-                command = "tinymist.pinMain",
-                arguments = { vim.api.nvim_buf_get_name(0) },
-            }, { bufnr = bufnr })
-        end, { desc = "[T]inymist [P]in", noremap = true })
-
-        vim.keymap.set("n", "<leader>tu", function()
-            client:exec_cmd({
-                title = "unpin",
-                command = "tinymist.pinMain",
-                arguments = { vim.v.null },
-            }, { bufnr = bufnr })
-        end, { desc = "[T]inymist [U]npin", noremap = true })
-    end,
-}
-```
-
-Using `lspconfig`:
-```lua
-require("lspconfig")["tinymist"].setup {
+require("lspconfig")["tinymist"].setup { -- Alternatively, can be used `vim.lsp.config["tinymist"]`
+    -- ...
     settings = {}
     on_attach = function(client, bufnr)
         vim.keymap.set("n", "<leader>tp", function()
