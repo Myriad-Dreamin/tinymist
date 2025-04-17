@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.10",
+  "version": "0.13.12-rc1",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -1361,7 +1361,7 @@
     "package": "npx @vscode/vsce package --yarn",
     "compile": "yarn run compile:system",
     "watch": "yarn run build-system-base -- --sourcemap --watch",
-    "check": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
