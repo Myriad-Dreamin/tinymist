@@ -4056,7 +4056,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.13.12-rc2",
+ "tinymist-assets 0.13.12-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-core",
  "tinymist-debug",
  "tinymist-l10n",
@@ -4119,13 +4119,13 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.12-rc2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9e6f26280638e6932c7f5b7c2a8f01259394d2a4c64821bfc90ec08b24fc654"
+version = "0.13.12-rc3"
 
 [[package]]
 name = "tinymist-assets"
 version = "0.13.12-rc3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8efbdcc62cc63c64184a3b60a76e475508461087b44c7e497c08038aeba6dc5"
 
 [[package]]
 name = "tinymist-bench-font-load"
@@ -4955,7 +4955,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.13.12-rc2",
+ "tinymist-assets 0.13.12-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
  "tokio",
  "typst",
