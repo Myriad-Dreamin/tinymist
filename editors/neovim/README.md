@@ -77,9 +77,9 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 - Or finally with the builtin lsp protocol:
 
   ```lua
-  vim.lsp.config['tinymist'] = {
-      cmd = {'tinymist'},
-      filetypes = {'typst'}
+  vim.lsp.config["tinymist"] = {
+      cmd = { "tinymist" },
+      filetypes = { "typst" },
       settings = {
           -- ...
       }

@@ -507,14 +507,12 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
   }
 }
 
-async function commandActivateDoc(doc: vscode.TextDocument | undefined): Promise<void> {
-  await commandActivateDocPath(doc, doc?.uri.fsPath);
+function commandActivateDoc(doc: vscode.TextDocument | undefined) {
+  commandActivateDocPath(doc, doc?.uri.fsPath);
 }
 
-async function commandActivateDocPath(
-  doc: vscode.TextDocument | undefined,
-  fsPath: string | undefined,
-): Promise<void> {
+let focusMainTimeout: NodeJS.Timeout | undefined = undefined;
+function commandActivateDocPath(doc: vscode.TextDocument | undefined, fsPath: string | undefined) {
   // console.log("focus main", fsPath, new Error().stack);
   extensionState.mut.focusingFile = fsPath;
   if (fsPath) {
@@ -528,7 +526,13 @@ async function commandActivateDocPath(
   triggerStatusBar(
     !!formatString && !!(fsPath || extensionState.mut.focusingDoc?.isClosed === false),
   );
-  await tinymist.executeCommand("tinymist.focusMain", [fsPath]);
+
+  if (focusMainTimeout) {
+    clearTimeout(focusMainTimeout);
+  }
+  focusMainTimeout = setTimeout(() => {
+    tinymist.executeCommand("tinymist.focusMain", [fsPath]);
+  }, 100);
 }
 
 async function commandRunCodeLens(...args: string[]): Promise<void> {
