@@ -20,6 +20,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: '{tinymist,typst-preview}-*'
       - name: Display structure of downloaded files
         run: ls -R artifacts
       - uses: ncipollo/release-action@v1
