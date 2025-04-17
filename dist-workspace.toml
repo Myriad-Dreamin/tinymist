@@ -28,6 +28,7 @@ targets = [
     "aarch64-pc-windows-msvc",
     "aarch64-unknown-linux-gnu",
     "aarch64-unknown-linux-musl",
+    "arm-unknown-linux-gnueabihf",
     "arm-unknown-linux-musleabihf",
     "armv7-unknown-linux-gnueabihf",
     "armv7-unknown-linux-musleabihf",
@@ -66,6 +67,7 @@ global = "ubuntu-22.04"
 aarch64-pc-windows-msvc = "windows-latest"
 aarch64-unknown-linux-gnu = "ubuntu-22.04"
 aarch64-unknown-linux-musl = "ubuntu-22.04"
+arm-unknown-linux-gnueabihf = "ubuntu-22.04"
 arm-unknown-linux-musleabihf = "ubuntu-22.04"
 armv7-unknown-linux-gnueabihf = "ubuntu-22.04"
 armv7-unknown-linux-musleabihf = "ubuntu-22.04"
