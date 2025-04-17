@@ -186,16 +186,17 @@ impl Message {
     }
 
     /// Writes the message to the given writer.
-    pub fn write<W: std::io::Write>(self, writer: &mut W) -> std::io::Result<()> {
+    pub fn write<W: std::io::Write>(self, _writer: &mut W) -> std::io::Result<()> {
         match self {
             #[cfg(feature = "lsp")]
-            Message::Lsp(msg) => msg.write(writer),
+            Message::Lsp(msg) => msg.write(_writer),
             #[cfg(feature = "dap")]
-            Message::Dap(msg) => msg.write(writer),
+            Message::Dap(msg) => msg.write(_writer),
         }
     }
 }
 
+#[allow(unused)]
 pub(crate) enum LspOrDapResponse {
     #[cfg(feature = "lsp")]
     Lsp(lsp::Response),
@@ -203,6 +204,7 @@ pub(crate) enum LspOrDapResponse {
     Dap(dap::Response),
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn read_msg_text(inp: &mut dyn BufRead) -> io::Result<Option<String>> {
     let mut size = None;
     let mut buf = String::new();
@@ -236,6 +238,7 @@ pub(crate) fn read_msg_text(inp: &mut dyn BufRead) -> io::Result<Option<String>>
     Ok(Some(buf))
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn write_msg_text(out: &mut dyn Write, msg: &str) -> io::Result<()> {
     log::debug!("> {msg}");
     write!(out, "Content-Length: {}\r\n\r\n", msg.len())?;
@@ -244,6 +247,7 @@ pub(crate) fn write_msg_text(out: &mut dyn Write, msg: &str) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn invalid_data(
     error: impl Into<Box<dyn std::error::Error + Send + Sync>>,
 ) -> io::Error {
