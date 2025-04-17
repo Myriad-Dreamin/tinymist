@@ -28,8 +28,8 @@ return {
             --- You could set the formatter mode to use lsp-enhanced formatters.
             -- formatterMode = "typstyle",
             
-            --- If you love to edit the documents and preview exported pdfs in the same time,
-            --- you could set this to `onType`.
+            --- If you would love to preview exported PDF files at the same time,
+            --- you could set this to `onType` and open the file with your favorite PDF viewer.
             -- exportPdf = "onType",
           },
           on_attach = function(client, bufnr)
