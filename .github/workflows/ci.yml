@@ -168,7 +168,7 @@ jobs:
   #   uses: ./.github/workflows/announce.yml
   #   if: ${{ startsWith(github.ref, 'refs/tags/') }}
   #   with:
-  #     tag: ${{ fromJson(needs.prepare-build.outputs.tag) }}
+  #     tag: ${{ needs.prepare-build.outputs.tag }}
 
   build-binary:
     needs: [prepare-build] # , announce
