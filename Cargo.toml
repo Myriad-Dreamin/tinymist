@@ -80,6 +80,7 @@ siphasher = "1"
 fxhash = "0.2.1"
 sha2 = "0.10.6"
 nohash-hasher = "0.2.0"
+fastrand = "2.3.0"
 
 # Data Structures
 bitvec = "1"
@@ -186,11 +187,12 @@ tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.12-rc1" }
 typst-shim = { path = "./crates/typst-shim", version = "0.13.12-rc1" }
 
 tinymist = { path = "./crates/tinymist/", version = "0.13.10" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.10" }
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.10", default-features = false }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.10" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.10" }
 tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.10" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.10" }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.10" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.10" }
 tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.10" }
 typlite = { path = "./crates/typlite", version = "0.13.10" }

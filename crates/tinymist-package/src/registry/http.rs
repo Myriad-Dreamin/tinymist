@@ -1,4 +1,4 @@
-//! Https registry for tinymist.
+//! Http registry for tinymist.
 
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -10,7 +10,9 @@ use tinymist_std::ImmutPath;
 use typst::diag::{eco_format, EcoString, PackageResult, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 
-use crate::package::{DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec};
+use super::{
+    DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec, DEFAULT_REGISTRY,
+};
 
 /// The http package registry for typst.ts.
 pub struct HttpRegistry {
@@ -108,9 +110,6 @@ impl PackageRegistry for HttpRegistry {
         self.storage().download_index()
     }
 }
-
-/// The default Typst registry.
-pub const DEFAULT_REGISTRY: &str = "https://packages.typst.org";
 
 /// The default packages sub directory within the package and package cache
 /// paths.
@@ -307,7 +306,7 @@ impl PackageStorage {
     }
 }
 
-fn threaded_http<T: Send + Sync>(
+pub(crate) fn threaded_http<T: Send + Sync>(
     url: &str,
     cert_path: Option<&Path>,
     f: impl FnOnce(Result<Response, reqwest::Error>) -> T + Send + Sync,

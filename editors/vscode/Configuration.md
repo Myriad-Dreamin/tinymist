@@ -64,6 +64,23 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
+## `tinymist.lint.enabled`
+
+Enable or disable lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.lint.when`
+
+Configure when to perform lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `onSave`: Perform lint checks on save
+  - `onType`: Perform lint checks on type
+- **Default**: `"onSave"`
+
 ## `tinymist.typingContinueCommentsOnNewline`
 
 Whether to prefix newlines after comments with the corresponding comment prefix.
@@ -147,7 +164,7 @@ The extension can format Typst files using typstfmt or typstyle.
   - `disable`: Formatter is not activated.
   - `typstyle`: Use typstyle formatter.
   - `typstfmt`: Use typstfmt formatter.
-- **Default**: `"disable"`
+- **Default**: `"typstyle"`
 
 ## `tinymist.formatterPrintWidth`
 

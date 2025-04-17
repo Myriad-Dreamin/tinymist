@@ -1,3 +1,5 @@
+//! Browser proxy registry for tinymist. You should implement interfaces in js.
+
 use std::{io::Read, path::Path};
 
 use js_sys::Uint8Array;
@@ -6,6 +8,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 
 use super::{PackageError, PackageRegistry, PackageSpec};
 
+/// The `ProxyContext` struct is a wrapper around a JavaScript this.
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct ProxyContext {
@@ -14,16 +17,20 @@ pub struct ProxyContext {
 
 #[wasm_bindgen]
 impl ProxyContext {
+    /// Creates a new `ProxyContext` instance.
     #[wasm_bindgen(constructor)]
     pub fn new(context: JsValue) -> Self {
         Self { context }
     }
 
+    /// Returns the JavaScript this.
     #[wasm_bindgen(getter)]
     pub fn context(&self) -> JsValue {
         self.context.clone()
     }
 
+    /// A convenience function to untar a tarball and call a callback for each
+    /// entry.
     pub fn untar(&self, data: &[u8], cb: js_sys::Function) -> Result<(), JsValue> {
         let cb = move |key: String, value: &[u8], mtime: u64| -> Result<(), JsValue> {
             let key = JsValue::from_str(&key);
@@ -68,13 +75,16 @@ impl ProxyContext {
     }
 }
 
+/// The `JsRegistry` struct is a wrapper around a JavaScript function that
 #[derive(Debug)]
-pub struct ProxyRegistry {
+pub struct JsRegistry {
+    /// The JavaScript this context.
     pub context: ProxyContext,
+    /// The JavaScript function to call for resolving packages.
     pub real_resolve_fn: js_sys::Function,
 }
 
-impl PackageRegistry for ProxyRegistry {
+impl PackageRegistry for JsRegistry {
     fn resolve(&self, spec: &PackageSpec) -> Result<std::sync::Arc<Path>, PackageError> {
         // prepare js_spec
         let js_spec = js_sys::Object::new();
@@ -109,3 +119,11 @@ impl PackageRegistry for ProxyRegistry {
         &[]
     }
 }
+
+// todo
+/// Safety: `JsRegistry` is only used in the browser environment, and we cannot
+/// share data between workers.
+unsafe impl Send for JsRegistry {}
+/// Safety: `JsRegistry` is only used in the browser environment, and we cannot
+/// share data between workers.
+unsafe impl Sync for JsRegistry {}

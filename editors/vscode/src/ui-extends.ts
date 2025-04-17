@@ -10,6 +10,7 @@ function initWordCountItem() {
   return statusBarItem;
 }
 
+let pages = 0;
 let words = 0;
 let chars = 0;
 let spaces = 0;
@@ -25,6 +26,7 @@ interface WordsCount {
 export interface TinymistStatus {
   status: "compiling" | "compileSuccess" | "compileError";
   path: string;
+  pageCount: number;
   wordsCount: WordsCount;
 }
 
@@ -50,6 +52,7 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
 [Click to show logs]`.trim();
   };
 
+  pages = event.pageCount || 0;
   words = event.wordsCount?.words || 0;
   chars = event.wordsCount?.chars || 0;
   spaces = event.wordsCount?.spaces || 0;
@@ -60,6 +63,7 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
 
   const formatString = statusBarFormatString()
     .replace(/\{wordCount\}/g, `${words} ${plural("Word", words)}`)
+    .replace(/\{pageCount\}/g, `${pages} ${plural("Page", pages)}`)
     .replace(/\{fileName\}/g, fileNameWithoutExt);
 
   if (statusBarItem) {

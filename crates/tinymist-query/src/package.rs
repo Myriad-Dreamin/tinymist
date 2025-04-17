@@ -8,7 +8,7 @@ use ecow::{eco_format, eco_vec, EcoVec};
 use parking_lot::Mutex;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::http::HttpRegistry;
+use tinymist_world::package::registry::HttpRegistry;
 use tinymist_world::package::PackageSpec;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
@@ -169,9 +169,9 @@ fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -
         Err(err) => err,
     };
 
-    static ONCES: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    let mut onces = ONCES.get_or_init(Default::default).lock();
-    if onces.insert(site) {
+    static ONCE: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+    let mut once = ONCE.get_or_init(Default::default).lock();
+    if once.insert(site) {
         log::error!("failed to perform {site}: {err}");
     }
 

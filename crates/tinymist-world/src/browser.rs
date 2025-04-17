@@ -7,7 +7,7 @@ use typst::Features;
 
 use crate::entry::EntryState;
 use crate::font::FontResolverImpl;
-use crate::package::browser::ProxyRegistry;
+use crate::package::registry::JsRegistry;
 use crate::package::RegistryPathMapper;
 
 /// A world that provides access to the browser.
@@ -22,23 +22,15 @@ impl crate::CompilerFeat for BrowserCompilerFeat {
     /// Uses [`FontResolverImpl`] directly.
     type FontResolver = FontResolverImpl;
     type AccessModel = ProxyAccessModel;
-    type Registry = ProxyRegistry;
+    type Registry = JsRegistry;
 }
-
-// todo
-/// Safety: `ProxyRegistry` is only used in the browser environment, and we
-/// cannot share data between workers.
-unsafe impl Send for ProxyRegistry {}
-/// Safety: `ProxyRegistry` is only used in the browser environment, and we
-/// cannot share data between workers.
-unsafe impl Sync for ProxyRegistry {}
 
 impl TypstBrowserUniverse {
     pub fn new(
         root_dir: PathBuf,
         inputs: Option<Arc<LazyHash<TypstDict>>>,
         access_model: ProxyAccessModel,
-        registry: ProxyRegistry,
+        registry: JsRegistry,
         font_resolver: FontResolverImpl,
     ) -> Self {
         let registry = Arc::new(registry);

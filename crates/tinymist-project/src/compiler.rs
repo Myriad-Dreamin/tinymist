@@ -132,52 +132,45 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 }
 
-// todo: remove me
-#[allow(missing_docs)]
-#[derive(Clone, Debug)]
-pub enum CompileReport {
+/// The compilation status of a project.
+#[derive(Debug, Clone)]
+pub struct CompileReport {
+    /// The project ID.
+    pub id: ProjectInsId,
+    /// The file getting compiled.
+    pub compiling_id: Option<FileId>,
+    /// The number of pages in the compiled document, zero if failed.
+    pub page_count: u32,
+    /// The status of the compilation.
+    pub status: CompileStatusEnum,
+}
+
+/// The compilation status of a project.
+#[derive(Debug, Clone)]
+pub enum CompileStatusEnum {
+    /// The project is suspended.
     Suspend,
-    Stage(FileId, &'static str, tinymist_std::time::Time),
-    CompileError(FileId, usize, tinymist_std::time::Duration),
-    ExportError(FileId, usize, tinymist_std::time::Duration),
-    CompileSuccess(
-        FileId,
-        // warnings, if not empty
-        usize,
-        tinymist_std::time::Duration,
-    ),
+    /// The project is compiling.
+    Compiling,
+    /// The project compiled successfully.
+    CompileSuccess(CompileStatusResult),
+    /// The project failed to compile.
+    CompileError(CompileStatusResult),
+    /// The project failed to export.
+    ExportError(CompileStatusResult),
+}
+
+/// The compilation status result of a project.
+#[derive(Debug, Clone)]
+pub struct CompileStatusResult {
+    /// The number of errors or warnings occur.
+    diag: u32,
+    /// Used time
+    elapsed: tinymist_std::time::Duration,
 }
 
 #[allow(missing_docs)]
 impl CompileReport {
-    pub fn compiling_id(&self) -> Option<FileId> {
-        Some(match self {
-            Self::Suspend => return None,
-            Self::Stage(id, ..)
-            | Self::CompileError(id, ..)
-            | Self::ExportError(id, ..)
-            | Self::CompileSuccess(id, ..) => *id,
-        })
-    }
-
-    pub fn duration(&self) -> Option<std::time::Duration> {
-        match self {
-            Self::Suspend | Self::Stage(..) => None,
-            Self::CompileError(_, _, dur)
-            | Self::ExportError(_, _, dur)
-            | Self::CompileSuccess(_, _, dur) => Some(*dur),
-        }
-    }
-
-    pub fn diagnostics_size(self) -> Option<usize> {
-        match self {
-            Self::Suspend | Self::Stage(..) => None,
-            Self::CompileError(_, diagnostics, ..)
-            | Self::ExportError(_, diagnostics, ..)
-            | Self::CompileSuccess(_, diagnostics, ..) => Some(diagnostics),
-        }
-    }
-
     /// Get the status message.
     pub fn message(&self) -> CompileReportMsg<'_> {
         CompileReportMsg(self)
@@ -189,26 +182,21 @@ pub struct CompileReportMsg<'a>(&'a CompileReport);
 
 impl fmt::Display for CompileReportMsg<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use CompileReport::*;
+        use CompileStatusEnum::*;
+        use CompileStatusResult as Res;
 
-        let input = WorkspaceResolver::display(self.0.compiling_id());
-        match self.0 {
-            Suspend => write!(f, "suspended"),
-            Stage(_, stage, ..) => write!(f, "{input:?}: {stage} ..."),
-            CompileSuccess(_, warnings, duration) => {
-                if *warnings == 0 {
-                    write!(f, "{input:?}: compilation succeeded in {duration:?}")
-                } else {
-                    write!(
-                        f,
-                        "{input:?}: compilation succeeded with {warnings} warnings in {duration:?}",
-                    )
-                }
+        let input = WorkspaceResolver::display(self.0.compiling_id);
+        let (stage, Res { diag, elapsed }) = match &self.0.status {
+            Suspend => return f.write_str("suspended"),
+            Compiling => return f.write_str("compiling"),
+            CompileSuccess(Res { diag: 0, elapsed }) => {
+                return write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
             }
-            CompileError(_, _, duration) | ExportError(_, _, duration) => {
-                write!(f, "{input:?}: compilation failed after {duration:?}")
-            }
-        }
+            CompileSuccess(res) => ("compilation succeeded", res),
+            CompileError(res) => ("compilation failed", res),
+            ExportError(res) => ("export failed", res),
+        };
+        write!(f, "{input:?}: {stage} with {diag} warnings in {elapsed:?}")
     }
 }
 
@@ -223,7 +211,7 @@ pub trait CompileHandler<F: CompilerFeat, Ext>: Send + Sync + 'static {
     /// Called when a project is removed.
     fn notify_removed(&self, _id: &ProjectInsId) {}
     /// Called when the compilation status is changed.
-    fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport);
+    fn status(&self, revision: usize, rep: CompileReport);
 }
 
 /// No need so no compilation.
@@ -234,7 +222,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> CompileHandler<F, Ex
         log::info!("ProjectHandle: no need to compile");
     }
     fn notify_compile(&self, _res: &CompiledArtifact<F>) {}
-    fn status(&self, _revision: usize, _id: &ProjectInsId, _rep: CompileReport) {}
+    fn status(&self, _revision: usize, _rep: CompileReport) {}
 }
 
 /// An interrupt to the compiler.
@@ -583,11 +571,14 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     // todo: dedicate suspended
                     if entry.is_inactive() {
                         log::info!("ProjectCompiler: removing diag");
-                        self.handler.status(
-                            proj.verse.revision.get(),
-                            &proj.id,
-                            CompileReport::Suspend,
-                        );
+                        self.handler.status(proj.verse.revision.get(), {
+                            CompileReport {
+                                id: proj.id.clone(),
+                                compiling_id: None,
+                                page_count: 0,
+                                status: CompileStatusEnum::Suspend,
+                            }
+                        });
                     }
 
                     // Reset the watch state and document state.
@@ -843,26 +834,37 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let id = graph.world().main_id().unwrap();
         let revision = graph.world().revision().get();
 
-        h.status(
-            revision,
-            &graph.snap.id,
-            CompileReport::Stage(id, "compiling", start),
-        );
+        h.status(revision, {
+            CompileReport {
+                id: graph.snap.id.clone(),
+                compiling_id: Some(id),
+                page_count: 0,
+                status: CompileStatusEnum::Compiling,
+            }
+        });
 
         move || {
             let compiled =
                 CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html));
 
-            let elapsed = start.elapsed().unwrap_or_default();
-            let rep = match &compiled.doc {
-                Some(..) => CompileReport::CompileSuccess(id, compiled.warning_cnt(), elapsed),
-                None => CompileReport::CompileError(id, compiled.error_cnt(), elapsed),
+            let res = CompileStatusResult {
+                diag: (compiled.warning_cnt() + compiled.error_cnt()) as u32,
+                elapsed: start.elapsed().unwrap_or_default(),
+            };
+            let rep = CompileReport {
+                id: compiled.id().clone(),
+                compiling_id: Some(id),
+                page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
+                status: match &compiled.doc {
+                    Some(..) => CompileStatusEnum::CompileSuccess(res),
+                    None => CompileStatusEnum::CompileError(res),
+                },
             };
 
             // todo: we need to check revision for really concurrent compilation
             log_compile_report(&rep);
 
-            h.status(revision, compiled.id(), rep);
+            h.status(revision, rep);
             h.notify_compile(&compiled);
 
             compiled

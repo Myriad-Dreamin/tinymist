@@ -41,6 +41,7 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 sha2.workspace = true
 strum.workspace = true
 tar.workspace = true
+tinymist-package.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
 typst.workspace = true
@@ -63,8 +64,9 @@ web = [
     "serde-wasm-bindgen",
     "tinymist-std/web",
     "tinymist-vfs/web",
+    "tinymist-package/web",
 ]
-browser = ["tinymist-vfs/browser", "web"]
+browser = ["web", "tinymist-vfs/browser", "tinymist-package/browser"]
 system = [
     "dirs",
     "fontdb",
@@ -72,6 +74,7 @@ system = [
     "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",
+    "tinymist-package/system",
 ]
 
 [package.metadata.docs.rs]
