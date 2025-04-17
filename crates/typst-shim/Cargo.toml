@@ -10,7 +10,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["nightly"]
+default = []
 nightly = []
 
 [dependencies]

@@ -60,12 +60,14 @@ jobs:
           cargo publish --dry-run -p typst-shim
           cargo publish --dry-run -p tinymist-derive
           cargo publish --dry-run -p tinymist-l10n
-          cargo publish --dry-run -p tinymist-analysis
           cargo publish --dry-run -p tinymist-std
           cargo publish --dry-run -p tinymist-vfs
+          cargo publish --dry-run -p tinymist-package
           cargo publish --dry-run -p tinymist-world
           cargo publish --dry-run -p tinymist-task --features no-content-hint
           cargo publish --dry-run -p tinymist-project --features no-content-hint
-          cargo publish --dry-run -p tinymist-package
           cargo publish --dry-run -p typlite
           cargo publish --dry-run -p crityp
+          # needs patched typst
+          # cargo publish --dry-run -p tinymist-analysis
+          
