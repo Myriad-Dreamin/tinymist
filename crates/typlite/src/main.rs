@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 use std::{
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -74,17 +75,28 @@ fn main() -> typlite::Result<()> {
     let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
     let world = universe.snapshot();
 
+    let format = match &output {
+        Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
+            typlite::Format::LaTeX
+        }
+        _ => typlite::Format::Md,
+    };
+
     let converter = Typlite::new(Arc::new(world))
         .with_library(lib())
         .with_feature(TypliteFeat {
             assets_path,
             assets_src_path,
             ..Default::default()
-        });
+        })
+        .with_format(format);
+
     let conv = converter.convert();
 
     match (conv, output) {
-        (Ok(conv), None) => println!("{}", conv),
+        (Ok(conv), None) => std::io::stdout()
+            .write_all(conv.as_str().as_bytes())
+            .unwrap(),
         (Ok(conv), Some(output)) => std::fs::write(output, conv.as_str()).unwrap(),
         (Err(err), ..) => {
             eprintln!("{err}");

@@ -153,7 +153,7 @@
   // show label: it => html.elem("m1Label", it)
   show ref: it => md-ref(it)
 
-  show heading: it => md-heading(level: it.level, it.body)
+  show heading: it => md-heading(level: it.level, box(it.body))
   show outline: md-outline
   show outline.entry: it => md-outline-entry(level: it.level, it.element)
   show quote: it => html.elem(
