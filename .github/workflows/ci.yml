@@ -38,13 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # https://github.com/dtolnay/rust-toolchain/issues/133
-      # https://github.com/rust-lang/rustup/issues/3635
-      # Only needed if your action will run two or more rust
-      # commands concurrently, otherwise rustup will lazily 
-      # install your rust-toolchain.toml when needed:
-      - name: 'Install from rust-toolchain.toml'
-        run: rustup show
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy, rustfmt
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -52,7 +48,6 @@ jobs:
           cache: 'yarn'
       - name: Install deps
         run: yarn install
-      - uses: Swatinem/rust-cache@v2
       - name: Check and build assets
         run: |
           yarn build:preview
@@ -84,6 +79,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.85.0 # check-min-version
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -92,8 +90,6 @@ jobs:
         run: yarn install
       - name: Check Rust Version
         run: yarn check-msrv
-      - uses: dtolnay/rust-toolchain@1.83.0 # check-min-version
-      - uses: Swatinem/rust-cache@v2
       - name: Check and build assets
         run: |
           yarn build:preview
