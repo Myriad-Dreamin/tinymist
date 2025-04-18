@@ -31,7 +31,7 @@ use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEnco
 use crate::{to_lsp_position, CompletionFeat};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
-    tinymist_tests::snapshot_testing(name, &|verse, path| {
+    tinymist_tests::snapshot_testing!(name, |verse, path| {
         run_with_ctx(verse, path, f);
     });
 }
