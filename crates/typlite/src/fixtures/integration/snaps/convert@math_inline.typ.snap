@@ -3,4 +3,14 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/math_inline.typ
 ---
-<picture><source media="(prefers-color-scheme: dark)" srcset="data:image-hash/svg+xml;base64,redacted"><img style="vertical-align: -0.35em" alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></picture>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1eqinline>redacted-frame</m1eqinline></m1document></body>
+</html>
+
+=====
+<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted"/>

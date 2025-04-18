@@ -1,1 +1,4 @@
-#figure(image("./fig.png", alt: "Content"))
+/// path: fig.svg
+<svg></svg>
+-----
+#figure(image("./fig.svg", alt: "Content"))

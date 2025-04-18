@@ -3,14 +3,4 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, true)"
 input_file: crates/typlite/src/fixtures/docs/nest_list.typ
 ---
-These again are dictionaries with the keys
-- <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
-
-See @@show-module() for outputting the results of this function.
-
-- <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
-- <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function 
-      references. If `auto`, the label-prefix name will be the module name. 
-  - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
-  - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 --><!-- typlite:end:list-item 0 -->
--> string
+failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(850330829973706), message: "expected string, found none", trace: [Call(Some("md-raw")), Show("raw")], hints: [] }, SourceDiagnostic { severity: Error, span: Span(301106836499353), message: "label `<>` does not exist in the document", trace: [], hints: [] }, SourceDiagnostic { severity: Error, span: Span(303146510243633), message: "label `<show-module>` does not exist in the document", trace: [], hints: [] }]
