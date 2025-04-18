@@ -33,7 +33,7 @@ fn conv(world: LspWorld, for_docs: bool) -> String {
     });
     let doc = match converter.convert_doc() {
         Ok(doc) => doc,
-        Err(err) => return format!("failed to convert to markdown: {err}").into(),
+        Err(err) => return format!("failed to convert to markdown: {err}"),
     };
 
     let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
