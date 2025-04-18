@@ -6,9 +6,9 @@ use std::ops::Range;
 use typst::syntax::Source;
 
 /// An LSP Position encoded by [`PositionEncoding`].
-type LspPosition = tinymist_world::debug_loc::LspPosition;
+pub type LspPosition = tinymist_world::debug_loc::LspPosition;
 /// An LSP range encoded by [`PositionEncoding`].
-type LspRange = tinymist_world::debug_loc::LspRange;
+pub type LspRange = tinymist_world::debug_loc::LspRange;
 
 /// What counts as "1 character" for string indexing. We should always prefer
 /// UTF-8, but support UTF-16 as long as it is standard. For more background on

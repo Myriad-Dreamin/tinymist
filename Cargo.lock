@@ -4315,6 +4315,7 @@ dependencies = [
  "tinymist-lint",
  "tinymist-project",
  "tinymist-std",
+ "tinymist-tests",
  "tinymist-world",
  "toml",
  "ttf-parser",
@@ -4408,6 +4409,19 @@ dependencies = [
  "typst-render",
  "typst-shim",
  "typst-svg",
+]
+
+[[package]]
+name = "tinymist-tests"
+version = "0.13.12-rc4"
+dependencies = [
+ "comemo",
+ "insta",
+ "rayon",
+ "tinymist-analysis",
+ "tinymist-project",
+ "tinymist-std",
+ "typst",
 ]
 
 [[package]]
