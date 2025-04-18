@@ -186,6 +186,8 @@ tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.12-rc3
 tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.12-rc3" }
 typst-shim = { path = "./crates/typst-shim", version = "0.13.12-rc3" }
 
+tinymist-tests = { path = "./crates/tinymist-tests/" }
+
 tinymist = { path = "./crates/tinymist/", version = "0.13.12-rc3" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.12-rc3" }
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.12-rc3", default-features = false }

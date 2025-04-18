@@ -6,9 +6,9 @@ use tinymist_world::vfs::PathResolution;
 use crate::prelude::*;
 
 /// An LSP Position encoded by [`PositionEncoding`].
-pub type LspPosition = lsp_types::Position;
+pub use tinymist_analysis::location::LspPosition;
 /// An LSP range encoded by [`PositionEncoding`].
-pub type LspRange = lsp_types::Range;
+pub use tinymist_analysis::location::LspRange;
 
 pub use tinymist_analysis::location::*;
 

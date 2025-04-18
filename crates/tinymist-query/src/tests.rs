@@ -9,27 +9,27 @@ use std::{
 };
 
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_project::{CompileFontArgs, ExportTarget, LspCompileSnapshot, LspComputeGraph};
+use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
-use tinymist_world::{EntryManager, EntryReader, EntryState, ShadowApi, TaskInputs};
-use typst::foundations::Bytes;
+use tinymist_world::{EntryReader, ShadowApi, TaskInputs};
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst_shim::syntax::LinkedNodeExt;
 
-pub use crate::syntax::find_module_level_docs;
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
-pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
+pub use tinymist_project::LspUniverse;
+pub use tinymist_tests::run_with_sources;
 pub use tinymist_world::WorldComputeGraph;
 
+pub use crate::syntax::find_module_level_docs;
 use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
-use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
+use crate::{to_lsp_position, CompletionFeat};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     let name = if name.is_empty() { "playground" } else { name };
@@ -141,64 +141,6 @@ pub fn compile_doc_for_test(
     let doc = typst::compile(&snap.world).output.unwrap();
     snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
     WorldComputeGraph::new(snap)
-}
-
-pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {
-    let root = if cfg!(windows) {
-        PathBuf::from("C:\\root")
-    } else {
-        PathBuf::from("/root")
-    };
-    let mut verse = LspUniverseBuilder::build(
-        EntryState::new_rooted(root.as_path().into(), None),
-        ExportTarget::Paged,
-        Default::default(),
-        Default::default(),
-        LspUniverseBuilder::resolve_package(None, None),
-        Arc::new(
-            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
-                ignore_system_fonts: true,
-                ..Default::default()
-            })
-            .unwrap(),
-        ),
-    );
-    let sources = source.split("-----");
-
-    let mut last_pw = None;
-    for (idx, source) in sources.enumerate() {
-        // find prelude
-        let mut source = source.trim_start();
-        let mut path = None;
-
-        if source.starts_with("//") {
-            let first_line = source.lines().next().unwrap();
-            let content = first_line.trim_start_matches("/").trim();
-
-            if let Some(path_attr) = content.strip_prefix("path:") {
-                source = source.strip_prefix(first_line).unwrap().trim();
-                path = Some(path_attr.trim().to_owned())
-            }
-        };
-
-        let path = path.unwrap_or_else(|| format!("/s{idx}.typ"));
-        let path = path.strip_prefix("/").unwrap_or(path.as_str());
-
-        let pw = root.join(Path::new(&path));
-        verse
-            .map_shadow(&pw, Bytes::from_string(source.to_owned()))
-            .unwrap();
-        last_pw = Some(pw);
-    }
-
-    let pw = last_pw.unwrap();
-    verse
-        .mutate_entry(EntryState::new_rooted(
-            root.as_path().into(),
-            Some(VirtualPath::new(pw.strip_prefix(root).unwrap())),
-        ))
-        .unwrap();
-    f(&mut verse, pw)
 }
 
 pub fn find_test_range(s: &Source) -> LspRange {
