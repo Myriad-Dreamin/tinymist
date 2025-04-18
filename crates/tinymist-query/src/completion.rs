@@ -100,8 +100,6 @@ impl StatefulRequest for CompletionRequest {
 mod tests {
     use std::collections::HashSet;
 
-    use insta::with_settings;
-
     use super::*;
     use crate::{completion::proto::CompletionItem, syntax::find_module_level_docs, tests::*};
 

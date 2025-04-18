@@ -397,7 +397,6 @@ mod type_check_tests {
 #[cfg(test)]
 mod post_type_check_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
@@ -433,7 +432,6 @@ mod post_type_check_tests {
 #[cfg(test)]
 mod type_describe_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 

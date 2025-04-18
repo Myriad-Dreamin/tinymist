@@ -4291,7 +4291,6 @@ dependencies = [
  "hex",
  "if_chain",
  "indexmap 2.9.0",
- "insta",
  "itertools 0.13.0",
  "log",
  "lsp-types",

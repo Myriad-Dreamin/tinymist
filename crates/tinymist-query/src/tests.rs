@@ -20,11 +20,10 @@ use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst_shim::syntax::LinkedNodeExt;
 
-pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
 pub use tinymist_project::LspUniverse;
-pub use tinymist_tests::run_with_sources;
+pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
 pub use crate::syntax::find_module_level_docs;
@@ -32,22 +31,8 @@ use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEnco
 use crate::{to_lsp_position, CompletionFeat};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
-    let name = if name.is_empty() { "playground" } else { name };
-
-    let mut settings = insta::Settings::new();
-    settings.set_prepend_module_to_snapshot(false);
-    settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
-    settings.bind(|| {
-        let glob_path = format!("fixtures/{name}/*.typ");
-        insta::glob!(&glob_path, |path| {
-            let contents = std::fs::read_to_string(path).unwrap();
-            #[cfg(windows)]
-            let contents = contents.replace("\r\n", "\n");
-
-            run_with_sources(&contents, |verse, path| {
-                run_with_ctx(verse, path, f);
-            });
-        });
+    tinymist_tests::snapshot_testing(name, &|verse, path| {
+        run_with_ctx(verse, path, f);
     });
 }
 

@@ -11,6 +11,27 @@ use tinymist_project::{
 };
 use typst::{foundations::Bytes, syntax::VirtualPath};
 
+pub use insta::{assert_debug_snapshot, assert_snapshot, with_settings};
+
+/// Runs snapshot tests.
+pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LspUniverse, PathBuf)) {
+    let name = if name.is_empty() { "playground" } else { name };
+
+    let mut settings = insta::Settings::new();
+    settings.set_prepend_module_to_snapshot(false);
+    settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
+    settings.bind(|| {
+        let glob_path = format!("fixtures/{name}/*.typ");
+        insta::glob!(&glob_path, |path| {
+            let contents = std::fs::read_to_string(path).unwrap();
+            #[cfg(windows)]
+            let contents = contents.replace("\r\n", "\n");
+
+            run_with_sources(&contents, f);
+        });
+    });
+}
+
 /// A test that runs a function with a given source string and returns the
 /// result.
 ///
