@@ -93,7 +93,8 @@ hashbrown = { version = "0.14", features = [
     "inline-more",
 ], default-features = false }
 indexmap = "2.7.0"
-rpds = "1"
+# todo: rpds 1.1.1 requires edition 2024
+rpds = "=1.1.0"
 
 # Data/Text Format and Processing
 hex = "0.4.3"
