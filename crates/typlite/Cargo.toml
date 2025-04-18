@@ -31,6 +31,7 @@ tinymist-project = { workspace = true, features = ["lsp"] }
 typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
+typst-html.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
