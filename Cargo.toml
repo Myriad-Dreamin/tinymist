@@ -8,7 +8,7 @@ license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
 # also change in ci.yml
-rust-version = "1.83"
+rust-version = "1.85"
 
 [workspace]
 resolver = "2"
@@ -93,8 +93,7 @@ hashbrown = { version = "0.14", features = [
     "inline-more",
 ], default-features = false }
 indexmap = "2.7.0"
-# todo: rpds 1.1.1 requires edition 2024
-rpds = "=1.1.0"
+rpds = "1"
 
 # Data/Text Format and Processing
 hex = "0.4.3"
