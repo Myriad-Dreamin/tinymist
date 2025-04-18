@@ -2,34 +2,37 @@
 
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use tinymist_project::{
-    base::ShadowApi, CompileFontArgs, EntryManager, EntryState, ExportTarget, LspUniverse,
-    LspUniverseBuilder,
+    base::ShadowApi, font::FontResolverImpl, CompileFontArgs, EntryManager, EntryState,
+    ExportTarget, LspUniverse, LspUniverseBuilder,
 };
 use typst::{foundations::Bytes, syntax::VirtualPath};
 
-pub use insta::{assert_debug_snapshot, assert_snapshot, with_settings};
+pub use insta::{assert_debug_snapshot, assert_snapshot, glob, with_settings, Settings};
 
 /// Runs snapshot tests.
-pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LspUniverse, PathBuf)) {
-    let name = if name.is_empty() { "playground" } else { name };
+#[macro_export]
+macro_rules! snapshot_testing {
+    ($name:expr, $f:expr) => {
+        let name = $name;
+        let name = if name.is_empty() { "playground" } else { name };
+        let mut settings = $crate::Settings::new();
+        settings.set_prepend_module_to_snapshot(false);
+        settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
+        settings.bind(|| {
+            let glob_path = format!("fixtures/{name}/*.typ");
+            $crate::glob!(&glob_path, |path| {
+                let contents = std::fs::read_to_string(path).unwrap();
+                #[cfg(windows)]
+                let contents = contents.replace("\r\n", "\n");
 
-    let mut settings = insta::Settings::new();
-    settings.set_prepend_module_to_snapshot(false);
-    settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
-    settings.bind(|| {
-        let glob_path = format!("fixtures/{name}/*.typ");
-        insta::glob!(&glob_path, |path| {
-            let contents = std::fs::read_to_string(path).unwrap();
-            #[cfg(windows)]
-            let contents = contents.replace("\r\n", "\n");
-
-            run_with_sources(&contents, f);
+                $crate::run_with_sources(&contents, $f);
+            });
         });
-    });
+    };
 }
 
 /// A test that runs a function with a given source string and returns the
@@ -38,6 +41,16 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LspUniverse, PathBuf)) {
 /// Multiple sources can be provided, separated by `-----`. The last source
 /// is used as the entry point.
 pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {
+    static FONT_RESOLVER: LazyLock<Arc<FontResolverImpl>> = LazyLock::new(|| {
+        Arc::new(
+            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
+                ignore_system_fonts: true,
+                ..Default::default()
+            })
+            .unwrap(),
+        )
+    });
+
     let root = if cfg!(windows) {
         PathBuf::from("C:\\root")
     } else {
@@ -49,13 +62,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         Default::default(),
         Default::default(),
         LspUniverseBuilder::resolve_package(None, None),
-        Arc::new(
-            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
-                ignore_system_fonts: true,
-                ..Default::default()
-            })
-            .unwrap(),
-        ),
+        FONT_RESOLVER.clone(),
     );
     let sources = source.split("-----");
 
