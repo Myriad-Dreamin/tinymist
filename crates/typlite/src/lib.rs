@@ -15,12 +15,14 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
+use tinymist_derive::TypliteAttr;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::TaskInputs;
 use tinymist_project::{base::ShadowApi, EntryReader, LspWorld};
 use tinymist_std::path::unix_slash;
 use typst::foundations::IntoValue;
-use typst::html::HtmlDocument;
+use typst::html::{tag, HtmlAttrs, HtmlDocument, HtmlElement, HtmlNode};
+use typst::layout::Frame;
 use typst::WorldExt;
 use typst::{
     foundations::{Bytes, Dict},
@@ -44,6 +46,25 @@ pub use typst_syntax as syntax;
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 pub use tinymist_project::CompileOnceArgs;
+
+pub struct MarkdownDocument {
+    pub base: HtmlDocument,
+    /// Features for the conversion.
+    feat: TypliteFeat,
+}
+
+impl MarkdownDocument {
+    /// Convert the content to a markdown string.
+    pub fn to_md_string(self) -> Result<EcoString> {
+        let mut w = EcoString::new();
+        MarkdownConverter {
+            feat: self.feat,
+            list_state: None,
+        }
+        .convert(&self.base.root, &mut w)?;
+        Ok(w)
+    }
+}
 
 /// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
 #[derive(Debug, Default, Clone, Copy)]
@@ -107,17 +128,12 @@ impl Typlite {
     }
 
     /// Convert the content to a markdown string.
-    pub fn to_md_string(doc: HtmlDocument) -> Result<EcoString> {
-        Ok(eco_format!("{:#?}", doc.root))
-    }
-
-    /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        Self::to_md_string(self.convert_doc()?)
+        self.convert_doc()?.to_md_string()
     }
 
     /// Convert the content to a markdown document.
-    pub fn convert_doc(self) -> Result<HtmlDocument> {
+    pub fn convert_doc(self) -> Result<MarkdownDocument> {
         let entry = self.world.entry_state();
         let main = entry.main();
         let current = main.ok_or("no main file in workspace")?;
@@ -169,16 +185,404 @@ impl Typlite {
             )
             .map_err(|err| format!("cannot map source for main file: {err:?}"))?;
 
-        println!(
-            "wrap_main_id: {:?} => {:?}",
-            wrap_main_id,
-            wrap_main_path.as_path()
-        );
-
-        let doc = typst::compile(&world)
+        let base = typst::compile(&world)
             .output
             .map_err(|err| format!("convert source for main file: {err:?}"))?;
-        Ok(doc)
+        Ok(MarkdownDocument {
+            base,
+            feat: self.feat,
+        })
+    }
+}
+
+#[allow(non_upper_case_globals)]
+mod md_tag {
+    use typst::html::HtmlTag;
+
+    macro_rules! tags {
+        ($($tag:ident -> $name:ident)*) => {
+            $(#[allow(non_upper_case_globals)]
+            pub const $tag: HtmlTag = HtmlTag::constant(
+                stringify!($name)
+            );)*
+        }
+    }
+
+    tags! {
+        parbreak -> m1parbreak
+        linebreak -> m1linebreak
+        image -> m1image
+        strong -> m1strong
+        emph -> m1emph
+        highlight -> m1highlight
+        strike -> m1strike
+        raw -> m1raw
+        label -> m1label
+        reference -> m1ref
+        heading -> m1heading
+        outline -> m1outline
+        outline_entry -> m1outentry
+        quote -> m1quote
+        table -> m1table
+        table_cell -> m1tablecell
+        grid -> m1grid
+        grid_cell -> m1gridcell
+
+        math_equation_inline -> m1eqinline
+        math_equation_block -> m1eqblock
+
+        doc -> m1document
+        link -> m1link
+    }
+}
+
+#[allow(non_upper_case_globals)]
+mod md_attr {
+    use typst::html::HtmlAttr;
+
+    // pub const level: HtmlAttr = HtmlAttr::constant("level");
+
+    macro_rules! attrs {
+        ($($attr:ident -> $name:ident)*) => {
+            $(#[allow(non_upper_case_globals)]
+            pub const $attr: HtmlAttr = HtmlAttr::constant(
+                stringify!($name)
+            );)*
+        }
+    }
+
+    attrs! {
+        src -> src
+        alt -> alt
+        level -> level
+        dest -> dest
+        lang -> lang
+        block -> block
+        text -> text
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListState {
+    Ordered,
+    Unordered,
+}
+
+/// Typlite worker
+#[derive(Clone)]
+pub struct MarkdownConverter {
+    feat: TypliteFeat,
+    list_state: Option<ListState>,
+}
+
+impl MarkdownConverter {
+    fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        match root.tag {
+            tag::head => Ok(()),
+            tag::html | tag::body | md_tag::doc => self.convert_children(root, w),
+            tag::span | tag::dl | tag::dt | tag::dd => {
+                self.convert_children(root, w)?;
+                Ok(())
+            }
+            tag::p => self.convert_paragraph(root, w),
+            tag::ol => {
+                let state = self.list_state;
+                self.list_state = Some(ListState::Ordered);
+                self.convert_children(root, w)?;
+                self.list_state = state;
+                Ok(())
+            }
+            tag::ul => {
+                let state = self.list_state;
+                self.list_state = Some(ListState::Unordered);
+                self.convert_children(root, w)?;
+                self.list_state = state;
+                Ok(())
+            }
+            // todo: li
+            tag::li => {
+                match self.list_state {
+                    Some(ListState::Ordered) => w.push_str("1. "),
+                    Some(ListState::Unordered) => w.push_str("- "),
+                    None => {}
+                }
+
+                self.convert_children(root, w)?;
+                w.push_str("\n");
+
+                Ok(())
+            }
+            tag::figure => self.convert_children(root, w),
+            tag::figcaption => Ok(()),
+            md_tag::heading => self.convert_heading(root, w),
+            md_tag::link => {
+                let attrs = LinkAttr::parse(&root.attrs)?;
+
+                w.push('[');
+                self.convert_children(root, w)?;
+                w.push(']');
+                w.push('(');
+                w.push_str(&attrs.dest);
+                w.push(')');
+
+                Ok(())
+            }
+            md_tag::parbreak => {
+                w.push_str("\n\n");
+                Ok(())
+            }
+            md_tag::linebreak => {
+                w.push_str("\n");
+                Ok(())
+            }
+            tag::strong | md_tag::strong => {
+                w.push_str("**");
+                self.convert_children(root, w)?;
+                w.push_str("**");
+                Ok(())
+            }
+            tag::em | md_tag::emph => {
+                w.push_str("*");
+                self.convert_children(root, w)?;
+                w.push_str("*");
+                Ok(())
+            }
+
+            md_tag::highlight => {
+                w.push_str("==");
+                self.convert_children(root, w)?;
+                w.push_str("==");
+                Ok(())
+            }
+
+            md_tag::strike => {
+                w.push_str("~~");
+                self.convert_children(root, w)?;
+                w.push_str("~~");
+                Ok(())
+            }
+
+            md_tag::raw => {
+                let attrs = RawAttr::parse(&root.attrs)?;
+                let lang = attrs.lang;
+                let block = attrs.block;
+                let text = attrs.text;
+                let mut max_backticks = if block { 3 } else { 1 };
+                let mut backticks = 0;
+                for c in text.chars() {
+                    if c == '`' {
+                        max_backticks += 1;
+                    } else {
+                        max_backticks = backticks.max(max_backticks);
+                        backticks = 0;
+                    }
+                }
+                let backticks = "`".repeat(max_backticks);
+
+                w.push_str(&backticks);
+                if block {
+                    w.push_str(&lang);
+                    w.push('\n');
+                }
+                // todo: ``` ` ```
+                w.push_str(&text);
+                if block {
+                    w.push('\n');
+                }
+                w.push_str(&backticks);
+                Ok(())
+            }
+
+            md_tag::label => {
+                w.push_str("`");
+                self.convert_children(root, w)?;
+                w.push_str("`");
+                Ok(())
+            }
+
+            md_tag::reference => {
+                w.push_str("`");
+                self.convert_children(root, w)?;
+                w.push_str("`");
+                Ok(())
+            }
+
+            md_tag::outline => {
+                w.push_str("`");
+                self.convert_children(root, w)?;
+                w.push_str("`");
+                Ok(())
+            }
+
+            md_tag::outline_entry => {
+                w.push_str("`");
+                self.convert_children(root, w)?;
+                w.push_str("`");
+                Ok(())
+            }
+
+            md_tag::quote => {
+                w.push_str(">");
+                self.convert_children(root, w)?;
+                w.push_str("\n");
+                Ok(())
+            }
+
+            md_tag::table => {
+                w.push_str("```");
+                self.convert_children(root, w)?;
+                w.push_str("```");
+                Ok(())
+            }
+
+            md_tag::table_cell => {
+                w.push_str("|");
+                self.convert_children(root, w)?;
+                w.push_str("|");
+                Ok(())
+            }
+
+            md_tag::grid => {
+                w.push_str("```");
+                self.convert_children(root, w)?;
+                w.push_str("```");
+                Ok(())
+            }
+
+            md_tag::grid_cell => {
+                w.push_str("|");
+                self.convert_children(root, w)?;
+                w.push_str("|");
+                Ok(())
+            }
+
+            md_tag::math_equation_inline | md_tag::math_equation_block => {
+                self.convert_children(root, w)
+            }
+
+            md_tag::image => {
+                let attrs = ImageAttr::parse(&root.attrs)?;
+                let src = unix_slash(Path::new(attrs.src.as_str()));
+
+                write!(w, r#"![{}]({src})"#, attrs.alt)?;
+                Ok(())
+            }
+
+            _ => panic!("unexpected tag: {:?}", root.tag),
+        }
+    }
+
+    fn convert_children(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        for child in &root.children {
+            match child {
+                HtmlNode::Tag(_) => {}
+                HtmlNode::Frame(frame) => self.write_frame(&frame, w),
+                HtmlNode::Text(text, _) => {
+                    w.push_str(&text);
+                }
+                HtmlNode::Element(element) => {
+                    self.convert(element, w)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn convert_heading(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let attrs = HeadingAttr::parse(&root.attrs)?;
+
+        if attrs.level >= 6 {
+            return Err(format!("heading level {} is too high", attrs.level).into());
+        }
+
+        for _ in 0..(attrs.level + 1) {
+            w.push('#');
+        }
+        w.push(' ');
+
+        self.convert_children(root, w)?;
+        w.push_str("\n\n");
+        Ok(())
+    }
+
+    /// Encode a laid out frame into the writer.
+    fn write_frame(&mut self, frame: &Frame, w: &mut EcoString) {
+        let _ = self.feat;
+
+        // FIXME: This string replacement is obviously a hack.
+        let svg = typst_svg::svg_frame(frame)
+            .replace("<svg class", "<svg style=\"overflow: visible;\" class");
+        // w.push_str(&svg);
+
+        let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
+        let _ = write!(
+            w,
+            r#"<img alt="typst-block" src="data:image/svg+xml;base64,{data}"/>"#
+        );
+    }
+
+    fn convert_paragraph(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\n\n");
+        self.convert_children(root, w)?;
+        w.push_str("\n\n");
+        Ok(())
+    }
+}
+
+#[derive(TypliteAttr, Default)]
+struct HeadingAttr {
+    level: usize,
+}
+
+#[derive(TypliteAttr, Default)]
+struct ImageAttr {
+    src: EcoString,
+    alt: EcoString,
+}
+
+#[derive(TypliteAttr, Default)]
+struct LinkAttr {
+    dest: EcoString,
+}
+
+#[derive(TypliteAttr, Default)]
+struct RawAttr {
+    lang: EcoString,
+    block: bool,
+    text: EcoString,
+}
+
+trait TypliteAttrsParser {
+    fn parse(attrs: &HtmlAttrs) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+trait TypliteAttrParser {
+    fn parse_attr(content: &EcoString) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+impl TypliteAttrParser for usize {
+    fn parse_attr(content: &EcoString) -> Result<Self> {
+        Ok(content
+            .parse::<usize>()
+            .map_err(|_| format!("cannot parse {} as usize", content))?)
+    }
+}
+
+impl TypliteAttrParser for bool {
+    fn parse_attr(content: &EcoString) -> Result<Self> {
+        Ok(content
+            .parse::<bool>()
+            .map_err(|_| format!("cannot parse {} as bool", content))?)
+    }
+}
+
+impl TypliteAttrParser for EcoString {
+    fn parse_attr(content: &EcoString) -> Result<Self> {
+        Ok(content.clone())
     }
 }
 

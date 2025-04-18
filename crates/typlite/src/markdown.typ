@@ -1,46 +1,77 @@
-#let md-parbreak = html.elem("typParbreak", "")
-#let md-linebreak = html.elem("typLinebreak", "")
-#let md-strong = html.elem.with("typStrong")
-#let md-emph = html.elem.with("typEmph")
-#let md-highlight = html.elem.with("typHighlight")
-#let md-strike = html.elem.with("typStrike")
-#let md-raw(lang: none, block: false, text) = html.elem(
-  "typRaw",
-  attrs: (lang: lang, block: block, text: text),
-  "",
-)
+#let bool-str(x) = {
+  if x {
+    "true"
+  } else {
+    "false"
+  }
+}
+
+// typst doesn't allow things like `typParbreak`.
+#let md-parbreak = html.elem("m1parbreak", "")
+#let md-linebreak = html.elem("m1linebreak", "")
+#let md-strong(body, delta: 0) = html.elem("span", html.elem("m1strong", body))
+#let md-emph(body) = html.elem("span", html.elem("m1emph", body))
+#let md-highlight(body) = html.elem("span", html.elem("m1highlight", body))
+#let md-strike(body) = html.elem("span", html.elem("m1strike", body))
+#let md-raw(lang: none, block: false, text) = {
+  let body = html.elem(
+    "m1raw",
+    attrs: (
+      lang: if lang == none {
+        ""
+      } else {
+        lang
+      },
+      block: bool-str(block),
+      text: text,
+    ),
+    "",
+  )
+
+  if block {
+    return body
+  } else {
+    html.elem("span", body)
+  }
+}
 #let md-link(dest: none, body) = html.elem(
-  "typLink",
-  attrs: (dest: dest),
-  body,
+  "span",
+  html.elem(
+    "m1link",
+    attrs: (dest: dest),
+    body,
+  ),
 )
 #let md-label(dest: none, body) = html.elem(
-  "typLabel",
+  "m1label",
   attrs: (dest: dest),
   body,
 )
 #let md-ref(body) = html.elem(
-  "typRef",
-  body,
+  "span",
+  html.elem(
+    "m1ref",
+    body,
+  ),
 )
 #let md-heading(level: int, body) = html.elem(
-  "typHeading",
+  "m1heading",
   attrs: (level: str(level)),
   body,
 )
-#let md-outline = html.elem.with("typOutline")
+#let md-outline = html.elem.with("m1outline")
 #let md-outline-entry(level: int, body) = html.elem(
-  "typOutlineEntry",
+  "m1outentry",
   attrs: (level: str(level)),
   body,
 )
 #let md-quote(attribution: none, body) = html.elem(
-  "typQuote",
+  "m1quote",
   attrs: (attribution: attribution),
   body,
 )
 #let md-table(columns: auto, ..children) = html.elem(
-  "typTable",
+  "m1table",
   attrs: (
     columns: str({
       if type(columns) == array {
@@ -57,7 +88,7 @@
   children
     .pos()
     .map(cell => html.elem(
-      "typTableCell",
+      "m1tablecell",
       attrs: (
         colspan: str(cell.fields().at("colspan", default: 1)),
         rowspan: str(cell.fields().at("rowspan", default: 1)),
@@ -67,7 +98,7 @@
     .join(),
 )
 #let md-grid(columns: auto, ..children) = html.elem(
-  "typGrid",
+  "m1grid",
   attrs: (
     columns: str({
       if type(columns) == array {
@@ -84,7 +115,7 @@
   children
     .pos()
     .map(cell => html.elem(
-      "typGridCell",
+      "m1gridcell",
       attrs: (
         colspan: str(cell.fields().at("colspan", default: 1)),
         rowspan: str(cell.fields().at("rowspan", default: 1)),
@@ -93,26 +124,40 @@
     ))
     .join(),
 )
+#let md-image(src: "", alt: none) = html.elem(
+  "m1image",
+  attrs: (
+    src: src,
+    alt: if alt == none {
+      ""
+    } else {
+      alt
+    },
+  ),
+  "",
+)
 
 #let md-doc(body) = {
   // distinguish parbreak from <p> tag
   show parbreak: md-parbreak
   show linebreak: md-linebreak
-  show strong: md-strong
-  show emph: md-emph
+  show strong: it => md-strong(it.body, delta: it.delta)
+  show emph: it => md-emph(it.body)
   show highlight: md-highlight
   show strike: md-strike
+  // todo: icc?
+  show image: it => md-image(src: it.source, alt: it.alt)
 
   show raw: it => md-raw(lang: it.lang, block: it.block, it.text)
   show link: it => md-link(dest: it.dest, it.body)
-  // show label: it => html.elem("typLabel", it)
+  // show label: it => html.elem("m1Label", it)
   show ref: it => md-ref(it)
 
   show heading: it => md-heading(level: it.level, it.body)
   show outline: md-outline
   show outline.entry: it => md-outline-entry(level: it.level, it.element)
   show quote: it => html.elem(
-    "typQuote",
+    "m1quote",
     attrs: (
       attribution: it.attribution,
     ),
@@ -128,9 +173,8 @@
     children: it.children,
   )
 
-  show math.equation.where(block: false): it => html.elem("typEquationInline", html.frame(it))
-  show math.equation.where(block: true): it => html.elem("typEquationBlock", html.frame(it))
+  show math.equation.where(block: false): it => html.elem("m1eqinline", html.frame(it))
+  show math.equation.where(block: true): it => html.elem("m1eqblock", html.frame(it))
 
-
-  html.elem("typDocument", body)
+  html.elem("m1document", body)
 }

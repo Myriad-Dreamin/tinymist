@@ -25,11 +25,32 @@ impl fmt::Debug for Error {
     }
 }
 
-impl<T> From<T> for Error
-where
-    T: Into<Cow<'static, str>>,
-{
-    fn from(s: T) -> Self {
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error(Box::new(Repr::Msg(e.to_string().into())))
+    }
+}
+
+impl From<fmt::Error> for Error {
+    fn from(e: fmt::Error) -> Self {
+        Error(Box::new(Repr::Msg(e.to_string().into())))
+    }
+}
+
+impl From<&'static str> for Error {
+    fn from(s: &'static str) -> Self {
+        Error(Box::new(Repr::Msg(s.into())))
+    }
+}
+
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Error(Box::new(Repr::Msg(s.into())))
+    }
+}
+
+impl From<Cow<'static, str>> for Error {
+    fn from(s: Cow<'static, str>) -> Self {
         Error(Box::new(Repr::Msg(s.into())))
     }
 }
