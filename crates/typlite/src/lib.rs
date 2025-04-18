@@ -7,6 +7,7 @@ pub mod value;
 
 use core::fmt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{fmt::Write, sync::LazyLock};
 
@@ -15,9 +16,11 @@ pub use error::*;
 use base64::Engine;
 use scopes::Scopes;
 use tinymist_project::vfs::WorkspaceResolver;
+use tinymist_project::TaskInputs;
 use tinymist_project::{base::ShadowApi, EntryReader, LspWorld};
 use tinymist_std::path::unix_slash;
 use typst::foundations::IntoValue;
+use typst::html::HtmlDocument;
 use typst::WorldExt;
 use typst::{
     foundations::{Bytes, Dict},
@@ -25,6 +28,7 @@ use typst::{
     utils::LazyHash,
     World,
 };
+use typst_syntax::VirtualPath;
 use value::{Args, Value};
 
 use crate::SyntaxKind::Text;
@@ -103,33 +107,78 @@ impl Typlite {
     }
 
     /// Convert the content to a markdown string.
-    pub fn convert(self) -> Result<EcoString> {
-        static DEFAULT_LIB: std::sync::LazyLock<Arc<Scopes<Value>>> =
-            std::sync::LazyLock::new(|| Arc::new(library::library()));
+    pub fn to_md_string(doc: HtmlDocument) -> Result<EcoString> {
+        Ok(eco_format!("{:#?}", doc.root))
+    }
 
-        let main = self.world.entry_state().main();
+    /// Convert the content to a markdown string.
+    pub fn convert(self) -> Result<EcoString> {
+        Self::to_md_string(self.convert_doc()?)
+    }
+
+    /// Convert the content to a markdown document.
+    pub fn convert_doc(self) -> Result<HtmlDocument> {
+        let entry = self.world.entry_state();
+        let main = entry.main();
         let current = main.ok_or("no main file in workspace")?;
         let world = self.world;
 
-        let main = world
-            .source(current)
+        if WorkspaceResolver::is_package_file(current) {
+            return Err("package file is not supported".into());
+        }
+
+        let wrap_main_id = current.join("__wrap_md_main.typ");
+        let wrap_main_path = world
+            .path_for_id(wrap_main_id)
             .map_err(|err| format!("getting source for main file: {err:?}"))?;
 
-        let worker = TypliteWorker {
-            current,
-            feat: self.feat,
-            list_depth: 0,
-            prepend_code: EcoString::new(),
-            assets_numbering: 0,
-            scopes: self
-                .library
-                .as_ref()
-                .unwrap_or_else(|| &*DEFAULT_LIB)
-                .clone(),
-            world,
-        };
+        let mut world = world.html_task().task(TaskInputs {
+            entry: Some(entry.select_in_workspace(&wrap_main_id.vpath().as_rooted_path())),
+            inputs: None,
+        });
 
-        worker.sub_file(main)
+        let markdown_id = FileId::new(
+            Some(typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0").unwrap()),
+            VirtualPath::new("lib.typ"),
+        );
+
+        world
+            .map_shadow_by_id(
+                markdown_id.join("typst.toml"),
+                Bytes::from_string(include_str!("markdown-typst.toml")),
+            )
+            .map_err(|err| format!("cannot map markdown-typst.toml: {err:?}"))?;
+        world
+            .map_shadow_by_id(
+                markdown_id,
+                Bytes::from_string(include_str!("markdown.typ")),
+            )
+            .map_err(|err| format!("cannot map markdown.typ: {err:?}"))?;
+
+        world
+            .map_shadow(
+                wrap_main_path.as_path().into(),
+                Bytes::from_string(format!(
+                    r#"
+                #import "@local/markdown:0.1.0": md-doc
+                #show: md-doc
+                #include {:?}
+                "#,
+                    current.vpath().as_rooted_path(),
+                )),
+            )
+            .map_err(|err| format!("cannot map source for main file: {err:?}"))?;
+
+        println!(
+            "wrap_main_id: {:?} => {:?}",
+            wrap_main_id,
+            wrap_main_path.as_path()
+        );
+
+        let doc = typst::compile(&world)
+            .output
+            .map_err(|err| format!("convert source for main file: {err:?}"))?;
+        Ok(doc)
     }
 }
 
