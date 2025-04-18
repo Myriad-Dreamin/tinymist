@@ -198,7 +198,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
   
-    await launchImpl({
+    return await launchImpl({
       kind,
       context,
       editor,
@@ -220,15 +220,43 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       return;
     }
     const { panel, state } = focusingContext;
+
+    // Find the preview task id.
+    let oldTaskId = "";
+    for (const t of activeTask.values())
+      if (t.panel === panel)
+        oldTaskId = t.taskId;
   
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
   
-    await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
+    const { taskId: newTaskId, message } = await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
       isNotPrimary: state.isNotPrimary,
     });
+
+    if (!newTaskId) {
+      vscode.window.showErrorMessage(`Failed to launch browser preview: ${message}`);
+      return;
+    }
+
+    // Restore the scroll position of the preview panel.
+    // vscode notify uri
+    const viewport = oldTaskId && extensionState.getPreviewViewport(oldTaskId);
+    if (!viewport) return;
+
+    // Wait for a while to ensure the preview page is ready.
+    setTimeout(async () => {
+      await tinymist.scrollPreview(newTaskId, {
+        event: "panelScrollByPosition",
+        position: {
+          page_no: viewport.pageNo,
+          x: 0,
+          y: viewport.y,
+        },
+      });
+    }, 1000);
   }
 }
 
