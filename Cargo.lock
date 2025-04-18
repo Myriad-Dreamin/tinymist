@@ -4749,6 +4749,7 @@ dependencies = [
  "tinymist-std",
  "tinymist-tests",
  "typst",
+ "typst-html",
  "typst-svg",
  "typst-syntax",
 ]
