@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, false)"
+input_file: crates/typlite/src/fixtures/integration/enum2.typ
+---
+2. A
+1. B
