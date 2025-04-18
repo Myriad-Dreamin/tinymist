@@ -3,7 +3,7 @@ import fs from "fs";
 const ciFile = fs.readFileSync(".github/workflows/ci.yml", "utf-8");
 
 const toolchainRe = (forWhat) =>
-  new RegExp(/dtolnay\/rust-toolchain@(\d+\.\d+\.\d+)/.source + `\\s*#\\s*${forWhat}`);
+  new RegExp(/toolchain: (\d+\.\d+\.\d+)/.source + `\\s*#\\s*${forWhat}`);
 
 const ciCheckedVersion = ciFile.match(toolchainRe("check-min-version"))?.[1];
 if (!ciCheckedVersion) {
