@@ -47,7 +47,7 @@ use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::Dict;
@@ -61,10 +61,8 @@ use crate::resolve::ResolveAccessModel;
 pub use tinymist_std::time::Time;
 pub use tinymist_std::ImmutPath;
 pub use typst::foundations::Bytes;
-pub use typst::syntax::FileId as TypstFileId;
+pub use typst::syntax::FileId;
 
-/// Handle to a file in [`Vfs`]
-pub type FileId = TypstFileId;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<LazyHash<Dict>>;
 
@@ -73,7 +71,7 @@ pub type ImmutDict = Arc<LazyHash<Dict>>;
 /// This trait is simplified by [`Vfs`] and requires a minimal method set for
 /// typst compilation.
 pub trait PathAccessModel {
-    /// Clear the cache of the access model.
+    /// Clears the cache of the access model.
     ///
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
@@ -88,54 +86,27 @@ pub trait PathAccessModel {
 /// This trait is simplified by [`Vfs`] and requires a minimal method set for
 /// typst compilation.
 pub trait AccessModel {
-    /// Clear the cache of the access model.
+    /// Clears the cache of the access model.
     ///
     /// This is called when the vfs is reset. See [`Vfs`]'s reset method for
     /// more information.
     fn reset(&mut self) {}
 
     /// Return the content of a file entry.
-    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>);
+    fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>);
 }
 
-#[derive(Clone)]
-pub struct SharedAccessModel<M> {
-    pub inner: Arc<RwLock<M>>,
-}
-
-impl<M> SharedAccessModel<M> {
-    pub fn new(inner: M) -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(inner)),
-        }
-    }
-}
-
-impl<M> PathAccessModel for SharedAccessModel<M>
-where
-    M: PathAccessModel,
-{
-    #[inline]
-    fn reset(&mut self) {
-        self.inner.write().reset();
-    }
-
-    fn content(&self, src: &Path) -> FileResult<Bytes> {
-        self.inner.read().content(src)
-    }
-}
-
-type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<SharedAccessModel<M>>>;
+type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<M>>;
 /// we add notify access model here since notify access model doesn't introduce
 /// overheads by our observation
-type VfsAccessModel<M> = OverlayAccessModel<TypstFileId, ResolveAccessModel<VfsPathAccessModel<M>>>;
+type VfsAccessModel<M> = OverlayAccessModel<FileId, ResolveAccessModel<VfsPathAccessModel<M>>>;
 
 pub trait FsProvider {
     /// Arbitrary one of file path corresponding to the given `id`.
-    fn file_path(&self, id: TypstFileId) -> FileResult<PathResolution>;
+    fn file_path(&self, id: FileId) -> FileResult<PathResolution>;
 
-    fn read(&self, id: TypstFileId) -> FileResult<Bytes>;
-    fn read_source(&self, id: TypstFileId) -> FileResult<Source>;
+    fn read(&self, id: FileId) -> FileResult<Bytes>;
+    fn read_source(&self, id: FileId) -> FileResult<Source>;
 }
 
 struct SourceEntry {
@@ -153,7 +124,7 @@ struct SourceIdShard {
 #[derive(Default, Clone)]
 pub struct SourceCache {
     /// The cache entries for each paths
-    cache_entries: Arc<FxDashMap<TypstFileId, SourceIdShard>>,
+    cache_entries: Arc<FxDashMap<FileId, SourceIdShard>>,
 }
 
 impl SourceCache {
@@ -180,7 +151,7 @@ impl SourceCache {
 pub struct Vfs<M: PathAccessModel + Sized> {
     source_cache: SourceCache,
     // The slots for all the files during a single lifecycle.
-    // pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
+    // pub slots: Arc<Mutex<FxHashMap<FileId, SourceCache>>>,
     managed: Arc<Mutex<EntryMap>>,
     paths: Arc<Mutex<PathMap>>,
     revision: NonZeroUsize,
@@ -258,7 +229,6 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     ///
     /// See [`AccessModel`] for more information.
     pub fn new(resolver: Arc<dyn RootResolver + Send + Sync>, access_model: M) -> Self {
-        let access_model = SharedAccessModel::new(access_model);
         let access_model = NotifyAccessModel::new(access_model);
         let access_model = OverlayAccessModel::new(access_model);
         let access_model = ResolveAccessModel {
@@ -317,7 +287,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Resolve the real path for a file id.
-    pub fn file_path(&self, id: TypstFileId) -> Result<PathResolution, FileError> {
+    pub fn file_path(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.access_model.inner.resolver.path_for_id(id)
     }
 
@@ -330,7 +300,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     ///
     /// The in memory untitled files can have no path so
     /// they only have file ids.
-    pub fn shadow_ids(&self) -> Vec<TypstFileId> {
+    pub fn shadow_ids(&self) -> Vec<FileId> {
         self.access_model.file_paths()
     }
 
@@ -358,14 +328,14 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Reads a file.
-    pub fn read(&self, fid: TypstFileId) -> FileResult<Bytes> {
+    pub fn read(&self, fid: FileId) -> FileResult<Bytes> {
         let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
 
         self.read_content(&bytes, fid).clone()
     }
 
     /// Reads a source.
-    pub fn source(&self, file_id: TypstFileId) -> FileResult<Source> {
+    pub fn source(&self, file_id: FileId) -> FileResult<Source> {
         let (bytes, source) = self
             .managed
             .lock()
@@ -422,7 +392,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Reads and caches content of a file.
-    fn read_content<'a>(&self, bytes: &'a BytesQuery, fid: TypstFileId) -> &'a FileResult<Bytes> {
+    fn read_content<'a>(&self, bytes: &'a BytesQuery, fid: FileId) -> &'a FileResult<Bytes> {
         &bytes
             .get_or_init(|| {
                 let (path, content) = self.access_model.content(fid);
@@ -491,7 +461,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         }
     }
 
-    fn invalidate_file_id(&mut self, file_id: TypstFileId) {
+    fn invalidate_file_id(&mut self, file_id: FileId) {
         self.view_changed = true;
         self.managed.slot(file_id, |e| {
             e.changed_at = self.goal_revision.get();
@@ -541,7 +511,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     }
 
     /// Add a shadowing file to the [`OverlayAccessModel`] by file id.
-    pub fn map_shadow_by_id(&mut self, file_id: TypstFileId, snap: FileSnapshot) -> FileResult<()> {
+    pub fn map_shadow_by_id(&mut self, file_id: FileId, snap: FileSnapshot) -> FileResult<()> {
         self.view_changed = true;
         self.invalidate_file_id(file_id);
         self.am().add_file(&file_id, snap, |c| *c);
@@ -550,7 +520,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     }
 
     /// Remove a shadowing file from the [`OverlayAccessModel`] by file id.
-    pub fn remove_shadow_by_id(&mut self, file_id: TypstFileId) {
+    pub fn remove_shadow_by_id(&mut self, file_id: FileId) {
         self.view_changed = true;
         self.invalidate_file_id(file_id);
         self.am().remove_file(&file_id);
@@ -588,13 +558,13 @@ struct VfsEntry {
 
 #[derive(Debug, Clone, Default)]
 struct EntryMap {
-    entries: RedBlackTreeMapSync<TypstFileId, VfsEntry>,
+    entries: RedBlackTreeMapSync<FileId, VfsEntry>,
 }
 
 impl EntryMap {
     /// Read a slot.
     #[inline(always)]
-    fn slot<T>(&mut self, path: TypstFileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
+    fn slot<T>(&mut self, path: FileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
         if let Some(entry) = self.entries.get_mut(&path) {
             f(entry)
         } else {
@@ -622,12 +592,12 @@ impl fmt::Debug for DisplayEntryMap<'_> {
 
 #[derive(Debug, Clone, Default)]
 struct PathMap {
-    paths: FxHashMap<ImmutPath, EcoVec<TypstFileId>>,
-    file_ids: FxHashMap<TypstFileId, (ImmutPath, NonZeroUsize)>,
+    paths: FxHashMap<ImmutPath, EcoVec<FileId>>,
+    file_ids: FxHashMap<FileId, (ImmutPath, NonZeroUsize)>,
 }
 
 impl PathMap {
-    fn insert(&mut self, next: &ImmutPath, fid: TypstFileId, rev: NonZeroUsize) {
+    fn insert(&mut self, next: &ImmutPath, fid: FileId, rev: NonZeroUsize) {
         use std::collections::hash_map::Entry;
         let rev_entry = self.file_ids.entry(fid);
 
@@ -656,7 +626,7 @@ impl PathMap {
         }
     }
 
-    fn get(&mut self, path: &Path) -> Option<&EcoVec<TypstFileId>> {
+    fn get(&mut self, path: &Path) -> Option<&EcoVec<FileId>> {
         self.paths.get(path)
     }
 
