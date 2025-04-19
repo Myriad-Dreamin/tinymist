@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tinymist_std::{hash::FxHashMap, QueryRef};
-use tinymist_vfs::{Bytes, FsProvider, TypstFileId};
+use tinymist_vfs::{Bytes, FileId, FsProvider};
 use typst::diag::{FileError, FileResult};
 use typst::syntax::Source;
 
@@ -13,7 +13,7 @@ type FileQuery<T> = QueryRef<T, FileError>;
 
 pub struct SourceCache {
     touched_by_compile: bool,
-    fid: TypstFileId,
+    fid: FileId,
     source: FileQuery<Source>,
     buffer: FileQuery<Bytes>,
 }
@@ -28,7 +28,7 @@ impl fmt::Debug for SourceCache {
 pub struct SourceDb {
     pub is_compiling: bool,
     /// The slots for all the files during a single lifecycle.
-    pub slots: Arc<Mutex<FxHashMap<TypstFileId, SourceCache>>>,
+    pub slots: Arc<Mutex<FxHashMap<FileId, SourceCache>>>,
 }
 
 impl fmt::Debug for SourceDb {
@@ -72,7 +72,7 @@ impl SourceDb {
     ///
     /// When you don't reset the vfs for each compilation, this function will
     /// still return remaining files from the previous compilation.
-    pub fn iter_dependencies_dyn(&self, f: &mut dyn FnMut(TypstFileId)) {
+    pub fn iter_dependencies_dyn(&self, f: &mut dyn FnMut(FileId)) {
         for slot in self.slots.lock().values() {
             if !slot.touched_by_compile {
                 continue;
@@ -82,7 +82,7 @@ impl SourceDb {
     }
 
     /// Get file content by path.
-    pub fn file(&self, fid: TypstFileId, p: &impl FsProvider) -> FileResult<Bytes> {
+    pub fn file(&self, fid: FileId, p: &impl FsProvider) -> FileResult<Bytes> {
         self.slot(fid, |slot| slot.buffer.compute(|| p.read(fid)).cloned())
     }
 
@@ -90,14 +90,14 @@ impl SourceDb {
     /// global file id.
     ///
     /// See `Vfs::resolve_with_f` for more information.
-    pub fn source(&self, fid: TypstFileId, p: &impl FsProvider) -> FileResult<Source> {
+    pub fn source(&self, fid: FileId, p: &impl FsProvider) -> FileResult<Source> {
         self.slot(fid, |slot| {
             slot.source.compute(|| p.read_source(fid)).cloned()
         })
     }
 
     /// Insert a new slot into the vfs.
-    fn slot<T>(&self, fid: TypstFileId, f: impl FnOnce(&SourceCache) -> T) -> T {
+    fn slot<T>(&self, fid: FileId, f: impl FnOnce(&SourceCache) -> T) -> T {
         let mut slots = self.slots.lock();
         f({
             let entry = slots.entry(fid).or_insert_with(|| SourceCache {

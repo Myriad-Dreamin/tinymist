@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! A synchronous LSP server implementation.
 
 use std::io::{self, BufRead, Write};
 
@@ -40,41 +40,9 @@ impl From<Notification> for Message {
     }
 }
 
-/// A request in the Language Server Protocol.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Request {
-    pub id: RequestId,
-    pub method: String,
-    #[serde(default = "serde_json::Value::default")]
-    #[serde(skip_serializing_if = "serde_json::Value::is_null")]
-    pub params: serde_json::Value,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Response {
-    // JSON RPC allows this to be null if it was impossible
-    // to decode the request's id. Ignore this special case
-    // and just die horribly.
-    pub id: RequestId,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ResponseError>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Notification {
-    pub method: String,
-    #[serde(default = "serde_json::Value::default")]
-    #[serde(skip_serializing_if = "serde_json::Value::is_null")]
-    pub params: serde_json::Value,
-}
-
 impl Message {
+    /// Reads a LSP message from the reader.
     pub fn read(r: &mut impl BufRead) -> io::Result<Option<Message>> {
-        Message::_read(r)
-    }
-    fn _read(r: &mut dyn BufRead) -> io::Result<Option<Message>> {
         let text = match read_msg_text(r)? {
             None => return Ok(None),
             Some(text) => text,
@@ -89,10 +57,9 @@ impl Message {
 
         Ok(Some(msg))
     }
+
+    /// Writes the LSP message to the writer.
     pub fn write(self, w: &mut impl Write) -> io::Result<()> {
-        self._write(w)
-    }
-    fn _write(self, w: &mut dyn Write) -> io::Result<()> {
         #[derive(Serialize)]
         struct JsonRpc {
             jsonrpc: &'static str,
@@ -107,29 +74,22 @@ impl Message {
     }
 }
 
-impl Response {
-    pub fn new_ok<R: serde::Serialize>(id: RequestId, result: R) -> Response {
-        Response {
-            id,
-            result: Some(serde_json::to_value(result).unwrap()),
-            error: None,
-        }
-    }
-    pub fn new_err(id: RequestId, code: i32, message: String) -> Response {
-        let error = ResponseError {
-            code,
-            message,
-            data: None,
-        };
-        Response {
-            id,
-            result: None,
-            error: Some(error),
-        }
-    }
+/// A request in the Language Server Protocol.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Request {
+    /// The id to be used for identify this request, which will be used to
+    /// construct the corresponding response.
+    pub id: RequestId,
+    /// The method identifier of the request.
+    pub method: String,
+    /// The parameters of the request.
+    #[serde(default = "serde_json::Value::default")]
+    #[serde(skip_serializing_if = "serde_json::Value::is_null")]
+    pub params: serde_json::Value,
 }
 
 impl Request {
+    /// Creates a new LSP request.
     pub fn new<P: serde::Serialize>(id: RequestId, method: String, params: P) -> Request {
         Request {
             id,
@@ -137,6 +97,8 @@ impl Request {
             params: serde_json::to_value(params).unwrap(),
         }
     }
+
+    /// Extracts the typed parameters of the a request accordingly.
     pub fn extract<P: DeserializeOwned>(
         self,
         method: &str,
@@ -154,13 +116,69 @@ impl Request {
     }
 }
 
+/// A response in the Language Server Protocol.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Response {
+    /// JSON RPC allows this to be null if it was impossible
+    /// to decode the request's id. Ignore this special case
+    /// and just die horribly.
+    pub id: RequestId,
+    /// The result of the LSP request from the language server. It is not null
+    /// if executed successfully, and it is null if an error occurs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    /// The error of the LSP request from the language server. It is null if
+    /// executed successfully, and it is not null if an error occurs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ResponseError>,
+}
+
+impl Response {
+    /// Creates a response with the success payload.
+    pub fn new_ok<R: serde::Serialize>(id: RequestId, result: R) -> Response {
+        Response {
+            id,
+            result: Some(serde_json::to_value(result).unwrap()),
+            error: None,
+        }
+    }
+
+    /// Creates a response with the failure reason.
+    pub fn new_err(id: RequestId, code: i32, message: String) -> Response {
+        let error = ResponseError {
+            code,
+            message,
+            data: None,
+        };
+        Response {
+            id,
+            result: None,
+            error: Some(error),
+        }
+    }
+}
+
+/// A notification in the Language Server Protocol.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Notification {
+    /// The method identifier of the notification.
+    pub method: String,
+    /// The parameters of the notification.
+    #[serde(default = "serde_json::Value::default")]
+    #[serde(skip_serializing_if = "serde_json::Value::is_null")]
+    pub params: serde_json::Value,
+}
+
 impl Notification {
+    /// Creates a new notification.
     pub fn new(method: String, params: impl serde::Serialize) -> Notification {
         Notification {
             method,
             params: serde_json::to_value(params).unwrap(),
         }
     }
+
+    /// Extracts the typed parameters of the a notification accordingly.
     pub fn extract<P: DeserializeOwned>(
         self,
         method: &str,
@@ -183,20 +201,14 @@ impl Notification {
     }
 }
 
-impl From<Response> for LspOrDapResponse {
-    fn from(resp: Response) -> Self {
-        Self::Lsp(resp)
-    }
-}
-
-impl TryFrom<LspOrDapResponse> for Response {
+impl TryFrom<crate::Message> for Message {
     type Error = anyhow::Error;
 
-    fn try_from(resp: LspOrDapResponse) -> anyhow::Result<Self> {
-        match resp {
-            LspOrDapResponse::Lsp(resp) => Ok(resp),
+    fn try_from(msg: crate::Message) -> anyhow::Result<Self> {
+        match msg {
+            crate::Message::Lsp(msg) => Ok(msg),
             #[cfg(feature = "dap")]
-            LspOrDapResponse::Dap(_) => anyhow::bail!("unexpected DAP response"),
+            crate::Message::Dap(msg) => anyhow::bail!("unexpected DAP message: {msg:?}"),
         }
     }
 }
@@ -219,14 +231,20 @@ impl From<Notification> for crate::Message {
     }
 }
 
-impl TryFrom<crate::Message> for Message {
+impl From<Response> for LspOrDapResponse {
+    fn from(resp: Response) -> Self {
+        Self::Lsp(resp)
+    }
+}
+
+impl TryFrom<LspOrDapResponse> for Response {
     type Error = anyhow::Error;
 
-    fn try_from(msg: crate::Message) -> anyhow::Result<Self> {
-        match msg {
-            crate::Message::Lsp(msg) => Ok(msg),
+    fn try_from(resp: LspOrDapResponse) -> anyhow::Result<Self> {
+        match resp {
+            LspOrDapResponse::Lsp(resp) => Ok(resp),
             #[cfg(feature = "dap")]
-            crate::Message::Dap(msg) => anyhow::bail!("unexpected DAP message: {msg:?}"),
+            LspOrDapResponse::Dap(_) => anyhow::bail!("unexpected DAP response"),
         }
     }
 }

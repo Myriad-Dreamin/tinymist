@@ -128,30 +128,6 @@ pub enum ErrorCode {
     RequestFailed = -32803,
 }
 
-/// The kind of the message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MessageKind {
-    /// A message in the LSP protocol.
-    #[cfg(feature = "lsp")]
-    Lsp,
-    /// A message in the DAP protocol.
-    #[cfg(feature = "dap")]
-    Dap,
-}
-
-/// Gets the kind of the message.
-pub trait GetMessageKind {
-    /// Returns the kind of the message.
-    fn get_message_kind() -> MessageKind;
-}
-
-#[cfg(feature = "lsp")]
-impl GetMessageKind for LspMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Lsp
-    }
-}
-
 /// The common message type for the LSP protocol.
 #[cfg(feature = "lsp")]
 pub type LspMessage = lsp::Message;
@@ -193,6 +169,37 @@ impl Message {
             #[cfg(feature = "dap")]
             Message::Dap(msg) => msg.write(_writer),
         }
+    }
+}
+
+/// The kind of the message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessageKind {
+    /// A message in the LSP protocol.
+    #[cfg(feature = "lsp")]
+    Lsp,
+    /// A message in the DAP protocol.
+    #[cfg(feature = "dap")]
+    Dap,
+}
+
+/// Gets the kind of the message.
+pub trait GetMessageKind {
+    /// Returns the kind of the message.
+    fn get_message_kind() -> MessageKind;
+}
+
+#[cfg(feature = "lsp")]
+impl GetMessageKind for LspMessage {
+    fn get_message_kind() -> MessageKind {
+        MessageKind::Lsp
+    }
+}
+
+#[cfg(feature = "dap")]
+impl GetMessageKind for DapMessage {
+    fn get_message_kind() -> MessageKind {
+        MessageKind::Dap
     }
 }
 

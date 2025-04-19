@@ -33,6 +33,8 @@ pub type FxDashMap<K, V> = dashmap::DashMap<K, V, FxBuildHasher>;
 /// > collision occurring. For a big crate graph with 1000 crates in it, there
 /// > is a probability of 1 in 36,890,000,000,000 of a `StableCrateId`
 /// > collision.
+///
+/// This stores the 16-bytes data in a pair of `u64` instead of single `u128` to avoid heavily affecting `align` of the embedding structs.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "rkyv", derive(Archive, rDeser, rSer))]
 #[cfg_attr(feature = "rkyv-validation", archive(check_bytes))]
@@ -61,12 +63,12 @@ impl<'de> serde::Deserialize<'de> for Fingerprint {
 }
 
 impl Fingerprint {
-    /// Create a new fingerprint from the given pair of 64-bit integers.
+    /// Creates a new fingerprint from the given pair of 64-bit integers.
     pub fn from_pair(lo: u64, hi: u64) -> Self {
         Self { lo, hi }
     }
 
-    /// Create a new fingerprint from the given 128-bit integer.
+    /// Creates a new fingerprint from the given 128-bit integer.
     pub const fn from_u128(hash: u128) -> Self {
         // Self(hash as u64, (hash >> 64) as u64)
         Self {
@@ -75,19 +77,22 @@ impl Fingerprint {
         }
     }
 
-    /// Get the fingerprint as a 128-bit integer.
+    /// Gets the fingerprint as a 128-bit integer.
     pub fn to_u128(self) -> u128 {
         ((self.hi as u128) << 64) | self.lo as u128
     }
 
-    /// Cut the fingerprint into a 32-bit integer.
+    /// Cuts the fingerprint into a 32-bit integer.
+    ///
     /// It could be used as a hash value if the fingerprint is calculated from a
-    /// stable hash function.
+    /// stable hash function, otherwise, the result has pool quality.
     pub fn lower32(self) -> u32 {
         self.lo as u32
     }
 
     /// Creates a new `Fingerprint` from a svg id that **doesn't have prefix**.
+    // todo: why do we split bytes decoding into two parts?
+    // todo: this causes panic if the str is not correct...
     pub fn try_from_str(s: &str) -> Result<Self> {
         let bytes = base64::engine::general_purpose::STANDARD_NO_PAD
             .decode(&s.as_bytes()[..11])
@@ -101,7 +106,7 @@ impl Fingerprint {
         Ok(Self::from_pair(lo, hi))
     }
 
-    /// Create a xml id from the given prefix and the fingerprint of this
+    /// Creates a XML id from the given prefix and the fingerprint of this
     /// reference. Note that the entire html document shares namespace for
     /// ids.
     #[comemo::memoize]
@@ -112,7 +117,7 @@ impl Fingerprint {
             return [prefix, &fingerprint_lo].join("");
         }
 
-        // possible the id in the lower 64 bits.
+        // the possible id in the lower 64 bits.
         let fingerprint_hi = {
             let id = self.hi.to_le_bytes();
             // truncate zero
@@ -142,7 +147,7 @@ pub struct FingerprintSipHasher {
 pub type FingerprintSipHasherBase = SipHasher13;
 
 impl FingerprintSipHasher {
-    /// Get the fast hash value and the underlying data.
+    /// Gets the fast hash value and the underlying data.
     pub fn fast_hash(&self) -> (u32, &Vec<u8>) {
         let mut inner = FxHasher32::default();
         self.data.hash(&mut inner);
@@ -192,7 +197,7 @@ pub struct FingerprintBuilder {
 
 #[cfg(not(feature = "bi-hash"))]
 impl FingerprintBuilder {
-    /// Resolve the fingerprint without checking the conflict.
+    /// Resolves the fingerprint without checking the conflict.
     pub fn resolve_unchecked<T: Hash>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.hash(&mut s);
@@ -200,7 +205,7 @@ impl FingerprintBuilder {
         fingerprint
     }
 
-    /// Resolve the fingerprint and check the conflict.
+    /// Resolves the fingerprint and check the conflict.
     pub fn resolve<T: Hash + 'static>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.type_id().hash(&mut s);
@@ -223,7 +228,7 @@ impl FingerprintBuilder {
 
 #[cfg(feature = "bi-hash")]
 impl FingerprintBuilder {
-    /// Resolve the fingerprint without checking the conflict.
+    /// Resolves the fingerprint without checking the conflict.
     pub fn resolve_unchecked<T: Hash>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.hash(&mut s);
@@ -241,7 +246,8 @@ impl FingerprintBuilder {
         fingerprint
     }
 
-    /// Resolve the fingerprint and check the conflict.
+    /// Resolves the fingerprint and check the conflict.
+    // todo: bi-hash affects the stability?
     pub fn resolve<T: Hash + 'static>(&self, item: &T) -> Fingerprint {
         let mut s = FingerprintSipHasher { data: Vec::new() };
         item.type_id().hash(&mut s);

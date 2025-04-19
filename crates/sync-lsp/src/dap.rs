@@ -1,4 +1,4 @@
-//! A synchronous debug adaptor implementation.
+//! A synchronous debug adaptor server implementation.
 
 use std::io;
 
@@ -6,12 +6,9 @@ use serde::{Deserialize, Serialize};
 
 pub use dapts::{Event, Request, Response};
 
-use crate::{
-    invalid_data_fmt, read_msg_text, write_msg_text, DapMessage, GetMessageKind, LspOrDapResponse,
-    MessageKind,
-};
+use crate::{invalid_data_fmt, read_msg_text, write_msg_text, LspOrDapResponse};
 
-/// Represents a DAP message.
+/// A message in the Debug Adaptor Protocol.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 pub enum Message {
@@ -45,11 +42,8 @@ impl From<Event> for Message {
 }
 
 impl Message {
-    /// Reads a dap message from the reader.
+    /// Reads a DAP message from the reader.
     pub fn read(r: &mut impl io::BufRead) -> io::Result<Option<Message>> {
-        Message::_read(r)
-    }
-    fn _read(r: &mut dyn io::BufRead) -> io::Result<Option<Message>> {
         let text = match read_msg_text(r)? {
             None => return Ok(None),
             Some(text) => text,
@@ -64,11 +58,8 @@ impl Message {
 
         Ok(Some(msg))
     }
-    /// Writes the message to the writer.
+    /// Writes the DAP message to the writer.
     pub fn write(self, w: &mut impl io::Write) -> io::Result<()> {
-        self._write(w)
-    }
-    fn _write(self, w: &mut dyn io::Write) -> io::Result<()> {
         #[derive(Serialize)]
         struct JsonRpc {
             jsonrpc: &'static str,
@@ -83,27 +74,15 @@ impl Message {
     }
 }
 
-impl From<Response> for LspOrDapResponse {
-    fn from(resp: Response) -> Self {
-        Self::Dap(resp)
-    }
-}
-
-impl TryFrom<LspOrDapResponse> for Response {
+impl TryFrom<crate::Message> for Message {
     type Error = anyhow::Error;
 
-    fn try_from(resp: LspOrDapResponse) -> anyhow::Result<Self> {
-        match resp {
+    fn try_from(msg: crate::Message) -> anyhow::Result<Self> {
+        match msg {
             #[cfg(feature = "lsp")]
-            LspOrDapResponse::Lsp(_) => anyhow::bail!("unexpected LSP response"),
-            LspOrDapResponse::Dap(resp) => Ok(resp),
+            crate::Message::Lsp(msg) => anyhow::bail!("unexpected LSP message: {msg:?}"),
+            crate::Message::Dap(msg) => Ok(msg),
         }
-    }
-}
-
-impl GetMessageKind for DapMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Dap
     }
 }
 
@@ -125,14 +104,20 @@ impl From<Event> for crate::Message {
     }
 }
 
-impl TryFrom<crate::Message> for DapMessage {
+impl From<Response> for LspOrDapResponse {
+    fn from(resp: Response) -> Self {
+        Self::Dap(resp)
+    }
+}
+
+impl TryFrom<LspOrDapResponse> for Response {
     type Error = anyhow::Error;
 
-    fn try_from(msg: crate::Message) -> anyhow::Result<Self> {
-        match msg {
+    fn try_from(resp: LspOrDapResponse) -> anyhow::Result<Self> {
+        match resp {
             #[cfg(feature = "lsp")]
-            crate::Message::Lsp(msg) => anyhow::bail!("unexpected LSP message: {msg:?}"),
-            crate::Message::Dap(msg) => Ok(msg),
+            LspOrDapResponse::Lsp(_) => anyhow::bail!("unexpected LSP response"),
+            LspOrDapResponse::Dap(resp) => Ok(resp),
         }
     }
 }

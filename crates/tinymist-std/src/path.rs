@@ -5,7 +5,7 @@ use std::path::{Component, Path, PathBuf};
 
 pub use path_clean::PathClean;
 
-/// Get the path cleaned as a unix-style string.
+/// Gets the path cleaned as a unix-style string.
 pub fn unix_slash(root: &Path) -> String {
     let mut res = String::with_capacity(root.as_os_str().len());
     let mut parent_norm = false;
@@ -46,7 +46,7 @@ pub fn unix_slash(root: &Path) -> String {
     res
 }
 
-/// Get the path cleaned as a platform-style string.
+/// Gets the path cleaned as a platform-style string.
 pub use path_clean::clean;
 
 /// Construct a relative path from a provided base directory path to the

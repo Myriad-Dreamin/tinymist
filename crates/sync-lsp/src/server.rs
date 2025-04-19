@@ -368,7 +368,8 @@ impl LspClient {
         Ok(Some(()))
     }
 
-    /// Catch the early rejected requests.
+    /// Finally sends the response if it is not sent before.
+    /// From the definition, the response is already sent if it is `Some(())`.
     pub(crate) fn schedule_tail(&self, req_id: RequestId, resp: ScheduledResult) {
         match resp {
             // Already responded
