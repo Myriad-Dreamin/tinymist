@@ -558,6 +558,20 @@
           "type": "boolean",
           "default": false
         },
+        "tinymist.completion.symbol": {
+          "title": "The Way to complete symbols",
+          "markdownDescription": "Whether to make symbol completion stepless. For example, `$ar|$` will be completed to `$arrow.r$`. Hint: Restarting the editor is required to change this setting.",
+          "type": "string",
+          "default": "step",
+          "enum": [
+            "step",
+            "stepless"
+          ],
+          "enumDescriptions": [
+            "Complete symbols step by step",
+            "Complete symbols steplessly"
+          ]
+        },
         "tinymist.completion.postfix": {
           "title": "%extension.tinymist.config.tinymist.completion.postfix.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.completion.postfix.desc%",
