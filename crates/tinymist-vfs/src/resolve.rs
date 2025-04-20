@@ -8,7 +8,9 @@ use crate::{path_mapper::RootResolver, AccessModel, Bytes, FileId, PathAccessMod
 /// Provides resolve access model.
 #[derive(Clone)]
 pub struct ResolveAccessModel<M> {
+    /// The path resolver
     pub resolver: Arc<dyn RootResolver + Send + Sync>,
+    /// The inner access model
     pub inner: M,
 }
 

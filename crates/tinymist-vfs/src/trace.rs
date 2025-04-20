@@ -11,8 +11,9 @@ use crate::{AccessModel, Bytes, FileId};
 /// stdout or the browser console.
 #[derive(Debug)]
 pub struct TraceAccessModel<M: AccessModel + Sized> {
-    pub inner: M,
     trace: [AtomicU64; 6],
+    /// The inner access model
+    pub inner: M,
 }
 
 impl<M: AccessModel + Sized> TraceAccessModel<M> {
