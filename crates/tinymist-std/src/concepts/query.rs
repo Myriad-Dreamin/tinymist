@@ -3,8 +3,9 @@ use std::sync::OnceLock;
 
 use parking_lot::Mutex;
 
-/// Represent the result of an immutable query reference.
-/// The compute function should be pure enough.
+/// Represents a reference to some lazily executed query.
+/// The compute function should be pure enough during call the [`compute`] and [`compute_ref`] so that the query result
+/// is consistent through any implementations (the provided `f`).
 ///
 /// [`compute`]: Self::compute
 /// [`compute_ref`]: Self::compute_ref
@@ -15,7 +16,7 @@ pub struct QueryRef<Res, Err, QueryContext = ()> {
 }
 
 impl<T, E, QC> QueryRef<T, E, QC> {
-    /// Create a new query reference with the given value.
+    /// Creates a new query reference with the given value.
     pub fn with_value(value: T) -> Self {
         let cell = OnceLock::new();
         cell.get_or_init(|| Ok(value));
@@ -25,7 +26,7 @@ impl<T, E, QC> QueryRef<T, E, QC> {
         }
     }
 
-    /// Create a new query reference with the given context to execute the
+    /// Creates a new query reference with the given context to execute the
     /// query.
     pub fn with_context(ctx: QC) -> Self {
         Self {
@@ -36,13 +37,13 @@ impl<T, E, QC> QueryRef<T, E, QC> {
 }
 
 impl<T, E: Clone, QC> QueryRef<T, E, QC> {
-    /// Compute and return a checked reference guard.
+    /// Computes and return a checked reference guard.
     #[inline]
     pub fn compute<F: FnOnce() -> Result<T, E>>(&self, f: F) -> Result<&T, E> {
         self.compute_with_context(|_| f())
     }
 
-    /// Compute with context and return a checked reference guard.
+    /// Computes with context and return a checked reference guard.
     #[inline]
     pub fn compute_with_context<F: FnOnce(QC) -> Result<T, E>>(&self, f: F) -> Result<&T, E> {
         let result = self.cell.get_or_init(|| f(self.ctx.lock().take().unwrap()));

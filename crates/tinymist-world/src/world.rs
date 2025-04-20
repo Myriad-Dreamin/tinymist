@@ -8,12 +8,12 @@ use std::{
 
 use tinymist_std::error::prelude::*;
 use tinymist_vfs::{
-    FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
+    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
-    syntax::{FileId, Source, Span, VirtualPath},
+    syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
     Features, Library, World,
@@ -279,7 +279,7 @@ impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
         self.vfs.shadow_paths()
     }
 
-    fn shadow_ids(&self) -> Vec<TypstFileId> {
+    fn shadow_ids(&self) -> Vec<FileId> {
         self.vfs.shadow_ids()
     }
 
@@ -609,7 +609,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     #[inline]
-    fn shadow_ids(&self) -> Vec<TypstFileId> {
+    fn shadow_ids(&self) -> Vec<FileId> {
         self.vfs.shadow_ids()
     }
 
@@ -634,29 +634,29 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     }
 
     #[inline]
-    fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
+    fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()> {
         self.vfs
             .revise()
             .map_shadow_by_id(file_id, Ok(content).into())
     }
 
     #[inline]
-    fn unmap_shadow_by_id(&mut self, file_id: TypstFileId) -> FileResult<()> {
+    fn unmap_shadow_by_id(&mut self, file_id: FileId) -> FileResult<()> {
         self.vfs.revise().remove_shadow_by_id(file_id);
         Ok(())
     }
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+    fn file_path(&self, file_id: FileId) -> FileResult<PathResolution> {
         self.vfs.file_path(file_id)
     }
 
-    fn read(&self, file_id: TypstFileId) -> FileResult<Bytes> {
+    fn read(&self, file_id: FileId) -> FileResult<Bytes> {
         self.vfs.read(file_id)
     }
 
-    fn read_source(&self, file_id: TypstFileId) -> FileResult<Source> {
+    fn read_source(&self, file_id: FileId) -> FileResult<Source> {
         self.vfs.source(file_id)
     }
 }
@@ -763,7 +763,7 @@ impl<F: CompilerFeat> EntryReader for CompilerWorld<F> {
 
 impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     #[inline]
-    fn iter_dependencies(&self, f: &mut dyn FnMut(TypstFileId)) {
+    fn iter_dependencies(&self, f: &mut dyn FnMut(FileId)) {
         self.source_db.iter_dependencies_dyn(f)
     }
 }

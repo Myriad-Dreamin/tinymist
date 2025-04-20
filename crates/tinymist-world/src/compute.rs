@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::any::TypeId;
 use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};

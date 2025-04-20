@@ -236,7 +236,7 @@ impl fmt::Display for Error {
                     write_with_args!(f, err.args, "{}", diag.message)
                 }
                 ErrKind::Inner(e) => write_with_args!(f, err.args, "{e}"),
-                ErrKind::None => write_with_args!(f, err.args, "unknwon error"),
+                ErrKind::None => write_with_args!(f, err.args, "unknown error"),
             }
         } else {
             match &err.kind {

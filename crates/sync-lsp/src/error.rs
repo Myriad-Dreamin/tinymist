@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 #![allow(unused)]
 
 use std::fmt;
@@ -6,14 +5,17 @@ use std::fmt;
 #[cfg(feature = "lsp")]
 use crate::lsp::{Notification, Request};
 
+/// A protocol error happened during communication through LSP or DAP.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProtocolError(String, bool);
 
 impl ProtocolError {
+    /// Creates a protocol error with a message.
     pub(crate) fn new(msg: impl Into<String>) -> Self {
         ProtocolError(msg.into(), false)
     }
 
+    /// Creates a protocol error caused by disconnection.
     pub(crate) fn disconnected() -> ProtocolError {
         ProtocolError("disconnected channel".into(), true)
     }
@@ -32,13 +34,17 @@ impl fmt::Display for ProtocolError {
     }
 }
 
+/// Failure of decoding happened during communication
+/// through LSP or DAP.
 #[derive(Debug)]
 pub enum ExtractError<T> {
     /// The extracted message was of a different method than expected.
     MethodMismatch(T),
     /// Failed to deserialize the message.
     JsonError {
+        /// The method is being decoded
         method: String,
+        /// The underlying error
         error: serde_json::Error,
     },
 }
