@@ -190,10 +190,15 @@ impl DocCommentMatcher {
         });
         let comments = comments.collect::<Vec<_>>();
 
-        let dedent = comments.iter().fold(usize::MAX, |acc, content| {
-            let indent = content.chars().take_while(|ch| ch.is_whitespace()).count();
-            acc.min(indent)
-        });
+        let dedent = comments
+            .iter()
+            .flat_map(|line| {
+                let mut chars = line.chars();
+                let cnt = chars.by_ref().take_while(|c| c.is_whitespace()).count();
+                chars.next().map(|_| cnt)
+            })
+            .min()
+            .unwrap_or(0);
 
         let size_hint = comments.iter().map(|comment| comment.len()).sum::<usize>();
         let mut comments = comments
@@ -211,5 +216,45 @@ impl DocCommentMatcher {
 
         self.comments.clear();
         res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple() {
+        let src = Source::detached(
+            r#"/// foo
+/// bar
+#let main() = printf("hello World")"#,
+        );
+        let docs = find_module_level_docs(&src);
+        assert_eq!(docs, Some("foo\nbar".to_string()));
+    }
+
+    #[test]
+    fn issue_1687_postive() {
+        let src = Source::detached(
+            r#"/// Description.
+/// 
+/// Note.
+#let main() = printf("hello World")"#,
+        );
+        let docs = find_module_level_docs(&src);
+        assert_eq!(docs, Some("Description.\n\nNote.".to_string()));
+    }
+
+    #[test]
+    fn issue_1687_negative() {
+        let src = Source::detached(
+            r#"/// Description.
+///
+/// Note.
+#let main() = printf("hello World")"#,
+        );
+        let docs = find_module_level_docs(&src);
+        assert_eq!(docs, Some("Description.\n\nNote.".to_string()));
     }
 }
