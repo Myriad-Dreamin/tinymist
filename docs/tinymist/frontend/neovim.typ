@@ -136,7 +136,6 @@ The solution is a bit internal, which should get further improvement, but you ca
 ```lua
 require("lspconfig")["tinymist"].setup { -- Alternatively, can be used `vim.lsp.config["tinymist"]`
     -- ...
-    settings = {}
     on_attach = function(client, bufnr)
         vim.keymap.set("n", "<leader>tp", function()
             client:exec_cmd({

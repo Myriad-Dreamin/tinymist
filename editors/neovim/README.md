@@ -155,11 +155,38 @@ Tinymist cannot know the main file of a multiple-files project if you don't tell
 The solution is a bit internal, which should get further improvement, but you can pin a main file by command.
 
 ```lua
+require("lspconfig")["tinymist"].setup { -- Alternatively, can be used `vim.lsp.config["tinymist"]`
+    -- ...
+    on_attach = function(client, bufnr)
+        vim.keymap.set("n", "<leader>tp", function()
+            client:exec_cmd({
+                title = "pin",
+                command = "tinymist.pinMain",
+                arguments = { vim.api.nvim_buf_get_name(0) },
+            }, { bufnr = bufnr })
+        end, { desc = "[T]inymist [P]in", noremap = true })
+
+        vim.keymap.set("n", "<leader>tu", function()
+            client:exec_cmd({
+                title = "unpin",
+                command = "tinymist.pinMain",
+                arguments = { vim.v.null },
+            }, { bufnr = bufnr })
+        end, { desc = "[T]inymist [U]npin", noremap = true })
+    end,
+}
+```
+
+Note that `vim.v.null` should be used instead of `nil` in the `arguments` table when unpinning. See [issue #1595](https://github.com/Myriad-Dreamin/tinymist/issues/1595).
+
+For Neovim versions prior to 0.11.0, `vim.lsp.buf.execute_command` should be used instead:
+```lua
 -- pin the main file
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.api.nvim_buf_get_name(0) } })
 -- unpin the main file
-vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.v.null } })
 ```
+
 
 It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
