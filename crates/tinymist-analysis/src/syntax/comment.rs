@@ -1,5 +1,7 @@
 //! Convenient utilities to match comment in code.
 
+use itertools::Itertools;
+
 use crate::prelude::*;
 
 /// Extract the module-level documentation from a source.
@@ -194,7 +196,10 @@ impl DocCommentMatcher {
             .iter()
             .flat_map(|line| {
                 let mut chars = line.chars();
-                let cnt = chars.by_ref().take_while(|c| c.is_whitespace()).count();
+                let cnt = chars
+                    .by_ref()
+                    .peeking_take_while(|c| c.is_whitespace())
+                    .count();
                 chars.next().map(|_| cnt)
             })
             .min()
@@ -223,38 +228,67 @@ impl DocCommentMatcher {
 mod tests {
     use super::*;
 
+    fn test(it: &str) -> String {
+        find_module_level_docs(&Source::detached(it)).unwrap()
+    }
+
     #[test]
     fn simple() {
-        let src = Source::detached(
-            r#"/// foo
+        assert_eq!(
+            test(
+                r#"/// foo
 /// bar
-#let main() = printf("hello World")"#,
+#let main() = printf("hello World")"#
+            ),
+            "foo\nbar"
         );
-        let docs = find_module_level_docs(&src);
-        assert_eq!(docs, Some("foo\nbar".to_string()));
+    }
+
+    #[test]
+    fn dedent() {
+        assert_eq!(
+            test(
+                r#"/// a
+/// b
+/// c
+#let main() = printf("hello World")"#
+            ),
+            "a\nb\nc"
+        );
+        assert_eq!(
+            test(
+                r#"///a
+/// b
+/// c
+#let main() = printf("hello World")"#
+            ),
+            "a\n b\n c"
+        );
     }
 
     #[test]
     fn issue_1687_postive() {
-        let src = Source::detached(
-            r#"/// Description.
+        assert_eq!(
+            test(
+                r#"/// Description.
 /// 
 /// Note.
-#let main() = printf("hello World")"#,
+#let main() = printf("hello World")"#
+            ),
+            "Description.\n\nNote."
         );
-        let docs = find_module_level_docs(&src);
-        assert_eq!(docs, Some("Description.\n\nNote.".to_string()));
     }
 
     #[test]
     fn issue_1687_negative() {
-        let src = Source::detached(
-            r#"/// Description.
+        assert_eq!(
+            test(
+                r#"/// Description.
 ///
 /// Note.
-#let main() = printf("hello World")"#,
+#let main() = printf("hello World")"#
+            ),
+            "Description.\n\nNote."
         );
-        let docs = find_module_level_docs(&src);
-        assert_eq!(docs, Some("Description.\n\nNote.".to_string()));
     }
 }
