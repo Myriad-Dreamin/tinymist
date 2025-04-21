@@ -2,12 +2,12 @@
 
 use regex::Regex;
 use tinymist_analysis::syntax::{adjust_expr, node_ancestors, SyntaxClass};
+use tinymist_std::path::unix_slash;
 
+use super::get_link_exprs_in;
 use crate::analysis::LinkTarget;
 use crate::prelude::*;
 use crate::syntax::{interpret_mode_at, InterpretMode};
-
-use super::get_link_exprs_in;
 
 /// Analyzes the document and provides code actions.
 pub struct CodeActionWorker<'a> {
@@ -178,8 +178,7 @@ impl<'a> CodeActionWorker<'a> {
                     new_path.push(name);
                 }
             }
-            let new_path = new_path.to_string_lossy().to_string();
-            let edit = self.edit_str(node, new_path)?;
+            let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeActionOrCommand::CodeAction(CodeAction {
                 title: "Convert to relative path".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
@@ -201,8 +200,7 @@ impl<'a> CodeActionWorker<'a> {
                     _ => {}
                 }
             }
-            let new_path = new_path.to_string_lossy().to_string();
-            let edit = self.edit_str(node, new_path)?;
+            let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeActionOrCommand::CodeAction(CodeAction {
                 title: "Convert to absolute path".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
