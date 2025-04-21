@@ -88,17 +88,16 @@ impl<'a> CodeActionWorker<'a> {
 
     fn path_actions(&mut self, node: &LinkedNode, cursor: usize) -> Option<()> {
         // We can only process the case where the import path is a string.
-        if let Some(SyntaxClass::ImportPath(path_node)) = classify_syntax(node.clone(), cursor) {
+        if let Some(SyntaxClass::IncludePath(path_node) | SyntaxClass::ImportPath(path_node)) =
+            classify_syntax(node.clone(), cursor)
+        {
             let str_node = adjust_expr(path_node)?;
             let str_ast = str_node.cast::<ast::Str>()?;
             return self.path_rewrite(self.source.id(), &str_ast.get(), &str_node);
         }
 
         let link_parent = node_ancestors(node)
-            .find(|node| {
-                use SyntaxKind::*;
-                matches!(node.kind(), FuncCall | ModuleInclude | ModuleImport)
-            })
+            .find(|node| matches!(node.kind(), SyntaxKind::FuncCall))
             .unwrap_or(node);
 
         // Actually there should be only one link left
@@ -109,7 +108,7 @@ impl<'a> CodeActionWorker<'a> {
             let mut resolved = false;
             for link in object_under_node {
                 if let LinkTarget::Path(id, path) = link.target {
-                    // todo: is there a link that is not a string?
+                    // todo: is there a link that is not a path string?
                     resolved = self.path_rewrite(id, &path, node).is_some() || resolved;
                 }
             }
