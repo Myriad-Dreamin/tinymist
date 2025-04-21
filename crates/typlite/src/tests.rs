@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use regex::Regex;
-use typst::html::HtmlTag;
+use typst::html::{HtmlNode, HtmlTag};
 use typst_syntax::Span;
 
 use super::*;

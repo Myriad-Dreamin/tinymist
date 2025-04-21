@@ -1,5 +1,7 @@
 //! # Typlite Library
 
+use crate::{scopes::Scopes, tinymist_std::typst::diag::EcoString, worker::TypliteWorker};
+
 use super::*;
 use ecow::eco_format;
 use typst_syntax::{ast, SyntaxKind, SyntaxNode};

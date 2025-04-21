@@ -77,9 +77,9 @@ fn main() -> typlite::Result<()> {
 
     let format = match &output {
         Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
-            typlite::Format::LaTeX
+            typlite::converter::Format::LaTeX
         }
-        _ => typlite::Format::Md,
+        _ => typlite::converter::Format::Md,
     };
 
     let converter = Typlite::new(Arc::new(world))
