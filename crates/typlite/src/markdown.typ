@@ -57,7 +57,7 @@
 #let md-heading(level: int, body) = html.elem(
   "m1heading",
   attrs: (level: str(level)),
-  body,
+  box(body)
 )
 #let md-outline = html.elem.with("m1outline")
 #let md-outline-entry(level: int, body) = html.elem(
@@ -153,7 +153,7 @@
   // show label: it => html.elem("m1Label", it)
   show ref: it => md-ref(it)
 
-  show heading: it => md-heading(level: it.level, box(it.body))
+  show heading: it => md-heading(level: it.level, it.body)
   show outline: md-outline
   show outline.entry: it => md-outline-entry(level: it.level, it.element)
   show quote: it => html.elem(
