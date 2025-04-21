@@ -2,6 +2,7 @@
 
 use regex::Regex;
 
+use crate::analysis::{get_link_exprs_in, LinkTarget};
 use crate::prelude::*;
 use crate::syntax::{interpret_mode_at, InterpretMode};
 
@@ -56,6 +57,9 @@ impl<'a> CodeActionWorker<'a> {
         let mut heading_resolved = false;
         let mut equation_resolved = false;
 
+        // Only if the node is a string, try to provide path conversion actions
+        let start_as_str = node.kind() == SyntaxKind::Str;
+
         self.wrap_actions(node, range);
 
         loop {
@@ -70,11 +74,123 @@ impl<'a> CodeActionWorker<'a> {
                     equation_resolved = true;
                     self.equation_actions(node);
                 }
+                // TODO: resolve path of SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
+                SyntaxKind::FuncCall if start_as_str => {
+                    self.path_actions(cursor, node);
+                    return Some(());
+                }
                 _ => {}
             }
 
             node = node.parent()?;
         }
+    }
+
+    fn path_actions(&mut self, cursor: usize, node: &LinkedNode<'_>) -> Option<()> {
+        if let Some(link_info) = get_link_exprs_in(node) {
+            // Actually there should be only one link left
+            for link in link_info
+                .objects
+                .into_iter()
+                .filter(|link| link.range.contains(&cursor))
+            {
+                if let LinkTarget::Path(id, path) = link.target {
+                    let path = Path::new(path.as_str());
+                    if path.is_absolute() {
+                        // Convert absolute path to relative path
+
+                        let canonicalize = |path: &Path| {
+                            let mut path_buf = PathBuf::new();
+                            for component in path.components() {
+                                match component {
+                                    std::path::Component::ParentDir => {
+                                        path_buf.pop();
+                                    }
+                                    std::path::Component::CurDir => {}
+                                    component => {
+                                        path_buf.push(component);
+                                    }
+                                }
+                            }
+                            path_buf
+                        };
+
+                        let path = canonicalize(path);
+                        let mut path_iter = path.components();
+                        path_iter.next(); // skip the first `RootDir`
+                        let mut last_path_iter = path_iter.clone();
+                        let cur_path = id.vpath().as_rooted_path().parent().unwrap();
+                        let mut cur_path_iter = cur_path.components();
+                        cur_path_iter.next(); // skip the first `RootDir`
+                        let mut last_cur_path_iter = cur_path_iter.clone();
+
+                        // current `/a`, path `/b/c`, convert to `../b/c`
+                        let mut new_path = PathBuf::new();
+                        while let (
+                            Some(std::path::Component::Normal(name1)),
+                            Some(std::path::Component::Normal(name2)),
+                        ) = (cur_path_iter.next(), path_iter.next())
+                        {
+                            if name1 != name2 {
+                                break;
+                            }
+                            last_path_iter = path_iter.clone();
+                            last_cur_path_iter = cur_path_iter.clone();
+                        }
+
+                        for _ in last_cur_path_iter {
+                            new_path.push("..");
+                        }
+
+                        for component in last_path_iter {
+                            if let std::path::Component::Normal(name) = component {
+                                new_path.push(name);
+                            }
+                        }
+                        let new_path = new_path.to_string_lossy().to_string();
+                        let edit = self.local_edit(TextEdit {
+                            range: self.ctx.to_lsp_range(link.range, &self.source),
+                            new_text: new_path,
+                        })?;
+                        let action = CodeActionOrCommand::CodeAction(CodeAction {
+                            title: "Convert to relative path".to_string(),
+                            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                            edit: Some(edit),
+                            ..CodeAction::default()
+                        });
+                        self.actions.push(action);
+                    } else {
+                        // Convert relative path to absolute path
+                        let mut new_path =
+                            id.vpath().as_rooted_path().parent().unwrap().to_path_buf();
+                        for i in path.components() {
+                            match i {
+                                std::path::Component::ParentDir => {
+                                    new_path.pop().then_some(())?;
+                                }
+                                std::path::Component::Normal(name) => {
+                                    new_path.push(name);
+                                }
+                                _ => {}
+                            }
+                        }
+                        let new_path = new_path.to_string_lossy().to_string();
+                        let edit = self.local_edit(TextEdit {
+                            range: self.ctx.to_lsp_range(link.range, &self.source),
+                            new_text: new_path,
+                        })?;
+                        let action = CodeActionOrCommand::CodeAction(CodeAction {
+                            title: "Convert to absolute path".to_string(),
+                            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                            edit: Some(edit),
+                            ..CodeAction::default()
+                        });
+                        self.actions.push(action);
+                    }
+                }
+            }
+        }
+        Some(())
     }
 
     fn wrap_actions(&mut self, node: &LinkedNode, range: Range<usize>) -> Option<()> {
