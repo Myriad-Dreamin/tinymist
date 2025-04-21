@@ -249,7 +249,7 @@ mod tests {
                 })
                 .join("\n");
 
-            insta::with_settings!({
+            with_settings!({
                 description => format!("Jump cursor on {})", make_range_annoation(&source)),
             }, {
                 assert_snapshot!(results);

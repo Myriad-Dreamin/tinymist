@@ -33,19 +33,16 @@ mod prelude;
 mod global;
 pub use global::*;
 
-use std::path::Path;
 use std::sync::Arc;
 
-use ecow::{eco_format, EcoVec};
+use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
-use tinymist_std::{bail, ImmutPath, Result};
-use tinymist_world::vfs::WorkspaceResolver;
-use tinymist_world::{EntryReader, TaskInputs, WorldDeps};
+use tinymist_std::{bail, Result};
+use tinymist_world::{EntryReader, TaskInputs};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
-use typst::syntax::{FileId, Source};
-use typst::World;
+use typst::syntax::FileId;
 
 use crate::{path_res_to_url, CompilerQueryResponse, SemanticRequest, StatefulRequest};
 
@@ -65,64 +62,16 @@ impl ToFunc for Value {
 
 /// Extension trait for `typst::World`.
 pub trait LspWorldExt {
-    /// Get file's id by its path
-    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId>;
-
-    /// Get the source of a file by file path.
-    fn source_by_path(&self, path: &Path) -> FileResult<Source>;
-
     /// Resolve the uri for a file id.
     fn uri_for_id(&self, fid: FileId) -> FileResult<Url>;
-
-    /// Get all depended file ids of a compilation, inclusively.
-    /// Note: must be called after compilation.
-    fn depended_files(&self) -> EcoVec<FileId>;
-
-    /// Get all depended paths in file system of a compilation, inclusively.
-    /// Note: must be called after compilation.
-    fn depended_fs_paths(&self) -> EcoVec<ImmutPath>;
 }
 
 impl LspWorldExt for tinymist_project::LspWorld {
-    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
-        // todo: source in packages
-        match self.id_for_path(path) {
-            Some(id) => Ok(id),
-            None => WorkspaceResolver::file_with_parent_root(path).ok_or_else(|| {
-                let reason = eco_format!("invalid path: {path:?}");
-                FileError::Other(Some(reason))
-            }),
-        }
-    }
-
-    fn source_by_path(&self, path: &Path) -> FileResult<Source> {
-        // todo: source cache
-        self.source(self.file_id_by_path(path)?)
-    }
-
     fn uri_for_id(&self, fid: FileId) -> Result<Url, FileError> {
         let res = path_res_to_url(self.path_for_id(fid)?);
 
         crate::log_debug_ct!("uri_for_id: {fid:?} -> {res:?}");
         res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
-    }
-
-    fn depended_files(&self) -> EcoVec<FileId> {
-        let mut deps = EcoVec::new();
-        self.iter_dependencies(&mut |file_id| {
-            deps.push(file_id);
-        });
-        deps
-    }
-
-    fn depended_fs_paths(&self) -> EcoVec<ImmutPath> {
-        let mut deps = EcoVec::new();
-        self.iter_dependencies(&mut |file_id| {
-            if let Ok(path) = self.path_for_id(file_id) {
-                deps.push(path.as_path().into());
-            }
-        });
-        deps
     }
 }
 
@@ -448,7 +397,6 @@ mod type_check_tests {
 #[cfg(test)]
 mod post_type_check_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
@@ -484,7 +432,6 @@ mod post_type_check_tests {
 #[cfg(test)]
 mod type_describe_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
