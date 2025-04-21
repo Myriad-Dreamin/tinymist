@@ -1,0 +1,44 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Code Action on $|| a $/* ran)
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/equation_block5.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "newText": "",
+      "range": "0:1:0:2"
+     },
+     {
+      "newText": "",
+      "range": "0:3:0:4"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to inline equation"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "newText": "\n",
+      "range": "0:1:0:2"
+     },
+     {
+      "newText": "\n",
+      "range": "0:3:0:4"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to multiple-line block equation"
+ }
+]
