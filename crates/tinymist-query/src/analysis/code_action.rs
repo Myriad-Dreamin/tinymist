@@ -120,6 +120,7 @@ impl<'a> CodeActionWorker<'a> {
         None
     }
 
+    /// Rewrites absolute paths from/to relative paths.
     fn path_rewrite(&mut self, id: TypstFileId, path: &str, node: &LinkedNode) -> Option<()> {
         if !matches!(node.kind(), SyntaxKind::Str) {
             log::warn!("bad path node kind on code action: {:?}", node.kind());
