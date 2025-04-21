@@ -87,7 +87,7 @@ impl<'a> CodeActionWorker<'a> {
     }
 
     fn path_actions(&mut self, node: &LinkedNode, cursor: usize) -> Option<()> {
-        // We can only process on the cases that import path is a string.
+        // We can only process the case where the import path is a string.
         if let Some(SyntaxClass::ImportPath(path_node)) = classify_syntax(node.clone(), cursor) {
             let str_node = adjust_expr(path_node)?;
             let str_ast = str_node.cast::<ast::Str>()?;
