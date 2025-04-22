@@ -128,7 +128,7 @@ impl<'a> CodeActionWorker<'a> {
 
         let path = Path::new(path);
 
-        if path.is_absolute() {
+        if path.starts_with("/") {
             // Convert absolute path to relative path
             let cur_path = id.vpath().as_rooted_path().parent().unwrap();
             let new_path = diff(path, cur_path)?;
