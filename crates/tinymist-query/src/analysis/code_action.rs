@@ -2,7 +2,7 @@
 
 use regex::Regex;
 use tinymist_analysis::syntax::{adjust_expr, node_ancestors, SyntaxClass};
-use tinymist_std::path::unix_slash;
+use tinymist_std::path::{diff, unix_slash};
 
 use super::get_link_exprs_in;
 use crate::analysis::LinkTarget;
@@ -130,54 +130,8 @@ impl<'a> CodeActionWorker<'a> {
 
         if path.is_absolute() {
             // Convert absolute path to relative path
-            let canonicalize = |path: &Path| {
-                let mut path_buf = PathBuf::new();
-                for component in path.components() {
-                    match component {
-                        std::path::Component::ParentDir => {
-                            path_buf.pop();
-                        }
-                        std::path::Component::CurDir => {}
-                        component => {
-                            path_buf.push(component);
-                        }
-                    }
-                }
-                path_buf
-            };
-
-            let path = canonicalize(path);
-            let mut path_iter = path.components();
-            path_iter.next(); // skip the first `RootDir`
-            let mut last_path_iter = path_iter.clone();
             let cur_path = id.vpath().as_rooted_path().parent().unwrap();
-            let mut cur_path_iter = cur_path.components();
-            cur_path_iter.next(); // skip the first `RootDir`
-            let mut last_cur_path_iter = cur_path_iter.clone();
-
-            // current `/a`, path `/b/c`, convert to `../b/c`
-            let mut new_path = PathBuf::new();
-            while let (
-                Some(std::path::Component::Normal(name1)),
-                Some(std::path::Component::Normal(name2)),
-            ) = (cur_path_iter.next(), path_iter.next())
-            {
-                if name1 != name2 {
-                    break;
-                }
-                last_path_iter = path_iter.clone();
-                last_cur_path_iter = cur_path_iter.clone();
-            }
-
-            for _ in last_cur_path_iter {
-                new_path.push("..");
-            }
-
-            for component in last_path_iter {
-                if let std::path::Component::Normal(name) = component {
-                    new_path.push(name);
-                }
-            }
+            let new_path = diff(path, cur_path)?;
             let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeActionOrCommand::CodeAction(CodeAction {
                 title: "Convert to relative path".to_string(),
