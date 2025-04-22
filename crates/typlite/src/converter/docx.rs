@@ -13,6 +13,8 @@ use crate::tags::md_tag;
 use crate::tinymist_std::path::unix_slash;
 use crate::Result;
 use crate::TypliteFeat;
+use resvg::tiny_skia::{self, Pixmap};
+use resvg::usvg::{Options, Tree};
 
 fn get_image_size(img_data: &[u8]) -> Option<(u32, u32)> {
     match image::load_from_memory(img_data) {
@@ -192,10 +194,7 @@ impl DocxConverter {
 
     pub fn convert(&mut self, root: &HtmlElement) -> Result<()> {
         self.initialize_numbering();
-
         self.initialize_styles();
-
-        println!("Converting: {:?}", root.tag);
 
         match root.tag {
             tag::head => Ok(()),
@@ -203,13 +202,16 @@ impl DocxConverter {
                 self.convert_children(root)?;
                 Ok(())
             }
-            tag::p | tag::span | tag::dl | tag::dt | tag::dd => {
+            tag::p | tag::span => {
                 self.convert_children(root)?;
                 Ok(())
             }
-            // ol: a list of ordered items
-            // ul: a list of unordered items
-            // li: a list item
+            // todo: handle description list
+            tag::dl | tag::dt | tag::dd => {
+                self.flush_paragraph()?;
+                self.convert_children(root)?;
+                Ok(())
+            }
             tag::ol => {
                 let state = self.list_state;
                 self.list_state = Some(ListState::Ordered);
@@ -240,7 +242,7 @@ impl DocxConverter {
 
                 if let Some(list_state) = self.list_state {
                     let level = IndentLevel::new(self.list_level.saturating_sub(1));
-                    println!("List level: {}", self.list_level.saturating_sub(1));
+                    // println!("List level: {}", self.list_level.saturating_sub(1));
                     match list_state {
                         ListState::Ordered => {
                             self.current_paragraph = Some(
@@ -273,6 +275,31 @@ impl DocxConverter {
             }
             tag::figcaption => self
                 .create_styled_paragraph("Caption", |converter| converter.convert_children(root)),
+            tag::div => {
+                self.flush_paragraph()?;
+                self.convert_children(root)?;
+                Ok(())
+            }
+            tag::pre => {
+                // should be treated as a code block
+                self.flush_paragraph()?;
+                let mut code_para = Paragraph::new().style("CodeBlock");
+                let lines = self.text_buffer.split('\n');
+                let mut first_line = true;
+                for line in lines {
+                    if !first_line {
+                        code_para =
+                            code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
+                    }
+                    code_para = code_para.add_run(Run::new().add_text(line));
+                    first_line = false;
+                }
+                self.docx = self.docx.clone().add_paragraph(code_para);
+                self.text_buffer.clear();
+                self.current_run = Some(Run::new());
+                self.current_paragraph = Some(Paragraph::new());
+                Ok(())
+            }
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
             md_tag::parbreak => {
@@ -351,7 +378,10 @@ impl DocxConverter {
         for child in &root.children {
             match child {
                 HtmlNode::Tag(_) => {}
-                HtmlNode::Frame(frame) => self.process_frame(frame, true)?,
+                HtmlNode::Frame(frame) => {
+                    // println!("Processing frame in root: {:#?}", root);
+                    self.process_frame(frame, true)?
+                }
                 HtmlNode::Text(text, _) => {
                     self.text_buffer.push_str(text);
                 }
@@ -384,8 +414,7 @@ impl DocxConverter {
     }
 
     fn process_frame(&mut self, frame: &Frame, flush_par: bool) -> Result<()> {
-        let svg = typst_svg::svg_frame(frame)
-            .replace("<svg class", "<svg style=\"overflow: visible;\" class");
+        let svg = typst_svg::svg_frame(frame);
 
         if flush_par {
             self.flush_paragraph()?;
@@ -393,38 +422,30 @@ impl DocxConverter {
             self.flush_run()?;
         }
 
-        let svg_data = svg.as_bytes().to_vec();
-        let (width, height) = self.calculate_svg_dimensions(&svg);
-
-        // SVG images need to be treated differently
-        // First attempt to convert to a bitmap format
-        let pic = match image::load_from_memory(&svg_data) {
-            Ok(_) => {
-                // If we can load it directly, use the SVG data as is
-                Pic::new(&svg_data).size(width, height)
-            }
-            Err(_) => {
-                // If direct loading fails, we could try to convert the SVG to PNG
-                // using resvg
-                let opt = resvg::usvg::Options::default();
-                let tree = resvg::usvg::Tree::from_data(&svg_data, &opt)
-                    .map_err(|e| format!("Failed to parse SVG: {}", e))?;
-                let pixmap_size = resvg::tiny_skia::IntSize::from_wh(width / 9525, height / 9525)
-                    .ok_or("Invalid image dimensions")?;
-                let mut pixmap =
-                    resvg::tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
-                        .ok_or("Failed to create pixmap")?;
-                resvg::render(
-                    &tree,
-                    resvg::tiny_skia::Transform::default(),
-                    &mut pixmap.as_mut(),
-                );
-                let png_data = pixmap
-                    .encode_png()
-                    .map_err(|e| format!("Failed to encode PNG: {}", e))?;
-                Pic::new(&png_data).size(width, height)
-            }
+        // Convert SVG to PNG using resvg
+        let png_data = {
+            let opt = Options::default();
+            let rtree = match Tree::from_str(&svg, &opt) {
+                Ok(tree) => tree,
+                Err(e) => {
+                    eprintln!("SVG parse error: {:?}, {:?}", e, typst_svg::svg_frame(frame));
+                    return Ok(()); // 不中断，直接返回
+                }
+            };
+            let size = rtree.size().to_int_size();
+            let mut pixmap =
+                Pixmap::new(size.width(), size.height()).ok_or("Failed to create pixmap")?;
+            resvg::render(
+                &rtree,
+                tiny_skia::Transform::default(),
+                &mut pixmap.as_mut(),
+            );
+            pixmap
+                .encode_png()
+                .map_err(|e| format!("PNG encode error: {:?}", e))?
         };
+        let (width, height) = self.calculate_image_dimensions(&png_data);
+        let pic = Pic::new(&png_data).size(width, height);
 
         if flush_par {
             // Create a new paragraph with the image

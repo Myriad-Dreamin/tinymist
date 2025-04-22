@@ -60,6 +60,10 @@ impl MarkdownConverter {
             }
             tag::figure => self.convert_children(root, w),
             tag::figcaption => Ok(()),
+            tag::div => {
+                self.convert_children(root, w)?;
+                Ok(())
+            }
             md_tag::heading => self.convert_heading(root, w),
             md_tag::link => {
                 let attrs = LinkAttr::parse(&root.attrs)?;
@@ -220,8 +224,7 @@ impl MarkdownConverter {
     /// Encode a laid out frame into the writer.
     fn write_frame(&mut self, frame: &Frame, w: &mut EcoString) {
         // FIXME: This string replacement is obviously a hack.
-        let svg = typst_svg::svg_frame(frame)
-            .replace("<svg class", "<svg style=\"overflow: visible;\" class");
+        let svg = typst_svg::svg_frame(frame);
 
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
         let _ = write!(

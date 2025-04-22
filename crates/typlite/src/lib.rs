@@ -31,6 +31,7 @@ pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
+#[derive(Debug, Clone)]
 pub struct MarkdownDocument {
     pub base: HtmlDocument,
     /// Features for the conversion.

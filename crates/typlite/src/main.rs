@@ -31,11 +31,19 @@ pub struct CompileArgs {
     /// code in the exported asset.
     #[clap(long, default_value = None, value_name = "ASSETS_SRC_PATH")]
     pub assets_src_path: Option<String>,
+
+    /// Print debug information of the document.
+    #[clap(long)]
+    pub debug_doc: bool,
 }
 
 fn main() -> typlite::Result<()> {
     // Parse command line arguments
     let args = CompileArgs::parse();
+
+    if args.debug_doc {
+        return debug_convert_doc();
+    }
 
     let input = args
         .compile
@@ -138,6 +146,23 @@ fn main() -> typlite::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn debug_convert_doc() -> typlite::Result<()> {
+    let args = CompileArgs::parse();
+    let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
+    let world = universe.snapshot();
+    let converter = Typlite::new(Arc::new(world))
+        .with_library(lib())
+        .with_feature(TypliteFeat {
+            assets_path: None,
+            assets_src_path: None,
+            ..Default::default()
+        })
+        .with_format(typlite::converter::Format::Md);
+    let doc = converter.convert_doc()?;
+    println!("{:#?}", doc);
     Ok(())
 }
 
