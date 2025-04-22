@@ -51,6 +51,6 @@ impl From<String> for Error {
 
 impl From<Cow<'static, str>> for Error {
     fn from(s: Cow<'static, str>) -> Self {
-        Error(Box::new(Repr::Msg(s.into())))
+        Error(Box::new(Repr::Msg(s)))
     }
 }
