@@ -26,6 +26,34 @@ fn convert_docs() {
     });
 }
 
+#[test]
+fn test_docx_generation() {
+    snapshot_testing("integration", &|world, _path| {
+        let converter = Typlite::new(Arc::new(world.clone()))
+            .with_feature(TypliteFeat {
+                ..Default::default()
+            })
+            .with_format(Format::Docx);
+
+        let docx_data = match converter.to_docx() {
+            Ok(data) => data,
+            Err(err) => {
+                panic!("Failed to generate DOCX: {}", err);
+            }
+        };
+
+        assert!(!docx_data.is_empty(), "DOCX data should not be empty");
+
+        assert_eq!(
+            &docx_data[0..2],
+            &[0x50, 0x4B],
+            "DOCX data should start with PK signature"
+        );
+
+        // std::fs::write("test_output.docx", &docx_data).expect("Failed to write DOCX file");
+    });
+}
+
 fn conv(world: LspWorld, for_docs: bool) -> String {
     let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
         annotate_elem: for_docs,

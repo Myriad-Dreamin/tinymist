@@ -687,7 +687,7 @@ impl TypliteWorker {
         for _ in 0..self.list_depth {
             s.push_str("  ");
         }
-        
+
         s.push_str("- ");
         if self.feat.annotate_elem {
             let _ = write!(s, "<!-- typlite:begin:list-item {} -->", self.list_depth);
@@ -705,26 +705,24 @@ impl TypliteWorker {
     fn enum_item(&mut self, node: &SyntaxNode) -> Result<Value> {
         let enum_item = node.cast::<ast::EnumItem>().unwrap();
         let mut s = EcoString::new();
-        
-        // 添加适当的缩进
+
         for _ in 0..self.list_depth {
             s.push_str("  ");
         }
-        
+
         if self.feat.annotate_elem {
             let _ = write!(s, "<!-- typlite:begin:enum-item {} -->", self.list_depth);
             self.list_depth += 1;
         }
-        
-        // 获取枚举项的编号（如果有）或默认为 1
+
         if let Some(num) = enum_item.number() {
             s.push_str(&format!("{}. ", num));
         } else {
             s.push_str("1. ");
         }
-        
+
         s.push_str(&Self::value(self.eval(enum_item.body().to_untyped())?));
-        
+
         if self.feat.annotate_elem {
             self.list_depth -= 1;
             let _ = write!(s, "<!-- typlite:end:enum-item {} -->", self.list_depth);

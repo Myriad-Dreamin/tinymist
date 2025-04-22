@@ -22,7 +22,7 @@ use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst_syntax::VirtualPath;
 
-use crate::converter::{Format, LaTeXConverter, MarkdownConverter};
+use crate::converter::{DocxConverter, Format, LaTeXConverter, MarkdownConverter};
 use typst_syntax::FileId;
 
 /// The result type for typlite.
@@ -76,6 +76,13 @@ impl MarkdownDocument {
 "#,
         );
         Ok(w)
+    }
+
+    /// Convert the content to a DOCX document
+    pub fn to_docx(&self) -> Result<Vec<u8>> {
+        let mut converter = DocxConverter::new(self.feat.clone());
+        converter.convert(&self.base.root)?;
+        converter.to_docx()
     }
 }
 
@@ -153,7 +160,16 @@ impl Typlite {
         match self.format {
             Format::Md => self.convert_doc()?.to_md_string(),
             Format::LaTeX => self.convert_doc()?.to_tex_string(),
+            _ => Err("format is not supported".into()),
         }
+    }
+
+    /// Convert the content to a DOCX document
+    pub fn to_docx(self) -> Result<Vec<u8>> {
+        if self.format != Format::Docx {
+            return Err("format is not DOCX".into());
+        }
+        self.convert_doc()?.to_docx()
     }
 
     /// Convert the content to a markdown document.

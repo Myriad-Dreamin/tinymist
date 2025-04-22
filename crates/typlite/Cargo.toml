@@ -33,6 +33,10 @@ typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
 typst-html.workspace = true
+docx-rs = { git = "https://github.com/bokuweb/docx-rs.git", version = "0.4.18-rc19" }
+image = "0.25.6"
+regex.workspace = true
+resvg = "0.45.1"
 
 [dev-dependencies]
 insta.workspace = true

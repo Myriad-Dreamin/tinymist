@@ -79,6 +79,9 @@ fn main() -> typlite::Result<()> {
         Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
             typlite::converter::Format::LaTeX
         }
+        Some(output) if output.extension() == Some(std::ffi::OsStr::new("docx")) => {
+            typlite::converter::Format::Docx
+        }
         _ => typlite::converter::Format::Md,
     };
 
@@ -91,16 +94,47 @@ fn main() -> typlite::Result<()> {
         })
         .with_format(format);
 
-    let conv = converter.convert();
+    match format {
+        typlite::converter::Format::Docx => {
+            let docx_data = match converter.to_docx() {
+                Ok(data) => data,
+                Err(err) => {
+                    eprintln!("{err}");
+                    std::process::exit(1);
+                }
+            };
 
-    match (conv, output) {
-        (Ok(conv), None) => std::io::stdout()
-            .write_all(conv.as_str().as_bytes())
-            .unwrap(),
-        (Ok(conv), Some(output)) => std::fs::write(output, conv.as_str()).unwrap(),
-        (Err(err), ..) => {
-            eprintln!("{err}");
-            std::process::exit(1);
+            match output {
+                None => {
+                    eprintln!("output file is required for DOCX format");
+                    std::process::exit(1);
+                }
+                Some(output) => {
+                    if let Err(err) = std::fs::write(output, docx_data) {
+                        eprintln!("failed to write DOCX file: {}", err);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        _ => {
+            let conv = converter.convert();
+
+            match (conv, output) {
+                (Ok(conv), None) => std::io::stdout()
+                    .write_all(conv.as_str().as_bytes())
+                    .unwrap(),
+                (Ok(conv), Some(output)) => {
+                    if let Err(err) = std::fs::write(output, conv.as_str()) {
+                        eprintln!("failed to write output file: {}", err);
+                        std::process::exit(1);
+                    }
+                }
+                (Err(err), ..) => {
+                    eprintln!("{err}");
+                    std::process::exit(1);
+                }
+            }
         }
     }
 
