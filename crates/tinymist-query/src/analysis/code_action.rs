@@ -113,7 +113,7 @@ impl<'a> CodeActionWorker<'a> {
                 }
             }
 
-            return Some(());
+            return resolved.then_some(());
         }
 
         None
