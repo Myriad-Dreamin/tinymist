@@ -170,6 +170,7 @@ struct ContentBuilder {
     current_paragraph: Option<Paragraph>,
     current_run: Option<Run>,
     text_buffer: String,
+    needs_new_paragraph: bool,
 }
 
 impl ContentBuilder {
@@ -178,6 +179,7 @@ impl ContentBuilder {
             current_paragraph: Some(Paragraph::new()),
             current_run: Some(Run::new()),
             text_buffer: String::new(),
+            needs_new_paragraph: false,
         }
     }
 
@@ -202,11 +204,17 @@ impl ContentBuilder {
     }
 
     fn add_text(&mut self, text: &str) {
+        if self.needs_new_paragraph && !text.trim().is_empty() {
+            self.needs_new_paragraph = false;
+        }
         self.text_buffer.push_str(text);
     }
 
     fn add_line_break(&mut self) {
-        self.text_buffer.push('\n');
+        // 在文档中只添加一个换行符，不创建新段落
+        if !self.text_buffer.is_empty() && !self.text_buffer.ends_with('\n') {
+            self.text_buffer.push('\n');
+        }
     }
 
     fn take_paragraph(&mut self) -> Option<Paragraph> {
@@ -216,6 +224,12 @@ impl ContentBuilder {
 
     fn set_paragraph(&mut self, paragraph: Paragraph) {
         self.current_paragraph = Some(paragraph);
+        // 当设置新段落时，重置需要新段落的标志
+        self.needs_new_paragraph = false;
+    }
+
+    fn mark_needs_new_paragraph(&mut self) {
+        self.needs_new_paragraph = true;
     }
 
     fn set_run(&mut self, run: Run) {
@@ -279,6 +293,7 @@ impl DocxConverter {
         }
 
         self.content_builder.set_paragraph(Paragraph::new());
+        self.content_builder.needs_new_paragraph = false;
 
         Ok(())
     }
@@ -297,33 +312,36 @@ impl DocxConverter {
                 self.convert_children(root)?;
                 Ok(())
             }
-            // todo: handle description list
+            // 处理描述列表
             tag::dl | tag::dt | tag::dd => {
-                // self.flush_paragraph()?;
                 self.convert_children(root)?;
                 Ok(())
             }
-            // ordered list
+            // 有序列表
             tag::ol => self.process_list(root, ListState::Ordered),
             tag::ul => self.process_list(root, ListState::Unordered),
             tag::li => self.process_list_item(root),
             tag::figure => {
                 self.flush_run()?;
                 self.convert_children(root)?;
+                self.content_builder.mark_needs_new_paragraph();
                 Ok(())
             }
             tag::figcaption => self
                 .create_styled_paragraph("Caption", |converter| converter.convert_children(root)),
             tag::div => {
-                // self.flush_paragraph()?;
                 self.convert_children(root)?;
+                self.content_builder.mark_needs_new_paragraph();
                 Ok(())
             }
             tag::pre => self.process_pre_block(root),
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
             md_tag::parbreak => {
-                // self.flush_paragraph()?;
+                // 只有当前段落不为空时才插入新段落
+                if !self.content_builder.text_buffer.is_empty() {
+                    self.flush_paragraph()?;
+                }
                 Ok(())
             }
             md_tag::linebreak => {
@@ -431,6 +449,10 @@ impl DocxConverter {
             }
         }) {
             self.process_frame(frame, root.tag == md_tag::math_equation_block)?;
+            // // 数学公式块后不需要额外的段落间距
+            // if root.tag == md_tag::math_equation_block {
+            //     self.content_builder.mark_needs_new_paragraph();
+            // }
         } else {
             self.content_builder.add_text("[Math Expression]");
             self.flush_run()?;
@@ -485,7 +507,7 @@ impl DocxConverter {
             return Err(format!("heading level {} is too high", attrs.level).into());
         }
 
-        self.create_styled_paragraph(
+        let result = self.create_styled_paragraph(
             match attrs.level {
                 1 => "Heading1",
                 2 => "Heading2",
@@ -495,16 +517,20 @@ impl DocxConverter {
                 _ => "Heading6",
             },
             |converter| converter.convert_children(root),
-        )
-    }
+        );
 
+        // 标题后不需要额外的空段落
+        self.content_builder.mark_needs_new_paragraph();
+
+        result
+    }
     fn render_frame_to_png(&self, frame: &Frame) -> Result<Vec<u8>> {
         let svg = typst_svg::svg_frame(frame);
 
         // Convert SVG to PNG using resvg
         let png_data = {
-            let dpi = 300.0; // Increased from 192.0
-            let scale_factor = 96.0 / dpi; // 96 DPI is the reference
+            let dpi = 300.0; // High DPI for better quality
+            let scale_factor = dpi / 96.0; // 96 DPI is the reference
 
             let opt = Options {
                 dpi: dpi,
@@ -537,14 +563,36 @@ impl DocxConverter {
         Ok(png_data)
     }
 
-    fn process_frame(&mut self, frame: &Frame, block: bool) -> Result<()> {
-        if block {
-            self.flush_paragraph()?;
+    fn calculate_image_dimensions(&self, img_data: &[u8], scale_factor: Option<f32>) -> (u32, u32) {
+        let actual_scale = scale_factor.unwrap_or(1.0);
+        let img_size = get_image_size(img_data);
+        match img_size {
+            Some((w, h)) => {
+                let max_width = 5486400;
+                // Apply the additional scale factor
+                let scaled_w = (w as f32 * actual_scale) as u32;
+                let scaled_h = (h as f32 * actual_scale) as u32;
+
+                if scaled_w > max_width {
+                    let ratio = scaled_h as f32 / scaled_w as f32;
+                    let new_width = max_width;
+                    let new_height = (max_width as f32 * ratio) as u32;
+                    (new_width, new_height)
+                } else {
+                    (scaled_w * 9525, scaled_h * 9525)
+                }
+            }
+            None => (4000000, 3000000),
         }
+    }
+
+    fn process_frame(&mut self, frame: &Frame, block: bool) -> Result<()> {
         self.flush_run()?;
 
         let png_data = self.render_frame_to_png(frame)?;
-        let (width, height) = self.calculate_image_dimensions(&png_data);
+        // Use a scale factor of 0.5 to make the image appear smaller in the document
+        // while maintaining the high resolution
+        let (width, height) = self.calculate_image_dimensions(&png_data, Some(96.0 / 300.0 / 2.0));
         let pic = Pic::new(&png_data).size(width, height);
 
         if block {
@@ -572,7 +620,7 @@ impl DocxConverter {
     }
 
     fn process_image(&mut self, img_data: &[u8], alt_text: &str) -> Result<()> {
-        let (width, height) = self.calculate_image_dimensions(img_data);
+        let (width, height) = self.calculate_image_dimensions(img_data, None);
 
         let pic = Pic::new(img_data).size(width, height);
         let pic_para = Paragraph::new().add_run(Run::new().add_image(pic));
@@ -583,23 +631,6 @@ impl DocxConverter {
         }
 
         Ok(())
-    }
-
-    fn calculate_image_dimensions(&self, img_data: &[u8]) -> (u32, u32) {
-        let img_size = get_image_size(img_data);
-        match img_size {
-            Some((w, h)) => {
-                let max_width = 5486400;
-                if w > max_width {
-                    let ratio = h as f32 / w as f32;
-                    let scaled_height = (max_width as f32 * ratio) as u32;
-                    (max_width, scaled_height)
-                } else {
-                    (w * 9525, h * 9525)
-                }
-            }
-            None => (4000000, 3000000),
-        }
     }
 
     fn add_caption(&mut self, caption_text: &str) {
@@ -688,7 +719,7 @@ impl DocxConverter {
     }
 
     fn process_code_block(&mut self, attrs: &RawAttr) -> Result<()> {
-        // self.flush_paragraph()?;
+        self.flush_paragraph()?;
 
         let mut code_para = Paragraph::new().style("CodeBlock");
 
@@ -712,6 +743,8 @@ impl DocxConverter {
         }
 
         self.docx = self.docx.clone().add_paragraph(code_para);
+        // 避免创建新段落，因为代码块已经是自包含的
+        self.content_builder.needs_new_paragraph = false;
         Ok(())
     }
 
@@ -743,6 +776,7 @@ impl DocxConverter {
         }
 
         self.docx = current_docx.add_table(table);
+        self.content_builder.mark_needs_new_paragraph();
 
         Ok(())
     }
