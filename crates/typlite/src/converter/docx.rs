@@ -26,46 +26,14 @@ fn get_image_size(img_data: &[u8]) -> Option<(u32, u32)> {
     }
 }
 
-fn extract_svg_dimensions(svg: &str) -> Option<(f32, f32)> {
-    let width_re = regex::Regex::new(r#"width="([0-9.]+)([a-z]+)?"#).ok()?;
-    let height_re = regex::Regex::new(r#"height="([0-9.]+)([a-z]+)?"#).ok()?;
-
-    let width_cap = width_re.captures(svg)?;
-    let width = width_cap.get(1)?.as_str().parse::<f32>().ok()?;
-
-    let height_cap = height_re.captures(svg)?;
-    let height = height_cap.get(1)?.as_str().parse::<f32>().ok()?;
-
-    Some((width, height))
-}
-
-/// DOCX converter implementation
 #[derive(Clone, Debug)]
-pub struct DocxConverter {
-    pub feat: TypliteFeat,
-    pub list_state: Option<ListState>,
-    pub list_level: usize,
-    docx: Docx,
-    current_paragraph: Option<Paragraph>,
-    current_run: Option<Run>,
-    text_buffer: String,
-    numbering_initialized: bool,
-    styles_initialized: bool,
+struct DocxStyles {
+    initialized: bool,
 }
 
-impl DocxConverter {
-    pub fn new(feat: TypliteFeat) -> Self {
-        Self {
-            feat,
-            list_state: None,
-            list_level: 0,
-            docx: Docx::new(),
-            current_paragraph: Some(Paragraph::new()),
-            current_run: Some(Run::new()),
-            text_buffer: String::new(),
-            numbering_initialized: false,
-            styles_initialized: false,
-        }
+impl DocxStyles {
+    fn new() -> Self {
+        Self { initialized: false }
     }
 
     fn create_heading_style(name: &str, display_name: &str, size: usize) -> Style {
@@ -75,9 +43,9 @@ impl DocxConverter {
             .bold()
     }
 
-    fn initialize_styles(&mut self) {
-        if self.styles_initialized {
-            return;
+    fn initialize_styles(&self, docx: Docx) -> Docx {
+        if self.initialized {
+            return docx;
         }
 
         let heading1 = Self::create_heading_style("Heading1", "Heading 1", 32);
@@ -130,10 +98,7 @@ impl DocxConverter {
             .name("Table")
             .table_align(TableAlignmentType::Center);
 
-        self.docx = self
-            .docx
-            .clone()
-            .add_style(heading1)
+        docx.add_style(heading1)
             .add_style(heading2)
             .add_style(heading3)
             .add_style(heading4)
@@ -146,14 +111,23 @@ impl DocxConverter {
             .add_style(highlight)
             .add_style(blockquote)
             .add_style(caption)
-            .add_style(table);
+            .add_style(table)
+    }
+}
 
-        self.styles_initialized = true;
+#[derive(Clone, Debug)]
+struct DocxNumbering {
+    initialized: bool,
+}
+
+impl DocxNumbering {
+    fn new() -> Self {
+        Self { initialized: false }
     }
 
-    fn create_list_level(_id: u32, format: &str, text: &str, _is_bullet: bool) -> Level {
+    fn create_list_level(id: usize, format: &str, text: &str, _is_bullet: bool) -> Level {
         let level = Level::new(
-            0,
+            id,
             Start::new(1),
             NumberFormat::new(format),
             LevelText::new(text),
@@ -163,33 +137,145 @@ impl DocxConverter {
         level.indent(Some(720), Some(SpecialIndentType::Hanging(360)), None, None)
     }
 
-    fn initialize_numbering(&mut self) {
-        if self.numbering_initialized {
-            return;
+    fn initialize_numbering(&self, docx: Docx) -> Docx {
+        if self.initialized {
+            return docx;
         }
 
-        let ordered_level = Self::create_list_level(0, "decimal", "%1.", false);
+        let ordered_level = Self::create_list_level(0, "decimal", "%4.", false);
         let unordered_level = Self::create_list_level(0, "bullet", "•", true);
 
         let ordered_abstract_numbering = AbstractNumbering::new(1).add_level(ordered_level);
         let unordered_abstract_numbering = AbstractNumbering::new(2).add_level(unordered_level);
 
-        self.docx = self
-            .docx
-            .clone()
+        let docx = docx
             .add_abstract_numbering(ordered_abstract_numbering)
             .add_abstract_numbering(unordered_abstract_numbering);
 
         let ordered_numbering = Numbering::new(1, 1); // numbering_id, abstract_numbering_id
         let unordered_numbering = Numbering::new(2, 2);
 
-        self.docx = self
-            .docx
-            .clone()
-            .add_numbering(ordered_numbering)
-            .add_numbering(unordered_numbering);
+        docx.add_numbering(ordered_numbering)
+            .add_numbering(unordered_numbering)
+    }
+}
 
-        self.numbering_initialized = true;
+#[derive(Debug, Clone)]
+struct ContentBuilder {
+    current_paragraph: Option<Paragraph>,
+    current_run: Option<Run>,
+    text_buffer: String,
+}
+
+impl ContentBuilder {
+    fn new() -> Self {
+        Self {
+            current_paragraph: Some(Paragraph::new()),
+            current_run: Some(Run::new()),
+            text_buffer: String::new(),
+        }
+    }
+
+    fn flush_run(&mut self) -> Result<()> {
+        if !self.text_buffer.is_empty() {
+            if let Some(ref mut run) = self.current_run {
+                *run = run.clone().add_text(&self.text_buffer);
+            }
+
+            self.text_buffer.clear();
+        }
+
+        if let (Some(ref mut para), Some(run)) =
+            (&mut self.current_paragraph, self.current_run.take())
+        {
+            *para = para.clone().add_run(run);
+        }
+
+        self.current_run = Some(Run::new());
+
+        Ok(())
+    }
+
+    fn add_text(&mut self, text: &str) {
+        self.text_buffer.push_str(text);
+    }
+
+    fn add_line_break(&mut self) {
+        self.text_buffer.push('\n');
+    }
+
+    fn take_paragraph(&mut self) -> Option<Paragraph> {
+        self.flush_run().ok()?;
+        self.current_paragraph.take()
+    }
+
+    fn set_paragraph(&mut self, paragraph: Paragraph) {
+        self.current_paragraph = Some(paragraph);
+    }
+
+    fn set_run(&mut self, run: Run) {
+        self.current_run = Some(run);
+    }
+
+    fn take_run(&mut self) -> Option<Run> {
+        self.current_run.take()
+    }
+
+    fn clear_buffer(&mut self) {
+        self.text_buffer.clear();
+    }
+
+    fn get_buffer_clone(&self) -> String {
+        self.text_buffer.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DocxConverter {
+    pub feat: TypliteFeat,
+    pub list_state: Option<ListState>,
+    pub list_level: usize,
+    docx: Docx,
+    content_builder: ContentBuilder,
+    styles: DocxStyles,
+    numbering: DocxNumbering,
+}
+
+impl DocxConverter {
+    pub fn new(feat: TypliteFeat) -> Self {
+        Self {
+            feat,
+            list_state: None,
+            list_level: 0,
+            docx: Docx::new(),
+            content_builder: ContentBuilder::new(),
+            styles: DocxStyles::new(),
+            numbering: DocxNumbering::new(),
+        }
+    }
+
+    fn initialize_styles(&mut self) {
+        self.docx = self.styles.initialize_styles(self.docx.clone());
+    }
+
+    fn initialize_numbering(&mut self) {
+        self.docx = self.numbering.initialize_numbering(self.docx.clone());
+    }
+
+    fn flush_run(&mut self) -> Result<()> {
+        self.content_builder.flush_run()
+    }
+
+    fn flush_paragraph(&mut self) -> Result<()> {
+        self.flush_run()?;
+
+        if let Some(para) = self.content_builder.take_paragraph() {
+            self.docx = self.docx.clone().add_paragraph(para);
+        }
+
+        self.content_builder.set_paragraph(Paragraph::new());
+
+        Ok(())
     }
 
     pub fn convert(&mut self, root: &HtmlElement) -> Result<()> {
@@ -208,66 +294,14 @@ impl DocxConverter {
             }
             // todo: handle description list
             tag::dl | tag::dt | tag::dd => {
-                self.flush_paragraph()?;
-                self.convert_children(root)?;
-                Ok(())
-            }
-            tag::ol => {
-                let state = self.list_state;
-                self.list_state = Some(ListState::Ordered);
-                self.list_level += 1;
-                self.flush_paragraph()?;
-
-                self.convert_children(root)?;
-
-                self.list_level -= 1;
-                self.list_state = state;
-                Ok(())
-            }
-            tag::ul => {
-                let state = self.list_state;
-                self.list_state = Some(ListState::Unordered);
-                self.list_level += 1;
-                self.flush_paragraph()?;
-
-                self.convert_children(root)?;
-
-                self.list_level -= 1;
-                self.list_state = state;
-                Ok(())
-            }
-            tag::li => {
                 // self.flush_paragraph()?;
-                self.current_paragraph = Some(Paragraph::new());
-
-                if let Some(list_state) = self.list_state {
-                    let level = IndentLevel::new(self.list_level.saturating_sub(1));
-                    // println!("List level: {}", self.list_level.saturating_sub(1));
-                    match list_state {
-                        ListState::Ordered => {
-                            self.current_paragraph = Some(
-                                self.current_paragraph
-                                    .take()
-                                    .unwrap()
-                                    .numbering(NumberingId::new(1), level),
-                            );
-                        }
-                        ListState::Unordered => {
-                            self.current_paragraph = Some(
-                                self.current_paragraph
-                                    .take()
-                                    .unwrap()
-                                    .numbering(NumberingId::new(2), level),
-                            );
-                        }
-                    }
-                }
-
                 self.convert_children(root)?;
-                self.flush_paragraph()?;
-
                 Ok(())
             }
+            // ordered list
+            tag::ol => self.process_list(root, ListState::Ordered),
+            tag::ul => self.process_list(root, ListState::Unordered),
+            tag::li => self.process_list_item(root),
             tag::figure => {
                 self.flush_run()?;
                 self.convert_children(root)?;
@@ -276,30 +310,11 @@ impl DocxConverter {
             tag::figcaption => self
                 .create_styled_paragraph("Caption", |converter| converter.convert_children(root)),
             tag::div => {
-                self.flush_paragraph()?;
+                // self.flush_paragraph()?;
                 self.convert_children(root)?;
                 Ok(())
             }
-            tag::pre => {
-                // should be treated as a code block
-                self.flush_paragraph()?;
-                let mut code_para = Paragraph::new().style("CodeBlock");
-                let lines = self.text_buffer.split('\n');
-                let mut first_line = true;
-                for line in lines {
-                    if !first_line {
-                        code_para =
-                            code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
-                    }
-                    code_para = code_para.add_run(Run::new().add_text(line));
-                    first_line = false;
-                }
-                self.docx = self.docx.clone().add_paragraph(code_para);
-                self.text_buffer.clear();
-                self.current_run = Some(Run::new());
-                self.current_paragraph = Some(Paragraph::new());
-                Ok(())
-            }
+            tag::pre => self.process_pre_block(root),
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
             md_tag::parbreak => {
@@ -307,7 +322,7 @@ impl DocxConverter {
                 Ok(())
             }
             md_tag::linebreak => {
-                self.text_buffer.push('\n');
+                self.content_builder.add_line_break();
                 Ok(())
             }
             tag::strong | md_tag::strong => {
@@ -334,56 +349,121 @@ impl DocxConverter {
                 self.convert_children(root)?;
                 Ok(())
             }
-            md_tag::math_equation_inline | md_tag::math_equation_block => {
-                if let Some(frame) = root.children.iter().find_map(|child| {
-                    if let HtmlNode::Frame(frame) = child {
-                        Some(frame)
-                    } else {
-                        None
-                    }
-                }) {
-                    self.process_frame(frame, root.tag == md_tag::math_equation_block)?;
-                } else {
-                    self.text_buffer.push_str("[Math Expression]");
-                    self.flush_run()?;
-                }
-                Ok(())
-            }
-            md_tag::image => {
-                let attrs = ImageAttr::parse(&root.attrs)?;
-                let src = unix_slash(Path::new(attrs.src.as_str()));
+            md_tag::math_equation_inline | md_tag::math_equation_block => self.process_math(root),
+            md_tag::image => self.process_image_element(root),
+            _ => self.process_unknown_tag(root),
+        }
+    }
 
-                if let Ok(img_data) = std::fs::read(&src) {
-                    self.flush_run()?;
-                    self.process_image(&img_data, &attrs.alt)?;
-                } else {
-                    self.text_buffer
-                        .push_str(&format!("[Image: {}]", attrs.alt));
-                    self.flush_run()?;
-                }
-
-                Ok(())
+    fn process_pre_block(&mut self, _root: &HtmlElement) -> Result<()> {
+        self.flush_paragraph()?;
+        let mut code_para = Paragraph::new().style("CodeBlock");
+        let buffer = self.content_builder.get_buffer_clone();
+        let lines = buffer.split('\n');
+        let mut first_line = true;
+        for line in lines {
+            if !first_line {
+                code_para = code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
             }
-            _ => {
-                self.text_buffer
-                    .push_str(&format!("[Unknown tag: {:?}]", root.tag));
-                self.flush_run()?;
-                self.convert_children(root)?;
-                Ok(())
+            code_para = code_para.add_run(Run::new().add_text(line));
+            first_line = false;
+        }
+        self.docx = self.docx.clone().add_paragraph(code_para);
+        self.content_builder.clear_buffer();
+        self.content_builder.set_run(Run::new());
+        self.content_builder.set_paragraph(Paragraph::new());
+        Ok(())
+    }
+
+    fn process_list(&mut self, root: &HtmlElement, list_state: ListState) -> Result<()> {
+        let prev_state = self.list_state;
+        self.list_state = Some(list_state);
+        self.list_level += 1;
+        self.flush_paragraph()?;
+
+        self.convert_children(root)?;
+
+        self.list_level -= 1;
+        self.list_state = prev_state;
+        Ok(())
+    }
+
+    fn process_list_item(&mut self, root: &HtmlElement) -> Result<()> {
+        self.content_builder.set_paragraph(Paragraph::new());
+
+        if let Some(list_state) = self.list_state {
+            let level = IndentLevel::new(self.list_level.saturating_sub(1));
+            match list_state {
+                ListState::Ordered => {
+                    let paragraph = self
+                        .content_builder
+                        .take_paragraph()
+                        .unwrap_or_default()
+                        .numbering(NumberingId::new(1), level);
+                    self.content_builder.set_paragraph(paragraph);
+                }
+                ListState::Unordered => {
+                    let paragraph = self
+                        .content_builder
+                        .take_paragraph()
+                        .unwrap_or_default()
+                        .numbering(NumberingId::new(2), level);
+                    self.content_builder.set_paragraph(paragraph);
+                }
             }
         }
+
+        self.convert_children(root)?;
+        Ok(())
+    }
+
+    fn process_math(&mut self, root: &HtmlElement) -> Result<()> {
+        if let Some(frame) = root.children.iter().find_map(|child| {
+            if let HtmlNode::Frame(frame) = child {
+                Some(frame)
+            } else {
+                None
+            }
+        }) {
+            self.process_frame(frame, root.tag == md_tag::math_equation_block)?;
+        } else {
+            self.content_builder.add_text("[Math Expression]");
+            self.flush_run()?;
+        }
+        Ok(())
+    }
+
+    fn process_image_element(&mut self, root: &HtmlElement) -> Result<()> {
+        let attrs = ImageAttr::parse(&root.attrs)?;
+        let src = unix_slash(Path::new(attrs.src.as_str()));
+
+        if let Ok(img_data) = std::fs::read(&src) {
+            self.flush_run()?;
+            self.process_image(&img_data, &attrs.alt)?;
+        } else {
+            self.content_builder
+                .add_text(&format!("[Image: {}]", attrs.alt));
+            self.flush_run()?;
+        }
+
+        Ok(())
+    }
+
+    fn process_unknown_tag(&mut self, root: &HtmlElement) -> Result<()> {
+        self.content_builder
+            .add_text(&format!("[Unknown tag: {:?}]", root.tag));
+        self.flush_run()?;
+        self.convert_children(root)?;
+        Ok(())
     }
 
     pub fn convert_children(&mut self, root: &HtmlElement) -> Result<()> {
         for child in &root.children {
             match child {
                 HtmlNode::Tag(_) => {}
-                HtmlNode::Frame(frame) => {
-                    // println!("Processing frame in root: {:#?}", root);
-                    self.process_frame(frame, true)?
-                }
+                HtmlNode::Frame(frame) => self.process_frame(frame, true)?,
                 HtmlNode::Text(text, _) => {
-                    self.text_buffer.push_str(text);
+                    self.content_builder.add_text(text);
                 }
                 HtmlNode::Element(element) => {
                     self.convert(element)?;
@@ -428,7 +508,11 @@ impl DocxConverter {
             let rtree = match Tree::from_str(&svg, &opt) {
                 Ok(tree) => tree,
                 Err(e) => {
-                    eprintln!("SVG parse error: {:?}, {:?}", e, typst_svg::svg_frame(frame));
+                    eprintln!(
+                        "SVG parse error: {:?}, {:?}",
+                        typst_svg::svg_frame(frame),
+                        e
+                    );
                     return Ok(()); // 不中断，直接返回
                 }
             };
@@ -453,42 +537,10 @@ impl DocxConverter {
             self.docx = self.docx.clone().add_paragraph(pic_para);
         } else {
             // Add the image to the current run
-            if let Some(ref mut run) = self.current_run {
-                *run = run.clone().add_image(pic);
+            if let Some(run) = self.content_builder.take_run() {
+                self.content_builder.set_run(run.add_image(pic));
             }
         }
-
-        Ok(())
-    }
-
-    fn flush_run(&mut self) -> Result<()> {
-        if !self.text_buffer.is_empty() {
-            if let Some(ref mut run) = self.current_run {
-                *run = run.clone().add_text(&self.text_buffer);
-            }
-
-            self.text_buffer.clear();
-        }
-
-        if let (Some(ref mut para), Some(run)) =
-            (&mut self.current_paragraph, self.current_run.take())
-        {
-            *para = para.clone().add_run(run);
-        }
-
-        self.current_run = Some(Run::new());
-
-        Ok(())
-    }
-
-    fn flush_paragraph(&mut self) -> Result<()> {
-        self.flush_run()?;
-
-        if let Some(para) = self.current_paragraph.take() {
-            self.docx = self.docx.clone().add_paragraph(para);
-        }
-
-        self.current_paragraph = Some(Paragraph::new());
 
         Ok(())
     }
@@ -542,41 +594,23 @@ impl DocxConverter {
         self.docx = self.docx.clone().add_paragraph(caption);
     }
 
-    fn calculate_svg_dimensions(&self, svg: &str) -> (u32, u32) {
-        if let Some((w, h)) = extract_svg_dimensions(svg) {
-            // 1 点 = 12700 EMU
-            let emu_w = (w * 12700.0) as u32;
-            let emu_h = (h * 12700.0) as u32;
-
-            let max_width = 5486400;
-            if emu_w > max_width {
-                let ratio = emu_h as f32 / emu_w as f32;
-                let scaled_height = (max_width as f32 * ratio) as u32;
-                (max_width, scaled_height)
-            } else {
-                (emu_w, emu_h)
-            }
-        } else {
-            (4000000, 3000000)
-        }
-    }
-
     fn process_with_style<F>(&mut self, style_name: &str, process_fn: F) -> Result<()>
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
         self.flush_run()?;
         process_fn(self)?;
-        if !self.text_buffer.is_empty() {
+        if !self.content_builder.get_buffer_clone().is_empty() {
             let code_run = Run::new()
-                .add_text(self.text_buffer.clone())
+                .add_text(self.content_builder.get_buffer_clone())
                 .style(style_name);
-            if let Some(ref mut para) = self.current_paragraph {
-                *para = para.clone().add_run(code_run);
+
+            if let Some(para) = self.content_builder.take_paragraph() {
+                self.content_builder.set_paragraph(para.add_run(code_run));
             }
-            self.text_buffer.clear();
+            self.content_builder.clear_buffer();
         }
-        self.current_run = Some(Run::new());
+        self.content_builder.set_run(Run::new());
         Ok(())
     }
 
@@ -584,41 +618,45 @@ impl DocxConverter {
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
-        self.flush_paragraph()?;
+        // self.flush_paragraph()?;
 
         let styled_para = Paragraph::new().style(style_name);
-        let prev_para = self.current_paragraph.take();
-        self.current_paragraph = Some(styled_para);
+        let prev_para = self.content_builder.take_paragraph();
+        self.content_builder.set_paragraph(styled_para);
 
         let result = process_fn(self);
         self.flush_paragraph()?;
 
-        self.current_paragraph = prev_para;
+        self.content_builder
+            .set_paragraph(prev_para.unwrap_or_else(|| Paragraph::new()));
         result
     }
 
     fn process_link(&mut self, root: &HtmlElement) -> Result<()> {
         let attrs = LinkAttr::parse(&root.attrs)?;
 
-        let prev_run = self.current_run.take();
-        self.current_run = Some(Run::new().color("0000FF").underline("single"));
+        let prev_run = self.content_builder.take_run();
+        self.content_builder
+            .set_run(Run::new().color("0000FF").underline("single"));
 
         self.convert_children(root)?;
         self.flush_run()?;
 
-        if let Some(ref mut para) = self.current_paragraph {
+        if let Some(para) = self.content_builder.take_paragraph() {
             let hyperlink = Hyperlink::new(&attrs.dest, HyperlinkType::External).add_run(
                 Run::new()
-                    .add_text(self.text_buffer.clone())
+                    .add_text(self.content_builder.get_buffer_clone())
                     .color("0000FF")
                     .underline("single"),
             );
 
-            *para = para.clone().add_hyperlink(hyperlink);
+            self.content_builder
+                .set_paragraph(para.add_hyperlink(hyperlink));
         }
 
-        self.text_buffer.clear();
-        self.current_run = prev_run;
+        self.content_builder.clear_buffer();
+        self.content_builder
+            .set_run(prev_run.unwrap_or_else(|| Run::new()));
 
         Ok(())
     }
@@ -627,39 +665,47 @@ impl DocxConverter {
         let attrs = RawAttr::parse(&root.attrs)?;
 
         if attrs.block {
-            self.flush_paragraph()?;
-
-            let mut code_para = Paragraph::new().style("CodeBlock");
-
-            if !attrs.lang.is_empty() {
-                code_para = code_para.add_run(
-                    Run::new()
-                        .add_text(format!("Language: {}\n", attrs.lang))
-                        .italic(),
-                );
-            }
-
-            let lines = attrs.text.split('\n');
-            let mut first_line = true;
-
-            for line in lines {
-                if !first_line {
-                    code_para = code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
-                }
-                code_para = code_para.add_run(Run::new().add_text(line));
-                first_line = false;
-            }
-
-            self.docx = self.docx.clone().add_paragraph(code_para);
+            self.process_code_block(&attrs)
         } else {
-            self.flush_run()?;
-            let code_run = Run::new().add_text(attrs.text).style("CodeInline");
-            if let Some(ref mut para) = self.current_paragraph {
-                *para = para.clone().add_run(code_run);
-            }
-            self.current_run = Some(Run::new());
+            self.process_inline_code(&attrs)
+        }
+    }
+
+    fn process_code_block(&mut self, attrs: &RawAttr) -> Result<()> {
+        self.flush_paragraph()?;
+
+        let mut code_para = Paragraph::new().style("CodeBlock");
+
+        if !attrs.lang.is_empty() {
+            code_para = code_para.add_run(
+                Run::new()
+                    .add_text(format!("Language: {}\n", attrs.lang))
+                    .italic(),
+            );
         }
 
+        let lines = attrs.text.split('\n');
+        let mut first_line = true;
+
+        for line in lines {
+            if !first_line {
+                code_para = code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
+            }
+            code_para = code_para.add_run(Run::new().add_text(line));
+            first_line = false;
+        }
+
+        self.docx = self.docx.clone().add_paragraph(code_para);
+        Ok(())
+    }
+
+    fn process_inline_code(&mut self, attrs: &RawAttr) -> Result<()> {
+        self.flush_run()?;
+        let code_run = Run::new().add_text(&attrs.text).style("CodeInline");
+        if let Some(para) = self.content_builder.take_paragraph() {
+            self.content_builder.set_paragraph(para.add_run(code_run));
+        }
+        self.content_builder.set_run(Run::new());
         Ok(())
     }
 
@@ -686,12 +732,10 @@ impl DocxConverter {
     }
 
     fn process_table_row(&mut self, row_element: &HtmlElement) -> Result<TableRow> {
-        // let mut row = TableRow::new(vec![]);
         let mut cells = Vec::new();
         for child in &row_element.children {
             if let HtmlNode::Element(cell_element) = child {
                 let cell = self.process_table_cell(cell_element)?;
-                // row = row.add_cell(cell);
                 cells.push(cell);
             }
         }
@@ -700,20 +744,22 @@ impl DocxConverter {
     }
 
     fn process_table_cell(&mut self, cell_element: &HtmlElement) -> Result<TableCell> {
-        let prev_paragraph = self.current_paragraph.take();
-        let prev_run = self.current_run.take();
+        let prev_paragraph = self.content_builder.take_paragraph();
+        let prev_run = self.content_builder.take_run();
 
-        self.current_paragraph = Some(Paragraph::new());
-        self.current_run = Some(Run::new());
-        self.text_buffer.clear();
+        self.content_builder.set_paragraph(Paragraph::new());
+        self.content_builder.set_run(Run::new());
+        self.content_builder.clear_buffer();
 
         self.convert_children(cell_element)?;
         self.flush_run()?;
 
-        let cell_paragraph = self.current_paragraph.take().unwrap_or_default();
+        let cell_paragraph = self.content_builder.take_paragraph().unwrap_or_default();
 
-        self.current_paragraph = prev_paragraph;
-        self.current_run = prev_run;
+        self.content_builder
+            .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
+        self.content_builder
+            .set_run(prev_run.unwrap_or_else(|| Run::new()));
 
         Ok(TableCell::new().add_paragraph(cell_paragraph))
     }
