@@ -57,7 +57,7 @@
 #let md-heading(level: int, body) = html.elem(
   "m1heading",
   attrs: (level: str(level)),
-  box(body)
+  box(body),
 )
 #let md-outline = html.elem.with("m1outline")
 #let md-outline-entry(level: int, body) = html.elem(
@@ -136,8 +136,13 @@
   ),
   "",
 )
+// #let md-block(body) = html.elem(
+//   "m1block",
+//   body,
+// )
 
 #let md-doc(body) = {
+  // show block: it => md-block(it)
   // distinguish parbreak from <p> tag
   show parbreak: md-parbreak
   show linebreak: md-linebreak
@@ -173,8 +178,8 @@
     children: it.children,
   )
 
-  show math.equation.where(block: false): it => html.elem("m1eqinline", html.frame(it))
-  show math.equation.where(block: true): it => html.elem("m1eqblock", html.frame(it))
+  show math.equation.where(block: false): it => html.elem("m1eqinline", html.frame(box(inset: 0.5em, it)))
+  show math.equation.where(block: true): it => html.elem("m1eqblock", html.frame(block(inset: 0.5em, it)))
 
   html.elem("m1document", body)
 }
