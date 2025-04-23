@@ -71,6 +71,10 @@ impl DocxStyles {
             .fonts(courier_fonts)
             .size(18);
 
+        let math_block = Style::new("MathBlock", StyleType::Paragraph)
+            .name("Math Block")
+            .align(AlignmentType::Center);
+
         let emphasis = Style::new("Emphasis", StyleType::Character)
             .name("Emphasis")
             .italic();
@@ -106,6 +110,7 @@ impl DocxStyles {
             .add_style(heading6)
             .add_style(code_block)
             .add_style(code_inline)
+            .add_style(math_block)
             .add_style(emphasis)
             .add_style(strong)
             .add_style(highlight)
@@ -318,7 +323,7 @@ impl DocxConverter {
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
             md_tag::parbreak => {
-                self.flush_paragraph()?;
+                // self.flush_paragraph()?;
                 Ok(())
             }
             md_tag::linebreak => {
@@ -461,7 +466,7 @@ impl DocxConverter {
         for child in &root.children {
             match child {
                 HtmlNode::Tag(_) => {}
-                HtmlNode::Frame(frame) => self.process_frame(frame, true)?,
+                HtmlNode::Frame(frame) => self.process_frame(frame, false)?,
                 HtmlNode::Text(text, _) => {
                     self.content_builder.add_text(text);
                 }
@@ -493,50 +498,61 @@ impl DocxConverter {
         )
     }
 
-    fn process_frame(&mut self, frame: &Frame, flush_par: bool) -> Result<()> {
+    fn render_frame_to_png(&self, frame: &Frame) -> Result<Vec<u8>> {
         let svg = typst_svg::svg_frame(frame);
-
-        if flush_par {
-            self.flush_paragraph()?;
-        } else {
-            self.flush_run()?;
-        }
 
         // Convert SVG to PNG using resvg
         let png_data = {
-            let opt = Options::default();
+            let dpi = 300.0; // Increased from 192.0
+            let scale_factor = 96.0 / dpi; // 96 DPI is the reference
+
+            let opt = Options {
+                dpi: dpi,
+                ..Options::default()
+            };
+
             let rtree = match Tree::from_str(&svg, &opt) {
                 Ok(tree) => tree,
-                Err(e) => {
-                    eprintln!(
-                        "SVG parse error: {:?}, {:?}",
-                        typst_svg::svg_frame(frame),
-                        e
-                    );
-                    return Ok(()); // 不中断，直接返回
-                }
+                Err(e) => return Err(format!("SVG parse error: {:?}", e).into()),
             };
+
+            // Get the size and scale it according to the DPI
             let size = rtree.size().to_int_size();
-            let mut pixmap =
-                Pixmap::new(size.width(), size.height()).ok_or("Failed to create pixmap")?;
+            let width = (size.width() as f32 * scale_factor) as u32;
+            let height = (size.height() as f32 * scale_factor) as u32;
+
+            let mut pixmap = Pixmap::new(width, height).ok_or("Failed to create pixmap")?;
+
             resvg::render(
                 &rtree,
-                tiny_skia::Transform::default(),
+                tiny_skia::Transform::from_scale(scale_factor, scale_factor),
                 &mut pixmap.as_mut(),
             );
+
             pixmap
                 .encode_png()
                 .map_err(|e| format!("PNG encode error: {:?}", e))?
         };
+
+        Ok(png_data)
+    }
+
+    fn process_frame(&mut self, frame: &Frame, block: bool) -> Result<()> {
+        if block {
+            self.flush_paragraph()?;
+        }
+        self.flush_run()?;
+
+        let png_data = self.render_frame_to_png(frame)?;
         let (width, height) = self.calculate_image_dimensions(&png_data);
         let pic = Pic::new(&png_data).size(width, height);
 
-        if flush_par {
-            // Create a new paragraph with the image
-            let pic_para = Paragraph::new().add_run(Run::new().add_image(pic));
-            self.docx = self.docx.clone().add_paragraph(pic_para);
+        if block {
+            let math_para = Paragraph::new()
+                .style("MathBlock")
+                .add_run(Run::new().add_image(pic));
+            self.docx = self.docx.clone().add_paragraph(math_para);
         } else {
-            // Add the image to the current run
             if let Some(run) = self.content_builder.take_run() {
                 self.content_builder.set_run(run.add_image(pic));
             }
@@ -672,7 +688,7 @@ impl DocxConverter {
     }
 
     fn process_code_block(&mut self, attrs: &RawAttr) -> Result<()> {
-        self.flush_paragraph()?;
+        // self.flush_paragraph()?;
 
         let mut code_para = Paragraph::new().style("CodeBlock");
 
@@ -710,7 +726,7 @@ impl DocxConverter {
     }
 
     fn process_table(&mut self, root: &HtmlElement) -> Result<()> {
-        self.flush_paragraph()?;
+        // self.flush_paragraph()?;
 
         let mut table = Table::new(vec![]).style("Table");
         let current_docx = self.docx.clone();
