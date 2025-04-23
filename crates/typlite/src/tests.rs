@@ -49,8 +49,8 @@ fn test_docx_generation() {
             &[0x50, 0x4B],
             "DOCX data should start with PK signature"
         );
-
-        // std::fs::write("test_output.docx", &docx_data).expect("Failed to write DOCX file");
+        
+        insta::assert_binary_snapshot!("test_output.docx", docx_data);
     });
 }
 

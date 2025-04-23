@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+expression: docx_data
+input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
+extension: docx
+snapshot_kind: binary
+---
