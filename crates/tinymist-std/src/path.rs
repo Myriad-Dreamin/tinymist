@@ -51,7 +51,7 @@ pub use path_clean::clean;
 
 /// Construct a relative path from a provided base directory path to the
 /// provided path.
-pub fn diff(fr: &Path, to: &Path) -> Option<PathBuf> {
+pub fn diff(to: &Path, fr: &Path) -> Option<PathBuf> {
     // Because of <https://github.com/Manishearth/pathdiff/issues/8>, we have to clean the path
     // before diff.
     fn clean_for_diff(p: &Path) -> Cow<'_, Path> {
@@ -64,7 +64,7 @@ pub fn diff(fr: &Path, to: &Path) -> Option<PathBuf> {
         }
     }
 
-    pathdiff::diff_paths(clean_for_diff(fr).as_ref(), clean_for_diff(to).as_ref())
+    pathdiff::diff_paths(clean_for_diff(to).as_ref(), clean_for_diff(fr).as_ref())
 }
 
 #[cfg(test)]
