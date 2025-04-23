@@ -1,7 +1,7 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: docx_data
+expression: hash
 input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
-extension: docx
-snapshot_kind: binary
+snapshot_kind: text
 ---
+7aabd4280e1c9d39cb301adbac7efb8e

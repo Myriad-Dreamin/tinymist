@@ -37,6 +37,7 @@ docx-rs = { git = "https://github.com/bokuweb/docx-rs.git", version = "0.4.18-rc
 image = "0.25.6"
 regex.workspace = true
 resvg = "0.45.1"
+md5 = "0.7.0"
 
 [dev-dependencies]
 insta.workspace = true

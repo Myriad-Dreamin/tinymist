@@ -1,7 +1,7 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: docx_data
+expression: hash
 input_file: crates/typlite/src/fixtures/integration/math_block.typ
-extension: docx
-snapshot_kind: binary
+snapshot_kind: text
 ---
+fd470c9d1ae7ad794a9ad014da45204e

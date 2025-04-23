@@ -1,7 +1,7 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: docx_data
+expression: hash
 input_file: crates/typlite/src/fixtures/integration/enum2.typ
-extension: docx
-snapshot_kind: binary
+snapshot_kind: text
 ---
+dcf643fdd24c67e895a15c69b72e1766

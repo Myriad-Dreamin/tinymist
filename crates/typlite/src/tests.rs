@@ -49,8 +49,11 @@ fn test_docx_generation() {
             &[0x50, 0x4B],
             "DOCX data should start with PK signature"
         );
-        
-        insta::assert_binary_snapshot!("test_output.docx", docx_data);
+
+        // insta::assert_binary_snapshot!("test_output.docx", docx_data);
+
+        let hash = format!("{:x}", md5::compute(&docx_data));
+        insta::assert_snapshot!(hash);
     });
 }
 
