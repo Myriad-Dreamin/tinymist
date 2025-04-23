@@ -130,35 +130,83 @@ impl DocxNumbering {
         Self { initialized: false }
     }
 
-    fn create_list_level(id: usize, format: &str, text: &str, _is_bullet: bool) -> Level {
-        let level = Level::new(
+    fn create_list_level(id: usize, format: &str, text: &str, is_bullet: bool) -> Level {
+        let indent_size = 720 * (id + 1) as i32;
+        let hanging_indent = if is_bullet { 360 } else { 420 };
+
+        Level::new(
             id,
             Start::new(1),
             NumberFormat::new(format),
             LevelText::new(text),
             LevelJc::new("left"),
-        );
-
-        level.indent(Some(720), Some(SpecialIndentType::Hanging(360)), None, None)
+        )
+        .indent(
+            Some(indent_size),
+            Some(SpecialIndentType::Hanging(hanging_indent)),
+            None,
+            None,
+        )
     }
 
-    fn initialize_numbering(&self, docx: Docx) -> Docx {
+    fn initialize_numbering(&mut self, docx: Docx) -> Docx {
         if self.initialized {
             return docx;
         }
 
-        let ordered_level = Self::create_list_level(0, "decimal", "%4.", false);
-        let unordered_level = Self::create_list_level(0, "bullet", "•", true);
+        let mut ordered_abstract = AbstractNumbering::new(1);
+        let mut unordered_abstract = AbstractNumbering::new(2);
 
-        let ordered_abstract_numbering = AbstractNumbering::new(1).add_level(ordered_level);
-        let unordered_abstract_numbering = AbstractNumbering::new(2).add_level(unordered_level);
+        for i in 0..9 {
+            let level_text = match i {
+                0 => "%1.",
+                1 => "%2.",
+                2 => "%3.",
+                3 => "%4.",
+                4 => "%5.",
+                5 => "%6.",
+                _ => "%7.",
+            };
+
+            let number_format = match i {
+                0 => "decimal",
+                1 => "lowerLetter",
+                2 => "lowerRoman",
+                3 => "upperRoman",
+                4 => "decimal",
+                5 => "lowerLetter",
+                _ => "decimal",
+            };
+
+            let mut ordered_level = Self::create_list_level(i, number_format, level_text, false);
+
+            if i > 0 {
+                ordered_level = ordered_level.level_restart(0 as u32);
+            }
+
+            ordered_abstract = ordered_abstract.add_level(ordered_level);
+
+            let bullet_text = match i {
+                0 => "•",
+                1 => "○",
+                2 => "▪",
+                3 => "▫",
+                4 => "◆",
+                _ => "◇",
+            };
+
+            let unordered_level = Self::create_list_level(i, "bullet", bullet_text, true);
+            unordered_abstract = unordered_abstract.add_level(unordered_level);
+        }
 
         let docx = docx
-            .add_abstract_numbering(ordered_abstract_numbering)
-            .add_abstract_numbering(unordered_abstract_numbering);
+            .add_abstract_numbering(ordered_abstract)
+            .add_abstract_numbering(unordered_abstract);
 
-        let ordered_numbering = Numbering::new(1, 1); // numbering_id, abstract_numbering_id
+        let ordered_numbering = Numbering::new(1, 1);
         let unordered_numbering = Numbering::new(2, 2);
+
+        self.initialized = true;
 
         docx.add_numbering(ordered_numbering)
             .add_numbering(unordered_numbering)
@@ -211,7 +259,6 @@ impl ContentBuilder {
     }
 
     fn add_line_break(&mut self) {
-        // 在文档中只添加一个换行符，不创建新段落
         if !self.text_buffer.is_empty() && !self.text_buffer.ends_with('\n') {
             self.text_buffer.push('\n');
         }
@@ -224,12 +271,14 @@ impl ContentBuilder {
 
     fn set_paragraph(&mut self, paragraph: Paragraph) {
         self.current_paragraph = Some(paragraph);
-        // 当设置新段落时，重置需要新段落的标志
         self.needs_new_paragraph = false;
     }
 
     fn mark_needs_new_paragraph(&mut self) {
-        self.needs_new_paragraph = true;
+        // 只有在文本缓冲区非空时才标记需要新段落
+        if !self.text_buffer.trim().is_empty() {
+            self.needs_new_paragraph = true;
+        }
     }
 
     fn set_run(&mut self, run: Run) {
@@ -258,6 +307,11 @@ pub struct DocxConverter {
     content_builder: ContentBuilder,
     styles: DocxStyles,
     numbering: DocxNumbering,
+    pub ordered_numbering_id: usize,
+    pub unordered_numbering_id: usize,
+    pub current_ordered_instance: usize,
+    pub current_unordered_instance: usize,
+    pub numbered_levels: Vec<(usize, bool)>,
 }
 
 impl DocxConverter {
@@ -270,6 +324,11 @@ impl DocxConverter {
             content_builder: ContentBuilder::new(),
             styles: DocxStyles::new(),
             numbering: DocxNumbering::new(),
+            ordered_numbering_id: 1,
+            unordered_numbering_id: 2,
+            current_ordered_instance: 1,
+            current_unordered_instance: 2,
+            numbered_levels: Vec::new(),
         }
     }
 
@@ -288,14 +347,86 @@ impl DocxConverter {
     fn flush_paragraph(&mut self) -> Result<()> {
         self.flush_run()?;
 
+        // 取出当前段落
         if let Some(para) = self.content_builder.take_paragraph() {
-            self.docx = self.docx.clone().add_paragraph(para);
+            // 只有非空段落才添加到文档中
+            if !para.children.is_empty() {
+                self.docx = self.docx.clone().add_paragraph(para);
+            }
         }
 
+        // 创建新的段落，但不标记需要新段落
+        // 这样避免插入不必要的空行
         self.content_builder.set_paragraph(Paragraph::new());
-        self.content_builder.needs_new_paragraph = false;
 
         Ok(())
+    }
+
+    fn reset_list_numbering(&mut self, to_level: usize) -> Result<()> {
+        let is_empty = self.numbered_levels.is_empty();
+
+        if !is_empty {
+            self.numbered_levels.retain(|(level, _)| *level <= to_level);
+        }
+
+        Ok(())
+    }
+
+    fn process_list(&mut self, root: &HtmlElement, list_state: ListState) -> Result<()> {
+        let prev_state = self.list_state;
+        let prev_level = self.list_level;
+
+        self.list_state = Some(list_state);
+        self.list_level = prev_level + 1;
+
+        let is_ordered = matches!(list_state, ListState::Ordered);
+
+        let list_type_changed = if !self.numbered_levels.is_empty() {
+            self.numbered_levels
+                .iter()
+                .find(|(level, _)| *level == self.list_level)
+                .map(|(_, prev_is_ordered)| *prev_is_ordered != is_ordered)
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        if list_type_changed {
+            if is_ordered {
+                self.ordered_numbering_id += 2;
+            } else {
+                self.unordered_numbering_id += 2;
+            }
+        }
+
+        self.numbered_levels
+            .retain(|(level, _)| *level != self.list_level);
+        self.numbered_levels.push((self.list_level, is_ordered));
+
+        if !self.content_builder.text_buffer.is_empty() {
+            self.flush_paragraph()?;
+        }
+
+        self.convert_children(root)?;
+
+        if !self.content_builder.text_buffer.is_empty() {
+            self.flush_paragraph()?;
+        }
+
+        self.reset_list_numbering(prev_level)?;
+
+        self.list_level = prev_level;
+        self.list_state = prev_state;
+
+        Ok(())
+    }
+
+    fn get_or_create_numbering_id(&mut self, is_ordered: bool) -> usize {
+        if is_ordered {
+            self.ordered_numbering_id
+        } else {
+            self.unordered_numbering_id
+        }
     }
 
     pub fn convert(&mut self, root: &HtmlElement) -> Result<()> {
@@ -312,12 +443,10 @@ impl DocxConverter {
                 self.convert_children(root)?;
                 Ok(())
             }
-            // 处理描述列表
             tag::dl | tag::dt | tag::dd => {
                 self.convert_children(root)?;
                 Ok(())
             }
-            // 有序列表
             tag::ol => self.process_list(root, ListState::Ordered),
             tag::ul => self.process_list(root, ListState::Unordered),
             tag::li => self.process_list_item(root),
@@ -338,10 +467,7 @@ impl DocxConverter {
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
             md_tag::parbreak => {
-                // 只有当前段落不为空时才插入新段落
-                if !self.content_builder.text_buffer.is_empty() {
-                    self.flush_paragraph()?;
-                }
+                self.flush_paragraph()?;
                 Ok(())
             }
             md_tag::linebreak => {
@@ -398,49 +524,34 @@ impl DocxConverter {
         Ok(())
     }
 
-    fn process_list(&mut self, root: &HtmlElement, list_state: ListState) -> Result<()> {
-        let prev_state = self.list_state;
-        self.list_state = Some(list_state);
-        self.list_level += 1;
-        self.flush_paragraph()?;
-
-        self.convert_children(root)?;
-
-        self.list_level -= 1;
-        self.list_state = prev_state;
-        Ok(())
-    }
-
     fn process_list_item(&mut self, root: &HtmlElement) -> Result<()> {
-        self.content_builder.set_paragraph(Paragraph::new());
+        self.flush_run()?;
+
+        let mut paragraph = Paragraph::new();
 
         if let Some(list_state) = self.list_state {
+            let is_ordered = matches!(list_state, ListState::Ordered);
+            let numbering_id = self.get_or_create_numbering_id(is_ordered);
             let level = IndentLevel::new(self.list_level.saturating_sub(1));
-            match list_state {
-                ListState::Ordered => {
-                    let paragraph = self
-                        .content_builder
-                        .take_paragraph()
-                        .unwrap_or_default()
-                        .numbering(NumberingId::new(1), level);
-                    self.content_builder.set_paragraph(paragraph);
-                }
-                ListState::Unordered => {
-                    let paragraph = self
-                        .content_builder
-                        .take_paragraph()
-                        .unwrap_or_default()
-                        .numbering(NumberingId::new(2), level);
-                    self.content_builder.set_paragraph(paragraph);
-                }
-            }
+            paragraph = paragraph.numbering(NumberingId::new(numbering_id), level);
         }
 
+        self.content_builder.set_paragraph(paragraph);
+
         self.convert_children(root)?;
+
+        if !self.content_builder.text_buffer.is_empty() {
+            self.flush_paragraph()?;
+        }
+
         Ok(())
     }
 
     fn process_math(&mut self, root: &HtmlElement) -> Result<()> {
+        // 先保存当前的状态，以便在处理完公式后恢复
+        let prev_paragraph = self.content_builder.take_paragraph();
+        let prev_run = self.content_builder.take_run();
+
         if let Some(frame) = root.children.iter().find_map(|child| {
             if let HtmlNode::Frame(frame) = child {
                 Some(frame)
@@ -448,15 +559,50 @@ impl DocxConverter {
                 None
             }
         }) {
-            self.process_frame(frame, root.tag == md_tag::math_equation_block)?;
-            // // 数学公式块后不需要额外的段落间距
-            // if root.tag == md_tag::math_equation_block {
-            //     self.content_builder.mark_needs_new_paragraph();
-            // }
+            let is_block = root.tag == md_tag::math_equation_block;
+
+            // 处理数学公式帧
+            let png_data = self.render_frame_to_png(frame)?;
+            let (width, height) =
+                self.calculate_image_dimensions(&png_data, Some(96.0 / 300.0 / 2.0));
+            let pic = Pic::new(&png_data).size(width, height);
+
+            if is_block {
+                // 对于块级公式，创建一个居中的新段落
+                let math_para = Paragraph::new()
+                    .style("MathBlock")
+                    .add_run(Run::new().add_image(pic));
+
+                // 先将之前的内容刷新到文档
+                if prev_paragraph.is_some() {
+                    self.content_builder.set_paragraph(prev_paragraph.unwrap());
+                    self.flush_paragraph()?;
+                }
+
+                // 添加数学公式段落
+                self.docx = self.docx.clone().add_paragraph(math_para);
+
+                // 创建新的空段落继续后面的内容
+                self.content_builder.set_paragraph(Paragraph::new());
+                self.content_builder
+                    .set_run(prev_run.unwrap_or_else(|| Run::new()));
+            } else {
+                // 行内公式只需添加到当前运行中
+                self.content_builder
+                    .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
+                let run = prev_run.unwrap_or_else(|| Run::new()).add_image(pic);
+                self.content_builder.set_run(run);
+            }
         } else {
+            // 如果没有找到帧，恢复之前的状态并添加一个占位符文本
+            self.content_builder
+                .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
+            self.content_builder
+                .set_run(prev_run.unwrap_or_else(|| Run::new()));
             self.content_builder.add_text("[Math Expression]");
             self.flush_run()?;
         }
+
         Ok(())
     }
 
@@ -507,30 +653,34 @@ impl DocxConverter {
             return Err(format!("heading level {} is too high", attrs.level).into());
         }
 
-        let result = self.create_styled_paragraph(
-            match attrs.level {
-                1 => "Heading1",
-                2 => "Heading2",
-                3 => "Heading3",
-                4 => "Heading4",
-                5 => "Heading5",
-                _ => "Heading6",
-            },
-            |converter| converter.convert_children(root),
-        );
+        // 标题内容通常放在一个单独的段落中，所以先刷新当前段落
+        if !self.content_builder.text_buffer.is_empty() {
+            self.flush_paragraph()?;
+        }
 
-        // 标题后不需要额外的空段落
-        self.content_builder.mark_needs_new_paragraph();
+        // 创建一个带有标题样式的段落
+        let style_name = match attrs.level {
+            1 => "Heading1",
+            2 => "Heading2",
+            3 => "Heading3",
+            4 => "Heading4",
+            5 => "Heading5",
+            _ => "Heading6",
+        };
 
-        result
+        // 使用 create_styled_paragraph 处理标题内容
+        self.create_styled_paragraph(style_name, |converter| {
+            converter.convert_children(root)
+        })
+        // 不再标记需要段落，而是让实际内容来决定何时创建新段落
     }
+
     fn render_frame_to_png(&self, frame: &Frame) -> Result<Vec<u8>> {
         let svg = typst_svg::svg_frame(frame);
 
-        // Convert SVG to PNG using resvg
         let png_data = {
-            let dpi = 300.0; // High DPI for better quality
-            let scale_factor = dpi / 96.0; // 96 DPI is the reference
+            let dpi = 300.0;
+            let scale_factor = dpi / 96.0;
 
             let opt = Options {
                 dpi: dpi,
@@ -542,7 +692,6 @@ impl DocxConverter {
                 Err(e) => return Err(format!("SVG parse error: {:?}", e).into()),
             };
 
-            // Get the size and scale it according to the DPI
             let size = rtree.size().to_int_size();
             let width = (size.width() as f32 * scale_factor) as u32;
             let height = (size.height() as f32 * scale_factor) as u32;
@@ -569,7 +718,6 @@ impl DocxConverter {
         match img_size {
             Some((w, h)) => {
                 let max_width = 5486400;
-                // Apply the additional scale factor
                 let scaled_w = (w as f32 * actual_scale) as u32;
                 let scaled_h = (h as f32 * actual_scale) as u32;
 
@@ -587,23 +735,21 @@ impl DocxConverter {
     }
 
     fn process_frame(&mut self, frame: &Frame, block: bool) -> Result<()> {
+        // 注意：现在这个方法已经不用于处理数学公式帧
+        // 因为数学公式帧的处理已经在 process_math 中完成
+        if block {
+            // 警告：这个分支不应该直接用于处理块级数学公式
+            return Err("Block frames should be handled in process_math".into());
+        }
+
         self.flush_run()?;
 
         let png_data = self.render_frame_to_png(frame)?;
-        // Use a scale factor of 0.5 to make the image appear smaller in the document
-        // while maintaining the high resolution
         let (width, height) = self.calculate_image_dimensions(&png_data, Some(96.0 / 300.0 / 2.0));
         let pic = Pic::new(&png_data).size(width, height);
 
-        if block {
-            let math_para = Paragraph::new()
-                .style("MathBlock")
-                .add_run(Run::new().add_image(pic));
-            self.docx = self.docx.clone().add_paragraph(math_para);
-        } else {
-            if let Some(run) = self.content_builder.take_run() {
-                self.content_builder.set_run(run.add_image(pic));
-            }
+        if let Some(run) = self.content_builder.take_run() {
+            self.content_builder.set_run(run.add_image(pic));
         }
 
         Ok(())
@@ -646,18 +792,17 @@ impl DocxConverter {
         F: FnOnce(&mut Self) -> Result<()>,
     {
         self.flush_run()?;
-        process_fn(self)?;
-        if !self.content_builder.get_buffer_clone().is_empty() {
-            let code_run = Run::new()
-                .add_text(self.content_builder.get_buffer_clone())
-                .style(style_name);
 
-            if let Some(para) = self.content_builder.take_paragraph() {
-                self.content_builder.set_paragraph(para.add_run(code_run));
-            }
-            self.content_builder.clear_buffer();
-        }
-        self.content_builder.set_run(Run::new());
+        let prev_run = self.content_builder.take_run();
+        self.content_builder.set_run(Run::new().style(style_name));
+
+        process_fn(self)?;
+
+        self.flush_run()?;
+
+        self.content_builder
+            .set_run(prev_run.unwrap_or_else(|| Run::new()));
+
         Ok(())
     }
 
@@ -665,8 +810,6 @@ impl DocxConverter {
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
-        // self.flush_paragraph()?;
-
         let styled_para = Paragraph::new().style(style_name);
         let prev_para = self.content_builder.take_paragraph();
         self.content_builder.set_paragraph(styled_para);
@@ -743,7 +886,6 @@ impl DocxConverter {
         }
 
         self.docx = self.docx.clone().add_paragraph(code_para);
-        // 避免创建新段落，因为代码块已经是自包含的
         self.content_builder.needs_new_paragraph = false;
         Ok(())
     }
@@ -759,8 +901,6 @@ impl DocxConverter {
     }
 
     fn process_table(&mut self, root: &HtmlElement) -> Result<()> {
-        // self.flush_paragraph()?;
-
         let mut table = Table::new(vec![]).style("Table");
         let current_docx = self.docx.clone();
 
