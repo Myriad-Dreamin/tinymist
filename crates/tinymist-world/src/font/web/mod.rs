@@ -371,13 +371,7 @@ pub struct BrowserFontSearcher {
 impl BrowserFontSearcher {
     /// Create a new, empty browser searcher.
     pub fn new() -> Self {
-        let mut searcher = Self { fonts: vec![] };
-
-        if cfg!(feature = "browser-embedded-fonts") {
-            searcher.add_embedded();
-        }
-
-        searcher
+        Self { fonts: vec![] }
     }
 
     /// Create a new browser searcher with fonts in a FontResolverImpl.
