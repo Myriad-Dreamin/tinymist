@@ -429,6 +429,7 @@ impl BrowserFontSearcher {
 
 impl BrowserFontSearcher {
     /// Add fonts that are embedded in the binary.
+    #[cfg(feature = "fonts")]
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
