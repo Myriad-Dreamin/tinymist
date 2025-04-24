@@ -87,6 +87,11 @@ impl DocxStyles {
             .name("Highlight")
             .highlight("yellow");
 
+        let hyperlink = Style::new("Hyperlink", StyleType::Character)
+            .name("Hyperlink")
+            .color("0000FF")
+            .underline("single");
+
         let blockquote = Style::new("Blockquote", StyleType::Paragraph)
             .name("Block Quote")
             .indent(Some(720), None, None, None)
@@ -114,6 +119,7 @@ impl DocxStyles {
             .add_style(emphasis)
             .add_style(strong)
             .add_style(highlight)
+            .add_style(hyperlink)
             .add_style(blockquote)
             .add_style(caption)
             .add_style(table)
@@ -218,7 +224,6 @@ struct ContentBuilder {
     current_paragraph: Option<Paragraph>,
     current_run: Option<Run>,
     text_buffer: String,
-    needs_new_paragraph: bool,
 }
 
 impl ContentBuilder {
@@ -227,7 +232,6 @@ impl ContentBuilder {
             current_paragraph: Some(Paragraph::new()),
             current_run: Some(Run::new()),
             text_buffer: String::new(),
-            needs_new_paragraph: false,
         }
     }
 
@@ -252,16 +256,14 @@ impl ContentBuilder {
     }
 
     fn add_text(&mut self, text: &str) {
-        if self.needs_new_paragraph && !text.trim().is_empty() {
-            self.needs_new_paragraph = false;
-        }
         self.text_buffer.push_str(text);
     }
 
     fn add_line_break(&mut self) {
-        if !self.text_buffer.is_empty() && !self.text_buffer.ends_with('\n') {
-            self.text_buffer.push('\n');
-        }
+        self.flush_run().ok();
+        self.current_run
+            .as_mut()
+            .map(|run| run.clone().add_break(BreakType::TextWrapping));
     }
 
     fn take_paragraph(&mut self) -> Option<Paragraph> {
@@ -271,14 +273,6 @@ impl ContentBuilder {
 
     fn set_paragraph(&mut self, paragraph: Paragraph) {
         self.current_paragraph = Some(paragraph);
-        self.needs_new_paragraph = false;
-    }
-
-    fn mark_needs_new_paragraph(&mut self) {
-        // 只有在文本缓冲区非空时才标记需要新段落
-        if !self.text_buffer.trim().is_empty() {
-            self.needs_new_paragraph = true;
-        }
     }
 
     fn set_run(&mut self, run: Run) {
@@ -332,18 +326,28 @@ impl DocxConverter {
         }
     }
 
+    /// 初始化文档样式
     fn initialize_styles(&mut self) {
         self.docx = self.styles.initialize_styles(self.docx.clone());
     }
 
+    /// 初始化文档编号
     fn initialize_numbering(&mut self) {
         self.docx = self.numbering.initialize_numbering(self.docx.clone());
     }
 
+    /// 初始化文档 - 同时初始化样式和编号
+    fn initialize_document(&mut self) {
+        self.initialize_styles();
+        self.initialize_numbering();
+    }
+
+    /// 刷新当前运行对象到段落中
     fn flush_run(&mut self) -> Result<()> {
         self.content_builder.flush_run()
     }
 
+    /// 刷新当前段落到文档中
     fn flush_paragraph(&mut self) -> Result<()> {
         self.flush_run()?;
 
@@ -355,23 +359,21 @@ impl DocxConverter {
             }
         }
 
-        // 创建新的段落，但不标记需要新段落
-        // 这样避免插入不必要的空行
         self.content_builder.set_paragraph(Paragraph::new());
 
         Ok(())
     }
 
+    /// 重置列表编号状态到指定层级
     fn reset_list_numbering(&mut self, to_level: usize) -> Result<()> {
-        let is_empty = self.numbered_levels.is_empty();
-
-        if !is_empty {
+        if !self.numbered_levels.is_empty() {
             self.numbered_levels.retain(|(level, _)| *level <= to_level);
         }
 
         Ok(())
     }
 
+    /// 处理列表元素
     fn process_list(&mut self, root: &HtmlElement, list_state: ListState) -> Result<()> {
         let prev_state = self.list_state;
         let prev_level = self.list_level;
@@ -421,6 +423,7 @@ impl DocxConverter {
         Ok(())
     }
 
+    /// 获取或创建列表编号 ID
     fn get_or_create_numbering_id(&mut self, is_ordered: bool) -> usize {
         if is_ordered {
             self.ordered_numbering_id
@@ -429,40 +432,24 @@ impl DocxConverter {
         }
     }
 
+    /// 主要转换方法 - 递归处理 HTML 元素
     pub fn convert(&mut self, root: &HtmlElement) -> Result<()> {
-        self.initialize_numbering();
-        self.initialize_styles();
+        self.initialize_document();
 
         match root.tag {
             tag::head => Ok(()),
-            tag::html | tag::body | md_tag::doc => {
-                self.convert_children(root)?;
-                Ok(())
-            }
-            tag::p | tag::span => {
-                self.convert_children(root)?;
-                Ok(())
-            }
-            tag::dl | tag::dt | tag::dd => {
-                self.convert_children(root)?;
-                Ok(())
-            }
+            tag::html | tag::body | md_tag::doc => self.convert_children(root),
+            tag::p | tag::span => self.convert_children(root),
+            tag::dl | tag::dt | tag::dd => self.convert_children(root),
             tag::ol => self.process_list(root, ListState::Ordered),
             tag::ul => self.process_list(root, ListState::Unordered),
             tag::li => self.process_list_item(root),
-            tag::figure => {
+            tag::div | tag::figure => {
                 self.flush_run()?;
-                self.convert_children(root)?;
-                self.content_builder.mark_needs_new_paragraph();
-                Ok(())
+                self.convert_children(root)
             }
             tag::figcaption => self
                 .create_styled_paragraph("Caption", |converter| converter.convert_children(root)),
-            tag::div => {
-                self.convert_children(root)?;
-                self.content_builder.mark_needs_new_paragraph();
-                Ok(())
-            }
             tag::pre => self.process_pre_block(root),
             md_tag::heading => self.convert_heading(root),
             md_tag::link => self.process_link(root),
@@ -494,36 +481,43 @@ impl DocxConverter {
                 converter.convert_children(root)
             }),
             md_tag::table | md_tag::grid => self.process_table(root),
-            md_tag::table_cell | md_tag::grid_cell => {
-                self.convert_children(root)?;
-                Ok(())
-            }
+            md_tag::table_cell | md_tag::grid_cell => self.convert_children(root),
             md_tag::math_equation_inline | md_tag::math_equation_block => self.process_math(root),
             md_tag::image => self.process_image_element(root),
             _ => self.process_unknown_tag(root),
         }
     }
 
-    fn process_pre_block(&mut self, _root: &HtmlElement) -> Result<()> {
-        self.flush_paragraph()?;
-        let mut code_para = Paragraph::new().style("CodeBlock");
+    /// 处理预格式化代码块
+    fn process_pre_block(&mut self, root: &HtmlElement) -> Result<()> {
         let buffer = self.content_builder.get_buffer_clone();
-        let lines = buffer.split('\n');
-        let mut first_line = true;
-        for line in lines {
-            if !first_line {
-                code_para = code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
+
+        self.process_block_element(Some("CodeBlock"), |converter| {
+            let lines = buffer.split('\n');
+            let mut first_line = true;
+
+            for line in lines {
+                if !first_line {
+                    // 添加换行
+                    if let Some(run) = converter.content_builder.take_run() {
+                        converter
+                            .content_builder
+                            .set_run(run.add_break(BreakType::TextWrapping));
+                    }
+                }
+                converter.content_builder.add_text(line);
+                converter.flush_run()?;
+                first_line = false;
             }
-            code_para = code_para.add_run(Run::new().add_text(line));
-            first_line = false;
-        }
-        self.docx = self.docx.clone().add_paragraph(code_para);
+
+            Ok(())
+        })?;
+
         self.content_builder.clear_buffer();
-        self.content_builder.set_run(Run::new());
-        self.content_builder.set_paragraph(Paragraph::new());
         Ok(())
     }
 
+    /// 处理列表项
     fn process_list_item(&mut self, root: &HtmlElement) -> Result<()> {
         self.flush_run()?;
 
@@ -547,81 +541,113 @@ impl DocxConverter {
         Ok(())
     }
 
+    /// 处理数学公式
     fn process_math(&mut self, root: &HtmlElement) -> Result<()> {
-        // 先保存当前的状态，以便在处理完公式后恢复
-        let prev_paragraph = self.content_builder.take_paragraph();
-        let prev_run = self.content_builder.take_run();
+        // 判断是否是块级公式
+        let is_block = root.tag == md_tag::math_equation_block;
 
-        if let Some(frame) = root.children.iter().find_map(|child| {
+        // 查找 Frame 子元素
+        let maybe_frame = root.children.iter().find_map(|child| {
             if let HtmlNode::Frame(frame) = child {
                 Some(frame)
             } else {
                 None
             }
-        }) {
-            let is_block = root.tag == md_tag::math_equation_block;
+        });
 
-            // 处理数学公式帧
-            let png_data = self.render_frame_to_png(frame)?;
-            let (width, height) =
-                self.calculate_image_dimensions(&png_data, Some(96.0 / 300.0 / 2.0));
-            let pic = Pic::new(&png_data).size(width, height);
-
+        // 如果找不到帧，则添加占位符文本
+        if maybe_frame.is_none() {
             if is_block {
-                // 对于块级公式，创建一个居中的新段落
-                let math_para = Paragraph::new()
-                    .style("MathBlock")
-                    .add_run(Run::new().add_image(pic));
-
-                // 先将之前的内容刷新到文档
-                if prev_paragraph.is_some() {
-                    self.content_builder.set_paragraph(prev_paragraph.unwrap());
-                    self.flush_paragraph()?;
-                }
-
-                // 添加数学公式段落
-                self.docx = self.docx.clone().add_paragraph(math_para);
-
-                // 创建新的空段落继续后面的内容
-                self.content_builder.set_paragraph(Paragraph::new());
-                self.content_builder
-                    .set_run(prev_run.unwrap_or_else(|| Run::new()));
+                return self.process_block_element(Some("MathBlock"), |converter| {
+                    converter.content_builder.add_text("[Math Expression]");
+                    Ok(())
+                });
             } else {
-                // 行内公式只需添加到当前运行中
-                self.content_builder
-                    .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
-                let run = prev_run.unwrap_or_else(|| Run::new()).add_image(pic);
-                self.content_builder.set_run(run);
+                return self.process_inline_element(None, |converter| {
+                    converter.content_builder.add_text("[Math Expression]");
+                    Ok(())
+                });
             }
-        } else {
-            // 如果没有找到帧，恢复之前的状态并添加一个占位符文本
-            self.content_builder
-                .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
-            self.content_builder
-                .set_run(prev_run.unwrap_or_else(|| Run::new()));
-            self.content_builder.add_text("[Math Expression]");
-            self.flush_run()?;
         }
 
-        Ok(())
+        let frame = maybe_frame.unwrap();
+
+        // 渲染公式为 PNG
+        let png_data = match self.render_frame_to_png(frame) {
+            Ok(data) => data,
+            Err(e) => return Err(e),
+        };
+
+        let (width, height) = self.calculate_image_dimensions(&png_data, Some(96.0 / 300.0 / 2.0));
+        let pic = Pic::new(&png_data).size(width, height);
+
+        // 根据是块级还是内联级处理
+        if is_block {
+            self.process_block_element(Some("MathBlock"), |converter| {
+                if let Some(para) = converter.content_builder.take_paragraph() {
+                    converter
+                        .content_builder
+                        .set_paragraph(para.add_run(Run::new().add_image(pic)));
+                }
+                Ok(())
+            })
+        } else {
+            self.process_inline_element(None, |converter| {
+                if let Some(run) = converter.content_builder.take_run() {
+                    converter.content_builder.set_run(run.add_image(pic));
+                }
+                Ok(())
+            })
+        }
     }
 
+    /// 处理图片元素
     fn process_image_element(&mut self, root: &HtmlElement) -> Result<()> {
         let attrs = ImageAttr::parse(&root.attrs)?;
         let src = unix_slash(Path::new(attrs.src.as_str()));
 
         if let Ok(img_data) = std::fs::read(&src) {
-            self.flush_run()?;
-            self.process_image(&img_data, &attrs.alt)?;
+            self.process_image(&img_data, &attrs.alt)
         } else {
-            self.content_builder
-                .add_text(&format!("[Image: {}]", attrs.alt));
-            self.flush_run()?;
+            // 对于找不到的图片，添加占位符文本
+            self.process_inline_element(None, |converter| {
+                converter
+                    .content_builder
+                    .add_text(&format!("[Image: {}]", attrs.alt));
+                Ok(())
+            })
+        }
+    }
+
+    /// 处理图片数据
+    fn process_image(&mut self, img_data: &[u8], alt_text: &str) -> Result<()> {
+        // 图片总是创建为块级元素
+        let (width, height) = self.calculate_image_dimensions(img_data, None);
+        let pic = Pic::new(img_data).size(width, height);
+
+        // 图片处理逻辑
+        self.process_block_element(None, |converter| {
+            let pic_para = converter
+                .content_builder
+                .take_paragraph()
+                .unwrap_or_else(|| Paragraph::new())
+                .add_run(Run::new().add_image(pic.clone()));
+            converter.content_builder.set_paragraph(pic_para);
+            Ok(())
+        })?;
+
+        // 如果有 alt 文本，添加图片说明
+        if !alt_text.is_empty() {
+            self.process_block_element(Some("Caption"), |converter| {
+                converter.content_builder.add_text(alt_text);
+                Ok(())
+            })?;
         }
 
         Ok(())
     }
 
+    /// 处理未知标签
     fn process_unknown_tag(&mut self, root: &HtmlElement) -> Result<()> {
         self.content_builder
             .add_text(&format!("[Unknown tag: {:?}]", root.tag));
@@ -630,6 +656,7 @@ impl DocxConverter {
         Ok(())
     }
 
+    /// 递归处理子元素
     pub fn convert_children(&mut self, root: &HtmlElement) -> Result<()> {
         for child in &root.children {
             match child {
@@ -646,6 +673,7 @@ impl DocxConverter {
         Ok(())
     }
 
+    /// 处理标题元素
     fn convert_heading(&mut self, root: &HtmlElement) -> Result<()> {
         let attrs = HeadingAttr::parse(&root.attrs)?;
 
@@ -653,12 +681,7 @@ impl DocxConverter {
             return Err(format!("heading level {} is too high", attrs.level).into());
         }
 
-        // 标题内容通常放在一个单独的段落中，所以先刷新当前段落
-        if !self.content_builder.text_buffer.is_empty() {
-            self.flush_paragraph()?;
-        }
-
-        // 创建一个带有标题样式的段落
+        // 根据标题级别确定样式名称
         let style_name = match attrs.level {
             1 => "Heading1",
             2 => "Heading2",
@@ -668,77 +691,72 @@ impl DocxConverter {
             _ => "Heading6",
         };
 
-        // 使用 create_styled_paragraph 处理标题内容
-        self.create_styled_paragraph(style_name, |converter| {
+        self.process_block_element(Some(style_name), |converter| {
             converter.convert_children(root)
         })
-        // 不再标记需要段落，而是让实际内容来决定何时创建新段落
     }
 
+    /// 将帧渲染为 PNG 图像
     fn render_frame_to_png(&self, frame: &Frame) -> Result<Vec<u8>> {
         let svg = typst_svg::svg_frame(frame);
 
-        let png_data = {
-            let dpi = 300.0;
-            let scale_factor = dpi / 96.0;
+        let dpi = 300.0;
+        let scale_factor = dpi / 96.0;
 
-            let opt = Options {
-                dpi: dpi,
-                ..Options::default()
-            };
-
-            let rtree = match Tree::from_str(&svg, &opt) {
-                Ok(tree) => tree,
-                Err(e) => return Err(format!("SVG parse error: {:?}", e).into()),
-            };
-
-            let size = rtree.size().to_int_size();
-            let width = (size.width() as f32 * scale_factor) as u32;
-            let height = (size.height() as f32 * scale_factor) as u32;
-
-            let mut pixmap = Pixmap::new(width, height).ok_or("Failed to create pixmap")?;
-
-            resvg::render(
-                &rtree,
-                tiny_skia::Transform::from_scale(scale_factor, scale_factor),
-                &mut pixmap.as_mut(),
-            );
-
-            pixmap
-                .encode_png()
-                .map_err(|e| format!("PNG encode error: {:?}", e))?
+        let opt = Options {
+            dpi,
+            ..Options::default()
         };
 
-        Ok(png_data)
+        let rtree = match Tree::from_str(&svg, &opt) {
+            Ok(tree) => tree,
+            Err(e) => return Err(format!("SVG parse error: {:?}", e).into()),
+        };
+
+        let size = rtree.size().to_int_size();
+        let width = (size.width() as f32 * scale_factor) as u32;
+        let height = (size.height() as f32 * scale_factor) as u32;
+
+        let mut pixmap = Pixmap::new(width, height).ok_or("Failed to create pixmap")?;
+
+        resvg::render(
+            &rtree,
+            tiny_skia::Transform::from_scale(scale_factor, scale_factor),
+            &mut pixmap.as_mut(),
+        );
+
+        pixmap
+            .encode_png()
+            .map_err(|e| format!("PNG encode error: {:?}", e).into())
     }
 
+    /// 计算图片尺寸
     fn calculate_image_dimensions(&self, img_data: &[u8], scale_factor: Option<f32>) -> (u32, u32) {
         let actual_scale = scale_factor.unwrap_or(1.0);
-        let img_size = get_image_size(img_data);
-        match img_size {
-            Some((w, h)) => {
-                let max_width = 5486400;
-                let scaled_w = (w as f32 * actual_scale) as u32;
-                let scaled_h = (h as f32 * actual_scale) as u32;
 
-                if scaled_w > max_width {
-                    let ratio = scaled_h as f32 / scaled_w as f32;
-                    let new_width = max_width;
-                    let new_height = (max_width as f32 * ratio) as u32;
-                    (new_width, new_height)
-                } else {
-                    (scaled_w * 9525, scaled_h * 9525)
-                }
+        if let Some((w, h)) = get_image_size(img_data) {
+            let max_width = 5486400;
+            let scaled_w = (w as f32 * actual_scale) as u32;
+            let scaled_h = (h as f32 * actual_scale) as u32;
+
+            if scaled_w > max_width {
+                let ratio = scaled_h as f32 / scaled_w as f32;
+                let new_width = max_width;
+                let new_height = (max_width as f32 * ratio) as u32;
+                (new_width, new_height)
+            } else {
+                (scaled_w * 9525, scaled_h * 9525)
             }
-            None => (4000000, 3000000),
+        } else {
+            // 默认尺寸
+            (4000000, 3000000)
         }
     }
 
+    /// 处理帧元素
     fn process_frame(&mut self, frame: &Frame, block: bool) -> Result<()> {
-        // 注意：现在这个方法已经不用于处理数学公式帧
-        // 因为数学公式帧的处理已经在 process_math 中完成
+        // 注意：这个方法不用于处理数学公式帧，那些在 process_math 中处理
         if block {
-            // 警告：这个分支不应该直接用于处理块级数学公式
             return Err("Block frames should be handled in process_math".into());
         }
 
@@ -755,6 +773,7 @@ impl DocxConverter {
         Ok(())
     }
 
+    /// 将内容导出为 DOCX 格式
     pub fn to_docx(&mut self) -> Result<Vec<u8>> {
         self.flush_paragraph()?;
 
@@ -765,92 +784,117 @@ impl DocxConverter {
         Ok(buffer)
     }
 
-    fn process_image(&mut self, img_data: &[u8], alt_text: &str) -> Result<()> {
-        let (width, height) = self.calculate_image_dimensions(img_data, None);
-
-        let pic = Pic::new(img_data).size(width, height);
-        let pic_para = Paragraph::new().add_run(Run::new().add_image(pic));
-        self.docx = self.docx.clone().add_paragraph(pic_para);
-
-        if !alt_text.is_empty() {
-            self.add_caption(alt_text);
-        }
-
-        Ok(())
-    }
-
-    fn add_caption(&mut self, caption_text: &str) {
-        let caption = Paragraph::new()
-            .add_run(Run::new().add_text(caption_text).italic().size(18))
-            .style("Caption");
-
-        self.docx = self.docx.clone().add_paragraph(caption);
-    }
-
-    fn process_with_style<F>(&mut self, style_name: &str, process_fn: F) -> Result<()>
+    /// 处理内联元素
+    fn process_inline_element<F>(&mut self, style_name: Option<&str>, process_fn: F) -> Result<()>
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
         self.flush_run()?;
 
         let prev_run = self.content_builder.take_run();
-        self.content_builder.set_run(Run::new().style(style_name));
+        let mut new_run = Run::new();
 
+        // 如果提供了样式名，则应用样式
+        if let Some(style) = style_name {
+            new_run = new_run.style(style);
+        }
+
+        self.content_builder.set_run(new_run);
+
+        // 处理内容
         process_fn(self)?;
 
         self.flush_run()?;
 
+        // 恢复之前的运行
         self.content_builder
             .set_run(prev_run.unwrap_or_else(|| Run::new()));
 
         Ok(())
     }
 
+    /// 处理块级元素
+    fn process_block_element<F>(&mut self, style_name: Option<&str>, process_fn: F) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.flush_run()?;
+
+        // 保存当前段落和运行
+        let prev_para = self.content_builder.take_paragraph();
+        let prev_run = self.content_builder.take_run();
+
+        // 创建新的段落，如果提供了样式则应用样式
+        let mut new_para = Paragraph::new();
+        if let Some(style) = style_name {
+            new_para = new_para.style(style);
+        }
+
+        self.content_builder.set_paragraph(new_para);
+        self.content_builder.set_run(Run::new());
+
+        // 处理内容
+        process_fn(self)?;
+
+        // 刷新并添加到文档
+        self.flush_paragraph()?;
+
+        // 恢复之前的状态
+        self.content_builder
+            .set_paragraph(prev_para.unwrap_or_else(|| Paragraph::new()));
+        self.content_builder
+            .set_run(prev_run.unwrap_or_else(|| Run::new()));
+
+        Ok(())
+    }
+
+    /// 使用指定样式处理内容
+    fn process_with_style<F>(&mut self, style_name: &str, process_fn: F) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.process_inline_element(Some(style_name), process_fn)
+    }
+
+    /// 创建带样式的段落
     fn create_styled_paragraph<F>(&mut self, style_name: &str, process_fn: F) -> Result<()>
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
-        let styled_para = Paragraph::new().style(style_name);
-        let prev_para = self.content_builder.take_paragraph();
-        self.content_builder.set_paragraph(styled_para);
-
-        let result = process_fn(self);
-        self.flush_paragraph()?;
-
-        self.content_builder
-            .set_paragraph(prev_para.unwrap_or_else(|| Paragraph::new()));
-        result
+        self.process_block_element(Some(style_name), process_fn)
     }
 
+    /// 处理链接元素
     fn process_link(&mut self, root: &HtmlElement) -> Result<()> {
         let attrs = LinkAttr::parse(&root.attrs)?;
 
-        let prev_run = self.content_builder.take_run();
-        self.content_builder
-            .set_run(Run::new().color("0000FF").underline("single"));
+        // 使用内联样式处理链接文本
+        self.process_inline_element(None, |converter| {
+            // 处理链接内容
+            converter.convert_children(root)?;
 
-        self.convert_children(root)?;
-        self.flush_run()?;
+            // 创建超链接
+            if let Some(para) = converter.content_builder.take_paragraph() {
+                // 获取当前运行内容
+                converter.flush_run()?;
+                let run = converter
+                    .content_builder
+                    .take_run()
+                    .unwrap_or_else(|| Run::new());
 
-        if let Some(para) = self.content_builder.take_paragraph() {
-            let hyperlink = Hyperlink::new(&attrs.dest, HyperlinkType::External).add_run(
-                Run::new()
-                    .add_text(self.content_builder.get_buffer_clone())
-                    .color("0000FF")
-                    .underline("single"),
-            );
+                // 创建超链接
+                let hyperlink = Hyperlink::new(&attrs.dest, HyperlinkType::External).add_run(run);
 
-            self.content_builder
-                .set_paragraph(para.add_hyperlink(hyperlink));
-        }
+                converter
+                    .content_builder
+                    .set_paragraph(para.add_hyperlink(hyperlink));
+            }
 
-        self.content_builder.clear_buffer();
-        self.content_builder
-            .set_run(prev_run.unwrap_or_else(|| Run::new()));
-
-        Ok(())
+            Ok(())
+        })
     }
 
+    /// 处理原始代码
     fn process_raw_code(&mut self, root: &HtmlElement) -> Result<()> {
         let attrs = RawAttr::parse(&root.attrs)?;
 
@@ -861,66 +905,81 @@ impl DocxConverter {
         }
     }
 
+    /// 处理代码块
     fn process_code_block(&mut self, attrs: &RawAttr) -> Result<()> {
-        self.flush_paragraph()?;
+        self.process_block_element(Some("CodeBlock"), |converter| {
+            // 如果有语言标记，先添加语言标签
+            if !attrs.lang.is_empty() {
+                converter.content_builder.set_run(
+                    Run::new()
+                        .add_text(format!("Language: {}", attrs.lang))
+                        .italic(),
+                );
+                converter.flush_run()?;
 
-        let mut code_para = Paragraph::new().style("CodeBlock");
-
-        if !attrs.lang.is_empty() {
-            code_para = code_para.add_run(
-                Run::new()
-                    .add_text(format!("Language: {}\n", attrs.lang))
-                    .italic(),
-            );
-        }
-
-        let lines = attrs.text.split('\n');
-        let mut first_line = true;
-
-        for line in lines {
-            if !first_line {
-                code_para = code_para.add_run(Run::new().add_break(BreakType::TextWrapping));
+                // 添加换行
+                if let Some(run) = converter.content_builder.take_run() {
+                    converter
+                        .content_builder
+                        .set_run(run.add_break(BreakType::TextWrapping));
+                }
             }
-            code_para = code_para.add_run(Run::new().add_text(line));
-            first_line = false;
-        }
 
-        self.docx = self.docx.clone().add_paragraph(code_para);
-        self.content_builder.needs_new_paragraph = false;
-        Ok(())
+            // 处理代码行
+            let lines = attrs.text.split('\n');
+            let mut first_line = true;
+
+            for line in lines {
+                if !first_line {
+                    // 添加换行
+                    if let Some(run) = converter.content_builder.take_run() {
+                        converter
+                            .content_builder
+                            .set_run(run.add_break(BreakType::TextWrapping));
+                    }
+                }
+                converter.content_builder.add_text(line);
+                converter.flush_run()?;
+                first_line = false;
+            }
+
+            Ok(())
+        })
     }
 
+    /// 处理内联代码
     fn process_inline_code(&mut self, attrs: &RawAttr) -> Result<()> {
-        self.flush_run()?;
-        let code_run = Run::new().add_text(&attrs.text).style("CodeInline");
-        if let Some(para) = self.content_builder.take_paragraph() {
-            self.content_builder.set_paragraph(para.add_run(code_run));
-        }
-        self.content_builder.set_run(Run::new());
-        Ok(())
+        self.process_inline_element(Some("CodeInline"), |converter| {
+            converter.content_builder.add_text(&attrs.text);
+            Ok(())
+        })
     }
 
+    /// 处理表格
     fn process_table(&mut self, root: &HtmlElement) -> Result<()> {
-        let mut table = Table::new(vec![]).style("Table");
-        let current_docx = self.docx.clone();
-
-        let mut rows = Vec::new();
-        for child in &root.children {
-            if let HtmlNode::Element(element) = child {
-                rows.push(self.process_table_row(element)?);
+        self.process_block_element(Some("Table"), |converter| {
+            // 处理表格行
+            let mut rows = Vec::new();
+            for child in &root.children {
+                if let HtmlNode::Element(element) = child {
+                    rows.push(converter.process_table_row(element)?);
+                }
             }
-        }
 
-        for row in rows {
-            table = table.add_row(row);
-        }
+            // 创建表格并添加行
+            let mut table = Table::new(vec![]).style("Table");
+            for row in rows {
+                table = table.add_row(row);
+            }
 
-        self.docx = current_docx.add_table(table);
-        self.content_builder.mark_needs_new_paragraph();
+            // 将表格添加到文档
+            converter.docx = converter.docx.clone().add_table(table);
 
-        Ok(())
+            Ok(())
+        })
     }
 
+    /// 处理表格行
     fn process_table_row(&mut self, row_element: &HtmlElement) -> Result<TableRow> {
         let mut cells = Vec::new();
         for child in &row_element.children {
@@ -929,39 +988,37 @@ impl DocxConverter {
                 cells.push(cell);
             }
         }
-        let row = TableRow::new(cells).cant_split();
-        Ok(row)
+        Ok(TableRow::new(cells).cant_split())
     }
 
+    /// 处理表格单元格
     fn process_table_cell(&mut self, cell_element: &HtmlElement) -> Result<TableCell> {
-        let prev_paragraph = self.content_builder.take_paragraph();
-        let prev_run = self.content_builder.take_run();
+        let mut cell_paragraph = Paragraph::default();
 
-        self.content_builder.set_paragraph(Paragraph::new());
-        self.content_builder.set_run(Run::new());
-        self.content_builder.clear_buffer();
+        self.process_block_element(None, |converter| {
+            // 处理单元格内的内容
+            converter.convert_children(cell_element)?;
 
-        self.convert_children(cell_element)?;
-        self.flush_run()?;
+            // 保存生成的段落
+            if let Some(para) = converter.content_builder.take_paragraph() {
+                cell_paragraph = para;
+            }
 
-        let cell_paragraph = self.content_builder.take_paragraph().unwrap_or_default();
+            Ok(())
+        })?;
 
-        self.content_builder
-            .set_paragraph(prev_paragraph.unwrap_or_else(|| Paragraph::new()));
-        self.content_builder
-            .set_run(prev_run.unwrap_or_else(|| Run::new()));
-
+        // 创建并返回表格单元格
         Ok(TableCell::new().add_paragraph(cell_paragraph))
     }
 
+    /// 开始文档处理
     pub fn begin_document(&mut self) -> Result<()> {
-        self.initialize_styles();
-        self.initialize_numbering();
+        self.initialize_document();
         Ok(())
     }
 
+    /// 完成文档处理
     pub fn finish_document(&mut self) -> Result<()> {
-        self.flush_paragraph()?;
-        Ok(())
+        self.flush_paragraph()
     }
 }
