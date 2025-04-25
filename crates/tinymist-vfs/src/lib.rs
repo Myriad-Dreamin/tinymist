@@ -260,7 +260,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     /// Resets all state.
     pub fn reset_all(&mut self) {
         self.reset_access_model();
-        self.reset_mapping();
+        self.reset_read();
         self.take_source_cache();
     }
 
@@ -269,9 +269,12 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         self.access_model.reset();
     }
 
-    /// Resets all possible caches.
-    pub fn reset_mapping(&mut self) {
-        self.revise().reset_cache();
+    /// Resets all read caches. This can happen when:
+    /// - package paths are reconfigured.
+    /// - The root of the workspace is switched.
+    pub fn reset_read(&mut self) {
+        self.managed = Arc::default();
+        self.paths = Arc::default();
     }
 
     /// Clears the cache that is not touched for a long time.
@@ -498,15 +501,6 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
 
         self.am().clear_shadow();
         self.am().inner.inner.clear_shadow();
-    }
-
-    /// Resets all caches. This can happen when:
-    /// - package paths are reconfigured.
-    /// - The root of the workspace is switched.
-    pub fn reset_cache(&mut self) {
-        self.view_changed = true;
-        self.managed = EntryMap::default();
-        self.paths = PathMap::default();
     }
 
     /// Adds a shadowing file to the [`OverlayAccessModel`].
