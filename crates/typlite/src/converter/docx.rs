@@ -728,35 +728,20 @@ impl DocxConverter {
         if attrs.block {
             self.flush_paragraph()?;
 
-            let code_para = Paragraph::new().style("CodeBlock");
-            self.current_paragraph = Some(code_para);
+            let lang_para = Paragraph::new().style("CodeBlock");
+            self.current_paragraph = Some(lang_para);
+            self.add_text(&attrs.lang);
+            self.flush_paragraph()?;
 
-            if !attrs.lang.is_empty() {
-                let lang_run = Run::new()
-                    .add_text(format!("Language: {}", attrs.lang))
-                    .italic();
-                if let Some(ref mut para) = self.current_paragraph {
-                    *para = para.clone().add_run(lang_run);
-                    *para = para
-                        .clone()
-                        .add_run(Run::new().add_break(BreakType::TextWrapping));
+            let raw_para = Paragraph::new().style("CodeBlock");
+            self.current_paragraph = Some(raw_para);
+            let lines: Vec<&str> = attrs.text.split('\n').collect();
+            for (i, line) in lines.iter().enumerate() {
+                self.add_text(line);
+                if i < lines.len() - 1 {
+                    self.add_line_break();
                 }
             }
-
-            for (i, line) in attrs.text.split('\n').enumerate() {
-                if i > 0 {
-                    let break_run = Run::new().add_break(BreakType::TextWrapping);
-                    if let Some(ref mut para) = self.current_paragraph {
-                        *para = para.clone().add_run(break_run);
-                    }
-                }
-
-                let code_run = Run::new().add_text(line);
-                if let Some(ref mut para) = self.current_paragraph {
-                    *para = para.clone().add_run(code_run);
-                }
-            }
-
             self.flush_paragraph()?;
         } else {
             self.flush_run()?;
