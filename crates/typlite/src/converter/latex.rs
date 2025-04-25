@@ -26,7 +26,7 @@ impl LaTeXConverter {
     /// Creates a new LaTeXConverter instance
     pub fn new(feat: TypliteFeat) -> Self {
         Self {
-            feat, 
+            feat,
             list_state: None,
         }
     }
@@ -40,46 +40,46 @@ impl LaTeXConverter {
             tag::span | tag::dl | tag::dt | tag::dd => {
                 self.convert_children(root, w)?;
                 Ok(())
-            },
+            }
             tag::p => self.convert_paragraph(root, w),
-            
+
             // List-related elements
             tag::ol => self.process_ordered_list(root, w),
             tag::ul => self.process_unordered_list(root, w),
             tag::li => self.process_list_item(root, w),
-            
+
             // Media and figure elements
             tag::figure => self.convert_children(root, w),
             tag::figcaption => Ok(()),
-            
+
             // Special elements
             md_tag::heading => self.convert_heading(root, w),
             md_tag::link => self.process_link(root, w),
             md_tag::parbreak => self.process_paragraph_break(w),
             md_tag::linebreak => self.process_line_break(w),
-            
+
             // Text formatting elements
             tag::strong | md_tag::strong => self.process_strong(root, w),
             tag::em | md_tag::emph => self.process_emphasis(root, w),
             md_tag::highlight => self.process_highlight(root, w),
             md_tag::strike => self.process_strike(root, w),
             md_tag::raw => self.process_raw(root, w),
-            
+
             // Reference elements
             md_tag::label | md_tag::reference | md_tag::outline | md_tag::outline_entry => {
                 self.process_reference(root, w)
-            },
-            
+            }
+
             // Block elements
             md_tag::quote => self.process_quote(root, w),
             md_tag::table | md_tag::grid | md_tag::table_cell | md_tag::grid_cell => {
                 self.process_table(root, w)
-            },
-            
+            }
+
             // Math and image elements
             md_tag::math_equation_inline | md_tag::math_equation_block => self.process_math(w),
             md_tag::image => self.process_image(root, w),
-            
+
             // Fallback for unknown elements
             _ => Err(format!("Unexpected tag: {:?}", root.tag).into()),
         }
@@ -103,7 +103,7 @@ impl LaTeXConverter {
     }
 
     // Processing methods for specific element types
-    
+
     /// Processes a paragraph break
     fn process_paragraph_break(&mut self, w: &mut EcoString) -> Result<()> {
         w.push_str("\n\n");
@@ -120,11 +120,11 @@ impl LaTeXConverter {
     fn process_ordered_list(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         let state = self.list_state;
         self.list_state = Some(ListState::Ordered);
-        
+
         w.push_str("\\begin{enumerate}\n");
         self.convert_children(root, w)?;
         w.push_str("\\end{enumerate}\n");
-        
+
         self.list_state = state;
         Ok(())
     }
@@ -133,11 +133,11 @@ impl LaTeXConverter {
     fn process_unordered_list(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         let state = self.list_state;
         self.list_state = Some(ListState::Unordered);
-        
+
         w.push_str("\\begin{itemize}\n");
         self.convert_children(root, w)?;
         w.push_str("\\end{itemize}\n");
-        
+
         self.list_state = state;
         Ok(())
     }
@@ -245,9 +245,9 @@ impl LaTeXConverter {
             } else {
                 w.push_str("\\begin{verbatim}\n");
             }
-            
+
             w.push_str(&text);
-            
+
             if !lang.is_empty() {
                 w.push_str("\n\\end{lstlisting}");
             } else {
@@ -269,11 +269,11 @@ impl LaTeXConverter {
                 .replace("~", "\\~{}")
                 .replace("<", "\\textless{}")
                 .replace(">", "\\textgreater{}");
-            
+
             w.push_str(&escaped_text);
             w.push_str("}");
         }
-        
+
         Ok(())
     }
 
@@ -287,15 +287,15 @@ impl LaTeXConverter {
         w.push_str("\\includegraphics[width=0.8\\textwidth]{");
         w.push_str(&src);
         w.push_str("}\n");
-        
+
         if !attrs.alt.is_empty() {
             w.push_str("\\caption{");
             w.push_str(&attrs.alt);
             w.push_str("}\n");
         }
-        
+
         w.push_str("\\end{figure}\n");
-        
+
         Ok(())
     }
 
@@ -335,7 +335,7 @@ impl LaTeXConverter {
 
         // Encode SVG as base64
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
-        
+
         // Write as inline image
         let _ = write!(
             w,
