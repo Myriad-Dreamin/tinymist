@@ -5,7 +5,6 @@ use cmark_writer::ast::{
     BlockNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, InlineNode, ListItem,
 };
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::WriterOptions;
 use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
@@ -72,8 +71,6 @@ impl MarkdownConverter {
     }
 
     fn convert_element(&mut self, element: &HtmlElement) -> Result<()> {
-        // 调试使用，打印出当前元素的标签
-        // println!("Converting element: {:?}", element.tag);
         match element.tag {
             tag::head => Ok(()),
 
@@ -156,6 +153,19 @@ impl MarkdownConverter {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
                 self.inline_buffer.push(InlineNode::Emphasis(content));
+                Ok(())
+            }
+
+            md_tag::highlight => {
+                let mut content = Vec::new();
+                self.convert_children_into(&mut content, element)?;
+                self.inline_buffer
+                    .push(InlineNode::HtmlElement(CmarkHtmlElement {
+                        tag: "mark".to_string(),
+                        attributes: vec![],
+                        children: content,
+                        self_closing: false,
+                    }));
                 Ok(())
             }
 
