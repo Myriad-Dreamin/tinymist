@@ -23,156 +23,70 @@ pub struct LaTeXConverter {
 }
 
 impl LaTeXConverter {
+    /// Creates a new LaTeXConverter instance
+    pub fn new(feat: TypliteFeat) -> Self {
+        Self {
+            feat, 
+            list_state: None,
+        }
+    }
+
+    /// Converts an HTML element to LaTeX format
     pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         match root.tag {
+            // Document structure elements
             tag::head => Ok(()),
             tag::html | tag::body | md_tag::doc => self.convert_children(root, w),
             tag::span | tag::dl | tag::dt | tag::dd => {
                 self.convert_children(root, w)?;
                 Ok(())
-            }
+            },
             tag::p => self.convert_paragraph(root, w),
-            tag::ol => {
-                let state = self.list_state;
-                self.list_state = Some(ListState::Ordered);
-                self.convert_children(root, w)?;
-                self.list_state = state;
-                Ok(())
-            }
-            tag::ul => {
-                let state = self.list_state;
-                self.list_state = Some(ListState::Unordered);
-                self.convert_children(root, w)?;
-                self.list_state = state;
-                Ok(())
-            }
-            tag::li => {
-                match self.list_state {
-                    Some(ListState::Ordered) => w.push_str("1. "),
-                    Some(ListState::Unordered) => w.push_str("- "),
-                    None => {}
-                }
-
-                self.convert_children(root, w)?;
-                w.push_str("\n");
-
-                Ok(())
-            }
+            
+            // List-related elements
+            tag::ol => self.process_ordered_list(root, w),
+            tag::ul => self.process_unordered_list(root, w),
+            tag::li => self.process_list_item(root, w),
+            
+            // Media and figure elements
             tag::figure => self.convert_children(root, w),
             tag::figcaption => Ok(()),
+            
+            // Special elements
             md_tag::heading => self.convert_heading(root, w),
-            md_tag::link => {
-                let attrs = LinkAttr::parse(&root.attrs)?;
-
-                w.push('[');
-                self.convert_children(root, w)?;
-                w.push(']');
-                w.push('(');
-                w.push_str(&attrs.dest);
-                w.push(')');
-
-                Ok(())
-            }
-            md_tag::parbreak => {
-                w.push_str("\n\n");
-                Ok(())
-            }
-            md_tag::linebreak => {
-                w.push_str("\n");
-                Ok(())
-            }
-            tag::strong | md_tag::strong => {
-                w.push_str("**");
-                self.convert_children(root, w)?;
-                w.push_str("**");
-                Ok(())
-            }
-            tag::em | md_tag::emph => {
-                w.push_str("*");
-                self.convert_children(root, w)?;
-                w.push_str("*");
-                Ok(())
-            }
-            md_tag::highlight => {
-                w.push_str("==");
-                self.convert_children(root, w)?;
-                w.push_str("==");
-                Ok(())
-            }
-            md_tag::strike => {
-                w.push_str("~~");
-                self.convert_children(root, w)?;
-                w.push_str("~~");
-                Ok(())
-            }
-            md_tag::raw => {
-                let attrs = RawAttr::parse(&root.attrs)?;
-                let lang = attrs.lang;
-                let block = attrs.block;
-                let text = attrs.text;
-                let mut max_backticks = if block { 3 } else { 1 };
-                let mut backticks = 0;
-                for c in text.chars() {
-                    if c == '`' {
-                        max_backticks += 1;
-                    } else {
-                        max_backticks = backticks.max(max_backticks);
-                        backticks = 0;
-                    }
-                }
-                let backticks = "`".repeat(max_backticks);
-
-                w.push_str(&backticks);
-                if block {
-                    w.push_str(&lang);
-                    w.push('\n');
-                }
-                w.push_str(&text);
-                if block {
-                    w.push('\n');
-                }
-                w.push_str(&backticks);
-                Ok(())
-            }
+            md_tag::link => self.process_link(root, w),
+            md_tag::parbreak => self.process_paragraph_break(w),
+            md_tag::linebreak => self.process_line_break(w),
+            
+            // Text formatting elements
+            tag::strong | md_tag::strong => self.process_strong(root, w),
+            tag::em | md_tag::emph => self.process_emphasis(root, w),
+            md_tag::highlight => self.process_highlight(root, w),
+            md_tag::strike => self.process_strike(root, w),
+            md_tag::raw => self.process_raw(root, w),
+            
+            // Reference elements
             md_tag::label | md_tag::reference | md_tag::outline | md_tag::outline_entry => {
-                w.push_str("`");
-                self.convert_children(root, w)?;
-                w.push_str("`");
-                Ok(())
-            }
-            md_tag::quote => {
-                w.push_str(">");
-                self.convert_children(root, w)?;
-                w.push_str("\n");
-                Ok(())
-            }
+                self.process_reference(root, w)
+            },
+            
+            // Block elements
+            md_tag::quote => self.process_quote(root, w),
             md_tag::table | md_tag::grid | md_tag::table_cell | md_tag::grid_cell => {
-                w.push_str("```");
-                self.convert_children(root, w)?;
-                w.push_str("```");
-                Ok(())
-            }
-            md_tag::math_equation_inline | md_tag::math_equation_block => {
-                w.push_str(
-                    r#"\begin{equation}
-\int x^2 \operatorname{d} x
-\end{equation}
-"#,
-                );
-                Ok(())
-            }
-            md_tag::image => {
-                let attrs = ImageAttr::parse(&root.attrs)?;
-                let src = unix_slash(Path::new(attrs.src.as_str()));
-
-                write!(w, r#"![{}]({src})"#, attrs.alt)?;
-                Ok(())
-            }
-            _ => panic!("unexpected tag: {:?}", root.tag),
+                self.process_table(root, w)
+            },
+            
+            // Math and image elements
+            md_tag::math_equation_inline | md_tag::math_equation_block => self.process_math(w),
+            md_tag::image => self.process_image(root, w),
+            
+            // Fallback for unknown elements
+            _ => Err(format!("Unexpected tag: {:?}", root.tag).into()),
         }
     }
 
-    fn convert_children(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+    /// Converts child elements
+    pub fn convert_children(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         for child in &root.children {
             match child {
                 HtmlNode::Tag(_) => {}
@@ -188,41 +102,245 @@ impl LaTeXConverter {
         Ok(())
     }
 
+    // Processing methods for specific element types
+    
+    /// Processes a paragraph break
+    fn process_paragraph_break(&mut self, w: &mut EcoString) -> Result<()> {
+        w.push_str("\n\n");
+        Ok(())
+    }
+
+    /// Processes a line break
+    fn process_line_break(&mut self, w: &mut EcoString) -> Result<()> {
+        w.push_str("\n");
+        Ok(())
+    }
+
+    /// Processes an ordered list
+    fn process_ordered_list(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let state = self.list_state;
+        self.list_state = Some(ListState::Ordered);
+        
+        w.push_str("\\begin{enumerate}\n");
+        self.convert_children(root, w)?;
+        w.push_str("\\end{enumerate}\n");
+        
+        self.list_state = state;
+        Ok(())
+    }
+
+    /// Processes an unordered list
+    fn process_unordered_list(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let state = self.list_state;
+        self.list_state = Some(ListState::Unordered);
+        
+        w.push_str("\\begin{itemize}\n");
+        self.convert_children(root, w)?;
+        w.push_str("\\end{itemize}\n");
+        
+        self.list_state = state;
+        Ok(())
+    }
+
+    /// Processes a list item
+    fn process_list_item(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\item ");
+        self.convert_children(root, w)?;
+        w.push_str("\n");
+        Ok(())
+    }
+
+    /// Processes a strong (bold) element
+    fn process_strong(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\textbf{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+        Ok(())
+    }
+
+    /// Processes an emphasis (italic) element
+    fn process_emphasis(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\textit{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+        Ok(())
+    }
+
+    /// Processes a highlight element
+    fn process_highlight(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\colorbox{yellow}{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+        Ok(())
+    }
+
+    /// Processes a strike element
+    fn process_strike(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\sout{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+        Ok(())
+    }
+
+    /// Processes a reference element
+    fn process_reference(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\texttt{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+        Ok(())
+    }
+
+    /// Processes a quote element
+    fn process_quote(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\begin{quote}\n");
+        self.convert_children(root, w)?;
+        w.push_str("\\end{quote}\n");
+        Ok(())
+    }
+
+    /// Processes a table element
+    fn process_table(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        w.push_str("\\begin{verbatim}\n");
+        self.convert_children(root, w)?;
+        w.push_str("\\end{verbatim}\n");
+        Ok(())
+    }
+
+    /// Processes math equation
+    fn process_math(&mut self, w: &mut EcoString) -> Result<()> {
+        w.push_str(
+            r#"\begin{equation}
+\int x^2 \operatorname{d} x
+\end{equation}
+"#,
+        );
+        Ok(())
+    }
+
+    /// Processes a link element
+    fn process_link(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let attrs = LinkAttr::parse(&root.attrs)?;
+
+        w.push_str("\\href{");
+        w.push_str(&attrs.dest);
+        w.push_str("}{");
+        self.convert_children(root, w)?;
+        w.push_str("}");
+
+        Ok(())
+    }
+
+    /// Processes a raw code element
+    fn process_raw(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let attrs = RawAttr::parse(&root.attrs)?;
+        let lang = attrs.lang;
+        let block = attrs.block;
+        let text = attrs.text;
+
+        if block {
+            if !lang.is_empty() {
+                w.push_str("\\begin{lstlisting}[language=");
+                w.push_str(&lang);
+                w.push_str("]\n");
+            } else {
+                w.push_str("\\begin{verbatim}\n");
+            }
+            
+            w.push_str(&text);
+            
+            if !lang.is_empty() {
+                w.push_str("\n\\end{lstlisting}");
+            } else {
+                w.push_str("\n\\end{verbatim}");
+            }
+        } else {
+            w.push_str("\\texttt{");
+            // Escape LaTeX special characters
+            let escaped_text = text
+                .replace("\\", "\\textbackslash{}")
+                .replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("_", "\\_")
+                .replace("^", "\\^")
+                .replace("&", "\\&")
+                .replace("%", "\\%")
+                .replace("$", "\\$")
+                .replace("#", "\\#")
+                .replace("~", "\\~{}")
+                .replace("<", "\\textless{}")
+                .replace(">", "\\textgreater{}");
+            
+            w.push_str(&escaped_text);
+            w.push_str("}");
+        }
+        
+        Ok(())
+    }
+
+    /// Processes an image element
+    fn process_image(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        let attrs = ImageAttr::parse(&root.attrs)?;
+        let src = unix_slash(Path::new(attrs.src.as_str()));
+
+        w.push_str("\\begin{figure}\n");
+        w.push_str("\\centering\n");
+        w.push_str("\\includegraphics[width=0.8\\textwidth]{");
+        w.push_str(&src);
+        w.push_str("}\n");
+        
+        if !attrs.alt.is_empty() {
+            w.push_str("\\caption{");
+            w.push_str(&attrs.alt);
+            w.push_str("}\n");
+        }
+        
+        w.push_str("\\end{figure}\n");
+        
+        Ok(())
+    }
+
+    /// Converts a heading element
     fn convert_heading(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         let attrs = HeadingAttr::parse(&root.attrs)?;
 
         if attrs.level >= 4 || attrs.level == 0 {
-            return Err(format!("heading level {} is not good", attrs.level).into());
+            return Err(format!("heading level {} is not supported in LaTeX", attrs.level).into());
         }
 
         w.push('\\');
-        for _ in 0..(attrs.level - 1) {
-            w.push_str("sub");
+        match attrs.level {
+            1 => w.push_str("section{"),
+            2 => w.push_str("subsection{"),
+            3 => w.push_str("subsubsection{"),
+            _ => return Err(format!("Heading level {} is not supported", attrs.level).into()),
         }
-        w.push_str("section{");
 
         self.convert_children(root, w)?;
-        w.push('}');
+        w.push_str("}\n\n");
         Ok(())
     }
 
-    /// Encode a laid out frame into the writer.
+    /// Converts a paragraph element
+    fn convert_paragraph(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        self.convert_children(root, w)?;
+        w.push_str("\n\n");
+        Ok(())
+    }
+
+    /// Encodes a laid out frame into the writer
     fn write_frame(&mut self, frame: &Frame, w: &mut EcoString) {
-        // FIXME: This string replacement is obviously a hack.
+        // Create SVG from frame and adjust it for better display
         let svg = typst_svg::svg_frame(frame)
             .replace("<svg class", "<svg style=\"overflow: visible;\" class");
 
+        // Encode SVG as base64
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
+        
+        // Write as inline image
         let _ = write!(
             w,
-            r#"<img alt="typst-block" src="data:image/svg+xml;base64,{data}"/>"#
+            r#"\\includegraphics{{data:image/svg+xml;base64,{}}}"#,
+            data
         );
-    }
-
-    fn convert_paragraph(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
-        w.push_str("\n\n");
-        self.convert_children(root, w)?;
-        w.push_str("\n\n");
-        Ok(())
     }
 }
