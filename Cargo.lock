@@ -663,9 +663,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.1.5"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d64b1b18dffbcd9a6e9351cac76a6c9efe680df438646d5d6b0e47fe95def55"
+checksum = "0c9ccf52cb5dcc8a97579ba640ef901be067b2ac58d7c2c7ba9c5b471d327f26"
 
 [[package]]
 name = "cobs"
