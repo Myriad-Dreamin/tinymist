@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/document_link.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_link/bibliography_csl.typ
+---
+[
+ {
+  "range": "0:15:0:29",
+  "target": "references.bib"
+ },
+ {
+  "range": "1:40:1:49",
+  "target": "style.csl"
+ },
+ {
+  "range": "1:15:1:29",
+  "target": "references.bib"
+ }
+]
