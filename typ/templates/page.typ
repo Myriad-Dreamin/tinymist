@@ -204,14 +204,12 @@
   }
 
   context if shiroa-sys-target() == "html" {
-    html.elem(
-      "style",
-      ```css
-      .pseudo-image svg {
-        width: 100%
-      }
-      ```.text,
-    )
+    show raw: it => html.elem("style", it.text)
+    ```css
+    .pseudo-image svg {
+      width: 100%
+    }
+    ```
   }
 
   show <typst-raw-func>: it => {

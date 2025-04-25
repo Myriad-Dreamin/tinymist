@@ -53,7 +53,7 @@ web-sys = { workspace = true, optional = true, features = ["console"] }
 [features]
 
 default = []
-browser-embedded-fonts = ["typst-assets/fonts"]
+fonts = ["typst-assets/fonts"]
 http-registry = ["reqwest"]
 web = [
     "chrono",

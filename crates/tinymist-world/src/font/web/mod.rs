@@ -371,13 +371,7 @@ pub struct BrowserFontSearcher {
 impl BrowserFontSearcher {
     /// Create a new, empty browser searcher.
     pub fn new() -> Self {
-        let mut searcher = Self { fonts: vec![] };
-
-        if cfg!(feature = "browser-embedded-fonts") {
-            searcher.add_embedded();
-        }
-
-        searcher
+        Self { fonts: vec![] }
     }
 
     /// Create a new browser searcher with fonts in a FontResolverImpl.
@@ -435,6 +429,7 @@ impl BrowserFontSearcher {
 
 impl BrowserFontSearcher {
     /// Add fonts that are embedded in the binary.
+    #[cfg(feature = "fonts")]
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
