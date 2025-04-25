@@ -2,6 +2,7 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/raw_inline.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -13,4 +14,4 @@ input_file: crates/typlite/src/fixtures/integration/raw_inline.typ
 </html>
 
 =====
-Some inlined raw `a`, `b`
+`a``b`

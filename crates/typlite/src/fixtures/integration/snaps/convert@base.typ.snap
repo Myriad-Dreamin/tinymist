@@ -2,6 +2,7 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/base.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -9,12 +10,10 @@ input_file: crates/typlite/src/fixtures/integration/base.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1heading level="1">Hello, World!</m1heading><p>This is a typst document.</p></m1document></body>
+  <body><m1document><m1heading level="1"><span style="display: inline-block;">Hello, World!</span></m1heading><p>This is a typst document.</p></m1document></body>
 </html>
 
 =====
 ## Hello, World!
-
-
 
 This is a typst document.

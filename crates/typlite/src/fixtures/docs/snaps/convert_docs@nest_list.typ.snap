@@ -2,5 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, true)"
 input_file: crates/typlite/src/fixtures/docs/nest_list.typ
+snapshot_kind: text
 ---
-failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(850330829973706), message: "expected string, found none", trace: [Call(Some("md-raw")), Show("raw")], hints: [] }, SourceDiagnostic { severity: Error, span: Span(301106836499353), message: "label `<>` does not exist in the document", trace: [], hints: [] }, SourceDiagnostic { severity: Error, span: Span(303146510243633), message: "label `<show-module>` does not exist in the document", trace: [], hints: [] }]
+failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(301106836499353), message: "label `<>` does not exist in the document", trace: [], hints: [] }, SourceDiagnostic { severity: Error, span: Span(303146510243633), message: "label `<show-module>` does not exist in the document", trace: [], hints: [] }]

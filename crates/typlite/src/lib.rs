@@ -42,11 +42,7 @@ impl MarkdownDocument {
     /// Convert the content to a markdown string.
     pub fn to_md_string(self) -> Result<ecow::EcoString> {
         let mut w = ecow::EcoString::new();
-        MarkdownConverter {
-            feat: self.feat,
-            list_state: None,
-        }
-        .convert(&self.base.root, &mut w)?;
+        MarkdownConverter::new(self.feat).convert(&self.base.root, &mut w)?;
         Ok(w)
     }
 
