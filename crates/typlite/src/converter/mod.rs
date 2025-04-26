@@ -50,7 +50,7 @@ impl HtmlToAstParser {
         converter.inline_buffer = inline_buffer;
         converter.convert_element(root)?;
         converter.flush_inline_buffer();
-        
+
         Ok(Node::Document(converter.blocks.clone()))
     }
 }

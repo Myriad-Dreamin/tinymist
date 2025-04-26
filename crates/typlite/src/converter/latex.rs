@@ -56,15 +56,15 @@ impl LaTeXWriter {
     fn write_preamble(&self, output: &mut EcoString) {
         output.push_str("\\documentclass[12pt,a4paper]{article}\n");
         output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n");     // For links
-        output.push_str("\\usepackage{graphicx}\n");     // For images
-        output.push_str("\\usepackage{ulem}\n");         // For strikethrough \sout
-        output.push_str("\\usepackage{listings}\n");     // For code blocks
-        output.push_str("\\usepackage{xcolor}\n");       // For colored text and backgrounds
-        output.push_str("\\usepackage{amsmath}\n");      // Math formula support
-        output.push_str("\\usepackage{amssymb}\n");      // Additional math symbols
-        output.push_str("\\usepackage{array}\n");        // Enhanced table functionality
-        
+        output.push_str("\\usepackage{hyperref}\n"); // For links
+        output.push_str("\\usepackage{graphicx}\n"); // For images
+        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
+        output.push_str("\\usepackage{listings}\n"); // For code blocks
+        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
+        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
+        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
+        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
+
         // Set code highlighting style
         output.push_str("\\lstset{\n");
         output.push_str("  basicstyle=\\ttfamily\\small,\n");
@@ -76,7 +76,7 @@ impl LaTeXWriter {
         output.push_str("  commentstyle=\\color{green!60!black},\n");
         output.push_str("  stringstyle=\\color{red}\n");
         output.push_str("}\n\n");
-        
+
         output.push_str("\\begin{document}\n\n");
     }
 
@@ -352,13 +352,13 @@ impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
         // Write LaTeX preamble with necessary package imports
         self.write_preamble(output);
-        
+
         // Write document main content
         self.write_node(document, output)?;
-        
+
         // Add document end tag
         output.push_str("\n\\end{document}");
-        
+
         Ok(())
     }
 

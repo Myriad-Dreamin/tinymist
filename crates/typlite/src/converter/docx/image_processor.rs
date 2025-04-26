@@ -101,9 +101,9 @@ impl DocxImageProcessor {
                             }
                             Err(_) => {
                                 // If unable to load image, return original document (without image)
-                                let err_para = Paragraph::new().add_run(
-                                    Run::new().add_text("[Image processing error: Unable to load image]".to_string()),
-                                );
+                                let err_para = Paragraph::new().add_run(Run::new().add_text(
+                                    "[Image processing error: Unable to load image]".to_string(),
+                                ));
                                 return docx.add_paragraph(err_para);
                             }
                         }
@@ -128,8 +128,11 @@ impl DocxImageProcessor {
             }
             Err(_) => {
                 // If unable to determine image format, return original document (without image)
-                let err_para = Paragraph::new()
-                    .add_run(Run::new().add_text("[Image processing error: Unknown image format]".to_string()));
+                let err_para =
+                    Paragraph::new()
+                        .add_run(Run::new().add_text(
+                            "[Image processing error: Unknown image format]".to_string(),
+                        ));
                 docx.add_paragraph(err_para)
             }
         }

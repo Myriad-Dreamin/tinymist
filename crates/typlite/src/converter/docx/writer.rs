@@ -53,7 +53,9 @@ impl DocxWriter {
 
         // Try reading image file
         if let Ok(img_data) = fs::read(url) {
-            Ok(self.image_processor.process_image_data(docx, &img_data, alt_text.as_deref(), None))
+            Ok(self
+                .image_processor
+                .process_image_data(docx, &img_data, alt_text.as_deref(), None))
         } else {
             let placeholder = format!("[Image not found: {}]", url);
             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
@@ -128,7 +130,11 @@ impl DocxWriter {
                         .unwrap_or("");
 
                     if src.starts_with("data:image/") {
-                        run = self.image_processor.process_data_url_image(run, src, is_typst_block)?;
+                        run = self.image_processor.process_data_url_image(
+                            run,
+                            src,
+                            is_typst_block,
+                        )?;
                     }
                 } else {
                     // Standard element content processing
@@ -501,7 +507,7 @@ impl DocxWriter {
 
         // Add table to document
         docx = docx.add_table(table);
-        
+
         Ok(docx)
     }
 
