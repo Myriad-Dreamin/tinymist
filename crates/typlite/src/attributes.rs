@@ -28,6 +28,7 @@ pub mod md_attr {
         block -> block
         text -> text
         value -> value
+        caption -> caption
     }
 }
 
@@ -40,6 +41,11 @@ pub struct HeadingAttr {
 pub struct ImageAttr {
     pub src: EcoString,
     pub alt: EcoString,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct FigureAttr {
+    pub caption: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]

@@ -32,7 +32,7 @@ pub mod md_tag {
         // table_cell -> m1tablecell
         grid -> m1grid
         // grid_cell -> m1gridcell
-        // figure -> m1figure
+        figure -> m1figure
 
         math_equation_inline -> m1eqinline
         math_equation_block -> m1eqblock

@@ -6,7 +6,7 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::converter::FormatWriter;
+use crate::converter::{FigureNode, FormatWriter};
 use crate::Result;
 use crate::TypliteFeat;
 
@@ -61,6 +61,89 @@ impl DocxWriter {
             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
             Ok(docx.add_paragraph(para))
         }
+    }
+
+    /// Process figure node (image with caption)
+    fn process_figure(&mut self, mut docx: Docx, figure_node: &FigureNode) -> Result<Docx> {
+        // First handle the figure body (typically an image)
+        match &*figure_node.body {
+            Node::Paragraph(content) => {
+                for node in content {
+                    if let Node::Image {
+                        url,
+                        title: _,
+                        alt: _,
+                    } = node
+                    {
+                        // Process the image
+                        if let Ok(img_data) = fs::read(url) {
+                            let alt_text = figure_node.caption.clone();
+                            // Add the image with caption
+                            docx = self.image_processor.process_image_data(
+                                docx,
+                                &img_data,
+                                Some(&alt_text),
+                                None,
+                            );
+
+                            // Add caption as a separate paragraph with Caption style
+                            if !figure_node.caption.is_empty() {
+                                let caption_text = format!("图：{}", figure_node.caption);
+                                let caption_para = Paragraph::new()
+                                    .style("Caption")
+                                    .add_run(Run::new().add_text(caption_text));
+                                docx = docx.add_paragraph(caption_para);
+                            }
+                        } else {
+                            // Image not found, show placeholder
+                            let placeholder = format!("[Image not found: {}]", url);
+                            let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
+                            docx = docx.add_paragraph(para);
+
+                            // Still add caption
+                            if !figure_node.caption.is_empty() {
+                                let caption_para = Paragraph::new()
+                                    .style("Caption")
+                                    .add_run(Run::new().add_text(&figure_node.caption));
+                                docx = docx.add_paragraph(caption_para);
+                            }
+                        }
+                    } else {
+                        // Handle non-image content
+                        let mut para = Paragraph::new();
+                        let run = Run::new();
+                        let run = self.process_inline_to_run(run, node)?;
+                        if !run.children.is_empty() {
+                            para = para.add_run(run);
+                            docx = docx.add_paragraph(para);
+                        }
+
+                        // Add caption as a separate paragraph
+                        if !figure_node.caption.is_empty() {
+                            let caption_para = Paragraph::new()
+                                .style("Caption")
+                                .add_run(Run::new().add_text(&figure_node.caption));
+                            docx = docx.add_paragraph(caption_para);
+                        }
+                    }
+                }
+            }
+            // Handle other content types within figure
+            _ => {
+                // Process the content using standard node processing
+                docx = self.process_node(docx, &figure_node.body)?;
+
+                // Add caption as a separate paragraph
+                if !figure_node.caption.is_empty() {
+                    let caption_para = Paragraph::new()
+                        .style("Caption")
+                        .add_run(Run::new().add_text(&figure_node.caption));
+                    docx = docx.add_paragraph(caption_para);
+                }
+            }
+        }
+
+        Ok(docx)
     }
 
     /// Process inline element and add to Run
@@ -318,6 +401,17 @@ impl DocxWriter {
             }
             Node::Image { url, title: _, alt } => {
                 docx = self.process_image(docx, url, alt)?;
+            }
+            Node::Custom(custom_node) => {
+                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
+                    // Process figure node with special handling
+                    docx = self.process_figure(docx, figure_node)?;
+                } else {
+                    // Fallback for unknown custom nodes - ignore or add placeholder
+                    let placeholder = "[Unknown custom content]";
+                    let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
+                    docx = docx.add_paragraph(para);
+                }
             }
             Node::ThematicBreak => {
                 // Add horizontal line as specially formatted paragraph

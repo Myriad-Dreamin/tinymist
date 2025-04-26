@@ -6,7 +6,7 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 use typst::html::HtmlElement;
 
-use crate::converter::{FormatWriter, HtmlToAstParser, ListState};
+use crate::converter::{FigureNode, FormatWriter, HtmlToAstParser, ListState};
 use crate::tinymist_std::path::unix_slash;
 use crate::Result;
 use crate::TypliteFeat;
@@ -259,6 +259,53 @@ impl LaTeXWriter {
                 output.push_str("\\hline\n");
                 output.push_str("\\end{tabular}\n");
                 output.push_str("\\end{table}\n\n");
+            }
+            Node::Custom(custom_node) => {
+                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
+                    // Start figure environment
+                    output.push_str("\\begin{figure}[htbp]\n\\centering\n");
+
+                    // Handle the body content (typically an image)
+                    match &*figure_node.body {
+                        Node::Paragraph(content) => {
+                            for node in content {
+                                // Special handling for image nodes in figures
+                                if let Node::Image {
+                                    url,
+                                    title: _,
+                                    alt: _,
+                                } = node
+                                {
+                                    // Path to the image file
+                                    let path = unix_slash(Path::new(url));
+
+                                    // Write includegraphics command
+                                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                                    output.push_str(&path);
+                                    output.push_str("}\n");
+                                } else {
+                                    // For non-image content, just render it normally
+                                    self.write_node(node, output)?;
+                                }
+                            }
+                        }
+                        // Directly handle the node if it's not in a paragraph
+                        node => self.write_node(node, output)?,
+                    }
+
+                    // Add caption if present
+                    if !figure_node.caption.is_empty() {
+                        output.push_str("\\caption{");
+                        output.push_str(&self.escape_latex(&figure_node.caption));
+                        output.push_str("}\n");
+                    }
+
+                    // Close figure environment
+                    output.push_str("\\end{figure}\n\n");
+                } else {
+                    // Fallback for unknown custom nodes
+                    output.push_str("[Unknown custom node]");
+                }
             }
             Node::Text(text) => {
                 output.push_str(&self.escape_latex(text));

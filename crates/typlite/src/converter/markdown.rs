@@ -8,7 +8,7 @@ use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
 use crate::attributes::{HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser};
-use crate::converter::{FormatWriter, ListState};
+use crate::converter::{FigureNode, FormatWriter, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -115,6 +115,48 @@ impl MarkdownConverter {
                 });
                 Ok(())
             }
+            md_tag::figure => {
+                self.flush_inline_buffer();
+
+                // Parse figure attributes to extract caption
+                let attrs = crate::attributes::FigureAttr::parse(&element.attrs)?;
+                let caption = attrs.caption.to_string();
+
+                // Find the image and body content
+                let mut body_content = Vec::new();
+
+                // Process figure children recursively for body content
+                for child in &element.children {
+                    match child {
+                        HtmlNode::Element(child_elem) => {
+                            self.convert_element(child_elem)?;
+                            if !self.inline_buffer.is_empty() {
+                                body_content.extend(std::mem::take(&mut self.inline_buffer));
+                            }
+                        }
+                        HtmlNode::Text(text, _) => {
+                            body_content.push(Node::Text(text.as_str().to_string()));
+                        }
+                        HtmlNode::Frame(frame) => {
+                            body_content.push(self.convert_frame(frame));
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Create figure body
+                let body = if !body_content.is_empty() {
+                    Box::new(Node::Paragraph(body_content))
+                } else {
+                    Box::new(Node::Paragraph(vec![]))
+                };
+
+                // Create a figure node using the common definition
+                self.blocks
+                    .push(Node::Custom(Box::new(FigureNode { body, caption })));
+
+                Ok(())
+            }
 
             tag::p | tag::span => {
                 self.convert_children(element)?;
@@ -183,6 +225,7 @@ impl MarkdownConverter {
             }
 
             md_tag::table | md_tag::grid => {
+                // ... existing table handling ...
                 self.flush_inline_buffer();
                 // Tables in CommonMark require headers, rows and alignments
                 let mut headers = Vec::new();

@@ -4,12 +4,14 @@ mod docx;
 mod latex;
 mod markdown;
 
+use cmark_writer::WriteResult;
 pub use docx::DocxConverter;
 pub use latex::LaTeXConverter;
 pub use markdown::MarkdownConverter;
 
-use cmark_writer::ast::Node;
+use cmark_writer::ast::{CustomNode, CustomNodeWriter, Node};
 use ecow::EcoString;
+use std::any::Any;
 use typst::html::HtmlElement;
 
 use crate::Result;
@@ -29,6 +31,86 @@ pub enum Format {
     Docx,
 }
 
+/// Figure node implementation for all formats
+#[derive(Debug, PartialEq, Clone)]
+pub struct FigureNode {
+    /// The main content of the figure, can be any block node
+    pub body: Box<Node>,
+    /// The caption text for the figure
+    pub caption: String,
+}
+
+impl CustomNode for FigureNode {
+    fn write(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        // For Markdown, we'll represent a figure as:
+        // <figure>
+        // [content - typically an image]
+        //
+        // <figcaption>Caption text</figcaption>
+        // </figure>
+
+        // Start the figure element
+        writer.write_str("<figure>\n")?;
+
+        // Write the body node content
+        match &*self.body {
+            Node::Paragraph(content) => {
+                for node in content {
+                    self.write_node(node, writer)?;
+                }
+                writer.write_str("\n")?;
+            }
+            node => self.write_node(node, writer)?,
+        }
+
+        // Add the caption
+        if !self.caption.is_empty() {
+            writer.write_str("<figcaption>")?;
+            writer.write_str(&self.caption)?;
+            writer.write_str("</figcaption>\n")?;
+        }
+
+        // Close the figure element
+        writer.write_str("</figure>")?;
+
+        Ok(())
+    }
+
+    fn clone_box(&self) -> Box<dyn CustomNode> {
+        Box::new(Self {
+            body: self.body.clone(),
+            caption: self.caption.clone(),
+        })
+    }
+
+    fn eq_box(&self, other: &dyn CustomNode) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<FigureNode>() {
+            self == other
+        } else {
+            false
+        }
+    }
+
+    fn is_block(&self) -> bool {
+        true // Figure is always a block-level element
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+impl FigureNode {
+    // Helper method to write a node to the provided writer
+    fn write_node(&self, node: &Node, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        let mut temp_writer = cmark_writer::writer::CommonMarkWriter::new();
+        temp_writer.write(node)?;
+        let content = temp_writer.into_string();
+        writer.write_str(&content)?;
+        Ok(())
+    }
+}
+
 /// Common HTML to AST parser for all converters
 pub struct HtmlToAstParser {
     feat: TypliteFeat,
@@ -41,8 +123,6 @@ impl HtmlToAstParser {
 
     /// Parse HTML structure to CommonMark AST
     pub fn parse(&self, root: &HtmlElement) -> Result<Node> {
-        // 使用 MarkdownConverter 的实现来转换 HTML 到 AST
-        // 但不生成 markdown 输出
         let mut converter = markdown::MarkdownConverter::new(self.feat.clone());
         let blocks = Vec::new();
         let inline_buffer = Vec::new();
