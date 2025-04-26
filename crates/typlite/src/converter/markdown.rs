@@ -33,7 +33,7 @@ impl MarkdownConverter {
     }
 }
 
-// 保留原有的解析逻辑，但暴露更多内部方法以供共享解析器使用
+// Maintain original parsing logic but expose more internal methods for shared parser use
 impl MarkdownConverter {
     pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         self.blocks = Vec::new();
@@ -43,7 +43,7 @@ impl MarkdownConverter {
 
         let document = Node::Document(self.blocks.clone());
 
-        // 使用 MarkdownWriter 进行写入
+        // Use MarkdownWriter for output
         let mut writer = MarkdownWriter::new();
         writer.write_eco(&document, w)?;
 

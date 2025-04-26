@@ -29,11 +29,11 @@ impl LaTeXConverter {
 
     /// Converts an HTML element to LaTeX format
     pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
-        // 使用共享解析器解析 HTML 到 AST
+        // Parse HTML to AST using shared parser
         let parser = HtmlToAstParser::new(self.feat.clone());
         let document = parser.parse(root)?;
 
-        // 使用 LaTeX writer 将 AST 转换为 LaTeX
+        // Convert AST to LaTeX using LaTeX writer
         let mut writer = LaTeXWriter::new();
         writer.write_eco(&document, w)?;
 
@@ -52,20 +52,20 @@ impl LaTeXWriter {
         Self { list_state: None }
     }
 
-    /// 生成 LaTeX 文档前言，包含必要的包引用
+    /// Generate LaTeX document preamble with necessary package imports
     fn write_preamble(&self, output: &mut EcoString) {
         output.push_str("\\documentclass[12pt,a4paper]{article}\n");
         output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n");     // 用于链接
-        output.push_str("\\usepackage{graphicx}\n");     // 用于图片
-        output.push_str("\\usepackage{ulem}\n");         // 用于删除线 \sout
-        output.push_str("\\usepackage{listings}\n");     // 用于代码块
-        output.push_str("\\usepackage{xcolor}\n");       // 用于彩色文本和背景
-        output.push_str("\\usepackage{amsmath}\n");      // 数学公式支持
-        output.push_str("\\usepackage{amssymb}\n");      // 额外的数学符号
-        output.push_str("\\usepackage{array}\n");        // 增强表格功能
+        output.push_str("\\usepackage{hyperref}\n");     // For links
+        output.push_str("\\usepackage{graphicx}\n");     // For images
+        output.push_str("\\usepackage{ulem}\n");         // For strikethrough \sout
+        output.push_str("\\usepackage{listings}\n");     // For code blocks
+        output.push_str("\\usepackage{xcolor}\n");       // For colored text and backgrounds
+        output.push_str("\\usepackage{amsmath}\n");      // Math formula support
+        output.push_str("\\usepackage{amssymb}\n");      // Additional math symbols
+        output.push_str("\\usepackage{array}\n");        // Enhanced table functionality
         
-        // 设置代码高亮风格
+        // Set code highlighting style
         output.push_str("\\lstset{\n");
         output.push_str("  basicstyle=\\ttfamily\\small,\n");
         output.push_str("  breaklines=true,\n");
@@ -171,7 +171,7 @@ impl LaTeXWriter {
                             output.push_str("\\item ");
                             for block in content {
                                 match block {
-                                    // 对于段落，我们想要内联内容而不是创建新段落
+                                    // For paragraphs, we want inline content rather than creating a new paragraph
                                     Node::Paragraph(inlines) => {
                                         self.write_inline_nodes(inlines, output)?;
                                     }
@@ -198,7 +198,7 @@ impl LaTeXWriter {
                             output.push_str("\\item ");
                             for block in content {
                                 match block {
-                                    // 对于段落，我们想要内联内容而不是创建新段落
+                                    // For paragraphs, we want inline content rather than creating a new paragraph
                                     Node::Paragraph(inlines) => {
                                         self.write_inline_nodes(inlines, output)?;
                                     }
@@ -218,7 +218,7 @@ impl LaTeXWriter {
                 rows,
                 alignments: _,
             } => {
-                // 计算列数
+                // Calculate column count
                 let col_count = headers
                     .len()
                     .max(rows.iter().map(|row| row.len()).max().unwrap_or(0));
@@ -227,13 +227,13 @@ impl LaTeXWriter {
                 output.push_str("\\centering\n");
                 output.push_str("\\begin{tabular}{");
 
-                // 添加列格式（居中对齐）
+                // Add column format (centered alignment)
                 for _ in 0..col_count {
                     output.push('c');
                 }
                 output.push_str("}\n\\hline\n");
 
-                // 处理表头
+                // Process header
                 if !headers.is_empty() {
                     for (i, cell) in headers.iter().enumerate() {
                         if i > 0 {
@@ -244,7 +244,7 @@ impl LaTeXWriter {
                     output.push_str(" \\\\\n\\hline\n");
                 }
 
-                // 处理所有行
+                // Process all rows
                 for row in rows {
                     for (i, cell) in row.iter().enumerate() {
                         if i > 0 {
@@ -255,7 +255,7 @@ impl LaTeXWriter {
                     output.push_str(" \\\\\n");
                 }
 
-                // 关闭表环境
+                // Close table environment
                 output.push_str("\\hline\n");
                 output.push_str("\\end{tabular}\n");
                 output.push_str("\\end{table}\n\n");
@@ -350,13 +350,13 @@ impl LaTeXWriter {
 
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        // 写入 LaTeX 前言，包含必要的包引用
+        // Write LaTeX preamble with necessary package imports
         self.write_preamble(output);
         
-        // 写入文档主体内容
+        // Write document main content
         self.write_node(document, output)?;
         
-        // 添加文档结束标记
+        // Add document end tag
         output.push_str("\n\\end{document}");
         
         Ok(())
