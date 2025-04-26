@@ -2,11 +2,11 @@
 
 use docx_rs::*;
 
-use crate::Result;
-use super::types::{DocxNode, DocxInline};
-use super::utils::calculate_image_dimensions;
-use super::styles::DocxStyles;
 use super::numbering::DocxNumbering;
+use super::styles::DocxStyles;
+use super::types::{DocxInline, DocxNode};
+use super::utils::calculate_image_dimensions;
+use crate::Result;
 
 //------------------------------------------------------------------------------
 // WRITER IMPLEMENTATION (DocxNode structure to DOCX)

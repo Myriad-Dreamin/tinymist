@@ -1,9 +1,9 @@
 //! Utility functions for DOCX conversion
 
 use image::GenericImageView;
-use typst::layout::Frame;
 use resvg::tiny_skia::{self, Pixmap};
 use resvg::usvg::{Options, Tree};
+use typst::layout::Frame;
 
 use crate::Result;
 
