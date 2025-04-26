@@ -4,4 +4,4 @@ expression: hash
 input_file: crates/typlite/src/fixtures/integration/list.typ
 snapshot_kind: text
 ---
-704f89869808961b43a417119e2c0779
+7a5fe9940e37ece3d68ce459890ad102
