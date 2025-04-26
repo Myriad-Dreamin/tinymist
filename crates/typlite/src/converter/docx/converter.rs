@@ -6,7 +6,7 @@ use crate::converter::{FormatWriter, HtmlToAstParser};
 use crate::Result;
 use crate::TypliteFeat;
 
-use super::DocxWriter;
+use crate::converter::docx::writer::DocxWriter;
 
 /// DOCX Converter implementation
 #[derive(Clone, Debug)]
@@ -22,14 +22,14 @@ impl DocxConverter {
 
     /// Convert HTML element to DOCX format
     pub fn convert(&mut self, root: &HtmlElement) -> Result<Vec<u8>> {
-        // 使用共享解析器解析 HTML 到 AST
+        // Parse HTML to AST using shared parser
         let parser = HtmlToAstParser::new(self.feat.clone());
         let document = parser.parse(root)?;
 
-        // 创建并初始化 DirectDocxWriter
+        // Create and initialize DocxWriter
         let mut writer = DocxWriter::new(self.feat.clone());
 
-        // 使用 DirectDocxWriter 处理 AST
+        // Process AST using DocxWriter
         writer.write_vec(&document)
     }
 }
