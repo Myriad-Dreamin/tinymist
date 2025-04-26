@@ -76,7 +76,7 @@
 )
 #let md-grid(columns: auto, ..children) = html.elem(
   "m1grid",
-  table(columns: columns, ..children.pos().map(it => table.cell(it.body))),
+  table(columns: columns, ..children.pos().map(it => table.cell(it))),
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
@@ -106,41 +106,46 @@
   body,
 )
 
-#let md-doc(body) = {
-  // show block: it => md-block(it)
+#let if-not-paged(it, act) = {
+  if target() == "html" {
+    act
+  } else {
+    it
+  }
+}
+
+#let md-doc(body) = context {
   // distinguish parbreak from <p> tag
-  show parbreak: md-parbreak
-  show strong: it => md-strong(it.body, delta: it.delta)
-  show emph: it => md-emph(it.body)
-  show highlight: md-highlight
-  show strike: md-strike
+  show parbreak: it => if-not-paged(it, md-parbreak)
+  show strong: it => if-not-paged(it, md-strong(it.body, delta: it.delta))
+  show emph: it => if-not-paged(it, md-emph(it.body))
+  show highlight: it => if-not-paged(it, md-highlight(it))
+  show strike: it => if-not-paged(it, md-strike(it))
   // todo: icc?
-  show image: it => md-image(src: it.source, alt: it.alt)
+  show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
 
-  show raw: it => md-raw(lang: it.lang, block: it.block, it.text)
-  show link: it => md-link(dest: it.dest, it.body)
-  // show label: it => html.elem("m1Label", it)
-  show ref: it => md-ref(it)
+  show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, it.text))
+  show link: it => if-not-paged(it, md-link(dest: it.dest, it.body))
+  show ref: it => if-not-paged(it, md-ref(it))
 
-  show heading: it => md-heading(level: it.level, it.body)
-  show outline: md-outline
-  show outline.entry: it => md-outline-entry(level: it.level, it.element)
-  show quote: it => html.elem(
-    "m1quote",
-    attrs: (
-      attribution: it.attribution,
-    ),
-    it.body,
+  show heading: it => if-not-paged(it, md-heading(level: it.level, it.body))
+  show outline: it => if-not-paged(it, md-outline(it))
+  show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
+  show quote: it => if-not-paged(it, md-quote(attribution: it.attribution, it.body))
+  show table: it => if-not-paged(it, md-table(it))
+  show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
+
+  show math.equation.where(block: false): it => if-not-paged(
+    it,
+    html.elem("m1eqinline", html.frame(box(inset: 0.5em, it))),
   )
-  show quote: it => md-quote(attribution: it.attribution, it.body)
-  show table: it => md-table(it)
-  show grid: it => md-grid(columns: it.columns, ..it.children)
+  show math.equation.where(block: true): it => if-not-paged(
+    it,
+    html.elem("m1eqblock", html.frame(block(inset: 0.5em, it))),
+  )
 
-  show math.equation.where(block: false): it => html.elem("m1eqinline", html.frame(box(inset: 0.5em, it)))
-  show math.equation.where(block: true): it => html.elem("m1eqblock", html.frame(block(inset: 0.5em, it)))
-
-  show linebreak: md-linebreak // math equation may include linebreak
-  show figure: it => md-figure(it.body, caption: it.caption.body)
+  show linebreak: it => if-not-paged(it, md-linebreak)
+  show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption.body))
 
   html.elem("m1document", body)
 }
