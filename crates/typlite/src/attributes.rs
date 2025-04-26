@@ -27,6 +27,7 @@ pub mod md_attr {
         lang -> lang
         block -> block
         text -> text
+        value -> value
     }
 }
 
@@ -53,6 +54,11 @@ pub struct RawAttr {
     pub text: EcoString,
 }
 
+#[derive(TypliteAttr, Default)]
+pub struct ListItemAttr {
+    pub value: Option<u32>,
+}
+
 pub trait TypliteAttrsParser {
     fn parse(attrs: &HtmlAttrs) -> Result<Self>
     where
@@ -73,6 +79,14 @@ impl TypliteAttrParser for usize {
     }
 }
 
+impl TypliteAttrParser for u32 {
+    fn parse_attr(content: &EcoString) -> Result<Self> {
+        Ok(content
+            .parse::<u32>()
+            .map_err(|_| format!("cannot parse {} as u32", content))?)
+    }
+}
+
 impl TypliteAttrParser for bool {
     fn parse_attr(content: &EcoString) -> Result<Self> {
         Ok(content
@@ -84,5 +98,18 @@ impl TypliteAttrParser for bool {
 impl TypliteAttrParser for EcoString {
     fn parse_attr(content: &EcoString) -> Result<Self> {
         Ok(content.clone())
+    }
+}
+
+impl<T> TypliteAttrParser for Option<T>
+where
+    T: TypliteAttrParser,
+{
+    fn parse_attr(content: &EcoString) -> Result<Self> {
+        if content.is_empty() {
+            Ok(None)
+        } else {
+            T::parse_attr(content).map(Some)
+        }
     }
 }

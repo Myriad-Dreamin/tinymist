@@ -1,9 +1,7 @@
 //! Markdown converter implementation
 
 use base64::Engine;
-use cmark_writer::ast::{
-    BlockNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, InlineNode, ListItem,
-};
+use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, ListItem, Node};
 use cmark_writer::writer::CommonMarkWriter;
 use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
@@ -20,8 +18,8 @@ use crate::TypliteFeat;
 pub struct MarkdownConverter {
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
-    blocks: Vec<BlockNode>,
-    inline_buffer: Vec<InlineNode>,
+    blocks: Vec<Node>,
+    inline_buffer: Vec<Node>,
 }
 
 impl MarkdownConverter {
@@ -42,11 +40,9 @@ impl MarkdownConverter {
         self.convert_element(root)?;
         self.flush_inline_buffer();
 
-        let document = BlockNode::Document(self.blocks.clone());
+        let document = Node::Document(self.blocks.clone());
         let mut writer = CommonMarkWriter::new();
-        writer
-            .write(&document.into_node())
-            .expect("Failed to write document");
+        writer.write(&document).expect("Failed to write document");
         w.push_str(&writer.into_string());
 
         Ok(())
@@ -54,16 +50,12 @@ impl MarkdownConverter {
 
     fn flush_inline_buffer(&mut self) {
         if !self.inline_buffer.is_empty() {
-            self.blocks.push(BlockNode::Paragraph(std::mem::take(
-                &mut self.inline_buffer,
-            )));
+            self.blocks
+                .push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
         }
     }
 
-    fn flush_inline_buffer_as_block(
-        &mut self,
-        make_block: impl FnOnce(Vec<InlineNode>) -> BlockNode,
-    ) {
+    fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Node>) -> Node) {
         if !self.inline_buffer.is_empty() {
             self.blocks
                 .push(make_block(std::mem::take(&mut self.inline_buffer)));
@@ -92,7 +84,7 @@ impl MarkdownConverter {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
                 self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| BlockNode::Heading {
+                self.flush_inline_buffer_as_block(|content| Node::Heading {
                     level: attrs.level as u8 + 1,
                     content,
                 });
@@ -102,14 +94,14 @@ impl MarkdownConverter {
             tag::ol => {
                 self.flush_inline_buffer();
                 let items = self.convert_list(element)?;
-                self.blocks.push(BlockNode::OrderedList { start: 1, items });
+                self.blocks.push(Node::OrderedList { start: 1, items });
                 Ok(())
             }
 
             tag::ul => {
                 self.flush_inline_buffer();
                 let items = self.convert_list(element)?;
-                self.blocks.push(BlockNode::UnorderedList(items));
+                self.blocks.push(Node::UnorderedList(items));
                 Ok(())
             }
 
@@ -117,13 +109,12 @@ impl MarkdownConverter {
                 let attrs = RawAttr::parse(&element.attrs)?;
                 if attrs.block {
                     self.flush_inline_buffer();
-                    self.blocks.push(BlockNode::CodeBlock {
+                    self.blocks.push(Node::CodeBlock {
                         language: Some(attrs.lang.into()),
                         content: attrs.text.into(),
                     });
                 } else {
-                    self.inline_buffer
-                        .push(InlineNode::InlineCode(attrs.text.into()));
+                    self.inline_buffer.push(Node::InlineCode(attrs.text.into()));
                 }
                 Ok(())
             }
@@ -132,7 +123,7 @@ impl MarkdownConverter {
                 self.flush_inline_buffer();
                 self.convert_children(element)?;
                 self.flush_inline_buffer_as_block(|content| {
-                    BlockNode::BlockQuote(vec![BlockNode::Paragraph(content)])
+                    Node::BlockQuote(vec![Node::Paragraph(content)])
                 });
                 Ok(())
             }
@@ -145,34 +136,33 @@ impl MarkdownConverter {
             tag::strong | md_tag::strong => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(InlineNode::Strong(content));
+                self.inline_buffer.push(Node::Strong(content));
                 Ok(())
             }
 
             tag::em | md_tag::emph => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(InlineNode::Emphasis(content));
+                self.inline_buffer.push(Node::Emphasis(content));
                 Ok(())
             }
 
             md_tag::highlight => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer
-                    .push(InlineNode::HtmlElement(CmarkHtmlElement {
-                        tag: "mark".to_string(),
-                        attributes: vec![],
-                        children: content,
-                        self_closing: false,
-                    }));
+                self.inline_buffer.push(Node::HtmlElement(CmarkHtmlElement {
+                    tag: "mark".to_string(),
+                    attributes: vec![],
+                    children: content,
+                    self_closing: false,
+                }));
                 Ok(())
             }
 
             md_tag::strike => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(InlineNode::Strike(content));
+                self.inline_buffer.push(Node::Strike(content));
                 Ok(())
             }
 
@@ -180,7 +170,7 @@ impl MarkdownConverter {
                 let attrs = LinkAttr::parse(&element.attrs)?;
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(InlineNode::Link {
+                self.inline_buffer.push(Node::Link {
                     url: attrs.dest.into(),
                     title: None,
                     content,
@@ -191,16 +181,16 @@ impl MarkdownConverter {
             md_tag::image => {
                 let attrs = ImageAttr::parse(&element.attrs)?;
                 let src = attrs.src.as_str();
-                self.inline_buffer.push(InlineNode::Image {
+                self.inline_buffer.push(Node::Image {
                     url: src.to_string(),
                     title: None,
-                    alt: attrs.alt.into(),
+                    alt: vec![Node::Text(attrs.alt.into())],
                 });
                 Ok(())
             }
 
             md_tag::linebreak => {
-                self.inline_buffer.push(InlineNode::HardBreak);
+                self.inline_buffer.push(Node::HardBreak);
                 Ok(())
             }
 
@@ -254,7 +244,7 @@ impl MarkdownConverter {
                         .into_iter()
                         .map(|row| row.into_iter().flatten().collect())
                         .collect();
-                    self.blocks.push(BlockNode::Table {
+                    self.blocks.push(Node::Table {
                         headers: flattened_headers,
                         rows: flattened_rows,
                         alignments,
@@ -292,7 +282,7 @@ impl MarkdownConverter {
             match child {
                 HtmlNode::Text(text, _) => {
                     self.inline_buffer
-                        .push(InlineNode::Text(text.as_str().to_string()));
+                        .push(Node::Text(text.as_str().to_string()));
                 }
                 HtmlNode::Element(element) => {
                     self.convert_element(element)?;
@@ -308,7 +298,7 @@ impl MarkdownConverter {
 
     fn convert_children_into(
         &mut self,
-        target: &mut Vec<InlineNode>,
+        target: &mut Vec<Node>,
         element: &HtmlElement,
     ) -> Result<()> {
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
@@ -321,32 +311,34 @@ impl MarkdownConverter {
     fn convert_list(&mut self, element: &HtmlElement) -> Result<Vec<ListItem>> {
         let mut all_items = Vec::new();
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
+        let is_ordered = element.tag == tag::ol;
 
         for child in &element.children {
             if let HtmlNode::Element(li) = child {
                 if li.tag == tag::li {
+                    let attrs = crate::attributes::ListItemAttr::parse(&li.attrs)?;
+
                     let mut item_content = Vec::new();
 
                     for li_child in &li.children {
                         match li_child {
                             HtmlNode::Text(text, _) => {
                                 self.inline_buffer
-                                    .push(InlineNode::Text(text.as_str().to_string()));
+                                    .push(Node::Text(text.as_str().to_string()));
                             }
                             HtmlNode::Element(child_elem) => {
                                 if child_elem.tag == tag::ul || child_elem.tag == tag::ol {
                                     if !self.inline_buffer.is_empty() {
-                                        item_content.push(BlockNode::Paragraph(std::mem::take(
+                                        item_content.push(Node::Paragraph(std::mem::take(
                                             &mut self.inline_buffer,
                                         )));
                                     }
 
                                     let items = self.convert_list(child_elem)?;
                                     if child_elem.tag == tag::ul {
-                                        item_content.push(BlockNode::UnorderedList(items));
+                                        item_content.push(Node::UnorderedList(items));
                                     } else {
-                                        item_content
-                                            .push(BlockNode::OrderedList { start: 1, items });
+                                        item_content.push(Node::OrderedList { start: 1, items });
                                     }
                                 } else {
                                     self.convert_element(child_elem)?;
@@ -357,15 +349,20 @@ impl MarkdownConverter {
                     }
 
                     if !self.inline_buffer.is_empty() {
-                        item_content.push(BlockNode::Paragraph(std::mem::take(
-                            &mut self.inline_buffer,
-                        )));
+                        item_content.push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
                     }
 
                     if !item_content.is_empty() {
-                        all_items.push(ListItem::Regular {
-                            content: item_content,
-                        });
+                        if is_ordered {
+                            all_items.push(ListItem::Ordered {
+                                number: attrs.value,
+                                content: item_content,
+                            });
+                        } else {
+                            all_items.push(ListItem::Unordered {
+                                content: item_content,
+                            });
+                        }
                     }
                 }
             }
@@ -375,10 +372,10 @@ impl MarkdownConverter {
         Ok(all_items)
     }
 
-    fn convert_frame(&self, frame: &Frame) -> InlineNode {
+    fn convert_frame(&self, frame: &Frame) -> Node {
         let svg = typst_svg::svg_frame(frame);
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
-        InlineNode::HtmlElement(CmarkHtmlElement {
+        Node::HtmlElement(CmarkHtmlElement {
             tag: "img".to_string(),
             attributes: vec![
                 HtmlAttribute {
