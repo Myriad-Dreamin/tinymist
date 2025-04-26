@@ -48,30 +48,13 @@ impl MarkdownDocument {
 
     /// Convert the content to a LaTeX string.
     pub fn to_tex_string(self) -> Result<ecow::EcoString> {
-        let mut w: ecow::EcoString = r#"\documentclass[sigconf]{acmart}
-
-\AtBeginDocument{%
-  \providecommand\BibTeX{{%
-    \normalfont B\kern-0.5em{\scshape i\kern-0.25em b}\kern-0.8em\TeX}}}
-
-\begin{document}
-
-\title{Typst Template for ACM Conference Proceedings}
-
-\maketitle
-"#
-        .into();
+        let mut w = ecow::EcoString::new();
         LaTeXConverter {
             feat: self.feat,
             list_state: None,
         }
         .convert(&self.base.root, &mut w)?;
 
-        w.push_str(
-            r#"
-\end{document}
-"#,
-        );
         Ok(w)
     }
 

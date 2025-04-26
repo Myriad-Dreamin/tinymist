@@ -52,6 +52,34 @@ impl LaTeXWriter {
         Self { list_state: None }
     }
 
+    /// 生成 LaTeX 文档前言，包含必要的包引用
+    fn write_preamble(&self, output: &mut EcoString) {
+        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
+        output.push_str("\\usepackage[utf8]{inputenc}\n");
+        output.push_str("\\usepackage{hyperref}\n");     // 用于链接
+        output.push_str("\\usepackage{graphicx}\n");     // 用于图片
+        output.push_str("\\usepackage{ulem}\n");         // 用于删除线 \sout
+        output.push_str("\\usepackage{listings}\n");     // 用于代码块
+        output.push_str("\\usepackage{xcolor}\n");       // 用于彩色文本和背景
+        output.push_str("\\usepackage{amsmath}\n");      // 数学公式支持
+        output.push_str("\\usepackage{amssymb}\n");      // 额外的数学符号
+        output.push_str("\\usepackage{array}\n");        // 增强表格功能
+        
+        // 设置代码高亮风格
+        output.push_str("\\lstset{\n");
+        output.push_str("  basicstyle=\\ttfamily\\small,\n");
+        output.push_str("  breaklines=true,\n");
+        output.push_str("  frame=single,\n");
+        output.push_str("  numbers=left,\n");
+        output.push_str("  numberstyle=\\tiny,\n");
+        output.push_str("  keywordstyle=\\color{blue},\n");
+        output.push_str("  commentstyle=\\color{green!60!black},\n");
+        output.push_str("  stringstyle=\\color{red}\n");
+        output.push_str("}\n\n");
+        
+        output.push_str("\\begin{document}\n\n");
+    }
+
     fn write_inline_nodes(&mut self, nodes: &[Node], output: &mut EcoString) -> Result<()> {
         for node in nodes {
             self.write_node(node, output)?;
@@ -322,7 +350,16 @@ impl LaTeXWriter {
 
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        self.write_node(document, output)
+        // 写入 LaTeX 前言，包含必要的包引用
+        self.write_preamble(output);
+        
+        // 写入文档主体内容
+        self.write_node(document, output)?;
+        
+        // 添加文档结束标记
+        output.push_str("\n\\end{document}");
+        
+        Ok(())
     }
 
     fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
