@@ -508,31 +508,79 @@ impl DocxConverter {
 
         let mut rows = Vec::new();
 
-        for child in &element.children {
-            if let HtmlNode::Element(row_elem) = child {
-                let mut cells = Vec::new();
+        // Find real table element - either directly in m1table or inside m1grid/m1table
+        let real_table_elem = if element.tag == md_tag::grid {
+            // For grid: grid -> table -> table
+            let mut inner_table = None;
 
-                for cell_node in &row_elem.children {
-                    if let HtmlNode::Element(cell_elem) = cell_node {
-                        if cell_elem.tag == md_tag::table_cell || cell_elem.tag == md_tag::grid_cell
-                        {
-                            let prev_nodes = std::mem::take(&mut self.nodes);
-                            let prev_buffer = std::mem::take(&mut self.inline_buffer);
+            for child in &element.children {
+                if let HtmlNode::Element(table_elem) = child {
+                    if table_elem.tag == md_tag::table {
+                        // Find table tag inside m1table
+                        for inner_child in &table_elem.children {
+                            if let HtmlNode::Element(inner) = inner_child {
+                                if inner.tag == tag::table {
+                                    inner_table = Some(inner);
+                                    break;
+                                }
+                            }
+                        }
 
-                            self.convert_children(cell_elem)?;
-                            self.flush_inline_buffer();
-
-                            let cell_content = std::mem::take(&mut self.nodes);
-                            cells.push(cell_content);
-
-                            self.nodes = prev_nodes;
-                            self.inline_buffer = prev_buffer;
+                        if inner_table.is_some() {
+                            break;
                         }
                     }
                 }
+            }
 
-                if !cells.is_empty() {
-                    rows.push(cells);
+            inner_table
+        } else {
+            // For m1table -> table
+            let mut direct_table = None;
+
+            for child in &element.children {
+                if let HtmlNode::Element(table_elem) = child {
+                    if table_elem.tag == tag::table {
+                        direct_table = Some(table_elem);
+                        break;
+                    }
+                }
+            }
+
+            direct_table
+        };
+
+        // Process table rows and cells if the real table element was found
+        if let Some(table) = real_table_elem {
+            // Process rows in table
+            for row_node in &table.children {
+                if let HtmlNode::Element(row_elem) = row_node {
+                    if row_elem.tag == tag::tr {
+                        let mut cells = Vec::new();
+
+                        // Process cells in this row
+                        for cell_node in &row_elem.children {
+                            if let HtmlNode::Element(cell_elem) = cell_node {
+                                if cell_elem.tag == tag::td {
+                                    let prev_nodes = std::mem::take(&mut self.nodes);
+                                    let prev_buffer = std::mem::take(&mut self.inline_buffer);
+
+                                    self.convert_children(cell_elem)?;
+                                    self.flush_inline_buffer();
+
+                                    let cell_content = std::mem::take(&mut self.nodes);
+                                    cells.push(cell_content);
+
+                                    self.nodes = prev_nodes;
+                                    self.inline_buffer = prev_buffer;
+                                }
+                            }
+                        }
+
+                        if !cells.is_empty() {
+                            rows.push(cells);
+                        }
+                    }
                 }
             }
         }

@@ -70,59 +70,13 @@
   attrs: (attribution: attribution),
   body,
 )
-#let md-table(columns: auto, ..children) = html.elem(
+#let md-table(it) = html.elem(
   "m1table",
-  attrs: (
-    columns: str({
-      if type(columns) == array {
-        str(columns.len())
-      } else if type(columns) == int {
-        str(columns)
-      } else if type(columns) == auto {
-        str(children.len())
-      } else {
-        error("Invalid columns type")
-      }
-    }),
-  ),
-  children
-    .pos()
-    .map(cell => html.elem(
-      "m1tablecell",
-      attrs: (
-        colspan: str(cell.fields().at("colspan", default: 1)),
-        rowspan: str(cell.fields().at("rowspan", default: 1)),
-      ),
-      cell,
-    ))
-    .join(),
+  it,
 )
 #let md-grid(columns: auto, ..children) = html.elem(
   "m1grid",
-  attrs: (
-    columns: str({
-      if type(columns) == array {
-        str(columns.len())
-      } else if type(columns) == int {
-        str(columns)
-      } else if type(columns) == auto {
-        str(children.len())
-      } else {
-        error("Invalid columns type")
-      }
-    }),
-  ),
-  children
-    .pos()
-    .map(cell => html.elem(
-      "m1gridcell",
-      attrs: (
-        colspan: str(cell.fields().at("colspan", default: 1)),
-        rowspan: str(cell.fields().at("rowspan", default: 1)),
-      ),
-      cell,
-    ))
-    .join(),
+  table(columns: columns, ..children.pos().map(it => table.cell(it.body))),
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
@@ -169,14 +123,8 @@
     it.body,
   )
   show quote: it => md-quote(attribution: it.attribution, it.body)
-  show table: it => md-table(
-    columns: it.columns,
-    children: it.children,
-  )
-  show grid: it => md-grid(
-    columns: it.columns,
-    children: it.children,
-  )
+  show table: it => md-table(it)
+  show grid: it => md-grid(columns: it.columns, ..it.children)
 
   show math.equation.where(block: false): it => html.elem("m1eqinline", html.frame(box(inset: 0.5em, it)))
   show math.equation.where(block: true): it => html.elem("m1eqblock", html.frame(block(inset: 0.5em, it)))

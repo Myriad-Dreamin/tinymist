@@ -29,9 +29,9 @@ pub mod md_tag {
         outline_entry -> m1outentry
         quote -> m1quote
         table -> m1table
-        table_cell -> m1tablecell
+        // table_cell -> m1tablecell
         grid -> m1grid
-        grid_cell -> m1gridcell
+        // grid_cell -> m1gridcell
         // figure -> m1figure
 
         math_equation_inline -> m1eqinline

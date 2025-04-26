@@ -202,34 +202,81 @@ impl MarkdownConverter {
                 let mut current_row;
                 let mut is_header = true;
 
-                // Process table cells
-                for child in &element.children {
-                    if let HtmlNode::Element(row_elem) = child {
-                        // Reset current row for each row element
-                        current_row = Vec::new();
+                // Find real table element - either directly in m1table or inside m1grid/m1table
+                let real_table_elem = if element.tag == md_tag::grid {
+                    // For grid: grid -> table -> table
+                    let mut inner_table = None;
 
-                        // Process cells in this row
-                        for cell_node in &row_elem.children {
-                            if let HtmlNode::Element(cell) = cell_node {
-                                if cell.tag == md_tag::table_cell || cell.tag == md_tag::grid_cell {
-                                    let mut cell_content = Vec::new();
-                                    self.convert_children_into(&mut cell_content, cell)?;
-
-                                    // Add to appropriate section
-                                    if is_header {
-                                        headers.push(cell_content);
-                                    } else {
-                                        current_row.push(cell_content);
+                    for child in &element.children {
+                        if let HtmlNode::Element(table_elem) = child {
+                            if table_elem.tag == md_tag::table {
+                                // Find table tag inside m1table
+                                for inner_child in &table_elem.children {
+                                    if let HtmlNode::Element(inner) = inner_child {
+                                        if inner.tag == tag::table {
+                                            inner_table = Some(inner);
+                                            break;
+                                        }
                                     }
+                                }
+
+                                if inner_table.is_some() {
+                                    break;
                                 }
                             }
                         }
+                    }
 
-                        // After first row, treat remaining rows as data rows
-                        if is_header {
-                            is_header = false;
-                        } else if !current_row.is_empty() {
-                            rows.push(current_row);
+                    inner_table
+                } else {
+                    // For m1table -> table
+                    let mut direct_table = None;
+
+                    for child in &element.children {
+                        if let HtmlNode::Element(table_elem) = child {
+                            if table_elem.tag == tag::table {
+                                direct_table = Some(table_elem);
+                                break;
+                            }
+                        }
+                    }
+
+                    direct_table
+                };
+
+                // Process table rows and cells if the real table element was found
+                if let Some(table) = real_table_elem {
+                    // Process rows in table
+                    for row_node in &table.children {
+                        if let HtmlNode::Element(row_elem) = row_node {
+                            if row_elem.tag == tag::tr {
+                                // Reset current row for each row element
+                                current_row = Vec::new();
+
+                                // Process cells in this row
+                                for cell_node in &row_elem.children {
+                                    if let HtmlNode::Element(cell) = cell_node {
+                                        if cell.tag == tag::td {
+                                            let mut cell_content = Vec::new();
+                                            self.convert_children_into(&mut cell_content, cell)?;
+
+                                            // Add to appropriate section
+                                            if is_header {
+                                                headers.push(cell_content);
+                                            } else {
+                                                current_row.push(cell_content);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // After first row, treat remaining rows as data rows
+                                if is_header {
+                                    is_header = false;
+                                } else if !current_row.is_empty() {
+                                    rows.push(current_row);
+                                }
+                            }
                         }
                     }
                 }
@@ -254,7 +301,7 @@ impl MarkdownConverter {
                 Ok(())
             }
 
-            md_tag::table_cell | md_tag::grid_cell => {
+            tag::td | tag::tr => {
                 self.convert_children(element)?;
                 Ok(())
             }

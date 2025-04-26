@@ -72,9 +72,7 @@ impl LaTeXConverter {
 
             // Block elements
             md_tag::quote => self.process_quote(root, w),
-            md_tag::table | md_tag::grid | md_tag::table_cell | md_tag::grid_cell => {
-                self.process_table(root, w)
-            }
+            md_tag::table | md_tag::grid => self.process_table(root, w),
 
             // Math and image elements
             md_tag::math_equation_inline | md_tag::math_equation_block => self.process_math(w),
@@ -199,10 +197,139 @@ impl LaTeXConverter {
     }
 
     /// Processes a table element
-    fn process_table(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
-        w.push_str("\\begin{verbatim}\n");
-        self.convert_children(root, w)?;
-        w.push_str("\\end{verbatim}\n");
+    fn process_table(&mut self, element: &HtmlElement, w: &mut EcoString) -> Result<()> {
+        // Find real table element - either directly in m1table or inside m1grid/m1table
+        let real_table_elem = if element.tag == md_tag::grid {
+            // For grid: grid -> table -> table
+            let mut inner_table = None;
+
+            for child in &element.children {
+                if let HtmlNode::Element(table_elem) = child {
+                    if table_elem.tag == md_tag::table {
+                        // Find table tag inside m1table
+                        for inner_child in &table_elem.children {
+                            if let HtmlNode::Element(inner) = inner_child {
+                                if inner.tag == tag::table {
+                                    inner_table = Some(inner);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if inner_table.is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            inner_table
+        } else {
+            // For m1table -> table
+            let mut direct_table = None;
+
+            for child in &element.children {
+                if let HtmlNode::Element(table_elem) = child {
+                    if table_elem.tag == tag::table {
+                        direct_table = Some(table_elem);
+                        break;
+                    }
+                }
+            }
+
+            direct_table
+        };
+
+        // If we found a real table element, process it as a LaTeX tabular
+        if let Some(table) = real_table_elem {
+            // Count columns in the first row to set up the tabular format
+            let mut col_count = 0;
+
+            // Find the first row to count columns
+            for row_node in &table.children {
+                if let HtmlNode::Element(row_elem) = row_node {
+                    if row_elem.tag == tag::tr {
+                        // Count cells in this row
+                        for cell_node in &row_elem.children {
+                            if let HtmlNode::Element(cell) = cell_node {
+                                if cell.tag == tag::td {
+                                    col_count += 1;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // If we found at least one column, create a tabular environment
+            if col_count > 0 {
+                // Start tabular environment
+                w.push_str("\\begin{table}[htbp]\n");
+                w.push_str("\\centering\n");
+                w.push_str("\\begin{tabular}{");
+
+                // Add column format specifiers (centered columns)
+                for _ in 0..col_count {
+                    w.push('c');
+                }
+                w.push_str("}\n\\hline\n");
+
+                // Process all rows in the table
+                let mut is_first_row = true;
+                for row_node in &table.children {
+                    if let HtmlNode::Element(row_elem) = row_node {
+                        if row_elem.tag == tag::tr {
+                            let mut cell_idx = 0;
+
+                            // Process cells in this row
+                            for cell_node in &row_elem.children {
+                                if let HtmlNode::Element(cell) = cell_node {
+                                    if cell.tag == tag::td {
+                                        // Add cell separator if not the first cell
+                                        if cell_idx > 0 {
+                                            w.push_str(" & ");
+                                        }
+
+                                        // Process cell content
+                                        let mut cell_content = EcoString::new();
+                                        self.convert_children(cell, &mut cell_content)?;
+                                        w.push_str(&cell_content);
+
+                                        cell_idx += 1;
+                                    }
+                                }
+                            }
+
+                            // End the row
+                            w.push_str(" \\\\\n");
+
+                            // Add a horizontal line after header row
+                            if is_first_row {
+                                w.push_str("\\hline\n");
+                                is_first_row = false;
+                            }
+                        }
+                    }
+                }
+
+                // Close the tabular environment
+                w.push_str("\\hline\n");
+                w.push_str("\\end{tabular}\n");
+                w.push_str("\\end{table}\n");
+            } else {
+                // Fallback if we couldn't determine the structure
+                w.push_str(
+                    "\\begin{verbatim}\n[Table content could not be processed]\n\\end{verbatim}\n",
+                );
+            }
+        } else {
+            // If no table structure was found, use verbatim as fallback
+            w.push_str("\\begin{verbatim}\n");
+            self.convert_children(element, w)?;
+            w.push_str("\\end{verbatim}\n");
+        }
+
         Ok(())
     }
 
