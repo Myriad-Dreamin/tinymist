@@ -78,8 +78,7 @@ impl MarkdownDocument {
     /// Convert the content to a DOCX document
     pub fn to_docx(&self) -> Result<Vec<u8>> {
         let mut converter = DocxConverter::new(self.feat.clone());
-        converter.convert(&self.base.root)?;
-        converter.to_docx()
+        converter.convert(&self.base.root)
     }
 }
 

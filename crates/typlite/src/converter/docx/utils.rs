@@ -1,11 +1,7 @@
 //! Utility functions for DOCX conversion
 
 use image::GenericImageView;
-use resvg::tiny_skia::{self, Pixmap};
-use resvg::usvg::{Options, Tree};
-use typst::layout::Frame;
 
-use crate::Result;
 
 /// Get image dimensions
 pub fn get_image_size(img_data: &[u8]) -> Option<(u32, u32)> {
@@ -38,38 +34,4 @@ pub fn calculate_image_dimensions(img_data: &[u8], scale_factor: Option<f32>) ->
     } else {
         (4000000, 3000000)
     }
-}
-
-/// Render frame to PNG image
-pub fn render_frame_to_png(frame: &Frame) -> Result<Vec<u8>> {
-    let svg = typst_svg::svg_frame(frame);
-
-    let dpi = 300.0;
-    let scale_factor = dpi / 96.0;
-
-    let opt = Options {
-        dpi,
-        ..Options::default()
-    };
-
-    let rtree = match Tree::from_str(&svg, &opt) {
-        Ok(tree) => tree,
-        Err(e) => return Err(format!("SVG parse error: {:?}", e).into()),
-    };
-
-    let size = rtree.size().to_int_size();
-    let width = (size.width() as f32 * scale_factor) as u32;
-    let height = (size.height() as f32 * scale_factor) as u32;
-
-    let mut pixmap = Pixmap::new(width, height).ok_or("Failed to create pixmap")?;
-
-    resvg::render(
-        &rtree,
-        tiny_skia::Transform::from_scale(scale_factor, scale_factor),
-        &mut pixmap.as_mut(),
-    );
-
-    pixmap
-        .encode_png()
-        .map_err(|e| format!("PNG encode error: {:?}", e).into())
 }

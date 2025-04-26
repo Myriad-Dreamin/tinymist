@@ -8,7 +8,7 @@ use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
 use crate::attributes::{HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser};
-use crate::converter::ListState;
+use crate::converter::{FormatWriter, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -18,8 +18,8 @@ use crate::TypliteFeat;
 pub struct MarkdownConverter {
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
-    blocks: Vec<Node>,
-    inline_buffer: Vec<Node>,
+    pub blocks: Vec<Node>,
+    pub inline_buffer: Vec<Node>,
 }
 
 impl MarkdownConverter {
@@ -33,6 +33,7 @@ impl MarkdownConverter {
     }
 }
 
+// 保留原有的解析逻辑，但暴露更多内部方法以供共享解析器使用
 impl MarkdownConverter {
     pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
         self.blocks = Vec::new();
@@ -41,28 +42,15 @@ impl MarkdownConverter {
         self.flush_inline_buffer();
 
         let document = Node::Document(self.blocks.clone());
-        let mut writer = CommonMarkWriter::new();
-        writer.write(&document).expect("Failed to write document");
-        w.push_str(&writer.into_string());
+
+        // 使用 MarkdownWriter 进行写入
+        let mut writer = MarkdownWriter::new();
+        writer.write_eco(&document, w)?;
 
         Ok(())
     }
 
-    fn flush_inline_buffer(&mut self) {
-        if !self.inline_buffer.is_empty() {
-            self.blocks
-                .push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
-        }
-    }
-
-    fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Node>) -> Node) {
-        if !self.inline_buffer.is_empty() {
-            self.blocks
-                .push(make_block(std::mem::take(&mut self.inline_buffer)));
-        }
-    }
-
-    fn convert_element(&mut self, element: &HtmlElement) -> Result<()> {
+    pub fn convert_element(&mut self, element: &HtmlElement) -> Result<()> {
         match element.tag {
             tag::head => Ok(()),
 
@@ -324,7 +312,21 @@ impl MarkdownConverter {
         }
     }
 
-    fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
+    pub fn flush_inline_buffer(&mut self) {
+        if !self.inline_buffer.is_empty() {
+            self.blocks
+                .push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
+        }
+    }
+
+    pub fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Node>) -> Node) {
+        if !self.inline_buffer.is_empty() {
+            self.blocks
+                .push(make_block(std::mem::take(&mut self.inline_buffer)));
+        }
+    }
+
+    pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
         for child in &element.children {
             match child {
                 HtmlNode::Text(text, _) => {
@@ -343,7 +345,7 @@ impl MarkdownConverter {
         Ok(())
     }
 
-    fn convert_children_into(
+    pub fn convert_children_into(
         &mut self,
         target: &mut Vec<Node>,
         element: &HtmlElement,
@@ -355,7 +357,7 @@ impl MarkdownConverter {
         Ok(())
     }
 
-    fn convert_list(&mut self, element: &HtmlElement) -> Result<Vec<ListItem>> {
+    pub fn convert_list(&mut self, element: &HtmlElement) -> Result<Vec<ListItem>> {
         let mut all_items = Vec::new();
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
         let is_ordered = element.tag == tag::ol;
@@ -419,7 +421,7 @@ impl MarkdownConverter {
         Ok(all_items)
     }
 
-    fn convert_frame(&self, frame: &Frame) -> Node {
+    pub fn convert_frame(&self, frame: &Frame) -> Node {
         let svg = typst_svg::svg_frame(frame);
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
         Node::HtmlElement(CmarkHtmlElement {
@@ -437,5 +439,28 @@ impl MarkdownConverter {
             children: vec![],
             self_closing: true,
         })
+    }
+}
+
+/// Markdown writer implementation that uses cmark-writer to write documents
+#[derive(Default)]
+pub struct MarkdownWriter {}
+
+impl MarkdownWriter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl FormatWriter for MarkdownWriter {
+    fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
+        let mut writer = CommonMarkWriter::new();
+        writer.write(document).expect("Failed to write document");
+        output.push_str(&writer.into_string());
+        Ok(())
+    }
+
+    fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
+        Err("Markdown writer does not support writing to Vec<u8>".into())
     }
 }
