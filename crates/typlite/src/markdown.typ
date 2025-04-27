@@ -96,8 +96,8 @@
     caption: if caption == none {
       ""
     } else {
-      if caption.func() == text {
-        caption.text
+      if caption.body.func() == text {
+        caption.body.text
       } else {
         ""
       }
@@ -145,7 +145,7 @@
   )
 
   show linebreak: it => if-not-paged(it, md-linebreak)
-  show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption.body))
+  show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption))
 
   html.elem("m1document", body)
 }
