@@ -683,7 +683,6 @@ impl TypliteWorker {
 
         let list_item = node.cast::<ast::ListItem>().unwrap();
 
-        // 添加适当的缩进
         for _ in 0..self.list_depth {
             s.push_str("  ");
         }

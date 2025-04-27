@@ -1,20 +1,24 @@
 //! # Typlite
 
 pub mod attributes;
-pub mod converter;
+pub mod common;
 mod error;
 pub mod library;
+pub mod parser;
 pub mod scopes;
 pub mod tags;
 pub mod value;
 pub mod worker;
+pub mod writer;
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
 pub use error::*;
 
+use cmark_writer::ast::Node;
 use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
@@ -22,7 +26,9 @@ use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst_syntax::VirtualPath;
 
-use crate::converter::{DocxConverter, Format, LaTeXConverter, MarkdownConverter};
+use crate::common::Format;
+use crate::parser::{create_parser, Parser};
+use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
 /// The result type for typlite.
@@ -34,34 +40,51 @@ pub use tinymist_std;
 #[derive(Debug, Clone)]
 pub struct MarkdownDocument {
     pub base: HtmlDocument,
-    /// Features for the conversion.
     feat: TypliteFeat,
+    ast_cache: RefCell<Option<Node>>,
 }
 
 impl MarkdownDocument {
+    /// Parse HTML document with AST cache.
+    fn parse(&self) -> Result<Node> {
+        if let Some(ast) = self.ast_cache.borrow().as_ref() {
+            return Ok(ast.clone());
+        }
+        let parser = create_parser(self.feat.clone());
+        let ast = parser.parse(&self.base.root)?;
+        *self.ast_cache.borrow_mut() = Some(ast.clone());
+
+        Ok(ast)
+    }
+
     /// Convert the content to a markdown string.
-    pub fn to_md_string(self) -> Result<ecow::EcoString> {
-        let mut w = ecow::EcoString::new();
-        MarkdownConverter::new(self.feat).convert(&self.base.root, &mut w)?;
-        Ok(w)
+    pub fn to_md_string(&self) -> Result<ecow::EcoString> {
+        let mut output = ecow::EcoString::new();
+        let ast = self.parse()?;
+
+        let mut writer = WriterFactory::create(Format::Md);
+        writer.write_eco(&ast, &mut output)?;
+
+        Ok(output)
     }
 
     /// Convert the content to a LaTeX string.
-    pub fn to_tex_string(self) -> Result<ecow::EcoString> {
-        let mut w = ecow::EcoString::new();
-        LaTeXConverter {
-            feat: self.feat,
-            list_state: None,
-        }
-        .convert(&self.base.root, &mut w)?;
+    pub fn to_tex_string(&self) -> Result<ecow::EcoString> {
+        let mut output = ecow::EcoString::new();
+        let ast = self.parse()?;
 
-        Ok(w)
+        let mut writer = WriterFactory::create(Format::LaTeX);
+        writer.write_eco(&ast, &mut output)?;
+
+        Ok(output)
     }
 
     /// Convert the content to a DOCX document
     pub fn to_docx(&self) -> Result<Vec<u8>> {
-        let mut converter = DocxConverter::new(self.feat.clone());
-        converter.convert(&self.base.root)
+        let ast = self.parse()?;
+
+        let mut writer = WriterFactory::create(Format::Docx);
+        writer.write_vec(&ast)
     }
 }
 
@@ -210,6 +233,7 @@ impl Typlite {
         Ok(MarkdownDocument {
             base,
             feat: self.feat,
+            ast_cache: RefCell::new(None),
         })
     }
 }

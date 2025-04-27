@@ -2,11 +2,12 @@
 
 use typst::html::HtmlElement;
 
-use crate::converter::{FormatWriter, HtmlToAstParser};
+use crate::common::FormatWriter;
+use crate::parser::{create_parser, Parser};
 use crate::Result;
 use crate::TypliteFeat;
 
-use crate::converter::docx::writer::DocxWriter;
+use crate::writer::docx::writer::DocxWriter;
 
 /// DOCX Converter implementation
 #[derive(Clone, Debug)]
@@ -23,13 +24,9 @@ impl DocxConverter {
     /// Convert HTML element to DOCX format
     pub fn convert(&mut self, root: &HtmlElement) -> Result<Vec<u8>> {
         // Parse HTML to AST using shared parser
-        let parser = HtmlToAstParser::new(self.feat.clone());
-        let document = parser.parse(root)?;
-
-        // Create and initialize DocxWriter
-        let mut writer = DocxWriter::new(self.feat.clone());
-
-        // Process AST using DocxWriter
+        let parser = create_parser(self.feat.clone());
+        let document = parser.parse(root)?; // Create and initialize DocxWriter
+        let mut writer = DocxWriter::new();
         writer.write_vec(&document)
     }
 }

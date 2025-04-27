@@ -9,7 +9,7 @@ use std::{
 use clap::Parser;
 use ecow::{eco_format, EcoString};
 use tinymist_project::WorldProvider;
-use typlite::{value::*, TypliteFeat};
+use typlite::{common::Format, value::*, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 
 /// Common arguments of compile, watch, and query.
@@ -84,13 +84,9 @@ fn main() -> typlite::Result<()> {
     let world = universe.snapshot();
 
     let format = match &output {
-        Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
-            typlite::converter::Format::LaTeX
-        }
-        Some(output) if output.extension() == Some(std::ffi::OsStr::new("docx")) => {
-            typlite::converter::Format::Docx
-        }
-        _ => typlite::converter::Format::Md,
+        Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => Format::LaTeX,
+        Some(output) if output.extension() == Some(std::ffi::OsStr::new("docx")) => Format::Docx,
+        _ => Format::Md,
     };
 
     let converter = Typlite::new(Arc::new(world))
@@ -103,7 +99,7 @@ fn main() -> typlite::Result<()> {
         .with_format(format);
 
     match format {
-        typlite::converter::Format::Docx => {
+        Format::Docx => {
             let docx_data = match converter.to_docx() {
                 Ok(data) => data,
                 Err(err) => {
@@ -160,7 +156,7 @@ fn debug_convert_doc() -> typlite::Result<()> {
             assets_src_path: None,
             ..Default::default()
         })
-        .with_format(typlite::converter::Format::Md);
+        .with_format(Format::Md);
     let doc = converter.convert_doc()?;
     println!("{:#?}", doc);
     Ok(())

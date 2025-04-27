@@ -6,9 +6,8 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::converter::{FigureNode, FormatWriter};
+use crate::common::{FigureNode, FormatWriter};
 use crate::Result;
-use crate::TypliteFeat;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
@@ -16,7 +15,6 @@ use super::styles::DocxStyles;
 
 /// DOCX writer that generates DOCX directly from AST (without intermediate representation)
 pub struct DocxWriter {
-    _feat: TypliteFeat,
     styles: DocxStyles,
     numbering: DocxNumbering,
     list_level: usize,
@@ -24,10 +22,15 @@ pub struct DocxWriter {
     image_processor: DocxImageProcessor,
 }
 
+impl Default for DocxWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DocxWriter {
-    pub fn new(feat: TypliteFeat) -> Self {
+    pub fn new() -> Self {
         Self {
-            _feat: feat,
             styles: DocxStyles::new(),
             numbering: DocxNumbering::new(),
             list_level: 0,

@@ -1,83 +1,28 @@
-//! LaTeX converter implementation
+//! LaTeX writer implementation
 
 use std::path::Path;
 
 use cmark_writer::ast::Node;
 use ecow::EcoString;
-use typst::html::HtmlElement;
+use tinymist_std::path::unix_slash;
 
-use crate::converter::{FigureNode, FormatWriter, HtmlToAstParser, ListState};
-use crate::tinymist_std::path::unix_slash;
+use crate::common::{FigureNode, FormatWriter, ListState};
 use crate::Result;
-use crate::TypliteFeat;
-
-/// LaTeX converter implementation
-#[derive(Clone)]
-pub struct LaTeXConverter {
-    pub feat: TypliteFeat,
-    pub list_state: Option<ListState>,
-}
-
-impl LaTeXConverter {
-    /// Creates a new LaTeXConverter instance
-    pub fn new(feat: TypliteFeat) -> Self {
-        Self {
-            feat,
-            list_state: None,
-        }
-    }
-
-    /// Converts an HTML element to LaTeX format
-    pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
-        // Parse HTML to AST using shared parser
-        let parser = HtmlToAstParser::new(self.feat.clone());
-        let document = parser.parse(root)?;
-
-        // Convert AST to LaTeX using LaTeX writer
-        let mut writer = LaTeXWriter::new();
-        writer.write_eco(&document, w)?;
-
-        Ok(())
-    }
-}
 
 /// LaTeX writer implementation
-#[derive(Default)]
 pub struct LaTeXWriter {
     list_state: Option<ListState>,
+}
+
+impl Default for LaTeXWriter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LaTeXWriter {
     pub fn new() -> Self {
         Self { list_state: None }
-    }
-
-    /// Generate LaTeX document preamble with necessary package imports
-    fn write_preamble(&self, output: &mut EcoString) {
-        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
-        output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n"); // For links
-        output.push_str("\\usepackage{graphicx}\n"); // For images
-        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
-        output.push_str("\\usepackage{listings}\n"); // For code blocks
-        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
-        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
-        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
-        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
-
-        // Set code highlighting style
-        output.push_str("\\lstset{\n");
-        output.push_str("  basicstyle=\\ttfamily\\small,\n");
-        output.push_str("  breaklines=true,\n");
-        output.push_str("  frame=single,\n");
-        output.push_str("  numbers=left,\n");
-        output.push_str("  numberstyle=\\tiny,\n");
-        output.push_str("  keywordstyle=\\color{blue},\n");
-        output.push_str("  commentstyle=\\color{green!60!black},\n");
-        output.push_str("  stringstyle=\\color{red}\n");
-        output.push_str("}\n\n");
-
-        output.push_str("\\begin{document}\n\n");
     }
 
     fn write_inline_nodes(&mut self, nodes: &[Node], output: &mut EcoString) -> Result<()> {
@@ -87,21 +32,7 @@ impl LaTeXWriter {
         Ok(())
     }
 
-    fn escape_latex(&self, text: &str) -> String {
-        text.replace("\\", "\\textbackslash{}")
-            .replace("{", "\\{")
-            .replace("}", "\\}")
-            .replace("_", "\\_")
-            .replace("^", "\\^")
-            .replace("&", "\\&")
-            .replace("%", "\\%")
-            .replace("$", "\\$")
-            .replace("#", "\\#")
-            .replace("~", "\\~{}")
-            .replace("<", "\\textless{}")
-            .replace(">", "\\textgreater{}")
-    }
-
+    /// Write the document to LaTeX format
     fn write_node(&mut self, node: &Node, output: &mut EcoString) -> Result<()> {
         match node {
             Node::Document(blocks) => {
@@ -296,7 +227,7 @@ impl LaTeXWriter {
                     // Add caption if present
                     if !figure_node.caption.is_empty() {
                         output.push_str("\\caption{");
-                        output.push_str(&self.escape_latex(&figure_node.caption));
+                        output.push_str(&escape_latex(&figure_node.caption));
                         output.push_str("}\n");
                     }
 
@@ -308,7 +239,7 @@ impl LaTeXWriter {
                 }
             }
             Node::Text(text) => {
-                output.push_str(&self.escape_latex(text));
+                output.push_str(&escape_latex(text));
             }
             Node::Emphasis(content) => {
                 output.push_str("\\textit{");
@@ -363,7 +294,7 @@ impl LaTeXWriter {
             }
             Node::InlineCode(code) => {
                 output.push_str("\\texttt{");
-                output.push_str(&self.escape_latex(code));
+                output.push_str(&escape_latex(code));
                 output.push_str("}");
             }
             Node::HardBreak => {
@@ -395,21 +326,60 @@ impl LaTeXWriter {
     }
 }
 
+/// Escape LaTeX special characters in a string
+fn escape_latex(text: &str) -> String {
+    text.replace('&', "\\&")
+        .replace('%', "\\%")
+        .replace('$', "\\$")
+        .replace('#', "\\#")
+        .replace('_', "\\_")
+        .replace('{', "\\{")
+        .replace('}', "\\}")
+        .replace('~', "\\textasciitilde{}")
+        .replace('^', "\\textasciicircum{}")
+        .replace('\\', "\\textbackslash{}")
+}
+
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        // Write LaTeX preamble with necessary package imports
-        self.write_preamble(output);
+        // Write LaTeX document preamble using the new method
+        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
+        output.push_str("\\usepackage[utf8]{inputenc}\n");
+        output.push_str("\\usepackage{hyperref}\n"); // For links
+        output.push_str("\\usepackage{graphicx}\n"); // For images
+        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
+        output.push_str("\\usepackage{listings}\n"); // For code blocks
+        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
+        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
+        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
+        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
 
-        // Write document main content
+        // Set code highlighting style
+        output.push_str("\\lstset{\n");
+        output.push_str("  basicstyle=\\ttfamily\\small,\n");
+        output.push_str("  breaklines=true,\n");
+        output.push_str("  frame=single,\n");
+        output.push_str("  numbers=left,\n");
+        output.push_str("  numberstyle=\\tiny,\n");
+        output.push_str("  keywordstyle=\\color{blue},\n");
+        output.push_str("  commentstyle=\\color{green!60!black},\n");
+        output.push_str("  stringstyle=\\color{red}\n");
+        output.push_str("}\n\n");
+
+        output.push_str("\\begin{document}\n\n");
+
+        // Write the document content
         self.write_node(document, output)?;
 
-        // Add document end tag
-        output.push_str("\n\\end{document}");
+        // Add document ending
+        output.push_str("\n\\end{document}\n");
 
         Ok(())
     }
 
-    fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
-        Err("LaTeXWriter does not support write_vec.".to_string().into())
+    fn write_vec(&mut self, document: &Node) -> Result<Vec<u8>> {
+        let mut output = EcoString::new();
+        self.write_eco(document, &mut output)?;
+        Ok(output.as_str().as_bytes().to_vec())
     }
 }

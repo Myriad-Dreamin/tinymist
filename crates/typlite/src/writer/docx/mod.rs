@@ -14,3 +14,4 @@ mod styles;
 mod writer;
 
 pub use converter::DocxConverter;
+pub use writer::DocxWriter;

@@ -1,21 +1,11 @@
-//! Converter implementations for different output formats
-
-mod docx;
-mod latex;
-mod markdown;
-
-use cmark_writer::WriteResult;
-pub use docx::DocxConverter;
-pub use latex::LaTeXConverter;
-pub use markdown::MarkdownConverter;
+//! Common types and interfaces for the conversion system
 
 use cmark_writer::ast::{CustomNodeWriter, Node};
 use cmark_writer::derive_custom_node;
+use cmark_writer::WriteResult;
 use ecow::EcoString;
-use typst::html::HtmlElement;
 
 use crate::Result;
-use crate::TypliteFeat;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListState {
@@ -54,30 +44,6 @@ impl FigureNode {
 
     fn is_block_custom(&self) -> bool {
         true
-    }
-}
-
-/// Common HTML to AST parser for all converters
-pub struct HtmlToAstParser {
-    feat: TypliteFeat,
-}
-
-impl HtmlToAstParser {
-    pub fn new(feat: TypliteFeat) -> Self {
-        Self { feat }
-    }
-
-    /// Parse HTML structure to CommonMark AST
-    pub fn parse(&self, root: &HtmlElement) -> Result<Node> {
-        let mut converter = markdown::MarkdownConverter::new(self.feat.clone());
-        let blocks = Vec::new();
-        let inline_buffer = Vec::new();
-        converter.blocks = blocks;
-        converter.inline_buffer = inline_buffer;
-        converter.convert_element(root)?;
-        converter.flush_inline_buffer();
-
-        Ok(Node::Document(converter.blocks.clone()))
     }
 }
 

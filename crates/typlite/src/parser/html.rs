@@ -1,30 +1,29 @@
-//! Markdown converter implementation
+//! HTML to AST parser implementation
 
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, ListItem, Node};
-use cmark_writer::writer::CommonMarkWriter;
-use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
 use crate::attributes::{
     FigureAttr, HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser,
 };
-use crate::converter::{FigureNode, FormatWriter, ListState};
+use crate::common::{FigureNode, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
 
-/// Markdown converter implementation
-#[derive(Clone, Default)]
-pub struct MarkdownConverter {
+use super::Parser;
+
+/// HTML to AST parser implementation
+pub struct HtmlToAstParser {
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
     pub blocks: Vec<Node>,
     pub inline_buffer: Vec<Node>,
 }
 
-impl MarkdownConverter {
+impl HtmlToAstParser {
     pub fn new(feat: TypliteFeat) -> Self {
         Self {
             feat,
@@ -32,24 +31,6 @@ impl MarkdownConverter {
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
         }
-    }
-}
-
-// Maintain original parsing logic but expose more internal methods for shared parser use
-impl MarkdownConverter {
-    pub fn convert(&mut self, root: &HtmlElement, w: &mut EcoString) -> Result<()> {
-        self.blocks = Vec::new();
-        self.inline_buffer = Vec::new();
-        self.convert_element(root)?;
-        self.flush_inline_buffer();
-
-        let document = Node::Document(self.blocks.clone());
-
-        // Use MarkdownWriter for output
-        let mut writer = MarkdownWriter::new();
-        writer.write_eco(&document, w)?;
-
-        Ok(())
     }
 
     pub fn convert_element(&mut self, element: &HtmlElement) -> Result<()> {
@@ -113,6 +94,7 @@ impl MarkdownConverter {
                 });
                 Ok(())
             }
+
             md_tag::figure => {
                 self.flush_inline_buffer();
 
@@ -497,25 +479,18 @@ impl MarkdownConverter {
     }
 }
 
-/// Markdown writer implementation that uses cmark-writer to write documents
-#[derive(Default)]
-pub struct MarkdownWriter {}
+impl Parser for HtmlToAstParser {
+    fn parse(&self, root: &HtmlElement) -> Result<Node> {
+        let mut parser = Self {
+            feat: self.feat.clone(),
+            list_state: self.list_state,
+            blocks: Vec::new(),
+            inline_buffer: Vec::new(),
+        };
 
-impl MarkdownWriter {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+        parser.convert_element(root)?;
+        parser.flush_inline_buffer();
 
-impl FormatWriter for MarkdownWriter {
-    fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let mut writer = CommonMarkWriter::new();
-        writer.write(document).expect("Failed to write document");
-        output.push_str(&writer.into_string());
-        Ok(())
-    }
-
-    fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
-        Err("Markdown writer does not support writing to Vec<u8>".into())
+        Ok(Node::Document(parser.blocks))
     }
 }
