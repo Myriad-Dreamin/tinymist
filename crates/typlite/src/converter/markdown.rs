@@ -7,7 +7,9 @@ use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
-use crate::attributes::{HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser};
+use crate::attributes::{
+    FigureAttr, HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser,
+};
 use crate::converter::{FigureNode, FormatWriter, ListState};
 use crate::tags::md_tag;
 use crate::Result;
@@ -55,11 +57,7 @@ impl MarkdownConverter {
             tag::head => Ok(()),
 
             tag::html | tag::body | md_tag::doc => {
-                for child in &element.children {
-                    if let HtmlNode::Element(child_elem) = child {
-                        self.convert_element(child_elem)?;
-                    }
-                }
+                self.convert_children(element)?;
                 Ok(())
             }
 
@@ -119,37 +117,13 @@ impl MarkdownConverter {
                 self.flush_inline_buffer();
 
                 // Parse figure attributes to extract caption
-                let attrs = crate::attributes::FigureAttr::parse(&element.attrs)?;
+                let attrs = FigureAttr::parse(&element.attrs)?;
                 let caption = attrs.caption.to_string();
 
                 // Find the image and body content
                 let mut body_content = Vec::new();
-
-                // Process figure children recursively for body content
-                for child in &element.children {
-                    match child {
-                        HtmlNode::Element(child_elem) => {
-                            self.convert_element(child_elem)?;
-                            if !self.inline_buffer.is_empty() {
-                                body_content.extend(std::mem::take(&mut self.inline_buffer));
-                            }
-                        }
-                        HtmlNode::Text(text, _) => {
-                            body_content.push(Node::Text(text.as_str().to_string()));
-                        }
-                        HtmlNode::Frame(frame) => {
-                            body_content.push(self.convert_frame(frame));
-                        }
-                        _ => {}
-                    }
-                }
-
-                // Create figure body
-                let body = if !body_content.is_empty() {
-                    Box::new(Node::Paragraph(body_content))
-                } else {
-                    Box::new(Node::Paragraph(vec![]))
-                };
+                self.convert_children_into(&mut body_content, element)?;
+                let body = Box::new(Node::Paragraph(body_content));
 
                 // Create a figure node using the common definition
                 self.blocks
@@ -214,7 +188,7 @@ impl MarkdownConverter {
                 self.inline_buffer.push(Node::Image {
                     url: src.to_string(),
                     title: None,
-                    alt: vec![Node::Text(attrs.alt.into())],
+                    alt: vec![Node::Text(attrs.alt.to_string())],
                 });
                 Ok(())
             }
