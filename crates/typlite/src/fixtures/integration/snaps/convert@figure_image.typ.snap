@@ -10,7 +10,7 @@ snapshot_kind: text
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><figure><m1image src="./fig.svg" alt=""></m1image><m1parbreak></m1parbreak></figure></m1document></body>
+  <body><m1document><m1figure caption=""><m1image src="./fig.svg" alt=""></m1image></m1figure></m1document></body>
 </html>
 
 =====

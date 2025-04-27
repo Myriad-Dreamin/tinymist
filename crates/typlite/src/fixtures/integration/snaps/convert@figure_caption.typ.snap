@@ -10,8 +10,9 @@ snapshot_kind: text
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><figure><m1image src="./fig.svg" alt="Content"></m1image><figcaption>Figure 1: Caption</figcaption><m1parbreak></m1parbreak></figure></m1document></body>
+  <body><m1document><m1figure caption="Caption"><m1image src="./fig.svg" alt="Content"></m1image></m1figure></m1document></body>
 </html>
 
 =====
-![Content](./fig.svg)Figure 1: Caption
+![Content](./fig.svg)
+Caption
