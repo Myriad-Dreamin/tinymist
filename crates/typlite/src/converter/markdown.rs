@@ -188,7 +188,7 @@ impl MarkdownConverter {
                 self.inline_buffer.push(Node::Image {
                     url: src.to_string(),
                     title: None,
-                    alt: vec![Node::Text(attrs.alt.to_string())],
+                    alt: vec![Node::Text(attrs.alt.into())],
                 });
                 Ok(())
             }
@@ -199,110 +199,11 @@ impl MarkdownConverter {
             }
 
             md_tag::table | md_tag::grid => {
-                // ... existing table handling ...
                 self.flush_inline_buffer();
-                // Tables in CommonMark require headers, rows and alignments
-                let mut headers = Vec::new();
-                let mut rows = Vec::new();
-                let mut current_row;
-                let mut is_header = true;
-
-                // Find real table element - either directly in m1table or inside m1grid/m1table
-                let real_table_elem = if element.tag == md_tag::grid {
-                    // For grid: grid -> table -> table
-                    let mut inner_table = None;
-
-                    for child in &element.children {
-                        if let HtmlNode::Element(table_elem) = child {
-                            if table_elem.tag == md_tag::table {
-                                // Find table tag inside m1table
-                                for inner_child in &table_elem.children {
-                                    if let HtmlNode::Element(inner) = inner_child {
-                                        if inner.tag == tag::table {
-                                            inner_table = Some(inner);
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                if inner_table.is_some() {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    inner_table
-                } else {
-                    // For m1table -> table
-                    let mut direct_table = None;
-
-                    for child in &element.children {
-                        if let HtmlNode::Element(table_elem) = child {
-                            if table_elem.tag == tag::table {
-                                direct_table = Some(table_elem);
-                                break;
-                            }
-                        }
-                    }
-
-                    direct_table
-                };
-
-                // Process table rows and cells if the real table element was found
-                if let Some(table) = real_table_elem {
-                    // Process rows in table
-                    for row_node in &table.children {
-                        if let HtmlNode::Element(row_elem) = row_node {
-                            if row_elem.tag == tag::tr {
-                                // Reset current row for each row element
-                                current_row = Vec::new();
-
-                                // Process cells in this row
-                                for cell_node in &row_elem.children {
-                                    if let HtmlNode::Element(cell) = cell_node {
-                                        if cell.tag == tag::td {
-                                            let mut cell_content = Vec::new();
-                                            self.convert_children_into(&mut cell_content, cell)?;
-
-                                            // Add to appropriate section
-                                            if is_header {
-                                                headers.push(cell_content);
-                                            } else {
-                                                current_row.push(cell_content);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // After first row, treat remaining rows as data rows
-                                if is_header {
-                                    is_header = false;
-                                } else if !current_row.is_empty() {
-                                    rows.push(current_row);
-                                }
-                            }
-                        }
-                    }
+                let table = self.convert_table(element)?;
+                if let Some(table) = table {
+                    self.blocks.push(table);
                 }
-
-                // Create alignments array (default to Center for all columns)
-                let alignments = vec![cmark_writer::Alignment::None; headers.len().max(1)];
-
-                // Add table to blocks if we have content
-                if !headers.is_empty() || !rows.is_empty() {
-                    let flattened_headers = headers.into_iter().flatten().collect();
-                    let flattened_rows: Vec<_> = rows
-                        .into_iter()
-                        .map(|row| row.into_iter().flatten().collect())
-                        .collect();
-                    self.blocks.push(Node::Table {
-                        headers: flattened_headers,
-                        rows: flattened_rows,
-                        alignments,
-                    });
-                }
-
                 Ok(())
             }
 
@@ -436,6 +337,143 @@ impl MarkdownConverter {
 
         self.inline_buffer = prev_buffer;
         Ok(all_items)
+    }
+
+    /// Convert HTML table to CommonMark AST
+    pub fn convert_table(&mut self, element: &HtmlElement) -> Result<Option<Node>> {
+        // Tables in CommonMark require headers, rows and alignments
+        let mut headers = Vec::new();
+        let mut rows = Vec::new();
+        let mut is_header = true;
+
+        // Find real table element
+        let real_table_elem = self.find_real_table_element(element);
+
+        // Process table rows and cells if the real table element was found
+        if let Some(table) = real_table_elem {
+            self.extract_table_content(table, &mut headers, &mut rows, &mut is_header)?;
+        }
+
+        // Create table node if we have content
+        self.create_table_node(headers, rows)
+    }
+
+    fn find_real_table_element<'a>(&self, element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+        if element.tag == md_tag::grid {
+            // For grid: grid -> table -> table
+            self.find_table_in_grid(element)
+        } else {
+            // For m1table -> table
+            self.find_table_direct(element)
+        }
+    }
+
+    fn find_table_in_grid<'a>(&self, grid_element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+        for child in &grid_element.children {
+            if let HtmlNode::Element(table_elem) = child {
+                if table_elem.tag == md_tag::table {
+                    // Find table tag inside m1table
+                    for inner_child in &table_elem.children {
+                        if let HtmlNode::Element(inner) = inner_child {
+                            if inner.tag == tag::table {
+                                return Some(inner);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn find_table_direct<'a>(&self, element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+        for child in &element.children {
+            if let HtmlNode::Element(table_elem) = child {
+                if table_elem.tag == tag::table {
+                    return Some(table_elem);
+                }
+            }
+        }
+        None
+    }
+
+    fn extract_table_content(
+        &mut self,
+        table: &HtmlElement,
+        headers: &mut Vec<Vec<Node>>,
+        rows: &mut Vec<Vec<Vec<Node>>>,
+        is_header: &mut bool,
+    ) -> Result<()> {
+        // Process rows in table
+        for row_node in &table.children {
+            if let HtmlNode::Element(row_elem) = row_node {
+                if row_elem.tag == tag::tr {
+                    let current_row = self.process_table_row(row_elem, *is_header, headers)?;
+
+                    // After first row, treat remaining rows as data rows
+                    if *is_header {
+                        *is_header = false;
+                    } else if !current_row.is_empty() {
+                        rows.push(current_row);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn process_table_row(
+        &mut self,
+        row_elem: &HtmlElement,
+        is_header: bool,
+        headers: &mut Vec<Vec<Node>>,
+    ) -> Result<Vec<Vec<Node>>> {
+        let mut current_row = Vec::new();
+
+        // Process cells in this row
+        for cell_node in &row_elem.children {
+            if let HtmlNode::Element(cell) = cell_node {
+                if cell.tag == tag::td {
+                    let mut cell_content = Vec::new();
+                    self.convert_children_into(&mut cell_content, cell)?;
+
+                    // Add to appropriate section
+                    if is_header {
+                        headers.push(cell_content);
+                    } else {
+                        current_row.push(cell_content);
+                    }
+                }
+            }
+        }
+
+        Ok(current_row)
+    }
+
+    fn create_table_node(
+        &self,
+        headers: Vec<Vec<Node>>,
+        rows: Vec<Vec<Vec<Node>>>,
+    ) -> Result<Option<Node>> {
+        // Create alignments array (default to None for all columns)
+        let alignments = vec![cmark_writer::Alignment::None; headers.len().max(1)];
+
+        // Add table to blocks if we have content
+        if !headers.is_empty() || !rows.is_empty() {
+            let flattened_headers = headers.into_iter().flatten().collect();
+            let flattened_rows: Vec<_> = rows
+                .into_iter()
+                .map(|row| row.into_iter().flatten().collect())
+                .collect();
+
+            return Ok(Some(Node::Table {
+                headers: flattened_headers,
+                rows: flattened_rows,
+                alignments,
+            }));
+        }
+
+        Ok(None)
     }
 
     pub fn convert_frame(&self, frame: &Frame) -> Node {
