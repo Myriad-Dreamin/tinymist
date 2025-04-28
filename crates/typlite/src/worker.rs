@@ -269,15 +269,15 @@ impl TypliteWorker {
         self.assets_numbering += 1;
         let prepend_code = prepend_node.clone().into_text();
         let code = node.clone().into_text();
-        if let Some(assets_src_path) = &self.feat.assets_src_path {
-            let file_name = assets_src_path
-                .join(self.assets_numbering.to_string())
-                .with_extension("typ");
-            if let Err(e) = std::fs::write(&file_name, format!("#{{\n// render_code\n{}\n}}", code))
-            {
-                return Err(format!("failed to write code to file: {}", e).into());
-            }
-        }
+        // if let Some(assets_src_path) = &self.feat.assets_src_path {
+        //     let file_name = assets_src_path
+        //         .join(self.assets_numbering.to_string())
+        //         .with_extension("typ");
+        //     if let Err(e) = std::fs::write(&file_name, format!("#{{\n// render_code\n{}\n}}", code))
+        //     {
+        //         return Err(format!("failed to write code to file: {}", e).into());
+        //     }
+        // }
         self.render_code(&prepend_code, &code, false, "center", "", inline)
     }
 
@@ -292,15 +292,17 @@ impl TypliteWorker {
     ) -> Result<Value> {
         let theme = self.feat.color_theme;
 
-        let code_file_name = if let Some(assets_src_path) = &self.feat.assets_src_path {
-            Some(
-                assets_src_path
-                    .join(self.assets_numbering.to_string())
-                    .with_extension("typ"),
-            )
-        } else {
-            None
-        };
+        // let code_file_name = if let Some(assets_src_path) = &self.feat.assets_src_path {
+        //     Some(
+        //         assets_src_path
+        //             .join(self.assets_numbering.to_string())
+        //             .with_extension("typ"),
+        //     )
+        // } else {
+        //     None
+        // };
+
+        let code_file_name = None;
 
         let mut render = |theme| self.render_inner(prepend_code, code, is_markup, theme);
 

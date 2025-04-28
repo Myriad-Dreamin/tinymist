@@ -102,8 +102,6 @@ pub struct TypliteFeat {
     pub color_theme: Option<ColorTheme>,
     /// The path of external assets directory.
     pub assets_path: Option<PathBuf>,
-    /// The path of external assets' source code directory.
-    pub assets_src_path: Option<PathBuf>,
     /// Allows GFM (GitHub Flavored Markdown) markups.
     pub gfm: bool,
     /// Annotate the elements for identification.

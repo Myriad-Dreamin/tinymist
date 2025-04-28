@@ -233,6 +233,23 @@ impl LaTeXWriter {
 
                     // Close figure environment
                     output.push_str("\\end{figure}\n\n");
+                } else if let Some(external_frame) = custom_node.as_any().downcast_ref::<crate::common::ExternalFrameNode>() {
+                    // Handle externally stored frames
+                    let path = unix_slash(&external_frame.file_path);
+                    
+                    output.push_str("\\begin{figure}[htbp]\n");
+                    output.push_str("\\centering\n");
+                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                    output.push_str(&path);
+                    output.push_str("}\n");
+                    
+                    if !external_frame.alt_text.is_empty() {
+                        output.push_str("\\caption{");
+                        output.push_str(&escape_latex(&external_frame.alt_text));
+                        output.push_str("}\n");
+                    }
+                    
+                    output.push_str("\\end{figure}\n\n");
                 } else {
                     // Fallback for unknown custom nodes
                     output.push_str("[Unknown custom node]");

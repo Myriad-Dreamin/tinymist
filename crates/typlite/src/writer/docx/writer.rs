@@ -1,5 +1,6 @@
 //! DOCX document writer implementation
 
+use base64::Engine;
 use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
@@ -91,7 +92,7 @@ impl DocxWriter {
 
                             // Add caption as a separate paragraph with Caption style
                             if !figure_node.caption.is_empty() {
-                                let caption_text = format!("图：{}", figure_node.caption);
+                                let caption_text = format!("Figure: {}", figure_node.caption);
                                 let caption_para = Paragraph::new()
                                     .style("Caption")
                                     .add_run(Run::new().add_text(caption_text));
@@ -409,6 +410,20 @@ impl DocxWriter {
                 if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
                     // Process figure node with special handling
                     docx = self.process_figure(docx, figure_node)?;
+                } else if let Some(external_frame) = custom_node
+                    .as_any()
+                    .downcast_ref::<crate::common::ExternalFrameNode>(
+                ) {
+                    let data = base64::engine::general_purpose::STANDARD
+                        .decode(&external_frame.svg_data)
+                        .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
+
+                    docx = self.image_processor.process_image_data(
+                        docx,
+                        &data,
+                        Some(&external_frame.alt_text),
+                        None,
+                    );
                 } else {
                     // Fallback for unknown custom nodes - ignore or add placeholder
                     let placeholder = "[Unknown custom content]";

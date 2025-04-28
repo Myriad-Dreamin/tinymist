@@ -14,6 +14,7 @@ use crate::Result;
 use crate::TypliteFeat;
 
 use super::Parser;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// HTML to AST parser implementation
 pub struct HtmlToAstParser {
@@ -461,6 +462,43 @@ impl HtmlToAstParser {
     pub fn convert_frame(&self, frame: &Frame) -> Node {
         let svg = typst_svg::svg_frame(frame);
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
+
+        if let Some(assets_path) = &self.feat.assets_path {
+            // Use a unique static counter for filenames
+            static FRAME_COUNTER: AtomicUsize = AtomicUsize::new(0);
+            let file_id = FRAME_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let file_name = format!("frame_{}.svg", file_id);
+            let file_path = assets_path.join(&file_name);
+
+            if let Err(e) = std::fs::write(&file_path, svg.as_bytes()) {
+                if self.feat.soft_error {
+                    return self.create_embedded_frame(&data);
+                } else {
+                    // Otherwise, construct an error node
+                    return Node::HtmlElement(CmarkHtmlElement {
+                        tag: "div".to_string(),
+                        attributes: vec![HtmlAttribute {
+                            name: "class".to_string(),
+                            value: "error".to_string(),
+                        }],
+                        children: vec![Node::Text(format!("Error writing frame to file: {}", e))],
+                        self_closing: false,
+                    });
+                }
+            }
+
+            return Node::Custom(Box::new(crate::common::ExternalFrameNode {
+                file_path,
+                alt_text: "typst-frame".to_string(),
+                svg_data: data,
+            }));
+        }
+
+        // If no external assets path specified, fall back to embedded mode
+        self.create_embedded_frame(&data)
+    }
+
+    fn create_embedded_frame(&self, data: &str) -> Node {
         Node::HtmlElement(CmarkHtmlElement {
             tag: "img".to_string(),
             attributes: vec![
