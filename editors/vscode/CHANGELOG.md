@@ -6,12 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.12 - [2025-04-18]
+## v0.13.12 - [2025-04-30]
 
 * Bumped typstyle from v0.13.1 to v0.13.3 in https://github.com/Myriad-Dreamin/tinymist/pull/1651
   * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0133---2025-04-10.
 * Bumped world crates to 0.13.12-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1608
-* todo: hard disable targets to build on CI in https://github.com/Myriad-Dreamin/tinymist/pull/1613
+* Bumped typst.ts to v0.6.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1707
 
 ### Server
 
@@ -23,8 +23,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Perf) Detecting root change correctly in https://github.com/Myriad-Dreamin/tinymist/pull/1661
   * This was invalidating vfs cache frequently.
+* (Perf) Removed unnecessary shared access model in https://github.com/Myriad-Dreamin/tinymist/pull/1693
 * Removed system time deps from crates in https://github.com/Myriad-Dreamin/tinymist/pull/1621
   * This allows tinymist to build to `wasm32-unknown-unknown` target, which is required to use tinymist as a typst plugin.
+* Modeling and Making `reset_read` public in https://github.com/Myriad-Dreamin/tinymist/pull/1705
 
 ### Editor
 
@@ -53,6 +55,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
   * This was causing panels when completing plugin functions.
 * (Fix) Corrected `name_range` implementation in https://github.com/Myriad-Dreamin/tinymist/pull/1623
   * This was causing the issue when hovering bibliography items.
+* (Fix) Corrected parameter name in `diff` function for clarity by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1700
+* (Fix) Recogizing built-in CSL styles correctly by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1704
 * Checking field of literals in https://github.com/Myriad-Dreamin/tinymist/pull/1619
   * This was causing the issue when code completing methods of literals.
 
@@ -64,7 +68,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
   * warning on `type("") == "str"` which will be always false in future typst.
 * Linting variable font uses by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1649
   * warning on argument like `text(font: "XXX VF")` which isn't properly supported by typst.
-* Providing `tinymist.lint.enabled` and `tinymist.lint.when` to disable or lint `on{Save,Type}` in https://github.com/Myriad-Dreamin/tinymist/pull/1658
+* Providing `tinymist.lint.enabled` and `tinymist.lint.when` to disable or lint `on{Save,Type}` in https://github.com/Myriad-Dreamin/tinymist/pull/1658 and https://github.com/Myriad-Dreamin/tinymist/pull/1708
 
 ### Preview
 
@@ -96,6 +100,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * `context {}` breaking association of `break`/`continue` with parent loops in https://github.com/Myriad-Dreamin/tinymist/pull/1635
   * It was highlighting `while` when the cursor is on `break` in `while { context { break } }`.
 
+### Completion
+
+* Optionally making symbol completion stepless in https://github.com/Myriad-Dreamin/tinymist/pull/1313
+
 ### Misc
 
 * VS Code extensions uses binaries built by cargo-dist in https://github.com/Myriad-Dreamin/tinymist/pull/1560
@@ -105,6 +113,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Added sponsoring section to readme in https://github.com/Myriad-Dreamin/tinymist/pull/1620
 * Updated Neovim config to use non-blocking system call by @ptdewey in https://github.com/Myriad-Dreamin/tinymist/pull/1607
 * Fixed syntax error in Neovim docs by @ptdewey in https://github.com/Myriad-Dreamin/tinymist/pull/1672
+* Suggesting non-deprecated function `client:exec` to call LSP commands by @ptdewey in https://github.com/Myriad-Dreamin/tinymist/pull/1678
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.10...v0.13.12
 
