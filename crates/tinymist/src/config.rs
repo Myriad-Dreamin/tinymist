@@ -803,7 +803,7 @@ pub struct LintFeat {
 impl LintFeat {
     /// When to trigger the lint checks.
     pub fn when(&self) -> TaskWhen {
-        if matches!(self.enabled, Some(false)) {
+        if matches!(self.enabled, Some(false) | None) {
             return TaskWhen::Never;
         }
 

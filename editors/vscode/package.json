@@ -371,7 +371,7 @@
           "title": "%extension.tinymist.config.tinymist.lint.enabled.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.lint.enabled.desc%",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "tinymist.lint.when": {
           "title": "%extension.tinymist.config.tinymist.lint.when.title%",
