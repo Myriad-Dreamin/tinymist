@@ -6,7 +6,7 @@ use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
 use crate::attributes::{
-    FigureAttr, HeadingAttr, ImageAttr, LinkAttr, RawAttr, TypliteAttrsParser,
+    FigureAttr, HeadingAttr, ImageAttr, LinkAttr, ListItemAttr, RawAttr, TypliteAttrsParser,
 };
 use crate::common::{FigureNode, ListState};
 use crate::tags::md_tag;
@@ -207,7 +207,34 @@ impl HtmlToAstParser {
             }
 
             _ => {
-                self.convert_children(element)?;
+                if !element.tag.to_string().starts_with("m1") {
+                    let tag_name = element
+                        .tag
+                        .to_string()
+                        .trim_start_matches('<')
+                        .trim_end_matches('>')
+                        .to_string();
+                    let mut attributes = Vec::new();
+
+                    for (attr_name, attr_value) in element.attrs.iter() {
+                        attributes.push(HtmlAttribute {
+                            name: attr_name.to_string(),
+                            value: attr_value.to_string(),
+                        });
+                    }
+
+                    let mut children = Vec::new();
+                    self.convert_children_into(&mut children, element)?;
+
+                    self.inline_buffer.push(Node::HtmlElement(CmarkHtmlElement {
+                        tag: tag_name,
+                        attributes,
+                        children,
+                        self_closing: element.children.is_empty(),
+                    }));
+                } else {
+                    self.convert_children(element)?;
+                }
                 Ok(())
             }
         }
@@ -266,7 +293,7 @@ impl HtmlToAstParser {
         for child in &element.children {
             if let HtmlNode::Element(li) = child {
                 if li.tag == tag::li {
-                    let attrs = crate::attributes::ListItemAttr::parse(&li.attrs)?;
+                    let attrs = ListItemAttr::parse(&li.attrs)?;
 
                     let mut item_content = Vec::new();
 
