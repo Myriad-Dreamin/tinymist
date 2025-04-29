@@ -1,9 +1,8 @@
 //! Message from and to language servers and clients.
 
-use std::{
-    fmt,
-    io::{self, BufRead, Write},
-};
+use std::fmt;
+#[cfg(any(feature = "lsp", feature = "dap"))]
+use std::io::{self, BufRead, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -261,7 +260,9 @@ pub(crate) fn invalid_data(
     io::Error::new(io::ErrorKind::InvalidData, error)
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 macro_rules! invalid_data_fmt {
     ($($tt:tt)*) => ($crate::invalid_data(format!($($tt)*)))
 }
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) use invalid_data_fmt;
