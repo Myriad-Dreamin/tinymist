@@ -10,6 +10,9 @@ pub use typst::syntax::package::PackageSpec;
 mod dummy;
 pub use dummy::*;
 
+mod memory;
+pub use memory::*;
+
 #[cfg(feature = "browser")]
 mod browser;
 #[cfg(feature = "browser")]
