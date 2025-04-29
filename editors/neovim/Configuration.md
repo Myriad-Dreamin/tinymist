@@ -115,6 +115,16 @@ Whether to trigger completions on arguments (placeholders) of snippets. For exam
 
 - **Type**: `boolean`
 
+## `completion.symbol`
+
+Whether to make symbol completion stepless. For example, `$ar|$` will be completed to `$arrow.r$`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `step`: Complete symbols step by step
+  - `stepless`: Complete symbols steplessly
+- **Default**: `"step"`
+
 ## `completion.postfix`
 
 Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
