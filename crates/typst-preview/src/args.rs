@@ -9,6 +9,10 @@ pub enum PreviewMode {
     /// Preview mode for slide
     #[cfg_attr(feature = "clap", clap(name = "slide"))]
     Slide,
+
+    /// Preview in WYSIWYG mode
+    #[cfg_attr(feature = "clap", clap(name = "wysiwyg"))]
+    Wysiwyg,
 }
 
 // Refresh Style
@@ -28,6 +32,10 @@ pub enum RefreshStyle {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct PreviewArgs {
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub mode: PreviewMode,
+
     /// Only render visible part of the document. This can improve performance
     /// but still being experimental.
     #[cfg_attr(feature = "clap", clap(long = "partial-rendering"))]

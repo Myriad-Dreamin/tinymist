@@ -23,7 +23,7 @@ use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    PreviewArgs, PreviewBuilder, Previewer, WsMessage,
 };
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -52,10 +52,6 @@ pub struct PreviewCliArgs {
     /// Compile arguments
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
-
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
 
     /// Data plane server will bind to this address. Note: if it equals to
     /// `static_file_host`, same address will be used.
@@ -382,7 +378,7 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.mode, "/");
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
@@ -455,6 +451,7 @@ impl PreviewState {
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
+    let mode = args.preview.mode;
     let handle = tokio::runtime::Handle::current();
 
     let open_in_browser = args.open_in_browser(true);
@@ -571,7 +568,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, mode, "/");
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");

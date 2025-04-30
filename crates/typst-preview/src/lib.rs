@@ -37,6 +37,7 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
     let mode = match mode {
         PreviewMode::Document => "Doc",
         PreviewMode::Slide => "Slide",
+        PreviewMode::Wysiwyg => "Wysiwyg",
     };
 
     html.replace("ws://127.0.0.1:23625", to).replace(

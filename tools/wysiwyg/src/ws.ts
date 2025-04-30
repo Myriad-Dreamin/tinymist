@@ -3,6 +3,7 @@
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, tap } from "rxjs";
+import { WysiwygDocument } from "./doc";
 
 // for debug propose
 // queryObjects((window as any).TypstRenderSession);
@@ -93,7 +94,8 @@ export async function wsMain({ url }: WsArgs) {
   }
 
   return new Promise<() => void>((resolveDispose) => {
-    const wsDispose = setupSocket(new WysiwygDocument());
+    const hookedElem = document.getElementById("typst-app")!;
+    const wsDispose = setupSocket(new WysiwygDocument(hookedElem));
 
     // todo: plugin init and setup socket at the same time
     resolveDispose(() => {
@@ -102,9 +104,4 @@ export async function wsMain({ url }: WsArgs) {
       // dispose kernel then
     });
   });
-}
-
-class WysiwygDocument {
-  reset() {}
-  dispose() {}
 }
