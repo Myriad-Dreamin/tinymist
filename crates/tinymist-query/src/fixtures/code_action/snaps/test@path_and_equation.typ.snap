@@ -1,0 +1,58 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on rt \"base.t||yp\"/* rang)"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "newText": "\"/base.typ\"",
+      "range": "0:9:0:19"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to absolute path"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "newText": " ",
+      "range": "0:1:0:1"
+     },
+     {
+      "newText": " ",
+      "range": "0:38:0:38"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to block equation"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "newText": "\n",
+      "range": "0:1:0:1"
+     },
+     {
+      "newText": "\n",
+      "range": "0:38:0:38"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to multiple-line block equation"
+ }
+]
