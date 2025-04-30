@@ -47,7 +47,11 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
         loop {
             if matching_return_ty {
                 matching_return_ty = false;
-                let Some(w) = line.trim_start().strip_prefix("->") else {
+                let line = line.trim_start();
+                let type_line = line
+                    .strip_prefix("-\\>")
+                    .or_else(|| line.strip_prefix("->"));
+                let Some(w) = type_line else {
                     // break_line = Some(i);
                     continue;
                 };
