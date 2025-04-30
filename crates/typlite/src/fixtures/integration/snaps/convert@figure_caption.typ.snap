@@ -3,4 +3,4 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 ---
-![Caption, Content](./fig.png)
+![Caption, Content](./fig.svg)
