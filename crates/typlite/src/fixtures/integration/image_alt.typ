@@ -1,1 +1,4 @@
-#image("./fig.png", alt: "Content")
+/// path: fig.svg
+<svg></svg>
+-----
+#image("./fig.svg", alt: "Content")
