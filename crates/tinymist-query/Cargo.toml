@@ -57,10 +57,10 @@ walkdir.workspace = true
 yaml-rust2.workspace = true
 
 [dev-dependencies]
-insta.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
+tinymist-tests = { workspace = true }
 sha2 = { version = "0.10" }
 hex = { version = "0.4" }
 

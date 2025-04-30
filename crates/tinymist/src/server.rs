@@ -7,7 +7,7 @@ use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
-use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
+use tinymist_query::{OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_task::ProjectTask;

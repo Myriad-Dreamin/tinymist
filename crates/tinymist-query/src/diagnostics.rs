@@ -4,7 +4,7 @@ use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
 
-use crate::{analysis::Analysis, prelude::*, LspWorldExt};
+use crate::{analysis::Analysis, prelude::*};
 
 use regex::RegexSet;
 
