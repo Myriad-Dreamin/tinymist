@@ -1,8 +1,12 @@
 //! Parser implementation for Typst HTML to CommonMark AST
 
-mod html;
+mod core;
+mod inline;
+mod list;
+mod media;
+mod table;
 
-pub use html::HtmlToAstParser;
+pub use core::HtmlToAstParser;
 
 use cmark_writer::ast::Node;
 use typst::html::HtmlElement;
