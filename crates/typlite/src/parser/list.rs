@@ -45,7 +45,12 @@ impl ListParser {
                                         )));
                                     }
 
+                                    parser.list_level += 1;
+
                                     let items = Self::convert_list(parser, child_elem)?;
+
+                                    parser.list_level -= 1;
+
                                     if child_elem.tag == tag::ul {
                                         item_content.push(Node::UnorderedList(items));
                                     } else {
