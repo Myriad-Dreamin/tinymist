@@ -5,7 +5,6 @@ use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
 use crate::common::ListState;
-use crate::parser::Parser;
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -16,6 +15,7 @@ use super::{inline::InlineParser, list::ListParser, media::MediaParser, table::T
 pub struct HtmlToAstParser {
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
+    pub list_level: usize,
     pub blocks: Vec<Node>,
     pub inline_buffer: Vec<Node>,
 }
@@ -24,6 +24,7 @@ impl HtmlToAstParser {
     pub fn new(feat: TypliteFeat) -> Self {
         Self {
             feat,
+            list_level: 0,
             list_state: None,
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
@@ -56,15 +57,22 @@ impl HtmlToAstParser {
 
             tag::ol => {
                 self.flush_inline_buffer();
-                let items = ListParser::convert_list(self, element)?;
-                self.blocks.push(Node::OrderedList { start: 1, items });
+                self.list_level += 1;
+                let items = ListParser::convert_list(self, element);
+                self.list_level -= 1;
+                self.blocks.push(Node::OrderedList {
+                    start: 1,
+                    items: items?,
+                });
                 Ok(())
             }
 
             tag::ul => {
                 self.flush_inline_buffer();
-                let items = ListParser::convert_list(self, element)?;
-                self.blocks.push(Node::UnorderedList(items));
+                self.list_level += 1;
+                let items = ListParser::convert_list(self, element);
+                self.list_level -= 1;
+                self.blocks.push(Node::UnorderedList(items?));
                 Ok(())
             }
 
@@ -216,18 +224,14 @@ impl HtmlToAstParser {
     }
 }
 
-impl Parser for HtmlToAstParser {
-    fn parse(&self, root: &HtmlElement) -> Result<Node> {
-        let mut parser = Self {
-            feat: self.feat.clone(),
-            list_state: self.list_state,
-            blocks: Vec::new(),
-            inline_buffer: Vec::new(),
-        };
+impl HtmlToAstParser {
+    pub fn parse(mut self, root: &HtmlElement) -> Result<Node> {
+        self.blocks.clear();
+        self.inline_buffer.clear();
 
-        parser.convert_element(root)?;
-        parser.flush_inline_buffer();
+        self.convert_element(root)?;
+        self.flush_inline_buffer();
 
-        Ok(Node::Document(parser.blocks))
+        Ok(Node::Document(self.blocks))
     }
 }

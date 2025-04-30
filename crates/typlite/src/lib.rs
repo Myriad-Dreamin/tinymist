@@ -27,7 +27,7 @@ use typst::html::HtmlDocument;
 use typst_syntax::VirtualPath;
 
 use crate::common::Format;
-use crate::parser::{create_parser, Parser};
+use crate::parser::HtmlToAstParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
@@ -50,7 +50,7 @@ impl MarkdownDocument {
         if let Some(ast) = self.ast_cache.borrow().as_ref() {
             return Ok(ast.clone());
         }
-        let parser = create_parser(self.feat.clone());
+        let parser = HtmlToAstParser::new(self.feat.clone());
         let ast = parser.parse(&self.base.root)?;
         *self.ast_cache.borrow_mut() = Some(ast.clone());
 
