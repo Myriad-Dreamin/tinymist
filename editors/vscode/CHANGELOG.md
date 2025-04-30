@@ -6,6 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.14 - [2025-05-31]
+
+* Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
+
 ## v0.13.12 - [2025-04-30]
 
 * Bumped world crates to v0.13.12
