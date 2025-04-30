@@ -3,4 +3,16 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 ---
-![Caption, Content](./fig.svg)
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1figure caption="Caption"><m1image src="./fig.svg" alt="Content"></m1image></m1figure></m1document></body>
+</html>
+
+=====
+![Content](./fig.svg)
+
+Caption

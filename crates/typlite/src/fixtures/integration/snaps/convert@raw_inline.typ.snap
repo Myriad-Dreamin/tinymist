@@ -3,4 +3,14 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/raw_inline.typ
 ---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document>Some inlined raw <span><m1raw lang="" block="false" text="a"></m1raw></span>, <span><m1raw lang="c" block="false" text="b"></m1raw></span></m1document></body>
+</html>
+
+=====
 Some inlined raw `a`, `b`
