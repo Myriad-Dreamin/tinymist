@@ -168,7 +168,7 @@ impl DocxWriter {
                     run = self.process_inline_to_run(run, child)?;
                 }
             }
-            Node::Strike(content) => {
+            Node::Strikethrough(content) => {
                 run = run.strike();
                 for child in content {
                     run = self.process_inline_to_run(run, child)?;
@@ -348,7 +348,11 @@ impl DocxWriter {
             Node::Paragraph(content) => {
                 docx = self.process_paragraph(docx, content, None)?;
             }
-            Node::Heading { level, content } => {
+            Node::Heading {
+                level,
+                content,
+                heading_type: _,
+            } => {
                 // Determine heading style name
                 let style_name = match level {
                     1 => "Heading1",
@@ -370,7 +374,11 @@ impl DocxWriter {
                     }
                 }
             }
-            Node::CodeBlock { language, content } => {
+            Node::CodeBlock {
+                language,
+                content,
+                block_type: _,
+            } => {
                 // Add language information
                 if let Some(lang) = language {
                     if !lang.is_empty() {
@@ -458,42 +466,7 @@ impl DocxWriter {
         // Process list items
         for item in items {
             if let ListItem::Ordered { content, .. } = item {
-                for block in content {
-                    match block {
-                        Node::Paragraph(inline) => {
-                            let mut para = Paragraph::new().numbering(
-                                NumberingId::new(num_id),
-                                IndentLevel::new(current_level),
-                            );
-
-                            // Process paragraph content
-                            for node in inline {
-                                let run = Run::new();
-                                let run = self.process_inline_to_run(run, node)?;
-                                if !run.children.is_empty() {
-                                    para = para.add_run(run);
-                                }
-                            }
-
-                            docx = docx.add_paragraph(para);
-                        }
-                        // Recursively process nested lists
-                        Node::OrderedList { start: _, items: _ } | Node::UnorderedList(_) => {
-                            docx = self.process_node(docx, block)?;
-                        }
-                        _ => {
-                            docx = self.process_node(docx, block)?;
-                        }
-                    }
-                }
-
-                // If list item content is empty, add empty paragraph
-                if content.is_empty() {
-                    let empty_para = Paragraph::new()
-                        .numbering(NumberingId::new(num_id), IndentLevel::new(current_level))
-                        .add_run(Run::new().add_text(""));
-                    docx = docx.add_paragraph(empty_para);
-                }
+                docx = self.process_list_item_content(docx, content, num_id, current_level)?;
             }
         }
 
@@ -515,47 +488,59 @@ impl DocxWriter {
         // Process list items
         for item in items {
             if let ListItem::Unordered { content } = item {
-                for block in content {
-                    match block {
-                        Node::Paragraph(inline) => {
-                            let mut para = Paragraph::new().numbering(
-                                NumberingId::new(num_id),
-                                IndentLevel::new(current_level),
-                            );
-
-                            // Process paragraph content
-                            for node in inline {
-                                let run = Run::new();
-                                let run = self.process_inline_to_run(run, node)?;
-                                if !run.children.is_empty() {
-                                    para = para.add_run(run);
-                                }
-                            }
-
-                            docx = docx.add_paragraph(para);
-                        }
-                        // Recursively process nested lists
-                        Node::OrderedList { start: _, items: _ } | Node::UnorderedList(_) => {
-                            docx = self.process_node(docx, block)?;
-                        }
-                        _ => {
-                            docx = self.process_node(docx, block)?;
-                        }
-                    }
-                }
-
-                // If list item content is empty, add empty paragraph
-                if content.is_empty() {
-                    let empty_para = Paragraph::new()
-                        .numbering(NumberingId::new(num_id), IndentLevel::new(current_level))
-                        .add_run(Run::new().add_text(""));
-                    docx = docx.add_paragraph(empty_para);
-                }
+                docx = self.process_list_item_content(docx, content, num_id, current_level)?;
             }
         }
 
         // Exit list level
         self.list_level -= 1;
+        Ok(docx)
+    }
+
+    /// Helper function to process list item content
+    fn process_list_item_content(
+        &mut self,
+        mut docx: Docx,
+        content: &[Node],
+        num_id: usize,
+        level: usize,
+    ) -> Result<Docx> {
+        // If content is empty, add empty paragraph
+        if content.is_empty() {
+            let empty_para = Paragraph::new()
+                .numbering(NumberingId::new(num_id), IndentLevel::new(level))
+                .add_run(Run::new().add_text(""));
+            return Ok(docx.add_paragraph(empty_para));
+        }
+
+        // Process content
+        for block in content {
+            match block {
+                Node::Paragraph(inline) => {
+                    let mut para = Paragraph::new()
+                        .numbering(NumberingId::new(num_id), IndentLevel::new(level));
+
+                    // Process paragraph content
+                    for node in inline {
+                        let run = Run::new();
+                        let run = self.process_inline_to_run(run, node)?;
+                        if !run.children.is_empty() {
+                            para = para.add_run(run);
+                        }
+                    }
+
+                    docx = docx.add_paragraph(para);
+                }
+                // Recursively process nested lists
+                Node::OrderedList { start: _, items: _ } | Node::UnorderedList(_) => {
+                    docx = self.process_node(docx, block)?;
+                }
+                _ => {
+                    docx = self.process_node(docx, block)?;
+                }
+            }
+        }
+
         Ok(docx)
     }
 

@@ -1,7 +1,7 @@
 //! Common types and interfaces for the conversion system
 
 use cmark_writer::ast::{CustomNodeWriter, Node};
-use cmark_writer::derive_custom_node;
+use cmark_writer::custom_node;
 use cmark_writer::WriteResult;
 use ecow::EcoString;
 use std::path::PathBuf;
@@ -24,6 +24,7 @@ pub enum Format {
 
 /// Figure node implementation for all formats
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 pub struct FigureNode {
     /// The main content of the figure, can be any block node
     pub body: Box<Node>,
@@ -31,7 +32,6 @@ pub struct FigureNode {
     pub caption: String,
 }
 
-derive_custom_node!(FigureNode);
 impl FigureNode {
     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         let mut temp_writer = cmark_writer::writer::CommonMarkWriter::new();
@@ -50,6 +50,7 @@ impl FigureNode {
 
 /// External Frame node for handling frames stored as external files
 #[derive(Debug, PartialEq, Clone)]
+#[custom_node]
 pub struct ExternalFrameNode {
     /// The path to the external file containing the frame
     pub file_path: PathBuf,
@@ -59,11 +60,14 @@ pub struct ExternalFrameNode {
     pub svg_data: String,
 }
 
-derive_custom_node!(ExternalFrameNode);
 impl ExternalFrameNode {
     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
         // The actual handling is implemented in format-specific writers
-        writer.write_str(&format!("![{}]({})", self.alt_text, self.file_path.display()))?;
+        writer.write_str(&format!(
+            "![{}]({})",
+            self.alt_text,
+            self.file_path.display()
+        ))?;
         Ok(())
     }
 

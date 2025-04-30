@@ -2,6 +2,7 @@
 
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, ListItem, Node};
+use cmark_writer::gfm::TableAlignment;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::layout::Frame;
 
@@ -52,9 +53,8 @@ impl HtmlToAstParser {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
                 self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| Node::Heading {
-                    level: attrs.level as u8 + 1,
-                    content,
+                self.flush_inline_buffer_as_block(|content| {
+                    Node::heading(attrs.level as u8 + 1, content)
                 });
                 Ok(())
             }
@@ -77,10 +77,8 @@ impl HtmlToAstParser {
                 let attrs = RawAttr::parse(&element.attrs)?;
                 if attrs.block {
                     self.flush_inline_buffer();
-                    self.blocks.push(Node::CodeBlock {
-                        language: Some(attrs.lang.into()),
-                        content: attrs.text.into(),
-                    });
+                    self.blocks
+                        .push(Node::code_block(Some(attrs.lang.into()), attrs.text.into()));
                 } else {
                     self.inline_buffer.push(Node::InlineCode(attrs.text.into()));
                 }
@@ -149,7 +147,7 @@ impl HtmlToAstParser {
             md_tag::strike => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(Node::Strike(content));
+                self.inline_buffer.push(Node::Strikethrough(content));
                 Ok(())
             }
 
@@ -207,25 +205,24 @@ impl HtmlToAstParser {
             }
 
             _ => {
-                if !element.tag.to_string().starts_with("m1") {
-                    let tag_name = element
-                        .tag
-                        .to_string()
-                        .trim_start_matches('<')
-                        .trim_end_matches('>')
-                        .to_string();
-                    let mut attributes = Vec::new();
+                let tag_name = element.tag.resolve().to_string();
 
-                    for (attr_name, attr_value) in element.attrs.iter() {
-                        attributes.push(HtmlAttribute {
-                            name: attr_name.to_string(),
-                            value: attr_value.to_string(),
-                        });
-                    }
+                if !tag_name.starts_with("m1") {
+                    // Convert HTML attributes
+                    let attributes = element
+                        .attrs
+                        .iter()
+                        .map(|(name, value)| HtmlAttribute {
+                            name: name.to_string(),
+                            value: value.to_string(),
+                        })
+                        .collect();
 
+                    // Convert children nodes
                     let mut children = Vec::new();
                     self.convert_children_into(&mut children, element)?;
 
+                    // Create HTML element node
                     self.inline_buffer.push(Node::HtmlElement(CmarkHtmlElement {
                         tag: tag_name,
                         attributes,
@@ -466,7 +463,7 @@ impl HtmlToAstParser {
         rows: Vec<Vec<Vec<Node>>>,
     ) -> Result<Option<Node>> {
         // Create alignments array (default to None for all columns)
-        let alignments = vec![cmark_writer::Alignment::None; headers.len().max(1)];
+        let alignments = vec![TableAlignment::None; headers.len().max(1)];
 
         // Add table to blocks if we have content
         if !headers.is_empty() || !rows.is_empty() {
