@@ -92,8 +92,50 @@ fn main() -> typlite::Result<()> {
         };
 
         match format {
-            Format::Docx => todo!(),
-            Format::LaTeX => todo!(),
+            Format::Docx => {
+                let docx_data = match doc.to_docx() {
+                    Ok(data) => data,
+                    Err(err) => {
+                        eprintln!("Error generating DOCX for {}: {}", output_path, err);
+                        continue;
+                    }
+                };
+
+                match output {
+                    None => {
+                        eprintln!("output file is required for DOCX format");
+                        continue;
+                    }
+                    Some(output) => {
+                        if let Err(err) = std::fs::write(&output, docx_data) {
+                            eprintln!("failed to write DOCX file {}: {}", output.display(), err);
+                            continue;
+                        }
+                        println!("Generated DOCX file: {}", output.display());
+                    }
+                }
+            }
+            Format::LaTeX => {
+                let result = doc.to_tex_string();
+                match (result, output) {
+                    (Ok(content), None) => {
+                        std::io::stdout()
+                            .write_all(content.as_str().as_bytes())
+                            .unwrap();
+                    }
+                    (Ok(content), Some(output)) => {
+                        if let Err(err) = std::fs::write(&output, content.as_str()) {
+                            eprintln!("failed to write LaTeX file {}: {}", output.display(), err);
+                            continue;
+                        }
+                        println!("Generated LaTeX file: {}", output.display());
+                    }
+                    (Err(err), _) => {
+                        eprintln!("Error converting to LaTeX for {}: {}", output_path, err);
+                        continue;
+                    }
+                }
+            }
             Format::Md => {
                 let result = doc.to_md_string();
                 match (result, output) {
