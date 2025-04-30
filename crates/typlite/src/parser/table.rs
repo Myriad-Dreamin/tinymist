@@ -3,6 +3,7 @@
 use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
 use typst::html::{tag, HtmlElement, HtmlNode};
+use typst::utils::PicoStr;
 
 use crate::tags::md_tag;
 use crate::Result;
@@ -44,7 +45,7 @@ impl TableParser {
     }
 
     /// Find the real table element in the HTML structure
-    fn find_real_table_element<'a>(element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+    fn find_real_table_element(element: &HtmlElement) -> Option<&HtmlElement> {
         if element.tag == md_tag::grid {
             // For grid: grid -> table -> table
             Self::find_table_in_grid(element)
@@ -54,7 +55,7 @@ impl TableParser {
         }
     }
 
-    fn find_table_in_grid<'a>(grid_element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+    fn find_table_in_grid(grid_element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &grid_element.children {
             if let HtmlNode::Element(table_elem) = child {
                 if table_elem.tag == md_tag::table {
@@ -72,7 +73,7 @@ impl TableParser {
         None
     }
 
-    fn find_table_direct<'a>(element: &'a HtmlElement) -> Option<&'a HtmlElement> {
+    fn find_table_direct(element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &element.children {
             if let HtmlNode::Element(table_elem) = child {
                 if table_elem.tag == tag::table {
@@ -145,13 +146,14 @@ impl TableParser {
                 if row_elem.tag == tag::tr {
                     for cell_node in &row_elem.children {
                         if let HtmlNode::Element(cell) = cell_node {
-                            if cell.tag == tag::td || cell.tag == tag::th {
-                                if cell.attrs.0.iter().any(|(name, _)| {
-                                    name.to_string().to_ascii_lowercase() == "colspan"
-                                        || name.to_string().to_ascii_lowercase() == "rowspan"
-                                }) {
-                                    return true;
-                                }
+                            if (cell.tag == tag::td || cell.tag == tag::th)
+                                && cell.attrs.0.iter().any(|(name, _)| {
+                                    let name = name.into_inner();
+                                    name == PicoStr::constant("colspan")
+                                        || name == PicoStr::constant("rowspan")
+                                })
+                            {
+                                return true;
                             }
                         }
                     }
