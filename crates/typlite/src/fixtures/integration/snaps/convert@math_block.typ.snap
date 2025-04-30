@@ -1,0 +1,6 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, false)"
+input_file: crates/typlite/src/fixtures/integration/math_block.typ
+---
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image-hash/svg+xml;base64,redacted"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></picture></p>
