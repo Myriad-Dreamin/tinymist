@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 mod modifier_set;
 mod semantic_tokens;
 mod typst_tokens;

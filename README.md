@@ -68,6 +68,7 @@ Extra features:
 - Compiles to PDF on save (configurable to as-you-type, or other options). Check [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html).
 - Also compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
 - Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
+- Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
@@ -143,7 +144,6 @@ To encourage contributions, we create many [Pull Requests](https://github.com/My
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
 - Type checking: complete the type checker.
-- Static Linter: linting code statically according to feedback of the type checker and succeeding code analysis.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
@@ -157,7 +157,6 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
   - Search labels.
   - Keep (persist) group preferences.
 - Improve Typst Preview.
-  - Preview for all editors: See [Issue 1237](https://github.com/Myriad-Dreamin/tinymist/issues/1237).
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - ~~Spell checking: There is already a branch but no suitable (default) spell checking library is found.~~

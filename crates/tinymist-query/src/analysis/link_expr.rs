@@ -120,7 +120,7 @@ impl LinkStrWorker {
                     }
                     "bibliography" => {
                         self.analyze_reader(node, call, "cite", false);
-                        self.analyze_reader(node, call, "style", false);
+                        self.analyze_bibliography_style(node, call);
                         self.analyze_reader(node, call, "path", true);
                     }
                     "cbor" | "csv" | "image" | "read" | "json" | "yaml" | "xml" => {
@@ -132,6 +132,24 @@ impl LinkStrWorker {
             }
             return None;
         }
+    }
+
+    fn analyze_bibliography_style(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
+        for item in call.args().items() {
+            match item {
+                ast::Arg::Named(named) if named.name().get().as_str() == "style" => {
+                    if let ast::Expr::Str(style) = named.expr() {
+                        if hayagriva::archive::ArchivedStyle::by_name(&style.get()).is_some() {
+                            return Some(());
+                        }
+                    }
+                    self.analyze_path_expr(node, named.expr());
+                    return Some(());
+                }
+                _ => {}
+            }
+        }
+        Some(())
     }
 
     fn analyze_reader(

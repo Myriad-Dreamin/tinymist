@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicU64;
 use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes, TypstFileId};
+use crate::{AccessModel, Bytes, FileId};
 
 /// Provides trace access model which traces the underlying access model.
 ///
@@ -11,8 +11,9 @@ use crate::{AccessModel, Bytes, TypstFileId};
 /// stdout or the browser console.
 #[derive(Debug)]
 pub struct TraceAccessModel<M: AccessModel + Sized> {
-    pub inner: M,
     trace: [AtomicU64; 6],
+    /// The inner access model
+    pub inner: M,
 }
 
 impl<M: AccessModel + Sized> TraceAccessModel<M> {
@@ -31,7 +32,7 @@ impl<M: AccessModel + Sized> AccessModel for TraceAccessModel<M> {
         self.inner.reset();
     }
 
-    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
+    fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
         let instant = tinymist_std::time::Instant::now();
         let res = self.inner.content(src);
         let elapsed = instant.elapsed();

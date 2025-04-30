@@ -65,11 +65,12 @@ jobs:
           cargo run -p tinymist -- completion elvish     > completions/elvish/lib/tinymist.elv
           cargo run -p tinymist -- completion nushell    > completions/nushell/vendor/autoload/tinymist.nu
           cargo run -p tinymist -- completion powershell > completions/powershell/tinymist.ps1
+          tar -czvf tinymist-completions.tar.gz completions
       - name: upload completions
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-completion-scripts
-          path: completions
+          path: tinymist-completions.tar.gz
       - name: Test tinymist
         run: cargo test --workspace -- --skip=e2e
 

@@ -1,9 +1,8 @@
 //! Message from and to language servers and clients.
 
-use std::{
-    fmt,
-    io::{self, BufRead, Write},
-};
+use std::fmt;
+#[cfg(any(feature = "lsp", feature = "dap"))]
+use std::io::{self, BufRead, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -128,30 +127,6 @@ pub enum ErrorCode {
     RequestFailed = -32803,
 }
 
-/// The kind of the message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MessageKind {
-    /// A message in the LSP protocol.
-    #[cfg(feature = "lsp")]
-    Lsp,
-    /// A message in the DAP protocol.
-    #[cfg(feature = "dap")]
-    Dap,
-}
-
-/// Gets the kind of the message.
-pub trait GetMessageKind {
-    /// Returns the kind of the message.
-    fn get_message_kind() -> MessageKind;
-}
-
-#[cfg(feature = "lsp")]
-impl GetMessageKind for LspMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Lsp
-    }
-}
-
 /// The common message type for the LSP protocol.
 #[cfg(feature = "lsp")]
 pub type LspMessage = lsp::Message;
@@ -186,16 +161,48 @@ impl Message {
     }
 
     /// Writes the message to the given writer.
-    pub fn write<W: std::io::Write>(self, writer: &mut W) -> std::io::Result<()> {
+    pub fn write<W: std::io::Write>(self, _writer: &mut W) -> std::io::Result<()> {
         match self {
             #[cfg(feature = "lsp")]
-            Message::Lsp(msg) => msg.write(writer),
+            Message::Lsp(msg) => msg.write(_writer),
             #[cfg(feature = "dap")]
-            Message::Dap(msg) => msg.write(writer),
+            Message::Dap(msg) => msg.write(_writer),
         }
     }
 }
 
+/// The kind of the message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessageKind {
+    /// A message in the LSP protocol.
+    #[cfg(feature = "lsp")]
+    Lsp,
+    /// A message in the DAP protocol.
+    #[cfg(feature = "dap")]
+    Dap,
+}
+
+/// Gets the kind of the message.
+pub trait GetMessageKind {
+    /// Returns the kind of the message.
+    fn get_message_kind() -> MessageKind;
+}
+
+#[cfg(feature = "lsp")]
+impl GetMessageKind for LspMessage {
+    fn get_message_kind() -> MessageKind {
+        MessageKind::Lsp
+    }
+}
+
+#[cfg(feature = "dap")]
+impl GetMessageKind for DapMessage {
+    fn get_message_kind() -> MessageKind {
+        MessageKind::Dap
+    }
+}
+
+#[allow(unused)]
 pub(crate) enum LspOrDapResponse {
     #[cfg(feature = "lsp")]
     Lsp(lsp::Response),
@@ -203,6 +210,7 @@ pub(crate) enum LspOrDapResponse {
     Dap(dap::Response),
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn read_msg_text(inp: &mut dyn BufRead) -> io::Result<Option<String>> {
     let mut size = None;
     let mut buf = String::new();
@@ -236,6 +244,7 @@ pub(crate) fn read_msg_text(inp: &mut dyn BufRead) -> io::Result<Option<String>>
     Ok(Some(buf))
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn write_msg_text(out: &mut dyn Write, msg: &str) -> io::Result<()> {
     log::debug!("> {msg}");
     write!(out, "Content-Length: {}\r\n\r\n", msg.len())?;
@@ -244,13 +253,16 @@ pub(crate) fn write_msg_text(out: &mut dyn Write, msg: &str) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) fn invalid_data(
     error: impl Into<Box<dyn std::error::Error + Send + Sync>>,
 ) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, error)
 }
 
+#[cfg(any(feature = "lsp", feature = "dap"))]
 macro_rules! invalid_data_fmt {
     ($($tt:tt)*) => ($crate::invalid_data(format!($($tt)*)))
 }
+#[cfg(any(feature = "lsp", feature = "dap"))]
 pub(crate) use invalid_data_fmt;

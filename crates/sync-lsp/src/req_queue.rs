@@ -60,15 +60,6 @@ pub struct Incoming<I> {
     pending: HashMap<RequestId, I>,
 }
 
-/// The outgoing request queue.
-///
-/// It holds the next request ID and the pending requests.
-#[derive(Debug)]
-pub struct Outgoing<O> {
-    next_id: i32,
-    pending: HashMap<RequestId, O>,
-}
-
 impl<I> Incoming<I> {
     /// Registers a request with the given ID and data.
     pub fn register(&mut self, id: RequestId, data: I) {
@@ -107,6 +98,15 @@ impl<I> Incoming<I> {
     pub fn complete(&mut self, id: &RequestId) -> Option<I> {
         self.pending.remove(id)
     }
+}
+
+/// The outgoing request queue.
+///
+/// It holds the next request ID and the pending requests.
+#[derive(Debug)]
+pub struct Outgoing<O> {
+    next_id: i32,
+    pending: HashMap<RequestId, O>,
 }
 
 impl<O> Outgoing<O> {

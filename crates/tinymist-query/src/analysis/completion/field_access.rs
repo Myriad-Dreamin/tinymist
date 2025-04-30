@@ -73,16 +73,7 @@ impl CompletionPair<'_, '_, '_> {
 
         match value {
             Value::Symbol(symbol) => {
-                for modifier in symbol.modifiers() {
-                    if let Ok(modified) = symbol.clone().modified(modifier) {
-                        self.push_completion(Completion {
-                            kind: CompletionKind::Symbol(modified.get()),
-                            label: modifier.into(),
-                            label_details: Some(symbol_label_detail(modified.get())),
-                            ..Completion::default()
-                        });
-                    }
-                }
+                self.symbol_var_completions(&symbol, None);
 
                 if valid_postfix_target {
                     self.ufcs_completions(target);
