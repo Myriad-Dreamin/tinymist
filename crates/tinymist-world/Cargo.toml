@@ -4,7 +4,7 @@ description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.13.12-rc5"
+version = "0.13.12-rc6"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
