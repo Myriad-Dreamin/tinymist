@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+expression: hash
+input_file: crates/typlite/src/fixtures/integration/link3.typ
+snapshot_kind: text
+---
+f0e50f0a3a42b5ea34be8f614f9eeb88

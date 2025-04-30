@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+expression: hash
+input_file: crates/typlite/src/fixtures/integration/enum.typ
+snapshot_kind: text
+---
+14058fe1653efaff6c8f65f83e504cd8
