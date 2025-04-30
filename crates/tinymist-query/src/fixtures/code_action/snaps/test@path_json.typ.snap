@@ -1,0 +1,22 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on n(\"base.js||on\" /* ran)"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/path_json.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "newText": "\"/base.json\"",
+      "range": "0:6:0:17"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to absolute path"
+ }
+]

@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.12-rc4",
+  "version": "0.13.12",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -371,7 +371,7 @@
           "title": "%extension.tinymist.config.tinymist.lint.enabled.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.lint.enabled.desc%",
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "tinymist.lint.when": {
           "title": "%extension.tinymist.config.tinymist.lint.when.title%",

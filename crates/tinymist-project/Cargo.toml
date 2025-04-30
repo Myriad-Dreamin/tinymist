@@ -4,7 +4,7 @@ description = "Project model of typst for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.13.12-rc4"
+version = "0.13.12"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -31,7 +31,7 @@ tinymist-world = { workspace = true }
 tinymist-std = { workspace = true, features = ["typst"] }
 tinymist-derive.workspace = true
 tinymist-l10n.workspace = true
-toml.workspace = true
+toml = { workspace = true, optional = true }
 typst.workspace = true
 typst-assets.workspace = true
 notify.workspace = true
@@ -40,7 +40,7 @@ notify.workspace = true
 
 fonts = ["typst-assets/fonts"]
 no-content-hint = ["tinymist-task/no-content-hint"]
-lsp = ["system"]
+lsp = ["system", "toml"]
 
 system = ["tinymist-std/system", "tinymist-world/system"]
 

@@ -27,6 +27,7 @@
     - #chapter("feature/export.typ")[Exporting Documents]
     - #chapter("feature/preview.typ")[Document Preview]
     - #chapter("feature/testing.typ")[Testing]
+    - #chapter("feature/linting.typ")[Linting]
     - #chapter("feature/language.typ")[Other Features]
     = Service Overview
     #prefix-chapter("overview.typ")[Overview of Service]

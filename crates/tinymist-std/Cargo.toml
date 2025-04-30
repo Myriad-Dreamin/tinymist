@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.13.12-rc4"
+version = "0.13.12"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true

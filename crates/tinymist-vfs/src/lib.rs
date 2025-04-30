@@ -1,8 +1,6 @@
 //! upstream of following files <https://github.com/rust-lang/rust-analyzer/tree/master/crates/vfs>
 //!   ::path_interner.rs -> path_interner.rs
 
-#![allow(missing_docs)]
-
 /// Provides ProxyAccessModel that makes access to JavaScript objects for
 /// browser compilation.
 #[cfg(feature = "browser")]
@@ -77,7 +75,7 @@ pub trait PathAccessModel {
     /// more information.
     fn reset(&mut self) {}
 
-    /// Return the content of a file entry.
+    /// Returns the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
 }
 
@@ -92,7 +90,7 @@ pub trait AccessModel {
     /// more information.
     fn reset(&mut self) {}
 
-    /// Return the content of a file entry.
+    /// Returns the content of a file entry.
     fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>);
 }
 
@@ -101,11 +99,14 @@ type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<M>>
 /// overheads by our observation
 type VfsAccessModel<M> = OverlayAccessModel<FileId, ResolveAccessModel<VfsPathAccessModel<M>>>;
 
+/// A trait to perform file system query.
 pub trait FsProvider {
-    /// Arbitrary one of file path corresponding to the given `id`.
+    /// Gets the file path corresponding to the given `id`.
     fn file_path(&self, id: FileId) -> FileResult<PathResolution>;
-
+    /// Gets the file content corresponding to the given `id`.
     fn read(&self, id: FileId) -> FileResult<Bytes>;
+    /// Gets the source code corresponding to the given `id`. It is preferred to
+    /// be used for source files so that parsing is reused across editions.
     fn read_source(&self, id: FileId) -> FileResult<Source>;
 }
 
@@ -121,6 +122,7 @@ struct SourceIdShard {
     sources: FxHashMap<Bytes, SourceEntry>,
 }
 
+/// A source cache shared across VFS.
 #[derive(Default, Clone)]
 pub struct SourceCache {
     /// The cache entries for each paths
@@ -128,6 +130,8 @@ pub struct SourceCache {
 }
 
 impl SourceCache {
+    /// Evicts cache, given a current revision `curr`, and a threshold. The too
+    /// old cache entries will be evicted from the cache.
     pub fn evict(&self, curr: NonZeroUsize, threshold: usize) {
         self.cache_entries.retain(|_, shard| {
             let diff = curr.get().saturating_sub(shard.last_accessed_rev);
@@ -145,13 +149,11 @@ impl SourceCache {
     }
 }
 
-/// Create a new `Vfs` harnessing over the given `access_model` specific for
+/// Creates a new `Vfs` harnessing over the given `access_model` specific for
 /// `reflexo_world::CompilerWorld`. With vfs, we can minimize the
 /// implementation overhead for [`AccessModel`] trait.
 pub struct Vfs<M: PathAccessModel + Sized> {
     source_cache: SourceCache,
-    // The slots for all the files during a single lifecycle.
-    // pub slots: Arc<Mutex<FxHashMap<FileId, SourceCache>>>,
     managed: Arc<Mutex<EntryMap>>,
     paths: Arc<Mutex<PathMap>>,
     revision: NonZeroUsize,
@@ -171,22 +173,26 @@ impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
 }
 
 impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
+    /// Gets current revision of the vfs.
     pub fn revision(&self) -> NonZeroUsize {
         self.revision
     }
 
+    /// Performs snapshot with sharing cache and managed resource.
     pub fn snapshot(&self) -> Self {
         Self {
+            revision: self.revision,
             source_cache: self.source_cache.clone(),
             managed: self.managed.clone(),
             paths: self.paths.clone(),
-            revision: self.revision,
             access_model: self.access_model.clone(),
         }
     }
 
+    /// Performs snapshot with sharing cache, but not the resources.
     pub fn fork(&self) -> Self {
         Self {
+            // todo: it is not correct to merely share source cache.
             source_cache: self.source_cache.clone(),
             managed: Arc::new(Mutex::new(EntryMap::default())),
             paths: Arc::new(Mutex::new(PathMap::default())),
@@ -195,6 +201,8 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
         }
     }
 
+    /// Detects whether the vfs is clean respecting a given revision and
+    /// `file_ids`.
     pub fn is_clean_compile(&self, rev: usize, file_ids: &[FileId]) -> bool {
         let mut m = self.managed.lock();
         for id in file_ids {
@@ -216,7 +224,7 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
 }
 
 impl<M: PathAccessModel + Sized> Vfs<M> {
-    /// Create a new `Vfs` with a given `access_model`.
+    /// Creates a new `Vfs` with a given `access_model`.
     ///
     /// Retrieving an [`AccessModel`], it will further wrap the access model
     /// with [`OverlayAccessModel`] and [`NotifyAccessModel`]. This means that
@@ -249,24 +257,27 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         }
     }
 
-    /// Reset all state.
+    /// Resets all state.
     pub fn reset_all(&mut self) {
         self.reset_access_model();
-        self.reset_mapping();
+        self.reset_read();
         self.take_source_cache();
     }
 
-    /// Reset access model.
+    /// Resets access model.
     pub fn reset_access_model(&mut self) {
         self.access_model.reset();
     }
 
-    /// Reset all possible caches.
-    pub fn reset_mapping(&mut self) {
-        self.revise().reset_cache();
+    /// Resets all read caches. This can happen when:
+    /// - package paths are reconfigured.
+    /// - The root of the workspace is switched.
+    pub fn reset_read(&mut self) {
+        self.managed = Arc::default();
+        self.paths = Arc::default();
     }
 
-    /// Clear the cache that is not touched for a long time.
+    /// Clears the cache that is not touched for a long time.
     pub fn evict(&mut self, threshold: usize) {
         let mut m = self.managed.lock();
         let rev = self.revision.get();
@@ -278,10 +289,12 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         }
     }
 
+    /// Takes source cache. It also cleans the cache in the current vfs.
     pub fn take_source_cache(&mut self) -> SourceCache {
         std::mem::take(&mut self.source_cache)
     }
 
+    /// Takes source cache for sharing.
     pub fn clone_source_cache(&self) -> SourceCache {
         self.source_cache.clone()
     }
@@ -309,6 +322,8 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         0
     }
 
+    /// Obtains an object to revise. The object will update the original vfs
+    /// when it is dropped.
     pub fn revise(&mut self) -> RevisingVfs<M> {
         let managed = self.managed.lock().clone();
         let paths = self.paths.lock().clone();
@@ -323,18 +338,20 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         }
     }
 
+    /// Obtains an object to display.
     pub fn display(&self) -> DisplayVfs<M> {
         DisplayVfs { inner: self }
     }
 
-    /// Reads a file.
+    /// Reads a file by id.
     pub fn read(&self, fid: FileId) -> FileResult<Bytes> {
         let bytes = self.managed.lock().slot(fid, |entry| entry.bytes.clone());
 
         self.read_content(&bytes, fid).clone()
     }
 
-    /// Reads a source.
+    /// Reads a source file by id. It is preferred to be used for source files
+    /// so that parsing is reused across editions.
     pub fn source(&self, file_id: FileId) -> FileResult<Source> {
         let (bytes, source) = self
             .managed
@@ -406,6 +423,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 }
 
+/// A display wrapper for [`Vfs`].
 pub struct DisplayVfs<'a, M: PathAccessModel + Sized> {
     inner: &'a Vfs<M>,
 }
@@ -420,6 +438,7 @@ impl<M: PathAccessModel + Sized> fmt::Debug for DisplayVfs<'_, M> {
     }
 }
 
+/// A revising wrapper for [`Vfs`].
 pub struct RevisingVfs<'a, M: PathAccessModel + Sized> {
     inner: &'a mut Vfs<M>,
     managed: EntryMap,
@@ -440,6 +459,7 @@ impl<M: PathAccessModel + Sized> Drop for RevisingVfs<'_, M> {
 }
 
 impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
+    /// Returns the underlying vfs.
     pub fn vfs(&mut self) -> &mut Vfs<M> {
         self.inner
     }
@@ -483,16 +503,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         self.am().inner.inner.clear_shadow();
     }
 
-    /// Reset all caches. This can happen when:
-    /// - package paths are reconfigured.
-    /// - The root of the workspace is switched.
-    pub fn reset_cache(&mut self) {
-        self.view_changed = true;
-        self.managed = EntryMap::default();
-        self.paths = PathMap::default();
-    }
-
-    /// Add a shadowing file to the [`OverlayAccessModel`].
+    /// Adds a shadowing file to the [`OverlayAccessModel`].
     pub fn map_shadow(&mut self, path: &Path, snap: FileSnapshot) -> FileResult<()> {
         self.view_changed = true;
         self.invalidate_path(path);
@@ -501,7 +512,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         Ok(())
     }
 
-    /// Remove a shadowing file from the [`OverlayAccessModel`].
+    /// Removes a shadowing file from the [`OverlayAccessModel`].
     pub fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
         self.view_changed = true;
         self.invalidate_path(path);
@@ -510,7 +521,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         Ok(())
     }
 
-    /// Add a shadowing file to the [`OverlayAccessModel`] by file id.
+    /// Adds a shadowing file to the [`OverlayAccessModel`] by file id.
     pub fn map_shadow_by_id(&mut self, file_id: FileId, snap: FileSnapshot) -> FileResult<()> {
         self.view_changed = true;
         self.invalidate_file_id(file_id);
@@ -519,20 +530,20 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         Ok(())
     }
 
-    /// Remove a shadowing file from the [`OverlayAccessModel`] by file id.
+    /// Removes a shadowing file from the [`OverlayAccessModel`] by file id.
     pub fn remove_shadow_by_id(&mut self, file_id: FileId) {
         self.view_changed = true;
         self.invalidate_file_id(file_id);
         self.am().remove_file(&file_id);
     }
 
-    /// Let the vfs notify the access model with a filesystem event.
+    /// Notifies the access model with a filesystem event.
     ///
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_event(&mut self, event: FilesystemEvent) {
         self.notify_fs_changes(event.split().0);
     }
-    /// Let the vfs notify the access model with a filesystem changes.
+    /// Notifies the access model with a filesystem changes.
     ///
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_changes(&mut self, event: FileChangeSet) {
@@ -580,6 +591,7 @@ impl EntryMap {
     }
 }
 
+/// A display wrapper for [`EntryMap`].
 pub struct DisplayEntryMap<'a> {
     map: &'a EntryMap,
 }
@@ -635,6 +647,7 @@ impl PathMap {
     }
 }
 
+/// A display wrapper for [`PathMap`].
 pub struct DisplayPathMap<'a> {
     map: &'a PathMap,
 }

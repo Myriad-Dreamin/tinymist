@@ -501,7 +501,7 @@ fn classify_def_(node: LinkedNode, strict: bool) -> Option<DefClass<'_>> {
 /// It is not formal, but the following cases are forbidden:
 /// - Parenthesized expression.
 /// - Identifier on the right side of a dot operator (field access).
-fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
+pub fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(paren_expr) = node.cast::<ast::Parenthesized>() {
         node = node.find(paren_expr.expr().span())?;
     }

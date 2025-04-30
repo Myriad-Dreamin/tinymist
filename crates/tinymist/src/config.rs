@@ -320,7 +320,7 @@ impl Config {
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
         assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
-        assign_config!(lint := "preview"?: LintFeat);
+        assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
@@ -803,7 +803,7 @@ pub struct LintFeat {
 impl LintFeat {
     /// When to trigger the lint checks.
     pub fn when(&self) -> TaskWhen {
-        if matches!(self.enabled, Some(false)) {
+        if matches!(self.enabled, Some(false) | None) {
             return TaskWhen::Never;
         }
 
