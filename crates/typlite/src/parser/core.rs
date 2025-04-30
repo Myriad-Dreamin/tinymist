@@ -1,6 +1,7 @@
 //! HTML parser core, containing main structures and general parsing logic
 
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
+use cmark_writer::CustomNode;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
@@ -221,6 +222,59 @@ impl HtmlToAstParser {
         target.append(&mut self.inline_buffer);
         self.inline_buffer = prev_buffer;
         Ok(())
+    }
+
+    pub(crate) fn begin_list(&self, item_content: &mut Vec<Node>) {
+        if self.feat.annotate_elem {
+            item_content.push(Node::Custom(Box::new(Comment(format!(
+                "typlite:begin:list-item {}",
+                self.list_level - 1
+            )))))
+        }
+    }
+
+    pub(crate) fn end_list(&self, item_content: &mut Vec<Node>) {
+        if self.feat.annotate_elem {
+            item_content.push(Node::Custom(Box::new(Comment(format!(
+                "typlite:end:list-item {}",
+                self.list_level - 1
+            )))))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Comment(String);
+
+impl CustomNode for Comment {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn write(
+        &self,
+        writer: &mut dyn cmark_writer::CustomNodeWriter,
+    ) -> cmark_writer::WriteResult<()> {
+        writer.write_str("<!-- ")?;
+        writer.write_str(&self.0)?;
+        writer.write_str(" -->")?;
+        Ok(())
+    }
+
+    fn clone_box(&self) -> Box<dyn CustomNode> {
+        Box::new(self.clone())
+    }
+
+    fn eq_box(&self, other: &dyn CustomNode) -> bool {
+        if let Some(other) = other.as_any().downcast_ref::<Comment>() {
+            self.0 == other.0
+        } else {
+            false
+        }
+    }
+
+    fn is_block(&self) -> bool {
+        false
     }
 }
 

@@ -2,6 +2,42 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, true)"
 input_file: crates/typlite/src/fixtures/docs/nest_list.typ
-snapshot_kind: text
 ---
-failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(301106836499353), message: "label `<>` does not exist in the document", trace: [], hints: [] }, SourceDiagnostic { severity: Error, span: Span(303146510243633), message: "label `<show-module>` does not exist in the document", trace: [], hints: [] }]
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><p>These again are dictionaries with the keys</p><ul><li><span><m1raw lang="" block="false" text="description"></m1raw></span> (optional): The description for the argument.</li></ul><m1parbreak></m1parbreak><p>See show-module() for outputting the results of this function.</p><m1parbreak></m1parbreak><ul><li>name (string): The name for the module.</li><li><p>label-prefix (auto, string): The label-prefix for internal function references. If <span><m1raw lang="" block="false" text="auto"></m1raw></span>, the label-prefix name will be the module name.</p><ul><li>nested something</li><li>nested something 2</li></ul></li></ul><p>-> string</p></m1document></body>
+</html>
+
+=====
+These again are dictionaries with the keys
+
+- <!-- typlite:begin:list-item 0 -->
+  `description` (optional): The description for the argument.
+  
+  <!-- typlite:end:list-item 0 -->
+
+See show-module() for outputting the results of this function.
+
+- <!-- typlite:begin:list-item 0 -->
+  name (string): The name for the module.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  label-prefix (auto, string): The label-prefix for internal function references. If `auto`, the label-prefix name will be the module name.
+  
+  - <!-- typlite:begin:list-item 0 -->
+    nested something
+    
+    <!-- typlite:end:list-item 0 -->
+  - <!-- typlite:begin:list-item 0 -->
+    nested something 2
+    
+    <!-- typlite:end:list-item 0 -->
+  
+  <!-- typlite:end:list-item 0 -->
+
+-\> string

@@ -2,6 +2,57 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, true)"
 input_file: crates/typlite/src/fixtures/docs/tidy.typ
-snapshot_kind: text
 ---
-failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(303940673753821), message: "label `<>` does not exist in the document", trace: [], hints: [] }, SourceDiagnostic { severity: Error, span: Span(304891602729193), message: "label `<show-module>` does not exist in the document", trace: [], hints: [] }]
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><p>These again are dictionaries with the keys</p><ul><li><span><m1raw lang="" block="false" text="description"></m1raw></span> (optional): The description for the argument.</li><li><span><m1raw lang="" block="false" text="types"></m1raw></span> (optional): A list of accepted argument types.</li><li><span><m1raw lang="" block="false" text="default"></m1raw></span> (optional): Default value for this argument.</li></ul><m1parbreak></m1parbreak><p>See show-module() for outputting the results of this function.</p><m1parbreak></m1parbreak><ul><li>content (string): Content of <span><m1raw lang="" block="false" text=".typ"></m1raw></span> file to analyze for docstrings.</li><li>name (string): The name for the module.</li><li>label-prefix (auto, string): The label-prefix for internal function references. If <span><m1raw lang="" block="false" text="auto"></m1raw></span>, the label-prefix name will be the module name.</li><li>require-all-parameters (boolean): Require that all parameters of a functions are documented and fail if some are not.</li><li>scope (dictionary): A dictionary of definitions that are then available in all function and parameter descriptions.</li><li>preamble (string): Code to prepend to all code snippets shown with <span><m1raw lang="" block="false" text="#example()"></m1raw></span>. This can for instance be used to import something from the scope.</li></ul><p>-> string</p></m1document></body>
+</html>
+
+=====
+These again are dictionaries with the keys
+
+- <!-- typlite:begin:list-item 0 -->
+  `description` (optional): The description for the argument.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  `types` (optional): A list of accepted argument types.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  `default` (optional): Default value for this argument.
+  
+  <!-- typlite:end:list-item 0 -->
+
+See show-module() for outputting the results of this function.
+
+- <!-- typlite:begin:list-item 0 -->
+  content (string): Content of `.typ` file to analyze for docstrings.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  name (string): The name for the module.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  label-prefix (auto, string): The label-prefix for internal function references. If `auto`, the label-prefix name will be the module name.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  require-all-parameters (boolean): Require that all parameters of a functions are documented and fail if some are not.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  scope (dictionary): A dictionary of definitions that are then available in all function and parameter descriptions.
+  
+  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->
+  preamble (string): Code to prepend to all code snippets shown with `#example()`. This can for instance be used to import something from the scope.
+  
+  <!-- typlite:end:list-item 0 -->
+
+-\> string
