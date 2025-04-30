@@ -188,11 +188,6 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            tag::td | tag::tr => {
-                self.convert_children(element)?;
-                Ok(())
-            }
-
             md_tag::math_equation_inline | md_tag::math_equation_block => {
                 if element.tag == md_tag::math_equation_block {
                     self.flush_inline_buffer();
