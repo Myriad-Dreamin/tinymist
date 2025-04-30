@@ -1,0 +1,1 @@
+#figure(image("./fig.png", alt: "Content"))
