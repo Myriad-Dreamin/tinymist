@@ -11,7 +11,8 @@
     "contrib/html/editors/vscode",
     "tools/editor-tools",
     "tools/typst-dom",
-    "tools/typst-preview-frontend"
+    "tools/typst-preview-frontend",
+    "tools/wysiwyg"
   ],
   "scripts": {
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",

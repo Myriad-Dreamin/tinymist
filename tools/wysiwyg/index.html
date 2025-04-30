@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg%20version%3D%221.1%22%20width%3D%22200%22%20height%3D%22200%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Asvg%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cdefs%20id%3D%22defs1%22%3E%3ClinearGradient%20id%3D%22linearGradient41%22%3E%3Cstop%20style%3D%22stop-color%3A%23800080%3Bstop-opacity%3A1%3B%22%20offset%3D%220%22%20id%3D%22stop41%22%20%2F%3E%3Cstop%20style%3D%22stop-color%3A%23800080%3Bstop-opacity%3A0%3B%22%20offset%3D%221%22%20id%3D%22stop42%22%20%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20xlink%3Ahref%3D%22%23linearGradient41%22%20id%3D%22linearGradient42%22%20x1%3D%2296.090034%22%20y1%3D%220.33597913%22%20x2%3D%2295.082092%22%20y2%3D%22432.40518%22%20gradientUnits%3D%22userSpaceOnUse%22%20%2F%3E%3C%2Fdefs%3E%3Cg%20id%3D%22layer2%22%3E%3Cpath%20style%3D%22display%3Ainline%3Bfill%3Aurl(%23linearGradient42)%3Bfill-opacity%3A1%3Bstroke%3A%23000000%3Bstroke-opacity%3A0%22%20d%3D%22M%20-0.16764459%2C0%200.16764459%2C200%20200%2C200.16764%20V%200%20Z%22%20id%3D%22path2%22%20%2F%3E%3Cpath%20style%3D%22display%3Ainline%3Bfill%3A%23ffffff%3Bstroke%3A%23000000%3Bstroke-opacity%3A0%22%20d%3D%22m%20103.60436%2C40.569992%20-24.979046%2C11.735121%200.33529%2C10.896899%20-12.573345%2C3.520536%201.508801%2C7.711651%2010.896899%2C-0.335289%200.880134%2C63.74686%20c%200.162406%2C1.54285%200.06549%2C3.73402%200.628668%2C4.27493%200.882607%2C1.93202%201.114606%2C4.00862%202.891869%2C5.74183%201.392208%2C2.32132%202.653601%2C2.81122%203.939647%2C3.64627%201.877861%2C1.14964%203.377192%2C2.48855%206.077117%2C3.22716%201.977929%2C0.63747%204.003142%2C1.204%206.20285%2C1.5088%202.787186%2C0.0303%205.088826%2C-0.10125%207.208716%2C-0.29338%202.19105%2C-0.35448%204.28771%2C-0.77975%206.03521%2C-1.46689%20l%206.70578%2C-3.05951%205.69992%2C-3.3948%209.01089%2C-6.07712%201.88601%2C-1.46689%20-5.19699%2C-6.3705%20-5.19698%2C3.26908%20c%20-1.36707%2C0.75846%20-2.7169%2C1.55139%20-4.19111%2C2.09555%20l%20-2.51467%2C0.50294%20-2.05365%2C0.20956%20-1.29925-0.0419%20c%20-1.63115%2C0.0254%20-2.28885-0.16416%20-3.68818-0.33529%20-1.45292-0.27741%20-2.90584-0.47623%20-4.35876-1.5088%20-0.49297-0.3054%20-1.02082-0.71545%20-1.84409-2.01174%20-0.5331-0.51579%20-0.56561-1.28187%20-0.67057-2.01173%20-0.32021-1.14867%20-0.39791-1.44854%20-0.50294-1.84409%20l%20-0.33529-1.67645%20V%2075.440067%20l%2022.63202%2C0.670578%201.5088-13.914501%20-23.63788%2C1.676446%20z%22%20id%3D%22path1%22%20%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"
+    />
+    <!-- https://github.com/darkreader/darkreader/blob/main/CONTRIBUTING.md#disabling-dark-reader-on-your-site -->
+    <meta name="darkreader-lock" />
+
+    <title>Typst Preview</title>
+    <style id="preview-theme-styles"></style>
+    <!-- before all of code to avoid rerender by style replacement -->
+    <script>
+      if (typeof acquireVsCodeApi !== "undefined") {
+        const bytes2utf8 = new TextDecoder("utf-8");
+        /**
+         * Base64 to UTF-8
+         * @param encoded Base64 encoded string
+         * @returns UTF-8 string
+         */
+        const base64Decode = (encoded) =>
+          bytes2utf8.decode(Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0)));
+        /// The string here is a placeholder
+        /// It will be replaced by the actual preview mode.
+        let state = `preview-arg:state:`;
+        state = state.replace("preview-arg:state:", "");
+        console.log("state", state);
+        if (state !== "") {
+          /// Set it later when acquiring the VSCode API
+          window.vscode_state = JSON.parse(base64Decode(state));
+          console.log("vscode_state", window.vscode_state);
+        }
+      }
+
+      /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
+      function deltaE(rgbA, rgbB) {
+        let labA = rgb2lab(rgbA);
+        let labB = rgb2lab(rgbB);
+        let deltaL = labA[0] - labB[0];
+        let deltaA = labA[1] - labB[1];
+        let deltaB = labA[2] - labB[2];
+        let c1 = Math.sqrt(labA[1] * labA[1] + labA[2] * labA[2]);
+        let c2 = Math.sqrt(labB[1] * labB[1] + labB[2] * labB[2]);
+        let deltaC = c1 - c2;
+        let deltaH = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
+        deltaH = deltaH < 0 ? 0 : Math.sqrt(deltaH);
+        let sc = 1.0 + 0.045 * c1;
+        let sh = 1.0 + 0.015 * c1;
+        let deltaLKlsl = deltaL / 1.0;
+        let deltaCkcsc = deltaC / sc;
+        let deltaHkhsh = deltaH / sh;
+        let i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
+        return i < 0 ? 0 : Math.sqrt(i);
+      }
+
+      function rgb2lab(rgb) {
+        let r = rgb[0] / 255,
+          g = rgb[1] / 255,
+          b = rgb[2] / 255,
+          x,
+          y,
+          z;
+        r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+        g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+        b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+        x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+        y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.0;
+        z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+        x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
+        y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
+        z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
+        return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+      }
+
+      // https://stackoverflow.com/questions/26414770/getting-the-rgb-values-for-a-css-html-named-color-in-javascript
+      function cssColorToRgba(cssColor) {
+        var canvas = document.createElement("canvas");
+        var context = canvas.getContext("2d");
+        context.fillStyle = cssColor;
+        context.fillRect(0, 0, 1, 1);
+        return context.getImageData(0, 0, 1, 1).data;
+      }
+
+      var defaultBackgroundColor = "rgb(82, 86, 89)";
+      var previewBackgroundColor =
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--vscode-sideBar-background",
+        ) || defaultBackgroundColor;
+
+      var defaultToolbarFgColor = "#fff";
+      var previewToolbarFgColor =
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-foreground") ||
+        defaultToolbarFgColor;
+
+      var previewForegroundColor = previewToolbarFgColor;
+
+      var defaultToolbarBorderColor = "rgba(0, 0, 0, 0)";
+      var previewToolbarBorderColor =
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-border") ||
+        defaultToolbarBorderColor;
+
+      var defaultToolbarBgColor = "rgb(50, 54, 57)";
+      var previewToolbarBgColor =
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-background") ||
+        defaultToolbarBgColor;
+
+      /// Perceptible distance between colors:
+      /// 0~1: cannot distinguish by human eyes
+      /// 1~2: perceptible through close observation
+      /// 2~10: perceptible at a glance
+      if (deltaE(cssColorToRgba(previewBackgroundColor), [255, 255, 255]) < 5) {
+        previewBackgroundColor = defaultBackgroundColor;
+        previewForegroundColor = defaultToolbarFgColor;
+      }
+
+      // append css variable --typst-preview-background-color
+      document.documentElement.style.setProperty(
+        "--typst-preview-background-color",
+        previewBackgroundColor,
+      );
+      document.documentElement.style.setProperty(
+        "--typst-preview-foreground-color",
+        previewForegroundColor,
+      );
+      document.documentElement.style.setProperty(
+        "--typst-preview-toolbar-fg-color",
+        previewToolbarFgColor,
+      );
+      document.documentElement.style.setProperty(
+        "--typst-preview-toolbar-border-color",
+        previewToolbarBorderColor,
+      );
+      document.documentElement.style.setProperty(
+        "--typst-preview-toolbar-bg-color",
+        previewToolbarBgColor,
+      );
+    </script>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+
+  <body
+    style="
+      padding: 0;
+      margin: 0;
+      height: fit-content;
+      width: 100%;
+      background-color: var(--typst-preview-background-color) !important;
+    "
+  >
+    <!-- reserving 1px to hide height border, margin-top: -1px; -->
+    <div id="typst-container" style="width: 100%">
+      <div id="typst-container-main">
+        <div
+          id="typst-app"
+          style="background-color: var(--typst-preview-background-color) !important"
+        ></div>
+      </div>
+    </div>
+  </body>
+</html>
