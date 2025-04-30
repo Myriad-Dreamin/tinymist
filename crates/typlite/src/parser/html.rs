@@ -208,33 +208,36 @@ impl HtmlToAstParser {
                 let tag_name = element.tag.resolve().to_string();
 
                 if !tag_name.starts_with("m1") {
-                    // Convert HTML attributes
-                    let attributes = element
-                        .attrs
-                        .iter()
-                        .map(|(name, value)| HtmlAttribute {
-                            name: name.to_string(),
-                            value: value.to_string(),
-                        })
-                        .collect();
-
-                    // Convert children nodes
-                    let mut children = Vec::new();
-                    self.convert_children_into(&mut children, element)?;
-
-                    // Create HTML element node
-                    self.inline_buffer.push(Node::HtmlElement(CmarkHtmlElement {
-                        tag: tag_name,
-                        attributes,
-                        children,
-                        self_closing: element.children.is_empty(),
-                    }));
+                    let html_element = self.create_html_element(element)?;
+                    self.inline_buffer.push(html_element);
                 } else {
                     self.convert_children(element)?;
                 }
                 Ok(())
             }
         }
+    }
+
+    /// Create a CommonMark HTML element from the given HTML element    
+    fn create_html_element(&mut self, element: &HtmlElement) -> Result<Node> {
+        let attributes = element
+            .attrs
+            .iter()
+            .map(|(name, value)| HtmlAttribute {
+                name: name.to_string(),
+                value: value.to_string(),
+            })
+            .collect();
+
+        let mut children = Vec::new();
+        self.convert_children_into(&mut children, element)?;
+
+        Ok(Node::HtmlElement(CmarkHtmlElement {
+            tag: element.tag.resolve().to_string(),
+            attributes,
+            children,
+            self_closing: element.children.is_empty(),
+        }))
     }
 
     pub fn flush_inline_buffer(&mut self) {
@@ -348,23 +351,32 @@ impl HtmlToAstParser {
 
     /// Convert HTML table to CommonMark AST
     pub fn convert_table(&mut self, element: &HtmlElement) -> Result<Option<Node>> {
-        // Tables in CommonMark require headers, rows and alignments
-        let mut headers = Vec::new();
-        let mut rows = Vec::new();
-        let mut is_header = true;
-
         // Find real table element
         let real_table_elem = self.find_real_table_element(element);
 
-        // Process table rows and cells if the real table element was found
+        // Process table if the real table element was found
         if let Some(table) = real_table_elem {
+            // Check if the table contains rowspan or colspan attributes
+            // If so, fall back to using HtmlElement
+            if self.table_has_complex_cells(table) {
+                if let Ok(html_node) = self.create_html_element(table) {
+                    return Ok(Some(html_node));
+                }
+                return Ok(None);
+            }
+
+            let mut headers = Vec::new();
+            let mut rows = Vec::new();
+            let mut is_header = true;
+
             self.extract_table_content(table, &mut headers, &mut rows, &mut is_header)?;
+            return self.create_table_node(headers, rows);
         }
 
-        // Create table node if we have content
-        self.create_table_node(headers, rows)
+        Ok(None)
     }
 
+    /// Find the real table element in the HTML structure   
     fn find_real_table_element<'a>(&self, element: &'a HtmlElement) -> Option<&'a HtmlElement> {
         if element.tag == md_tag::grid {
             // For grid: grid -> table -> table
@@ -404,6 +416,7 @@ impl HtmlToAstParser {
         None
     }
 
+    // Extract table content from the table element
     fn extract_table_content(
         &mut self,
         table: &HtmlElement,
@@ -455,6 +468,29 @@ impl HtmlToAstParser {
         }
 
         Ok(current_row)
+    }
+
+    /// Check if the table has complex cells (rowspan/colspan)
+    fn table_has_complex_cells(&self, table: &HtmlElement) -> bool {
+        for row_node in &table.children {
+            if let HtmlNode::Element(row_elem) = row_node {
+                if row_elem.tag == tag::tr {
+                    for cell_node in &row_elem.children {
+                        if let HtmlNode::Element(cell) = cell_node {
+                            if cell.tag == tag::td || cell.tag == tag::th {
+                                if cell.attrs.iter().any(|(name, _)| {
+                                    name.to_string().to_ascii_lowercase() == "colspan"
+                                        || name.to_string().to_ascii_lowercase() == "rowspan"
+                                }) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     fn create_table_node(
