@@ -8,16 +8,16 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.12 - [2025-04-30]
 
+* Bumped world crates to v0.13.12
+* Bumped typst.ts to v0.6.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1707
 * Bumped typstyle from v0.13.1 to v0.13.3 in https://github.com/Myriad-Dreamin/tinymist/pull/1651
   * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0133---2025-04-10.
-* Bumped world crates to 0.13.12-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1608
-* Bumped typst.ts to v0.6.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1707
 
 ### Server
 
 * Hot updating configuratuion item `tinymist.compileStatus` in https://github.com/Myriad-Dreamin/tinymist/pull/1584
 * Supporting `--feature` and `--pdf-standard` in `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/1596
-* feat: resolve roots of typst packages in https://github.com/Myriad-Dreamin/tinymist/pull/1663
+* Resolving roots of typst packages in https://github.com/Myriad-Dreamin/tinymist/pull/1663
 
 ### Compiler
 
@@ -37,6 +37,16 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Change) Changing configuratuion item `tinymist.formatterMode`'s default value from `never` to `typstyle` by @kaerbr in https://github.com/Myriad-Dreamin/tinymist/pull/1655
 * Supporting to use `{pageCount}` in `tinymist.statusBarFormat` in https://github.com/Myriad-Dreamin/tinymist/pull/1666
 * Providing AST view in https://github.com/Myriad-Dreamin/tinymist/pull/1617
+
+### Linting (New)
+
+* Linting on bug-prone show/set rules in https://github.com/Myriad-Dreamin/tinymist/pull/1634
+* Linting implicitly discarded statements before `break/continue/return` in https://github.com/Myriad-Dreamin/tinymist/pull/1637, https://github.com/Myriad-Dreamin/tinymist/pull/1664, and https://github.com/Myriad-Dreamin/tinymist/pull/1668
+* Linting types comparing with strings in https://github.com/Myriad-Dreamin/tinymist/pull/1643
+  * warning on `type("") == "str"` which will be always false in future typst.
+* Linting variable font uses by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1649
+  * warning on argument like `text(font: "XXX VF")` which isn't properly supported by typst.
+* Providing `tinymist.lint.enabled` and `tinymist.lint.when` to disable or lint `on{Save,Type}` in https://github.com/Myriad-Dreamin/tinymist/pull/1658 and https://github.com/Myriad-Dreamin/tinymist/pull/1708
 
 ### Export
 
@@ -59,16 +69,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Fix) Recogizing built-in CSL styles correctly by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1704
 * Checking field of literals in https://github.com/Myriad-Dreamin/tinymist/pull/1619
   * This was causing the issue when code completing methods of literals.
-
-### Linting (New)
-
-* Linting on bug-prone show/set rules in https://github.com/Myriad-Dreamin/tinymist/pull/1634
-* Linting implicitly discarded statements before `break/continue/return` in https://github.com/Myriad-Dreamin/tinymist/pull/1637, https://github.com/Myriad-Dreamin/tinymist/pull/1664, and https://github.com/Myriad-Dreamin/tinymist/pull/1668
-* Linting types comparing with strings in https://github.com/Myriad-Dreamin/tinymist/pull/1643
-  * warning on `type("") == "str"` which will be always false in future typst.
-* Linting variable font uses by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1649
-  * warning on argument like `text(font: "XXX VF")` which isn't properly supported by typst.
-* Providing `tinymist.lint.enabled` and `tinymist.lint.when` to disable or lint `on{Save,Type}` in https://github.com/Myriad-Dreamin/tinymist/pull/1658 and https://github.com/Myriad-Dreamin/tinymist/pull/1708
 
 ### Preview
 
