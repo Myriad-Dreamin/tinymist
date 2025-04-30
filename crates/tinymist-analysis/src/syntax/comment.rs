@@ -1,5 +1,7 @@
 //! Convenient utilities to match comment in code.
 
+use itertools::Itertools;
+
 use crate::prelude::*;
 
 /// Extract the module-level documentation from a source.
@@ -190,10 +192,18 @@ impl DocCommentMatcher {
         });
         let comments = comments.collect::<Vec<_>>();
 
-        let dedent = comments.iter().fold(usize::MAX, |acc, content| {
-            let indent = content.chars().take_while(|ch| ch.is_whitespace()).count();
-            acc.min(indent)
-        });
+        let dedent = comments
+            .iter()
+            .flat_map(|line| {
+                let mut chars = line.chars();
+                let cnt = chars
+                    .by_ref()
+                    .peeking_take_while(|c| c.is_whitespace())
+                    .count();
+                chars.next().map(|_| cnt)
+            })
+            .min()
+            .unwrap_or(0);
 
         let size_hint = comments.iter().map(|comment| comment.len()).sum::<usize>();
         let mut comments = comments
@@ -211,5 +221,74 @@ impl DocCommentMatcher {
 
         self.comments.clear();
         res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test(it: &str) -> String {
+        find_module_level_docs(&Source::detached(it)).unwrap()
+    }
+
+    #[test]
+    fn simple() {
+        assert_eq!(
+            test(
+                r#"/// foo
+/// bar
+#let main() = printf("hello World")"#
+            ),
+            "foo\nbar"
+        );
+    }
+
+    #[test]
+    fn dedent() {
+        assert_eq!(
+            test(
+                r#"/// a
+/// b
+/// c
+#let main() = printf("hello World")"#
+            ),
+            "a\nb\nc"
+        );
+        assert_eq!(
+            test(
+                r#"///a
+/// b
+/// c
+#let main() = printf("hello World")"#
+            ),
+            "a\n b\n c"
+        );
+    }
+
+    #[test]
+    fn issue_1687_postive() {
+        assert_eq!(
+            test(
+                r#"/// Description.
+/// 
+/// Note.
+#let main() = printf("hello World")"#
+            ),
+            "Description.\n\nNote."
+        );
+    }
+
+    #[test]
+    fn issue_1687_negative() {
+        assert_eq!(
+            test(
+                r#"/// Description.
+///
+/// Note.
+#let main() = printf("hello World")"#
+            ),
+            "Description.\n\nNote."
+        );
     }
 }
