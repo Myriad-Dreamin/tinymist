@@ -35,6 +35,7 @@ typst-syntax.workspace = true
 [dev-dependencies]
 insta.workspace = true
 regex.workspace = true
+tinymist-tests.workspace = true
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint"]
