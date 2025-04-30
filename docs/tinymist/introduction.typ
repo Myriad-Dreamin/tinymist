@@ -93,7 +93,6 @@ To encourage contributions, we create many #link("https://github.com/Myriad-Drea
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
 - Type checking: complete the type checker.
-- Static Linter: linting code statically according to feedback of the type checker and succeeding code analysis.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
@@ -107,7 +106,6 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
   - Search labels.
   - Keep (persist) group preferences.
 - Improve Typst Preview.
-  - Preview for all editors: See #link("https://github.com/Myriad-Dreamin/tinymist/issues/1237")[Issue 1237].
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - #strike[Spell checking: There is already a branch but no suitable (default) spell checking library is found.]
