@@ -114,6 +114,8 @@
   }
 }
 
+#let example(code) = eval(code.text, mode: "markup")
+
 #let md-doc(body) = context {
   // distinguish parbreak from <p> tag
   show parbreak: it => if-not-paged(it, md-parbreak)

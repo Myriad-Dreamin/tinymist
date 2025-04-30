@@ -188,9 +188,10 @@ impl Typlite {
                 wrap_main_path.as_path(),
                 Bytes::from_string(format!(
                     r#"
-                #import "@local/markdown:0.1.0": md-doc
+                #import "@local/markdown:0.1.0": md-doc, example
                 #show: md-doc
-                #include {:?}
+                
+                #eval(read({:?}), mode: "markup", scope: (example: example))
                 "#,
                     current.vpath().as_rooted_path(),
                 )),
