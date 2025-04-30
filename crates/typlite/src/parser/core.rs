@@ -1,7 +1,6 @@
 //! HTML parser core, containing main structures and general parsing logic
 
-use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
-use cmark_writer::CustomNode;
+use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
@@ -250,6 +249,10 @@ struct Comment(String);
 
 impl CustomNode for Comment {
     fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
 
