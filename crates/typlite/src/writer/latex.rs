@@ -6,7 +6,7 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
-use crate::common::{FigureNode, FormatWriter, ListState};
+use crate::common::{ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, ListState};
 use crate::Result;
 
 /// LaTeX writer implementation
@@ -243,10 +243,9 @@ impl LaTeXWriter {
 
                     // Close figure environment
                     output.push_str("\\end{figure}\n\n");
-                } else if let Some(external_frame) = custom_node
-                    .as_any()
-                    .downcast_ref::<crate::common::ExternalFrameNode>(
-                ) {
+                } else if let Some(external_frame) =
+                    custom_node.as_any().downcast_ref::<ExternalFrameNode>()
+                {
                     // Handle externally stored frames
                     let path = unix_slash(&external_frame.file_path);
 
@@ -263,6 +262,14 @@ impl LaTeXWriter {
                     }
 
                     output.push_str("\\end{figure}\n\n");
+                } else if let Some(highlight_node) =
+                    custom_node.as_any().downcast_ref::<HighlightNode>()
+                {
+                    output.push_str("\\colorbox{yellow}{");
+                    for child in &highlight_node.content {
+                        self.write_node(child, output)?;
+                    }
+                    output.push_str("}");
                 } else {
                     // Fallback for unknown custom nodes
                     output.push_str("[Unknown custom node]");
@@ -337,16 +344,8 @@ impl LaTeXWriter {
                 output.push_str("\\hrule\n\n");
             }
             Node::HtmlElement(element) => {
-                if element.tag == "mark" {
-                    output.push_str("\\colorbox{yellow}{");
-                    for child in &element.children {
-                        self.write_node(child, output)?;
-                    }
-                    output.push_str("}");
-                } else {
-                    for child in &element.children {
-                        self.write_node(child, output)?;
-                    }
+                for child in &element.children {
+                    self.write_node(child, output)?;
                 }
             }
             _ => {}

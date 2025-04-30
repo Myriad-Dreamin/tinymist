@@ -76,6 +76,30 @@ impl ExternalFrameNode {
     }
 }
 
+/// Highlight node for highlighted text
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node]
+pub struct HighlightNode {
+    /// The content to be highlighted
+    pub content: Vec<Node>,
+}
+
+impl HighlightNode {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        let mut temp_writer = cmark_writer::writer::CommonMarkWriter::new();
+        for node in &self.content {
+            temp_writer.write(node)?;
+        }
+        let content = temp_writer.into_string();
+        writer.write_str(&format!("=={}==", content))?;
+        Ok(())
+    }
+
+    fn is_block_custom(&self) -> bool {
+        false
+    }
+}
+
 /// Common writer interface for different formats
 pub trait FormatWriter {
     /// Write AST document to output format

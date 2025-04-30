@@ -9,7 +9,7 @@ use typst::layout::Frame;
 use crate::attributes::{
     FigureAttr, HeadingAttr, ImageAttr, LinkAttr, ListItemAttr, RawAttr, TypliteAttrsParser,
 };
-use crate::common::{FigureNode, ListState};
+use crate::common::{FigureNode, HighlightNode, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -135,12 +135,8 @@ impl HtmlToAstParser {
             md_tag::highlight => {
                 let mut content = Vec::new();
                 self.convert_children_into(&mut content, element)?;
-                self.inline_buffer.push(Node::HtmlElement(CmarkHtmlElement {
-                    tag: "mark".to_string(),
-                    attributes: vec![],
-                    children: content,
-                    self_closing: false,
-                }));
+                self.inline_buffer
+                    .push(Node::Custom(Box::new(HighlightNode { content })));
                 Ok(())
             }
 
