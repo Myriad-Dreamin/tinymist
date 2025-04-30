@@ -204,7 +204,7 @@ mod tests {
 - <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 --> 
 - <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
 
-See @@show-module() for outputting the results of this function.
+See show-module() for outputting the results of this function.
 
 - <!-- typlite:begin:list-item 0 -->content (string): Content of `.typ` file to analyze for docstrings.<!-- typlite:end:list-item 0 -->
 - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
@@ -223,7 +223,7 @@ See @@show-module() for outputting the results of this function.
         - <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 --> 
         - <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
 
-        See @@show-module() for outputting the results of this function.
+        See show-module() for outputting the results of this function.
         << docs
         >>return
         string
@@ -258,7 +258,7 @@ See @@show-module() for outputting the results of this function.
         insta::assert_snapshot!(func(r###"These again are dictionaries with the keys
 - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
 
-See @@show-module() for outputting the results of this function.
+See show-module() for outputting the results of this function.
 
 - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
 - <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function 
@@ -270,7 +270,7 @@ See @@show-module() for outputting the results of this function.
         These again are dictionaries with the keys
         - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
 
-        See @@show-module() for outputting the results of this function.
+        See show-module() for outputting the results of this function.
         << docs
         >>return
         string
@@ -289,10 +289,10 @@ See @@show-module() for outputting the results of this function.
 
     #[test]
     fn test_identify_tidy_docs3() {
-        insta::assert_snapshot!(var(r###"See @@show-module() for outputting the results of this function.
+        insta::assert_snapshot!(var(r###"See show-module() for outputting the results of this function.
 -> string"###), @r"
         >> docs:
-        See @@show-module() for outputting the results of this function.
+        See show-module() for outputting the results of this function.
         << docs
         >>return
         string

@@ -15,44 +15,17 @@ input_file: crates/typlite/src/fixtures/docs/tidy.typ
 =====
 These again are dictionaries with the keys
 
-- <!-- typlite:begin:list-item 0 -->
-  `description` (optional): The description for the argument.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  `types` (optional): A list of accepted argument types.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  `default` (optional): Default value for this argument.
-  
-  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
 
 See show-module() for outputting the results of this function.
 
-- <!-- typlite:begin:list-item 0 -->
-  content (string): Content of `.typ` file to analyze for docstrings.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  name (string): The name for the module.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  label-prefix (auto, string): The label-prefix for internal function references. If `auto`, the label-prefix name will be the module name.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  require-all-parameters (boolean): Require that all parameters of a functions are documented and fail if some are not.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  scope (dictionary): A dictionary of definitions that are then available in all function and parameter descriptions.
-  
-  <!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->
-  preamble (string): Code to prepend to all code snippets shown with `#example()`. This can for instance be used to import something from the scope.
-  
-  <!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->content (string): Content of `.typ` file to analyze for docstrings.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function references. If `auto`, the label-prefix name will be the module name.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->require-all-parameters (boolean): Require that all parameters of a functions are documented and fail if some are not.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->scope (dictionary): A dictionary of definitions that are then available in all function and parameter descriptions.<!-- typlite:end:list-item 0 -->
+- <!-- typlite:begin:list-item 0 -->preamble (string): Code to prepend to all code snippets shown with `#example()`. This can for instance be used to import something from the scope.<!-- typlite:end:list-item 0 -->
 
 -\> string

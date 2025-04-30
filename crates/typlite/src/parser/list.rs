@@ -27,7 +27,7 @@ impl ListParser {
                     let attrs = ListItemAttr::parse(&li.attrs)?;
                     let mut item_content = Vec::new();
 
-                    parser.begin_list(&mut item_content);
+                    parser.begin_list();
 
                     for li_child in &li.children {
                         match li_child {
@@ -59,12 +59,12 @@ impl ListParser {
                         }
                     }
 
+                    parser.end_list();
+
                     if !parser.inline_buffer.is_empty() {
                         item_content
                             .push(Node::Paragraph(std::mem::take(&mut parser.inline_buffer)));
                     }
-
-                    parser.end_list(&mut item_content);
 
                     if !item_content.is_empty() {
                         if is_ordered {

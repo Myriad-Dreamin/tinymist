@@ -224,21 +224,23 @@ impl HtmlToAstParser {
         Ok(())
     }
 
-    pub(crate) fn begin_list(&self, item_content: &mut Vec<Node>) {
+    pub(crate) fn begin_list(&mut self) {
         if self.feat.annotate_elem {
-            item_content.push(Node::Custom(Box::new(Comment(format!(
-                "typlite:begin:list-item {}",
-                self.list_level - 1
-            )))))
+            self.inline_buffer
+                .push(Node::Custom(Box::new(Comment(format!(
+                    "typlite:begin:list-item {}",
+                    self.list_level - 1
+                )))))
         }
     }
 
-    pub(crate) fn end_list(&self, item_content: &mut Vec<Node>) {
+    pub(crate) fn end_list(&mut self) {
         if self.feat.annotate_elem {
-            item_content.push(Node::Custom(Box::new(Comment(format!(
-                "typlite:end:list-item {}",
-                self.list_level - 1
-            )))))
+            self.inline_buffer
+                .push(Node::Custom(Box::new(Comment(format!(
+                    "typlite:end:list-item {}",
+                    self.list_level - 1
+                )))))
         }
     }
 }
