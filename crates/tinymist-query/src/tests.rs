@@ -317,7 +317,12 @@ impl fmt::Display for JsonRepr {
         let mut ser = Serializer::with_formatter(w, PrettyFormatter::with_indent(b" "));
         self.0.serialize(&mut ser).unwrap();
 
-        f.write_str(&String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap())
+        let res = String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap();
+        // replace Span(number) to Span(..)
+        static REG: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"Span\((\d+)\)"#).unwrap());
+        let res = REG.replace_all(&res, "Span(..)");
+        f.write_str(&res)
     }
 }
 

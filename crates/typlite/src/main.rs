@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 use std::{
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -8,7 +9,7 @@ use std::{
 use clap::Parser;
 use ecow::{eco_format, EcoString};
 use tinymist_project::WorldProvider;
-use typlite::{value::*, TypliteFeat};
+use typlite::{common::Format, value::*, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 
 /// Common arguments of compile, watch, and query.
@@ -17,19 +18,13 @@ pub struct CompileArgs {
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
-    /// Path to output file
-    #[clap(value_name = "OUTPUT")]
-    pub output: Option<String>,
+    /// Path to output file(s)
+    #[clap(value_name = "OUTPUT", action = clap::ArgAction::Append)]
+    pub outputs: Vec<String>,
 
     /// Configures the path of assets directory
     #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
     pub assets_path: Option<String>,
-
-    /// Configure the path to the assets' corresponding source code directory.
-    /// When the path is specified, typlite adds a href to jump to the source
-    /// code in the exported asset.
-    #[clap(long, default_value = None, value_name = "ASSETS_SRC_PATH")]
-    pub assets_src_path: Option<String>,
 }
 
 fn main() -> typlite::Result<()> {
@@ -41,29 +36,22 @@ fn main() -> typlite::Result<()> {
         .input
         .as_ref()
         .ok_or("Missing required argument: INPUT")?;
-    let output = match args.output {
-        Some(stdout_path) if stdout_path == "-" => None,
-        Some(output_path) => Some(PathBuf::from(output_path)),
-        None => Some(Path::new(input).with_extension("md")),
+
+    let outputs = if args.outputs.is_empty() {
+        vec![Path::new(input)
+            .with_extension("md")
+            .to_string_lossy()
+            .to_string()]
+    } else {
+        args.outputs.clone()
     };
+
     let assets_path = match args.assets_path {
         Some(assets_path) => {
             let path = PathBuf::from(assets_path);
             if !path.exists() {
                 if let Err(e) = std::fs::create_dir_all(&path) {
                     return Err(format!("failed to create assets directory: {}", e).into());
-                }
-            }
-            Some(path)
-        }
-        None => None,
-    };
-    let assets_src_path = match args.assets_src_path {
-        Some(assets_src_path) => {
-            let path = PathBuf::from(assets_src_path);
-            if !path.exists() {
-                if let Err(e) = std::fs::create_dir_all(&path) {
-                    return Err(format!("failed to create assets' src directory: {}", e).into());
                 }
             }
             Some(path)
@@ -77,18 +65,60 @@ fn main() -> typlite::Result<()> {
     let converter = Typlite::new(Arc::new(world))
         .with_library(lib())
         .with_feature(TypliteFeat {
-            assets_path,
-            assets_src_path,
+            assets_path: assets_path.clone(),
             ..Default::default()
         });
-    let conv = converter.convert();
+    let doc = match converter.convert_doc() {
+        Ok(doc) => doc,
+        Err(err) => return Err(format!("failed to convert document: {err}").into()),
+    };
 
-    match (conv, output) {
-        (Ok(conv), None) => println!("{}", conv),
-        (Ok(conv), Some(output)) => std::fs::write(output, conv.as_str()).unwrap(),
-        (Err(err), ..) => {
-            eprintln!("{err}");
-            std::process::exit(1);
+    for output_path in &outputs {
+        let is_stdout = output_path == "-";
+        let output = if is_stdout {
+            None
+        } else {
+            Some(PathBuf::from(output_path))
+        };
+
+        let format = match &output {
+            Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
+                Format::LaTeX
+            }
+            Some(output) if output.extension() == Some(std::ffi::OsStr::new("docx")) => {
+                Format::Docx
+            }
+            _ => Format::Md,
+        };
+
+        match format {
+            Format::Docx => todo!(),
+            Format::LaTeX => todo!(),
+            Format::Md => {
+                let result = doc.to_md_string();
+                match (result, output) {
+                    (Ok(content), None) => {
+                        std::io::stdout()
+                            .write_all(content.as_str().as_bytes())
+                            .unwrap();
+                    }
+                    (Ok(content), Some(output)) => {
+                        if let Err(err) = std::fs::write(&output, content.as_str()) {
+                            eprintln!(
+                                "failed to write Markdown file {}: {}",
+                                output.display(),
+                                err
+                            );
+                            continue;
+                        }
+                        println!("Generated Markdown file: {}", output.display());
+                    }
+                    (Err(err), _) => {
+                        eprintln!("Error converting to Markdown for {}: {}", output_path, err);
+                        continue;
+                    }
+                }
+            }
         }
     }
 

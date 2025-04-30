@@ -3,4 +3,77 @@ source: crates/typlite/src/tests.rs
 expression: "conv(world, false)"
 input_file: crates/typlite/src/fixtures/integration/outline.typ
 ---
-failed to convert to markdown: unknown variable: outline
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1outline><m1heading level="1"><span style="display: inline-block;">Contents</span></m1heading><m1outentry level="2"><m1heading level="2"><span style="display: inline-block;">Heading 1</span></m1heading></m1outentry><m1outentry level="3"><m1heading level="3"><span style="display: inline-block;">Heading 2</span></m1heading></m1outentry></m1outline><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block;">Heading 1</span></m1heading><m1parbreak></m1parbreak><m1heading level="3"><span style="display: inline-block;">Heading 2</span></m1heading><m1parbreak></m1parbreak><p><span><m1link dest="https://example.com">This is a link to example.com</m1link></span></p><m1parbreak></m1parbreak><p>Inline <span><m1raw lang="" block="false" text="code"></m1raw></span> has <span><m1raw lang="" block="false" text="back-ticks around"></m1raw></span> it.</p><m1parbreak></m1parbreak><m1raw lang="cs" block="true" text="using System.IO.Compression;
+
+#pragma warning disable 414, 3021
+
+namespace MyApplication
+{
+    [Obsolete(&quot;...&quot;)]
+    class Program : IInterface
+    {
+        public static List<int> JustDoIt(int count)
+        {
+            Console.WriteLine($&quot;Hello {Name}!&quot;);
+            return new List<int>(new int[] { 1, 2, 3 })
+        }
+    }
+}"></m1raw><m1parbreak></m1parbreak><p>Math inline:</p><m1eqinline>redacted-frame</m1eqinline><p>and block:</p><m1eqblock>redacted-frame</m1eqblock><m1parbreak></m1parbreak><ul><li>First item</li><li><p>Second item</p><ol><li>First sub-item</li><li><p>Second sub-item</p><ul><li>First sub-sub-item</li></ul></li></ol></li></ul><m1parbreak></m1parbreak><dl><dt>First term</dt><dd>First definition</dd></dl><m1parbreak></m1parbreak><m1table><table><tr><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td></tr></table></m1table></m1document></body>
+</html>
+
+=====
+## Contents
+
+### Heading 1
+
+#### Heading 2
+
+### Heading 1
+
+#### Heading 2
+
+[This is a link to example.com](https://example.com)
+
+Inline `code` has `back-ticks around` it.
+
+```cs
+using System.IO.Compression;
+
+#pragma warning disable 414, 3021
+
+namespace MyApplication
+{
+    [Obsolete("...")]
+    class Program : IInterface
+    {
+        public static List<int> JustDoIt(int count)
+        {
+            Console.WriteLine($"Hello {Name}!");
+            return new List<int>(new int[] { 1, 2, 3 })
+        }
+    }
+}
+```
+
+Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />and block:
+
+<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+
+- First item
+- Second item
+  
+  1. First sub-item
+  2. Second sub-item
+     
+     - First sub-sub-item
+
+<dl><dt>First term</dt><dd>First definition</dd></dl>
+
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

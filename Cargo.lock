@@ -580,6 +580,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmark-writer"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79ac3be73d18979a75f69c6f73bae74d2ff9fa61e9c3539732040429ad2659b8"
+dependencies = [
+ "cmark-writer-macros",
+]
+
+[[package]]
+name = "cmark-writer-macros"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23ad8476b03e933c3ff38eefa7c96a9c155e4402621918852f27cf67cb637b99"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "cobs"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4743,15 +4763,18 @@ version = "0.13.12"
 dependencies = [
  "base64",
  "clap",
+ "cmark-writer",
  "comemo",
  "ecow",
  "insta",
  "regex",
  "tinymist-analysis",
+ "tinymist-derive",
  "tinymist-project",
  "tinymist-std",
  "tinymist-tests",
  "typst",
+ "typst-html",
  "typst-svg",
  "typst-syntax",
 ]

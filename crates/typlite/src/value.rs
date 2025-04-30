@@ -1,6 +1,12 @@
 //! # Typlite Values
 
+use crate::tinymist_std::typst::diag::EcoString;
+use crate::worker::TypliteWorker;
 use core::fmt;
+use typst_syntax::{
+    ast::{self, AstNode},
+    SyntaxNode,
+};
 
 use crate::*;
 
