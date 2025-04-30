@@ -2,7 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, true)"
 input_file: crates/typlite/src/fixtures/docs/tidy.typ
-snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>

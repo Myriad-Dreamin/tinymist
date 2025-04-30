@@ -188,12 +188,9 @@ impl Typlite {
             .map_shadow(
                 wrap_main_path.as_path(),
                 Bytes::from_string(format!(
-                    r#"
-                #import "@local/markdown:0.1.0": md-doc, example
-                #show: md-doc
-                
-                {}
-                "#,
+                    r#"#import "@local/markdown:0.1.0": md-doc, example
+#show: md-doc
+{}"#,
                     world.source(current).unwrap().text()
                 )),
             )

@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/render_equation.typ
-snapshot_kind: text
 ---
 {
  "contents": "```typc\nlet lam(\n  A: type,\n  B: type,\n) = dictionary;\n```\n\n---\n\nLambda constructor.\n\nTyping Rule:\n\n<img alt=\"typst-block\" src=\"data:image-hash/svg+xml;base64,redacted\" />\n\n# Positional Parameters\n\n## A\n\n```typc\ntype: type\n```\n\nThe type of the argument.\n  \n  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the condition of the proposition.<!-- typlite:end:list-item 1 -->\n\n## B (positional)\n\n```typc\ntype: type\n```\n\nThe type of the body.\n  \n  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the conclusion of the proposition.<!-- typlite:end:list-item 1 -->",
