@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/hover.rs
+assertion_line: 433
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/annotate_dict_param2.typ
+---
+{
+ "contents": "```typc\nlet inherited-scope = dictionary;\n```",
+ "range": "6:21:6:36"
+}

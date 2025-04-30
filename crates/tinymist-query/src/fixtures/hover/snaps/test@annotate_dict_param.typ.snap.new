@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/hover.rs
+assertion_line: 433
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/annotate_dict_param.typ
+---
+{
+ "contents": "```typc\nlet show-example(\n  ..options: arguments,\n  inherited-scope: dictionary = (:),\n) = none;\n```\n\n---\n\n- <!-- typlite:begin:list-item 0 -->inherited-scope (dictionary): Definitions that are made available to the entire parsed<!-- typlite:end:list-item 0 -->\n\nmodule. This parameter is only used internally.\n\n# Rest Parameters\n\n## options\n\n```typc\ntype: arguments\n```\n\n\n\n# Named Parameters\n\n## inherited-scope\n\n```typc\ntype: dictionary\n```\n\n",
+ "range": "7:20:7:32"
+}
