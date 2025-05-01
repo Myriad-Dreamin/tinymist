@@ -7,9 +7,8 @@ use std::{
 };
 
 use clap::Parser;
-use ecow::{eco_format, EcoString};
 use tinymist_project::WorldProvider;
-use typlite::{common::Format, value::*, TypliteFeat};
+use typlite::{common::Format, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 
 /// Common arguments of compile, watch, and query.
@@ -62,12 +61,10 @@ fn main() -> typlite::Result<()> {
     let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
     let world = universe.snapshot();
 
-    let converter = Typlite::new(Arc::new(world))
-        .with_library(lib())
-        .with_feature(TypliteFeat {
-            assets_path: assets_path.clone(),
-            ..Default::default()
-        });
+    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+        assets_path: assets_path.clone(),
+        ..Default::default()
+    });
     let doc = match converter.convert_doc() {
         Ok(doc) => doc,
         Err(err) => return Err(format!("failed to convert document: {err}").into()),
@@ -167,32 +164,4 @@ fn main() -> typlite::Result<()> {
     }
 
     Ok(())
-}
-
-fn lib() -> Arc<typlite::scopes::Scopes<Value>> {
-    let mut scopes = typlite::library::docstring_lib();
-
-    // todo: how to import this function correctly?
-    scopes.define("cross-link", cross_link as RawFunc);
-
-    Arc::new(scopes)
-}
-
-/// Evaluate a `cross-link`.
-pub fn cross_link(mut args: Args) -> typlite::Result<Value> {
-    let dest = get_pos_named!(args, dest: EcoString);
-    let body = get_pos_named!(args, body: Content);
-
-    let dest = std::path::Path::new(dest.as_str()).with_extension("html");
-    let mut dest = dest.as_path();
-
-    // strip leading `/` from the path
-    if let Ok(s) = dest.strip_prefix("/") {
-        dest = s;
-    }
-
-    Ok(Value::Content(eco_format!(
-        "[{body}](https://myriad-dreamin.github.io/tinymist/{dest})",
-        dest = dest.to_string_lossy()
-    )))
 }
