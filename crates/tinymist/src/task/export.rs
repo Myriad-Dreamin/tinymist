@@ -1,24 +1,27 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
+use std::path::PathBuf;
 use std::str::FromStr;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::atomic::AtomicUsize;
+use std::sync::{Arc, OnceLock};
 
 use reflexo::ImmutPath;
+use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
+use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
+use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{convert_datetime, get_page_selection, ExportTarget, TextExport};
+use tinymist_task::{get_page_selection, ExportTarget, PdfExport, TextExport};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
-use typst_pdf::PdfOptions;
 
 use super::{FutureFolder, SyncTaskFactory};
 use crate::project::{
-    convert_source_date_epoch, ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask,
-    ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask,
-    ExportTask as ProjectExportTask, ExportTextTask, LspCompiledArtifact, ProjectTask, QueryTask,
-    TaskWhen,
+    ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask, ExportMarkdownTask,
+    ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask, ExportTextTask,
+    LspCompiledArtifact, ProjectTask, QueryTask, TaskWhen,
 };
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
@@ -62,8 +65,8 @@ impl ExportTask {
         artifact: &LspCompiledArtifact,
         config: &Arc<ExportUserConfig>,
     ) -> Option<()> {
-        let doc = artifact.doc.as_ref().ok()?;
-        let s = artifact.signal;
+        let doc = artifact.doc.as_ref()?;
+        let s = artifact.snap.signal;
 
         let when = config.task.when().unwrap_or_default();
         let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
@@ -78,7 +81,7 @@ impl ExportTask {
             return None;
         }
 
-        let rev = artifact.world.revision().get();
+        let rev = artifact.world().revision().get();
         let fut = self.export_folder.spawn(rev, || {
             let task = config.task.clone();
             let artifact = artifact.clone();
@@ -103,12 +106,12 @@ impl ExportTask {
         }
 
         let editor_tx = self.editor_tx.clone()?;
-        let rev = artifact.world.revision().get();
+        let rev = artifact.world().revision().get();
         let fut = self.count_word_folder.spawn(rev, || {
             let artifact = artifact.clone();
             Box::pin(async move {
-                let id = artifact.snap.id;
-                let doc = artifact.doc.ok()?;
+                let id = artifact.id().clone();
+                let doc = artifact.doc?;
                 let wc =
                     log_err(FutureFolder::compute(move |_| word_count::word_count(&doc)).await);
                 log::debug!("WordCount({id:?}:{rev}): {wc:?}");
@@ -134,24 +137,28 @@ impl ExportTask {
         use reflexo_vec2svg::DefaultExportFeature;
         use ProjectTask::*;
 
-        let CompiledArtifact { snap, doc, .. } = artifact;
+        let CompiledArtifact { graph, doc, .. } = artifact;
 
         // Prepare the output path.
-        let entry = snap.world.entry_state();
+        let entry = graph.snap.world.entry_state();
         let config = task.as_export().unwrap();
         let output = config.output.clone().unwrap_or_default();
-        let Some(to) = output.substitute(&entry) else {
+        let Some(write_to) = output.substitute(&entry) else {
             return Ok(None);
         };
-        if to.is_relative() {
-            bail!("ExportTask({task:?}): output path is relative: {to:?}");
+        if write_to.is_relative() {
+            bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if to.is_dir() {
-            bail!("ExportTask({task:?}): output path is a directory: {to:?}");
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
-        let to = to.with_extension(task.extension());
-        log::info!("ExportTask({task:?}): exporting {entry:?} to {to:?}");
-        if let Some(e) = to.parent() {
+        let write_to = write_to.with_extension(task.extension());
+
+        static EXPORT_ID: AtomicUsize = AtomicUsize::new(0);
+        let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        log::debug!("ExportTask({export_id}): exporting {entry:?} to {write_to:?}");
+        if let Some(e) = write_to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
             }
@@ -160,7 +167,7 @@ impl ExportTask {
         let _: Option<()> = lock_dir.and_then(|lock_dir| {
             let mut updater = crate::project::update_lock(lock_dir);
 
-            let doc_id = updater.compiled(&snap.world)?;
+            let doc_id = updater.compiled(graph.world())?;
 
             updater.task(ApplyProjectTask {
                 id: doc_id.clone(),
@@ -173,25 +180,38 @@ impl ExportTask {
         });
 
         // Prepare the document.
-        let doc = doc.ok().context("no document")?;
+        let doc = doc.context("cannot export with compilation errors")?;
 
         // Prepare data.
         let kind2 = task.clone();
-        let data = FutureFolder::compute(move |_| -> Result<Vec<u8>> {
+        let data = FutureFolder::compute(move |_| -> Result<Bytes> {
             let doc = &doc;
 
             // static BLANK: Lazy<Page> = Lazy::new(Page::default);
-            let html_doc = || {
-                Ok(match &doc {
-                    TypstDocument::Html(html_doc) => html_doc,
-                    TypstDocument::Paged(_) => bail!("expected html document, found Paged"),
-                })
+            // todo: check warnings and errors inside
+            let html_once = OnceLock::new();
+            let html_doc = || -> Result<_> {
+                html_once
+                    .get_or_init(|| -> Result<_> {
+                        Ok(match &doc {
+                            TypstDocument::Html(html_doc) => html_doc.clone(),
+                            TypstDocument::Paged(_) => extra_compile_for_export(graph.world())?,
+                        })
+                    })
+                    .as_ref()
+                    .map_err(|e| e.clone())
             };
+            let page_once = OnceLock::new();
             let paged_doc = || {
-                Ok(match &doc {
-                    TypstDocument::Paged(paged_doc) => paged_doc,
-                    TypstDocument::Html(_) => bail!("expected paged document, found HTML"),
-                })
+                page_once
+                    .get_or_init(|| -> Result<_> {
+                        Ok(match &doc {
+                            TypstDocument::Paged(paged_doc) => paged_doc.clone(),
+                            TypstDocument::Html(_) => extra_compile_for_export(graph.world())?,
+                        })
+                    })
+                    .as_ref()
+                    .map_err(|e| e.clone())
             };
             let first_page = || {
                 paged_doc()?
@@ -200,28 +220,9 @@ impl ExportTask {
                     .context("no first page to export")
             };
             Ok(match kind2 {
-                Preview(..) => vec![],
+                Preview(..) => Bytes::new([]),
                 // todo: more pdf flags
-                ExportPdf(ExportPdfTask {
-                    creation_timestamp, ..
-                }) => {
-                    // todo: timestamp world.now()
-                    let creation_timestamp = creation_timestamp
-                        .map(convert_source_date_epoch)
-                        .transpose()
-                        .context_ut("parse pdf creation timestamp")?
-                        .unwrap_or_else(chrono::Utc::now);
-
-                    // todo: Some(pdf_uri.as_str())
-                    typst_pdf::pdf(
-                        paged_doc()?,
-                        &PdfOptions {
-                            timestamp: convert_datetime(creation_timestamp),
-                            ..PdfOptions::default()
-                        },
-                    )
-                    .map_err(|e| anyhow::anyhow!("failed to convert to pdf: {e:?}"))?
-                }
+                ExportPdf(config) => PdfExport::run(&graph, paged_doc()?, &config)?,
                 Query(QueryTask {
                     export: _,
                     output_extension: _,
@@ -231,7 +232,7 @@ impl ExportTask {
                     one,
                 }) => {
                     let pretty = false;
-                    let elements = reflexo_typst::query::retrieve(&snap.world, &selector, doc)
+                    let elements = reflexo_typst::query::retrieve(&graph.world(), &selector, doc)
                         .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
@@ -249,37 +250,37 @@ impl ExportTask {
                         let Some(value) = mapped.first() else {
                             bail!("no such field found for element");
                         };
-                        serialize(value, &format, pretty).map(String::into_bytes)?
+                        serialize(value, &format, pretty).map(Bytes::from_string)?
                     } else {
-                        serialize(&mapped, &format, pretty).map(String::into_bytes)?
+                        serialize(&mapped, &format, pretty).map(Bytes::from_string)?
                     }
                 }
-                ExportHtml(ExportHtmlTask { export: _ }) => typst_html::html(html_doc()?)
-                    .map_err(|e| format!("export error: {e:?}"))
-                    .context_ut("failed to export to html")?
-                    .into_bytes(),
-                ExportSvgHtml(ExportHtmlTask { export: _ }) => {
-                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?)
-                        .into_bytes()
-                }
+                ExportHtml(ExportHtmlTask { export: _ }) => Bytes::from_string(
+                    typst_html::html(html_doc()?)
+                        .map_err(|e| format!("export error: {e:?}"))
+                        .context_ut("failed to export to html")?,
+                ),
+                ExportSvgHtml(ExportHtmlTask { export: _ }) => Bytes::from_string(
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?),
+                ),
                 ExportText(ExportTextTask { export: _ }) => {
-                    TextExport::run_on_doc(doc)?.into_bytes()
+                    Bytes::from_string(TextExport::run_on_doc(doc)?)
                 }
                 ExportMd(ExportMarkdownTask { export: _ }) => {
-                    let conv = Typlite::new(Arc::new(snap.world))
+                    let conv = Typlite::new(Arc::new(graph.world().clone()))
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 
-                    conv.as_bytes().to_owned()
+                    Bytes::from_string(conv)
                 }
                 ExportSvg(ExportSvgTask { export }) => {
                     let (is_first, merged_gap) = get_page_selection(&export)?;
 
-                    if is_first {
-                        typst_svg::svg(first_page()?).into_bytes()
+                    Bytes::from_string(if is_first {
+                        typst_svg::svg(first_page()?)
                     } else {
-                        typst_svg::svg_merged(paged_doc()?, merged_gap).into_bytes()
-                    }
+                        typst_svg::svg_merged(paged_doc()?, merged_gap)
+                    })
                 }
                 ExportPng(ExportPngTask { export, ppi, fill }) => {
                     let ppi = ppi.to_f32();
@@ -301,19 +302,23 @@ impl ExportTask {
                         typst_render::render_merged(paged_doc()?, ppi / 72., merged_gap, Some(fill))
                     };
 
-                    pixmap
-                        .encode_png()
-                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+                    Bytes::new(
+                        pixmap
+                            .encode_png()
+                            .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
+                    )
                 }
             })
-        });
+        })
+        .await??;
 
-        tokio::fs::write(&to, data.await??)
+        let to = write_to.clone();
+        tokio::task::spawn_blocking(move || write_atomic(to, data))
             .await
-            .context("failed to export")?;
+            .context_ut("failed to export")??;
 
-        log::info!("ExportTask({task:?}): export complete");
-        Ok(Some(to))
+        log::debug!("ExportTask({export_id}): export complete");
+        Ok(Some(write_to))
     }
 }
 
@@ -365,6 +370,18 @@ fn log_err<T>(artifact: Result<T>) -> Option<T> {
             log::error!("{err}");
             None
         }
+    }
+}
+
+fn extra_compile_for_export<D: typst::Document + Send + Sync + 'static>(
+    world: &LspWorld,
+) -> Result<Arc<D>> {
+    let res = tokio::task::block_in_place(|| CompilationTask::<D>::execute(world));
+
+    match res.output {
+        Ok(v) => Ok(v),
+        Err(e) if e.is_empty() => bail!("failed to compile: internal error"),
+        Err(e) => bail!("failed to compile: {}", e[0].message),
     }
 }
 
@@ -473,5 +490,71 @@ mod tests {
             ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
 
         assert!(needs_run);
+    }
+
+    use chrono::{DateTime, Utc};
+    use tinymist_std::time::*;
+
+    /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+    pub fn convert_source_date_epoch(seconds: i64) -> Result<DateTime<Utc>, String> {
+        DateTime::from_timestamp(seconds, 0).ok_or_else(|| "timestamp out of range".to_string())
+    }
+
+    /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+    pub fn convert_system_time(seconds: i64) -> Result<Time, String> {
+        if seconds < 0 {
+            return Err("negative timestamp since unix epoch".to_string());
+        }
+
+        Time::UNIX_EPOCH
+            .checked_add(Duration::new(seconds as u64, 0))
+            .ok_or_else(|| "timestamp out of range".to_string())
+    }
+
+    #[test]
+    fn test_timestamp_chrono() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_source_date_epoch(timestamp).unwrap();
+        assert_eq!(date_time.timestamp(), timestamp);
+    }
+
+    #[test]
+    fn test_timestamp_system() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_system_time(timestamp).unwrap();
+        assert_eq!(
+            date_time
+                .duration_since(Time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            timestamp as u64
+        );
+    }
+
+    use typst::foundations::Datetime as TypstDatetime;
+
+    fn convert_datetime_chrono(date_time: DateTime<Utc>) -> Option<TypstDatetime> {
+        use chrono::{Datelike, Timelike};
+        TypstDatetime::from_ymd_hms(
+            date_time.year(),
+            date_time.month().try_into().ok()?,
+            date_time.day().try_into().ok()?,
+            date_time.hour().try_into().ok()?,
+            date_time.minute().try_into().ok()?,
+            date_time.second().try_into().ok()?,
+        )
+    }
+
+    #[test]
+    fn test_timestamp_pdf() {
+        let timestamp = 1_000_000_000;
+        let date_time = convert_source_date_epoch(timestamp).unwrap();
+        assert_eq!(date_time.timestamp(), timestamp);
+        let chrono_pdf_ts = convert_datetime_chrono(date_time).unwrap();
+
+        let timestamp = 1_000_000_000;
+        let date_time = convert_system_time(timestamp).unwrap();
+        let system_pdf_ts = tinymist_std::time::to_typst_time(date_time.into());
+        assert_eq!(chrono_pdf_ts, system_pdf_ts);
     }
 }

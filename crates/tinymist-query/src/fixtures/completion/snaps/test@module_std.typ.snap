@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (20..21)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/module_std.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 9,
+    "label": "std",
+    "labelDetails": {
+     "description": "module(\"global\")"
+    },
+    "sortText": "177",
+    "textEdit": {
+     "newText": "std",
+     "range": {
+      "end": {
+       "character": 2,
+       "line": 1
+      },
+      "start": {
+       "character": 1,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

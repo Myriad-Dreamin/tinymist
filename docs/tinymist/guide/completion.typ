@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Guide: Completion")
+#show: book-page.with(title: [Code Completion])
 
 == Using LSP-Based Completion
 

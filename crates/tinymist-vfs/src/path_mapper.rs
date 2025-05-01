@@ -2,6 +2,8 @@
 //! no longer exist -- the assumption is total size of paths we ever look at is
 //! not too big.
 
+#![allow(missing_docs)]
+
 use core::fmt;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -15,7 +17,7 @@ use typst::diag::{eco_format, EcoString, FileError, FileResult};
 use typst::syntax::package::{PackageSpec, PackageVersion};
 use typst::syntax::VirtualPath;
 
-use super::TypstFileId;
+use super::FileId;
 
 #[derive(Debug)]
 pub enum PathResolution {
@@ -49,7 +51,7 @@ impl PathResolution {
 }
 
 pub trait RootResolver {
-    fn path_for_id(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+    fn path_for_id(&self, file_id: FileId) -> FileResult<PathResolution> {
         use WorkspaceResolution::*;
         let root = match WorkspaceResolver::resolve(file_id)? {
             Workspace(id) => id.path().clone(),
@@ -68,7 +70,7 @@ pub trait RootResolver {
             .ok_or_else(|| FileError::AccessDenied)
     }
 
-    fn resolve_root(&self, file_id: TypstFileId) -> FileResult<Option<ImmutPath>> {
+    fn resolve_root(&self, file_id: FileId) -> FileResult<Option<ImmutPath>> {
         use WorkspaceResolution::*;
         match WorkspaceResolver::resolve(file_id)? {
             Workspace(id) | UntitledRooted(id) => Ok(Some(id.path().clone())),
@@ -160,12 +162,12 @@ pub struct WorkspaceResolver {}
 impl WorkspaceResolver {
     pub const WORKSPACE_NS: EcoString = EcoString::inline("ws");
 
-    pub fn is_workspace_file(fid: TypstFileId) -> bool {
+    pub fn is_workspace_file(fid: FileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
     }
 
-    pub fn is_package_file(fid: TypstFileId) -> bool {
+    pub fn is_package_file(fid: FileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace != WorkspaceResolver::WORKSPACE_NS)
     }
@@ -195,12 +197,12 @@ impl WorkspaceResolver {
     }
 
     /// Creates a file id for a rootless file.
-    pub fn rootless_file(path: VirtualPath) -> TypstFileId {
-        TypstFileId::new(None, path)
+    pub fn rootless_file(path: VirtualPath) -> FileId {
+        FileId::new(None, path)
     }
 
     /// Creates a file id for a rootless file.
-    pub fn file_with_parent_root(path: &Path) -> Option<TypstFileId> {
+    pub fn file_with_parent_root(path: &Path) -> Option<FileId> {
         if !path.is_absolute() {
             return None;
         }
@@ -213,21 +215,21 @@ impl WorkspaceResolver {
     /// Creates a file id for a file in some workspace. The `root` is the root
     /// directory of the workspace. If `root` is `None`, the source code at the
     /// `path` will not be able to access physical files.
-    pub fn workspace_file(root: Option<&ImmutPath>, path: VirtualPath) -> TypstFileId {
+    pub fn workspace_file(root: Option<&ImmutPath>, path: VirtualPath) -> FileId {
         let workspace = root.map(Self::workspace_id);
-        TypstFileId::new(workspace.as_ref().map(WorkspaceId::package), path)
+        FileId::new(workspace.as_ref().map(WorkspaceId::package), path)
     }
 
     /// Mounts an untiled file to some workspace. The `root` is the
     /// root directory of the workspace. If `root` is `None`, the source
     /// code at the `path` will not be able to access physical files.
-    pub fn rooted_untitled(root: Option<&ImmutPath>, path: VirtualPath) -> TypstFileId {
+    pub fn rooted_untitled(root: Option<&ImmutPath>, path: VirtualPath) -> FileId {
         let workspace = root.map(Self::workspace_id);
-        TypstFileId::new(workspace.as_ref().map(WorkspaceId::untitled_root), path)
+        FileId::new(workspace.as_ref().map(WorkspaceId::untitled_root), path)
     }
 
     /// File path corresponding to the given `fid`.
-    pub fn resolve(fid: TypstFileId) -> FileResult<WorkspaceResolution> {
+    pub fn resolve(fid: FileId) -> FileResult<WorkspaceResolution> {
         let Some(package) = fid.package() else {
             return Ok(WorkspaceResolution::Rootless);
         };
@@ -249,13 +251,13 @@ impl WorkspaceResolver {
     }
 
     /// File path corresponding to the given `fid`.
-    pub fn display(id: Option<TypstFileId>) -> Resolving {
+    pub fn display(id: Option<FileId>) -> Resolving {
         Resolving { id }
     }
 }
 
 pub struct Resolving {
-    id: Option<TypstFileId>,
+    id: Option<FileId>,
 }
 
 impl fmt::Debug for Resolving {

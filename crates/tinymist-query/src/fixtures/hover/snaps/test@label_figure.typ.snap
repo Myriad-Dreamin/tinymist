@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/label_figure.typ
+---
+{
+ "contents": "Label: `fig:test1`\n",
+ "range": "3:37:3:48"
+}

@@ -77,9 +77,9 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 - Or finally with the builtin lsp protocol:
 
   ```lua
-  vim.lsp.config['tinymist'] = {
-      cmd = {'tinymist'},
-      filetypes = {'typst'}
+  vim.lsp.config["tinymist"] = {
+      cmd = { "tinymist" },
+      filetypes = { "typst" },
       settings = {
           -- ...
       }
@@ -124,13 +124,18 @@ It is often useful to have a command that opens the current file in the reader.
 vim.api.nvim_create_user_command("OpenPdf", function()
   local filepath = vim.api.nvim_buf_get_name(0)
   if filepath:match("%.typ$") then
-    os.execute("open " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
-    -- replace open with your preferred pdf viewer
-    -- os.execute("zathura " .. vim.fn.shellescape(filepath:gsub("%.typ$", ".pdf")))
+    local pdf_path = filepath:gsub("%.typ$", ".pdf")
+    vim.system({ "open", pdf_path })
   end
 end, {})
-
 ```
+
+> [!NOTE]
+> 
+>   For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue \#1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
+
+
+
 Make sure to change `exportPdf` to "onType" or "onSave".
 
 ### Working with Multiple-Files Projects
@@ -150,13 +155,40 @@ Tinymist cannot know the main file of a multiple-files project if you don't tell
 The solution is a bit internal, which should get further improvement, but you can pin a main file by command.
 
 ```lua
+require("lspconfig")["tinymist"].setup { -- Alternatively, can be used `vim.lsp.config["tinymist"]`
+    -- ...
+    on_attach = function(client, bufnr)
+        vim.keymap.set("n", "<leader>tp", function()
+            client:exec_cmd({
+                title = "pin",
+                command = "tinymist.pinMain",
+                arguments = { vim.api.nvim_buf_get_name(0) },
+            }, { bufnr = bufnr })
+        end, { desc = "[T]inymist [P]in", noremap = true })
+
+        vim.keymap.set("n", "<leader>tu", function()
+            client:exec_cmd({
+                title = "unpin",
+                command = "tinymist.pinMain",
+                arguments = { vim.v.null },
+            }, { bufnr = bufnr })
+        end, { desc = "[T]inymist [U]npin", noremap = true })
+    end,
+}
+```
+
+Note that `vim.v.null` should be used instead of `nil` in the `arguments` table when unpinning. See [issue #1595](https://github.com/Myriad-Dreamin/tinymist/issues/1595).
+
+For Neovim versions prior to 0.11.0, `vim.lsp.buf.execute_command` should be used instead:
+```lua
 -- pin the main file
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.api.nvim_buf_get_name(0) } })
 -- unpin the main file
-vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.v.null } })
 ```
 
-It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting neovim.
+
+It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
 This could be improved in the future.
 
@@ -174,7 +206,7 @@ This is most commonly due to nvim not recognizing the `.typ` file extension as a
 :set filetype=typst
 ```
 
-In older versions of neovim an autocommand may be necessary.
+In older versions of Neovim an autocommand may be necessary.
 
 ```vim
 autocmd BufNewFile,BufRead *.typ setfiletype typst

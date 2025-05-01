@@ -1,0 +1,33 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (40..41)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/func_self3.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "flatten",
+    "labelDetails": {
+     "description": "(array) => array"
+    },
+    "textEdit": {
+     "newText": "flatten()${1:}",
+     "range": {
+      "end": {
+       "character": 18,
+       "line": 1
+      },
+      "start": {
+       "character": 17,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

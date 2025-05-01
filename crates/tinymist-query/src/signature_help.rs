@@ -1,4 +1,3 @@
-use once_cell::sync::OnceCell;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
@@ -52,7 +51,7 @@ impl SemanticRequest for SignatureHelpRequest {
         label.push('(');
 
         let mut real_offset = 0;
-        let focus_name = OnceCell::new();
+        let focus_name = OnceLock::new();
         for (idx, (param, ty)) in sig.params().enumerate() {
             if is_set && !param.attrs.settable {
                 continue;

@@ -23,7 +23,26 @@ pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
     Some(worker.info)
 }
 
+/// Link information in a source file.
+#[derive(Debug, Default)]
+pub struct LinkInfo {
+    /// The link objects in a source file.
+    pub objects: Vec<LinkObject>,
+}
+
+/// A link object in a source file.
+#[derive(Debug)]
+pub struct LinkObject {
+    /// The range of the link expression.
+    pub range: Range<usize>,
+    /// The span of the link expression.
+    pub span: Span,
+    /// The target of the link.
+    pub target: LinkTarget,
+}
+
 /// A valid link target.
+#[derive(Debug)]
 pub enum LinkTarget {
     /// A package specification.
     Package(Box<PackageSpec>),
@@ -40,28 +59,11 @@ impl LinkTarget {
             LinkTarget::Url(url) => Some(url.as_ref().clone()),
             LinkTarget::Path(id, path) => {
                 // Avoid creating new ids here.
-                let root = ctx.path_for_id(id.join("/")).ok()?;
+                let root = ctx.path_for_id(id.join("")).ok()?;
                 crate::path_res_to_url(root.join(path).ok()?).ok()
             }
         }
     }
-}
-
-/// A link object in a source file.
-pub struct LinkObject {
-    /// The range of the link expression.
-    pub range: Range<usize>,
-    /// The span of the link expression.
-    pub span: Span,
-    /// The target of the link.
-    pub target: LinkTarget,
-}
-
-/// Link information in a source file.
-#[derive(Default)]
-pub struct LinkInfo {
-    /// The link objects in a source file.
-    pub objects: Vec<LinkObject>,
 }
 
 struct LinkStrWorker {
@@ -118,7 +120,7 @@ impl LinkStrWorker {
                     }
                     "bibliography" => {
                         self.analyze_reader(node, call, "cite", false);
-                        self.analyze_reader(node, call, "style", false);
+                        self.analyze_bibliography_style(node, call);
                         self.analyze_reader(node, call, "path", true);
                     }
                     "cbor" | "csv" | "image" | "read" | "json" | "yaml" | "xml" => {
@@ -130,6 +132,24 @@ impl LinkStrWorker {
             }
             return None;
         }
+    }
+
+    fn analyze_bibliography_style(&mut self, node: &LinkedNode, call: ast::FuncCall) -> Option<()> {
+        for item in call.args().items() {
+            match item {
+                ast::Arg::Named(named) if named.name().get().as_str() == "style" => {
+                    if let ast::Expr::Str(style) = named.expr() {
+                        if hayagriva::archive::ArchivedStyle::by_name(&style.get()).is_some() {
+                            return Some(());
+                        }
+                    }
+                    self.analyze_path_expr(node, named.expr());
+                    return Some(());
+                }
+                _ => {}
+            }
+        }
+        Some(())
     }
 
     fn analyze_reader(

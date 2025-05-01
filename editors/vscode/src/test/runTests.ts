@@ -37,23 +37,21 @@ async function main() {
     extensionTestsEnv.VSCODE_TEST_FILTER = filter;
   }
 
-  // Run tests using the minimal supported version.
-  await runTests({
-    version: minimalVersion,
-    launchArgs,
-    extensionDevelopmentPath,
-    extensionTestsPath,
-    extensionTestsEnv,
-  });
-
-  // and the latest one
-  await runTests({
-    version: "stable",
-    launchArgs,
-    extensionDevelopmentPath,
-    extensionTestsPath,
-    extensionTestsEnv,
-  });
+  // Run tests using the minimal supported version and the latest one.
+  for (const version of [minimalVersion, "stable"]) {
+    for (const uri of [
+      path.resolve(extensionDevelopmentPath, "e2e-workspaces/export"),
+      undefined,
+    ]) {
+      await runTests({
+        version,
+        launchArgs: uri ? [...launchArgs, uri] : launchArgs,
+        extensionDevelopmentPath,
+        extensionTestsPath,
+        extensionTestsEnv,
+      });
+    }
+  }
 
   // await runVSCodeCommand(["--install-extension", "ms-python.python"], { version: "1.60.0" });
 }

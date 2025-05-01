@@ -6,11 +6,10 @@ use anyhow::bail;
 use base64::Engine;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
-use lsp_server::RequestId;
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use sync_lsp::{just_future, LspClient, SchedulableResponse};
+use sync_ls::{just_future, LspClient, RequestId, SchedulableResponse};
 use tinymist_std::error::IgnoreLogging;
 use typst::{syntax::Span, World};
 
@@ -57,7 +56,7 @@ impl UserActionTask {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraceReport {
     request: TraceParams,
-    messages: Vec<lsp_server::Message>,
+    messages: Vec<sync_ls::LspMessage>,
     stderr: String,
 }
 
@@ -109,8 +108,8 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
             if has_response {
                 return None;
             }
-            let msg = lsp_server::Message::read(&mut input_chan).ok()?;
-            if let Some(lsp_server::Message::Response(resp)) = &msg {
+            let msg = sync_ls::lsp::Message::read(&mut input_chan).ok()?;
+            if let Some(sync_ls::lsp::Message::Response(resp)) = &msg {
                 if resp.id == 0.into() {
                     has_response = true;
                 }
@@ -183,13 +182,13 @@ async fn trace_main(
 
     let rpc_kind = rpc_kind.as_str();
 
-    client.send_notification_(lsp_server::Notification {
+    client.send_notification_(sync_ls::lsp::Notification {
         method: "tinymistExt/diagnostics".to_owned(),
         params: serde_json::json!(diagnostics),
     });
     match rpc_kind {
         "lsp" => {
-            client.respond(lsp_server::Response {
+            client.respond_lsp(sync_ls::lsp::Response {
                 id: req_id,
                 result: Some(serde_json::json!({
                     "tracingData": String::from_utf8(timings).unwrap(),
@@ -206,7 +205,7 @@ async fn trace_main(
 
             let addr = addr_rx.await.unwrap();
 
-            client.respond(lsp_server::Response {
+            client.respond_lsp(sync_ls::lsp::Response {
                 id: req_id,
                 result: Some(serde_json::json!({
                     "tracingUrl": format!("http://{addr}"),

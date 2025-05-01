@@ -5,20 +5,30 @@ use std::collections::HashMap;
 
 use lsp_types::notification::{Notification, PublishDiagnostics as PublishDiagnosticsBase};
 use lsp_types::{Diagnostic, Url};
+use reflexo::path::unix_slash;
 use reflexo_typst::typst::prelude::{eco_vec, EcoVec};
 use serde::{Deserialize, Serialize};
+use tinymist_project::CompileReport;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
+use typst::utils::OptionExt;
 
 use crate::project::ProjectInsId;
 use crate::{tool::word_count::WordsCount, LspClient};
 
+#[derive(Debug, Clone)]
+pub struct EditorActorConfig {
+    /// Whether to notify status to the editor.
+    pub notify_status: bool,
+}
+
 /// The request to the editor actor.
 pub enum EditorRequest {
+    Config(EditorActorConfig),
     /// Publishes diagnostics to the editor.
     Diag(ProjVersion, Option<DiagnosticsMap>),
     /// Updates compile status to the editor.
-    Status(CompileStatus),
+    Status(CompileReport),
     /// Updastes words count status to the editor.
     WordCount(ProjectInsId, WordsCount),
 }
@@ -30,8 +40,8 @@ pub struct EditorActor {
     client: LspClient,
     /// The channel receiving the [`EditorRequest`].
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
-    /// Whether to notify compile status to the editor.
-    notify_compile_status: bool,
+    /// The configuration of the editor actor.
+    config: EditorActorConfig,
 
     /// Accumulated diagnostics per file.
     /// The outer `HashMap` is indexed by the file's URL.
@@ -47,14 +57,14 @@ impl EditorActor {
     pub fn new(
         client: LspClient,
         editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
-        notify_compile_status: bool,
+        notify_status: bool,
     ) -> Self {
         Self {
             client,
             editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
-            notify_compile_status,
+            config: EditorActorConfig { notify_status },
         }
     }
 
@@ -65,11 +75,16 @@ impl EditorActor {
         let mut status = StatusAll {
             status: CompileStatusEnum::Compiling,
             path: "".to_owned(),
+            page_count: 0,
             words_count: None,
         };
 
         while let Some(req) = self.editor_rx.recv().await {
             match req {
+                EditorRequest::Config(config) => {
+                    log::info!("received config request: {config:?}");
+                    self.config = config;
+                }
                 EditorRequest::Diag(version, diagnostics) => {
                     log::debug!(
                         "received diagnostics from {version:?}: diag({:?})",
@@ -79,16 +94,27 @@ impl EditorActor {
                     self.publish(version.id, diagnostics).await;
                 }
                 EditorRequest::Status(compile_status) => {
-                    log::debug!("received status request: {compile_status:?}");
-                    if self.notify_compile_status && compile_status.id == ProjectInsId::PRIMARY {
-                        status.status = compile_status.status;
-                        status.path = compile_status.path;
+                    log::trace!("received status request: {compile_status:?}");
+                    if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
+                        use tinymist_project::CompileStatusEnum::*;
+
+                        status.path = compile_status
+                            .compiling_id
+                            .map_or_default(|fid| unix_slash(fid.vpath().as_rooted_path()));
+                        status.page_count = compile_status.page_count;
+                        status.status = match &compile_status.status {
+                            Compiling => CompileStatusEnum::Compiling,
+                            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
+                            ExportError { .. } | CompileError { .. } => {
+                                CompileStatusEnum::CompileError
+                            }
+                        };
                         self.client.send_notification::<StatusAll>(&status);
                     }
                 }
                 EditorRequest::WordCount(id, count) => {
-                    log::debug!("received word count request");
-                    if self.notify_compile_status && id == ProjectInsId::PRIMARY {
+                    log::trace!("received word count request");
+                    if self.config.notify_status && id == ProjectInsId::PRIMARY {
                         status.words_count = Some(count);
                         self.client.send_notification::<StatusAll>(&status);
                     }
@@ -171,18 +197,6 @@ pub struct ProjVersion {
 }
 
 /// The compilation status of a project.
-#[derive(Debug, Clone)]
-pub struct CompileStatus {
-    /// The project ID.
-    pub id: ProjectInsId,
-    /// The file getting compiled.
-    // todo: eco string
-    pub path: String,
-    /// The status of the compilation.
-    pub status: CompileStatusEnum,
-}
-
-/// The compilation status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CompileStatusEnum {
@@ -194,6 +208,17 @@ pub enum CompileStatusEnum {
     CompileError,
 }
 
+impl From<&tinymist_project::CompileStatusEnum> for CompileStatusEnum {
+    fn from(value: &tinymist_project::CompileStatusEnum) -> Self {
+        use tinymist_project::CompileStatusEnum::*;
+        match value {
+            Compiling => CompileStatusEnum::Compiling,
+            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
+            ExportError { .. } | CompileError { .. } => CompileStatusEnum::CompileError,
+        }
+    }
+}
+
 /// All the status of a project.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -202,6 +227,8 @@ struct StatusAll {
     pub status: CompileStatusEnum,
     /// The file getting compiled.
     pub path: String,
+    /// The number of pages in the compiled document, zero if failed.
+    pub page_count: u32,
     /// The word count of the project.
     pub words_count: Option<WordsCount>,
 }

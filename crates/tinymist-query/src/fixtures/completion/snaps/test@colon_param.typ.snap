@@ -3,30 +3,10 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on   (65..66)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/colon_param.typ
-snapshot_kind: text
 ---
 [
  {
   "isIncomplete": false,
-  "items": [
-   {
-    "kind": 15,
-    "label": "length",
-    "sortText": "000",
-    "textEdit": {
-     "newText": " ${1:length}",
-     "range": {
-      "end": {
-       "character": 19,
-       "line": 2
-      },
-      "start": {
-       "character": 19,
-       "line": 2
-      }
-     }
-    }
-   }
-  ]
+  "items": []
  }
 ]

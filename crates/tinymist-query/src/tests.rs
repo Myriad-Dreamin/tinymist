@@ -8,49 +8,31 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use once_cell::sync::Lazy;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_project::{CompileFontArgs, ExportTarget};
-use tinymist_std::debug_loc::LspRange;
+use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
+use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
+use tinymist_world::debug_loc::LspRange;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::WorkspaceResolver;
-use tinymist_world::EntryState;
-use tinymist_world::TaskInputs;
-use tinymist_world::{EntryManager, EntryReader, ShadowApi};
-use typst::foundations::Bytes;
+use tinymist_world::{EntryReader, ShadowApi, TaskInputs};
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
-
-pub use insta::assert_snapshot;
-pub use serde::Serialize;
-pub use serde_json::json;
-pub use tinymist_project::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::syntax::find_module_level_docs;
-use crate::{
-    analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding, VersionedDocument,
-};
-use crate::{to_lsp_position, CompletionFeat, LspWorldExt};
+pub use serde::Serialize;
+pub use serde_json::json;
+pub use tinymist_project::LspUniverse;
+pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
+pub use tinymist_world::WorldComputeGraph;
+
+pub use crate::syntax::find_module_level_docs;
+use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
+use crate::{to_lsp_position, CompletionFeat};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
-    let name = if name.is_empty() { "playground" } else { name };
-
-    let mut settings = insta::Settings::new();
-    settings.set_prepend_module_to_snapshot(false);
-    settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
-    settings.bind(|| {
-        let glob_path = format!("fixtures/{name}/*.typ");
-        insta::glob!(&glob_path, |path| {
-            let contents = std::fs::read_to_string(path).unwrap();
-            #[cfg(windows)]
-            let contents = contents.replace("\r\n", "\n");
-
-            run_with_sources(&contents, |verse, path| {
-                run_with_ctx(verse, path, f);
-            });
-        });
+    tinymist_tests::snapshot_testing!(name, |verse, path| {
+        run_with_ctx(verse, path, f);
     });
 }
 
@@ -93,7 +75,7 @@ pub fn run_with_ctx<T>(
         },
         ..Analysis::default()
     })
-    .snapshot(world);
+    .enter(world);
 
     ctx.test_package_list(|| {
         vec![(
@@ -122,13 +104,13 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 pub fn compile_doc_for_test(
     ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
-) -> Option<VersionedDocument> {
+) -> LspComputeGraph {
     let prev = ctx.world.entry_state();
-    let next = match properties.get("compile")?.trim() {
-        "true" => prev.clone(),
-        "false" => return None,
-        path if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
-        v => panic!("invalid value for 'compile' property: {v}"),
+    let next = match properties.get("compile").map(|s| s.trim()) {
+        Some("true") => prev.clone(),
+        None | Some("false") => return WorldComputeGraph::from_world(ctx.world.clone()),
+        Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
+        v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
     let mut world = Cow::Borrowed(&ctx.world);
@@ -138,70 +120,12 @@ pub fn compile_doc_for_test(
             ..Default::default()
         }));
     }
-    let mut world = world.into_owned();
-    world.set_is_compiling(true);
+    let mut snap = LspCompileSnapshot::from_world(world.into_owned());
+    snap.world.set_is_compiling(true);
 
-    let doc = typst::compile(&world).output.unwrap();
-    Some(VersionedDocument {
-        version: 0,
-        document: TypstDocument::Paged(Arc::new(doc)),
-    })
-}
-
-pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {
-    let root = if cfg!(windows) {
-        PathBuf::from("C:\\")
-    } else {
-        PathBuf::from("/")
-    };
-    let mut verse = LspUniverseBuilder::build(
-        EntryState::new_rooted(root.as_path().into(), None),
-        ExportTarget::Paged,
-        Default::default(),
-        Arc::new(
-            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
-                ignore_system_fonts: true,
-                ..Default::default()
-            })
-            .unwrap(),
-        ),
-        LspUniverseBuilder::resolve_package(None, None),
-    );
-    let sources = source.split("-----");
-
-    let mut last_pw = None;
-    for (idx, source) in sources.enumerate() {
-        // find prelude
-        let mut source = source.trim_start();
-        let mut path = None;
-
-        if source.starts_with("//") {
-            let first_line = source.lines().next().unwrap();
-            let content = first_line.trim_start_matches("/").trim();
-
-            if let Some(path_attr) = content.strip_prefix("path:") {
-                source = source.strip_prefix(first_line).unwrap().trim();
-                path = Some(path_attr.trim().to_owned())
-            }
-        };
-
-        let path = path.unwrap_or_else(|| format!("/s{idx}.typ"));
-
-        let pw = root.join(Path::new(&path));
-        verse
-            .map_shadow(&pw, Bytes::from_string(source.to_owned()))
-            .unwrap();
-        last_pw = Some(pw);
-    }
-
-    let pw = last_pw.unwrap();
-    verse
-        .mutate_entry(EntryState::new_rooted(
-            root.as_path().into(),
-            Some(VirtualPath::new(pw.strip_prefix(root).unwrap())),
-        ))
-        .unwrap();
-    f(&mut verse, pw)
+    let doc = typst::compile(&snap.world).output.unwrap();
+    snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
+    WorldComputeGraph::new(snap)
 }
 
 pub fn find_test_range(s: &Source) -> LspRange {
@@ -237,14 +161,19 @@ pub fn find_test_range_(s: &Source) -> Range<usize> {
 }
 
 pub fn find_test_position_after(s: &Source) -> LspPosition {
-    find_test_position_(s, 1)
+    find_test_lsp_pos(s, 1)
 }
 
 pub fn find_test_position(s: &Source) -> LspPosition {
-    find_test_position_(s, 0)
+    find_test_lsp_pos(s, 0)
 }
 
-pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
+pub fn find_test_lsp_pos(s: &Source, offset: usize) -> LspPosition {
+    let node = find_test_typst_pos(s);
+    to_lsp_position(node + offset, PositionEncoding::Utf16, s)
+}
+
+pub fn find_test_typst_pos(s: &Source) -> usize {
     enum AstMatcher {
         MatchAny { prev: bool },
         MatchIdent { prev: bool },
@@ -333,12 +262,24 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         break;
     }
 
-    to_lsp_position(n.offset() + offset, PositionEncoding::Utf16, s)
+    n.offset()
+}
+
+pub fn make_range_annoation(source: &Source) -> String {
+    let range = find_test_range_(source);
+    let range_before = range.start.saturating_sub(10)..range.start;
+    let range_window = range.clone();
+    let range_after = range.end..range.end.saturating_add(10).min(source.text().len());
+
+    let window_before = &source.text()[range_before];
+    let window_line = &source.text()[range_window];
+    let window_after = &source.text()[range_after];
+    format!("{window_before}|{window_line}|{window_after}")
 }
 
 // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||
 // RedactFields::from_iter(["uri"]));
-pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
+pub static REDACT_LOC: LazyLock<RedactFields> = LazyLock::new(|| {
     RedactFields::from_iter([
         "location",
         "contents",
@@ -376,7 +317,12 @@ impl fmt::Display for JsonRepr {
         let mut ser = Serializer::with_formatter(w, PrettyFormatter::with_indent(b" "));
         self.0.serialize(&mut ser).unwrap();
 
-        f.write_str(&String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap())
+        let res = String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap();
+        // replace Span(number) to Span(..)
+        static REG: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"Span\((\d+)\)"#).unwrap());
+        let res = REG.replace_all(&res, "Span(..)");
+        f.write_str(&res)
     }
 }
 
@@ -420,12 +366,12 @@ impl Redact for RedactFields {
                             map.insert(
                                 key.to_owned(),
                                 Value::Object(
-                                    obj.iter().map(|(k, v)| (file_name(k), v.clone())).collect(),
+                                    obj.iter().map(|(k, v)| (file_path(k), v.clone())).collect(),
                                 ),
                             );
                         }
                         "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
-                            map.insert(key.to_owned(), file_name(t.as_str().unwrap()).into());
+                            map.insert(key.to_owned(), file_path(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -462,9 +408,22 @@ impl Redact for RedactFields {
     }
 }
 
-fn file_name(path: &str) -> String {
-    let name = Path::new(path).file_name().unwrap();
-    name.to_str().unwrap().to_owned()
+pub(crate) fn file_path(uri: &str) -> String {
+    file_path_(&lsp_types::Url::parse(uri).unwrap())
+}
+
+pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
+    let root = if cfg!(windows) {
+        PathBuf::from("C:\\root")
+    } else {
+        PathBuf::from("/root")
+    };
+    let uri = uri.to_file_path().unwrap();
+    let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
+    let rel_path =
+        abs_path.unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().last().unwrap()));
+
+    unix_slash(&rel_path)
 }
 
 pub struct HashRepr<T>(pub T);

@@ -134,15 +134,20 @@ impl ServerState {
 
     /// Focuses main file to the given path.
     pub fn focus_main_file(&mut self, new_entry: Option<ImmutPath>) -> Result<bool> {
+        if new_entry.as_deref() != self.focusing.as_deref() {
+            self.implicit_position = None;
+        }
+
+        self.focusing = new_entry.clone();
+
         if self.pinning_by_user
             || (self.pinning_by_preview && !self.pinning_by_browsing_preview)
-            || self.config.compile.has_default_entry_path
+            || self.config.has_default_entry_path
         {
-            self.focusing = new_entry;
             return Ok(false);
         }
 
-        self.change_main_file(new_entry.clone())
+        self.change_main_file(new_entry)
     }
 
     /// This is used for tracking activating document status if a client is not
@@ -152,7 +157,7 @@ impl ServerState {
     ///
     /// we do want to focus the file implicitly by `textDocument/diagnostic`
     /// (pullDiagnostics mode), as suggested by language-server-protocol#718,
-    /// however, this has poor support, e.g. since neovim 0.10.0.
+    /// however, this has poor support, e.g. since Neovim 0.10.0.
     pub fn implicit_focus_entry(
         &mut self,
         new_entry: impl FnOnce() -> Option<ImmutPath>,
@@ -207,7 +212,7 @@ impl ServerState {
 
     pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
         let proj_input = matches!(
-            self.config.project_resolution,
+            self.entry_resolver().project_resolution,
             ProjectResolutionKind::LockDatabase
         )
         .then(|| {

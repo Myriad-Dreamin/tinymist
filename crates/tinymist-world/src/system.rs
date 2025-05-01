@@ -2,15 +2,18 @@ use std::{borrow::Cow, sync::Arc};
 
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tinymist_vfs::{system::SystemAccessModel, ImmutDict, Vfs};
-use typst::utils::LazyHash;
+use typst::{utils::LazyHash, Features};
 
 use crate::{
     args::{CompileFontArgs, CompilePackageArgs},
     config::{CompileFontOpts, CompileOpts},
     font::{system::SystemFontSearcher, FontResolverImpl},
-    package::{http::HttpRegistry, RegistryPathMapper},
+    package::{registry::HttpRegistry, RegistryPathMapper},
     EntryState,
 };
+
+mod diag;
+pub use diag::*;
 
 /// type trait of [`TypstSystemWorld`].
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +47,7 @@ impl TypstSystemUniverse {
         // todo: enable html
         Ok(Self::new_raw(
             opts.entry.clone().try_into()?,
-            false,
+            Features::default(),
             Some(Arc::new(LazyHash::new(inputs))),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -56,7 +59,7 @@ impl TypstSystemUniverse {
     fn resolve_fonts(opts: CompileOpts) -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(opts.into())?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 }
 
@@ -78,7 +81,7 @@ impl SystemUniverseBuilder {
         // todo: enable html
         TypstSystemUniverse::new_raw(
             entry,
-            false,
+            Features::default(),
             Some(inputs),
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
@@ -90,12 +93,11 @@ impl SystemUniverseBuilder {
     pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
-            font_profile_cache_path: Default::default(),
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
-        Ok(searcher.into())
+        Ok(searcher.build())
     }
 
     /// Resolve package registry from given options.

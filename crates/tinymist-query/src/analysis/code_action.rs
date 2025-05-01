@@ -1,7 +1,11 @@
 //! Provides code actions for the document.
 
 use regex::Regex;
+use tinymist_analysis::syntax::{adjust_expr, node_ancestors, SyntaxClass};
+use tinymist_std::path::{diff, unix_slash};
 
+use super::get_link_exprs_in;
+use crate::analysis::LinkTarget;
 use crate::prelude::*;
 use crate::syntax::{interpret_mode_at, InterpretMode};
 
@@ -55,6 +59,7 @@ impl<'a> CodeActionWorker<'a> {
 
         let mut heading_resolved = false;
         let mut equation_resolved = false;
+        let mut path_resolved = false;
 
         self.wrap_actions(node, range);
 
@@ -70,11 +75,109 @@ impl<'a> CodeActionWorker<'a> {
                     equation_resolved = true;
                     self.equation_actions(node);
                 }
+                SyntaxKind::Str if !path_resolved => {
+                    path_resolved = true;
+                    self.path_actions(node, cursor);
+                }
                 _ => {}
             }
 
             node = node.parent()?;
         }
+    }
+
+    fn path_actions(&mut self, node: &LinkedNode, cursor: usize) -> Option<()> {
+        // We can only process the case where the import path is a string.
+        if let Some(SyntaxClass::IncludePath(path_node) | SyntaxClass::ImportPath(path_node)) =
+            classify_syntax(node.clone(), cursor)
+        {
+            let str_node = adjust_expr(path_node)?;
+            let str_ast = str_node.cast::<ast::Str>()?;
+            return self.path_rewrite(self.source.id(), &str_ast.get(), &str_node);
+        }
+
+        let link_parent = node_ancestors(node)
+            .find(|node| matches!(node.kind(), SyntaxKind::FuncCall))
+            .unwrap_or(node);
+
+        // Actually there should be only one link left
+        if let Some(link_info) = get_link_exprs_in(link_parent) {
+            let objects = link_info.objects.into_iter();
+            let object_under_node = objects.filter(|link| link.range.contains(&cursor));
+
+            let mut resolved = false;
+            for link in object_under_node {
+                if let LinkTarget::Path(id, path) = link.target {
+                    // todo: is there a link that is not a path string?
+                    resolved = self.path_rewrite(id, &path, node).is_some() || resolved;
+                }
+            }
+
+            return resolved.then_some(());
+        }
+
+        None
+    }
+
+    /// Rewrites absolute paths from/to relative paths.
+    fn path_rewrite(&mut self, id: TypstFileId, path: &str, node: &LinkedNode) -> Option<()> {
+        if !matches!(node.kind(), SyntaxKind::Str) {
+            log::warn!("bad path node kind on code action: {:?}", node.kind());
+            return None;
+        }
+
+        let path = Path::new(path);
+
+        if path.starts_with("/") {
+            // Convert absolute path to relative path
+            let cur_path = id.vpath().as_rooted_path().parent().unwrap();
+            let new_path = diff(path, cur_path)?;
+            let edit = self.edit_str(node, unix_slash(&new_path))?;
+            let action = CodeActionOrCommand::CodeAction(CodeAction {
+                title: "Convert to relative path".to_string(),
+                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                edit: Some(edit),
+                ..CodeAction::default()
+            });
+            self.actions.push(action);
+        } else {
+            // Convert relative path to absolute path
+            let mut new_path = id.vpath().as_rooted_path().parent().unwrap().to_path_buf();
+            for i in path.components() {
+                match i {
+                    std::path::Component::ParentDir => {
+                        new_path.pop().then_some(())?;
+                    }
+                    std::path::Component::Normal(name) => {
+                        new_path.push(name);
+                    }
+                    _ => {}
+                }
+            }
+            let edit = self.edit_str(node, unix_slash(&new_path))?;
+            let action = CodeActionOrCommand::CodeAction(CodeAction {
+                title: "Convert to absolute path".to_string(),
+                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                edit: Some(edit),
+                ..CodeAction::default()
+            });
+            self.actions.push(action);
+        }
+
+        Some(())
+    }
+
+    fn edit_str(&mut self, node: &LinkedNode, new_content: String) -> Option<WorkspaceEdit> {
+        if !matches!(node.kind(), SyntaxKind::Str) {
+            log::warn!("edit_str only works on string AST nodes: {:?}", node.kind());
+            return None;
+        }
+
+        self.local_edit(TextEdit {
+            range: self.ctx.to_lsp_range(node.range(), &self.source),
+            // todo: this is merely ocasionally correct, abusing string escape (`fmt::Debug`)
+            new_text: format!("{new_content:?}"),
+        })
     }
 
     fn wrap_actions(&mut self, node: &LinkedNode, range: Range<usize>) -> Option<()> {

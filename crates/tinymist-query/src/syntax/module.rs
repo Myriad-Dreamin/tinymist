@@ -1,6 +1,5 @@
 use std::sync::Once;
 
-use once_cell::sync::Lazy;
 use regex::RegexSet;
 
 use crate::prelude::*;
@@ -31,7 +30,7 @@ pub fn construct_module_dependencies(
             Err(err) => {
                 static WARN_ONCE: Once = Once::new();
                 WARN_ONCE.call_once(|| {
-                    log::warn!("construct_module_dependencies: {err:?}", err = err);
+                    log::warn!("construct_module_dependencies: {err:?}");
                 });
                 continue;
             }
@@ -95,7 +94,7 @@ pub(crate) fn scan_workspace_files<T>(
         }
 
         /// this is a temporary solution to ignore some common build directories
-        static IGNORE_REGEX: Lazy<RegexSet> = Lazy::new(|| {
+        static IGNORE_REGEX: LazyLock<RegexSet> = LazyLock::new(|| {
             RegexSet::new([
                 r#"^build$"#,
                 r#"^target$"#,

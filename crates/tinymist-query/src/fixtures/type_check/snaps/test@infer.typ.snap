@@ -2,11 +2,10 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
-snapshot_kind: text
 ---
 =====
 1..6 -> Func(image)
-1..18 -> Element(image)
+1..18 -> Content(image)
 21..25 -> Func(read)
 21..37 -> (Type(bytes) | Type(str))
 40..44 -> Func(json)

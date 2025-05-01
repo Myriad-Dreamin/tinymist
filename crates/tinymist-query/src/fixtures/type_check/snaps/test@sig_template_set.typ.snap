@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/sig_template_set.typ
-snapshot_kind: text
 ---
 "tmpl" = ((Any, "authors": (Type(array) | Type(str)), "class": Any, "font": (TextFont | Array<TextFont>)) => Any).with(..("authors": (), "class": "article", "font": None) => any)
 "content" = Any
@@ -13,6 +12,7 @@ snapshot_kind: text
 5..9 -> @tmpl
 10..17 -> @content
 19..26 -> @authors
+28..30 -> ()
 32..36 -> @font
 44..49 -> @class
 71..76 -> @class

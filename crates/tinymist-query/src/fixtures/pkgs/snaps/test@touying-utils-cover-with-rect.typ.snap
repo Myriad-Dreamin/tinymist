@@ -9,12 +9,16 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rec
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "fill",
     "labelDetails": {
      "description": "auto | color | int | ratio | type"
     },
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "fill: ${1:}",
      "range": {
@@ -30,12 +34,16 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rec
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "stroke",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "188",
+    "sortText": "186",
     "textEdit": {
      "newText": "stroke(${1:})",
      "range": {

@@ -276,6 +276,7 @@
     "triggerParameterHints": true,
     "triggerSuggestAndParameterHints": true,
     "supportHtmlInMarkdown": true,
+    "customizedShowDocument": true,
     "experimentalFormatterMode": "disable"
   },
   "trace": "off"

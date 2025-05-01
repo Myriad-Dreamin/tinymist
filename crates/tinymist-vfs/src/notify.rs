@@ -52,6 +52,8 @@ pub enum FilesystemEvent {
 }
 
 impl FilesystemEvent {
+    /// Splits the filesystem event into a changeset and an optional upstream
+    /// event.
     pub fn split(self) -> (FileChangeSet, Option<UpstreamUpdateEvent>) {
         match self {
             FilesystemEvent::UpstreamUpdate {
@@ -63,7 +65,11 @@ impl FilesystemEvent {
     }
 }
 
+/// A trait implementing dependency getter.
 pub trait NotifyDeps: fmt::Debug + Send + Sync {
+    /// Gets the dependencies recorded in the world. It is a list of
+    /// accessed file recorded during this revision, e.g. a single compilation
+    /// or other compiler tasks.
     fn dependencies(&self, f: &mut dyn FnMut(&ImmutPath));
 }
 

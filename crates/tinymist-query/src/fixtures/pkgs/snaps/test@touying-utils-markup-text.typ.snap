@@ -45,6 +45,10 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "str",
     "sortText": "002",
@@ -63,12 +67,16 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "str",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "182",
+    "sortText": "183",
     "textEdit": {
      "newText": "str(${1:})",
      "range": {

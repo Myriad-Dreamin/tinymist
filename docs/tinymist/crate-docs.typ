@@ -2,4 +2,4 @@
 
 #show: book-page.with(title: "Crate Docs")
 
-#cross-link("/rs/tinymist/index.typ")[Tinymist Crate Docs (for Developers)]
+#link("https://myriad-dreamin.github.io/tinymist/rs/tinymist/index.html")[Tinymist Crate Docs (for Developers)]

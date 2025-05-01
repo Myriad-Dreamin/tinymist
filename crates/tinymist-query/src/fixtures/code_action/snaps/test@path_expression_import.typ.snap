@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on  + \"base.t||yp\"/* rang)"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/path_expression_import.typ
+---
+null

@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Preview")
+#show: book-page.with(title: [Preview])
 
 Todo: rewrite this guide #link("https://enter-tainer.github.io/typst-preview/arch.html")[Developer Guide: Typst-Preview Architecture].
 

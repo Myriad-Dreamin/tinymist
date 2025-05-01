@@ -3,32 +3,30 @@
 #![allow(missing_docs)]
 
 pub mod args;
-
-pub mod source;
-
 pub mod config;
-
+pub mod debug_loc;
 pub mod entry;
-pub use entry::*;
-
-pub mod world;
-pub use world::*;
-
 pub mod font;
 pub mod package;
 pub mod parser;
-mod snapshot;
-pub use snapshot::*;
-mod compute;
+pub mod source;
+pub mod world;
+
 pub use compute::*;
+pub use entry::*;
+pub use snapshot::*;
+pub use world::*;
 
 pub use tinymist_vfs as vfs;
+
+mod compute;
+mod snapshot;
 
 /// Run the compiler in the system environment.
 #[cfg(feature = "system")]
 pub mod system;
 #[cfg(feature = "system")]
-pub use system::{SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld};
+pub use system::{print_diagnostics, SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld};
 
 /// Run the compiler in the browser environment.
 #[cfg(feature = "browser")]
@@ -144,6 +142,14 @@ pub trait CompilerFeat: Send + Sync + 'static {
     type AccessModel: VfsAccessModel + Clone + Send + Sync + Sized;
     /// Specify the package registry.
     type Registry: PackageRegistry + Send + Sync + Sized;
+}
+
+/// Which format to use for diagnostics.
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd)]
+pub enum DiagnosticFormat {
+    #[default]
+    Human,
+    Short,
 }
 
 pub mod build_info {

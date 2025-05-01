@@ -2,7 +2,7 @@ use ecow::EcoString;
 use lsp_types::InsertTextFormat;
 use serde::{Deserialize, Serialize};
 
-use crate::ty::Interned;
+use crate::StrRef;
 
 use super::LspRange;
 
@@ -284,11 +284,11 @@ pub struct LspCompletionCommand {
     /// The title of command.
     pub title: EcoString,
     /// The identifier of the actual command handler.
-    pub command: Interned<str>,
+    pub command: StrRef,
 }
 
-impl From<Interned<str>> for LspCompletionCommand {
-    fn from(command: Interned<str>) -> Self {
+impl From<StrRef> for LspCompletionCommand {
+    fn from(command: StrRef) -> Self {
         Self {
             title: EcoString::default(),
             command,

@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tinymist_std::debug_loc::DataSource;
 use tinymist_std::typst::TypstDocument;
+use tinymist_world::debug_loc::DataSource;
 use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
@@ -98,13 +98,8 @@ pub struct DocumentMetricsRequest {
 impl StatefulRequest for DocumentMetricsRequest {
     type Response = DocumentMetricsResponse;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
-        let doc = doc?;
-        let doc = doc.document;
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref()?;
 
         let mut worker = DocumentMetricsWorker {
             ctx,
@@ -113,7 +108,7 @@ impl StatefulRequest for DocumentMetricsRequest {
             font_info: Default::default(),
         };
 
-        worker.work(&doc)?;
+        worker.work(doc)?;
 
         let font_info = worker.compute()?;
         let span_info = SpanInfo {

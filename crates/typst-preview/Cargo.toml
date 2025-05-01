@@ -19,7 +19,6 @@ comemo.workspace = true
 
 reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
-once_cell.workspace = true
 tokio.workspace = true
 env_logger.workspace = true
 log.workspace = true

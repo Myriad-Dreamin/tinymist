@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/discard_equation.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "This equation is implicitly discarded by function return",
+   "range": "1:2:1:11",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

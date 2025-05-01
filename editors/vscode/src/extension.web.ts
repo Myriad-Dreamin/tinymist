@@ -9,6 +9,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   extensionState.features = {
     web: true,
     lsp: false,
+    export: false,
     task: false,
     wordSeparator: true,
     label: false,
@@ -18,6 +19,8 @@ export async function activate(context: ExtensionContext): Promise<void> {
     dragAndDrop: false,
     copyAndPaste: false,
     onEnter: false,
+    testing: false,
+    testingDebug: false,
     preview: false,
     language: false,
     renderDocs: false,

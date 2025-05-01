@@ -1,0 +1,49 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/list-enum.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 2,
+   "startCharacter": 0,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 127,
+   "endLine": 3,
+   "startCharacter": 0,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 27,
+   "endLine": 7,
+   "startCharacter": 0,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 127,
+   "endLine": 8,
+   "startCharacter": 0,
+   "startLine": 8
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 2,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endLine": 7,
+   "startLine": 5
+  }
+ ]
+}

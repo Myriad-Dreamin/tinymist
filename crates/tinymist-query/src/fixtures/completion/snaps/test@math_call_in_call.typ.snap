@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_call_in_call.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "abs",
     "sortText": "000",
@@ -27,12 +31,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_call_in_call.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "abs",
     "labelDetails": {
      "description": "(content, size: relative) => content"
     },
-    "sortText": "058",
+    "sortText": "057",
     "textEdit": {
      "newText": "abs(${1:})",
      "range": {

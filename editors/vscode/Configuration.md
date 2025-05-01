@@ -18,7 +18,7 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 
 ## `tinymist.exportTarget`
 
-The target to export the document to. Defaults to `paged`. Note: you can still export pdf when it is set to `html`. This configuration only affects how the language server completes your code.
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
 
 - **Type**: `string`
 - **Enum**:
@@ -35,12 +35,12 @@ The extension can export PDFs of your Typst files. This setting controls whether
   - `never`: Never export PDFs, you will manually run typst.
   - `onSave`: Export PDFs when you save a file.
   - `onType`: Export PDFs as you type in a file.
-  - `onDocumentHasTitle`: Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
+  - `onDocumentHasTitle`: (Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
 - **Default**: `"never"`
 
 ## `tinymist.rootPath`
 
-Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for neovim users, if it complains root not found, you must set `require("lspconfig")["tinymist"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528).
+Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for Neovim users, if it complains root not found, you must set `require("lspconfig")["tinymist"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528).
 
 - **Type**: `string` or `null`
 
@@ -64,6 +64,23 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
+## `tinymist.lint.enabled`
+
+Enable or disable lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.lint.when`
+
+Configure when to perform lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `onSave`: Perform lint checks on save
+  - `onType`: Perform lint checks on type
+- **Default**: `"onSave"`
+
 ## `tinymist.typingContinueCommentsOnNewline`
 
 Whether to prefix newlines after comments with the corresponding comment prefix.
@@ -80,7 +97,7 @@ Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analy
 
 ## `tinymist.systemFonts`
 
-A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. 
+A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options.
 
 - **Type**: `boolean`
 - **Default**: `true`
@@ -147,7 +164,7 @@ The extension can format Typst files using typstfmt or typstyle.
   - `disable`: Formatter is not activated.
   - `typstyle`: Use typstyle formatter.
   - `typstfmt`: Use typstfmt formatter.
-- **Default**: `"disable"`
+- **Default**: `"typstyle"`
 
 ## `tinymist.formatterPrintWidth`
 
@@ -174,8 +191,8 @@ Whether to handle drag-and-drop of resources into the editing typst document. No
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable drag-and-drop.
+  - `disable`: Disable drag-and-drop.
 - **Default**: `"enable"`
 
 ## `tinymist.copyAndPaste`
@@ -184,8 +201,8 @@ Whether to handle paste of resources into the editing typst document. Note: rest
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable copy-and-paste.
+  - `disable`: Disable copy-and-paste.
 - **Default**: `"enable"`
 
 ## `tinymist.renderDocs`
@@ -194,8 +211,8 @@ Whether to handle paste of resources into the editing typst document. Note: rest
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable render docs.
+  - `disable`: Disable render docs.
 - **Default**: `"enable"`
 
 ## `tinymist.completion.triggerOnSnippetPlaceholders`
@@ -203,6 +220,16 @@ Whether to handle paste of resources into the editing typst document. Note: rest
 Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.
 
 - **Type**: `boolean`
+
+## `tinymist.completion.symbol`
+
+Whether to make symbol completion stepless. For example, `$ar|$` will be completed to `$arrow.r$`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `step`: Complete symbols step by step
+  - `stepless`: Complete symbols steplessly
+- **Default**: `"step"`
 
 ## `tinymist.completion.postfix`
 
@@ -238,8 +265,8 @@ Enable or disable preview features of Typst. Note: restarting the editor is requ
 
 - **Type**: `string`
 - **Enum**:
-  - `enable`
-  - `disable`
+  - `enable`: Enable preview features.
+  - `disable`: Disable preview features.
 - **Default**: `"enable"`
 
 ## `tinymist.preview.refresh`

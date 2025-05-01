@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/sig_dict.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "cap",
     "labelDetails": {
@@ -30,6 +34,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/sig_dict.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 5,
     "label": "paint",
     "labelDetails": {

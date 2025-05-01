@@ -4,7 +4,7 @@ use rpds::RedBlackTreeMapSync;
 use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{AccessModel, Bytes, FileSnapshot, PathAccessModel, TypstFileId};
+use crate::{AccessModel, Bytes, FileId, FileSnapshot, PathAccessModel};
 
 /// Provides overlay access model which allows to shadow the underlying access
 /// model with memory contents.
@@ -82,12 +82,12 @@ impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
     }
 }
 
-impl<M: AccessModel> AccessModel for OverlayAccessModel<TypstFileId, M> {
+impl<M: AccessModel> AccessModel for OverlayAccessModel<FileId, M> {
     fn reset(&mut self) {
         self.inner.reset();
     }
 
-    fn content(&self, src: TypstFileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
+    fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
         if let Some(content) = self.files.get(&src) {
             return (None, content.content().cloned());
         }

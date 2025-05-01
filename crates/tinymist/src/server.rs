@@ -3,24 +3,27 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
-use sync_lsp::*;
-use tinymist_query::{LspWorldExt, OnExportRequest, ServerInfoResponse};
+use reflexo::debug_loc::LspPosition;
+use sync_ls::*;
+use tinymist_query::{OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
+use tinymist_task::ProjectTask;
 use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
-use crate::lsp_query::OnEnter;
+use crate::lsp::query::OnEnter;
 use crate::project::{
-    update_lock, CompiledArtifact, EntryResolver, LspCompileSnapshot, LspInterrupt, ProjectInsId,
+    update_lock, CompiledArtifact, EntryResolver, LspComputeGraph, LspInterrupt, ProjectInsId,
     ProjectState, PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
 use crate::route::ProjectRouteState;
 use crate::task::{ExportTask, FormatTask, UserActionTask};
 use crate::world::TaskInputs;
-use crate::{init::*, *};
+use crate::{lsp::init::*, *};
 
 pub(crate) use futures::Future;
 
@@ -49,6 +52,8 @@ pub struct ServerState {
     /// The preview state.
     #[cfg(feature = "preview")]
     pub preview: tool::preview::PreviewState,
+    #[cfg(feature = "dap")]
+    pub(crate) debug: crate::dap::DebugState,
     /// The formatter tasks running in backend, which will be scheduled by async
     /// runtime.
     pub formatter: FormatTask,
@@ -71,6 +76,8 @@ pub struct ServerState {
     pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
+    /// The client focusing position.
+    pub implicit_position: Option<LspPosition>,
     /// The client ever focused implicitly by activities.
     pub ever_focusing_by_activities: bool,
     /// The client ever sent manual focusing request.
@@ -112,7 +119,13 @@ impl ServerState {
             editor_tx,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(watchers, client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(
+                &config,
+                watchers,
+                client.cast(|s| &mut s.preview),
+            ),
+            #[cfg(feature = "dap")]
+            debug: crate::dap::DebugState::default(),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -123,6 +136,7 @@ impl ServerState {
             pinning_by_preview: false,
             pinning_by_browsing_preview: false,
             focusing: None,
+            implicit_position: None,
             formatter,
             user_action: UserActionTask,
         }
@@ -133,14 +147,9 @@ impl ServerState {
         &self.config.const_config
     }
 
-    /// Gets the compile configuration.
-    pub fn compile_config(&self) -> &CompileConfig {
-        &self.config.compile
-    }
-
     /// Gets the entry resolver.
     pub fn entry_resolver(&self) -> &EntryResolver {
-        &self.compile_config().entry_resolver
+        &self.config.entry_resolver
     }
 
     /// Whether the main file is pinning.
@@ -154,36 +163,40 @@ impl ServerState {
 
     /// The entry point for the language server.
     pub fn main(client: TypedLspClient<Self>, config: Config, start: bool) -> Self {
-        log::info!("LanguageState: initialized with config {config:?}");
+        log::info!("ServerState: initialized with config {config:?}");
 
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = ServerState::new(client.clone(), config, editor_tx);
+        let mut server = ServerState::new(client.clone(), config, editor_tx);
+
+        if !server.config.warnings.is_empty() {
+            server.show_config_warnings();
+        }
 
         if start {
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
-                service.config.compile.notify_status,
+                server.config.notify_status,
             );
 
-            service
+            server
                 .reload_projects()
                 .log_error("could not restart primary");
 
             #[cfg(feature = "preview")]
-            service.background_preview();
+            server.background_preview();
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
         }
 
-        service
+        server
     }
 
-    /// Installs handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands + 'static>(
+    /// Installs LSP handlers to the language server.
+    pub fn install_lsp<T: Initializer<S = Self> + AddCommands + 'static>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;
@@ -196,7 +209,7 @@ impl ServerState {
             .with_command("tinymist.startDefaultPreview", State::default_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview)
             // Internal commands
-            .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doStartPreview", State::do_start_preview)
             .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview);
 
@@ -256,6 +269,7 @@ impl ServerState {
             .with_command_("tinymist.exportMarkdown", State::export_markdown)
             .with_command_("tinymist.exportQuery", State::export_query)
             .with_command("tinymist.exportAnsiHighlight", State::export_ansi_hl)
+            .with_command("tinymist.exportAst", State::export_ast)
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
@@ -287,6 +301,25 @@ impl ServerState {
         );
 
         provider
+    }
+
+    /// Installs DAP handlers to the language server.
+    pub fn install_dap<T: Initializer<S = Self> + 'static>(
+        provider: DapBuilder<T>,
+    ) -> DapBuilder<T> {
+        use dapts::request;
+
+        // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
+        provider
+            .with_request::<request::ConfigurationDone>(Self::configuration_done)
+            .with_request::<request::Disconnect>(Self::disconnect)
+            .with_request::<request::Terminate>(Self::terminate_debug)
+            .with_request::<request::TerminateThreads>(Self::terminate_debug_thread)
+            .with_request::<request::Attach>(Self::attach_debug)
+            .with_request::<request::Launch>(Self::launch_debug)
+            .with_request::<request::Evaluate>(Self::evaluate_repl)
+            .with_request::<request::Completions>(Self::complete_repl)
+            .with_request::<request::Threads>(Self::debug_threads)
     }
 
     /// Handles the project interrupts.
@@ -326,6 +359,26 @@ impl ServerState {
 
         Ok(())
     }
+
+    #[cfg(feature = "preview")]
+    pub(crate) fn infer_pos(&self) -> LspResult<typst_preview::ControlPlaneMessage> {
+        use typst_preview::{ControlPlaneMessage, ResolveSourceLocRequest};
+
+        let focus_file = self.focusing.as_ref();
+        let focus_file = focus_file.ok_or_else(|| invalid_request("no focusing file"))?;
+
+        let focus_location = self.implicit_position.as_ref();
+        let focus_location =
+            focus_location.ok_or_else(|| invalid_request("no focusing location"))?;
+
+        Ok(ControlPlaneMessage::ResolveSourceLoc(
+            ResolveSourceLocRequest {
+                filepath: focus_file.as_ref().to_owned(),
+                line: focus_location.line,
+                character: focus_location.character,
+            },
+        ))
+    }
 }
 
 /// An event sent to the language server.
@@ -335,6 +388,31 @@ pub enum ServerEvent {
 }
 
 impl ServerState {
+    /// Shows the configuration warnings to the client.
+    pub fn show_config_warnings(&mut self) {
+        if !self.config.warnings.is_empty() {
+            for warning in self.config.warnings.iter() {
+                self.client.send_lsp_request::<ShowMessageRequest>(
+                    ShowMessageRequestParams {
+                        typ: MessageType::WARNING,
+                        message: tinymist_l10n::t!(
+                            "tinymist.config.badServerConfig",
+                            "bad server configuration: {warning}",
+                            warning = warning.as_ref().into()
+                        )
+                        .into(),
+                        actions: None,
+                    },
+                    |_s, r| {
+                        if let Some(err) = r.error {
+                            log::error!("failed to send warning message: {err:?}");
+                        }
+                    },
+                );
+            }
+        }
+    }
+
     /// Gets the current server info.
     pub fn collect_server_info(&mut self) -> QueryFuture {
         let dg = self.project.primary_id().to_string();
@@ -344,7 +422,7 @@ impl ServerState {
 
         let snap = self.snapshot()?;
         just_future(async move {
-            let w = &snap.world;
+            let w = snap.world();
 
             let info = ServerInfoResponse {
                 root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
@@ -366,15 +444,15 @@ impl ServerState {
     pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
         let OnExportRequest { path, task, open } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
-        let lock_dir = self.compile_config().entry_resolver.resolve_lock(&entry);
+        let lock_dir = self.entry_resolver().resolve_lock(&entry);
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
-            |snap: LspCompileSnapshot| async move {
+            |snap: LspComputeGraph| async move {
                 let mut updater = update_lock(lock_dir);
-                let world = snap.world.clone();
-                let doc_id = updater.compiled(&world)?;
+                let world = snap.world();
+                let doc_id = updater.compiled(world)?;
 
-                updater.update_materials(doc_id.clone(), snap.world.depended_fs_paths());
+                updater.update_materials(doc_id.clone(), world.depended_fs_paths());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
                 updater.commit();
@@ -390,7 +468,8 @@ impl ServerState {
                 ..TaskInputs::default()
             });
 
-            let artifact = CompiledArtifact::from_snapshot(snap.clone());
+            let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+            let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
             let res = ExportTask::do_export(task, artifact, lock_dir).await?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
@@ -406,11 +485,11 @@ impl ServerState {
             }
 
             if let Some(Some(path)) = open.then_some(res.as_ref()) {
-                log::info!("open with system default apps: {path:?}");
+                log::trace!("open with system default apps: {path:?}");
                 do_open(path).log_error("failed to open with system default apps");
             }
 
-            log::info!("CompileActor: on export end: {path:?} as {res:?}");
+            log::trace!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
         })
     }

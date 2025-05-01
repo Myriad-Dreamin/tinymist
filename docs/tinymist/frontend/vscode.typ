@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: "Tinymist VS Code Extension")
+#show: book-page.with(title: [VS Cod(e,ium)])
 
 A VS Code or VS Codium extension for Typst. You can find the extension on:
 
@@ -40,6 +40,15 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
   }
 }
 ```
+
+=== Configuring Linter
+<configuring-linter>
++ Open settings.
++ Search for "Tinymist Lint" and modify the value.
+  + Toggle "Enabled" to enable or disable the linter.
+  + Change "When" to configure when the linter runs.
+    - (Default) `onSave` run linting when you save the file.
+    - `onType` run linting as you type.
 
 === Configuring/Using Tinymist’s Activity Bar (Sidebar)
 <configuringusing-tinymists-activity-bar-sidebar>

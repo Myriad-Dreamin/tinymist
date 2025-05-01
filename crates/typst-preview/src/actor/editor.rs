@@ -15,13 +15,13 @@ use crate::{
 };
 
 use super::webview::WebviewActorRequest;
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DocToSrcJumpResolveRequest {
     /// Span id in hex-format.
     pub span: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct PanelScrollByPositionRequest {
     position: DocumentPosition,
 }
@@ -106,7 +106,7 @@ impl ControlPlaneTx {
 }
 
 pub struct EditorActor<T> {
-    client: Arc<T>,
+    server: Arc<T>,
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
     editor_conn: ControlPlaneTx,
 
@@ -116,7 +116,7 @@ pub struct EditorActor<T> {
     span_interner: SpanInterner,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "event")]
 pub enum ControlPlaneMessage {
     #[serde(rename = "changeCursorPosition")]
@@ -150,7 +150,7 @@ pub enum ControlPlaneResponse {
 
 impl<T: EditorServer> EditorActor<T> {
     pub fn new(
-        client: Arc<T>,
+        server: Arc<T>,
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
         editor_websocket_conn: ControlPlaneTx,
         renderer_sender: broadcast::Sender<RenderActorRequest>,
@@ -158,7 +158,7 @@ impl<T: EditorServer> EditorActor<T> {
         span_interner: SpanInterner,
     ) -> Self {
         Self {
-            client,
+            server,
             mailbox,
             editor_conn: editor_websocket_conn,
             renderer_sender,
@@ -230,7 +230,7 @@ impl<T: EditorServer> EditorActor<T> {
                             );
                             handle_error(
                                 "SyncMemoryFiles",
-                                self.client.update_memory_files(req, true).await,
+                                self.server.update_memory_files(req, true).await,
                             );
                         }
                         ControlPlaneMessage::UpdateMemoryFiles(req) => {
@@ -240,14 +240,14 @@ impl<T: EditorServer> EditorActor<T> {
                             );
                             handle_error(
                                 "UpdateMemoryFiles",
-                                self.client.update_memory_files(req, false).await,
+                                self.server.update_memory_files(req, false).await,
                             );
                         }
                         ControlPlaneMessage::RemoveMemoryFiles(req) => {
                             log::debug!("EditorActor: processing REMOVE memory files: {:?}", req.files);
                             handle_error(
                                 "RemoveMemoryFiles",
-                                self.client.remove_shadow_files(req).await,
+                                self.server.remove_memory_files(req).await,
                             );
                         }
                     };

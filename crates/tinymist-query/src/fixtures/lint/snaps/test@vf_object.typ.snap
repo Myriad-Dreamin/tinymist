@@ -1,0 +1,21 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/vf_object.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "variable font is not supported by typst yet\nHint: consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185",
+   "range": "0:20:0:34",
+   "severity": 2,
+   "source": "typst"
+  },
+  {
+   "message": "variable font is not supported by typst yet\nHint: consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185",
+   "range": "1:19:1:33",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

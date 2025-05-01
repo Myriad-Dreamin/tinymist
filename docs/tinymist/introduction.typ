@@ -29,7 +29,7 @@ The release cycle is as follows:
 
 Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/vscode.typ")[VS Cod(e,ium)]
-- #cross-link("/frontend/neovim.typ")[NeoVim]
+- #cross-link("/frontend/neovim.typ")[Neovim]
 - #cross-link("/frontend/emacs.typ")[Emacs]
 - #cross-link("/frontend/sublime-text.typ")[Sublime Text]
 - #cross-link("/frontend/helix.typ")[Helix]
@@ -84,15 +84,18 @@ Nightly Channel:
 
 == Roadmap
 
-The development in typst v0.12.0 has been finished. We'll slow down for a while to catch regressions and bugs by changes. We are also planning to implement the following features in typst v0.13.0 or spare time in weekend:
+=== Short Terms
 
-- Spell checking: There is already a branch but no suitable (default) spell checking library is found.
+To encourage contributions, we create many #link("https://github.com/Myriad-Dreamin/tinymist/pulls")[Pull Requests] in draft to navigate short-term plans. They give you a hint of what or where to start in this large repository.
+
+=== Long Terms
+
+We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
+
 - Type checking: complete the type checker.
-- Static Linter: linting code statically according to feedback of the type checker and succeeding code analysis.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
-- A reliable way of configuring projects's entry files and files to export across editors. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/530")[GitHub Issue 530.]
 - Improve symbol view's appearance.
 - Improve package view.
   - Navigate to symbols by clicking on the symbol name in the view.
@@ -103,9 +106,10 @@ The development in typst v0.12.0 has been finished. We'll slow down for a while 
   - Search labels.
   - Keep (persist) group preferences.
 - Improve Typst Preview.
-  - Browsing mode: if no main file is specified, the preview will be in browsing mode and use the recently focused file as the main.
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
+- #strike[Spell checking: There is already a branch but no suitable (default) spell checking library is found.]
+  - #link("https://github.com/crate-ci/typos")[typos] is great for typst. #link("harper")[harper] looks promise.
 
 If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub.]
 
@@ -113,13 +117,9 @@ If you are interested by any above features, please feel free to send Issues to 
 
 Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution guidelines.
 
-== Maintainers
+== Sponsoring
 
-Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ")[MAINTAINERS.typ]. Or programmatically by `yarn maintainers`
-
-#note-box[
-  You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
-]
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
 == Acknowledgements
 

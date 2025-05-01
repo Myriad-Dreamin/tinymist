@@ -2,20 +2,19 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/bug_cite_func_infer.typ
-snapshot_kind: text
 ---
-"cite_prose" = (RefLabel) => Element(ref)
+"cite_prose" = (RefLabel) => Content(ref)
 "labl" = Any
-"cite_prose_different_name" = (RefLabel) => Element(ref)
+"cite_prose_different_name" = (RefLabel) => Content(ref)
 "labl" = Any
 =====
 5..15 -> @cite_prose
 16..20 -> @labl
 24..27 -> Func(ref)
-24..33 -> Element(ref)
+24..33 -> Content(ref)
 28..32 -> @labl
 39..64 -> @cite_prose_different_name
 65..69 -> @labl
 73..76 -> Func(ref)
-73..82 -> Element(ref)
+73..82 -> Content(ref)
 77..81 -> @labl

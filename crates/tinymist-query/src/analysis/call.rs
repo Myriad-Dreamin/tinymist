@@ -1,7 +1,7 @@
 //! Hybrid analysis for function calls.
 
 use super::prelude::*;
-use super::{Signature, StrRef};
+use super::Signature;
 use crate::analysis::{analyze_signature, PrimarySignature, SignatureTarget};
 
 /// Describes kind of a parameter.
@@ -43,7 +43,7 @@ pub fn analyze_call(
     source: Source,
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
-    log::trace!("func call found: {:?}", node);
+    log::trace!("func call found: {node:?}");
     let call = node.cast::<ast::FuncCall>()?;
 
     let callee = call.callee();

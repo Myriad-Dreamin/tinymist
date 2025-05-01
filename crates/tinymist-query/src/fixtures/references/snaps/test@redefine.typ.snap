@@ -2,12 +2,11 @@
 source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/redefine.typ
-snapshot_kind: text
 ---
 [
- "/s0.typ@0:23:0:24",
- "/s0.typ@3:2:3:3",
- "/s0.typ@3:6:3:7",
- "/s0.typ@6:12:6:13",
- "/s0.typ@8:9:8:10"
+ "s0.typ@0:23:0:24",
+ "s0.typ@3:2:3:3",
+ "s0.typ@3:6:3:7",
+ "s0.typ@6:12:6:13",
+ "s0.typ@8:9:8:10"
 ]

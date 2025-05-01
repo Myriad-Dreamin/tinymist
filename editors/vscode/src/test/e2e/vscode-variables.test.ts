@@ -3,7 +3,7 @@ import { CodeVariableContext, vscodeVariables } from "../../vscode-variables";
 
 export async function getTests(ctx: Context) {
   // await ctx.openWorkspace("simple-docs");
-  await ctx.suite("vscodeVariables", (suite) => {
+  await ctx.suite("vscodeVariables", async (suite) => {
     suite.addTest("emptyString", async () => {
       ctx.expect(vscodeVariables("")).to.eq(``);
       ctx.expect(vscodeVariables("", true)).to.eq(``);

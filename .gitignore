@@ -10,4 +10,6 @@ editors/lapce/out/
 /external/typst-preview
 /dist
 
+*.pdf
 .vscode/*.code-workspace
+refs/

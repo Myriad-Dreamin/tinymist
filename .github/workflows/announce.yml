@@ -1,0 +1,69 @@
+name: tinymist::announce
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release Tag
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release Tag
+        required: true
+        type: string
+permissions:
+  "contents": "write"
+
+env:
+  isNightly: ${{ ((!((!contains(inputs.tag, 'rc') && (endsWith(inputs.tag, '0') || endsWith(inputs.tag, '2') || endsWith(inputs.tag, '4') || endsWith(inputs.tag, '6') || endsWith(inputs.tag, '8')))))) }}
+
+jobs:
+  build:
+    runs-on: "ubuntu-22.04"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dist
+        # we specify bash to get pipefail; it guards against the `curl` command
+        # failing. otherwise `sh` won't catch that `curl` returned non-0
+        shell: bash
+        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8/cargo-dist-installer.sh | sh"
+      - name: Install parse changelog
+        uses: taiki-e/install-action@parse-changelog
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+      - name: Install deps
+        run: yarn install
+      - name: "Generate announcement"
+        run: |
+          yarn draft-release ${{ inputs.tag }}
+          echo "draft-release ran successfully"
+      - name: "Upload announcement changelog"
+        uses: actions/upload-artifact@v4
+        with:
+          name: announcement-changelog.md
+          path: target/announcement-changelog.md
+      - name: "Upload announcement"
+        uses: actions/upload-artifact@v4
+        with:
+          name: announcement-dist.md
+          path: target/announcement-dist.md
+      - name: "Upload announcement"
+        uses: actions/upload-artifact@v4
+        with:
+          name: announcement.gen.md
+          path: target/announcement.gen.md
+      - name: Create GitHub Release
+        env:
+          PRERELEASE_FLAG: "${{ (fromJson(env.isNightly) && '--prerelease') || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Creating release for ${{ inputs.tag }} with PRERELEASE_FLAG=$PRERELEASE_FLAG (isNightly=$isNightly)"
+          gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true

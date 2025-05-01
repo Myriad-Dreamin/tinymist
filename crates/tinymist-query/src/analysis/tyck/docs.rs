@@ -1,27 +1,25 @@
+use tinymist_analysis::docs::DocString;
 use tinymist_std::TakeAs;
 
 use super::*;
-use crate::syntax::DocString;
 
 impl TypeChecker<'_> {
     pub fn check_docstring(&mut self, base_id: &Interned<Decl>) -> Option<Arc<DocString>> {
         let docstring = self.ei.docstrings.get(base_id)?.clone();
         Some(Arc::new(
-            docstring.take().rename_based_on(base_id.clone(), self),
+            self.rename_based_on(docstring.take(), base_id.clone()),
         ))
     }
-}
 
-impl DocString {
-    fn rename_based_on(self, documenting_id: Interned<Decl>, base: &mut TypeChecker) -> DocString {
+    fn rename_based_on(&mut self, docs: DocString, documenting_id: Interned<Decl>) -> DocString {
         let DocString {
             docs,
             var_bounds,
             vars,
             mut res_ty,
-        } = self;
+        } = docs;
         let mut renamer = IdRenamer {
-            base,
+            base: self,
             var_bounds: &var_bounds,
             base_id: documenting_id,
         };

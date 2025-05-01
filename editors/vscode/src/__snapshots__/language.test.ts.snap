@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`wordPattern 1`] = `
+[
+  "foo",
+  "bar",
+  "baz",
+]
+`;
+
+exports[`wordPattern 2`] = `
+[
+  "1",
+  "A",
+]
+`;
+
+exports[`wordPattern 3`] = `
+[
+  "A-B",
+]
+`;
+
+exports[`wordPattern 4`] = `
+[
+  "A-B",
+]
+`;
+
+exports[`wordPattern 5`] = `
+[
+  "let",
+  "x",
+  "a-b",
+]
+`;
+
+exports[`wordPattern 6`] = `
+[
+  "Some",
+  "quick-tests",
+]
+`;
+
+exports[`wordPattern 7`] = `
+[
+  "Some",
+  "show-tests",
+]
+`;

@@ -1,5 +1,5 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Language and Editor Features")
+#show: book-page.with(title: [Language and Editor Features])
 
 #include "language-content.typ"
