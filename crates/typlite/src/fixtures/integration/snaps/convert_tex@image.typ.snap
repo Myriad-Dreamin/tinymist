@@ -1,0 +1,26 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/image.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1image src="./fig.svg" alt=""></m1image></m1document></body>
+</html>
+
+=====
+\begin{document}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{fig.svg}
+\end{figure}
+
+
+
+
+\end{document}
