@@ -19,6 +19,7 @@ pub enum ListState {
 pub enum Format {
     Md,
     LaTeX,
+    #[cfg(feature = "docx")]
     Docx,
 }
 

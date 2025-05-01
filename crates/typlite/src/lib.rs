@@ -97,6 +97,15 @@ impl MarkdownDocument {
 
         Ok(output)
     }
+
+    /// Convert the content to a DOCX document
+    #[cfg(feature = "docx")]
+    pub fn to_docx(&self) -> Result<Vec<u8>> {
+        let ast = self.parse()?;
+
+        let mut writer = WriterFactory::create(Format::Docx);
+        writer.write_vec(&ast)
+    }
 }
 
 /// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
@@ -171,8 +180,18 @@ impl Typlite {
         match self.format {
             Format::Md => self.convert_doc()?.to_md_string(),
             Format::LaTeX => self.convert_doc()?.to_tex_string(true),
-            _ => Err("format is not supported".into()),
+            #[cfg(feature = "docx")]
+            Format::Docx => Err("docx format is not supported".into()),
         }
+    }
+
+    /// Convert the content to a DOCX document
+    #[cfg(feature = "docx")]
+    pub fn to_docx(self) -> Result<Vec<u8>> {
+        if self.format != Format::Docx {
+            return Err("format is not DOCX".into());
+        }
+        self.convert_doc()?.to_docx()
     }
 
     /// Convert the content to a markdown document.

@@ -33,7 +33,16 @@ typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
 typst-html.workspace = true
+regex.workspace = true
 cmark-writer = { version = "0.6.3", features = ["gfm"] }
+docx-rs = { git = "https://github.com/Myriad-Dreamin/docx-rs", default-features = false, rev = "db49a729f68dbdb9e8e91857fbb1c3d414209871", optional = true }
+# typst can only support these formats.
+image = { version = "0.25.6", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+], optional = true }
+resvg = { version = "0.43.0", optional = true }
 
 [dev-dependencies]
 insta.workspace = true
@@ -41,10 +50,11 @@ regex.workspace = true
 tinymist-tests.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint"]
+default = ["cli", "embed-fonts", "no-content-hint", "docx"]
 clap = ["dep:clap"]
 cli = ["clap", "clap/wrap_help"]
 no-content-hint = ["tinymist-project/no-content-hint"]
+docx = ["docx-rs", "image", "resvg"]
 
 # Embeds Typst's default fonts for
 # - text (Linux Libertine),
