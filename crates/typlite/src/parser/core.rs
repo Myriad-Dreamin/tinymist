@@ -13,6 +13,7 @@ use super::{inline::InlineParser, list::ListParser, table::TableParser};
 
 /// HTML to AST parser implementation
 pub struct HtmlToAstParser {
+    pub frame_counter: usize,
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
     pub list_level: usize,
@@ -24,6 +25,7 @@ impl HtmlToAstParser {
     pub fn new(feat: TypliteFeat) -> Self {
         Self {
             feat,
+            frame_counter: 0,
             list_level: 0,
             list_state: None,
             blocks: Vec::new(),
@@ -202,7 +204,8 @@ impl HtmlToAstParser {
                     self.convert_element(element)?;
                 }
                 HtmlNode::Frame(frame) => {
-                    self.inline_buffer.push(self.convert_frame(frame));
+                    let res = self.convert_frame(frame);
+                    self.inline_buffer.push(res);
                 }
                 _ => {}
             }
