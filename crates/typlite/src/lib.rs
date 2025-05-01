@@ -5,10 +5,7 @@ pub mod common;
 mod error;
 pub mod library;
 pub mod parser;
-pub mod scopes;
 pub mod tags;
-pub mod value;
-pub mod worker;
 pub mod writer;
 
 use std::path::PathBuf;
@@ -136,8 +133,6 @@ pub struct TypliteFeat {
 pub struct Typlite {
     /// The universe to use for the conversion.
     world: Arc<LspWorld>,
-    /// library to use for the conversion.
-    library: Option<Arc<scopes::Scopes<value::Value>>>,
     /// Features for the conversion.
     feat: TypliteFeat,
     /// The format to use for the conversion.
@@ -152,16 +147,9 @@ impl Typlite {
     pub fn new(world: Arc<LspWorld>) -> Self {
         Self {
             world,
-            library: None,
             feat: Default::default(),
             format: Format::Md,
         }
-    }
-
-    /// Set library to use for the conversion.
-    pub fn with_library(mut self, library: Arc<scopes::Scopes<value::Value>>) -> Self {
-        self.library = Some(library);
-        self
     }
 
     /// Set conversion feature
