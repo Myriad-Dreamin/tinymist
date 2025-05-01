@@ -93,7 +93,27 @@ fn main() -> typlite::Result<()> {
 
         match format {
             Format::Docx => todo!(),
-            Format::LaTeX => todo!(),
+            Format::LaTeX => {
+                let result = doc.to_tex_string(true);
+                match (result, output) {
+                    (Ok(content), None) => {
+                        std::io::stdout()
+                            .write_all(content.as_str().as_bytes())
+                            .unwrap();
+                    }
+                    (Ok(content), Some(output)) => {
+                        if let Err(err) = std::fs::write(&output, content.as_str()) {
+                            eprintln!("failed to write LaTeX file {}: {}", output.display(), err);
+                            continue;
+                        }
+                        println!("Generated LaTeX file: {}", output.display());
+                    }
+                    (Err(err), _) => {
+                        eprintln!("Error converting to LaTeX for {}: {}", output_path, err);
+                        continue;
+                    }
+                }
+            }
             Format::Md => {
                 let result = doc.to_md_string();
                 match (result, output) {

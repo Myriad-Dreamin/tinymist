@@ -1,7 +1,9 @@
 //! Writer implementations for different output formats
 
+pub mod latex;
 pub mod markdown;
 
+pub use latex::LaTeXWriter;
 pub use markdown::MarkdownWriter;
 
 use crate::common::{Format, FormatWriter};
@@ -10,8 +12,9 @@ use crate::common::{Format, FormatWriter};
 pub fn create_writer(format: Format) -> Box<dyn FormatWriter> {
     match format {
         Format::Md => Box::new(markdown::MarkdownWriter::new()),
-        Format::LaTeX | Format::Docx => {
-            panic!("LaTeX and Docx writers are not implemented yet")
+        Format::LaTeX => Box::new(latex::LaTeXWriter::new()),
+        Format::Docx => {
+            panic!("Docx writers are not implemented yet")
         }
     }
 }

@@ -1,0 +1,21 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/link3.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><span><m1link dest="https://example.com">Reverse <span><m1strong>the World</m1strong></span></m1link></span></m1document></body>
+</html>
+
+=====
+\begin{document}
+
+\href{https://example.com}{Reverse \textbf{the World}}
+
+
+\end{document}

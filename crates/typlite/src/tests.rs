@@ -15,20 +15,41 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(LspWorld, PathBuf)) {
 #[test]
 fn convert() {
     snapshot_testing("integration", &|world, _path| {
-        insta::assert_snapshot!(conv(world, false));
+        insta::assert_snapshot!(conv(world, ConvKind::Md { for_docs: false }));
+    });
+}
+
+#[test]
+fn convert_tex() {
+    snapshot_testing("integration", &|world, _path| {
+        insta::assert_snapshot!(conv(world, ConvKind::LaTeX));
     });
 }
 
 #[test]
 fn convert_docs() {
     snapshot_testing("docs", &|world, _path| {
-        insta::assert_snapshot!(conv(world, true));
+        insta::assert_snapshot!(conv(world, ConvKind::Md { for_docs: true }));
     });
 }
 
-fn conv(world: LspWorld, for_docs: bool) -> String {
+enum ConvKind {
+    Md { for_docs: bool },
+    LaTeX,
+}
+
+impl ConvKind {
+    fn for_docs(&self) -> bool {
+        match self {
+            ConvKind::Md { for_docs } => *for_docs,
+            ConvKind::LaTeX => false,
+        }
+    }
+}
+
+fn conv(world: LspWorld, kind: ConvKind) -> String {
     let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
-        annotate_elem: for_docs,
+        annotate_elem: kind.for_docs(),
         ..Default::default()
     });
     let doc = match converter.convert_doc() {
@@ -37,7 +58,11 @@ fn conv(world: LspWorld, for_docs: bool) -> String {
     };
 
     let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
-    let res = doc.to_md_string().unwrap();
+    let res = match kind {
+        ConvKind::Md { .. } => doc.to_md_string().unwrap(),
+        ConvKind::LaTeX => doc.to_tex_string(false).unwrap(),
+    };
+
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
     let res = reg.replace_all(&res, |_captures: &regex::Captures| {

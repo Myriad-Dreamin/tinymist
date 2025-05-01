@@ -2,7 +2,6 @@
 
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use typst::layout::Frame;
 
 use crate::common::ExternalFrameNode;
@@ -11,7 +10,7 @@ use super::core::HtmlToAstParser;
 
 impl HtmlToAstParser {
     /// Convert Typst frame to CommonMark node
-    pub fn convert_frame(&self, frame: &Frame) -> Node {
+    pub fn convert_frame(&mut self, frame: &Frame) -> Node {
         if self.feat.remove_html {
             // todo: make error silent is not good.
             return Node::Text(String::new());
@@ -21,10 +20,9 @@ impl HtmlToAstParser {
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
 
         if let Some(assets_path) = &self.feat.assets_path {
-            // Use a unique static counter to generate filenames
-            static FRAME_COUNTER: AtomicUsize = AtomicUsize::new(0);
-            let file_id = FRAME_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let file_name = format!("frame_{}.svg", file_id);
+            let file_id = self.frame_counter;
+            self.frame_counter += 1;
+            let file_name = format!("frame_{file_id}.svg");
             let file_path = assets_path.join(&file_name);
 
             if let Err(e) = std::fs::write(&file_path, svg.as_bytes()) {
