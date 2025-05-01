@@ -223,12 +223,6 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
-
-[[package]]
-name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
@@ -764,7 +758,7 @@ name = "crityp"
 version = "0.13.12"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "clap",
  "comemo",
  "criterion",
@@ -1043,9 +1037,9 @@ dependencies = [
 [[package]]
 name = "docx-rs"
 version = "0.4.18-rc19"
-source = "git+https://github.com/bokuweb/docx-rs.git?rev=4728e080a423a48c14fd45876b9fd2e6a823254b#4728e080a423a48c14fd45876b9fd2e6a823254b"
+source = "git+https://github.com/Myriad-Dreamin/docx-rs?rev=db49a729f68dbdb9e8e91857fbb1c3d414209871#db49a729f68dbdb9e8e91857fbb1c3d414209871"
 dependencies = [
- "base64 0.13.1",
+ "base64",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2614,7 +2608,7 @@ version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eac26e981c03a6e53e0aee43c113e3202f5581d5360dae7bd2c70e800dd0451d"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "indexmap 2.9.0",
  "quick-xml 0.32.0",
  "serde",
@@ -2990,7 +2984,7 @@ version = "0.6.0-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6443e5fa969316c0d17cf5008d1e251aa481e35f56a9ac80cbee6fc9d4f0972a"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bitvec",
  "comemo",
  "dashmap",
@@ -3077,7 +3071,7 @@ version = "0.6.0-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e05cab4dbbce6158f783181971b1b70bf25e0be46ab44cd9695f41eba8843b32"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "comemo",
  "log",
  "reflexo",
@@ -3135,7 +3129,7 @@ version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d19c46a6fdd48bc4dab94b6103fccc55d34c67cc0ad04653aad4ea2a07cd7bbb"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "bytes",
  "futures-channel",
  "futures-core",
@@ -3522,7 +3516,7 @@ version = "3.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6b6f7f2fcb69f747921f79f3926bd1e203fce4fef62c268dd3abfb6d86029aa"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -4060,7 +4054,7 @@ version = "0.13.12"
 dependencies = [
  "anyhow",
  "async-trait",
- "base64 0.22.1",
+ "base64",
  "cargo_metadata",
  "chrono",
  "clap",
@@ -4193,7 +4187,7 @@ dependencies = [
 name = "tinymist-dap"
 version = "0.13.12"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "comemo",
  "ecow",
  "insta",
@@ -4212,7 +4206,7 @@ dependencies = [
 name = "tinymist-debug"
 version = "0.13.12"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "comemo",
  "insta",
  "parking_lot",
@@ -4266,7 +4260,7 @@ dependencies = [
 name = "tinymist-package"
 version = "0.13.12"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "comemo",
  "dirs",
  "ecow",
@@ -4322,7 +4316,7 @@ name = "tinymist-query"
 version = "0.13.12"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "biblatex",
  "comemo",
  "dashmap",
@@ -4373,7 +4367,7 @@ dependencies = [
 name = "tinymist-render"
 version = "0.13.12"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "log",
  "reflexo-typst",
  "reflexo-vec2svg",
@@ -4387,7 +4381,7 @@ name = "tinymist-std"
 version = "0.13.12"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64",
  "bitvec",
  "comemo",
  "core-foundation",
@@ -4780,7 +4774,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 name = "typlite"
 version = "0.13.12"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "clap",
  "cmark-writer",
  "comemo",
@@ -4981,7 +4975,7 @@ version = "0.13.1"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist%2Fv0.13.10#946ea31fb554bcf62e3215f64ddda87d70b026af"
 dependencies = [
  "arrayvec 0.7.6",
- "base64 0.22.1",
+ "base64",
  "bytemuck",
  "comemo",
  "ecow",
@@ -5074,7 +5068,7 @@ name = "typst-svg"
 version = "0.13.1"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist%2Fv0.13.10#946ea31fb554bcf62e3215f64ddda87d70b026af"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "comemo",
  "ecow",
  "flate2",
@@ -5292,7 +5286,7 @@ version = "0.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6803057b5cbb426e9fb8ce2216f3a9b4ca1dd2c705ba3cbebc13006e437735fd"
 dependencies = [
- "base64 0.22.1",
+ "base64",
  "data-url",
  "flate2",
  "fontdb",
