@@ -81,6 +81,13 @@ impl ConvKind {
             ConvKind::LaTeX => false,
         }
     }
+
+    fn kind(&self) -> Format {
+        match self {
+            ConvKind::Md { .. } => Format::Md,
+            ConvKind::LaTeX => Format::LaTeX,
+        }
+    }
 }
 
 fn conv(world: LspWorld, kind: ConvKind) -> String {
@@ -88,7 +95,7 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         annotate_elem: kind.for_docs(),
         ..Default::default()
     });
-    let doc = match converter.convert_doc() {
+    let doc = match converter.convert_doc(kind.kind()) {
         Ok(doc) => doc,
         Err(err) => return format!("failed to convert to markdown: {err}"),
     };
