@@ -127,6 +127,8 @@ pub struct TypliteFeat {
     pub soft_error: bool,
     /// Remove HTML tags from the output.
     pub remove_html: bool,
+    /// The target to convert
+    pub target: Format,
 }
 
 /// Task builder for converting a typst document to Markdown.
@@ -166,8 +168,8 @@ impl Typlite {
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<ecow::EcoString> {
         match self.format {
-            Format::Md => self.convert_doc()?.to_md_string(),
-            Format::LaTeX => self.convert_doc()?.to_tex_string(true),
+            Format::Md => self.convert_doc(Format::Md)?.to_md_string(),
+            Format::LaTeX => self.convert_doc(Format::LaTeX)?.to_tex_string(true),
             #[cfg(feature = "docx")]
             Format::Docx => Err("docx format is not supported".into()),
         }
@@ -179,11 +181,11 @@ impl Typlite {
         if self.format != Format::Docx {
             return Err("format is not DOCX".into());
         }
-        self.convert_doc()?.to_docx()
+        self.convert_doc(Format::Docx)?.to_docx()
     }
 
     /// Convert the content to a markdown document.
-    pub fn convert_doc(self) -> Result<MarkdownDocument> {
+    pub fn convert_doc(self, format: Format) -> Result<MarkdownDocument> {
         let entry = self.world.entry_state();
         let main = entry.main();
         let current = main.ok_or("no main file in workspace")?;
@@ -236,7 +238,9 @@ impl Typlite {
         let base = typst::compile(&world)
             .output
             .map_err(|err| format!("convert source for main file: {err:?}"))?;
-        Ok(MarkdownDocument::new(base, self.feat))
+        let mut feat = self.feat;
+        feat.target = format;
+        Ok(MarkdownDocument::new(base, feat))
     }
 }
 

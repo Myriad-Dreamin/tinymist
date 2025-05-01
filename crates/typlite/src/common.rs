@@ -15,8 +15,9 @@ pub enum ListState {
 }
 
 /// Valid formats for the conversion.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
+    #[default]
     Md,
     LaTeX,
     #[cfg(feature = "docx")]
