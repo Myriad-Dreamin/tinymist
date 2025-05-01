@@ -94,7 +94,7 @@ fn main() -> typlite::Result<()> {
         match format {
             Format::Docx => todo!(),
             Format::LaTeX => {
-                let result = doc.to_tex_string();
+                let result = doc.to_tex_string(true);
                 match (result, output) {
                     (Ok(content), None) => {
                         std::io::stdout()

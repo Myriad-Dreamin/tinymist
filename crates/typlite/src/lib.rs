@@ -25,6 +25,7 @@ use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst::World;
 use typst_syntax::VirtualPath;
+use writer::LaTeXWriter;
 
 use crate::common::Format;
 use crate::parser::HtmlToAstParser;
@@ -84,11 +85,14 @@ impl MarkdownDocument {
     }
 
     /// Convert the content to a LaTeX string.
-    pub fn to_tex_string(&self) -> Result<ecow::EcoString> {
+    pub fn to_tex_string(&self, prelude: bool) -> Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::LaTeX);
+        if prelude {
+            LaTeXWriter::default_prelude(&mut output);
+        }
         writer.write_eco(&ast, &mut output)?;
 
         Ok(output)
@@ -166,7 +170,7 @@ impl Typlite {
     pub fn convert(self) -> Result<ecow::EcoString> {
         match self.format {
             Format::Md => self.convert_doc()?.to_md_string(),
-            Format::LaTeX => self.convert_doc()?.to_tex_string(),
+            Format::LaTeX => self.convert_doc()?.to_tex_string(true),
             _ => Err("format is not supported".into()),
         }
     }

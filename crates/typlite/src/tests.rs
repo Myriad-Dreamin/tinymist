@@ -60,7 +60,7 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
     let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
     let res = match kind {
         ConvKind::Md { .. } => doc.to_md_string().unwrap(),
-        ConvKind::LaTeX => doc.to_tex_string().unwrap(),
+        ConvKind::LaTeX => doc.to_tex_string(false).unwrap(),
     };
 
     static REG: OnceLock<Regex> = OnceLock::new();

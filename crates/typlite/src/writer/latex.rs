@@ -25,6 +25,32 @@ impl LaTeXWriter {
         Self { list_state: None }
     }
 
+    pub fn default_prelude(output: &mut EcoString) {
+        // Write LaTeX document preamble using the new method
+        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
+        output.push_str("\\usepackage[utf8]{inputenc}\n");
+        output.push_str("\\usepackage{hyperref}\n"); // For links
+        output.push_str("\\usepackage{graphicx}\n"); // For images
+        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
+        output.push_str("\\usepackage{listings}\n"); // For code blocks
+        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
+        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
+        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
+        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
+
+        // Set code highlighting style
+        output.push_str("\\lstset{\n");
+        output.push_str("  basicstyle=\\ttfamily\\small,\n");
+        output.push_str("  breaklines=true,\n");
+        output.push_str("  frame=single,\n");
+        output.push_str("  numbers=left,\n");
+        output.push_str("  numberstyle=\\tiny,\n");
+        output.push_str("  keywordstyle=\\color{blue},\n");
+        output.push_str("  commentstyle=\\color{green!60!black},\n");
+        output.push_str("  stringstyle=\\color{red}\n");
+        output.push_str("}\n\n");
+    }
+
     fn write_inline_nodes(&mut self, nodes: &[Node], output: &mut EcoString) -> Result<()> {
         for node in nodes {
             self.write_node(node, output)?;
@@ -110,7 +136,8 @@ impl LaTeXWriter {
                             output.push_str("\\item ");
                             for block in content {
                                 match block {
-                                    // For paragraphs, we want inline content rather than creating a new paragraph
+                                    // For paragraphs, we want inline content rather than creating a
+                                    // new paragraph
                                     Node::Paragraph(inlines) => {
                                         self.write_inline_nodes(inlines, output)?;
                                     }
@@ -138,7 +165,8 @@ impl LaTeXWriter {
                             output.push_str("\\item ");
                             for block in content {
                                 match block {
-                                    // For paragraphs, we want inline content rather than creating a new paragraph
+                                    // For paragraphs, we want inline content rather than creating a
+                                    // new paragraph
                                     Node::Paragraph(inlines) => {
                                         self.write_inline_nodes(inlines, output)?;
                                     }
@@ -371,30 +399,6 @@ fn escape_latex(text: &str) -> String {
 
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        // Write LaTeX document preamble using the new method
-        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
-        output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n"); // For links
-        output.push_str("\\usepackage{graphicx}\n"); // For images
-        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
-        output.push_str("\\usepackage{listings}\n"); // For code blocks
-        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
-        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
-        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
-        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
-
-        // Set code highlighting style
-        output.push_str("\\lstset{\n");
-        output.push_str("  basicstyle=\\ttfamily\\small,\n");
-        output.push_str("  breaklines=true,\n");
-        output.push_str("  frame=single,\n");
-        output.push_str("  numbers=left,\n");
-        output.push_str("  numberstyle=\\tiny,\n");
-        output.push_str("  keywordstyle=\\color{blue},\n");
-        output.push_str("  commentstyle=\\color{green!60!black},\n");
-        output.push_str("  stringstyle=\\color{red}\n");
-        output.push_str("}\n\n");
-
         output.push_str("\\begin{document}\n\n");
 
         // Write the document content
