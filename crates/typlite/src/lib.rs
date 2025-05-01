@@ -226,7 +226,7 @@ impl Typlite {
             },
         };
 
-        let mut world = world.html_task().task(task_inputs);
+        let mut world = world.task(task_inputs).html_task().into_owned();
 
         let markdown_id = FileId::new(
             Some(typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0").unwrap()),
