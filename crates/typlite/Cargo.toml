@@ -33,7 +33,7 @@ typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
 typst-html.workspace = true
-cmark-writer = { version = "0.6.1", features = ["gfm"] }
+cmark-writer = { version = "0.6.3", features = ["gfm"] }
 
 [dev-dependencies]
 insta.workspace = true

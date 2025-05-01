@@ -9,16 +9,18 @@ use crate::common::ExternalFrameNode;
 
 use super::core::HtmlToAstParser;
 
-/// Media content parser
-pub struct MediaParser;
-
-impl MediaParser {
+impl HtmlToAstParser {
     /// Convert Typst frame to CommonMark node
-    pub fn convert_frame(parser: &HtmlToAstParser, frame: &Frame) -> Node {
+    pub fn convert_frame(&self, frame: &Frame) -> Node {
+        if self.feat.remove_html {
+            // todo: make error silent is not good.
+            return Node::Text(String::new());
+        }
+
         let svg = typst_svg::svg_frame(frame);
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
 
-        if let Some(assets_path) = &parser.feat.assets_path {
+        if let Some(assets_path) = &self.feat.assets_path {
             // Use a unique static counter to generate filenames
             static FRAME_COUNTER: AtomicUsize = AtomicUsize::new(0);
             let file_id = FRAME_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -26,7 +28,7 @@ impl MediaParser {
             let file_path = assets_path.join(&file_name);
 
             if let Err(e) = std::fs::write(&file_path, svg.as_bytes()) {
-                if parser.feat.soft_error {
+                if self.feat.soft_error {
                     return Self::create_embedded_frame(&data);
                 } else {
                     // Construct error node

@@ -22,9 +22,9 @@ See show-module() for outputting the results of this function.
 - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 -->
 - <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function references. If `auto`, the label-prefix name will be the module name.
   
-  - <!-- typlite:begin:list-item 0 -->nested something<!-- typlite:end:list-item 0 -->
-  - <!-- typlite:begin:list-item 0 -->nested something 2<!-- typlite:end:list-item 0 -->
+  - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
+  - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 -->
   
   <!-- typlite:end:list-item 0 -->
 
--\> string
+-> string

@@ -24,6 +24,7 @@ use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
+use typst::World;
 use typst_syntax::VirtualPath;
 
 use crate::common::Format;
@@ -187,12 +188,10 @@ impl Typlite {
             .map_shadow(
                 wrap_main_path.as_path(),
                 Bytes::from_string(format!(
-                    r#"
-                #import "@local/markdown:0.1.0": md-doc
-                #show: md-doc
-                #include {:?}
-                "#,
-                    current.vpath().as_rooted_path(),
+                    r#"#import "@local/markdown:0.1.0": md-doc, example
+#show: md-doc
+{}"#,
+                    world.source(current).unwrap().text()
                 )),
             )
             .map_err(|err| format!("cannot map source for main file: {err:?}"))?;
