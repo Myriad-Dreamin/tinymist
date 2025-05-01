@@ -34,6 +34,7 @@ fn convert_docs() {
 }
 
 #[test]
+#[cfg(feature = "docx")]
 fn test_docx_generation() {
     snapshot_testing("integration", &|world, _path| {
         let converter = Typlite::new(Arc::new(world.clone()))
@@ -59,7 +60,10 @@ fn test_docx_generation() {
 
         // insta::assert_binary_snapshot!("test_output.docx", docx_data);
 
-        let hash = format!("{:x}", md5::compute(&docx_data));
+        let hash = format!(
+            "siphash128_13:{:016x}",
+            tinymist_std::hash::hash128(&docx_data)
+        );
         insta::assert_snapshot!(hash);
     });
 }

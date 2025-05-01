@@ -1119,7 +1119,7 @@ dependencies = [
 [[package]]
 name = "docx-rs"
 version = "0.4.18-rc19"
-source = "git+https://github.com/bokuweb/docx-rs.git#4728e080a423a48c14fd45876b9fd2e6a823254b"
+source = "git+https://github.com/bokuweb/docx-rs.git?rev=4728e080a423a48c14fd45876b9fd2e6a823254b#4728e080a423a48c14fd45876b9fd2e6a823254b"
 dependencies = [
  "base64 0.13.1",
  "image 0.24.9",

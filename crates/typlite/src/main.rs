@@ -85,6 +85,7 @@ fn main() -> typlite::Result<()> {
             Some(output) if output.extension() == Some(std::ffi::OsStr::new("tex")) => {
                 Format::LaTeX
             }
+            #[cfg(feature = "docx")]
             Some(output) if output.extension() == Some(std::ffi::OsStr::new("docx")) => {
                 Format::Docx
             }
@@ -92,6 +93,7 @@ fn main() -> typlite::Result<()> {
         };
 
         match format {
+            #[cfg(feature = "docx")]
             Format::Docx => {
                 let docx_data = match doc.to_docx() {
                     Ok(data) => data,
