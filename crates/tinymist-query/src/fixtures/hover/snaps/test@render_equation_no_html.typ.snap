@@ -4,6 +4,6 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/render_equation_no_html.typ
 ---
 {
- "contents": "```typc\nlet lam(\n  A: type,\n  B: type,\n) = dictionary;\n```\n\n---\n\nLambda constructor.\n\nTyping Rule:\n\n<img alt=\"typst-block\" src=\"data:image-hash/svg+xml;base64,redacted\" />\n\n# Positional Parameters\n\n## A\n\n```typc\ntype: type\n```\n\nThe type of the argument.\n  \n  - It can be also regarded as the condition of the proposition.\n\n## B (positional)\n\n```typc\ntype: type\n```\n\nThe type of the body.\n  \n  - It can be also regarded as the conclusion of the proposition.",
+ "contents": "```typc\nlet lam(\n  A: type,\n  B: type,\n) = dictionary;\n```\n\n---\n\nLambda constructor.\n\nTyping Rule:\n\n# Positional Parameters\n\n## A\n\n```typc\ntype: type\n```\n\nThe type of the argument.\n  \n  - It can be also regarded as the condition of the proposition.\n\n## B (positional)\n\n```typc\ntype: type\n```\n\nThe type of the body.\n  \n  - It can be also regarded as the conclusion of the proposition.",
  "range": "14:20:14:23"
 }
