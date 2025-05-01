@@ -1,7 +1,0 @@
----
-source: crates/typlite/src/tests.rs
-assertion_line: 67
-expression: hash
-input_file: crates/typlite/src/fixtures/integration/enum2.typ
----
-siphash128_13:120c2e9245d767d648fd52a8564c9efc

@@ -2,7 +2,6 @@
 
 use base64::Engine;
 use docx_rs::*;
-use image::GenericImageView;
 use std::io::Cursor;
 
 use crate::Result;
@@ -72,19 +71,19 @@ impl DocxImageProcessor {
         // Add image format validation
         match image::guess_format(data) {
             Ok(..) => {
-                let (width, height) = self.calculate_image_dimensions(data, scale);
-
                 // Process image data
 
                 // For other formats, try to convert to PNG
                 let pic = match image::load_from_memory(data) {
                     Ok(img) => {
+                        let (w, h) =
+                            Self::image_dim(::image::GenericImageView::dimensions(&img), scale);
                         let mut buffer = Vec::new();
                         if img
                             .write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
                             .is_ok()
                         {
-                            Pic::new_with_dimensions(buffer, width, height)
+                            Pic::new_with_dimensions(buffer, w, h)
                         } else {
                             // If conversion fails, return original document (without image)
                             let err_para = Paragraph::new().add_run(Run::new().add_text(
@@ -134,18 +133,16 @@ impl DocxImageProcessor {
     pub fn process_inline_image(&self, mut run: Run, data: &[u8]) -> Result<Run> {
         match image::guess_format(data) {
             Ok(..) => {
-                let (width, height) =
-                    self.calculate_image_dimensions(data, Some(96.0 / 300.0 / 2.0));
-
                 // Try to convert to PNG
                 let pic = match image::load_from_memory(data) {
                     Ok(img) => {
+                        let (w, h) = ::image::GenericImageView::dimensions(&img);
                         let mut buffer = Vec::new();
                         if img
                             .write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
                             .is_ok()
                         {
-                            Pic::new_with_dimensions(buffer, width, height)
+                            Pic::new_with_dimensions(buffer, w, h)
                         } else {
                             run = run.add_text("[Image conversion error]");
                             return Ok(run);
@@ -193,40 +190,21 @@ impl DocxImageProcessor {
         Ok(run.add_text("[Invalid data URL]"))
     }
 
-    /// Get image dimensions
-    fn get_image_size(&self, img_data: &[u8]) -> Option<(u32, u32)> {
-        match image::load_from_memory(img_data) {
-            Ok(img) => {
-                let (width, height) = img.dimensions();
-                Some((width, height))
-            }
-            Err(_) => None,
-        }
-    }
-
     /// Calculate image dimensions for DOCX
-    pub fn calculate_image_dimensions(
-        &self,
-        img_data: &[u8],
-        scale_factor: Option<f32>,
-    ) -> (u32, u32) {
+    pub fn image_dim((w, h): (u32, u32), scale_factor: Option<f32>) -> (u32, u32) {
         let actual_scale = scale_factor.unwrap_or(1.0);
 
-        if let Some((w, h)) = self.get_image_size(img_data) {
-            let max_width = 5486400;
-            let scaled_w = (w as f32 * actual_scale) as u32;
-            let scaled_h = (h as f32 * actual_scale) as u32;
+        let max_width = 5486400;
+        let scaled_w = (w as f32 * actual_scale) as u32;
+        let scaled_h = (h as f32 * actual_scale) as u32;
 
-            if scaled_w > max_width {
-                let ratio = scaled_h as f32 / scaled_w as f32;
-                let new_width = max_width;
-                let new_height = (max_width as f32 * ratio) as u32;
-                (new_width, new_height)
-            } else {
-                (scaled_w * 9525, scaled_h * 9525)
-            }
+        if scaled_w > max_width {
+            let ratio = scaled_h as f32 / scaled_w as f32;
+            let new_width = max_width;
+            let new_height = (max_width as f32 * ratio) as u32;
+            (new_width, new_height)
         } else {
-            (4000000, 3000000)
+            (scaled_w * 9525, scaled_h * 9525)
         }
     }
 }
