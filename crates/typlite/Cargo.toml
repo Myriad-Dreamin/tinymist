@@ -36,7 +36,12 @@ typst-html.workspace = true
 regex.workspace = true
 cmark-writer = { version = "0.6.3", features = ["gfm"] }
 docx-rs = { git = "https://github.com/bokuweb/docx-rs.git", default-features = false, rev = "4728e080a423a48c14fd45876b9fd2e6a823254b", optional = true }
-image = { version = "0.25.6", optional = true }
+# typst can only support these formats.
+image = { version = "0.25.6", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+], optional = true }
 resvg = { version = "0.43.0", optional = true }
 
 [dev-dependencies]
