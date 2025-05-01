@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/hover.rs
+assertion_line: 433
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/render_equation_no_html.typ
+---
+{
+ "contents": "```typc\nlet lam(\n  A: any,\n  B: any,\n) = dictionary;\n```\n\n---\n\n```\nfailed to parse docs: failed to convert to markdown: convert source for main file: [SourceDiagnostic { severity: Error, span: Span(..), message: \"html export is only available when \\`--features html\\` is passed\", trace: [], hints: [\"html export is under active development and incomplete\", \"see https://github.com/typst/typst/issues/5512 for more information\"] }]\n```\n\n```typ\nLambda constructor.\n\nTyping Rule:\n\n$ (Γ , x : A ⊢ M : B #h(2em) Γ ⊢ a:B)/(Γ ⊢ λ (x : A) → M : π (x : A) → B) $\n\n- A (type): The type of the argument.\n  - It can be also regarded as the condition of the proposition.\n- B (type): The type of the body.\n  - It can be also regarded as the conclusion of the proposition.\n```\n\n# Positional Parameters\n\n## A\n\n```typc\ntype: \n```\n\n\n\n## B (positional)\n\n```typc\ntype: \n```\n\n",
+ "range": "14:20:14:23"
+}

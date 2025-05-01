@@ -29,6 +29,9 @@ use crate::parser::HtmlToAstParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
+use crate::tinymist_std::typst::foundations::Value::Str;
+use crate::tinymist_std::typst::{LazyHash, TypstDict};
+
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
@@ -76,6 +79,17 @@ impl MarkdownDocument {
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::Md);
+        writer.write_eco(&ast, &mut output)?;
+
+        Ok(output)
+    }
+
+    /// Convert content to plain text string
+    pub fn to_text_string(&self) -> Result<ecow::EcoString> {
+        let mut output = ecow::EcoString::new();
+        let ast = self.parse()?;
+
+        let mut writer = WriterFactory::create(Format::Text);
         writer.write_eco(&ast, &mut output)?;
 
         Ok(output)
@@ -170,6 +184,7 @@ impl Typlite {
         match self.format {
             Format::Md => self.convert_doc(Format::Md)?.to_md_string(),
             Format::LaTeX => self.convert_doc(Format::LaTeX)?.to_tex_string(true),
+            Format::Text => self.convert_doc(Format::Text)?.to_text_string(),
             #[cfg(feature = "docx")]
             Format::Docx => Err("docx format is not supported".into()),
         }
@@ -200,10 +215,18 @@ impl Typlite {
             .path_for_id(wrap_main_id)
             .map_err(|err| format!("getting source for main file: {err:?}"))?;
 
-        let mut world = world.html_task().task(TaskInputs {
+        let task_inputs = TaskInputs {
             entry: Some(entry.select_in_workspace(wrap_main_id.vpath().as_rooted_path())),
-            inputs: None,
-        });
+            inputs: if format == Format::Text || self.feat.remove_html {
+                let mut dict = TypstDict::new();
+                dict.insert("x-remove-html".into(), Str("true".into()));
+                Some(Arc::new(LazyHash::new(dict)))
+            } else {
+                None
+            },
+        };
+
+        let mut world = world.html_task().task(task_inputs);
 
         let markdown_id = FileId::new(
             Some(typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0").unwrap()),

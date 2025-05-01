@@ -139,11 +139,21 @@
 
   show math.equation.where(block: false): it => if-not-paged(
     it,
-    html.elem("m1eqinline", html.frame(box(inset: 0.5em, it))),
+    html.elem(
+      "m1eqinline",
+      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(box(inset: 0.5em, it)) } else {
+        it.body
+      },
+    ),
   )
   show math.equation.where(block: true): it => if-not-paged(
     it,
-    html.elem("m1eqblock", html.frame(block(inset: 0.5em, it))),
+    html.elem(
+      "m1eqblock",
+      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(block(inset: 0.5em, it)) } else {
+        it.body
+      },
+    ),
   )
 
   // show linebreak: it => if-not-paged(it, md-linebreak)
