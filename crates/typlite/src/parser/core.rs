@@ -9,7 +9,7 @@ use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
 
-use super::{inline::InlineParser, list::ListParser, media::MediaParser, table::TableParser};
+use super::{inline::InlineParser, list::ListParser, table::TableParser};
 
 /// HTML to AST parser implementation
 pub struct HtmlToAstParser {
@@ -202,8 +202,7 @@ impl HtmlToAstParser {
                     self.convert_element(element)?;
                 }
                 HtmlNode::Frame(frame) => {
-                    self.inline_buffer
-                        .push(MediaParser::convert_frame(self, frame));
+                    self.inline_buffer.push(self.convert_frame(frame));
                 }
                 _ => {}
             }
