@@ -204,7 +204,7 @@ impl DocxImageProcessor {
             let new_height = (max_width as f32 * ratio) as u32;
             (new_width, new_height)
         } else {
-            (scaled_w * 9525, scaled_h * 9525)
+            (scaled_w, scaled_h)
         }
     }
 }
