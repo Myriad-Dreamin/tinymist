@@ -17,7 +17,7 @@ input_file: crates/typlite/src/fixtures/integration/math_block2.typ
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.8\textwidth]{frame_0.svg}
+\includegraphics[width=0.8\textwidth]{frame_0.pdf}
 \caption{typst-frame}
 \end{figure}
 
@@ -27,4 +27,4 @@ input_file: crates/typlite/src/fixtures/integration/math_block2.typ
 \end{document}
 
 =====
-frame_0.svg
+frame_0.pdf
