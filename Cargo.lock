@@ -1122,7 +1122,6 @@ version = "0.4.18-rc19"
 source = "git+https://github.com/bokuweb/docx-rs.git?rev=4728e080a423a48c14fd45876b9fd2e6a823254b#4728e080a423a48c14fd45876b9fd2e6a823254b"
 dependencies = [
  "base64 0.13.1",
- "image 0.24.9",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2001,22 +2000,6 @@ name = "if_chain"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb56e1aa765b4b4f3aadfab769793b7087bb03a4ea4920644a6d238e2df5b9ed"
-
-[[package]]
-name = "image"
-version = "0.24.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5690139d2f55868e080017335e4b94cb7414274c74f1669c84fb5feba2c9f69d"
-dependencies = [
- "bytemuck",
- "byteorder",
- "color_quant",
- "gif",
- "jpeg-decoder",
- "num-traits",
- "png",
- "tiff",
-]
 
 [[package]]
 name = "image"
@@ -3391,7 +3374,7 @@ dependencies = [
  "crossbeam-queue",
  "dashmap",
  "flate2",
- "image 0.25.6",
+ "image",
  "log",
  "parking_lot",
  "rayon",
@@ -4102,7 +4085,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5014c9dadcf318fb7ef8c16438e95abcc9de1ae24d60d5bccc64c55100c50364"
 dependencies = [
  "fontdb",
- "image 0.25.6",
+ "image",
  "log",
  "miniz_oxide",
  "once_cell",
@@ -5161,7 +5144,7 @@ dependencies = [
  "comemo",
  "docx-rs",
  "ecow",
- "image 0.25.6",
+ "image",
  "insta",
  "regex",
  "resvg",
@@ -5299,7 +5282,7 @@ dependencies = [
  "icu_properties",
  "icu_provider",
  "icu_provider_blob",
- "image 0.25.6",
+ "image",
  "indexmap 2.9.0",
  "kamadak-exif",
  "kurbo",
@@ -5360,7 +5343,7 @@ dependencies = [
  "bytemuck",
  "comemo",
  "ecow",
- "image 0.25.6",
+ "image",
  "indexmap 2.9.0",
  "miniz_oxide",
  "pdf-writer",
@@ -5423,7 +5406,7 @@ source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist%2Fv0.13.1
 dependencies = [
  "bytemuck",
  "comemo",
- "image 0.25.6",
+ "image",
  "pixglyph",
  "resvg",
  "tiny-skia",
@@ -5453,7 +5436,7 @@ dependencies = [
  "comemo",
  "ecow",
  "flate2",
- "image 0.25.6",
+ "image",
  "ttf-parser",
  "typst-library",
  "typst-macros",

@@ -71,42 +71,34 @@ impl DocxImageProcessor {
     ) -> Docx {
         // Add image format validation
         match image::guess_format(data) {
-            Ok(format) => {
+            Ok(..) => {
                 let (width, height) = self.calculate_image_dimensions(data, scale);
 
                 // Process image data
-                let pic = match format {
-                    image::ImageFormat::Png => Pic::new(data).size(width, height),
-                    image::ImageFormat::Jpeg => Pic::new(data).size(width, height),
-                    _ => {
-                        // For other formats, try to convert to PNG
-                        match image::load_from_memory(data) {
-                            Ok(img) => {
-                                let mut buffer = Vec::new();
-                                if img
-                                    .write_to(
-                                        &mut Cursor::new(&mut buffer),
-                                        image::ImageFormat::Png,
-                                    )
-                                    .is_ok()
-                                {
-                                    Pic::new(&buffer).size(width, height)
-                                } else {
-                                    // If conversion fails, return original document (without image)
-                                    let err_para = Paragraph::new().add_run(Run::new().add_text(
+
+                // For other formats, try to convert to PNG
+                let pic = match image::load_from_memory(data) {
+                    Ok(img) => {
+                        let mut buffer = Vec::new();
+                        if img
+                            .write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
+                            .is_ok()
+                        {
+                            Pic::new_with_dimensions(buffer, width, height)
+                        } else {
+                            // If conversion fails, return original document (without image)
+                            let err_para = Paragraph::new().add_run(Run::new().add_text(
                                         "[Image processing error: Unable to convert to supported format]".to_string(),
                                     ));
-                                    return docx.add_paragraph(err_para);
-                                }
-                            }
-                            Err(_) => {
-                                // If unable to load image, return original document (without image)
-                                let err_para = Paragraph::new().add_run(Run::new().add_text(
-                                    "[Image processing error: Unable to load image]".to_string(),
-                                ));
-                                return docx.add_paragraph(err_para);
-                            }
+                            return docx.add_paragraph(err_para);
                         }
+                    }
+                    Err(_) => {
+                        // If unable to load image, return original document (without image)
+                        let err_para = Paragraph::new().add_run(Run::new().add_text(
+                            "[Image processing error: Unable to load image]".to_string(),
+                        ));
+                        return docx.add_paragraph(err_para);
                     }
                 };
 
@@ -141,39 +133,30 @@ impl DocxImageProcessor {
     /// Process inline image and add to Run
     pub fn process_inline_image(&self, mut run: Run, data: &[u8]) -> Result<Run> {
         match image::guess_format(data) {
-            Ok(format) => {
+            Ok(..) => {
                 let (width, height) =
                     self.calculate_image_dimensions(data, Some(96.0 / 300.0 / 2.0));
 
-                let pic = match format {
-                    image::ImageFormat::Png | image::ImageFormat::Jpeg => {
-                        Pic::new(data).size(width, height)
-                    }
-                    _ => {
-                        // Try to convert to PNG
-                        match image::load_from_memory(data) {
-                            Ok(img) => {
-                                let mut buffer = Vec::new();
-                                if img
-                                    .write_to(
-                                        &mut Cursor::new(&mut buffer),
-                                        image::ImageFormat::Png,
-                                    )
-                                    .is_ok()
-                                {
-                                    Pic::new(&buffer).size(width, height)
-                                } else {
-                                    run = run.add_text("[Image conversion error]");
-                                    return Ok(run);
-                                }
-                            }
-                            Err(_) => {
-                                run = run.add_text("[Image loading error]");
-                                return Ok(run);
-                            }
+                // Try to convert to PNG
+                let pic = match image::load_from_memory(data) {
+                    Ok(img) => {
+                        let mut buffer = Vec::new();
+                        if img
+                            .write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
+                            .is_ok()
+                        {
+                            Pic::new_with_dimensions(buffer, width, height)
+                        } else {
+                            run = run.add_text("[Image conversion error]");
+                            return Ok(run);
                         }
                     }
+                    Err(_) => {
+                        run = run.add_text("[Image loading error]");
+                        return Ok(run);
+                    }
                 };
+
                 run = run.add_image(pic);
                 Ok(run)
             }
