@@ -64,7 +64,8 @@ fn test_docx_generation() {
             "siphash128_13:{:016x}",
             tinymist_std::hash::hash128(&docx_data)
         );
-        insta::assert_snapshot!(hash);
+        insta::assert_snapshot!("docx_generation_hash", hash);
+        // insta::assert_binary_snapshot!(".docx", docx_data);
     });
 }
 
