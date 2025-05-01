@@ -63,7 +63,19 @@ namespace MyApplication
 }
 \end{lstlisting}
 
-Math inline:and block:
+Math inline:\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{frame_0.svg}
+\caption{typst-frame}
+\end{figure}
+
+and block:
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{frame_1.svg}
+\caption{typst-frame}
+\end{figure}
 
 
 
@@ -95,3 +107,7 @@ First termFirst definition
 
 
 \end{document}
+
+=====
+frame_0.svg
+frame_1.svg

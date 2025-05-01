@@ -8,7 +8,7 @@ use std::{
 
 use clap::Parser;
 use tinymist_project::WorldProvider;
-use typlite::{common::Format, TypliteFeat};
+use typlite::{common::Format, AssetsHandler, SystemAssetsHandler, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 use typst::foundations::Bytes;
 
@@ -50,6 +50,10 @@ fn main() -> typlite::Result<()> {
         _ => Format::Md,
     };
 
+    if matches!(output_format, Format::LaTeX) && args.assets_path.is_none() {
+        return Err("LaTeX output requires an assets path".into());
+    }
+
     let assets_path = match args.assets_path {
         Some(assets_path) => {
             let path = PathBuf::from(assets_path);
@@ -66,8 +70,10 @@ fn main() -> typlite::Result<()> {
     let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
     let world = universe.snapshot();
 
+    type AH = Arc<dyn AssetsHandler>;
     let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
-        assets_path: assets_path.clone(),
+        assets_handler: assets_path
+            .map(|assets_path| Arc::new(SystemAssetsHandler::new(assets_path)) as AH),
         ..Default::default()
     });
     let doc = converter.convert_doc(output_format)?;

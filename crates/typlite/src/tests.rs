@@ -1,4 +1,7 @@
-use std::sync::OnceLock;
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 
 use regex::Regex;
 use typst::html::{HtmlNode, HtmlTag};
@@ -90,8 +93,27 @@ impl ConvKind {
     }
 }
 
+#[derive(Debug, Default)]
+struct HashMapAssetsHandler {
+    assets: Mutex<HashMap<PathBuf, Vec<u8>>>,
+}
+
+impl AssetsHandler for HashMapAssetsHandler {
+    fn add_asset(&self, path: &Path, data: &[u8]) -> io::Result<PathBuf> {
+        let path = path.to_path_buf();
+        self.assets
+            .lock()
+            .unwrap()
+            .insert(path.clone(), data.to_vec());
+        Ok(path)
+    }
+}
+
 fn conv(world: LspWorld, kind: ConvKind) -> String {
+    let asset_handler = Arc::new(HashMapAssetsHandler::default());
+
     let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+        assets_handler: Some(asset_handler.clone() as Arc<dyn AssetsHandler>),
         annotate_elem: kind.for_docs(),
         ..Default::default()
     });
@@ -112,7 +134,21 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         "data:image-hash/svg+xml;base64,redacted"
     });
 
-    [repr.as_str(), res.as_ref()].join("\n=====\n")
+    let assets_paths = asset_handler
+        .assets
+        .lock()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut assets_paths = assets_paths
+        .iter()
+        .map(|path| path.to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    assets_paths.sort();
+    let assets_paths = assets_paths.join("\n");
+
+    [repr.as_str(), res.as_ref(), assets_paths.as_ref()].join("\n=====\n")
 }
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {

@@ -40,3 +40,5 @@ input_file: crates/typlite/src/fixtures/integration/table.typ
 
 012345678910111213141516171819012345678910111213141516171819
 \end{document}
+
+=====

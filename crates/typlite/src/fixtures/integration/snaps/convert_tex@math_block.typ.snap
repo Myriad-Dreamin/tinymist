@@ -15,7 +15,16 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
 =====
 \begin{document}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{frame_0.svg}
+\caption{typst-frame}
+\end{figure}
+
 
 
 
 \end{document}
+
+=====
+frame_0.svg
