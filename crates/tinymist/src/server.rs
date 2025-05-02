@@ -7,7 +7,7 @@ use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
-use tinymist_query::{OnExportRequest, ServerInfoResponse};
+use tinymist_query::{LspRange, OnExportRequest, ServerInfoResponse};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_task::ProjectTask;
@@ -76,7 +76,11 @@ pub struct ServerState {
     pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
-    /// The client focusing position.
+    /// The client focusing range. There might be multiple ranges selected by
+    /// the client at the same time, but we only record the primary one.
+    pub focusing_selection: Option<LspRange>,
+    /// The client focusing position, implicitly. It is inferred from the LSP
+    /// requests so may be inaccurate.
     pub implicit_position: Option<LspPosition>,
     /// The client ever focused implicitly by activities.
     pub ever_focusing_by_activities: bool,
@@ -136,6 +140,7 @@ impl ServerState {
             pinning_by_preview: false,
             pinning_by_browsing_preview: false,
             focusing: None,
+            focusing_selection: None,
             implicit_position: None,
             formatter,
             user_action: UserActionTask,
@@ -273,6 +278,7 @@ impl ServerState {
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
+            .with_command("tinymist.changeSelections", State::change_selections)
             .with_command("tinymist.doInitTemplate", State::init_template)
             .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
