@@ -76,8 +76,18 @@ pub struct ServerState {
     pub pinning_by_browsing_preview: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
-    /// The client focusing range. There might be multiple ranges selected by
-    /// the client at the same time, but we only record the primary one.
+    /// The client focusing selection ranges.
+    ///
+    /// To reduce complexity, we only record the primary selection range, while
+    /// there can be multiple ranges selected by the client at the same time.
+    /// - Example: In VS Code, you can create multiple cursors by `Ctrl + D`.
+    ///
+    /// To reduce complexity, A further question that we haven't covered
+    /// currently is that: The client may select ranges in multiple files at
+    /// the same time, but we only preasume that all of the selections are
+    /// in the [`Self::focusing`] file.
+    /// - Example: In VS Code, you can pick multiple ranges in multiple files by
+    ///   the text search command.
     pub focusing_selection: Option<LspRange>,
     /// The client focusing position, implicitly. It is inferred from the LSP
     /// requests so may be inaccurate.
