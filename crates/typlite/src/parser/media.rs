@@ -15,7 +15,7 @@ impl HtmlToAstParser {
             // todo: make error silent is not good.
             return Node::Text(String::new());
         }
-        
+
         let svg = typst_svg::svg_frame(frame);
         let data = base64::engine::general_purpose::STANDARD.encode(svg.as_bytes());
 
