@@ -95,11 +95,14 @@ pub fn definition(
             DefResolver::new(ctx, source)?.of_span(path.span())
         }
         SyntaxClass::Label {
-            node: r,
+            node,
             is_error: false,
         }
-        | SyntaxClass::Ref(r) => {
-            let ref_expr: ast::Expr = r.cast()?;
+        | SyntaxClass::Ref {
+            node,
+            suffix_colon: false,
+        } => {
+            let ref_expr: ast::Expr = node.cast()?;
             let name = match ref_expr {
                 ast::Expr::Ref(r) => r.target(),
                 ast::Expr::Label(r) => r.get(),
@@ -113,6 +116,10 @@ pub fn definition(
         SyntaxClass::Label {
             node: _,
             is_error: true,
+        }
+        | SyntaxClass::Ref {
+            node: _,
+            suffix_colon: true,
         }
         | SyntaxClass::Normal(..) => None,
     }

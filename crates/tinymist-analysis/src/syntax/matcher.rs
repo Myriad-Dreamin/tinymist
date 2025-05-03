@@ -625,7 +625,7 @@ impl<'a> VarClass<'a> {
                 span: node.span(),
                 offset: node.range().len() + 1,
             })),
-            Self::Ident(_) => None,
+            Self::Ident(..) => None,
         }
     }
 }
@@ -645,7 +645,13 @@ pub enum SyntaxClass<'a> {
         is_error: bool,
     },
     /// A (content) reference expression.
-    Ref(LinkedNode<'a>),
+    Ref {
+        /// The node of the reference.
+        node: LinkedNode<'a>,
+        /// A colon after a reference expression, for example, `@a:|` or
+        /// `@a:b:|`.
+        suffix_colon: bool,
+    },
     /// A callee expression.
     Callee(LinkedNode<'a>),
     /// An import path expression.
@@ -678,7 +684,7 @@ impl<'a> SyntaxClass<'a> {
         match self {
             SyntaxClass::VarAccess(cls) => cls.node(),
             SyntaxClass::Label { node, .. }
-            | SyntaxClass::Ref(node)
+            | SyntaxClass::Ref { node, .. }
             | SyntaxClass::Callee(node)
             | SyntaxClass::ImportPath(node)
             | SyntaxClass::IncludePath(node)
@@ -804,6 +810,38 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
         }
     }
 
+    /// Matches ref parsing broken by a colon.
+    ///
+    /// When in markup mode, the ref is valid if the colon is after a ref
+    /// expression.
+    fn classify_ref<'a>(node: &LinkedNode<'a>) -> Option<SyntaxClass<'a>> {
+        let prev_leaf = node.prev_leaf()?;
+
+        if matches!(prev_leaf.kind(), SyntaxKind::RefMarker)
+            && prev_leaf.range().end == node.offset()
+        {
+            return Some(SyntaxClass::Ref {
+                node: prev_leaf,
+                suffix_colon: true,
+            });
+        }
+
+        None
+    }
+
+    if node.offset() + 1 == cursor && {
+        // Check if the cursor is exactly after single dot.
+        matches!(node.kind(), SyntaxKind::Colon)
+            || (matches!(
+                node.kind(),
+                SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
+            ) && node.text().starts_with(":"))
+    } {
+        if let Some(ref_syntax) = classify_ref(&node) {
+            return Some(ref_syntax);
+        }
+    }
+
     // todo: check if we can remove Text here
     if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
         let mode = interpret_mode_at(Some(&node));
@@ -824,7 +862,10 @@ pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_
     let expr = adjusted.cast::<ast::Expr>()?;
     Some(match expr {
         ast::Expr::Label(..) => SyntaxClass::label(adjusted),
-        ast::Expr::Ref(..) => SyntaxClass::Ref(adjusted),
+        ast::Expr::Ref(..) => SyntaxClass::Ref {
+            node: adjusted,
+            suffix_colon: false,
+        },
         ast::Expr::FuncCall(call) => SyntaxClass::Callee(adjusted.find(call.callee().span())?),
         ast::Expr::Set(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) => {
@@ -1088,6 +1129,14 @@ pub enum SyntaxContext<'a> {
         /// Whether the label is converted from an error node.
         is_error: bool,
     },
+    /// A (content) reference expression.
+    Ref {
+        /// The node of the reference.
+        node: LinkedNode<'a>,
+        /// A colon after a reference expression, for example, `@a:|` or
+        /// `@a:b:|`.
+        suffix_colon: bool,
+    },
     /// A cursor on a normal [`SyntaxClass`].
     Normal(LinkedNode<'a>),
 }
@@ -1105,6 +1154,7 @@ impl<'a> SyntaxContext<'a> {
             SyntaxContext::VarAccess(cls) => cls.node().clone(),
             SyntaxContext::Paren { container, .. } => container.clone(),
             SyntaxContext::Label { node, .. }
+            | SyntaxContext::Ref { node, .. }
             | SyntaxContext::ImportPath(node)
             | SyntaxContext::IncludePath(node)
             | SyntaxContext::Normal(node) => node.clone(),
@@ -1147,7 +1197,7 @@ pub fn classify_context_outer<'a>(
 
     match context_syntax {
         Callee(callee)
-            if matches!(node_syntax, Normal(..) | Label { .. } | Ref(..))
+            if matches!(node_syntax, Normal(..) | Label { .. } | Ref { .. })
                 && !matches!(node_syntax, Callee(..)) =>
         {
             let parent = callee.parent()?;
@@ -1194,6 +1244,9 @@ pub fn classify_context(node: LinkedNode, cursor: Option<usize>) -> Option<Synta
         }
         SyntaxClass::Label { node, is_error } => {
             return Some(SyntaxContext::Label { node, is_error });
+        }
+        SyntaxClass::Ref { node, suffix_colon } => {
+            return Some(SyntaxContext::Ref { node, suffix_colon });
         }
         SyntaxClass::ImportPath(node) => {
             return Some(SyntaxContext::ImportPath(node));
@@ -1445,7 +1498,7 @@ mod tests {
                 Some(SyntaxClass::VarAccess(..)) => 'v',
                 Some(SyntaxClass::Normal(..)) => 'n',
                 Some(SyntaxClass::Label { .. }) => 'l',
-                Some(SyntaxClass::Ref(..)) => 'r',
+                Some(SyntaxClass::Ref { .. }) => 'r',
                 Some(SyntaxClass::Callee(..)) => 'c',
                 Some(SyntaxClass::ImportPath(..)) => 'i',
                 Some(SyntaxClass::IncludePath(..)) => 'I',
@@ -1466,6 +1519,7 @@ mod tests {
                 Some(SyntaxContext::ImportPath(..)) => 'i',
                 Some(SyntaxContext::IncludePath(..)) => 'I',
                 Some(SyntaxContext::Label { .. }) => 'l',
+                Some(SyntaxContext::Ref { .. }) => 'r',
                 Some(SyntaxContext::Normal(..)) => 'n',
                 None => ' ',
             }
@@ -1546,6 +1600,54 @@ Text
          eeeeee  
           Test
         ");
+    }
+
+    #[test]
+    fn ref_syntxax() {
+        assert_snapshot!(map_syntax("@ab:"), @r###"
+        @ab:
+        rrrr
+        "###);
+    }
+
+    #[test]
+    fn ref_syntax() {
+        assert_snapshot!(map_syntax("@ab"), @r###"
+        @ab
+        rrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:"), @r###"
+        @ab:
+        rrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab"), @r###"
+        @ab:ab
+        rrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab:"), @r###"
+        @ab:ab:
+        rrrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab:ab"), @r###"
+        @ab:ab:ab
+        rrrrrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab[]:"), @r###"
+        @ab[]:
+        rrrnn
+        "###);
+        assert_snapshot!(map_syntax("@ab[ab]:"), @r###"
+        @ab[ab]:
+        rrrn  n
+        "###);
+        assert_snapshot!(map_syntax("@ab :ab: ab"), @r###"
+        @ab :ab: ab
+        rrr
+        "###);
+        assert_snapshot!(map_syntax("@ab :ab:ab"), @r###"
+        @ab :ab:ab
+        rrr
+        "###);
     }
 
     fn access_node(s: &str, cursor: i32) -> String {
