@@ -319,12 +319,20 @@ impl<'a> PostTypeChecker<'a> {
             | SyntaxContext::VarAccess(VarClass::FieldAccess(node))
             | SyntaxContext::VarAccess(VarClass::DotAccess(node))
             | SyntaxContext::Label { node, .. }
+            | SyntaxContext::Ref { node, .. }
             | SyntaxContext::Normal(node) => {
-                let label_ty = matches!(cursor, SyntaxContext::Label { is_error: true, .. })
-                    .then_some(Ty::Builtin(BuiltinTy::Label));
+                let label_or_ref_ty = match cursor {
+                    SyntaxContext::Label { is_error: true, .. } => {
+                        Some(Ty::Builtin(BuiltinTy::Label))
+                    }
+                    SyntaxContext::Ref {
+                        suffix_colon: true, ..
+                    } => Some(Ty::Builtin(BuiltinTy::RefLabel)),
+                    _ => None,
+                };
                 let ty = self.check_or(node, context_ty);
-                crate::log_debug_ct!("post check target normal: {ty:?} {label_ty:?}");
-                ty.or(label_ty)
+                crate::log_debug_ct!("post check target normal: {ty:?} {label_or_ref_ty:?}");
+                ty.or(label_or_ref_ty)
             }
         }
     }

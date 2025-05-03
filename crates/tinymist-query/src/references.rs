@@ -47,8 +47,17 @@ pub(crate) fn find_references(
 ) -> Option<Vec<LspLocation>> {
     let finding_label = match syntax {
         SyntaxClass::VarAccess(..) | SyntaxClass::Callee(..) => false,
-        SyntaxClass::Label { .. } | SyntaxClass::Ref(..) => true,
-        SyntaxClass::ImportPath(..) | SyntaxClass::IncludePath(..) | SyntaxClass::Normal(..) => {
+        SyntaxClass::Label { .. }
+        | SyntaxClass::Ref {
+            suffix_colon: false,
+            ..
+        } => true,
+        SyntaxClass::ImportPath(..)
+        | SyntaxClass::IncludePath(..)
+        | SyntaxClass::Ref {
+            suffix_colon: true, ..
+        }
+        | SyntaxClass::Normal(..) => {
             return None;
         }
     };

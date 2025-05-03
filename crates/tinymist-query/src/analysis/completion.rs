@@ -255,7 +255,7 @@ impl<'a> CompletionCursor<'a> {
 
             // @identifier
             //  ^ from
-            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref(..)))
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref { .. }))
                 && self.leaf.offset() + 1 == self.from;
             if is_from_ref {
                 return Some(SelectedNode::Ref(self.leaf.clone()));
@@ -287,6 +287,7 @@ impl<'a> CompletionCursor<'a> {
                     | SyntaxContext::VarAccess(..)
                     | SyntaxContext::Paren { .. }
                     | SyntaxContext::Label { .. }
+                    | SyntaxContext::Ref { .. }
                     | SyntaxContext::Normal(..),
                 )
                 | None => {}
@@ -641,8 +642,11 @@ impl CompletionPair<'_, '_, '_> {
                 return Some(());
             }
             // todo: complete reference by type
-            Some(SyntaxContext::Normal(node)) if (matches!(node.kind(), SyntaxKind::Ref)) => {
-                self.cursor.from = self.cursor.leaf.offset() + 1;
+            Some(SyntaxContext::Ref {
+                node,
+                suffix_colon: _,
+            }) => {
+                self.cursor.from = node.offset() + 1;
                 self.ref_completions();
                 return Some(());
             }
