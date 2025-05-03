@@ -1548,6 +1548,38 @@ Text
         ");
     }
 
+    #[test]
+    fn ref_syntax() {
+        assert_snapshot!(map_syntax("@ab"), @r###"
+        @ab
+        rrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:"), @r###"
+        @ab:
+        rrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab"), @r###"
+        @ab:ab
+        rrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab:"), @r###"
+        @ab:ab:
+        rrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab:ab:ab"), @r###"
+        @ab:ab:ab
+        rrrrrrrrr
+        "###);
+        assert_snapshot!(map_syntax("@ab :ab: ab"), @r###"
+        @ab :ab: ab
+        rrr
+        "###);
+        assert_snapshot!(map_syntax("@ab :ab:ab"), @r###"
+        @ab :ab:ab
+        rrr
+        "###);
+    }
+
     fn access_node(s: &str, cursor: i32) -> String {
         access_node_(s, cursor).unwrap_or_default()
     }
