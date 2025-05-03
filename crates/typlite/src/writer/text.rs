@@ -53,11 +53,10 @@ impl TextWriter {
                 output.push_str("\n\n");
             }
             Node::OrderedList { start: _, items } => {
-                for (i, item) in items.iter().enumerate() {
+                for item in items.iter() {
                     match item {
                         cmark_writer::ast::ListItem::Ordered { content, .. }
                         | cmark_writer::ast::ListItem::Unordered { content } => {
-                            output.push_str(&format!("{}. ", i + 1));
                             for block in content {
                                 Self::write_node(block, output)?;
                             }
@@ -71,7 +70,6 @@ impl TextWriter {
                     match item {
                         cmark_writer::ast::ListItem::Ordered { content, .. }
                         | cmark_writer::ast::ListItem::Unordered { content } => {
-                            output.push_str("- ");
                             for block in content {
                                 Self::write_node(block, output)?;
                             }
