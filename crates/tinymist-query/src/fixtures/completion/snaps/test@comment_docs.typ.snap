@@ -1,0 +1,30 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on \n (59..60)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/comment_docs.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 21,
+    "label": "Document function",
+    "textEdit": {
+     "newText": " $0\n///\n/// - x ($1): $2\n/// - y ($3): $4\n/// -> $5",
+     "range": {
+      "end": {
+       "character": 3,
+       "line": 3
+      },
+      "start": {
+       "character": 3,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
