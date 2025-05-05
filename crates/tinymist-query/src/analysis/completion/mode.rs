@@ -9,15 +9,28 @@ impl CompletionPair<'_, '_, '_> {
         if_chain! {
             if text == "///" || text == "/// ";
             // hash node
-            if let Some(next) = self.cursor.leaf.next_leaf();
+            if let Some(hash_node) = self.cursor.leaf.next_leaf();
             // let node
-            if let Some(next_next) = next.next_leaf();
-            if let Some(next_next) = next_next.next_leaf();
-            if matches!(next_next.parent_kind(), Some(SyntaxKind::Closure));
-            if let Some(closure) = next_next.parent();
+            if let Some(let_node) = hash_node.next_leaf();
+            if let Some(let_closure) = let_node.next_leaf();
+            if matches!(let_closure.parent_kind(), Some(SyntaxKind::Closure));
+            if let Some(closure) = let_closure.parent();
             if let Some(closure) = closure.cast::<ast::Expr>();
             if let ast::Expr::Closure(c) = closure;
             then {
+                // Only completes if the next line is a function definition
+                let rng = self.cursor.leaf.offset()..hash_node.offset();
+                let text_between = &self.cursor.source.text()[rng];
+                let mut line_count = 0;
+                for ch in text_between.chars() {
+                    if ch == '\n' {
+                        line_count += 1;
+                    }
+                    if line_count > 1 {
+                        return false;
+                    }
+                }
+
                 let mut doc_snippet: String = if text == "///" {
                     " $0\n///".to_string()
                 } else {
