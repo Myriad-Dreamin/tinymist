@@ -8,7 +8,7 @@
     <version>0.1.0</version> <!-- This will be overwritten by gradle -->
 
     <!-- Text to display as company information on Settings | Plugins page -->
-    <vendor email="your.email@example.com" url="https://github.com/Myzel394/tinymist">Myzel394 &amp; Contributors</vendor>
+    <vendor email="your.email@example.com" url="example.com"> &amp; Contributors</vendor>
 
     <!-- Description of the plugin -->
     <description><![CDATA[
@@ -37,22 +37,17 @@
     <!-- Declare dependencies on other plugins or modules -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.ultimate</depends> <!-- Required for LSP API -->
-    <!-- We will add lsp4ij extensions here later, not usually a direct dependency -->
 
     <!-- Extension points defined by the plugin. -->
     <extensions defaultExtensionNs="com.intellij">
         <!-- Basic language support -->
-        <fileType name="Typst" implementationClass="org.tinymist.intellij.TypstFileType" fieldName="INSTANCE" language="Typst" extensions="typ"/>
+        <fileType name="Typst file" implementationClass="org.tinymist.intellij.TypstFileType" fieldName="INSTANCE" language="Typst" extensions="typ"/>
         <lang.parserDefinition language="Typst" implementationClass="org.tinymist.intellij.TypstParserDefinition"/>
         <lang.syntaxHighlighterFactory language="Typst" implementationClass="org.tinymist.intellij.TypstSyntaxHighlighterFactory"/>
 
         <!-- LSP Integration -->
         <!-- Register the LspServerSupportProvider implementation -->
         <platform.lsp.serverSupportProvider implementation="org.tinymist.intellij.lsp.TinymistLspServerSupportProvider"/>
-    </extensions>
-
-    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
-        <!-- lsp4ij server definition and language mapping will go here -->
     </extensions>
 
     <actions>

@@ -30,7 +30,7 @@ private class TinymistLspServerDescriptor(project: Project) : ProjectWideLspServ
         // TODO: Add error handling if 'tinymist' is not found on PATH
         // TODO: Allow configuring the path to the tinymist executable
         // TODO: Add necessary arguments if tinymist requires any flags to start as LSP server
-        return GeneralCommandLine("tinymist")
+        return GeneralCommandLine("tinymist", "lsp")
             // Add any necessary arguments like: .withParameters("lsp")
             // Add environment variables if needed: .withEnvironment(...)
             .withWorkDirectory(project.basePath) // Set working directory to project root
