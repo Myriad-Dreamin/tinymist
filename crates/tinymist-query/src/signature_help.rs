@@ -141,14 +141,16 @@ mod tests {
     fn test() {
         snapshot_testing("signature_help", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
+            let (position, anno) = make_pos_annoation(&source);
 
-            let request = SignatureHelpRequest {
-                path: path.clone(),
-                position: find_test_position(&source),
-            };
+            let request = SignatureHelpRequest { path, position };
 
             let result = request.request(ctx);
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            with_settings!({
+                description => format!("signature help on {anno}"),
+            }, {
+                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            })
         });
     }
 }
