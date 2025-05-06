@@ -214,10 +214,11 @@ function setupDocFocus(context: IContext) {
       }
     }),
     // Watches the active editor that owning an untitled `document` (`isUntitled`)
+    // FIXME: we may do better if we could have a way to handle the `document` state with only one handler.
     //
-    // FIXME: It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
-    // I remeber `onDidChangeActiveTextEditor` didn't capture changes of untitled `document`s.
-    // I also remeber I had figured the reason vscode do that, but I forget it.
+    // `onDidChangeActiveTextEditor` didn't capture changes of untitled `document`s. This is because when the user
+    // change the language id from `plaintext` to `typst` manually,vscode doesn't trigger `onDidChangeActiveTextEditor`,
+    // becuase the editor state is not changed but only replacen with a new document with language id `typst`.
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
         return focusDoc(isTypstDocument(doc) ? doc : undefined, window.activeTextEditor);
