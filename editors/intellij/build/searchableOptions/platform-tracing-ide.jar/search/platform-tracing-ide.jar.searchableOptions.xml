@@ -1,9 +1,0 @@
-<options>
-  <configurable id="preferences.keymap" configurable_name="Keymap">
-    <option name="build" path="ActionManager" hit="Toggle Build Tracing" />
-    <option name="toggle" path="ActionManager" hit="Toggle Build Tracing" />
-    <option name="tracing" path="ActionManager" hit="Toggle Build Tracing" />
-    <option name="toggle" path="ActionManager" hit="Toggle tracing" />
-    <option name="tracing" path="ActionManager" hit="Toggle tracing" />
-  </configurable>
-</options>

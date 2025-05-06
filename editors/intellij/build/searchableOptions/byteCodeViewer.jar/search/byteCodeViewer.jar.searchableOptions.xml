@@ -1,7 +1,0 @@
-<options>
-  <configurable id="preferences.keymap" configurable_name="Keymap">
-    <option name="" path="ActionManager" hit="" />
-    <option name="bytecode" path="ActionManager" hit="Show Bytecode" />
-    <option name="show" path="ActionManager" hit="Show Bytecode" />
-  </configurable>
-</options>
