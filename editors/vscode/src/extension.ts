@@ -149,7 +149,7 @@ async function languageActivate(context: IContext) {
     });
   }
 
-  setupDocFocus();
+  setupDocFocus(context);
 
   const initTemplateCommand =
     (inPlace: boolean) =>
@@ -187,50 +187,51 @@ async function languageActivate(context: IContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );
+}
 
-  function setupDocFocus() {
-    // At startup, we missed the state about the existing active editor and `document`s, so we should find
-    // the correct `document` to focus.
-    const editor = window.activeTextEditor;
-    if (isTypstDocument(editor?.document)) {
-      focusDoc(editor.document, editor);
-    } else {
-      window.visibleTextEditors.forEach((editor) => {
-        if (isTypstDocument(editor.document)) {
-          focusDoc(editor.document, editor);
-        }
-      });
-    }
-
-    context.subscriptions.push(
-      // Watches the active editor that owning a titled `document` (`!isUntitled`)
-      //
-      // todo: plaintext detection
-      window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
-        if (!editor?.document.isUntitled) {
-          return focusDoc(isTypstDocument(editor?.document) ? editor?.document : undefined, editor);
-        }
-      }),
-      // Watches the active editor that owning an untitled `document` (`isUntitled`)
-      //
-      // FIXME: It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
-      // I remeber `onDidChangeActiveTextEditor` didn't capture changes of untitled `document`s.
-      // I also remeber I had figured the reason vscode do that, but I forget it.
-      vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
-        if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-          return focusDoc(isTypstDocument(doc) ? doc : undefined, window.activeTextEditor);
-        }
-      }),
-      // Watches that the active editor is closed
-      //
-      // todo: should we turn to find and focus another visible typst `document`?
-      vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-        if (extensionState.mut.focusing.doc === doc) {
-          focusDoc(undefined);
-        }
-      }),
-    );
+function setupDocFocus(context: IContext) {
+  // At startup, we missed the state about the existing active editor and `document`s, so we should find
+  // the correct `document` to focus.
+  const editor = window.activeTextEditor;
+  if (isTypstDocument(editor?.document)) {
+    focusDoc(editor.document, editor);
+  } else {
+    window.visibleTextEditors.forEach((editor) => {
+      if (isTypstDocument(editor.document)) {
+        focusDoc(editor.document, editor);
+      }
+    });
   }
+
+  // Then, add the event listeners to watch the active editor and `document`s.
+  context.subscriptions.push(
+    // Watches the active editor that owning a titled `document` (`!isUntitled`)
+    //
+    // todo: plaintext detection
+    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
+      if (!editor?.document.isUntitled) {
+        return focusDoc(isTypstDocument(editor?.document) ? editor?.document : undefined, editor);
+      }
+    }),
+    // Watches the active editor that owning an untitled `document` (`isUntitled`)
+    //
+    // FIXME: It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
+    // I remeber `onDidChangeActiveTextEditor` didn't capture changes of untitled `document`s.
+    // I also remeber I had figured the reason vscode do that, but I forget it.
+    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+      if (doc.isUntitled && window.activeTextEditor?.document === doc) {
+        return focusDoc(isTypstDocument(doc) ? doc : undefined, window.activeTextEditor);
+      }
+    }),
+    // Watches that the active editor is closed
+    //
+    // todo: should we turn to find and focus another visible typst `document`?
+    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+      if (extensionState.mut.focusing.doc === doc) {
+        focusDoc(undefined);
+      }
+    }),
+  );
 }
 
 async function openInternal(target: string): Promise<void> {
