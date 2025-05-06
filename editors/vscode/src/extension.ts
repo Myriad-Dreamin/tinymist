@@ -163,16 +163,17 @@ async function languageActivate(context: IContext) {
 
   context.subscriptions.push(
     // todo: plaintext detection
-    // Watches the active editor that owning titled documents (`!isUntitled`)
+    // Watches the active editor that owning a titled document (`!isUntitled`)
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
       if (!editor?.document.isUntitled) {
         return focusDoc(isTypstDocument(editor?.document) ? editor?.document : undefined, editor);
       }
     }),
-    // Watches the active editor that owning untitled documents (`isUntitled`)
+    // Watches the active editor that owning an untitled document (`isUntitled`)
     //
-    // There was a reason I added this, when I found `onDidChangeActiveTextEditor`
-    // didn't capture changes of untitled documents, but I forgot.
+    // It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
+    // I remeber `onDidChangeActiveTextEditor` didn't capture changes of untitled documents.
+    // I also remeber I had figured the reason vscode do that, but I forget it.
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
         return focusDoc(isTypstDocument(doc) ? doc : undefined, window.activeTextEditor);
