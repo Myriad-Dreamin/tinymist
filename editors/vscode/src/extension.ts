@@ -190,8 +190,8 @@ async function languageActivate(context: IContext) {
 }
 
 function setupDocFocus(context: IContext) {
-  // At startup, we missed the state about the existing active editor and `document`s, so we should find
-  // the correct `document` to focus.
+  // At startup, we have missed the state about the existing active editor and `document`s, so we should find
+  // the correct `document` to focus from the current global state.
   const editor = window.activeTextEditor;
   if (isTypstDocument(editor?.document)) {
     focusDoc(editor.document, editor);
