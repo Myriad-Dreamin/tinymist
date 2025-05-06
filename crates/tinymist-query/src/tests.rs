@@ -28,7 +28,7 @@ pub use tinymist_world::WorldComputeGraph;
 
 pub use crate::syntax::find_module_level_docs;
 use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
-use crate::{to_lsp_position, CompletionFeat};
+use crate::{to_lsp_position, to_typst_position, CompletionFeat};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
@@ -174,50 +174,60 @@ pub fn find_test_lsp_pos(s: &Source, offset: usize) -> LspPosition {
 }
 
 pub fn find_test_typst_pos(s: &Source) -> usize {
-    enum AstMatcher {
-        MatchAny { prev: bool },
-        MatchIdent { prev: bool },
+    enum PosMatcher {
+        Pos { prev: bool, ident: bool },
+        LoC { line: i32, column: i32 },
     }
-    use AstMatcher::*;
+    use PosMatcher::*;
 
-    let re = s
-        .text()
-        .find("/* position */")
-        .zip(Some(MatchAny { prev: true }));
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* position after */")
-            .zip(Some(MatchAny { prev: false }))
-    });
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* ident */")
-            .zip(Some(MatchIdent { prev: true }))
-    });
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* ident after */")
-            .zip(Some(MatchIdent { prev: false }))
-    });
-    let (re, m) = re
-        .ok_or_else(|| panic!("No position marker found in source:\n{}", s.text()))
-        .unwrap();
+    fn pos(prev: bool, ident: bool) -> Option<PosMatcher> {
+        Some(Pos { prev, ident })
+    }
 
-    let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at_compat(re + 1).unwrap();
+    let re = s.text().find("/* position */").zip(pos(true, false));
+    let re = re.or_else(|| s.text().find("/* position after */").zip(pos(false, false)));
+    let re = re.or_else(|| s.text().find("/* ident */").zip(pos(true, true)));
+    let re = re.or_else(|| s.text().find("/* ident after */").zip(pos(false, true)));
+    let re = re.or_else(|| {
+        let re = s.text().find("/* loc ")?;
+        let (parts, _) = s.text()[re + "/* loc ".len()..]
+            .trim()
+            .split_once("*/")
+            .expect("bad loc marker");
+        let (line, column) = parts.split_once(',').expect("bad loc marker");
+        let line = line.trim().parse::<i32>().expect("bad loc marker");
+        let column = column.trim().parse::<i32>().expect("bad loc marker");
+        Some((re, LoC { line, column }))
+    });
 
-    let match_prev = match &m {
-        MatchAny { prev } => *prev,
-        MatchIdent { prev } => *prev,
-    };
-    let match_ident = match m {
-        MatchAny { .. } => false,
-        MatchIdent { .. } => true,
+    let Some((rel_offset, matcher)) = re else {
+        panic!("No (or bad) position marker found in source:\n{}", s.text())
     };
 
+    match matcher {
+        Pos { prev, ident } => {
+            let node = LinkedNode::new(s.root());
+            let node = node.leaf_at_compat(rel_offset + 1).unwrap();
+
+            match_by_pos(node, prev, ident)
+        }
+        LoC { line, column } => {
+            let column = if line != 0 { column } else { 0 };
+
+            let rel_pos = to_lsp_position(rel_offset, PositionEncoding::Utf16, s);
+            let pos = LspPosition {
+                line: (rel_pos.line as i32 + line) as u32,
+                character: (rel_pos.character as i32 + column) as u32,
+            };
+            to_typst_position(pos, PositionEncoding::Utf16, s).expect("invalid loc")
+        }
+    }
+}
+
+fn match_by_pos(mut n: LinkedNode, prev: bool, ident: bool) -> usize {
     'match_loop: loop {
         if n.kind().is_trivia() || n.kind().is_error() {
-            let m = if match_prev {
+            let m = if prev {
                 n.prev_sibling()
             } else {
                 n.next_sibling()
@@ -226,7 +236,7 @@ pub fn find_test_typst_pos(s: &Source) -> usize {
             continue;
         }
         if matches!(n.kind(), SyntaxKind::Named) {
-            if match_ident {
+            if ident {
                 n = n
                     .children()
                     .find(|n| matches!(n.kind(), SyntaxKind::Ident))
@@ -236,7 +246,7 @@ pub fn find_test_typst_pos(s: &Source) -> usize {
             }
             continue;
         }
-        if match_ident {
+        if ident {
             match n.kind() {
                 SyntaxKind::Closure => {
                     let closure = n.cast::<ast::Closure>().unwrap();
@@ -263,6 +273,18 @@ pub fn find_test_typst_pos(s: &Source) -> usize {
     }
 
     n.offset()
+}
+
+pub fn make_pos_annoation(source: &Source) -> (LspPosition, String) {
+    let pos = find_test_typst_pos(source);
+    let range_before = pos.saturating_sub(10)..pos;
+    let range_after = pos..pos.saturating_add(10).min(source.text().len());
+
+    let window_before = &source.text()[range_before];
+    let window_after = &source.text()[range_after];
+
+    let pos = to_lsp_position(pos, PositionEncoding::Utf16, source);
+    (pos, format!("{window_before}|{window_after}"))
 }
 
 pub fn make_range_annoation(source: &Source) -> String {

@@ -99,7 +99,7 @@ mod tests {
             let result = request.request(ctx);
 
             with_settings!({
-                description => format!("Code Action on {})", make_range_annoation(&source)),
+                description => format!("Code Action on {}", make_range_annoation(&source)),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             })

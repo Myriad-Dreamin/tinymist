@@ -1334,6 +1334,22 @@ fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<Sy
     };
     let args = parent.find(args.span())?;
 
+    let mut parent = &node;
+    loop {
+        use SyntaxKind::*;
+        match parent.kind() {
+            ContentBlock | CodeBlock | Str | Raw | LineComment | BlockComment => {
+                return Option::None
+            }
+            Args if parent.range() == args.range() => {
+                break;
+            }
+            _ => {}
+        }
+
+        parent = parent.parent()?;
+    }
+
     let is_set = parent.kind() == SyntaxKind::SetRule;
     let target = arg_context(args.clone(), node, ArgSourceKind::Call)?;
     Some(SyntaxContext::Arg {

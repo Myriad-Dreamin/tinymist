@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/signature_help.rs
+description: "signature help on */\n#strong|(\"\")\n"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/signature_help/pos_callee2.typ
+---
+{
+ "activeSignature": 0,
+ "signatures": [
+  {
+   "activeParameter": 0,
+   "documentation": {
+    "kind": "markdown",
+    "value": "Strongly emphasizes content by increasing the font weight.\n\nIncreases the current font weight by a given `delta`.\n\n# Example\n```example\nThis is *strong.* \\\nThis is #strong[too.] \\\n\n#show strong: set text(red)\nAnd this is *evermore.*\n```\n\n# Syntax\nThis function also has dedicated syntax: To strongly emphasize content,\nsimply enclose it in stars/asterisks (`*`). Note that this only works at\nword boundaries. To strongly emphasize part of a word, you have to use the\nfunction."
+   },
+   "label": "strong(body: content, delta: int) -> strong",
+   "parameters": [
+    {
+     "documentation": {
+      "kind": "markdown",
+      "value": "The content to strongly emphasize."
+     },
+     "label": "body:"
+    },
+    {
+     "documentation": {
+      "kind": "markdown",
+      "value": "The delta to apply on the font weight.\n\n```example\n#set strong(delta: 0)\nNo *effect!*\n```"
+     },
+     "label": "delta:"
+    }
+   ]
+  }
+ ]
+}

@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/signature_help.rs
+description: "signature help on tem.where(|/* loc 0, "
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/signature_help/list_item.typ
-snapshot_kind: text
 ---
 {
  "activeSignature": 0,
