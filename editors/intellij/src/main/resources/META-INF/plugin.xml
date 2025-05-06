@@ -36,8 +36,7 @@
 
     <!-- Declare dependencies on other plugins or modules -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.ultimate</depends> <!-- Recommended for LSP API -->
-    <depends>org.jetbrains.plugins.lsp</depends> <!-- Explicit dependency on the LSP Plugin -->
+    <depends>com.intellij.modules.ultimate</depends> <!-- Required for LSP API -->
     <!-- We will add lsp4ij extensions here later, not usually a direct dependency -->
 
     <!-- Extension points defined by the plugin. -->

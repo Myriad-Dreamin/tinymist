@@ -78,6 +78,11 @@ tasks {
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
     }
+
+    // Set JVM target compatibility
+    withType<KotlinCompile> { 
+        kotlinOptions.jvmTarget = properties("javaVersion")
+    }
 }
 
 dependencies {
