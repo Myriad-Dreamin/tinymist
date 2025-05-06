@@ -5,7 +5,7 @@
 
     <!-- Text to display as name on Settings | Plugins page -->
     <name>Tinymist Typst</name>
-    <version>0.1.0</version> <!-- This will be overwritten by gradle -->
+    <version>0.1.0</version>
 
     <!-- Text to display as company information on Settings | Plugins page -->
     <vendor email="your.email@example.com" url="example.com"> &amp; Contributors</vendor>
@@ -21,7 +21,6 @@
         <li>Completions</li>
         <li>Hover Information</li>
         <li>Go to Definition</li>
-        <!-- Add more features as they are implemented -->
     </ul>
     Requires the tinymist LSP executable to be installed and available on PATH.
     ]]></description>
@@ -37,6 +36,7 @@
     <!-- Declare dependencies on other plugins or modules -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.ultimate</depends> <!-- Required for LSP API -->
+    <depends>com.redhat.devtools.lsp4ij</depends> <!-- Added dependency for LSP4IJ -->
 
     <!-- Extension points defined by the plugin. -->
     <extensions defaultExtensionNs="com.intellij">
@@ -45,18 +45,24 @@
         <lang.parserDefinition language="Typst" implementationClass="org.tinymist.intellij.TypstParserDefinition"/>
         <lang.syntaxHighlighterFactory language="Typst" implementationClass="org.tinymist.intellij.TypstSyntaxHighlighterFactory"/>
 
-        <!-- LSP Integration -->
-        <!-- Register the LspServerSupportProvider implementation -->
-        <platform.lsp.serverSupportProvider implementation="org.tinymist.intellij.lsp.TinymistLspServerSupportProvider"/>
+        <!-- LSP Integration using LSP4IJ -->
+    </extensions>
+
+    <!-- LSP4IJ specific extensions -->
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="tinymistServer"
+                name="Tinymist Language Server" 
+                factoryClass="org.tinymist.intellij.lsp.TinymistLanguageServerFactory">
+            <description><![CDATA[
+            Provides Typst language intelligence via the tinymist LSP.
+            ]]></description>
+        </server>
+        <fileNamePatternMapping patterns="*.typ"
+                                serverId="tinymistServer"
+                                languageId="typst"/>
     </extensions>
 
     <actions>
-        <!-- Add actions here -->
     </actions>
-
-    <!-- LSP Integration -->
-    <!-- Register the LspServerSupportProvider implementation -->
-    <!-- MOVED INSIDE com.intellij extensions -->
-    <!-- <platform.lsp.serverSupportProvider implementation="org.tinymist.intellij.lsp.TinymistLspServerSupportProvider"/> -->
 
 </idea-plugin> 

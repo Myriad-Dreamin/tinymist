@@ -1,77 +1,56 @@
-# IntelliJ Plugin API Documentation Notes for Tinymist
+# Tinymist IntelliJ Plugin Development Notes
 
-This file contains links to relevant documentation and summaries for the IntelliJ Platform APIs used in the Tinymist plugin.
+## Project Scope
 
-## Language Server Protocol (LSP) Integration
+The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs. This is achieved by integrating the `tinymist` language server ([https://github.com/Myzel394/tinymist](https://github.com/Myzel394/tinymist)) into the IntelliJ Platform using the `lsp4ij` plugin developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)). The plugin aims to offer features such as syntax highlighting, autocompletion, diagnostics, hover information, go-to-definition, and potentially more, mirroring the capabilities of the Tinymist VSCode extension.
 
-*   **Official Documentation:** [Language Server Protocol (LSP)](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
-    *   Explains the overall approach, supported IDEs (requires Ultimate/paid versions), setup (`build.gradle.kts`, `plugin.xml` dependencies), and supported LSP features per IDE version.
-*   **`LspServerSupportProvider`** (`org.tinymist.intellij.lsp.TinymistLspServerSupportProvider`)
-    *   **Purpose:** Entry point to connect files of a specific type (`TypstFileType`) to an LSP server. Registered via the `platform.lsp.serverSupportProvider` extension point in `plugin.xml`.
-    *   **Key Method:** `fileOpened(project, file, serverStarter)`: Called when a file is opened. Inside this method, check if the `file` is relevant (e.g., by checking `file.fileType`). If it is, call `serverStarter.ensureServerStarted(descriptor)` with an appropriate `LspServerDescriptor`.
-    *   **Docs:** Mentioned within the main LSP documentation page.
-*   **`LspServerDescriptor`** (`org.tinymist.intellij.lsp.TinymistLspServerDescriptor`)
-    *   **Purpose:** Describes how to start, connect to, and interact with a specific Language Server instance. It's typically project-scoped (e.g., extending `ProjectWideLspServerDescriptor`).
-    *   **Key Methods/Properties:**
-        *   `isSupportedFile(file)`: Checks if a given `VirtualFile` should be handled by this LSP server.
-        *   `createCommandLine()`: Returns a `GeneralCommandLine` object describing how to execute the LSP server (e.g., `GeneralCommandLine("path/to/tinymist", "--lsp")`). This is used for StdIO communication. Socket communication is also possible via other methods.
-        *   Customization properties (e.g., `lspGoToDefinitionSupport`, `lspCompletionSupport`, `lspHoverSupport`): Allow enabling/disabling or potentially fine-tuning specific LSP features provided by the platform's integration layer.
-        *   `createLsp4jClient()` / `lsp4jServerClass`: Advanced customization points for handling non-standard requests/notifications.
-    *   **Docs:** Detailed within the main LSP documentation page and likely in the API source code comments (attach sources in IDE).
 
-## Basic Language Support APIs (Minimal Implementation for LSP)
+## Current Next Steps
 
-*   **`ParserDefinition`** (`org.tinymist.intellij.TypstParserDefinition`)
-    *   **Purpose:** Defines the bridge between lexing, parsing, and PSI tree creation for a language. Registered via `com.intellij.lang.parserDefinition` extension point. Even with LSP handling most intelligence, a minimal implementation is often required by the platform.
-    *   **Key Methods:**
-        *   `createLexer(project)`: Returns an instance of the `Lexer` for this language.
-        *   `createParser(project)`: Returns an instance of the `PsiParser`. For LSP-heavy plugins, this can be a minimal parser that just creates the root file node.
-        *   `getFileNodeType()`: Returns the `IFileElementType` representing the root of a file.
-        *   `getWhitespaceTokens()`: Returns a `TokenSet` of token types considered whitespace (usually `TokenSet.WHITE_SPACE`).
-        *   `getCommentTokens()`: Returns a `TokenSet` for comment token types.
-        *   `getStringLiteralElements()`: Returns a `TokenSet` for string literal tokens.
-        *   `createElement(node)`: Creates a `PsiElement` for a given `ASTNode`. Often delegates to a generated factory if using Grammar-Kit, or can be a simple wrapper like `ASTWrapperPsiElement(node)`.
-        *   `createFile(viewProvider)`: Creates the `PsiFile` instance for the language (e.g., `TypstFile(viewProvider)`).
-    *   **Docs:**
-        *   [Implementing Parser and PSI](https://plugins.jetbrains.com/docs/intellij/implementing-parser-and-psi.html)
-        *   [Custom Language Support Tutorial: Parser Definition](https://plugins.jetbrains.com/docs/intellij/lexer-and-parser-definition.html)
-*   **`Lexer`** (`org.tinymist.intellij.TypstLexerAdapter`)
-    *   **Purpose:** Breaks file content into a stream of tokens (`IElementType`). Used by the parser and the syntax highlighter. A minimal implementation is needed even if LSP provides semantic tokens. The lexer *must* cover the entire file content without gaps.
-    *   **Key Methods (when implementing `com.intellij.lexer.Lexer` directly):**
-        *   `start(buffer, startOffset, endOffset, initialState)`: Initializes the lexer with the text buffer.
-        *   `advance()`: Advances to the next token. Updates internal state.
-        *   `getTokenType()`: Returns the `IElementType` of the current token. Returns `null` at the end.
-        *   `getTokenStart()` / `getTokenEnd()`: Return start/end offsets of the current token.
-        *   `getState()`: Returns the lexer state at the *end* of the current token (important for incremental highlighting). Can be `0` for simple/non-incremental lexers.
-        *   `getCurrentPosition()`: Returns a `LexerPosition` (offset and state) for checkpointing.
-        *   `restore(position)`: Restores the lexer to a previously saved position.
-    *   **Alternative:** Use JFlex and `FlexAdapter`. [Implementing Lexer](https://plugins.jetbrains.com/docs/intellij/implementing-lexer.html)
-    *   **Docs:**
-        *   [Implementing Lexer](https://plugins.jetbrains.com/docs/intellij/implementing-lexer.html)
-        *   [Custom Language Support Tutorial: Lexer](https://plugins.jetbrains.com/docs/intellij/lexer-and-parser-definition.html)
-*   **`SyntaxHighlighter` / `SyntaxHighlighterFactory`** (`org.tinymist.intellij.TypstSyntaxHighlighter`, `org.tinymist.intellij.TypstSyntaxHighlighterFactory`)
-    *   **Purpose:** Provides basic, lexer-based syntax highlighting. Registered via `com.intellij.lang.syntaxHighlighterFactory` extension point. LSP provides richer semantic highlighting later.
-    *   **`SyntaxHighlighterFactory.getSyntaxHighlighter(project, virtualFile)`:** Returns an instance of the `SyntaxHighlighter`.
-    *   **`SyntaxHighlighter.getHighlightingLexer()`:** Returns the `Lexer` instance to use for highlighting.
-    *   **`SyntaxHighlighter.getTokenHighlights(tokenType)`:** Returns an array of `TextAttributesKey`s to apply to the given `IElementType`.
-    *   **`TextAttributesKey`:** Defines the styling (color, font style). Can inherit from `DefaultLanguageHighlighterColors` or `HighlighterColors`.
-    *   **Docs:**
-        *   [Syntax and Error Highlighting](https://plugins.jetbrains.com/docs/intellij/syntax-highlighting-and-error-highlighting.html)
-        *   [Custom Language Support Tutorial: Syntax Highlighter](https://plugins.jetbrains.com/docs/intellij/syntax-highlighter-and-color-settings-page.html)
+The immediate priority is to resolve the language server startup failure, which currently prevents any LSP features from functioning. The primary goal after resolving this is to achieve basic linting (diagnostics).
 
-## Other Relevant APIs
+**Phase 1: Resolve Server Startup Crash**
+*   **Objective:** Ensure the `tinymist` language server can be successfully registered and started by `lsp4ij` without the `IllegalArgumentException` ("mappings must not be null" error).
+*   **Key Actions:**
+    *   **Verify Build Environment & Caches:**
+        *   Perform a full Gradle clean (`./gradlew clean`).
+        *   In the IntelliJ IDEA development instance, invalidate all caches ("File" > "Invalidate Caches..." > select all options > "Invalidate and Restart").
+        *   Rebuild the plugin project.
+        *   Retest running the plugin (`./gradlew runIde`).
+    *   **Analyze `idea.log`:** If the crash persists after the above, meticulously examine the `idea.log` from the *target* IntelliJ instance (launched by `runIde`). Look for any errors or warnings related to `org.tinymist.intellij` components (especially `TypstFileType`, `TypstLanguage`) or `lsp4ij` that occur *before* the main `IllegalArgumentException`. These could indicate the root cause (e.g., class loading issues, problems with `TypstLanguage.kt` or `plugin.xml` interactions).
+    *   **Confirm Core Language Definitions:** Re-verify `TypstLanguage.kt` (containing `TypstLanguage` and `TypstFileType` objects) and its registration in `plugin.xml` to ensure the "Typst" language ID is correctly and unambiguously defined and available to the platform before `lsp4ij` initialization. (Recent simplifications to `TypstLanguage.kt` were a diagnostic step for this; if the crash is resolved, the necessity of the removed `IElementType` should be re-evaluated).
 
-*   **`plugin.xml` Configuration:**
-    *   **`<depends>`:** Defines mandatory dependencies on platform modules (e.g., `com.intellij.modules.platform`, `com.intellij.modules.ultimate`) or other plugins. [Plugin Dependencies](https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html)
-    *   **`<extensions>`:** Registers plugin components (implementations of Extension Points). [Plugin Extension Points](https://plugins.jetbrains.com/docs/intellij/plugin-extensions.html)
-    *   **Docs:** [Plugin Configuration File](https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html)
-*   **`FileType`** (`org.tinymist.intellij.TypstFileType`)
-    *   **Purpose:** Associates a language with file extensions, name, description, and icon. Registered via `com.intellij.fileType` extension point.
-    *   **Docs:** [File Types](https://plugins.jetbrains.com/docs/intellij/language-and-filetype.html)
-*   **PSI Elements (`PsiElement`, `PsiFile`)** (`org.tinymist.intellij.TypstFile`)
-    *   **Purpose:** Represent nodes in the Program Structure Interface tree, built on top of the AST. `PsiFile` is the root element for a file.
-    *   **Implementation:** Often extends base classes like `PsiFileBase` or `ASTWrapperPsiElement`.
-    *   **Docs:** [Implementing Parser and PSI](https://plugins.jetbrains.com/docs/intellij/implementing-parser-and-psi.html)
-*   **`IElementType` / `TokenSet`** (`org.tinymist.intellij.TYPST_TEXT`)
-    *   **Purpose:** `IElementType` represents the type of a token (from lexer) or an AST node (from parser). `TokenSet` groups related element types.
-    *   **Docs:** [Implementing Lexer](https://plugins.jetbrains.com/docs/intellij/implementing-lexer.html), [Implementing Parser and PSI](https://plugins.jetbrains.com/docs/intellij/implementing-parser-and-psi.html)
+**Phase 2: Achieve Basic Linting (Diagnostics)**
+*   **Objective:** Verify that diagnostics (linting errors/warnings) from the `tinymist` server are correctly displayed in the IntelliJ editor for `.typ` files.
+*   **Prerequisites:** Phase 1 (Server Startup Crash) must be resolved.
+*   **Key Actions:**
+    *   **Confirm Server Emits Diagnostics:** Ensure the `tinymist lsp` server itself is configured and capable of generating and sending `textDocument/publishDiagnostics` notifications for Typst files. This may involve testing the `tinymist` LSP separately or reviewing its capabilities.
+    *   **Verify `lsp4ij` Processes Diagnostics:** Once the server is running and theoretically sending diagnostics, open a `.typ` file with known errors. Confirm that `lsp4ij` receives these diagnostics and correctly translates them into IntelliJ editor annotations (e.g., squiggly underlines, entries in the "Problems" view).
+    *   **Basic `IElementType` (If Necessary):** If the `TYPST_TEXT` `IElementType` (previously in `TypstLanguage.kt`) was removed as a diagnostic and its absence prevents basic lexing/parsing required by the IntelliJ platform (even before full LSP features), it might need to be carefully reintroduced or an alternative minimal lexer/parser setup considered. This is to ensure the file is recognized sufficiently by IntelliJ for `lsp4ij` to operate on it.
+
+**Phase 3: Implement Core LSP Features & Settings (Revisit Original Next Steps)**
+*   Once the server starts reliably and basic diagnostics are working, proceed with the broader feature implementation plan:
+    1.  **Implement IntelliJ Settings Panel:**
+        *   Create a dedicated settings/preferences page for Tinymist (e.g., under "Languages & Frameworks" or "Tools").
+        *   Allow configuration of: Path to the `tinymist` executable, font paths (if needed by the server), PDF export settings, preview-related settings, and other relevant options from the VSCode `TinymistConfig`.
+    2.  **Load Settings into `TinymistInitializationOptions`:**
+        *   In `TinymistLspStreamConnectionProvider#getInitializationOptions`, retrieve configured values from the settings panel and correctly populate the `TinymistInitializationOptions` data class.
+    3.  **Enhance `findTinymistExecutable()` in `TinymistLspStreamConnectionProvider`:**
+        *   Prioritize the path configured in IntelliJ settings.
+        *   Fall back to searching `PATH`.
+        *   Consider options for bundling `tinymist` or providing clear download/setup instructions.
+    4.  **User-Friendly Notifications & Error Handling:**
+        *   If the `tinymist` executable is not found/started, display a clear notification guiding the user to settings.
+        *   Leverage `lsp4ij`'s error reporting for server-side issues.
+    5.  **Address Server-Specific Interactions (from "Insights" section):**
+        *   Systematically investigate and implement handlers for: `workspace/configuration` requests, sending `textDocument/didOpen|Change|Close` for auxiliary files (if needed by `tinymist`), focus tracking notifications (if needed).
+        *   Continue to monitor and address any file watcher issues if they arise.
+    6.  **Testing and Refinement of Core LSP Features:**
+        *   Thoroughly test: completions, hover information, go-to-definition, semantic highlighting (if provided by the server).
+        *   Test with various Typst projects and edge cases.
+        *   Profile performance and optimize if necessary.
+    7.  **Preview Panel Integration (Longer Term):**
+        *   Plan and implement an integrated preview panel for Typst documents.
+    8.  **Documentation:**
+        *   Update the plugin's `README.md` with setup instructions and feature overview.
+        *   Ensure these development notes (`PLUGIN_DEV_NOTES.md`) are kept up-to-date with progress and any new findings.

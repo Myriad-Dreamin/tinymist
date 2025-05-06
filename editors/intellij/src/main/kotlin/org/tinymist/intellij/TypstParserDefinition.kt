@@ -11,6 +11,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.psi.tree.TokenSet
 import com.intellij.extapi.psi.ASTWrapperPsiElement
+import com.intellij.psi.tree.IElementType
+
+// Define the missing IElementType
+val TYPST_TEXT: IElementType = IElementType("TYPST_TEXT", TypstLanguage)
 
 // Basic implementation - LSP handles most things
 class TypstParserDefinition : ParserDefinition {
