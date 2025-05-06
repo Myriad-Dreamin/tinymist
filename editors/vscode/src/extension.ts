@@ -218,7 +218,7 @@ function setupDocFocus(context: IContext) {
     // change language id from `plaintext` to `typst` manually, the editor is not changed but only replacen with a new
     // document with language id `typst`, in which case vscode doesn't trigger `onDidChangeActiveTextEditor`.
     //
-    // FIXME1: we could do better by finding a way to handle the `document` state with only one handler.
+    // FIXME1: we could do better by finding a way to handle the focus of `document` with only one handler.
     // FIXME2: seems like we are also failing to capture changes of language id of titled `document`?
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
