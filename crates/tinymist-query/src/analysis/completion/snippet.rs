@@ -6,6 +6,8 @@
 //! A postfix snippet is a snippet that modifies existing items by the dot
 //! accessor syntax. For example `$ RR.abs| $` is completed as `$ abs(RR) $`.
 
+use core::fmt;
+
 use super::*;
 
 impl CompletionPair<'_, '_, '_> {
@@ -151,7 +153,7 @@ impl CompletionPair<'_, '_, '_> {
                 ..Default::default()
             };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
-                let node_content = node.get().clone().into_text();
+                let node_content = SnippetEscape(node.get().clone().into_text());
                 let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
                     new_text: EcoString::new(),
@@ -268,7 +270,7 @@ impl CompletionPair<'_, '_, '_> {
             }
             let more_args = fn_feat.min_pos() > 1 || fn_feat.min_named() > 0;
             if self.worker.ctx.analysis.completion_feat.ufcs_left() && more_args {
-                let node_content = node.get().clone().into_text();
+                let node_content = SnippetEscape(node.get().clone().into_text());
                 let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
                     new_text: eco_format!("{name}{lb}"),
@@ -301,5 +303,20 @@ impl CompletionPair<'_, '_, '_> {
                 });
             }
         }
+    }
+}
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#snippet_syntax
+struct SnippetEscape(EcoString);
+
+impl fmt::Display for SnippetEscape {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // todo: poor performance
+        let escaped = self
+            .0
+            .replace("\\", "\\\\")
+            .replace("$", "\\$")
+            .replace("}", "\\}");
+        write!(f, "{escaped}")
     }
 }
