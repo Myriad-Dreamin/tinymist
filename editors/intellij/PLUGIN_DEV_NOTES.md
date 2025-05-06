@@ -5,52 +5,56 @@
 The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs. This is achieved by integrating the `tinymist` language server ([https://github.com/Myzel394/tinymist](https://github.com/Myzel394/tinymist)) into the IntelliJ Platform using the `lsp4ij` plugin developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)). The plugin aims to offer features such as syntax highlighting, autocompletion, diagnostics, hover information, go-to-definition, and potentially more, mirroring the capabilities of the Tinymist VSCode extension.
 
 
-## Current Next Steps
+## Current Status and Next Steps
 
-The immediate priority is to resolve the language server startup failure, which currently prevents any LSP features from functioning. The primary goal after resolving this is to achieve basic linting (diagnostics).
+**Status as of 2025-05-06:**
+*   **Phase 1: Resolve Server Startup Crash - COMPLETED**
+    *   The language server (`tinymist`) now starts successfully. The `IllegalArgumentException` ("mappings must not be null" error) was resolved by:
+        1.  Adding the `TYPST_TEXT` `IElementType` definition.
+        2.  Switching from direct `ProcessStreamConnectionProvider` implementation in `plugin.xml` to using a `LanguageServerFactory` (`TinymistLanguageServerFactory`).
+        3.  Ensuring the `TinymistLanguageServerFactory` and `TinymistLspStreamConnectionProvider` constructors correctly handled non-nullable `Project` parameters.
+        4.  Changing the LSP mapping in `plugin.xml` from `<languageMapping>` to `<fileNamePatternMapping patterns="*.typ" languageId="typst"/>`.
+*   **Phase 2: Achieve Basic Linting (Diagnostics) - COMPLETED**
+    *   Basic diagnostics (linting errors/warnings) from the `tinymist` server are now correctly displayed in the IntelliJ editor for `.typ` files, as observed after resolving the startup crash.
 
-**Phase 1: Resolve Server Startup Crash**
-*   **Objective:** Ensure the `tinymist` language server can be successfully registered and started by `lsp4ij` without the `IllegalArgumentException` ("mappings must not be null" error).
+**Phase 3: Enable and Test Core LSP Features**
+*   **Objective:** Ensure that core LSP features beyond diagnostics are functioning correctly. This includes, but is not limited to:
+    *   Completions
+    *   Hover Information
+    *   Go-to-Definition
+    *   Semantic Highlighting (if provided by the server and distinct from basic lexer-based highlighting).
 *   **Key Actions:**
-    *   **Verify Build Environment & Caches:**
-        *   Perform a full Gradle clean (`./gradlew clean`).
-        *   In the IntelliJ IDEA development instance, invalidate all caches ("File" > "Invalidate Caches..." > select all options > "Invalidate and Restart").
-        *   Rebuild the plugin project.
-        *   Retest running the plugin (`./gradlew runIde`).
-    *   **Analyze `idea.log`:** If the crash persists after the above, meticulously examine the `idea.log` from the *target* IntelliJ instance (launched by `runIde`). Look for any errors or warnings related to `org.tinymist.intellij` components (especially `TypstFileType`, `TypstLanguage`) or `lsp4ij` that occur *before* the main `IllegalArgumentException`. These could indicate the root cause (e.g., class loading issues, problems with `TypstLanguage.kt` or `plugin.xml` interactions).
-    *   **Confirm Core Language Definitions:** Re-verify `TypstLanguage.kt` (containing `TypstLanguage` and `TypstFileType` objects) and its registration in `plugin.xml` to ensure the "Typst" language ID is correctly and unambiguously defined and available to the platform before `lsp4ij` initialization. (Recent simplifications to `TypstLanguage.kt` were a diagnostic step for this; if the crash is resolved, the necessity of the removed `IElementType` should be re-evaluated).
+    1.  **Systematic Testing:** Test each of the above features with various Typst projects and edge cases. Document findings and any issues encountered.
+    2.  **Review `TinymistInitializationOptions.kt`:**
+        *   Examine the current `lspInputs: {"x-preview": "{\"version\":1,\"theme\":\"\"}"}`. Determine its exact purpose for `tinymist` and if it's correctly configured for core features or if it should be modified/removed for this phase.
+        *   Identify other `initializationOptions` that `tinymist` might expect or require for these core LSP features to function optimally. This may involve looking at the Tinymist VSCode extension's configuration or `tinymist` server documentation if available.
+        *   Update `TinymistInitializationOptions.kt` and its population in `TinymistLspStreamConnectionProvider#getInitializationOptions` as needed.
+    3.  **Address Server-Specific Interactions (from "Insights from VSCode Extension..." section - if blocking core features):**
+        *   Based on testing, investigate if any of the following are immediately necessary for the core features listed above to work correctly. Implement minimal, targeted handlers if they are identified as blockers:
+            *   Handling `workspace/configuration` requests from the server.
+            *   Sending `textDocument/didOpen|Change|Close` for auxiliary files (e.g., `.bib`, images) if `tinymist` relies on this for context for core features.
+            *   Focus tracking notifications (e.g., `tinymist/setActiveTextEditor`) if lack of this breaks context-sensitive operations like completions or go-to-definition.
+        *   Defer full, robust implementation of these (and Preview Management) until Phase 4, unless they prove essential for basic feature operability.
+    4.  **File Watcher Issues:** Continue to monitor for any file watcher issues as mentioned in the original "Insights" section, as these could affect diagnostics or other features.
+    5.  **Profile performance and optimize if necessary (ongoing).**
 
-**Phase 2: Achieve Basic Linting (Diagnostics)**
-*   **Objective:** Verify that diagnostics (linting errors/warnings) from the `tinymist` server are correctly displayed in the IntelliJ editor for `.typ` files.
-*   **Prerequisites:** Phase 1 (Server Startup Crash) must be resolved.
-*   **Key Actions:**
-    *   **Confirm Server Emits Diagnostics:** Ensure the `tinymist lsp` server itself is configured and capable of generating and sending `textDocument/publishDiagnostics` notifications for Typst files. This may involve testing the `tinymist` LSP separately or reviewing its capabilities.
-    *   **Verify `lsp4ij` Processes Diagnostics:** Once the server is running and theoretically sending diagnostics, open a `.typ` file with known errors. Confirm that `lsp4ij` receives these diagnostics and correctly translates them into IntelliJ editor annotations (e.g., squiggly underlines, entries in the "Problems" view).
-    *   **Basic `IElementType` (If Necessary):** If the `TYPST_TEXT` `IElementType` (previously in `TypstLanguage.kt`) was removed as a diagnostic and its absence prevents basic lexing/parsing required by the IntelliJ platform (even before full LSP features), it might need to be carefully reintroduced or an alternative minimal lexer/parser setup considered. This is to ensure the file is recognized sufficiently by IntelliJ for `lsp4ij` to operate on it.
-
-**Phase 3: Implement Core LSP Features & Settings (Revisit Original Next Steps)**
-*   Once the server starts reliably and basic diagnostics are working, proceed with the broader feature implementation plan:
+**Phase 4: Implement Settings, Improve User Experience, and Advanced Features (Previously part of Phase 3)**
+*   Once core LSP features are verified and stable:
     1.  **Implement IntelliJ Settings Panel:**
         *   Create a dedicated settings/preferences page for Tinymist (e.g., under "Languages & Frameworks" or "Tools").
-        *   Allow configuration of: Path to the `tinymist` executable, font paths (if needed by the server), PDF export settings, preview-related settings, and other relevant options from the VSCode `TinymistConfig`.
+        *   Allow configuration of: Path to the `tinymist` executable, font paths, PDF export settings, preview-related settings, and other relevant options derived from `TinymistConfig` (VSCode) and `TinymistInitializationOptions`.
     2.  **Load Settings into `TinymistInitializationOptions`:**
         *   In `TinymistLspStreamConnectionProvider#getInitializationOptions`, retrieve configured values from the settings panel and correctly populate the `TinymistInitializationOptions` data class.
-    3.  **Enhance `findTinymistExecutable()` in `TinymistLspStreamConnectionProvider`:**
+    3.  **Enhance `findTinymistExecutable()` in `TinymistLspStreamConnectionProvider` & Error Handling:**
+        *   Modify the `init` block of `TinymistLspStreamConnectionProvider` (and `findTinymistExecutable`) to:
         *   Prioritize the path configured in IntelliJ settings.
         *   Fall back to searching `PATH`.
-        *   Consider options for bundling `tinymist` or providing clear download/setup instructions.
-    4.  **User-Friendly Notifications & Error Handling:**
-        *   If the `tinymist` executable is not found/started, display a clear notification guiding the user to settings.
-        *   Leverage `lsp4ij`'s error reporting for server-side issues.
-    5.  **Address Server-Specific Interactions (from "Insights" section):**
-        *   Systematically investigate and implement handlers for: `workspace/configuration` requests, sending `textDocument/didOpen|Change|Close` for auxiliary files (if needed by `tinymist`), focus tracking notifications (if needed).
-        *   Continue to monitor and address any file watcher issues if they arise.
-    6.  **Testing and Refinement of Core LSP Features:**
-        *   Thoroughly test: completions, hover information, go-to-definition, semantic highlighting (if provided by the server).
-        *   Test with various Typst projects and edge cases.
-        *   Profile performance and optimize if necessary.
-    7.  **Preview Panel Integration (Longer Term):**
-        *   Plan and implement an integrated preview panel for Typst documents.
-    8.  **Documentation:**
-        *   Update the plugin's `README.md` with setup instructions and feature overview.
-        *   Ensure these development notes (`PLUGIN_DEV_NOTES.md`) are kept up-to-date with progress and any new findings.
+            *   If the executable is not found or invalid, display a user-friendly IntelliJ notification (e.g., a balloon notification with a link to settings) instead of throwing a `RuntimeException`. Prevent LSP connection attempts if the path is invalid.
+        *   Consider options for bundling `tinymist` or providing clear download/setup instructions within the settings UI.
+    4.  **Full Implementation of Server-Specific Interactions:**
+        *   Systematically implement robust handlers for: `workspace/configuration` requests, sending `textDocument/didOpen|Change|Close` for auxiliary files, and focus tracking notifications, based on a deeper understanding of `tinymist`'s requirements.
+    5.  **Preview Panel Integration (Longer Term):**
+        *   Plan and implement an integrated preview panel for Typst documents, including handling custom messages like `tinymist/previewStart`, `tinymist/updatePreview`, etc.
+    6.  **Documentation:**
+        *   Update the plugin's `README.md` with setup instructions, feature overview, and settings guide.
+        *   Ensure these development notes (`PLUGIN_DEV_NOTES.md`) are kept up-to-date.

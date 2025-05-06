@@ -2,21 +2,15 @@ package org.tinymist.intellij.lsp
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectLocator
+// import com.intellij.openapi.project.ProjectLocator // No longer directly used in getInitializationOptions
 import com.intellij.openapi.vfs.VirtualFile
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider
 import org.eclipse.lsp4j.services.LanguageServer
 import java.nio.file.Files
 import java.nio.file.Paths
 
-// Define a data class for initialization options mirroring VSCode's config structure
-// TODO: Populate this with actual configurable settings from IntelliJ's settings system
-data class TinymistInitializationOptions(
-    val serverPath: String? = null, // Example setting
-    // Add other relevant fields based on VSCode config and tinymist server needs
-    // e.g., fontPaths, exportPdf, preview settings, etc.
-    val lspInputs: Map<String, String> = mapOf("x-preview" to "{\"version\":1,\"theme\":\"\"}") // Placeholder from logs
-)
+// TinymistInitializationOptions and its sub-classes are now defined in their own file 
+// (e.g., TinymistInitializationOptions.kt if you created it separately)
 
 class TinymistLspStreamConnectionProvider(private val project: Project) : ProcessStreamConnectionProvider() {
 
@@ -24,8 +18,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
         val executable = findTinymistExecutable()
             ?: throw RuntimeException("Tinymist executable not found on PATH during initialization. Please configure the path or ensure it's on PATH.")
         super.setCommands(mutableListOf(executable, "lsp"))
-        // Consider setting working directory here if it's static:
-        // super.setWorkingDirectory(project.basePath) 
+        // super.setWorkingDirectory(project.basePath) // Example if commands are set here
     }
 
     private fun findTinymistExecutable(): String? {
@@ -57,19 +50,13 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
     // If an explicit working directory is needed and is static (e.g. project root), set it in init.
     // Otherwise, if null is acceptable, ProcessStreamConnectionProvider might default to project root or let server decide.
     override fun getWorkingDirectory(): String? {
-         return project.basePath // Example: Use project base path, now project is non-null
-        // return null 
+         return project.basePath
     }
 
     override fun getInitializationOptions(virtualFile: VirtualFile): Any? {
-        // project is now available from constructor
-        // val projectFromLocator: Project? = ProjectLocator.getInstance().guessProjectForFile(virtualFile)
-        
-        // It's better to use the executable path found during init, if possible,
-        // or re-find it if it can change per file (unlikely for serverPath).
-        // For now, let's assume findTinymistExecutable() is cheap enough to call again or we store it.
-        val executablePath = findTinymistExecutable() // Or retrieve from a field if stored in init
-        return TinymistInitializationOptions(serverPath = executablePath)
+        // Construct with defaults defined in TinymistInitializationOptions.kt.
+        // Later, these defaults can be overridden by values from an IntelliJ settings panel.
+        return TinymistInitializationOptions()
     }
 
     fun getProvidedInterface(): Class<out LanguageServer> {
