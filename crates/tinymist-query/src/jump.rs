@@ -250,7 +250,7 @@ mod tests {
                 .join("\n");
 
             with_settings!({
-                description => format!("Jump cursor on {})", make_range_annoation(&source)),
+                description => format!("Jump cursor on {})", make_range_annotation(&source)),
             }, {
                 assert_snapshot!(results);
             })

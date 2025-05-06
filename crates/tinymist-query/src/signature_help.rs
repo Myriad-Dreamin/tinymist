@@ -141,7 +141,7 @@ mod tests {
     fn test() {
         snapshot_testing("signature_help", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
-            let (position, anno) = make_pos_annoation(&source);
+            let (position, anno) = make_pos_annotation(&source);
 
             let request = SignatureHelpRequest { path, position };
 

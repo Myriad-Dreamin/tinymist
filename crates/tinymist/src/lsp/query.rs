@@ -207,7 +207,8 @@ impl ServerState {
     ) -> ScheduledResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(req_id, self.CodeAction(path, range))
+        let context = params.context;
+        run_query!(req_id, self.CodeAction(path, range, context))
     }
 
     pub(crate) fn code_lens(
