@@ -171,7 +171,7 @@ async function languageActivate(context: IContext) {
     }),
     // Watches the active editor that owning an untitled document (`isUntitled`)
     //
-    // It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
+    // FIXME: It looks weird that we should do this together with `onDidChangeActiveTextEditor`.
     // I remeber `onDidChangeActiveTextEditor` didn't capture changes of untitled documents.
     // I also remeber I had figured the reason vscode do that, but I forget it.
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
