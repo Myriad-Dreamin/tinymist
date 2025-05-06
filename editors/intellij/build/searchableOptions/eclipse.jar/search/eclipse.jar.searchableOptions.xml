@@ -1,0 +1,9 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="eclipse" path="ActionManager" hit="Export Project to Eclipse…" />
+    <option name="export" path="ActionManager" hit="Export Project to Eclipse…" />
+    <option name="project" path="ActionManager" hit="Export Project to Eclipse…" />
+    <option name="to" path="ActionManager" hit="Export Project to Eclipse…" />
+  </configurable>
+</options>

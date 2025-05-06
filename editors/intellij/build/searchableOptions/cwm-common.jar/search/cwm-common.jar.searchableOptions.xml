@@ -1,0 +1,118 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="about" path="ActionManager" hit="About Code With Me" />
+    <option name="code" path="ActionManager" hit="About Code With Me" />
+    <option name="me" path="ActionManager" hit="About Code With Me" />
+    <option name="with" path="ActionManager" hit="About Code With Me" />
+    <option name="and" path="ActionManager" hit="Audio and Calls" />
+    <option name="audio" path="ActionManager" hit="Audio and Calls" />
+    <option name="calls" path="ActionManager" hit="Audio and Calls" />
+    <option name="camera" path="ActionManager" hit="Camera" />
+    <option name="call" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="code" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="me" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="show" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="window" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="with" path="ActionManager" hit="Code With Me: Show Call Window" />
+    <option name="code" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="forwarding" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="me" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="port" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="show" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="window" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="with" path="ActionManager" hit="Code With Me: Show Port Forwarding Window" />
+    <option name="follow" path="ActionManager" hit="Follow single user" />
+    <option name="single" path="ActionManager" hit="Follow single user" />
+    <option name="user" path="ActionManager" hit="Follow single user" />
+    <option name="call" path="ActionManager" hit="Join Call" />
+    <option name="join" path="ActionManager" hit="Join Call" />
+    <option name="cursor" path="ActionManager" hit="Jump to cursor" />
+    <option name="jump" path="ActionManager" hit="Jump to cursor" />
+    <option name="to" path="ActionManager" hit="Jump to cursor" />
+    <option name="call" path="ActionManager" hit="Leave Call" />
+    <option name="leave" path="ActionManager" hit="Leave Call" />
+    <option name="everyone" path="ActionManager" hit="Make Everyone Follow You" />
+    <option name="follow" path="ActionManager" hit="Make Everyone Follow You" />
+    <option name="make" path="ActionManager" hit="Make Everyone Follow You" />
+    <option name="you" path="ActionManager" hit="Make Everyone Follow You" />
+    <option name="microphone" path="ActionManager" hit="Microphone" />
+    <option name="code" path="ActionManager" hit="Open Code With Me Settings" />
+    <option name="me" path="ActionManager" hit="Open Code With Me Settings" />
+    <option name="open" path="ActionManager" hit="Open Code With Me Settings" />
+    <option name="settings" path="ActionManager" hit="Open Code With Me Settings" />
+    <option name="with" path="ActionManager" hit="Open Code With Me Settings" />
+    <option name="screen" path="ActionManager" hit="Screen Sharing" />
+    <option name="sharing" path="ActionManager" hit="Screen Sharing" />
+    <option name="settings" path="ActionManager" hit="Settings…" />
+    <option name="cwm" path="ActionManager" hit="Show CWM Round Icon Test" />
+    <option name="icon" path="ActionManager" hit="Show CWM Round Icon Test" />
+    <option name="round" path="ActionManager" hit="Show CWM Round Icon Test" />
+    <option name="show" path="ActionManager" hit="Show CWM Round Icon Test" />
+    <option name="test" path="ActionManager" hit="Show CWM Round Icon Test" />
+    <option name="configuration" path="ActionManager" hit="Show Connection Configuration Widget (Internal)" />
+    <option name="connection" path="ActionManager" hit="Show Connection Configuration Widget (Internal)" />
+    <option name="internal" path="ActionManager" hit="Show Connection Configuration Widget (Internal)" />
+    <option name="show" path="ActionManager" hit="Show Connection Configuration Widget (Internal)" />
+    <option name="widget" path="ActionManager" hit="Show Connection Configuration Widget (Internal)" />
+    <option name="current" path="ActionManager" hit="Unfollow current lead" />
+    <option name="lead" path="ActionManager" hit="Unfollow current lead" />
+    <option name="unfollow" path="ActionManager" hit="Unfollow current lead" />
+    <option name="avatars" path="ActionManager" hit="User Avatars" />
+    <option name="user" path="ActionManager" hit="User Avatars" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Code With Me" configurable_name="Code With Me">
+    <option name="code" hit="Code With Me" />
+    <option name="me" hit="Code With Me" />
+    <option name="with" hit="Code With Me" />
+    <option name="1" hit="User 1 cursor" />
+    <option name="cursor" hit="User 1 cursor" />
+    <option name="user" hit="User 1 cursor" />
+    <option name="1" hit="User 1 selection" />
+    <option name="selection" hit="User 1 selection" />
+    <option name="user" hit="User 1 selection" />
+    <option name="2" hit="User 2 cursor" />
+    <option name="cursor" hit="User 2 cursor" />
+    <option name="user" hit="User 2 cursor" />
+    <option name="2" hit="User 2 selection" />
+    <option name="selection" hit="User 2 selection" />
+    <option name="user" hit="User 2 selection" />
+    <option name="3" hit="User 3 cursor" />
+    <option name="cursor" hit="User 3 cursor" />
+    <option name="user" hit="User 3 cursor" />
+    <option name="3" hit="User 3 selection" />
+    <option name="selection" hit="User 3 selection" />
+    <option name="user" hit="User 3 selection" />
+    <option name="4" hit="User 4 cursor" />
+    <option name="cursor" hit="User 4 cursor" />
+    <option name="user" hit="User 4 cursor" />
+    <option name="4" hit="User 4 selection" />
+    <option name="selection" hit="User 4 selection" />
+    <option name="user" hit="User 4 selection" />
+    <option name="5" hit="User 5 cursor" />
+    <option name="cursor" hit="User 5 cursor" />
+    <option name="user" hit="User 5 cursor" />
+    <option name="5" hit="User 5 selection" />
+    <option name="selection" hit="User 5 selection" />
+    <option name="user" hit="User 5 selection" />
+    <option name="6" hit="User 6 cursor" />
+    <option name="cursor" hit="User 6 cursor" />
+    <option name="user" hit="User 6 cursor" />
+    <option name="6" hit="User 6 selection" />
+    <option name="selection" hit="User 6 selection" />
+    <option name="user" hit="User 6 selection" />
+  </configurable>
+  <configurable id="CodeWithMe" configurable_name="Code With Me">
+    <option name="code" hit="Code With Me" />
+    <option name="me" hit="Code With Me" />
+    <option name="with" hit="Code With Me" />
+    <option name="lobby" hit="Lobby server URL:" />
+    <option name="server" hit="Lobby server URL:" />
+    <option name="url" hit="Lobby server URL:" />
+    <option name="name" hit="Use System Name" />
+    <option name="system" hit="Use System Name" />
+    <option name="use" hit="Use System Name" />
+    <option name="name" hit="User name:" />
+    <option name="user" hit="User name:" />
+  </configurable>
+</options>

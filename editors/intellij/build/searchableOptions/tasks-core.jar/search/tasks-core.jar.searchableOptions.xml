@@ -1,0 +1,92 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="analyze" path="ActionManager" hit="Analyze Stack Trace From Task…" />
+    <option name="from" path="ActionManager" hit="Analyze Stack Trace From Task…" />
+    <option name="stack" path="ActionManager" hit="Analyze Stack Trace From Task…" />
+    <option name="task" path="ActionManager" hit="Analyze Stack Trace From Task…" />
+    <option name="trace" path="ActionManager" hit="Analyze Stack Trace From Task…" />
+    <option name="clear" path="ActionManager" hit="Clear Context" />
+    <option name="context" path="ActionManager" hit="Clear Context" />
+    <option name="active" path="ActionManager" hit="Close Active Task…" />
+    <option name="close" path="ActionManager" hit="Close Active Task…" />
+    <option name="task" path="ActionManager" hit="Close Active Task…" />
+    <option name="configure" path="ActionManager" hit="Configure Servers…" />
+    <option name="servers" path="ActionManager" hit="Configure Servers…" />
+    <option name="changelist" path="ActionManager" hit="Create Changelist…" />
+    <option name="create" path="ActionManager" hit="Create Changelist…" />
+    <option name="certificate" path="ActionManager" hit="Deadlock IDE with certificate dialog" />
+    <option name="deadlock" path="ActionManager" hit="Deadlock IDE with certificate dialog" />
+    <option name="dialog" path="ActionManager" hit="Deadlock IDE with certificate dialog" />
+    <option name="ide" path="ActionManager" hit="Deadlock IDE with certificate dialog" />
+    <option name="with" path="ActionManager" hit="Deadlock IDE with certificate dialog" />
+    <option name="edit" path="ActionManager" hit="Edit Task…" />
+    <option name="task" path="ActionManager" hit="Edit Task…" />
+    <option name="context" path="ActionManager" hit="Load Context…" />
+    <option name="load" path="ActionManager" hit="Load Context…" />
+    <option name="open" path="ActionManager" hit="Open Task…" />
+    <option name="task" path="ActionManager" hit="Open Task…" />
+    <option name="browser" path="ActionManager" hit="Open in Browser" />
+    <option name="in" path="ActionManager" hit="Open in Browser" />
+    <option name="open" path="ActionManager" hit="Open in Browser" />
+    <option name="context" path="ActionManager" hit="Save Context…" />
+    <option name="save" path="ActionManager" hit="Save Context…" />
+    <option name="description" path="ActionManager" hit="Show Description" />
+    <option name="show" path="ActionManager" hit="Show Description" />
+    <option name="certificate" path="ActionManager" hit="Show certificate dialog" />
+    <option name="dialog" path="ActionManager" hit="Show certificate dialog" />
+    <option name="show" path="ActionManager" hit="Show certificate dialog" />
+    <option name="switch" path="ActionManager" hit="Switch Task…" />
+    <option name="task" path="ActionManager" hit="Switch Task…" />
+  </configurable>
+  <configurable id="tasks" configurable_name="Tasks">
+    <option name="" hit="       Update" />
+    <option name="update" hit="       Update" />
+    <option name="changelist" hit="Changelist name format:" />
+    <option name="format" hit="Changelist name format:" />
+    <option name="name" hit="Changelist name format:" />
+    <option name="connection" hit="Connection timeout:" />
+    <option name="timeout" hit="Connection timeout:" />
+    <option name="cache" hit="Enable cache" />
+    <option name="enable" hit="Enable cache" />
+    <option name="branch" hit="Feature branch name format:" />
+    <option name="feature" hit="Feature branch name format:" />
+    <option name="format" hit="Feature branch name format:" />
+    <option name="name" hit="Feature branch name format:" />
+    <option name="cache" hit="Issue cache" />
+    <option name="issue" hit="Issue cache" />
+    <option name="lowercased" hit="Lowercased" />
+    <option name="replace" hit="Replace spaces with" />
+    <option name="spaces" hit="Replace spaces with" />
+    <option name="with" hit="Replace spaces with" />
+    <option name="commit" hit="Save context on commit" />
+    <option name="context" hit="Save context on commit" />
+    <option name="on" hit="Save context on commit" />
+    <option name="save" hit="Save context on commit" />
+    <option name="active" hit="Show task widget if there are no active tasks" />
+    <option name="are" hit="Show task widget if there are no active tasks" />
+    <option name="if" hit="Show task widget if there are no active tasks" />
+    <option name="no" hit="Show task widget if there are no active tasks" />
+    <option name="show" hit="Show task widget if there are no active tasks" />
+    <option name="task" hit="Show task widget if there are no active tasks" />
+    <option name="tasks" hit="Show task widget if there are no active tasks" />
+    <option name="there" hit="Show task widget if there are no active tasks" />
+    <option name="widget" hit="Show task widget if there are no active tasks" />
+    <option name="history" hit="Task history length:" />
+    <option name="length" hit="Task history length:" />
+    <option name="task" hit="Task history length:" />
+    <option name="tasks" hit="Tasks" />
+    <option name="every" hit="issues every" />
+    <option name="issues" hit="issues every" />
+    <option name="milliseconds" hit="milliseconds" />
+    <option name="minutes" hit="minutes" />
+  </configurable>
+  <configurable id="tasks.servers" configurable_name="Servers">
+    <option name="configured" hit="Configured servers:" />
+    <option name="servers" hit="Configured servers:" />
+    <option name="no" hit="No server selected" />
+    <option name="selected" hit="No server selected" />
+    <option name="server" hit="No server selected" />
+    <option name="servers" hit="Servers" />
+  </configurable>
+</options>

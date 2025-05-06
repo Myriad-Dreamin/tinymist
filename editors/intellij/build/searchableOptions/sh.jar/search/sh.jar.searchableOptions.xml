@@ -1,0 +1,190 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="creates" path="ActionManager" hit="Creates for loop" />
+    <option name="for" path="ActionManager" hit="Creates for loop" />
+    <option name="loop" path="ActionManager" hit="Creates for loop" />
+    <option name="creates" path="ActionManager" hit="Creates until loop" />
+    <option name="loop" path="ActionManager" hit="Creates until loop" />
+    <option name="until" path="ActionManager" hit="Creates until loop" />
+    <option name="creates" path="ActionManager" hit="Creates while loop" />
+    <option name="loop" path="ActionManager" hit="Creates while loop" />
+    <option name="while" path="ActionManager" hit="Creates while loop" />
+    <option name="for" path="ActionManager" hit="For Loop" />
+    <option name="loop" path="ActionManager" hit="For Loop" />
+    <option name="file" path="ActionManager" hit="Run File" />
+    <option name="run" path="ActionManager" hit="Run File" />
+    <option name="current" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="file" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="in" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="run" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="shell" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="terminal" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="the" path="ActionManager" hit="Run current shell file in the terminal" />
+    <option name="loop" path="ActionManager" hit="Until Loop" />
+    <option name="until" path="ActionManager" hit="Until Loop" />
+    <option name="loop" path="ActionManager" hit="While Loop" />
+    <option name="while" path="ActionManager" hit="While Loop" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Shell Script" configurable_name="Shell Script">
+    <option name="script" hit="Shell Script" />
+    <option name="shell" hit="Shell Script" />
+    <option name="backquotes" hit="Backquotes" />
+    <option name="braces" hit="Braces//Parentheses" />
+    <option name="parentheses" hit="Braces//Parentheses" />
+    <option name="braces" hit="Braces//curly brackets" />
+    <option name="brackets" hit="Braces//curly brackets" />
+    <option name="curly" hit="Braces//curly brackets" />
+    <option name="braces" hit="Braces//square brackets" />
+    <option name="brackets" hit="Braces//square brackets" />
+    <option name="square" hit="Braces//square brackets" />
+    <option name="command" hit="Commands//generic command" />
+    <option name="commands" hit="Commands//generic command" />
+    <option name="generic" hit="Commands//generic command" />
+    <option name="command" hit="Commands//subshell command" />
+    <option name="commands" hit="Commands//subshell command" />
+    <option name="subshell" hit="Commands//subshell command" />
+    <option name="conditional" hit="Conditional operators" />
+    <option name="operators" hit="Conditional operators" />
+    <option name="declaration" hit="Function declaration" />
+    <option name="function" hit="Function declaration" />
+    <option name="documents" hit="Here documents" />
+    <option name="here" hit="Here documents" />
+    <option name="documents" hit="Here documents end" />
+    <option name="end" hit="Here documents end" />
+    <option name="here" hit="Here documents end" />
+    <option name="documents" hit="Here documents start" />
+    <option name="here" hit="Here documents start" />
+    <option name="start" hit="Here documents start" />
+    <option name="keyword" hit="Keyword" />
+    <option name="comment" hit="Line comment" />
+    <option name="line" hit="Line comment" />
+    <option name="number" hit="Number" />
+    <option name="raw" hit="Raw string" />
+    <option name="string" hit="Raw string" />
+    <option name="redirection" hit="Redirection" />
+    <option name="comment" hit="Shebang comment" />
+    <option name="shebang" hit="Shebang comment" />
+    <option name="string" hit="String" />
+    <option name="composed" hit="Variables//composed variable" />
+    <option name="variable" hit="Variables//composed variable" />
+    <option name="variables" hit="Variables//composed variable" />
+    <option name="declaration" hit="Variables//variable declaration" />
+    <option name="variable" hit="Variables//variable declaration" />
+    <option name="variables" hit="Variables//variable declaration" />
+    <option name="usage" hit="Variables//variable usage" />
+    <option name="variable" hit="Variables//variable usage" />
+    <option name="variables" hit="Variables//variable usage" />
+  </configurable>
+  <configurable id="preferences.sourceCode.Shell Script" configurable_name="Shell Script">
+    <option name="add" hit="Add space after redirect operators" />
+    <option name="after" hit="Add space after redirect operators" />
+    <option name="operators" hit="Add space after redirect operators" />
+    <option name="redirect" hit="Add space after redirect operators" />
+    <option name="space" hit="Add space after redirect operators" />
+    <option name="after" hit="Allow line breaks after binary operators" />
+    <option name="allow" hit="Allow line breaks after binary operators" />
+    <option name="binary" hit="Allow line breaks after binary operators" />
+    <option name="breaks" hit="Allow line breaks after binary operators" />
+    <option name="line" hit="Allow line breaks after binary operators" />
+    <option name="operators" hit="Allow line breaks after binary operators" />
+    <option name="can" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="download" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="formatter" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="install" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="it" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="manually" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="shfmt" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="t" hit="Can't download shfmt formatter. Install it manually." />
+    <option name="disable" hit="Disable" />
+    <option name="download" hit="Download" />
+    <option name="indent" hit="Indent" />
+    <option name="case" hit="Indent case statements" />
+    <option name="indent" hit="Indent case statements" />
+    <option name="statements" hit="Indent case statements" />
+    <option name="indent" hit="Indent:" />
+    <option name="invalid" hit="Invalid path." />
+    <option name="path" hit="Invalid path." />
+    <option name="alignment" hit="Keep column alignment padding" />
+    <option name="column" hit="Keep column alignment padding" />
+    <option name="keep" hit="Keep column alignment padding" />
+    <option name="padding" hit="Keep column alignment padding" />
+    <option name="loading" hit="Loading..." />
+    <option name="its" hit="Minify program to reduce its size" />
+    <option name="minify" hit="Minify program to reduce its size" />
+    <option name="program" hit="Minify program to reduce its size" />
+    <option name="reduce" hit="Minify program to reduce its size" />
+    <option name="size" hit="Minify program to reduce its size" />
+    <option name="to" hit="Minify program to reduce its size" />
+    <option name="path" hit="Path:" />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="script" hit="Shell Script" />
+    <option name="shell" hit="Shell Script" />
+    <option name="formatter" hit="Shfmt formatter" />
+    <option name="shfmt" hit="Shfmt formatter" />
+    <option name="size" hit="Tab size:" />
+    <option name="tab" hit="Tab size:" />
+    <option name="line" hit="Use Unix line separators (\n)" />
+    <option name="n" hit="Use Unix line separators (\n)" />
+    <option name="separators" hit="Use Unix line separators (\n)" />
+    <option name="unix" hit="Use Unix line separators (\n)" />
+    <option name="use" hit="Use Unix line separators (\n)" />
+    <option name="character" hit="Use tab character" />
+    <option name="tab" hit="Use tab character" />
+    <option name="use" hit="Use tab character" />
+    <option name="formatter" hit="missing formatter" />
+    <option name="missing" hit="missing formatter" />
+  </configurable>
+  <configurable id="copyright.filetypes.Shell Script" configurable_name="Shell Script">
+    <option name="a" hit="Add blank line after" />
+    <option name="after" hit="Add blank line after" />
+    <option name="blank" hit="Add blank line after" />
+    <option name="dd" hit="Add blank line after" />
+    <option name="line" hit="Add blank line after" />
+    <option name="add" hit="Add blank line before" />
+    <option name="before" hit="Add blank line before" />
+    <option name="blank" hit="Add blank line before" />
+    <option name="line" hit="Add blank line before" />
+    <option name="afte" hit="After other comments" />
+    <option name="comments" hit="After other comments" />
+    <option name="other" hit="After other comments" />
+    <option name="r" hit="After other comments" />
+    <option name="bef" hit="Before other comments" />
+    <option name="comments" hit="Before other comments" />
+    <option name="ore" hit="Before other comments" />
+    <option name="other" hit="Before other comments" />
+    <option name="borders" hit="Borders" />
+    <option name="box" hit="Box" />
+    <option name="comment" hit="Comment Type" />
+    <option name="type" hit="Comment Type" />
+    <option name="length" hit="Length:" />
+    <option name="copyright" hit="No copyright" />
+    <option name="no" hit="No copyright" />
+    <option name="each" hit="Prefix each line" />
+    <option name="line" hit="Prefix each line" />
+    <option name="prefix" hit="Prefix each line" />
+    <option name="location" hit="Relative Location" />
+    <option name="relative" hit="Relative Location" />
+    <option name="after" hit="Separator after" />
+    <option name="separator" hit="Separator after" />
+    <option name="before" hit="Separator before" />
+    <option name="separator" hit="Separator before" />
+    <option name="separator" hit="Separator:" />
+    <option name="script" hit="Shell Script" />
+    <option name="shell" hit="Shell Script" />
+    <option name="block" hit="Use block comment" />
+    <option name="comment" hit="Use block comment" />
+    <option name="use" hit="Use block comment" />
+    <option name="custom" hit="Use custom formatting options" />
+    <option name="formatting" hit="Use custom formatting options" />
+    <option name="options" hit="Use custom formatting options" />
+    <option name="use" hit="Use custom formatting options" />
+    <option name="default" hit="Use default settings" />
+    <option name="settings" hit="Use default settings" />
+    <option name="use" hit="Use default settings" />
+    <option name="comment" hit="Use line comment" />
+    <option name="line" hit="Use line comment" />
+    <option name="use" hit="Use line comment" />
+  </configurable>
+</options>

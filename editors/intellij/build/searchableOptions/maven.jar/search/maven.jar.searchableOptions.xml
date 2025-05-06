@@ -1,0 +1,708 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="activate" path="ActionManager" hit="Activate/deactivate profile" />
+    <option name="deactivate" path="ActionManager" hit="Activate/deactivate profile" />
+    <option name="profile" path="ActionManager" hit="Activate/deactivate profile" />
+    <option name="add" path="ActionManager" hit="Add Maven Projects" />
+    <option name="maven" path="ActionManager" hit="Add Maven Projects" />
+    <option name="projects" path="ActionManager" hit="Add Maven Projects" />
+    <option name="add" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="and" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="maven" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="project" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="projects" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="reload" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="the" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="to" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="tree" path="ActionManager" hit="Add and reload Maven project to the projects tree" />
+    <option name="add" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="and" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="maven" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="projects" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="reload" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="the" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="to" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="tree" path="ActionManager" hit="Add and reload Maven projects to the projects tree" />
+    <option name="add" path="ActionManager" hit="Add as Maven Project" />
+    <option name="as" path="ActionManager" hit="Add as Maven Project" />
+    <option name="maven" path="ActionManager" hit="Add as Maven Project" />
+    <option name="project" path="ActionManager" hit="Add as Maven Project" />
+    <option name="always" path="ActionManager" hit="Always Show ArtifactId" />
+    <option name="artifactid" path="ActionManager" hit="Always Show ArtifactId" />
+    <option name="show" path="ActionManager" hit="Always Show ArtifactId" />
+    <option name="always" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="artifactid" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="instead" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="name" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="of" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="project" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="show" path="ActionManager" hit="Always Show ArtifactId instead of project name" />
+    <option name="analyze" path="ActionManager" hit="Analyze Dependencies..." />
+    <option name="dependencies" path="ActionManager" hit="Analyze Dependencies..." />
+    <option name="assign" path="ActionManager" hit="Assign Shortcut..." />
+    <option name="shortcut" path="ActionManager" hit="Assign Shortcut..." />
+    <option name="assign" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="goal" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="phase" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="selected" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="shortcut" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="the" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="to" path="ActionManager" hit="Assign shortcut to the selected phase/goal" />
+    <option name="all" path="ActionManager" hit="Collapse All" />
+    <option name="collapse" path="ActionManager" hit="Collapse All" />
+    <option name="documentation" path="ActionManager" hit="Download Documentation" />
+    <option name="download" path="ActionManager" hit="Download Documentation" />
+    <option name="download" path="ActionManager" hit="Download Sources" />
+    <option name="sources" path="ActionManager" hit="Download Sources" />
+    <option name="and" path="ActionManager" hit="Download Sources and Documentation" />
+    <option name="documentation" path="ActionManager" hit="Download Sources and Documentation" />
+    <option name="download" path="ActionManager" hit="Download Sources and Documentation" />
+    <option name="sources" path="ActionManager" hit="Download Sources and Documentation" />
+    <option name="and" path="ActionManager" hit="Download Sources and/or Documentation" />
+    <option name="documentation" path="ActionManager" hit="Download Sources and/or Documentation" />
+    <option name="download" path="ActionManager" hit="Download Sources and/or Documentation" />
+    <option name="or" path="ActionManager" hit="Download Sources and/or Documentation" />
+    <option name="sources" path="ActionManager" hit="Download Sources and/or Documentation" />
+    <option name="all" path="ActionManager" hit="Download documentation for all dependencies" />
+    <option name="dependencies" path="ActionManager" hit="Download documentation for all dependencies" />
+    <option name="documentation" path="ActionManager" hit="Download documentation for all dependencies" />
+    <option name="download" path="ActionManager" hit="Download documentation for all dependencies" />
+    <option name="for" path="ActionManager" hit="Download documentation for all dependencies" />
+    <option name="all" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="dependencies" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="documentation" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="download" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="for" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="projects" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="selected" path="ActionManager" hit="Download documentation for all dependencies for selected projects" />
+    <option name="all" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="and" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="dependencies" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="documentation" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="download" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="for" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="sources" path="ActionManager" hit="Download sources and documentation for all dependencies" />
+    <option name="all" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="and" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="dependencies" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="documentation" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="download" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="for" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="projects" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="selected" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="sources" path="ActionManager" hit="Download sources and documentation for all dependencies for selected projects" />
+    <option name="all" path="ActionManager" hit="Download sources for all dependencies" />
+    <option name="dependencies" path="ActionManager" hit="Download sources for all dependencies" />
+    <option name="download" path="ActionManager" hit="Download sources for all dependencies" />
+    <option name="for" path="ActionManager" hit="Download sources for all dependencies" />
+    <option name="sources" path="ActionManager" hit="Download sources for all dependencies" />
+    <option name="all" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="dependencies" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="download" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="for" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="projects" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="selected" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="sources" path="ActionManager" hit="Download sources for all dependencies for selected projects" />
+    <option name="current" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="edit" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="for" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="integration" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="maven" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="project" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="settings" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="the" path="ActionManager" hit="Edit Maven integration settings for the current project" />
+    <option name="configuration" path="ActionManager" hit="Edit Run Configuration..." />
+    <option name="edit" path="ActionManager" hit="Edit Run Configuration..." />
+    <option name="run" path="ActionManager" hit="Edit Run Configuration..." />
+    <option name="being" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="exclude" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="from" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="imported" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="include" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="maven" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="projects" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="selected" path="ActionManager" hit="Exclude/Include selected Maven projects from being imported" />
+    <option name="after" path="ActionManager" hit="Execute After Build" />
+    <option name="build" path="ActionManager" hit="Execute After Build" />
+    <option name="execute" path="ActionManager" hit="Execute After Build" />
+    <option name="after" path="ActionManager" hit="Execute After Rebuild" />
+    <option name="execute" path="ActionManager" hit="Execute After Rebuild" />
+    <option name="rebuild" path="ActionManager" hit="Execute After Rebuild" />
+    <option name="before" path="ActionManager" hit="Execute Before Build" />
+    <option name="build" path="ActionManager" hit="Execute Before Build" />
+    <option name="execute" path="ActionManager" hit="Execute Before Build" />
+    <option name="before" path="ActionManager" hit="Execute Before Rebuild" />
+    <option name="execute" path="ActionManager" hit="Execute Before Rebuild" />
+    <option name="rebuild" path="ActionManager" hit="Execute Before Rebuild" />
+    <option name="before" path="ActionManager" hit="Execute Before Run/Debug..." />
+    <option name="debug" path="ActionManager" hit="Execute Before Run/Debug..." />
+    <option name="execute" path="ActionManager" hit="Execute Before Run/Debug..." />
+    <option name="run" path="ActionManager" hit="Execute Before Run/Debug..." />
+    <option name="execute" path="ActionManager" hit="Execute Maven Goal" />
+    <option name="goal" path="ActionManager" hit="Execute Maven Goal" />
+    <option name="maven" path="ActionManager" hit="Execute Maven Goal" />
+    <option name="after" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="build" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="execute" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="goal" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="phase" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="selected" path="ActionManager" hit="Execute selected phase/goal after Build" />
+    <option name="after" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="execute" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="full" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="goal" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="phase" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="rebuild" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="selected" path="ActionManager" hit="Execute selected phase/goal after full rebuild" />
+    <option name="before" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="build" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="execute" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="goal" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="phase" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="selected" path="ActionManager" hit="Execute selected phase/goal before Build" />
+    <option name="before" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="execute" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="full" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="goal" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="phase" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="rebuild" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="selected" path="ActionManager" hit="Execute selected phase/goal before full rebuild" />
+    <option name="before" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="configuration" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="debug" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="execute" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="goal" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="launching" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="phase" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="run" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="selected" path="ActionManager" hit="Execute selected phase/goal before launching Run/Debug configuration" />
+    <option name="execute" path="ActionManager" hit="Execute selected phases or goals" />
+    <option name="goals" path="ActionManager" hit="Execute selected phases or goals" />
+    <option name="or" path="ActionManager" hit="Execute selected phases or goals" />
+    <option name="phases" path="ActionManager" hit="Execute selected phases or goals" />
+    <option name="selected" path="ActionManager" hit="Execute selected phases or goals" />
+    <option name="all" path="ActionManager" hit="Expand All" />
+    <option name="expand" path="ActionManager" hit="Expand All" />
+    <option name="dependency" path="ActionManager" hit="Extract Managed Dependency" />
+    <option name="extract" path="ActionManager" hit="Extract Managed Dependency" />
+    <option name="managed" path="ActionManager" hit="Extract Managed Dependency" />
+    <option name="generate" path="ActionManager" hit="Generate" />
+    <option name="and" path="ActionManager" hit="Generate Sources and Update Folders" />
+    <option name="folders" path="ActionManager" hit="Generate Sources and Update Folders" />
+    <option name="generate" path="ActionManager" hit="Generate Sources and Update Folders" />
+    <option name="sources" path="ActionManager" hit="Generate Sources and Update Folders" />
+    <option name="update" path="ActionManager" hit="Generate Sources and Update Folders" />
+    <option name="all" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="and" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="folders" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="for" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="generate" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="projects" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="sources" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="update" path="ActionManager" hit="Generate Sources and Update Folders For All Projects" />
+    <option name="and" path="ActionManager" hit="Generate and show effective POM" />
+    <option name="effective" path="ActionManager" hit="Generate and show effective POM" />
+    <option name="generate" path="ActionManager" hit="Generate and show effective POM" />
+    <option name="pom" path="ActionManager" hit="Generate and show effective POM" />
+    <option name="show" path="ActionManager" hit="Generate and show effective POM" />
+    <option name="dependency" path="ActionManager" hit="Go to Maven Dependency" />
+    <option name="go" path="ActionManager" hit="Go to Maven Dependency" />
+    <option name="maven" path="ActionManager" hit="Go to Maven Dependency" />
+    <option name="to" path="ActionManager" hit="Go to Maven Dependency" />
+    <option name="group" path="ActionManager" hit="Group Modules" />
+    <option name="modules" path="ActionManager" hit="Group Modules" />
+    <option name="according" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="group" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="maven" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="projects" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="structure" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="to" path="ActionManager" hit="Group projects according to Maven structure" />
+    <option name="ignore" path="ActionManager" hit="Ignore Projects" />
+    <option name="projects" path="ActionManager" hit="Ignore Projects" />
+    <option name="maven" path="ActionManager" hit="Maven" />
+    <option name="maven" path="ActionManager" hit="Maven Settings" />
+    <option name="settings" path="ActionManager" hit="Maven Settings" />
+    <option name="config" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="dependency" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="file" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="in" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="maven" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="navigates" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="parent" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="to" path="ActionManager" hit="Navigates to dependency in parent Maven config file" />
+    <option name="config" path="ActionManager" hit="Open Maven Config" />
+    <option name="maven" path="ActionManager" hit="Open Maven Config" />
+    <option name="open" path="ActionManager" hit="Open Maven Config" />
+    <option name="maven" path="ActionManager" hit="Open Maven settings.xml" />
+    <option name="open" path="ActionManager" hit="Open Maven settings.xml" />
+    <option name="settings" path="ActionManager" hit="Open Maven settings.xml" />
+    <option name="xml" path="ActionManager" hit="Open Maven settings.xml" />
+    <option name="open" path="ActionManager" hit="Open settings.xml" />
+    <option name="settings" path="ActionManager" hit="Open settings.xml" />
+    <option name="xml" path="ActionManager" hit="Open settings.xml" />
+    <option name="config" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="file" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="for" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="library" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="maven" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="module" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="opens" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="or" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="selected" path="ActionManager" hit="Opens Maven config file for selected module or library" />
+    <option name="maven" path="ActionManager" hit="Print Maven Statistics" />
+    <option name="print" path="ActionManager" hit="Print Maven Statistics" />
+    <option name="statistics" path="ActionManager" hit="Print Maven Statistics" />
+    <option name="property" path="ActionManager" hit="Property" />
+    <option name="all" path="ActionManager" hit="Reload All Maven Projects" />
+    <option name="maven" path="ActionManager" hit="Reload All Maven Projects" />
+    <option name="projects" path="ActionManager" hit="Reload All Maven Projects" />
+    <option name="reload" path="ActionManager" hit="Reload All Maven Projects" />
+    <option name="project" path="ActionManager" hit="Reload project" />
+    <option name="reload" path="ActionManager" hit="Reload project" />
+    <option name="maven" path="ActionManager" hit="Reload selected Maven projects" />
+    <option name="projects" path="ActionManager" hit="Reload selected Maven projects" />
+    <option name="reload" path="ActionManager" hit="Reload selected Maven projects" />
+    <option name="selected" path="ActionManager" hit="Reload selected Maven projects" />
+    <option name="configuration" path="ActionManager" hit="Remove Run Configuration" />
+    <option name="remove" path="ActionManager" hit="Remove Run Configuration" />
+    <option name="run" path="ActionManager" hit="Remove Run Configuration" />
+    <option name="profiles" path="ActionManager" hit="Reset Profiles" />
+    <option name="reset" path="ActionManager" hit="Reset Profiles" />
+    <option name="default" path="ActionManager" hit="Reset profiles to default state" />
+    <option name="profiles" path="ActionManager" hit="Reset profiles to default state" />
+    <option name="reset" path="ActionManager" hit="Reset profiles to default state" />
+    <option name="state" path="ActionManager" hit="Reset profiles to default state" />
+    <option name="to" path="ActionManager" hit="Reset profiles to default state" />
+    <option name="resetmavenstatistics" path="ActionManager" hit="ResetMavenStatistics" />
+    <option name="build" path="ActionManager" hit="Run Maven Build" />
+    <option name="maven" path="ActionManager" hit="Run Maven Build" />
+    <option name="run" path="ActionManager" hit="Run Maven Build" />
+    <option name="basic" path="ActionManager" hit="Show Basic Phases Only" />
+    <option name="only" path="ActionManager" hit="Show Basic Phases Only" />
+    <option name="phases" path="ActionManager" hit="Show Basic Phases Only" />
+    <option name="show" path="ActionManager" hit="Show Basic Phases Only" />
+    <option name="effective" path="ActionManager" hit="Show Effective POM" />
+    <option name="pom" path="ActionManager" hit="Show Effective POM" />
+    <option name="show" path="ActionManager" hit="Show Effective POM" />
+    <option name="ignored" path="ActionManager" hit="Show Ignored Projects" />
+    <option name="projects" path="ActionManager" hit="Show Ignored Projects" />
+    <option name="show" path="ActionManager" hit="Show Ignored Projects" />
+    <option name="connectors" path="ActionManager" hit="Show Maven Connectors" />
+    <option name="maven" path="ActionManager" hit="Show Maven Connectors" />
+    <option name="show" path="ActionManager" hit="Show Maven Connectors" />
+    <option name="basic" path="ActionManager" hit="Show basic phases only" />
+    <option name="only" path="ActionManager" hit="Show basic phases only" />
+    <option name="phases" path="ActionManager" hit="Show basic phases only" />
+    <option name="show" path="ActionManager" hit="Show basic phases only" />
+    <option name="ignored" path="ActionManager" hit="Show ignored projects" />
+    <option name="projects" path="ActionManager" hit="Show ignored projects" />
+    <option name="show" path="ActionManager" hit="Show ignored projects" />
+    <option name="show" path="ActionManager" hit="Show version" />
+    <option name="version" path="ActionManager" hit="Show version" />
+    <option name="for" path="ActionManager" hit="Show version for Maven project" />
+    <option name="maven" path="ActionManager" hit="Show version for Maven project" />
+    <option name="project" path="ActionManager" hit="Show version for Maven project" />
+    <option name="show" path="ActionManager" hit="Show version for Maven project" />
+    <option name="version" path="ActionManager" hit="Show version for Maven project" />
+    <option name="all" path="ActionManager" hit="Stop All Maven Connectors" />
+    <option name="connectors" path="ActionManager" hit="Stop All Maven Connectors" />
+    <option name="maven" path="ActionManager" hit="Stop All Maven Connectors" />
+    <option name="stop" path="ActionManager" hit="Stop All Maven Connectors" />
+    <option name="mode" path="ActionManager" hit="Toggle 'Skip Tests' Mode" />
+    <option name="skip" path="ActionManager" hit="Toggle 'Skip Tests' Mode" />
+    <option name="tests" path="ActionManager" hit="Toggle 'Skip Tests' Mode" />
+    <option name="toggle" path="ActionManager" hit="Toggle 'Skip Tests' Mode" />
+    <option name="builds" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="for" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="maven" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="mode" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="skip" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="tests" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="toggle" path="ActionManager" hit="Toggle 'Skip tests' mode for Maven builds" />
+    <option name="mode" path="ActionManager" hit="Toggle Offline Mode" />
+    <option name="offline" path="ActionManager" hit="Toggle Offline Mode" />
+    <option name="toggle" path="ActionManager" hit="Toggle Offline Mode" />
+    <option name="profile" path="ActionManager" hit="Toggle Profile" />
+    <option name="toggle" path="ActionManager" hit="Toggle Profile" />
+    <option name="for" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="maven" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="project" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="recursively" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="search" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="toggle" path="ActionManager" hit="Toggle Search For Maven Project Recursively" />
+    <option name="for" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="importing" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="maven" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="project" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="projects" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="recursively" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="search" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="toggle" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="when" path="ActionManager" hit="Toggle Search for project recursively when importing Maven projects" />
+    <option name="builds" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="for" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="maven" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="mode" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="offline" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="toggle" path="ActionManager" hit="Toggle offline mode for Maven builds" />
+    <option name="maven" path="ActionManager" hit="Unlink Maven Projects" />
+    <option name="projects" path="ActionManager" hit="Unlink Maven Projects" />
+    <option name="unlink" path="ActionManager" hit="Unlink Maven Projects" />
+    <option name="and" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="from" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="maven" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="project" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="projects" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="selected" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="subprojects" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="the" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="their" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="tree" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+    <option name="unlink" path="ActionManager" hit="Unlink selected Maven projects and their subprojects from the project tree" />
+  </configurable>
+  <configurable id="MavenSettings" configurable_name="Maven">
+    <option name="" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="after" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="any" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="be" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="changes" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="configuration" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="in" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="its" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="lost" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="made" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="might" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="reimporting" hit=" Any changes made in its configuration might be lost after reimporting." />
+    <option name="-t" hit="-T option" />
+    <option name="option" hit="-T option" />
+    <option name="always" hit="Always update snapshots" />
+    <option name="snapshots" hit="Always update snapshots" />
+    <option name="update" hit="Always update snapshots" />
+    <option name="3" hit="Bundled (Maven 3)" />
+    <option name="bundled" hit="Bundled (Maven 3)" />
+    <option name="maven" hit="Bundled (Maven 3)" />
+    <option name="checksum" hit="Checksum policy:" />
+    <option name="policy" hit="Checksum policy:" />
+    <option name="debug" hit="Debug" />
+    <option name="default" hit="Default" />
+    <option name="disabled" hit="Disabled" />
+    <option name="error" hit="Error" />
+    <option name="execute" hit="Execute goals recursively" />
+    <option name="goals" hit="Execute goals recursively" />
+    <option name="recursively" hit="Execute goals recursively" />
+    <option name="fail" hit="Fail" />
+    <option name="at" hit="Fail At End" />
+    <option name="end" hit="Fail At End" />
+    <option name="fail" hit="Fail At End" />
+    <option name="fail" hit="Fail Fast" />
+    <option name="fast" hit="Fail Fast" />
+    <option name="fail" hit="Fail Never" />
+    <option name="never" hit="Fail Never" />
+    <option name="fatal" hit="Fatal" />
+    <option name="info" hit="Info" />
+    <option name="local" hit="Local repository:" />
+    <option name="repository" hit="Local repository:" />
+    <option name="maven" hit="Maven" />
+    <option name="home" hit="Maven home path:" />
+    <option name="maven" hit="Maven home path:" />
+    <option name="path" hit="Maven home path:" />
+    <option name="build" hit="Multiproject build fail policy:" />
+    <option name="fail" hit="Multiproject build fail policy:" />
+    <option name="multiproject" hit="Multiproject build fail policy:" />
+    <option name="policy" hit="Multiproject build fail policy:" />
+    <option name="global" hit="No Global Policy" />
+    <option name="no" hit="No Global Policy" />
+    <option name="policy" hit="No Global Policy" />
+    <option name="level" hit="Output level:" />
+    <option name="output" hit="Output level:" />
+    <option name="override" hit="Override" />
+    <option name="exception" hit="Print exception stack traces" />
+    <option name="print" hit="Print exception stack traces" />
+    <option name="stack" hit="Print exception stack traces" />
+    <option name="traces" hit="Print exception stack traces" />
+    <option name="dialog" hit="Show settings dialog for new Maven projects" />
+    <option name="for" hit="Show settings dialog for new Maven projects" />
+    <option name="maven" hit="Show settings dialog for new Maven projects" />
+    <option name="new" hit="Show settings dialog for new Maven projects" />
+    <option name="projects" hit="Show settings dialog for new Maven projects" />
+    <option name="settings" hit="Show settings dialog for new Maven projects" />
+    <option name="show" hit="Show settings dialog for new Maven projects" />
+    <option name="count" hit="Thread count" />
+    <option name="thread" hit="Thread count" />
+    <option name="maven" hit="Use Maven wrapper" />
+    <option name="use" hit="Use Maven wrapper" />
+    <option name="wrapper" hit="Use Maven wrapper" />
+    <option name="config" hit="Use settings from .mvn/maven.config" />
+    <option name="from" hit="Use settings from .mvn/maven.config" />
+    <option name="maven" hit="Use settings from .mvn/maven.config" />
+    <option name="mvn" hit="Use settings from .mvn/maven.config" />
+    <option name="settings" hit="Use settings from .mvn/maven.config" />
+    <option name="use" hit="Use settings from .mvn/maven.config" />
+    <option name="file" hit="User settings file:" />
+    <option name="settings" hit="User settings file:" />
+    <option name="user" hit="User settings file:" />
+    <option name="warn" hit="Warn" />
+    <option name="offline" hit="Work offline" />
+    <option name="work" hit="Work offline" />
+  </configurable>
+  <configurable id="reference.settings.project.maven.importing" configurable_name="Importing">
+    <option name="" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="all" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="and" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="are" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="compile" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="configured" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="discover" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="execute" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="firstly" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="folders" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="generate" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="idea" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="in" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="intellij" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="listed" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="maven" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="needs" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="note" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="of" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="one" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="order" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="phases" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="plugins" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="production" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="source" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="sources" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="test-" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="that" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="the" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="to" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="via" hit=" IntelliJ IDEA needs to execute one of the listed phases in order to discover all source folders that are configured via Maven plugins. Note that all test-* phases firstly generate and compile production sources." />
+    <option name="" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="and" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="api" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="are" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="be" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="consider" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="customizations" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="deprecated" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="disabling" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="folder" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="future" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="idea" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="import" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="imported" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="in" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="internal" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="is" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="it" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="keeps" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="manual" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="migrating" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="module" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="new" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="not" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="option" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="or" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="please" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="project" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="root" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="settings" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="storage" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="stored" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="supported" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="the" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="this" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="to" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="under" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="using" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="while" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="will" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="workspace" hit=" This option is deprecated and will not be supported in the future. Please consider disabling this option or migrating to import using new Workspace API. It keeps imported Module settings in internal storage, while manual customizations are stored in under the project root in .idea folder. " />
+    <option name="annotations" hit="Annotations" />
+    <option name="automatically" hit="Automatically download:" />
+    <option name="download" hit="Automatically download:" />
+    <option name="be" hit="Comma separated list of dependency types that should be imported" />
+    <option name="comma" hit="Comma separated list of dependency types that should be imported" />
+    <option name="dependency" hit="Comma separated list of dependency types that should be imported" />
+    <option name="imported" hit="Comma separated list of dependency types that should be imported" />
+    <option name="list" hit="Comma separated list of dependency types that should be imported" />
+    <option name="of" hit="Comma separated list of dependency types that should be imported" />
+    <option name="separated" hit="Comma separated list of dependency types that should be imported" />
+    <option name="should" hit="Comma separated list of dependency types that should be imported" />
+    <option name="that" hit="Comma separated list of dependency types that should be imported" />
+    <option name="types" hit="Comma separated list of dependency types that should be imported" />
+    <option name="aggregator" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="create" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="for" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="idea" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="intellij" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="modules" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="packaging" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="pom" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="projects" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="with" hit="Create IntelliJ IDEA modules for aggregator projects (with 'pom' packaging)" />
+    <option name="dependency" hit="Dependency types:" />
+    <option name="types" hit="Dependency types:" />
+    <option name="automatically" hit="Detect automatically" />
+    <option name="detect" hit="Detect automatically" />
+    <option name="automatically" hit="Detect compiler automatically" />
+    <option name="compiler" hit="Detect compiler automatically" />
+    <option name="detect" hit="Detect compiler automatically" />
+    <option name="documentation" hit="Documentation" />
+    <option name="detect" hit="Don't detect" />
+    <option name="don" hit="Don't detect" />
+    <option name="t" hit="Don't detect" />
+    <option name="enable" hit="Enable fast import" />
+    <option name="fast" hit="Enable fast import" />
+    <option name="import" hit="Enable fast import" />
+    <option name="build" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="directory" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="exclude" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="project" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="root" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="target" hit="Exclude build directory (%PROJECT_ROOT%/target)" />
+    <option name="folders" hit="Generated sources folders:" />
+    <option name="generated" hit="Generated sources folders:" />
+    <option name="sources" hit="Generated sources folders:" />
+    <option name="importing" hit="Importing" />
+    <option name="a" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="affect" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="as" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="be" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="configuration" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="does" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="fallback" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="internal" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="not" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="project" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="runtime" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="sdk" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="this" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="used" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="will" hit="Internal runtime will be used as a fallback. This does not affect project SDK configuration." />
+    <option name="for" hit="JDK for importer:" />
+    <option name="importer" hit="JDK for importer:" />
+    <option name="jdk" hit="JDK for importer:" />
+    <option name="files" hit="Keep project files in:" />
+    <option name="in" hit="Keep project files in:" />
+    <option name="keep" hit="Keep project files in:" />
+    <option name="project" hit="Keep project files in:" />
+    <option name="and" hit="Keep source and test folders on project reload" />
+    <option name="folders" hit="Keep source and test folders on project reload" />
+    <option name="keep" hit="Keep source and test folders on project reload" />
+    <option name="on" hit="Keep source and test folders on project reload" />
+    <option name="project" hit="Keep source and test folders on project reload" />
+    <option name="reload" hit="Keep source and test folders on project reload" />
+    <option name="source" hit="Keep source and test folders on project reload" />
+    <option name="test" hit="Keep source and test folders on project reload" />
+    <option name="config" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="field" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="files" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="in" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="jvm" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="mvn" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="ones" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="options" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="override" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="specified" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="the" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="this" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="be" hit="Phase to be used for folders update:" />
+    <option name="folders" hit="Phase to be used for folders update:" />
+    <option name="for" hit="Phase to be used for folders update:" />
+    <option name="phase" hit="Phase to be used for folders update:" />
+    <option name="to" hit="Phase to be used for folders update:" />
+    <option name="update" hit="Phase to be used for folders update:" />
+    <option name="used" hit="Phase to be used for folders update:" />
+    <option name="for" hit="Search for projects recursively" />
+    <option name="projects" hit="Search for projects recursively" />
+    <option name="recursively" hit="Search for projects recursively" />
+    <option name="search" hit="Search for projects recursively" />
+    <option name="sources" hit="Sources" />
+    <option name="deprecated" hit="Store generated project files under the project root (deprecated)" />
+    <option name="files" hit="Store generated project files under the project root (deprecated)" />
+    <option name="generated" hit="Store generated project files under the project root (deprecated)" />
+    <option name="project" hit="Store generated project files under the project root (deprecated)" />
+    <option name="root" hit="Store generated project files under the project root (deprecated)" />
+    <option name="store" hit="Store generated project files under the project root (deprecated)" />
+    <option name="the" hit="Store generated project files under the project root (deprecated)" />
+    <option name="under" hit="Store generated project files under the project root (deprecated)" />
+    <option name="directories" hit="Use Maven output directories" />
+    <option name="maven" hit="Use Maven output directories" />
+    <option name="output" hit="Use Maven output directories" />
+    <option name="use" hit="Use Maven output directories" />
+    <option name="for" hit="VM options for importer:" />
+    <option name="importer" hit="VM options for importer:" />
+    <option name="options" hit="VM options for importer:" />
+    <option name="vm" hit="VM options for importer:" />
+    <option name="generate-resources" hit="generate-resources" />
+    <option name="generate-sources" hit="generate-sources" />
+    <option name="generate-test-resources" hit="generate-test-resources" />
+    <option name="generate-test-sources" hit="generate-test-sources" />
+    <option name="process-resources" hit="process-resources" />
+    <option name="process-sources" hit="process-sources" />
+    <option name="process-test-resources" hit="process-test-resources" />
+    <option name="process-test-sources" hit="process-test-sources" />
+    <option name="generated-sources" hit="subdirectories of &quot;target/generated-sources&quot;" />
+    <option name="of" hit="subdirectories of &quot;target/generated-sources&quot;" />
+    <option name="subdirectories" hit="subdirectories of &quot;target/generated-sources&quot;" />
+    <option name="target" hit="subdirectories of &quot;target/generated-sources&quot;" />
+    <option name="generated-sources" hit="target/generated-sources" />
+    <option name="target" hit="target/generated-sources" />
+  </configurable>
+  <configurable id="reference.settings.project.maven.ignored.files" configurable_name="Ignored Files">
+    <option name="files" hit="Ignored Files" />
+    <option name="ignored" hit="Ignored Files" />
+    <option name="allowed" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+    <option name="and" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+    <option name="comma-separated" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+    <option name="path" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+    <option name="patterns" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+    <option name="wildcards" hit="Path patterns (comma-separated, '*' and '?' wildcards allowed):" />
+  </configurable>
+  <configurable id="reference.settings.project.maven.runner" configurable_name="Runner">
+    <option name="" hit="Delegate IDE build/run actions to Maven" />
+    <option name="actions" hit="Delegate IDE build/run actions to Maven" />
+    <option name="build" hit="Delegate IDE build/run actions to Maven" />
+    <option name="delegate" hit="Delegate IDE build/run actions to Maven" />
+    <option name="ide" hit="Delegate IDE build/run actions to Maven" />
+    <option name="maven" hit="Delegate IDE build/run actions to Maven" />
+    <option name="run" hit="Delegate IDE build/run actions to Maven" />
+    <option name="to" hit="Delegate IDE build/run actions to Maven" />
+    <option name="environment" hit="Environment variables:" />
+    <option name="variables" hit="Environment variables:" />
+    <option name="" hit="JRE:" />
+    <option name="jre" hit="JRE:" />
+    <option name="config" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="field" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="files" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="in" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="jvm" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="mvn" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="ones" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="options" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="override" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="specified" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="the" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="this" hit="Options specified in this field override the ones in .mvn/jvm.config files" />
+    <option name="properties" hit="Properties:" />
+    <option name="runner" hit="Runner" />
+    <option name="skip" hit="Skip Tests" />
+    <option name="tests" hit="Skip Tests" />
+    <option name="" hit="VM Options:" />
+    <option name="options" hit="VM Options:" />
+    <option name="vm" hit="VM Options:" />
+  </configurable>
+  <configurable id="reference.settings.project.maven.archetype.catalogs" configurable_name="Archetype Catalogs">
+    <option name="add" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="and" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="archetype" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="catalogs" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="edit" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="remove" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="your" hit="Add, remove, and edit your archetype catalogs" />
+    <option name="archetype" hit="Archetype Catalogs" />
+    <option name="catalogs" hit="Archetype Catalogs" />
+  </configurable>
+</options>

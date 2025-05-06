@@ -1,0 +1,93 @@
+<options>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.PostCSS" configurable_name="PostCSS">
+    <option name="postcss" hit="PostCSS" />
+    <option name="ampersand" hit="Ampersand" />
+    <option name="at-keyword" hit="At-keyword" />
+    <option name="attribute" hit="Attribute name" />
+    <option name="name" hit="Attribute name" />
+    <option name="bad" hit="Bad character" />
+    <option name="character" hit="Bad character" />
+    <option name="braces" hit="Braces" />
+    <option name="brackets" hit="Brackets" />
+    <option name="class" hit="Class name" />
+    <option name="name" hit="Class name" />
+    <option name="colon" hit="Colon" />
+    <option name="comma" hit="Comma" />
+    <option name="comment" hit="Comment" />
+    <option name="dot" hit="Dot" />
+    <option name="function" hit="Function" />
+    <option name="color" hit="Hex color" />
+    <option name="hex" hit="Hex color" />
+    <option name="id" hit="Id selector" />
+    <option name="selector" hit="Id selector" />
+    <option name="identifier" hit="Identifier" />
+    <option name="important" hit="Important" />
+    <option name="number" hit="Number" />
+    <option name="operators" hit="Operators" />
+    <option name="parenthesis" hit="Parenthesis" />
+    <option name="name" hit="Property name" />
+    <option name="property" hit="Property name" />
+    <option name="property" hit="Property value" />
+    <option name="value" hit="Property value" />
+    <option name="pseudo" hit="Pseudo selector" />
+    <option name="selector" hit="Pseudo selector" />
+    <option name="semicolon" hit="Semicolon" />
+    <option name="string" hit="String" />
+    <option name="name" hit="Tag name" />
+    <option name="tag" hit="Tag name" />
+    <option name="url" hit="URL" />
+    <option name="range" hit="Unicode range" />
+    <option name="unicode" hit="Unicode range" />
+    <option name="unit" hit="Unit" />
+  </configurable>
+  <configurable id="copyright.filetypes.PostCSS" configurable_name="PostCSS">
+    <option name="a" hit="Add blank line after" />
+    <option name="after" hit="Add blank line after" />
+    <option name="blank" hit="Add blank line after" />
+    <option name="dd" hit="Add blank line after" />
+    <option name="line" hit="Add blank line after" />
+    <option name="add" hit="Add blank line before" />
+    <option name="before" hit="Add blank line before" />
+    <option name="blank" hit="Add blank line before" />
+    <option name="line" hit="Add blank line before" />
+    <option name="afte" hit="After other comments" />
+    <option name="comments" hit="After other comments" />
+    <option name="other" hit="After other comments" />
+    <option name="r" hit="After other comments" />
+    <option name="bef" hit="Before other comments" />
+    <option name="comments" hit="Before other comments" />
+    <option name="ore" hit="Before other comments" />
+    <option name="other" hit="Before other comments" />
+    <option name="borders" hit="Borders" />
+    <option name="box" hit="Box" />
+    <option name="comment" hit="Comment Type" />
+    <option name="type" hit="Comment Type" />
+    <option name="length" hit="Length:" />
+    <option name="copyright" hit="No copyright" />
+    <option name="no" hit="No copyright" />
+    <option name="postcss" hit="PostCSS" />
+    <option name="each" hit="Prefix each line" />
+    <option name="line" hit="Prefix each line" />
+    <option name="prefix" hit="Prefix each line" />
+    <option name="location" hit="Relative Location" />
+    <option name="relative" hit="Relative Location" />
+    <option name="after" hit="Separator after" />
+    <option name="separator" hit="Separator after" />
+    <option name="before" hit="Separator before" />
+    <option name="separator" hit="Separator before" />
+    <option name="separator" hit="Separator:" />
+    <option name="block" hit="Use block comment" />
+    <option name="comment" hit="Use block comment" />
+    <option name="use" hit="Use block comment" />
+    <option name="custom" hit="Use custom formatting options" />
+    <option name="formatting" hit="Use custom formatting options" />
+    <option name="options" hit="Use custom formatting options" />
+    <option name="use" hit="Use custom formatting options" />
+    <option name="default" hit="Use default settings" />
+    <option name="settings" hit="Use default settings" />
+    <option name="use" hit="Use default settings" />
+    <option name="comment" hit="Use line comment" />
+    <option name="line" hit="Use line comment" />
+    <option name="use" hit="Use line comment" />
+  </configurable>
+</options>

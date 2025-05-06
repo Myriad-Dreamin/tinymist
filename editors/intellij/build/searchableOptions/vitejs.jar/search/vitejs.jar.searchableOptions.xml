@@ -1,0 +1,17 @@
+<options>
+  <configurable id="settings.vite" configurable_name="Vite">
+    <option name="automatically" hit="Automatically" />
+    <option name="configuration" hit="Configuration file:" />
+    <option name="file" hit="Configuration file:" />
+    <option name="configuration" hit="Detect Vite configuration files for module resolution:" />
+    <option name="detect" hit="Detect Vite configuration files for module resolution:" />
+    <option name="files" hit="Detect Vite configuration files for module resolution:" />
+    <option name="for" hit="Detect Vite configuration files for module resolution:" />
+    <option name="module" hit="Detect Vite configuration files for module resolution:" />
+    <option name="resolution" hit="Detect Vite configuration files for module resolution:" />
+    <option name="vite" hit="Detect Vite configuration files for module resolution:" />
+    <option name="disabled" hit="Disabled" />
+    <option name="manually" hit="Manually" />
+    <option name="vite" hit="Vite" />
+  </configurable>
+</options>

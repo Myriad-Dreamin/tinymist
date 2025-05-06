@@ -1,0 +1,50 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="evaluate" path="ActionManager" hit="Evaluate JSONPath Expression..." />
+    <option name="expression" path="ActionManager" hit="Evaluate JSONPath Expression..." />
+    <option name="jsonpath" path="ActionManager" hit="Evaluate JSONPath Expression..." />
+    <option name="export" path="ActionManager" hit="Export Result" />
+    <option name="result" path="ActionManager" hit="Export Result" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.JSONPath" configurable_name="JSONPath">
+    <option name="jsonpath" hit="JSONPath" />
+    <option name="boolean" hit="Boolean" />
+    <option name="and" hit="Braces and Operators//Braces" />
+    <option name="braces" hit="Braces and Operators//Braces" />
+    <option name="operators" hit="Braces and Operators//Braces" />
+    <option name="and" hit="Braces and Operators//Brackets" />
+    <option name="braces" hit="Braces and Operators//Brackets" />
+    <option name="brackets" hit="Braces and Operators//Brackets" />
+    <option name="operators" hit="Braces and Operators//Brackets" />
+    <option name="and" hit="Braces and Operators//Colon" />
+    <option name="braces" hit="Braces and Operators//Colon" />
+    <option name="colon" hit="Braces and Operators//Colon" />
+    <option name="operators" hit="Braces and Operators//Colon" />
+    <option name="and" hit="Braces and Operators//Comma" />
+    <option name="braces" hit="Braces and Operators//Comma" />
+    <option name="comma" hit="Braces and Operators//Comma" />
+    <option name="operators" hit="Braces and Operators//Comma" />
+    <option name="and" hit="Braces and Operators//Dot" />
+    <option name="braces" hit="Braces and Operators//Dot" />
+    <option name="dot" hit="Braces and Operators//Dot" />
+    <option name="operators" hit="Braces and Operators//Dot" />
+    <option name="and" hit="Braces and Operators//Operation sign" />
+    <option name="braces" hit="Braces and Operators//Operation sign" />
+    <option name="operation" hit="Braces and Operators//Operation sign" />
+    <option name="operators" hit="Braces and Operators//Operation sign" />
+    <option name="sign" hit="Braces and Operators//Operation sign" />
+    <option name="and" hit="Braces and Operators//Parentheses" />
+    <option name="braces" hit="Braces and Operators//Parentheses" />
+    <option name="operators" hit="Braces and Operators//Parentheses" />
+    <option name="parentheses" hit="Braces and Operators//Parentheses" />
+    <option name="context" hit="Context variable" />
+    <option name="variable" hit="Context variable" />
+    <option name="call" hit="Function call" />
+    <option name="function" hit="Function call" />
+    <option name="identifier" hit="Identifier" />
+    <option name="keyword" hit="Keyword" />
+    <option name="number" hit="Number" />
+    <option name="string" hit="String" />
+  </configurable>
+</options>

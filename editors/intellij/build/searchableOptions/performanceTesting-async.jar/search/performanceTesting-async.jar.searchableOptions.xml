@@ -1,0 +1,25 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="capture" path="ActionManager" hit="Capture CPU usage data" />
+    <option name="cpu" path="ActionManager" hit="Capture CPU usage data" />
+    <option name="data" path="ActionManager" hit="Capture CPU usage data" />
+    <option name="usage" path="ActionManager" hit="Capture CPU usage data" />
+    <option name="indexing" path="ActionManager" hit="Profile Indexing" />
+    <option name="profile" path="ActionManager" hit="Profile Indexing" />
+    <option name="indexing" path="ActionManager" hit="Profile Indexing on next restart" />
+    <option name="next" path="ActionManager" hit="Profile Indexing on next restart" />
+    <option name="on" path="ActionManager" hit="Profile Indexing on next restart" />
+    <option name="profile" path="ActionManager" hit="Profile Indexing on next restart" />
+    <option name="restart" path="ActionManager" hit="Profile Indexing on next restart" />
+    <option name="async" path="ActionManager" hit="Start Async Profiler" />
+    <option name="profiler" path="ActionManager" hit="Start Async Profiler" />
+    <option name="start" path="ActionManager" hit="Start Async Profiler" />
+    <option name="cpu" path="ActionManager" hit="Start CPU Usage Profiling" />
+    <option name="profiling" path="ActionManager" hit="Start CPU Usage Profiling" />
+    <option name="start" path="ActionManager" hit="Start CPU Usage Profiling" />
+    <option name="usage" path="ActionManager" hit="Start CPU Usage Profiling" />
+    <option name="async" path="ActionManager" hit="Start async profiler" />
+    <option name="profiler" path="ActionManager" hit="Start async profiler" />
+    <option name="start" path="ActionManager" hit="Start async profiler" />
+  </configurable>
+</options>

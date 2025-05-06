@@ -1,0 +1,30 @@
+<options>
+  <configurable id="proofread" configurable_name="Natural Languages">
+    <option name="download" hit="Download missing languages" />
+    <option name="languages" hit="Download missing languages" />
+    <option name="missing" hit="Download missing languages" />
+    <option name="languages" hit="Languages:" />
+    <option name="languages" hit="Natural Languages" />
+    <option name="natural" hit="Natural Languages" />
+  </configurable>
+  <configurable id="reference.settingsdialog.project.grazie" configurable_name="Grammar and Style">
+    <option name="check" path="Scope" hit="Check in:" />
+    <option name="in" path="Scope" hit="Check in:" />
+    <option name="comments" path="Scope" hit="Comments" />
+    <option name="commit" path="Scope" hit="Commit messages" />
+    <option name="messages" path="Scope" hit="Commit messages" />
+    <option name="documentation" path="Scope" hit="Documentation" />
+    <option name="exceptions" path="Exceptions" hit="Exceptions" />
+    <option name="file" path="Scope" hit="File types:" />
+    <option name="types" path="Scope" hit="File types:" />
+    <option name="and" hit="Grammar and Style" />
+    <option name="grammar" hit="Grammar and Style" />
+    <option name="style" hit="Grammar and Style" />
+    <option name="description" path="Rules" hit="Rule description" />
+    <option name="rule" path="Rules" hit="Rule description" />
+    <option name="rules" path="Rules" hit="Rules" />
+    <option name="scope" path="Scope" hit="Scope" />
+    <option name="literals" path="Scope" hit="String literals" />
+    <option name="string" path="Scope" hit="String literals" />
+  </configurable>
+</options>

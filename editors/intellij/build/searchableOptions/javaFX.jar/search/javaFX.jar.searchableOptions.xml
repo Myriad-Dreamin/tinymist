@@ -1,0 +1,26 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="application" path="ActionManager" hit="Create JavaFX application class" />
+    <option name="class" path="ActionManager" hit="Create JavaFX application class" />
+    <option name="create" path="ActionManager" hit="Create JavaFX application class" />
+    <option name="javafx" path="ActionManager" hit="Create JavaFX application class" />
+    <option name="create" path="ActionManager" hit="Create new FXML file" />
+    <option name="file" path="ActionManager" hit="Create new FXML file" />
+    <option name="fxml" path="ActionManager" hit="Create new FXML file" />
+    <option name="new" path="ActionManager" hit="Create new FXML file" />
+    <option name="file" path="ActionManager" hit="FXML File" />
+    <option name="fxml" path="ActionManager" hit="FXML File" />
+    <option name="application" path="ActionManager" hit="JavaFX Application" />
+    <option name="javafx" path="ActionManager" hit="JavaFX Application" />
+    <option name="in" path="ActionManager" hit="Open In SceneBuilder" />
+    <option name="open" path="ActionManager" hit="Open In SceneBuilder" />
+    <option name="scenebuilder" path="ActionManager" hit="Open In SceneBuilder" />
+  </configurable>
+  <configurable id="preferences.JavaFX" configurable_name="JavaFX">
+    <option name="javafx" hit="JavaFX" />
+    <option name="path" hit="Path to SceneBuilder:" />
+    <option name="scenebuilder" hit="Path to SceneBuilder:" />
+    <option name="to" hit="Path to SceneBuilder:" />
+  </configurable>
+</options>

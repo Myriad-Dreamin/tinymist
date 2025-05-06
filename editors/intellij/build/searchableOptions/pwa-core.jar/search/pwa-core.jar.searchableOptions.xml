@@ -1,0 +1,36 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="all" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="check" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="corresponds" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="error" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="errors" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="files" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="from" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="in" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="ones" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="storage" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="that" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="the" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="to" path="ActionManager" hit="Check that all errors in error storage corresponds to the ones from files" />
+    <option name="analysis" path="ActionManager" hit="Enable Project-Wide Analysis" />
+    <option name="enable" path="ActionManager" hit="Enable Project-Wide Analysis" />
+    <option name="project-wide" path="ActionManager" hit="Enable Project-Wide Analysis" />
+    <option name="check" path="ActionManager" hit="Pwa check errors consistency" />
+    <option name="consistency" path="ActionManager" hit="Pwa check errors consistency" />
+    <option name="errors" path="ActionManager" hit="Pwa check errors consistency" />
+    <option name="pwa" path="ActionManager" hit="Pwa check errors consistency" />
+    <option name="analysis" path="ActionManager" hit="Restart Project-Wide Analysis" />
+    <option name="project-wide" path="ActionManager" hit="Restart Project-Wide Analysis" />
+    <option name="restart" path="ActionManager" hit="Restart Project-Wide Analysis" />
+    <option name="declared" path="ActionManager" hit="Show PWA declared symbols" />
+    <option name="pwa" path="ActionManager" hit="Show PWA declared symbols" />
+    <option name="show" path="ActionManager" hit="Show PWA declared symbols" />
+    <option name="symbols" path="ActionManager" hit="Show PWA declared symbols" />
+    <option name="pwa" path="ActionManager" hit="Show PWA used symbols" />
+    <option name="show" path="ActionManager" hit="Show PWA used symbols" />
+    <option name="symbols" path="ActionManager" hit="Show PWA used symbols" />
+    <option name="used" path="ActionManager" hit="Show PWA used symbols" />
+  </configurable>
+</options>

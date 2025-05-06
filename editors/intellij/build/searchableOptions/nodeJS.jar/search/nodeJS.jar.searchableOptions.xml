@@ -1,0 +1,24 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="analyze" path="ActionManager" hit="Analyze V8 Heap Snapshot…" />
+    <option name="heap" path="ActionManager" hit="Analyze V8 Heap Snapshot…" />
+    <option name="snapshot" path="ActionManager" hit="Analyze V8 Heap Snapshot…" />
+    <option name="v8" path="ActionManager" hit="Analyze V8 Heap Snapshot…" />
+    <option name="analyze" path="ActionManager" hit="Analyze V8 Profiling Log…" />
+    <option name="log" path="ActionManager" hit="Analyze V8 Profiling Log…" />
+    <option name="profiling" path="ActionManager" hit="Analyze V8 Profiling Log…" />
+    <option name="v8" path="ActionManager" hit="Analyze V8 Profiling Log…" />
+    <option name="analyze" path="ActionManager" hit="Analyze V8 heap snapshot" />
+    <option name="heap" path="ActionManager" hit="Analyze V8 heap snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Analyze V8 heap snapshot" />
+    <option name="v8" path="ActionManager" hit="Analyze V8 heap snapshot" />
+    <option name="cpu" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="file" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="log" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="profiling" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="read" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="results" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="show" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+    <option name="v8" path="ActionManager" hit="Read V8 profiling log file, show CPU profiling results." />
+  </configurable>
+</options>

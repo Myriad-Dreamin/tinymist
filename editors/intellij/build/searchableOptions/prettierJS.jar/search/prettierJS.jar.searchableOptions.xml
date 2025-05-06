@@ -1,0 +1,45 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="apply" path="ActionManager" hit="Apply Prettier Code Style Rules" />
+    <option name="code" path="ActionManager" hit="Apply Prettier Code Style Rules" />
+    <option name="prettier" path="ActionManager" hit="Apply Prettier Code Style Rules" />
+    <option name="rules" path="ActionManager" hit="Apply Prettier Code Style Rules" />
+    <option name="style" path="ActionManager" hit="Apply Prettier Code Style Rules" />
+    <option name="prettier" path="ActionManager" hit="Reformat with Prettier" />
+    <option name="reformat" path="ActionManager" hit="Reformat with Prettier" />
+    <option name="with" path="ActionManager" hit="Reformat with Prettier" />
+  </configurable>
+  <configurable id="settings.javascript.prettier" configurable_name="Prettier">
+    <option name="actions" hit="All actions on save " />
+    <option name="all" hit="All actions on save " />
+    <option name="on" hit="All actions on save " />
+    <option name="save" hit="All actions on save " />
+    <option name="" hit="Automatic Prettier configuration" />
+    <option name="automatic" hit="Automatic Prettier configuration" />
+    <option name="configuration" hit="Automatic Prettier configuration" />
+    <option name="prettier" hit="Automatic Prettier configuration" />
+    <option name="" hit="Disable Prettier" />
+    <option name="disable" hit="Disable Prettier" />
+    <option name="prettier" hit="Disable Prettier" />
+    <option name="" hit="Manual Prettier configuration" />
+    <option name="configuration" hit="Manual Prettier configuration" />
+    <option name="manual" hit="Manual Prettier configuration" />
+    <option name="prettier" hit="Manual Prettier configuration" />
+    <option name="prettier" hit="Prettier" />
+    <option name="" hit="Prettier package:" />
+    <option name="package" hit="Prettier package:" />
+    <option name="prettier" hit="Prettier package:" />
+    <option name="files" hit="Run for files:" />
+    <option name="for" hit="Run for files:" />
+    <option name="run" hit="Run for files:" />
+    <option name="action" hit="Run on 'Reformat Code' action" />
+    <option name="code" hit="Run on 'Reformat Code' action" />
+    <option name="on" hit="Run on 'Reformat Code' action" />
+    <option name="reformat" hit="Run on 'Reformat Code' action" />
+    <option name="run" hit="Run on 'Reformat Code' action" />
+    <option name="on" hit="Run on save" />
+    <option name="run" hit="Run on save" />
+    <option name="save" hit="Run on save" />
+  </configurable>
+</options>

@@ -1,0 +1,328 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="" path="ActionManager" hit=".editorconfig file" />
+    <option name="editorconfig" path="ActionManager" hit=".editorconfig file" />
+    <option name="file" path="ActionManager" hit=".editorconfig file" />
+    <option name="add" path="ActionManager" hit="Add language properties" />
+    <option name="language" path="ActionManager" hit="Add language properties" />
+    <option name="properties" path="ActionManager" hit="Add language properties" />
+    <option name="create" path="ActionManager" hit="Create .editorconfig file" />
+    <option name="editorconfig" path="ActionManager" hit="Create .editorconfig file" />
+    <option name="file" path="ActionManager" hit="Create .editorconfig file" />
+    <option name="editorconfig" path="ActionManager" hit="EditorConfig File" />
+    <option name="file" path="ActionManager" hit="EditorConfig File" />
+    <option name="language" path="ActionManager" hit="Language Properties" />
+    <option name="properties" path="ActionManager" hit="Language Properties" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.EditorConfig" configurable_name="EditorConfig">
+    <option name="editorconfig" hit="EditorConfig" />
+    <option name="brace" hit="Brace" />
+    <option name="bracket" hit="Bracket" />
+    <option name="comma" hit="Comma" />
+    <option name="comment" hit="Comment" />
+    <option name="identifier" hit="Identifier" />
+    <option name="char" hit="Invalid char escape" />
+    <option name="escape" hit="Invalid char escape" />
+    <option name="invalid" hit="Invalid char escape" />
+    <option name="pattern" hit="Pattern" />
+    <option name="key" hit="Property key" />
+    <option name="property" hit="Property key" />
+    <option name="property" hit="Property value" />
+    <option name="value" hit="Property value" />
+    <option name="key" hit="Qualified key part" />
+    <option name="part" hit="Qualified key part" />
+    <option name="qualified" hit="Qualified key part" />
+    <option name="separator" hit="Separator" />
+    <option name="special" hit="Special symbol" />
+    <option name="symbol" hit="Special symbol" />
+    <option name="char" hit="Valid char escape" />
+    <option name="escape" hit="Valid char escape" />
+    <option name="valid" hit="Valid char escape" />
+  </configurable>
+  <configurable id="preferences.sourceCode.EditorConfig" configurable_name="EditorConfig">
+    <option name="disable" hit="Disable" />
+    <option name="editorconfig" hit="EditorConfig" />
+    <option name="loading" hit="Loading..." />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="spaces" path="Spaces" hit="Spaces" />
+    <option name="and" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="braces" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="wrapping" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="line" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="next" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="on" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="signs" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="and" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="line" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="next" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="on" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="signs" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="catch" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="do" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="while" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="else" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="finally" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="for" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="if" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="switch" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="try" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="" path="Wrapping and Braces" hit="'try-with-resources'" />
+    <option name="try-with-resources" path="Wrapping and Braces" hit="'try-with-resources'" />
+    <option name="" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="while" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="while" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="after" path="Spaces" hit="After ':'" />
+    <option name="after" path="Spaces" hit="After comma" />
+    <option name="comma" path="Spaces" hit="After comma" />
+    <option name="align" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="method" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="start" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="throws" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="to" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="align" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="assignments" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="fields" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="multiline" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="parenthesised" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="when" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="align" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="methods" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="simple" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="variables" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="multiline" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="when" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="around" path="Spaces" hit="Around operators" />
+    <option name="operators" path="Spaces" hit="Around operators" />
+    <option name="around" path="Spaces" hit="Around separator" />
+    <option name="separator" path="Spaces" hit="Around separator" />
+    <option name="array" path="Wrapping and Braces" hit="Array initializer" />
+    <option name="initializer" path="Wrapping and Braces" hit="Array initializer" />
+    <option name="assert" path="Wrapping and Braces" hit="Assert statement" />
+    <option name="statement" path="Wrapping and Braces" hit="Assert statement" />
+    <option name="assignment" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="line" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="next" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="on" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="sign" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="assignment" path="Wrapping and Braces" hit="Assignment statement" />
+    <option name="statement" path="Wrapping and Braces" hit="Assignment statement" />
+    <option name="before" path="Spaces" hit="Before ':'" />
+    <option name="before" path="Spaces" hit="Before comma" />
+    <option name="comma" path="Spaces" hit="Before comma" />
+    <option name="binary" path="Wrapping and Braces" hit="Binary expressions" />
+    <option name="expressions" path="Wrapping and Braces" hit="Binary expressions" />
+    <option name="braces" path="Wrapping and Braces" hit="Braces placement" />
+    <option name="placement" path="Wrapping and Braces" hit="Braces placement" />
+    <option name="builder" path="Wrapping and Braces" hit="Builder methods" />
+    <option name="methods" path="Wrapping and Braces" hit="Builder methods" />
+    <option name="calls" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="chained" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="method" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="annotations" path="Wrapping and Braces" hit="Class annotations" />
+    <option name="class" path="Wrapping and Braces" hit="Class annotations" />
+    <option name="at" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="column" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="comment" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="first" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="comments" path="Wrapping and Braces" hit="Comments" />
+    <option name="control" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="statement" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="a" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="case" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="each" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="line" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="on" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="separate" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="ensure" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="exceeded" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="is" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="margin" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="not" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="right" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="constants" path="Wrapping and Braces" hit="Enum constants" />
+    <option name="enum" path="Wrapping and Braces" hit="Enum constants" />
+    <option name="extends" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="implements" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="keyword" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="permits" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="extends" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="implements" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="list" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="permits" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="annotations" path="Wrapping and Braces" hit="Field annotations" />
+    <option name="field" path="Wrapping and Braces" hit="Field annotations" />
+    <option name="braces" path="Wrapping and Braces" hit="Force braces" />
+    <option name="force" path="Wrapping and Braces" hit="Force braces" />
+    <option name="declarations" path="Wrapping and Braces" hit="Group declarations" />
+    <option name="group" path="Wrapping and Braces" hit="Group declarations" />
+    <option name="at" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="hard" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="wrap" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="class" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="lambda" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="method" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="break" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="case" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="from" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="indent" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="branches" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="case" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="indent" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="builder" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="indents" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="keep" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="methods" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="keep" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="reformatting" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="when" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="breaks" path="Wrapping and Braces" hit="Line breaks" />
+    <option name="line" path="Wrapping and Braces" hit="Line breaks" />
+    <option name="annotations" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="local" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="variable" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="annotations" path="Wrapping and Braces" hit="Method annotations" />
+    <option name="method" path="Wrapping and Braces" hit="Method annotations" />
+    <option name="arguments" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="call" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="method" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="declaration" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="method" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="parameters" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="method" path="Wrapping and Braces" hit="Method parentheses" />
+    <option name="parentheses" path="Wrapping and Braces" hit="Method parentheses" />
+    <option name="list" path="Wrapping and Braces" hit="Modifier list" />
+    <option name="modifier" path="Wrapping and Braces" hit="Modifier list" />
+    <option name="expressions" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="multiple" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="after" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="line" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="new" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="after" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="line" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="new" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="line" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="next" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="on" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="operation" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="sign" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="other" path="Wrapping and Braces" hit="Other" />
+    <option name="annotations" path="Wrapping and Braces" hit="Parameter annotations" />
+    <option name="parameter" path="Wrapping and Braces" hit="Parameter annotations" />
+    <option name="line" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="place" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="place" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="blocks" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="classes" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="lambdas" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="methods" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="else" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="if" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="special" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="treatment" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="call" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="chain" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="over" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="priority" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="take" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="wrapping" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="operation" path="Wrapping and Braces" hit="Ternary operation" />
+    <option name="ternary" path="Wrapping and Braces" hit="Ternary operation" />
+    <option name="keyword" path="Wrapping and Braces" hit="Throws keyword" />
+    <option name="throws" path="Wrapping and Braces" hit="Throws keyword" />
+    <option name="list" path="Wrapping and Braces" hit="Throws list" />
+    <option name="throws" path="Wrapping and Braces" hit="Throws list" />
+    <option name="guides" path="Wrapping and Braces" hit="Visual guides" />
+    <option name="visual" path="Wrapping and Braces" hit="Visual guides" />
+    <option name="after" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="list" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="modifier" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="at" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="margin" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="right" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="call" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="first" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="on" path="Wrapping and Braces" hit="Wrap on typing" />
+    <option name="typing" path="Wrapping and Braces" hit="Wrap on typing" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap on typing" />
+  </configurable>
+</options>

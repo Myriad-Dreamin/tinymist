@@ -1,0 +1,23 @@
+<options>
+  <configurable id="editor.breadcrumbs" configurable_name="Breadcrumbs">
+    <option name="freemarker" hit="FreeMarker" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.FreeMarker" configurable_name="FreeMarker">
+    <option name="freemarker" hit="FreeMarker" />
+    <option name="braces" hit="Braces" />
+    <option name="brackets" hit="Brackets" />
+    <option name="comma" hit="Comma" />
+    <option name="comment" hit="Comment" />
+    <option name="directive" hit="Directive" />
+    <option name="dot" hit="Dot" />
+    <option name="escape" hit="Escape" />
+    <option name="keyword" hit="Keyword" />
+    <option name="number" hit="Number" />
+    <option name="operation" hit="Operation sign" />
+    <option name="sign" hit="Operation sign" />
+    <option name="parentheses" hit="Parentheses" />
+    <option name="reference" hit="Reference" />
+    <option name="semicolon" hit="Semicolon" />
+    <option name="string" hit="String" />
+  </configurable>
+</options>

@@ -1,0 +1,8 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="class" path="ActionManager" hit="Show Decompiled Class" />
+    <option name="decompiled" path="ActionManager" hit="Show Decompiled Class" />
+    <option name="show" path="ActionManager" hit="Show Decompiled Class" />
+  </configurable>
+</options>

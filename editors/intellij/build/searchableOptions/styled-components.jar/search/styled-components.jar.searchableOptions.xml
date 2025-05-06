@@ -1,0 +1,10 @@
+<options>
+  <configurable id="styled-components" configurable_name="Styled Components">
+    <option name="additional" hit="Additional template tag prefixes:" />
+    <option name="prefixes" hit="Additional template tag prefixes:" />
+    <option name="tag" hit="Additional template tag prefixes:" />
+    <option name="template" hit="Additional template tag prefixes:" />
+    <option name="components" hit="Styled Components" />
+    <option name="styled" hit="Styled Components" />
+  </configurable>
+</options>

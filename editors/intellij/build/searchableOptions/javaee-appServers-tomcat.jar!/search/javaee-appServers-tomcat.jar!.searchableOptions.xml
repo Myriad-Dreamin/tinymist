@@ -1,0 +1,7 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="0" hit="context_5_0" />
+    <option name="5" hit="context_5_0" />
+    <option name="context" hit="context_5_0" />
+  </configurable>
+</options>

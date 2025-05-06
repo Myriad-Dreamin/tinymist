@@ -1,0 +1,27 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="start" path="ActionManager" hit="Start/Stop Timer" />
+    <option name="stop" path="ActionManager" hit="Start/Stop Timer" />
+    <option name="timer" path="ActionManager" hit="Start/Stop Timer" />
+    <option name="active" path="ActionManager" hit="Start/stop Timer for active task" />
+    <option name="for" path="ActionManager" hit="Start/stop Timer for active task" />
+    <option name="start" path="ActionManager" hit="Start/stop Timer for active task" />
+    <option name="stop" path="ActionManager" hit="Start/stop Timer for active task" />
+    <option name="task" path="ActionManager" hit="Start/stop Timer for active task" />
+    <option name="timer" path="ActionManager" hit="Start/stop Timer for active task" />
+  </configurable>
+  <configurable id="tasks.timeTracking" configurable_name="Time Tracking">
+    <option name="" hit="Enable Time Tracking" />
+    <option name="enable" hit="Enable Time Tracking" />
+    <option name="time" hit="Enable Time Tracking" />
+    <option name="tracking" hit="Enable Time Tracking" />
+    <option name="delay" hit="Suspend delay:" />
+    <option name="suspend" hit="Suspend delay:" />
+    <option name="time" hit="Time Tracking" />
+    <option name="tracking" hit="Time Tracking" />
+    <option name="settings" hit="Time Tracking settings" />
+    <option name="time" hit="Time Tracking settings" />
+    <option name="tracking" hit="Time Tracking settings" />
+    <option name="seconds" hit="seconds" />
+  </configurable>
+</options>

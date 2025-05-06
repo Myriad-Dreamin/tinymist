@@ -1,0 +1,13 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="dump" path="ActionManager" hit="Dump Spring MVC Model" />
+    <option name="model" path="ActionManager" hit="Dump Spring MVC Model" />
+    <option name="mvc" path="ActionManager" hit="Dump Spring MVC Model" />
+    <option name="spring" path="ActionManager" hit="Dump Spring MVC Model" />
+    <option name="dump" path="ActionManager" hit="Dump Url Modules Sorted" />
+    <option name="modules" path="ActionManager" hit="Dump Url Modules Sorted" />
+    <option name="sorted" path="ActionManager" hit="Dump Url Modules Sorted" />
+    <option name="url" path="ActionManager" hit="Dump Url Modules Sorted" />
+  </configurable>
+</options>

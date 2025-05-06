@@ -1,0 +1,67 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="code" path="ActionManager" hit="Code With Me: Permissions…" />
+    <option name="me" path="ActionManager" hit="Code With Me: Permissions…" />
+    <option name="permissions" path="ActionManager" hit="Code With Me: Permissions…" />
+    <option name="with" path="ActionManager" hit="Code With Me: Permissions…" />
+    <option name="and" path="ActionManager" hit="Collect Host and Client Logs" />
+    <option name="client" path="ActionManager" hit="Collect Host and Client Logs" />
+    <option name="collect" path="ActionManager" hit="Collect Host and Client Logs" />
+    <option name="host" path="ActionManager" hit="Collect Host and Client Logs" />
+    <option name="logs" path="ActionManager" hit="Collect Host and Client Logs" />
+    <option name="copy" path="ActionManager" hit="Copy Session Link" />
+    <option name="link" path="ActionManager" hit="Copy Session Link" />
+    <option name="session" path="ActionManager" hit="Copy Session Link" />
+    <option name="changelists" path="ActionManager" hit="Create Changelists for Guest Changes" />
+    <option name="changes" path="ActionManager" hit="Create Changelists for Guest Changes" />
+    <option name="create" path="ActionManager" hit="Create Changelists for Guest Changes" />
+    <option name="for" path="ActionManager" hit="Create Changelists for Guest Changes" />
+    <option name="guest" path="ActionManager" hit="Create Changelists for Guest Changes" />
+    <option name="configuration" path="ActionManager" hit="Debug context configuration" />
+    <option name="context" path="ActionManager" hit="Debug context configuration" />
+    <option name="debug" path="ActionManager" hit="Debug context configuration" />
+    <option name="dumpremoteeditors" path="ActionManager" hit="DumpRemoteEditors" />
+    <option name="end" path="ActionManager" hit="End Session" />
+    <option name="session" path="ActionManager" hit="End Session" />
+    <option name="join" path="ActionManager" hit="Join Session…" />
+    <option name="session" path="ActionManager" hit="Join Session…" />
+    <option name="license" path="ActionManager" hit="Manage License…" />
+    <option name="manage" path="ActionManager" hit="Manage License…" />
+    <option name="code" path="ActionManager" hit="Open Code With Me Popup" />
+    <option name="me" path="ActionManager" hit="Open Code With Me Popup" />
+    <option name="open" path="ActionManager" hit="Open Code With Me Popup" />
+    <option name="popup" path="ActionManager" hit="Open Code With Me Popup" />
+    <option name="with" path="ActionManager" hit="Open Code With Me Popup" />
+    <option name="all" path="ActionManager" hit="Reload All Client ToolWindows" />
+    <option name="client" path="ActionManager" hit="Reload All Client ToolWindows" />
+    <option name="reload" path="ActionManager" hit="Reload All Client ToolWindows" />
+    <option name="toolwindows" path="ActionManager" hit="Reload All Client ToolWindows" />
+    <option name="configuration" path="ActionManager" hit="Run context configuration" />
+    <option name="context" path="ActionManager" hit="Run context configuration" />
+    <option name="run" path="ActionManager" hit="Run context configuration" />
+    <option name="all" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="extensibility" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="guests" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="messages" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="send" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="to" path="ActionManager" hit="Send Extensibility Messages To All Guests" />
+    <option name="be" path="ActionManager" hit="Show Be Controls" />
+    <option name="controls" path="ActionManager" hit="Show Be Controls" />
+    <option name="show" path="ActionManager" hit="Show Be Controls" />
+    <option name="demo" path="ActionManager" hit="Show Lux Demo Window" />
+    <option name="lux" path="ActionManager" hit="Show Lux Demo Window" />
+    <option name="show" path="ActionManager" hit="Show Lux Demo Window" />
+    <option name="window" path="ActionManager" hit="Show Lux Demo Window" />
+    <option name="code" path="ActionManager" hit="Start Code With Me Session" />
+    <option name="me" path="ActionManager" hit="Start Code With Me Session" />
+    <option name="session" path="ActionManager" hit="Start Code With Me Session" />
+    <option name="start" path="ActionManager" hit="Start Code With Me Session" />
+    <option name="with" path="ActionManager" hit="Start Code With Me Session" />
+    <option name="an" path="ActionManager" hit="Submit an Issue…" />
+    <option name="issue" path="ActionManager" hit="Submit an Issue…" />
+    <option name="submit" path="ActionManager" hit="Submit an Issue…" />
+    <option name="chars" path="ActionManager" hit="Type Chars" />
+    <option name="type" path="ActionManager" hit="Type Chars" />
+  </configurable>
+</options>

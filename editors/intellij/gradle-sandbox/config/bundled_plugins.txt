@@ -1,0 +1,318 @@
+AngularJS|JavaScript Frameworks and Tools
+
+ByteCodeViewer|Other Tools
+
+Coverage|Code Coverage
+
+Docker|Deployment
+
+Git4Idea|Version Controls
+
+HtmlTools|HTML and XML
+
+JBoss|Deployment
+
+JSIntentionPowerPack|JavaScript Frameworks and Tools
+
+JUnit|Test Tools
+
+JavaScriptDebugger|JavaScript Frameworks and Tools
+
+JavaScript|JavaScript Frameworks and Tools
+
+Karma|JavaScript Frameworks and Tools
+
+Lombook Plugin|JVM Frameworks
+
+NodeJS|JavaScript Frameworks and Tools
+
+PerforceDirectPlugin|Version Controls
+
+Refactor-X|HTML and XML
+
+Remote Development Server|null
+
+Subversion|Version Controls
+
+TestNG-J|Test Tools
+
+Tomcat|Deployment
+
+XPathView|HTML and XML
+
+com.deadlock.scsyntax|JavaScript Frameworks and Tools
+
+com.intellij.LineProfiler|null
+
+com.intellij.analysis.pwa.java|null
+
+com.intellij.analysis.pwa|null
+
+com.intellij.aop|JVM Frameworks
+
+com.intellij.beanValidation|JVM Frameworks
+
+com.intellij.cdi|JVM Frameworks
+
+com.intellij.completion.ml.ranking|AI-Powered
+
+com.intellij.configurationScript|null
+
+com.intellij.copyright|Other Tools
+
+com.intellij.css|Style Sheets
+
+com.intellij.cvp|Other Tools
+
+com.intellij.database|Database
+
+com.intellij.dev|null
+
+com.intellij.diagram|Other Tools
+
+com.intellij.dsm|Other Tools
+
+com.intellij.freemarker|Template Languages
+
+com.intellij.gradle|Build Tools
+
+com.intellij.grpc|Microservices
+
+com.intellij.hibernate|JVM Frameworks
+
+com.intellij.java-i18n|Other Tools
+
+com.intellij.java.ide|null
+
+com.intellij.javaee.app.servers.integration|Deployment
+
+com.intellij.javaee.el|JVM Frameworks
+
+com.intellij.javaee.extensions|JVM Frameworks
+
+com.intellij.javaee.gradle|JVM Frameworks
+
+com.intellij.javaee.jpa|JVM Frameworks
+
+com.intellij.javaee.web|JVM Frameworks
+
+com.intellij.javaee|JVM Frameworks
+
+com.intellij.java|null
+
+com.intellij.jsonpath|JavaScript Frameworks and Tools
+
+com.intellij.jsp|Template Languages
+
+com.intellij.kubernetes|Deployment
+
+com.intellij.micronaut|JVM Frameworks
+
+com.intellij.microservices.jvm|JVM Frameworks
+
+com.intellij.microservices.ui|Microservices
+
+com.intellij.ml.llm|AI-Powered
+
+com.intellij.persistence|JVM Frameworks
+
+com.intellij.platform.images|null
+
+com.intellij.plugins.eclipsekeymap|Keymap
+
+com.intellij.plugins.netbeanskeymap|Keymap
+
+com.intellij.plugins.visualstudiokeymap|Keymap
+
+com.intellij.plugins.webcomponents|JavaScript Frameworks and Tools
+
+com.intellij.properties|Languages
+
+com.intellij.quarkus|JVM Frameworks
+
+com.intellij.reactivestreams|JVM Frameworks
+
+com.intellij.searcheverywhere.ml|AI-Powered
+
+com.intellij.settingsSync|IDE Settings
+
+com.intellij.spring.boot.initializr|JVM Frameworks
+
+com.intellij.spring.boot|JVM Frameworks
+
+com.intellij.spring.cloud|JVM Frameworks
+
+com.intellij.spring.data|JVM Frameworks
+
+com.intellij.spring.integration|JVM Frameworks
+
+com.intellij.spring.messaging|JVM Frameworks
+
+com.intellij.spring.mvc|JVM Frameworks
+
+com.intellij.spring.security|JVM Frameworks
+
+com.intellij.spring|JVM Frameworks
+
+com.intellij.swagger|Microservices
+
+com.intellij.tailwindcss|Style Sheets
+
+com.intellij.tasks.timeTracking|Other Tools
+
+com.intellij.tasks|Other Tools
+
+com.intellij.thymeleaf|Template Languages
+
+com.intellij.tracing.ide|null
+
+com.intellij.turboComplete|AI-Powered
+
+com.intellij.uiDesigner|Swing
+
+com.intellij.velocity|Template Languages
+
+com.intellij|null
+
+com.jetbrains.ae.database|null
+
+com.jetbrains.codeWithMe|null
+
+com.jetbrains.gateway.terminal|null
+
+com.jetbrains.gateway|Remote Development
+
+com.jetbrains.performancePlugin.async|Other Tools
+
+com.jetbrains.performancePlugin.dynamicPlugins|null
+
+com.jetbrains.performancePlugin|Other Tools
+
+com.jetbrains.plugins.webDeployment|Deployment
+
+com.jetbrains.restClient|Microservices
+
+com.jetbrains.restWebServices|JVM Frameworks
+
+com.jetbrains.sh|Languages
+
+com.jetbrains.space|null
+
+com.jetbrains.warmup.performanceTesting|null
+
+cucumber-groovy|Test Tools
+
+cucumber-java|Test Tools
+
+gherkin|Languages
+
+hg4idea|Version Controls
+
+idea.plugin.protoeditor|Microservices
+
+intellij.caches.shared|null
+
+intellij.charts|null
+
+intellij.grid.core.impl|null
+
+intellij.grid.impl|null
+
+intellij.indexing.shared.core|null
+
+intellij.indexing.shared|null
+
+intellij.ktor|Kotlin Frameworks
+
+intellij.nextjs|JavaScript Frameworks and Tools
+
+intellij.platform.ijent.impl|null
+
+intellij.prettierJS|JavaScript Frameworks and Tools
+
+intellij.vitejs|JavaScript Frameworks and Tools
+
+intellij.webpack|JavaScript Frameworks and Tools
+
+intellij.webp|null
+
+org.editorconfig.editorconfigjetbrains|Other Tools
+
+org.intellij.groovy|Languages
+
+org.intellij.intelliLang|Other Tools
+
+org.intellij.plugins.markdown|Languages
+
+org.intellij.plugins.postcss|Style Sheets
+
+org.intellij.qodana|null
+
+org.jetbrains.debugger.streams|Other Tools
+
+org.jetbrains.idea.eclipse|Other Tools
+
+org.jetbrains.idea.gradle.dsl|null
+
+org.jetbrains.idea.gradle.ext|Build Tools
+
+org.jetbrains.idea.maven.ext|Build Tools
+
+org.jetbrains.idea.maven.model|null
+
+org.jetbrains.idea.maven.server.api|null
+
+org.jetbrains.idea.maven|Build Tools
+
+org.jetbrains.idea.reposearch|null
+
+org.jetbrains.java.decompiler|Other Tools
+
+org.jetbrains.kotlin|Languages
+
+org.jetbrains.plugins.docker.gateway|Remote Development
+
+org.jetbrains.plugins.emojipicker|Other Tools
+
+org.jetbrains.plugins.github|Version Controls
+
+org.jetbrains.plugins.gitlab|Version Controls
+
+org.jetbrains.plugins.gradle.analysis|null
+
+org.jetbrains.plugins.gradle.dependency.updater|null
+
+org.jetbrains.plugins.gradle.maven|Build Tools
+
+org.jetbrains.plugins.gradle|null
+
+org.jetbrains.plugins.javaFX|JVM Frameworks
+
+org.jetbrains.plugins.less|Style Sheets
+
+org.jetbrains.plugins.node-remote-interpreter|JavaScript Frameworks and Tools
+
+org.jetbrains.plugins.remote-run|null
+
+org.jetbrains.plugins.sass|Style Sheets
+
+org.jetbrains.plugins.terminal|Other Tools
+
+org.jetbrains.plugins.textmate|Other Tools
+
+org.jetbrains.plugins.vue|JavaScript Frameworks and Tools
+
+org.jetbrains.plugins.wsl.remoteSdk|null
+
+org.jetbrains.plugins.yaml|Languages
+
+org.jetbrains.security.package-checker|null
+
+org.toml.lang|Languages
+
+tanvd.grazi|null
+
+training|null
+
+tslint|JavaScript Frameworks and Tools
+

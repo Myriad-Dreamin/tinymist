@@ -1,0 +1,74 @@
+<options>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Qute" configurable_name="Qute">
+    <option name="qute" hit="Qute" />
+    <option name="boolean" hit="Boolean" />
+    <option name="and" hit="Braces and Operators//Brackets" />
+    <option name="braces" hit="Braces and Operators//Brackets" />
+    <option name="brackets" hit="Braces and Operators//Brackets" />
+    <option name="operators" hit="Braces and Operators//Brackets" />
+    <option name="and" hit="Braces and Operators//Comma" />
+    <option name="braces" hit="Braces and Operators//Comma" />
+    <option name="comma" hit="Braces and Operators//Comma" />
+    <option name="operators" hit="Braces and Operators//Comma" />
+    <option name="and" hit="Braces and Operators//Dot" />
+    <option name="braces" hit="Braces and Operators//Dot" />
+    <option name="dot" hit="Braces and Operators//Dot" />
+    <option name="operators" hit="Braces and Operators//Dot" />
+    <option name="and" hit="Braces and Operators//Operator sign" />
+    <option name="braces" hit="Braces and Operators//Operator sign" />
+    <option name="operator" hit="Braces and Operators//Operator sign" />
+    <option name="operators" hit="Braces and Operators//Operator sign" />
+    <option name="sign" hit="Braces and Operators//Operator sign" />
+    <option name="and" hit="Braces and Operators//Parentheses" />
+    <option name="braces" hit="Braces and Operators//Parentheses" />
+    <option name="operators" hit="Braces and Operators//Parentheses" />
+    <option name="parentheses" hit="Braces and Operators//Parentheses" />
+    <option name="and" hit="Braces and Operators//Tag braces" />
+    <option name="braces" hit="Braces and Operators//Tag braces" />
+    <option name="operators" hit="Braces and Operators//Tag braces" />
+    <option name="tag" hit="Braces and Operators//Tag braces" />
+    <option name="comment" hit="Comment" />
+    <option name="identifier" hit="Identifier" />
+    <option name="number" hit="Number" />
+    <option name="keyword" hit="Secondary keyword" />
+    <option name="secondary" hit="Secondary keyword" />
+    <option name="string" hit="String" />
+    <option name="name" hit="Tag name" />
+    <option name="tag" hit="Tag name" />
+    <option name="background" hit="Template background" />
+    <option name="template" hit="Template background" />
+  </configurable>
+  <configurable id="preferences.sourceCode.Qute" configurable_name="Qute">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="disable" hit="Disable" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="qute" hit="Qute" />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+  </configurable>
+  <configurable id="quarkus" configurable_name="Quarkus">
+    <option name="automatically" hit="Create run configuration automatically" />
+    <option name="configuration" hit="Create run configuration automatically" />
+    <option name="create" hit="Create run configuration automatically" />
+    <option name="run" hit="Create run configuration automatically" />
+    <option name="quarkus" hit="Quarkus" />
+  </configurable>
+</options>

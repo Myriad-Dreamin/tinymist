@@ -1,0 +1,7 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="body" hit="Dynamic Method Body" />
+    <option name="dynamic" hit="Dynamic Method Body" />
+    <option name="method" hit="Dynamic Method Body" />
+  </configurable>
+</options>

@@ -1,0 +1,14 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="data" path="ActionManager" hit="Import Data Sources From server" />
+    <option name="from" path="ActionManager" hit="Import Data Sources From server" />
+    <option name="import" path="ActionManager" hit="Import Data Sources From server" />
+    <option name="server" path="ActionManager" hit="Import Data Sources From server" />
+    <option name="sources" path="ActionManager" hit="Import Data Sources From server" />
+    <option name="data" path="ActionManager" hit="Import data sources from server" />
+    <option name="from" path="ActionManager" hit="Import data sources from server" />
+    <option name="import" path="ActionManager" hit="Import data sources from server" />
+    <option name="server" path="ActionManager" hit="Import data sources from server" />
+    <option name="sources" path="ActionManager" hit="Import data sources from server" />
+  </configurable>
+</options>

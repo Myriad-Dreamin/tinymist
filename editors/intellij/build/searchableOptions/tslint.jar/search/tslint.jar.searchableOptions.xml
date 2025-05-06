@@ -1,0 +1,46 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="apply" path="ActionManager" hit="Apply TSLint Code Style Rules" />
+    <option name="code" path="ActionManager" hit="Apply TSLint Code Style Rules" />
+    <option name="rules" path="ActionManager" hit="Apply TSLint Code Style Rules" />
+    <option name="style" path="ActionManager" hit="Apply TSLint Code Style Rules" />
+    <option name="tslint" path="ActionManager" hit="Apply TSLint Code Style Rules" />
+    <option name="fix" path="ActionManager" hit="Fix TSLint Problems" />
+    <option name="problems" path="ActionManager" hit="Fix TSLint Problems" />
+    <option name="tslint" path="ActionManager" hit="Fix TSLint Problems" />
+    <option name="all" path="ActionManager" hit="Fix all TSLint problems" />
+    <option name="fix" path="ActionManager" hit="Fix all TSLint problems" />
+    <option name="problems" path="ActionManager" hit="Fix all TSLint problems" />
+    <option name="tslint" path="ActionManager" hit="Fix all TSLint problems" />
+  </configurable>
+  <configurable id="settings.javascript.linters.tslint" configurable_name="TSLint">
+    <option name="additional" hit="Additional rules directory:" />
+    <option name="directory" hit="Additional rules directory:" />
+    <option name="rules" hit="Additional rules directory:" />
+    <option name="" hit="Automatic TSLint configuration" />
+    <option name="automatic" hit="Automatic TSLint configuration" />
+    <option name="configuration" hit="Automatic TSLint configuration" />
+    <option name="tslint" hit="Automatic TSLint configuration" />
+    <option name="automatic" hit="Automatic search" />
+    <option name="search" hit="Automatic search" />
+    <option name="configuration" hit="Configuration File" />
+    <option name="file" hit="Configuration File" />
+    <option name="" hit="Configuration file:" />
+    <option name="configuration" hit="Configuration file:" />
+    <option name="file" hit="Configuration file:" />
+    <option name="" hit="Disable TSLint" />
+    <option name="disable" hit="Disable TSLint" />
+    <option name="tslint" hit="Disable TSLint" />
+    <option name="files" hit="Lint JavaScript files:" />
+    <option name="javascript" hit="Lint JavaScript files:" />
+    <option name="lint" hit="Lint JavaScript files:" />
+    <option name="" hit="Manual TSLint configuration" />
+    <option name="configuration" hit="Manual TSLint configuration" />
+    <option name="manual" hit="Manual TSLint configuration" />
+    <option name="tslint" hit="Manual TSLint configuration" />
+    <option name="tslint" hit="TSLint" />
+    <option name="package" hit="TSLint package:" />
+    <option name="tslint" hit="TSLint package:" />
+  </configurable>
+</options>

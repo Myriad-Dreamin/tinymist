@@ -1,0 +1,7 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="emoji" path="ActionManager" hit="Emoji &amp; Symbols" />
+    <option name="symbols" path="ActionManager" hit="Emoji &amp; Symbols" />
+  </configurable>
+</options>

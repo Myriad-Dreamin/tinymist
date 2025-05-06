@@ -1,0 +1,480 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add New Context" />
+    <option name="context" path="ActionManager" hit="Add New Context" />
+    <option name="new" path="ActionManager" hit="Add New Context" />
+    <option name="a" path="ActionManager" hit="Add a new Kubernetes context" />
+    <option name="add" path="ActionManager" hit="Add a new Kubernetes context" />
+    <option name="context" path="ActionManager" hit="Add a new Kubernetes context" />
+    <option name="kubernetes" path="ActionManager" hit="Add a new Kubernetes context" />
+    <option name="new" path="ActionManager" hit="Add a new Kubernetes context" />
+    <option name="a" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="add" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="dependencies" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="dependency" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="into" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="new" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="section" path="ActionManager" hit="Add a new dependency into 'dependencies' section" />
+    <option name="all" path="ActionManager" hit="All Namespaces" />
+    <option name="namespaces" path="ActionManager" hit="All Namespaces" />
+    <option name="apply" path="ActionManager" hit="Apply" />
+    <option name="apply" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="cluster" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="configuration" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="file" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="in" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="to" path="ActionManager" hit="Apply configuration in file to cluster" />
+    <option name="attach" path="ActionManager" hit="Attach New Context From File" />
+    <option name="context" path="ActionManager" hit="Attach New Context From File" />
+    <option name="file" path="ActionManager" hit="Attach New Context From File" />
+    <option name="from" path="ActionManager" hit="Attach New Context From File" />
+    <option name="new" path="ActionManager" hit="Attach New Context From File" />
+    <option name="a" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="attach" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="context" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="file" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="from" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="kubernetes" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="new" path="ActionManager" hit="Attach a new Kubernetes context from file" />
+    <option name="change" path="ActionManager" hit="Change Current Context" />
+    <option name="context" path="ActionManager" hit="Change Current Context" />
+    <option name="current" path="ActionManager" hit="Change Current Context" />
+    <option name="change" path="ActionManager" hit="Change context to use" />
+    <option name="context" path="ActionManager" hit="Change context to use" />
+    <option name="to" path="ActionManager" hit="Change context to use" />
+    <option name="use" path="ActionManager" hit="Change context to use" />
+    <option name="cluster" path="ActionManager" hit="Compare with Cluster" />
+    <option name="compare" path="ActionManager" hit="Compare with Cluster" />
+    <option name="with" path="ActionManager" hit="Compare with Cluster" />
+    <option name="a" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="change" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="configuration" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="file" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="is" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="kubeconfig" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="on" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="reloaded" path="ActionManager" hit="Configuration is reloaded on a kubeconfig file change" />
+    <option name="configure" path="ActionManager" hit="Configure" />
+    <option name="configure" path="ActionManager" hit="Configure Helm Parameters" />
+    <option name="helm" path="ActionManager" hit="Configure Helm Parameters" />
+    <option name="parameters" path="ActionManager" hit="Configure Helm Parameters" />
+    <option name="chart" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="command" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="common" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="configure" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="for" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="helm" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="parameters" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="this" path="ActionManager" hit="Configure common Helm command parameters for this chart" />
+    <option name="configure" path="ActionManager" hit="Configure external schema specifications" />
+    <option name="external" path="ActionManager" hit="Configure external schema specifications" />
+    <option name="schema" path="ActionManager" hit="Configure external schema specifications" />
+    <option name="specifications" path="ActionManager" hit="Configure external schema specifications" />
+    <option name="connect" path="ActionManager" hit="Connect Telepresence" />
+    <option name="telepresence" path="ActionManager" hit="Connect Telepresence" />
+    <option name="cluster" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="connects" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="enabling" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="interceptions" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="telepresence" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="the" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="to" path="ActionManager" hit="Connects Telepresence to the cluster, enabling interceptions" />
+    <option name="create" path="ActionManager" hit="Create Kubernetes Resource file (YAML)" />
+    <option name="file" path="ActionManager" hit="Create Kubernetes Resource file (YAML)" />
+    <option name="kubernetes" path="ActionManager" hit="Create Kubernetes Resource file (YAML)" />
+    <option name="resource" path="ActionManager" hit="Create Kubernetes Resource file (YAML)" />
+    <option name="yaml" path="ActionManager" hit="Create Kubernetes Resource file (YAML)" />
+    <option name="create" path="ActionManager" hit="Create New Interception" />
+    <option name="interception" path="ActionManager" hit="Create New Interception" />
+    <option name="new" path="ActionManager" hit="Create New Interception" />
+    <option name="create" path="ActionManager" hit="Create New Secret…" />
+    <option name="new" path="ActionManager" hit="Create New Secret…" />
+    <option name="secret" path="ActionManager" hit="Create New Secret…" />
+    <option name="a" path="ActionManager" hit="Create a new chart" />
+    <option name="chart" path="ActionManager" hit="Create a new chart" />
+    <option name="create" path="ActionManager" hit="Create a new chart" />
+    <option name="new" path="ActionManager" hit="Create a new chart" />
+    <option name="create" path="ActionManager" hit="Create new secret" />
+    <option name="new" path="ActionManager" hit="Create new secret" />
+    <option name="secret" path="ActionManager" hit="Create new secret" />
+    <option name="creates" path="ActionManager" hit="Creates Telepresence interception" />
+    <option name="interception" path="ActionManager" hit="Creates Telepresence interception" />
+    <option name="telepresence" path="ActionManager" hit="Creates Telepresence interception" />
+    <option name="customize" path="ActionManager" hit="Customize Namespaces…" />
+    <option name="namespaces" path="ActionManager" hit="Customize Namespaces…" />
+    <option name="customize" path="ActionManager" hit="Customize Notifications…" />
+    <option name="notifications" path="ActionManager" hit="Customize Notifications…" />
+    <option name="customize" path="ActionManager" hit="Customize namespace list" />
+    <option name="list" path="ActionManager" hit="Customize namespace list" />
+    <option name="namespace" path="ActionManager" hit="Customize namespace list" />
+    <option name="customize" path="ActionManager" hit="Customize notifications" />
+    <option name="notifications" path="ActionManager" hit="Customize notifications" />
+    <option name="delete" path="ActionManager" hit="Delete" />
+    <option name="delete" path="ActionManager" hit="Delete Resource" />
+    <option name="resource" path="ActionManager" hit="Delete Resource" />
+    <option name="cluster" path="ActionManager" hit="Delete resource from cluster" />
+    <option name="delete" path="ActionManager" hit="Delete resource from cluster" />
+    <option name="from" path="ActionManager" hit="Delete resource from cluster" />
+    <option name="resource" path="ActionManager" hit="Delete resource from cluster" />
+    <option name="cluster" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="defined" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="delete" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="file" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="from" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="in" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="resources" path="ActionManager" hit="Delete resources defined in file from cluster" />
+    <option name="describe" path="ActionManager" hit="Describe Resource" />
+    <option name="resource" path="ActionManager" hit="Describe Resource" />
+    <option name="and" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="cluster" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="describe" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="editor" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="from" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="in" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="resource" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="result" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="show" path="ActionManager" hit="Describe resource from cluster and show result in editor" />
+    <option name="download" path="ActionManager" hit="Download Log" />
+    <option name="log" path="ActionManager" hit="Download Log" />
+    <option name="and" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="download" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="install" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="kubectl" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="latest" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="stable" path="ActionManager" hit="Download and install latest stable kubectl" />
+    <option name="download" path="ActionManager" hit="Download log of…" />
+    <option name="log" path="ActionManager" hit="Download log of…" />
+    <option name="of" path="ActionManager" hit="Download log of…" />
+    <option name="download" path="ActionManager" hit="Download log…" />
+    <option name="log" path="ActionManager" hit="Download log…" />
+    <option name="a" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="chart" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="examine" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="for" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="issues" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="possible" path="ActionManager" hit="Examine a chart for possible issues" />
+    <option name="find" path="ActionManager" hit="Find Usages" />
+    <option name="usages" path="ActionManager" hit="Find Usages" />
+    <option name="finds" path="ActionManager" hit="Finds usages in project sources" />
+    <option name="in" path="ActionManager" hit="Finds usages in project sources" />
+    <option name="project" path="ActionManager" hit="Finds usages in project sources" />
+    <option name="sources" path="ActionManager" hit="Finds usages in project sources" />
+    <option name="usages" path="ActionManager" hit="Finds usages in project sources" />
+    <option name="follow" path="ActionManager" hit="Follow Log" />
+    <option name="log" path="ActionManager" hit="Follow Log" />
+    <option name="follow" path="ActionManager" hit="Follow log of…" />
+    <option name="log" path="ActionManager" hit="Follow log of…" />
+    <option name="of" path="ActionManager" hit="Follow log of…" />
+    <option name="follow" path="ActionManager" hit="Follow log…" />
+    <option name="log" path="ActionManager" hit="Follow log…" />
+    <option name="forward" path="ActionManager" hit="Forward Ports…" />
+    <option name="ports" path="ActionManager" hit="Forward Ports…" />
+    <option name="forward" path="ActionManager" hit="Forward ports to pod" />
+    <option name="pod" path="ActionManager" hit="Forward ports to pod" />
+    <option name="ports" path="ActionManager" hit="Forward ports to pod" />
+    <option name="to" path="ActionManager" hit="Forward ports to pod" />
+    <option name="chart" path="ActionManager" hit="Helm Chart" />
+    <option name="helm" path="ActionManager" hit="Helm Chart" />
+    <option name="dependency" path="ActionManager" hit="Helm Dependency" />
+    <option name="helm" path="ActionManager" hit="Helm Dependency" />
+    <option name="dependency" path="ActionManager" hit="Helm Dependency Update" />
+    <option name="helm" path="ActionManager" hit="Helm Dependency Update" />
+    <option name="update" path="ActionManager" hit="Helm Dependency Update" />
+    <option name="helm" path="ActionManager" hit="Helm Lint" />
+    <option name="lint" path="ActionManager" hit="Helm Lint" />
+    <option name="helm" path="ActionManager" hit="Helm Template" />
+    <option name="template" path="ActionManager" hit="Helm Template" />
+    <option name="how" path="ActionManager" hit="How To Install kubectl…" />
+    <option name="install" path="ActionManager" hit="How To Install kubectl…" />
+    <option name="kubectl" path="ActionManager" hit="How To Install kubectl…" />
+    <option name="to" path="ActionManager" hit="How To Install kubectl…" />
+    <option name="how" path="ActionManager" hit="How to install kubectl…" />
+    <option name="install" path="ActionManager" hit="How to install kubectl…" />
+    <option name="kubectl" path="ActionManager" hit="How to install kubectl…" />
+    <option name="to" path="ActionManager" hit="How to install kubectl…" />
+    <option name="install" path="ActionManager" hit="Install kubectl" />
+    <option name="kubectl" path="ActionManager" hit="Install kubectl" />
+    <option name="intercept" path="ActionManager" hit="Intercept with Telepresence" />
+    <option name="telepresence" path="ActionManager" hit="Intercept with Telepresence" />
+    <option name="with" path="ActionManager" hit="Intercept with Telepresence" />
+    <option name="kubernetes" path="ActionManager" hit="Kubernetes Resource" />
+    <option name="resource" path="ActionManager" hit="Kubernetes Resource" />
+    <option name="interception" path="ActionManager" hit="Leave Interception" />
+    <option name="leave" path="ActionManager" hit="Leave Interception" />
+    <option name="and" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="cluster" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="editor" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="from" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="in" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="it" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="load" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="show" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="yaml" path="ActionManager" hit="Load YAML from cluster and show it in editor" />
+    <option name="and" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="cluster" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="content" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="current" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="diff" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="file" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="from" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="load" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="show" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="the" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="with" path="ActionManager" hit="Load content from cluster and show diff with the current file" />
+    <option name="more" path="ActionManager" hit="More" />
+    <option name="namespace" path="ActionManager" hit="Namespace" />
+    <option name="console" path="ActionManager" hit="Open Console" />
+    <option name="open" path="ActionManager" hit="Open Console" />
+    <option name="console" path="ActionManager" hit="Open console of…" />
+    <option name="of" path="ActionManager" hit="Open console of…" />
+    <option name="open" path="ActionManager" hit="Open console of…" />
+    <option name="editor" path="ActionManager" hit="Open kubeconfig File in Editor" />
+    <option name="file" path="ActionManager" hit="Open kubeconfig File in Editor" />
+    <option name="in" path="ActionManager" hit="Open kubeconfig File in Editor" />
+    <option name="kubeconfig" path="ActionManager" hit="Open kubeconfig File in Editor" />
+    <option name="open" path="ActionManager" hit="Open kubeconfig File in Editor" />
+    <option name="quit" path="ActionManager" hit="Quit Telepresence" />
+    <option name="telepresence" path="ActionManager" hit="Quit Telepresence" />
+    <option name="and" path="ActionManager" hit="Quit Telepresence and stop daemon" />
+    <option name="daemon" path="ActionManager" hit="Quit Telepresence and stop daemon" />
+    <option name="quit" path="ActionManager" hit="Quit Telepresence and stop daemon" />
+    <option name="stop" path="ActionManager" hit="Quit Telepresence and stop daemon" />
+    <option name="telepresence" path="ActionManager" hit="Quit Telepresence and stop daemon" />
+    <option name="refresh" path="ActionManager" hit="Refresh" />
+    <option name="cluster" path="ActionManager" hit="Refresh information from cluster" />
+    <option name="from" path="ActionManager" hit="Refresh information from cluster" />
+    <option name="information" path="ActionManager" hit="Refresh information from cluster" />
+    <option name="refresh" path="ActionManager" hit="Refresh information from cluster" />
+    <option name="configuration" path="ActionManager" hit="Reload Configuration" />
+    <option name="reload" path="ActionManager" hit="Reload Configuration" />
+    <option name="automatically" path="ActionManager" hit="Reload Configuration Automatically" />
+    <option name="configuration" path="ActionManager" hit="Reload Configuration Automatically" />
+    <option name="reload" path="ActionManager" hit="Reload Configuration Automatically" />
+    <option name="cluster" path="ActionManager" hit="Reload Content From Cluster" />
+    <option name="content" path="ActionManager" hit="Reload Content From Cluster" />
+    <option name="from" path="ActionManager" hit="Reload Content From Cluster" />
+    <option name="reload" path="ActionManager" hit="Reload Content From Cluster" />
+    <option name="and" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="api" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="cached" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="cluster" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="configuration" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="from" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="information" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="reload" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="reread" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="schemas" path="ActionManager" hit="Reload cached configuration and information from cluster and reread API schemas" />
+    <option name="and" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="cluster" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="content" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="editor" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="from" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="in" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="it" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="reload" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="update" path="ActionManager" hit="Reload content from cluster and update it in editor" />
+    <option name="existing" path="ActionManager" hit="Remove existing intercept" />
+    <option name="intercept" path="ActionManager" hit="Remove existing intercept" />
+    <option name="remove" path="ActionManager" hit="Remove existing intercept" />
+    <option name="run" path="ActionManager" hit="Run Shell" />
+    <option name="shell" path="ActionManager" hit="Run Shell" />
+    <option name="in" path="ActionManager" hit="Run shell in…" />
+    <option name="run" path="ActionManager" hit="Run shell in…" />
+    <option name="shell" path="ActionManager" hit="Run shell in…" />
+    <option name="namespace" path="ActionManager" hit="Select namespace" />
+    <option name="select" path="ActionManager" hit="Select namespace" />
+    <option name="cluster" path="ActionManager" hit="Show Cluster Settings…" />
+    <option name="settings" path="ActionManager" hit="Show Cluster Settings…" />
+    <option name="show" path="ActionManager" hit="Show Cluster Settings…" />
+    <option name="a" path="ActionManager" hit="Show a chart template result" />
+    <option name="chart" path="ActionManager" hit="Show a chart template result" />
+    <option name="result" path="ActionManager" hit="Show a chart template result" />
+    <option name="show" path="ActionManager" hit="Show a chart template result" />
+    <option name="template" path="ActionManager" hit="Show a chart template result" />
+    <option name="actions" path="ActionManager" hit="Show additional actions…" />
+    <option name="additional" path="ActionManager" hit="Show additional actions…" />
+    <option name="show" path="ActionManager" hit="Show additional actions…" />
+    <option name="cluster" path="ActionManager" hit="Show cluster view settings" />
+    <option name="settings" path="ActionManager" hit="Show cluster view settings" />
+    <option name="show" path="ActionManager" hit="Show cluster view settings" />
+    <option name="view" path="ActionManager" hit="Show cluster view settings" />
+    <option name="all" path="ActionManager" hit="Show information from all namespaces" />
+    <option name="from" path="ActionManager" hit="Show information from all namespaces" />
+    <option name="information" path="ActionManager" hit="Show information from all namespaces" />
+    <option name="namespaces" path="ActionManager" hit="Show information from all namespaces" />
+    <option name="show" path="ActionManager" hit="Show information from all namespaces" />
+    <option name="and" path="ActionManager" hit="Stop And Close" />
+    <option name="close" path="ActionManager" hit="Stop And Close" />
+    <option name="stop" path="ActionManager" hit="Stop And Close" />
+    <option name="and" path="ActionManager" hit="Stop process and close tab" />
+    <option name="close" path="ActionManager" hit="Stop process and close tab" />
+    <option name="process" path="ActionManager" hit="Stop process and close tab" />
+    <option name="stop" path="ActionManager" hit="Stop process and close tab" />
+    <option name="tab" path="ActionManager" hit="Stop process and close tab" />
+    <option name="a" path="ActionManager" hit="Update a chart's dependencies" />
+    <option name="chart" path="ActionManager" hit="Update a chart's dependencies" />
+    <option name="dependencies" path="ActionManager" hit="Update a chart's dependencies" />
+    <option name="s" path="ActionManager" hit="Update a chart's dependencies" />
+    <option name="update" path="ActionManager" hit="Update a chart's dependencies" />
+    <option name="view" path="ActionManager" hit="View YAML" />
+    <option name="yaml" path="ActionManager" hit="View YAML" />
+  </configurable>
+  <configurable id="com.intellij.kubernetes.config.KubernetesConfigurable" configurable_name="Kubernetes">
+    <option name="1" hit="1.10" />
+    <option name="10" hit="1.10" />
+    <option name="1" hit="1.11" />
+    <option name="11" hit="1.11" />
+    <option name="1" hit="1.12" />
+    <option name="12" hit="1.12" />
+    <option name="1" hit="1.13" />
+    <option name="13" hit="1.13" />
+    <option name="1" hit="1.14" />
+    <option name="14" hit="1.14" />
+    <option name="1" hit="1.15" />
+    <option name="15" hit="1.15" />
+    <option name="1" hit="1.16" />
+    <option name="16" hit="1.16" />
+    <option name="1" hit="1.17" />
+    <option name="17" hit="1.17" />
+    <option name="1" hit="1.18" />
+    <option name="18" hit="1.18" />
+    <option name="1" hit="1.19" />
+    <option name="19" hit="1.19" />
+    <option name="1" hit="1.20" />
+    <option name="20" hit="1.20" />
+    <option name="1" hit="1.21" />
+    <option name="21" hit="1.21" />
+    <option name="1" hit="1.22" />
+    <option name="22" hit="1.22" />
+    <option name="1" hit="1.23" />
+    <option name="23" hit="1.23" />
+    <option name="1" hit="1.24" />
+    <option name="24" hit="1.24" />
+    <option name="1" hit="1.25" />
+    <option name="25" hit="1.25" />
+    <option name="1" hit="1.26" />
+    <option name="26" hit="1.26" />
+    <option name="1" hit="1.27" />
+    <option name="27" hit="1.27" />
+    <option name="1" hit="1.28" />
+    <option name="28" hit="1.28" />
+    <option name="1" hit="1.6" />
+    <option name="6" hit="1.6" />
+    <option name="1" hit="1.7" />
+    <option name="7" hit="1.7" />
+    <option name="1" hit="1.8" />
+    <option name="8" hit="1.8" />
+    <option name="1" hit="1.9" />
+    <option name="9" hit="1.9" />
+    <option name="0" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="14-v1" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="2" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="20" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="3" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="embedded" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="in" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="kubectl" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="v1" hit="2.0.3 (embedded in kubectl v1.14-v1.20)" />
+    <option name="4" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="components" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="envs" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="etc" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="inline" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="patches" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="replicas" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="x" hit="4.x (components, inline patches, 'replicas', 'envs', etc.)" />
+    <option name="check" hit="Check Configuration" />
+    <option name="configuration" hit="Check Configuration" />
+    <option name="cluster" hit="Configure cluster settings" />
+    <option name="configure" hit="Configure cluster settings" />
+    <option name="settings" hit="Configure cluster settings" />
+    <option name="context" hit="Context to use:" />
+    <option name="to" hit="Context to use:" />
+    <option name="use" hit="Context to use:" />
+    <option name="kubernetes" hit="Kubernetes" />
+    <option name="api" hit="Kubernetes API version:" />
+    <option name="kubernetes" hit="Kubernetes API version:" />
+    <option name="version" hit="Kubernetes API version:" />
+    <option name="kustomize" hit="Kustomize version:" />
+    <option name="version" hit="Kustomize version:" />
+    <option name="cache" hit="Reset Schema Cache" />
+    <option name="reset" hit="Reset Schema Cache" />
+    <option name="schema" hit="Reset Schema Cache" />
+    <option name="active" hit="Use API schema from the active cluster if available" />
+    <option name="api" hit="Use API schema from the active cluster if available" />
+    <option name="available" hit="Use API schema from the active cluster if available" />
+    <option name="cluster" hit="Use API schema from the active cluster if available" />
+    <option name="from" hit="Use API schema from the active cluster if available" />
+    <option name="if" hit="Use API schema from the active cluster if available" />
+    <option name="schema" hit="Use API schema from the active cluster if available" />
+    <option name="the" hit="Use API schema from the active cluster if available" />
+    <option name="use" hit="Use API schema from the active cluster if available" />
+  </configurable>
+  <configurable id="com.intellij.kubernetes.view.ui.settings.KubernetesViewConfigurable" configurable_name="Kubernetes">
+    <option name="append" hit="Append timestamp to log file name" />
+    <option name="file" hit="Append timestamp to log file name" />
+    <option name="log" hit="Append timestamp to log file name" />
+    <option name="name" hit="Append timestamp to log file name" />
+    <option name="timestamp" hit="Append timestamp to log file name" />
+    <option name="to" hit="Append timestamp to log file name" />
+    <option name="ask" hit="Ask where to save log before downloading" />
+    <option name="before" hit="Ask where to save log before downloading" />
+    <option name="downloading" hit="Ask where to save log before downloading" />
+    <option name="log" hit="Ask where to save log before downloading" />
+    <option name="save" hit="Ask where to save log before downloading" />
+    <option name="to" hit="Ask where to save log before downloading" />
+    <option name="where" hit="Ask where to save log before downloading" />
+    <option name="command" hit="Command to run shell inside container:" />
+    <option name="container" hit="Command to run shell inside container:" />
+    <option name="inside" hit="Command to run shell inside container:" />
+    <option name="run" hit="Command to run shell inside container:" />
+    <option name="shell" hit="Command to run shell inside container:" />
+    <option name="to" hit="Command to run shell inside container:" />
+    <option name="configuration" hit="Configuration" />
+    <option name="kubernetes" hit="Kubernetes" />
+    <option name="global" hit="Logs (global settings)" />
+    <option name="logs" hit="Logs (global settings)" />
+    <option name="settings" hit="Logs (global settings)" />
+    <option name="applied" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="be" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="cannot" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="cluster" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="from" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="loaded" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="namespaces" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="the" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="they" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="when" hit="Namespaces (applied when they cannot be loaded from the cluster)" />
+    <option name="download" hit="Path to download logs to:" />
+    <option name="logs" hit="Path to download logs to:" />
+    <option name="path" hit="Path to download logs to:" />
+    <option name="to" hit="Path to download logs to:" />
+    <option name="executable" hit="Path to helm executable:" />
+    <option name="helm" hit="Path to helm executable:" />
+    <option name="path" hit="Path to helm executable:" />
+    <option name="to" hit="Path to helm executable:" />
+    <option name="executable" hit="Path to kubectl executable:" />
+    <option name="kubectl" hit="Path to kubectl executable:" />
+    <option name="path" hit="Path to kubectl executable:" />
+    <option name="to" hit="Path to kubectl executable:" />
+    <option name="pod" hit="Pod Shell" />
+    <option name="shell" hit="Pod Shell" />
+    <option name="automatically" hit="Reload configuration automatically" />
+    <option name="configuration" hit="Reload configuration automatically" />
+    <option name="reload" hit="Reload configuration automatically" />
+    <option name="all" hit="Set this shell command globally for all projects" />
+    <option name="command" hit="Set this shell command globally for all projects" />
+    <option name="for" hit="Set this shell command globally for all projects" />
+    <option name="globally" hit="Set this shell command globally for all projects" />
+    <option name="projects" hit="Set this shell command globally for all projects" />
+    <option name="set" hit="Set this shell command globally for all projects" />
+    <option name="shell" hit="Set this shell command globally for all projects" />
+    <option name="this" hit="Set this shell command globally for all projects" />
+    <option name="test" hit="Test" />
+    <option name="global" hit="Tool locations (global settings)" />
+    <option name="locations" hit="Tool locations (global settings)" />
+    <option name="settings" hit="Tool locations (global settings)" />
+    <option name="tool" hit="Tool locations (global settings)" />
+  </configurable>
+</options>

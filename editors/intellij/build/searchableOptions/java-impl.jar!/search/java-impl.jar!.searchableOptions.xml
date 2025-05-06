@@ -1,0 +1,42 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="body" hit="Catch Statement Body" />
+    <option name="catch" hit="Catch Statement Body" />
+    <option name="statement" hit="Catch Statement Body" />
+    <option name="catch" hit="Catch Statement Declaration" />
+    <option name="declaration" hit="Catch Statement Declaration" />
+    <option name="statement" hit="Catch Statement Declaration" />
+    <option name="file" hit="File Header" />
+    <option name="header" hit="File Header" />
+    <option name="concatenation" hit="I18nized Concatenation" />
+    <option name="i18nized" hit="I18nized Concatenation" />
+    <option name="expression" hit="I18nized Expression" />
+    <option name="i18nized" hit="I18nized Expression" />
+    <option name="expression" hit="I18nized JSP Expression" />
+    <option name="i18nized" hit="I18nized JSP Expression" />
+    <option name="jsp" hit="I18nized JSP Expression" />
+    <option name="body" hit="Implemented Method Body" />
+    <option name="implemented" hit="Implemented Method Body" />
+    <option name="method" hit="Implemented Method Body" />
+    <option name="class" hit="JavaDoc Class" />
+    <option name="javadoc" hit="JavaDoc Class" />
+    <option name="constructor" hit="JavaDoc Constructor" />
+    <option name="javadoc" hit="JavaDoc Constructor" />
+    <option name="field" hit="JavaDoc Field" />
+    <option name="javadoc" hit="JavaDoc Field" />
+    <option name="javadoc" hit="JavaDoc Method" />
+    <option name="method" hit="JavaDoc Method" />
+    <option name="javadoc" hit="JavaDoc Overriding Method" />
+    <option name="method" hit="JavaDoc Overriding Method" />
+    <option name="overriding" hit="JavaDoc Overriding Method" />
+    <option name="body" hit="New Method Body" />
+    <option name="method" hit="New Method Body" />
+    <option name="new" hit="New Method Body" />
+    <option name="body" hit="Overridden Method Body" />
+    <option name="method" hit="Overridden Method Body" />
+    <option name="overridden" hit="Overridden Method Body" />
+    <option name="branch" hit="Switch Default Branch" />
+    <option name="default" hit="Switch Default Branch" />
+    <option name="switch" hit="Switch Default Branch" />
+  </configurable>
+</options>

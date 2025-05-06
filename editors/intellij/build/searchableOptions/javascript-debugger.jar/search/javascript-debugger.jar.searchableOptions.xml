@@ -1,0 +1,60 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add sources to Source Map" />
+    <option name="map" path="ActionManager" hit="Add sources to Source Map" />
+    <option name="source" path="ActionManager" hit="Add sources to Source Map" />
+    <option name="sources" path="ActionManager" hit="Add sources to Source Map" />
+    <option name="to" path="ActionManager" hit="Add sources to Source Map" />
+    <option name="copy" path="ActionManager" hit="Copy JSON" />
+    <option name="json" path="ActionManager" hit="Copy JSON" />
+    <option name="code" path="ActionManager" hit="Open Source Code from URL..." />
+    <option name="from" path="ActionManager" hit="Open Source Code from URL..." />
+    <option name="open" path="ActionManager" hit="Open Source Code from URL..." />
+    <option name="source" path="ActionManager" hit="Open Source Code from URL..." />
+    <option name="url" path="ActionManager" hit="Open Source Code from URL..." />
+    <option name="frame" path="ActionManager" hit="Restart Frame" />
+    <option name="restart" path="ActionManager" hit="Restart Frame" />
+    <option name="current" path="ActionManager" hit="Restarts the current frame" />
+    <option name="frame" path="ActionManager" hit="Restarts the current frame" />
+    <option name="restarts" path="ActionManager" hit="Restarts the current frame" />
+    <option name="the" path="ActionManager" hit="Restarts the current frame" />
+    <option name="break" path="ActionManager" hit="Toggle Break on Exception" />
+    <option name="exception" path="ActionManager" hit="Toggle Break on Exception" />
+    <option name="on" path="ActionManager" hit="Toggle Break on Exception" />
+    <option name="toggle" path="ActionManager" hit="Toggle Break on Exception" />
+    <option name="map" path="ActionManager" hit="Visualize Source Map" />
+    <option name="source" path="ActionManager" hit="Visualize Source Map" />
+    <option name="visualize" path="ActionManager" hit="Visualize Source Map" />
+  </configurable>
+  <configurable id="debugger.dataViews.javascript" configurable_name="JavaScript">
+    <option name="javascript" hit="JavaScript" />
+    <option name="an" hit="Show the following properties for an object node:" />
+    <option name="following" hit="Show the following properties for an object node:" />
+    <option name="for" hit="Show the following properties for an object node:" />
+    <option name="node" hit="Show the following properties for an object node:" />
+    <option name="object" hit="Show the following properties for an object node:" />
+    <option name="properties" hit="Show the following properties for an object node:" />
+    <option name="show" hit="Show the following properties for an object node:" />
+    <option name="the" hit="Show the following properties for an object node:" />
+  </configurable>
+  <configurable id="debugger.stepping" configurable_name="Stepping">
+    <option name="always" hit="Always do smart step into" />
+    <option name="do" hit="Always do smart step into" />
+    <option name="into" hit="Always do smart step into" />
+    <option name="smart" hit="Always do smart step into" />
+    <option name="step" hit="Always do smart step into" />
+    <option name="do" hit="Do not step into library scripts" />
+    <option name="into" hit="Do not step into library scripts" />
+    <option name="library" hit="Do not step into library scripts" />
+    <option name="not" hit="Do not step into library scripts" />
+    <option name="scripts" hit="Do not step into library scripts" />
+    <option name="step" hit="Do not step into library scripts" />
+    <option name="do" hit="Do not step into scripts:" />
+    <option name="into" hit="Do not step into scripts:" />
+    <option name="not" hit="Do not step into scripts:" />
+    <option name="scripts" hit="Do not step into scripts:" />
+    <option name="step" hit="Do not step into scripts:" />
+    <option name="javascript" hit="JavaScript" />
+  </configurable>
+</options>

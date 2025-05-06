@@ -1,0 +1,185 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add Attribute..." />
+    <option name="attribute" path="ActionManager" hit="Add Attribute..." />
+    <option name="add" path="ActionManager" hit="Add Subtag..." />
+    <option name="subtag" path="ActionManager" hit="Add Subtag..." />
+    <option name="a" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="add" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="all" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="instances" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="of" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="selected" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="subtag" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="tag" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="the" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="to" path="ActionManager" hit="Add a subtag to all instances of the selected tag" />
+    <option name="add" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="all" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="an" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="attribute" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="instances" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="of" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="selected" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="tag" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="the" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="to" path="ActionManager" hit="Add an attribute to all instances of the selected tag" />
+    <option name="attribute" path="ActionManager" hit="Change Attribute Value.." />
+    <option name="change" path="ActionManager" hit="Change Attribute Value.." />
+    <option name="value" path="ActionManager" hit="Change Attribute Value.." />
+    <option name="a" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="all" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="attribute" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="change" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="current" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="from" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="instances" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="new" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="of" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="selected" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="the" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="to" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="value" path="ActionManager" hit="Change the value of all instances of the selected attribute from the current value to a new value" />
+    <option name="attribute" path="ActionManager" hit="Convert Tag Contents To Attribute..." />
+    <option name="contents" path="ActionManager" hit="Convert Tag Contents To Attribute..." />
+    <option name="convert" path="ActionManager" hit="Convert Tag Contents To Attribute..." />
+    <option name="tag" path="ActionManager" hit="Convert Tag Contents To Attribute..." />
+    <option name="to" path="ActionManager" hit="Convert Tag Contents To Attribute..." />
+    <option name="all" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="an" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="as" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="attribute" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="contents" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="converts" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="instances" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="of" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="selected" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="tag" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="the" path="ActionManager" hit="Converts the contents all instances of the selected tag as an attribute" />
+    <option name="attribute" path="ActionManager" hit="Delete Attribute..." />
+    <option name="delete" path="ActionManager" hit="Delete Attribute..." />
+    <option name="delete" path="ActionManager" hit="Delete Tag..." />
+    <option name="tag" path="ActionManager" hit="Delete Tag..." />
+    <option name="attribute" path="ActionManager" hit="Move Attribute In..." />
+    <option name="in" path="ActionManager" hit="Move Attribute In..." />
+    <option name="move" path="ActionManager" hit="Move Attribute In..." />
+    <option name="attribute" path="ActionManager" hit="Move Attribute Out..." />
+    <option name="move" path="ActionManager" hit="Move Attribute Out..." />
+    <option name="out" path="ActionManager" hit="Move Attribute Out..." />
+    <option name="all" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="an" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="appropriate" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="attribute" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="instances" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="move" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="of" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="selected" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="subtag" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="the" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="to" path="ActionManager" hit="Move all instances of the selected attribute to an appropriate subtag" />
+    <option name="all" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="attribute" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="containing" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="instances" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="move" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="of" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="selected" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="tag" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="the" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="to" path="ActionManager" hit="Move all instances of the selected attribute to the containing tag" />
+    <option name="all" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="attribute" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="instances" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="of" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="remove" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="selected" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="the" path="ActionManager" hit="Remove all instances of the selected attribute" />
+    <option name="all" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="instances" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="of" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="remove" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="selected" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="tag" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="the" path="ActionManager" hit="Remove all instances of the selected tag" />
+    <option name="attribute" path="ActionManager" hit="Rename Attribute..." />
+    <option name="rename" path="ActionManager" hit="Rename Attribute..." />
+    <option name="rename" path="ActionManager" hit="Rename Tag..." />
+    <option name="tag" path="ActionManager" hit="Rename Tag..." />
+    <option name="all" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="instances" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="of" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="rename" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="selected" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="tag" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="the" path="ActionManager" hit="Rename all instances of the selected tag" />
+    <option name="attribute" path="ActionManager" hit="Replace Attribute with Tag..." />
+    <option name="replace" path="ActionManager" hit="Replace Attribute with Tag..." />
+    <option name="tag" path="ActionManager" hit="Replace Attribute with Tag..." />
+    <option name="with" path="ActionManager" hit="Replace Attribute with Tag..." />
+    <option name="attribute" path="ActionManager" hit="Replace Tag with Attribute..." />
+    <option name="replace" path="ActionManager" hit="Replace Tag with Attribute..." />
+    <option name="tag" path="ActionManager" hit="Replace Tag with Attribute..." />
+    <option name="with" path="ActionManager" hit="Replace Tag with Attribute..." />
+    <option name="a" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="all" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="attribute" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="corresponding" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="instances" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="of" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="replace" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="selected" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="tag" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="the" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="with" path="ActionManager" hit="Replace all instances of the selected attribute with a corresponding tag" />
+    <option name="a" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="all" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="attribute" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="corresponding" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="instances" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="of" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="replace" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="selected" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="tag" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="the" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="with" path="ActionManager" hit="Replace all instances of the selected tag with a corresponding attribute" />
+    <option name="all" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="contents" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="instances" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="of" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="replace" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="selected" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="tag" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="the" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="their" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="with" path="ActionManager" hit="Replace all instances of the selected tag with their contents" />
+    <option name="tag" path="ActionManager" hit="Unwrap Tag..." />
+    <option name="unwrap" path="ActionManager" hit="Unwrap Tag..." />
+    <option name="contents" path="ActionManager" hit="Wrap Tag Contents..." />
+    <option name="tag" path="ActionManager" hit="Wrap Tag Contents..." />
+    <option name="wrap" path="ActionManager" hit="Wrap Tag Contents..." />
+    <option name="tag" path="ActionManager" hit="Wrap Tag..." />
+    <option name="wrap" path="ActionManager" hit="Wrap Tag..." />
+    <option name="all" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="another" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="instances" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="of" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="selected" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="tag" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="the" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="with" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="wrap" path="ActionManager" hit="Wrap all instances of the selected tag with another tag" />
+    <option name="all" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="another" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="contents" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="instances" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="of" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="selected" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="tag" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="the" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="with" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="wrap" path="ActionManager" hit="Wrap the contents all instances of the selected tag with another tag" />
+    <option name="refactorings" path="ActionManager" hit="XML Refactorings" />
+    <option name="xml" path="ActionManager" hit="XML Refactorings" />
+  </configurable>
+</options>

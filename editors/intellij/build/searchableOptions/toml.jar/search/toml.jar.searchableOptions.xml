@@ -1,0 +1,46 @@
+<options>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.TOML" configurable_name="TOML">
+    <option name="toml" hit="TOML" />
+    <option name="boolean" hit="Boolean" />
+    <option name="comments" hit="Comments" />
+    <option name="date" hit="Date" />
+    <option name="keys" hit="Keys" />
+    <option name="number" hit="Number" />
+    <option name="escape" hit="String//Escape sequence//Invalid" />
+    <option name="invalid" hit="String//Escape sequence//Invalid" />
+    <option name="sequence" hit="String//Escape sequence//Invalid" />
+    <option name="string" hit="String//Escape sequence//Invalid" />
+    <option name="escape" hit="String//Escape sequence//Valid" />
+    <option name="sequence" hit="String//Escape sequence//Valid" />
+    <option name="string" hit="String//Escape sequence//Valid" />
+    <option name="valid" hit="String//Escape sequence//Valid" />
+    <option name="string" hit="String//String text" />
+    <option name="text" hit="String//String text" />
+  </configurable>
+  <configurable id="preferences.sourceCode.TOML" configurable_name="TOML">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="disable" hit="Disable" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="toml" hit="TOML" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+  </configurable>
+</options>

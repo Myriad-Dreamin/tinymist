@@ -1,0 +1,70 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add Qodana to CI Pipeline" />
+    <option name="ci" path="ActionManager" hit="Add Qodana to CI Pipeline" />
+    <option name="pipeline" path="ActionManager" hit="Add Qodana to CI Pipeline" />
+    <option name="qodana" path="ActionManager" hit="Add Qodana to CI Pipeline" />
+    <option name="to" path="ActionManager" hit="Add Qodana to CI Pipeline" />
+    <option name="allows" path="ActionManager" hit="Allows grouping problems" />
+    <option name="grouping" path="ActionManager" hit="Allows grouping problems" />
+    <option name="problems" path="ActionManager" hit="Allows grouping problems" />
+    <option name="cache" path="ActionManager" hit="Clear Qodana Reports Cache" />
+    <option name="clear" path="ActionManager" hit="Clear Qodana Reports Cache" />
+    <option name="qodana" path="ActionManager" hit="Clear Qodana Reports Cache" />
+    <option name="reports" path="ActionManager" hit="Clear Qodana Reports Cache" />
+    <option name="a" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="click" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="for" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="it" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="open" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="preview" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="problem" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="selected" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="to" path="ActionManager" hit="Click a selected problem to open a preview for it" />
+    <option name="close" path="ActionManager" hit="Close Report" />
+    <option name="report" path="ActionManager" hit="Close Report" />
+    <option name="analysis" path="ActionManager" hit="Exclude from Qodana Analysis…" />
+    <option name="exclude" path="ActionManager" hit="Exclude from Qodana Analysis…" />
+    <option name="from" path="ActionManager" hit="Exclude from Qodana Analysis…" />
+    <option name="qodana" path="ActionManager" hit="Exclude from Qodana Analysis…" />
+    <option name="build" path="ActionManager" hit="Open Build Page" />
+    <option name="open" path="ActionManager" hit="Open Build Page" />
+    <option name="page" path="ActionManager" hit="Open Build Page" />
+    <option name="editor" path="ActionManager" hit="Open Editor Preview" />
+    <option name="open" path="ActionManager" hit="Open Editor Preview" />
+    <option name="preview" path="ActionManager" hit="Open Editor Preview" />
+    <option name="local" path="ActionManager" hit="Open Local Report…" />
+    <option name="open" path="ActionManager" hit="Open Local Report…" />
+    <option name="report" path="ActionManager" hit="Open Local Report…" />
+    <option name="browser" path="ActionManager" hit="Open Qodana in Browser" />
+    <option name="in" path="ActionManager" hit="Open Qodana in Browser" />
+    <option name="open" path="ActionManager" hit="Open Qodana in Browser" />
+    <option name="qodana" path="ActionManager" hit="Open Qodana in Browser" />
+    <option name="open" path="ActionManager" hit="Open SARIF with Qodana" />
+    <option name="qodana" path="ActionManager" hit="Open SARIF with Qodana" />
+    <option name="sarif" path="ActionManager" hit="Open SARIF with Qodana" />
+    <option name="with" path="ActionManager" hit="Open SARIF with Qodana" />
+    <option name="other" path="ActionManager" hit="Other…" />
+    <option name="qodana" path="ActionManager" hit="Qodana" />
+    <option name="refresh" path="ActionManager" hit="Refresh Report" />
+    <option name="report" path="ActionManager" hit="Refresh Report" />
+    <option name="qodana" path="ActionManager" hit="Reset Qodana Tab" />
+    <option name="reset" path="ActionManager" hit="Reset Qodana Tab" />
+    <option name="tab" path="ActionManager" hit="Reset Qodana Tab" />
+    <option name="browser" path="ActionManager" hit="Show Qodana in Browser" />
+    <option name="in" path="ActionManager" hit="Show Qodana in Browser" />
+    <option name="qodana" path="ActionManager" hit="Show Qodana in Browser" />
+    <option name="show" path="ActionManager" hit="Show Qodana in Browser" />
+    <option name="analysis" path="ActionManager" hit="Try Code Analysis with Qodana" />
+    <option name="code" path="ActionManager" hit="Try Code Analysis with Qodana" />
+    <option name="qodana" path="ActionManager" hit="Try Code Analysis with Qodana" />
+    <option name="try" path="ActionManager" hit="Try Code Analysis with Qodana" />
+    <option name="with" path="ActionManager" hit="Try Code Analysis with Qodana" />
+    <option name="options" path="ActionManager" hit="View Options" />
+    <option name="view" path="ActionManager" hit="View Options" />
+  </configurable>
+  <configurable id="settings.qodana" configurable_name="Qodana">
+    <option name="qodana" hit="Qodana" />
+  </configurable>
+</options>

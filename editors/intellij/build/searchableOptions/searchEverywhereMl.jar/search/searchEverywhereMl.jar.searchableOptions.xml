@@ -1,0 +1,36 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="a" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="and" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="displays" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="element" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="every" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="features" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="file" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="from" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="in" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="ml" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="of" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="results" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="scratch" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="search" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="sorting" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="the" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="weight" path="ActionManager" hit="Displays ML features and sorting weight of every element from the search results in a scratch file" />
+    <option name="current" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="dictionary" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="dump" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="file" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="for" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="tab" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="the" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="to" path="ActionManager" hit="Dump Dictionary for the Current Tab to File" />
+    <option name="element" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+    <option name="everywhere" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+    <option name="features" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+    <option name="ml" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+    <option name="search" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+    <option name="show" path="ActionManager" hit="Show Search Everywhere ML Element Features" />
+  </configurable>
+</options>

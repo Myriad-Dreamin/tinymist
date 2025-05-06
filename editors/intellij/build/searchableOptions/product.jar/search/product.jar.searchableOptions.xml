@@ -1,0 +1,66 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="clipboard" path="ActionManager" hit="Copy Diagram to Clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy Diagram to Clipboard" />
+    <option name="diagram" path="ActionManager" hit="Copy Diagram to Clipboard" />
+    <option name="to" path="ActionManager" hit="Copy Diagram to Clipboard" />
+    <option name="clipboard" path="ActionManager" hit="Copy Selection to Clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy Selection to Clipboard" />
+    <option name="selection" path="ActionManager" hit="Copy Selection to Clipboard" />
+    <option name="to" path="ActionManager" hit="Copy Selection to Clipboard" />
+    <option name="data" path="ActionManager" hit="Enter registration data" />
+    <option name="enter" path="ActionManager" hit="Enter registration data" />
+    <option name="registration" path="ActionManager" hit="Enter registration data" />
+    <option name="export" path="ActionManager" hit="Export to Image..." />
+    <option name="image" path="ActionManager" hit="Export to Image..." />
+    <option name="to" path="ActionManager" hit="Export to Image..." />
+    <option name="export" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="file" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="gif" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="jpg" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="or" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="png" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="svg" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="svgz" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="to" path="ActionManager" hit="Export to PNG, JPG, GIF, SVG or SVGZ file" />
+    <option name="go" path="ActionManager" hit="Go to URL Mapping..." />
+    <option name="mapping" path="ActionManager" hit="Go to URL Mapping..." />
+    <option name="to" path="ActionManager" hit="Go to URL Mapping..." />
+    <option name="url" path="ActionManager" hit="Go to URL Mapping..." />
+    <option name="licenses" path="ActionManager" hit="Manage Licenses..." />
+    <option name="manage" path="ActionManager" hit="Manage Licenses..." />
+    <option name="register" path="ActionManager" hit="Register..." />
+    <option name="evaluation" path="ActionManager" hit="Show Evaluation Feedback Request" />
+    <option name="feedback" path="ActionManager" hit="Show Evaluation Feedback Request" />
+    <option name="request" path="ActionManager" hit="Show Evaluation Feedback Request" />
+    <option name="show" path="ActionManager" hit="Show Evaluation Feedback Request" />
+    <option name="dependencies" path="ActionManager" hit="Show Selected Nodes with Dependencies" />
+    <option name="nodes" path="ActionManager" hit="Show Selected Nodes with Dependencies" />
+    <option name="selected" path="ActionManager" hit="Show Selected Nodes with Dependencies" />
+    <option name="show" path="ActionManager" hit="Show Selected Nodes with Dependencies" />
+    <option name="with" path="ActionManager" hit="Show Selected Nodes with Dependencies" />
+    <option name="boilerplate" path="ActionManager" hit="Show boilerplate code" />
+    <option name="code" path="ActionManager" hit="Show boilerplate code" />
+    <option name="show" path="ActionManager" hit="Show boilerplate code" />
+    <option name="ide" path="ActionManager" hit="Signal IDE Not Used" />
+    <option name="not" path="ActionManager" hit="Signal IDE Not Used" />
+    <option name="signal" path="ActionManager" hit="Signal IDE Not Used" />
+    <option name="used" path="ActionManager" hit="Signal IDE Not Used" />
+    <option name="either" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="ide" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="is" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="not" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="or" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="signal" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="the" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="used" path="ActionManager" hit="Signal the IDE is either not used or used." />
+    <option name="boilerplate" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="client" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="code" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="generator" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="in" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="showing" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+    <option name="toggle" path="ActionManager" hit="Toggle showing boilerplate code in client generator" />
+  </configurable>
+</options>

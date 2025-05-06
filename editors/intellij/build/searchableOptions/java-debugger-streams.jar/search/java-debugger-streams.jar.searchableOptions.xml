@@ -1,0 +1,9 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="chain" path="ActionManager" hit="Trace Current Stream Chain" />
+    <option name="current" path="ActionManager" hit="Trace Current Stream Chain" />
+    <option name="stream" path="ActionManager" hit="Trace Current Stream Chain" />
+    <option name="trace" path="ActionManager" hit="Trace Current Stream Chain" />
+  </configurable>
+</options>

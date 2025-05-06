@@ -1,0 +1,235 @@
+{
+  "groups" : [ {
+    "id" : "llm.chat.events",
+    "builds" : [ ],
+    "versions" : [ {
+      "from" : "1"
+    } ],
+    "rules" : {
+      "event_id" : [ "{enum#__event_id}" ],
+      "event_data" : {
+        "chat_session_id" : [ "{regexp#date_short_hash}" ],
+        "context" : [ "{util#llm_parameters}" ],
+        "duration_ms" : [ "{regexp#integer}" ],
+        "function_arguments" : [ "{util#llm_parameters}" ],
+        "function_call_error" : [ "{util#class_name}" ],
+        "function_call_response" : [ "{util#llm_parameters}" ],
+        "function_call_trimmed" : [ "{enum#boolean}" ],
+        "function_name" : [ "{util#class_name}" ],
+        "history.message_id" : [ "{regexp#short_hash}" ],
+        "history.role" : [ "{enum:System|Assistant|User}", "{enum:Function}" ],
+        "internal_text" : [ "{util#llm_parameters}" ],
+        "is_exceeded_token_limit" : [ "{enum#boolean}" ],
+        "message_id" : [ "{regexp#short_hash}" ],
+        "messages" : [ "{util#llm_parameters}" ],
+        "plugin" : [ "{util#plugin}" ],
+        "plugin_type" : [ "{util#plugin_type}" ],
+        "plugin_version" : [ "{util#plugin_version}" ],
+        "profile" : [ "{util#llm_parameters}" ],
+        "prompt_text" : [ "{util#llm_parameters}" ],
+        "request" : [ "{util#llm_parameters}" ],
+        "result" : [ "{util#llm_parameters}" ],
+        "score" : [ "{enum:None|Like|Dislike}" ],
+        "source_action" : [ "{enum#__source_action}", "{enum:RIDER_GENERATE_UNIT_TESTS}", "{enum:PYTHON_EXPLAIN_DATA_FRAME}", "{enum:GENERATE_API_REQUEST_EXAMPLE}", "{enum:BUILD_ERROR_EXPLANATION}", "{enum:NEW_POPUP_CHAT}", "{enum:UNKNOWN|NEW_CHAT|EXPLAIN_CODE_INTENTION|FIND_PROBLEMS_INTENTION|REFACTOR_THIS|UNKNOWN_CHAT_INTENTION|LOAD_STATE|RUNTIME_ERROR_EXPLANATION|EXPLAIN_COMMIT|UNITY_CREATE_NEW_FILE|UNITY_GENERATE_CODE|GENERATE_CODE_INPLACE|CUSTOM_CHAT|PROMPT_LIBRARY|ERROR_MESSAGE}" ],
+        "user_message_id" : [ "{regexp#short_hash}" ]
+      },
+      "enums" : {
+        "__event_id" : [ "message.received", "new.chat.created", "message.scored", "chatLogsSent", "message.sent", "edit.user.message.cancelled.with.mouse", "code.inserted", "edit.user.message.cancelled", "code.copied", "message.received.canceled", "chat.from.history.opened", "all.chats.clicked", "edit.usage.message.finished", "edit.user.message.started", "code.snippet.inserted.at.caret", "function.called", "code.snippet.file.created" ],
+        "__source_action" : [ "PYTHON_DJANGO_VIEW_FOR_MODEL_INTENTION", "PYTHON_DJANGO_CUSTOM_SMART_CHAT_INTENTION", "PYTHON_FILE_SIGNATURES_CUSTOM_INTENTION", "PYTHON_DJANGO_CUSTOM_INTENTION", "GENERATE_UNIT_TESTS", "PYTHON_DJANGO_ADMIN_FOR_MODEL_INTENTION", "PYTHON_DJANGO_SERIALIZER_FOR_MODEL_INTENTION" ]
+      }
+    },
+    "anonymized_fields" : [ {
+      "event" : "function.called",
+      "fields" : [ "chat_session_id" ]
+    }, {
+      "event" : "message.received",
+      "fields" : [ "message_id", "user_message_id", "chat_session_id" ]
+    }, {
+      "event" : "message.received.canceled",
+      "fields" : [ "message_id", "user_message_id", "chat_session_id" ]
+    }, {
+      "event" : "message.scored",
+      "fields" : [ "message_id", "chat_session_id" ]
+    }, {
+      "event" : "message.sent",
+      "fields" : [ "history.message_id", "message_id", "chat_session_id" ]
+    }, {
+      "event" : "edit.user.message.cancelled",
+      "fields" : [ "message_id", "chat_session_id" ]
+    }, {
+      "event" : "chat.from.history.opened",
+      "fields" : [ "chat_session_id" ]
+    }, {
+      "event" : "code.snippet.file.created",
+      "fields" : [ "chat_session_id", "message_id" ]
+    }, {
+      "event" : "edit.user.message.started",
+      "fields" : [ "message_id", "chat_session_id" ]
+    }, {
+      "event" : "code.snippet.inserted.at.caret",
+      "fields" : [ "message_id", "chat_session_id" ]
+    }, {
+      "event" : "new.chat.created",
+      "fields" : [ "chat_session_id" ]
+    }, {
+      "event" : "chatLogsSent",
+      "fields" : [ "chat_session_id" ]
+    }, {
+      "event" : "edit.user.message.cancelled.with.mouse",
+      "fields" : [ "chat_session_id" ]
+    }, {
+      "event" : "code.copied",
+      "fields" : [ "message_id", "chat_session_id" ]
+    }, {
+      "event" : "edit.usage.message.finished",
+      "fields" : [ "message_id", "chat_session_id" ]
+    } ]
+  }, {
+    "id" : "llm.events",
+    "builds" : [ ],
+    "versions" : [ {
+      "from" : "1"
+    } ],
+    "rules" : {
+      "event_id" : [ "{enum#__event_id}" ],
+      "event_data" : {
+        "all_summary_score" : [ "{enum#boolean}" ],
+        "all_summary_vcs_navigated" : [ "{enum#boolean}" ],
+        "code_generation_request_finish_state" : [ "{enum:CODE_GENERATED|NO_CODE_GENERATED|INTERRUPTED|FAILED}", "{enum:PROGRESS}" ],
+        "code_generation_state" : [ "{enum:NOT_AVAILABLE|ERROR|CLOSED|ACCEPTED}" ],
+        "commit_generate_feature" : [ "{util#class_name}" ],
+        "context" : [ "{util#llm_parameters}" ],
+        "custom_instruction" : [ "{util#llm_parameters}" ],
+        "documentation_invoke_state" : [ "{enum:INLAY_BUTTON|INTENTION|INSPECTION}" ],
+        "duration_ms" : [ "{regexp#integer}" ],
+        "file_lang" : [ "{util#class_name}" ],
+        "file_text" : [ "{util#llm_parameters}" ],
+        "generated_summary_message_length" : [ "{regexp#integer}" ],
+        "id" : [ "{regexp#integer}" ],
+        "ide_activity_id" : [ "{regexp#integer}" ],
+        "interaction" : [ "{util#class_name}" ],
+        "lang" : [ "{util#lang}" ],
+        "lang_detection_mechanism" : [ "{enum:JET_ENRY}" ],
+        "messages" : [ "{util#llm_parameters}" ],
+        "number_of_files" : [ "{regexp#integer}" ],
+        "original_name" : [ "{util#llm_parameters}" ],
+        "parameters.input" : [ "{util#llm_parameters}" ],
+        "parameters.instruction" : [ "{util#llm_parameters}" ],
+        "parameters.log_prob" : [ "{regexp#float}" ],
+        "parameters.max_tokens" : [ "{regexp#integer}" ],
+        "parameters.messages" : [ "{util#llm_parameters}" ],
+        "parameters.model" : [ "{util#llm_parameters}" ],
+        "parameters.number_of_suggestions" : [ "{regexp#integer}" ],
+        "parameters.options" : [ "{util#llm_parameters}" ],
+        "parameters.request" : [ "{enum:OPENAI_EDIT|OPENAI_COMPLETION|CODEGEN_COMPLETION|MOCK}", "{enum:OPENAI_EDIT|OPENAI_COMPLETION|OPENAI_CHAT|GRAZIE_COMPLETION|GRAZIE_EDIT|MOCK|GRAZIE_REFACTORING}" ],
+        "parameters.suffix" : [ "{util#llm_parameters}" ],
+        "parameters.temperature" : [ "{regexp#float}" ],
+        "parameters.top_p" : [ "{regexp#float}" ],
+        "pasted_snippet" : [ "{util#llm_parameters}" ],
+        "pasted_snippet_lang" : [ "{util#class_name}" ],
+        "plugin" : [ "{util#plugin}" ],
+        "plugin_type" : [ "{util#plugin_type}" ],
+        "plugin_version" : [ "{util#plugin_version}" ],
+        "profile" : [ "{util#llm_parameters}" ],
+        "regenerate_count" : [ "{regexp#integer}" ],
+        "request" : [ "{util#llm_parameters}" ],
+        "result" : [ "{util#llm_parameters}" ],
+        "score" : [ "{enum:YES|NO|CANCEL}" ],
+        "selected_option" : [ "{util#llm_parameters}" ],
+        "session_id" : [ "{regexp#date_short_hash}" ],
+        "source_action" : [ "{util#llm_parameters}", "{enum#__source_action}" ],
+        "specify_count" : [ "{regexp#integer}" ],
+        "state" : [ "{enum:SUCCEED|ERROR|CANCEL|NOT_AUTHENTICATED}" ],
+        "stop_reason" : [ "{util#llm_parameters}" ],
+        "succeed" : [ "{enum#boolean}" ],
+        "target" : [ "{util#class_name}" ],
+        "target_lang" : [ "{util#class_name}" ],
+        "time_to_first_diff" : [ "{regexp#integer}" ],
+        "time_to_show" : [ "{regexp#integer}" ]
+      },
+      "enums" : {
+        "__event_id" : [ "edit.request.started", "edit.request.sent", "edit.request.finished", "edit.request.score", "completion.request.started", "completion.request.sent", "completion.request.finished", "completion.request.score", "chat.request.sent", "chat.request.score", "chat.request.started", "chat.request.finished", "chatLogsSent", "name.suggestion.finished", "name.suggestion.started", "name.suggestion.request", "name.suggestion.show", "name.suggestion.response", "name.suggestion.score", "commit.generation.finished", "commit.generation.sent", "commit.generation.started", "commit.generation.score", "documentation.generation.started", "documentation.generation.sent", "documentation.generation.score", "documentation.generation.finished", "commit.summary.generation.sent", "commit.summary.generation.finished", "commit.summary.generation.score", "commit.summary.generation.started", "code.generation.started", "code.generation.request.finished", "code.generation.finished", "code.generation.request.started", "test.generation.finished", "test.generation.review", "test.generation.score", "test.generation.started", "test.generation.request", "language.conversion.paste.finished", "language.conversion.paste.score", "language.conversion.file.started", "language.conversion.paste.request", "language.conversion.file.finished", "language.conversion.paste.started" ],
+        "__source_action" : [ "UNKNOWN_CHAT_INTENTION", "REFACTOR_THIS", "FIND_PROBLEMS_INTENTION", "RUNTIME_ERROR_EXPLANATION", "EXPLAIN_CODE_INTENTION", "UNKNOWN", "LOAD_STATE", "NEW_CHAT" ]
+      }
+    },
+    "anonymized_fields" : [ {
+      "event" : "chatLogsSent",
+      "fields" : [ "session_id" ]
+    } ]
+  }, {
+    "id" : "llm.inline.completion.llmc",
+    "builds" : [ ],
+    "versions" : [ {
+      "from" : "2"
+    } ],
+    "rules" : {
+      "event_id" : [ "{enum:llm.item.ready}" ],
+      "event_data" : {
+        "accumulatedResponse" : [ "{util#llm_parameters}" ],
+        "accumulation_stop_reason" : [ "{enum:LLM_CODE_FINISHED|EOF|BLOCK_BALANCE|TOO_NESTED|FIRST_LINE_MODE}", "{enum:LINE_LIMIT}" ],
+        "attachments" : [ "{util#llm_parameters}" ],
+        "cached_request_id" : [ "{regexp#integer}" ],
+        "caching" : [ "{enum:FRESH|BY_POSITION|BY_PROMPT_TEXT|CONTINUATION}" ],
+        "decline_reason" : [ "{enum:LLM_DECISION|LLM_DID_NOT_RESPOND|LLM_RESPONSE_HAS_NO_ANSWER|LLM_RESPONSE_HAS_NO_CODE|SYNTAX_ERROR|UNRESOLVABLE|UNSUPPORTED_CONTEXT|INTERNAL_IDE_PROBLEM|CANCELLED|EXCEPTION|DAILY_LIMIT_EXCEEDED}", "{enum:DUPLICATE}", "{enum:CONFLICTING_PLUGINS}" ],
+        "instructions" : [ "{util#llm_parameters}" ],
+        "prefix" : [ "{util#llm_parameters}" ],
+        "prompt" : [ "{util#llm_parameters}" ],
+        "references_renamed" : [ "{enum#boolean}" ],
+        "request_id" : [ "{regexp#integer}" ],
+        "stage" : [ "{enum:START|PROMPT_GENERATION|SEND_REQUEST|ACCUMULATE_RESPONSE|POST_PROCESS|RESULT}" ],
+        "suffix" : [ "{util#llm_parameters}" ],
+        "suggestion" : [ "{util#llm_parameters}" ],
+        "time_to_accumulate_response" : [ "{regexp#integer}" ],
+        "time_to_collect_context" : [ "{regexp#integer}" ],
+        "time_to_postprocess" : [ "{regexp#integer}" ],
+        "will_yield_more_results" : [ "{enum#boolean}" ]
+      }
+    }
+  }, {
+    "id" : "llmc.event.log",
+    "builds" : [ ],
+    "versions" : [ {
+      "from" : "1"
+    } ],
+    "rules" : {
+      "event_id" : [ "{enum#__event_id}" ],
+      "event_data" : {
+        "code" : [ "{regexp#integer}" ],
+        "error" : [ "{util#class_name}", "{enum:EMPTY_CONTENT|INVALID_JSON|UNKNOWN}", "{enum:EMPTY_SERVICE_URL|UNREACHABLE_SERVICE|EMPTY_RESPONSE_BODY|ERROR_ON_LOAD}" ],
+        "error_ts" : [ "{regexp#integer}" ],
+        "errors" : [ "{regexp#integer}" ],
+        "external" : [ "{enum#boolean}" ],
+        "failed" : [ "{regexp#integer}" ],
+        "paths" : [ "{regexp#hash}" ],
+        "send" : [ "{regexp#integer}" ],
+        "stage" : [ "{enum:LOADING|PARSING}" ],
+        "succeed" : [ "{regexp#integer}" ],
+        "total" : [ "{regexp#integer}" ],
+        "version" : [ "{regexp#version}" ]
+      },
+      "enums" : {
+        "__event_id" : [ "logs.send", "loading.config.failed", "metadata.loaded", "metadata.updated", "metadata.update.failed", "metadata.load.failed" ]
+      }
+    },
+    "anonymized_fields" : [ {
+      "event" : "logs.send",
+      "fields" : [ "paths" ]
+    } ]
+  } ],
+  "rules" : {
+    "enums" : {
+      "boolean" : [ "true", "false", "TRUE", "FALSE", "True", "False" ]
+    },
+    "regexps" : {
+      "count" : "\\d+K?M?\\+?",
+      "date_YYYY-MM-DD_HH" : "^[12][0-9]{3}-(0[0-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])( ([0-1][0-9]|2[0-3]))?$",
+      "date_short_hash" : "[0-9]{2}[01][0-9][0123][0-9]-(([0-9A-Fa-f]{12})|undefined)",
+      "float" : "-?\\d+(\\.\\d+(E\\-?\\d+)?)?",
+      "hash" : "[0-9a-f]{64}(#[SC])+",
+      "integer" : "-?\\d+",
+      "short_hash" : "([0-9A-Fa-f]{12})|undefined",
+      "version" : "Unknown|unknown.format|unknown|UNKNOWN|((\\d+\\.?)*\\d+)"
+    }
+  },
+  "version" : "4214"
+}

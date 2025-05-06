@@ -1,0 +1,11 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="client" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+    <option name="create" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+    <option name="grpc" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+    <option name="http" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+    <option name="in" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+    <option name="request" path="ActionManager" hit="Create GRPC Request in HTTP Client" />
+  </configurable>
+</options>

@@ -1,0 +1,38 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="default" path="ActionManager" hit="Edit Default Path" />
+    <option name="edit" path="ActionManager" hit="Edit Default Path" />
+    <option name="path" path="ActionManager" hit="Edit Default Path" />
+    <option name="edit" path="ActionManager" hit="Edit Starters..." />
+    <option name="starters" path="ActionManager" hit="Edit Starters..." />
+    <option name="boot" path="ActionManager" hit="Spring Boot Diagnostics" />
+    <option name="diagnostics" path="ActionManager" hit="Spring Boot Diagnostics" />
+    <option name="spring" path="ActionManager" hit="Spring Boot Diagnostics" />
+  </configurable>
+  <configurable id="spring.boot" configurable_name="Spring Boot">
+    <option name="automatically" hit="Create run configuration automatically" />
+    <option name="configuration" hit="Create run configuration automatically" />
+    <option name="create" hit="Create run configuration automatically" />
+    <option name="run" hit="Create run configuration automatically" />
+    <option name="import" hit="Project Import" />
+    <option name="project" hit="Project Import" />
+    <option name="actuator" hit="Refresh health in the Actuator tab every" />
+    <option name="every" hit="Refresh health in the Actuator tab every" />
+    <option name="health" hit="Refresh health in the Actuator tab every" />
+    <option name="in" hit="Refresh health in the Actuator tab every" />
+    <option name="refresh" hit="Refresh health in the Actuator tab every" />
+    <option name="tab" hit="Refresh health in the Actuator tab every" />
+    <option name="the" hit="Refresh health in the Actuator tab every" />
+    <option name="configuration" hit="Show notification panel in configuration metadata files" />
+    <option name="files" hit="Show notification panel in configuration metadata files" />
+    <option name="in" hit="Show notification panel in configuration metadata files" />
+    <option name="metadata" hit="Show notification panel in configuration metadata files" />
+    <option name="notification" hit="Show notification panel in configuration metadata files" />
+    <option name="panel" hit="Show notification panel in configuration metadata files" />
+    <option name="show" hit="Show notification panel in configuration metadata files" />
+    <option name="boot" hit="Spring Boot" />
+    <option name="spring" hit="Spring Boot" />
+    <option name="sec" hit="sec." />
+  </configurable>
+</options>

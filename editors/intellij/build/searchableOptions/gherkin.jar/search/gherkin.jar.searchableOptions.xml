@@ -1,0 +1,49 @@
+<options>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Cucumber" configurable_name="Cucumber">
+    <option name="cucumber" hit="Cucumber" />
+    <option name="comment" hit="Comment" />
+    <option name="keyword" hit="Keyword" />
+    <option name="multiline" hit="Multiline string" />
+    <option name="string" hit="Multiline string" />
+    <option name="outline" hit="Scenario outline parameter" />
+    <option name="parameter" hit="Scenario outline parameter" />
+    <option name="scenario" hit="Scenario outline parameter" />
+    <option name="parameter" hit="Step parameter" />
+    <option name="step" hit="Step parameter" />
+    <option name="cell" hit="Table cell" />
+    <option name="table" hit="Table cell" />
+    <option name="cell" hit="Table header cell" />
+    <option name="header" hit="Table header cell" />
+    <option name="table" hit="Table header cell" />
+    <option name="pipe" hit="Table pipe" />
+    <option name="table" hit="Table pipe" />
+    <option name="tag" hit="Tag" />
+    <option name="text" hit="Text" />
+  </configurable>
+  <configurable id="preferences.sourceCode.Gherkin" configurable_name="Gherkin">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="disable" hit="Disable" />
+    <option name="gherkin" hit="Gherkin" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+  </configurable>
+</options>

@@ -1,0 +1,27 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="capture" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="memory" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="capture" path="ActionManager" hit="Capture memory snapshot" />
+    <option name="memory" path="ActionManager" hit="Capture memory snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Capture memory snapshot" />
+    <option name="execute" path="ActionManager" hit="Execute Performance Script…" />
+    <option name="performance" path="ActionManager" hit="Execute Performance Script…" />
+    <option name="script" path="ActionManager" hit="Execute Performance Script…" />
+    <option name="execute" path="ActionManager" hit="Execute performance test script" />
+    <option name="performance" path="ActionManager" hit="Execute performance test script" />
+    <option name="script" path="ActionManager" hit="Execute performance test script" />
+    <option name="test" path="ActionManager" hit="Execute performance test script" />
+    <option name="diagnostics" path="ActionManager" hit="Open Indexing Diagnostics" />
+    <option name="indexing" path="ActionManager" hit="Open Indexing Diagnostics" />
+    <option name="open" path="ActionManager" hit="Open Indexing Diagnostics" />
+    <option name="current" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="diagnostics" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="for" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="indexing" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="open" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="project" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+    <option name="the" path="ActionManager" hit="Open Indexing Diagnostics for the current project" />
+  </configurable>
+</options>

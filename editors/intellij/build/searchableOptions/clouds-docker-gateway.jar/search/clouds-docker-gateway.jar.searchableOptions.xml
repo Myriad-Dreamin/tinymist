@@ -1,0 +1,26 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="and" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="clone" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="container" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="create" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="dev" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="sources" path="ActionManager" hit="Create Dev Container and Clone Sources..." />
+    <option name="and" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="container" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="create" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="dev" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="mount" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="sources" path="ActionManager" hit="Create Dev Container and Mount Sources..." />
+    <option name="containers" path="ActionManager" hit="Dev Containers" />
+    <option name="dev" path="ActionManager" hit="Dev Containers" />
+    <option name="backends" path="ActionManager" hit="Manage Dev Container Backends" />
+    <option name="container" path="ActionManager" hit="Manage Dev Container Backends" />
+    <option name="dev" path="ActionManager" hit="Manage Dev Container Backends" />
+    <option name="manage" path="ActionManager" hit="Manage Dev Container Backends" />
+    <option name="containers" path="ActionManager" hit="Show Dev Containers" />
+    <option name="dev" path="ActionManager" hit="Show Dev Containers" />
+    <option name="show" path="ActionManager" hit="Show Dev Containers" />
+  </configurable>
+</options>

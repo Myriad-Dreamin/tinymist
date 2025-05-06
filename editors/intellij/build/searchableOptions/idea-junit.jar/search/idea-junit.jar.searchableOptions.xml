@@ -1,0 +1,13 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add to JUnit Pattern Suite" />
+    <option name="junit" path="ActionManager" hit="Add to JUnit Pattern Suite" />
+    <option name="pattern" path="ActionManager" hit="Add to JUnit Pattern Suite" />
+    <option name="suite" path="ActionManager" hit="Add to JUnit Pattern Suite" />
+    <option name="to" path="ActionManager" hit="Add to JUnit Pattern Suite" />
+    <option name="exclude" path="ActionManager" hit="Exclude from Suite" />
+    <option name="from" path="ActionManager" hit="Exclude from Suite" />
+    <option name="suite" path="ActionManager" hit="Exclude from Suite" />
+  </configurable>
+</options>

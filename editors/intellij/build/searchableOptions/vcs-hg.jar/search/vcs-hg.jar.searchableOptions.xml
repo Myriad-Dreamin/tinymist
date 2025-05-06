@@ -1,0 +1,191 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="abort" path="ActionManager" hit="Abort Rebasing" />
+    <option name="rebasing" path="ActionManager" hit="Abort Rebasing" />
+    <option name="add" path="ActionManager" hit="Add selected files to .hgignore" />
+    <option name="files" path="ActionManager" hit="Add selected files to .hgignore" />
+    <option name="hgignore" path="ActionManager" hit="Add selected files to .hgignore" />
+    <option name="selected" path="ActionManager" hit="Add selected files to .hgignore" />
+    <option name="to" path="ActionManager" hit="Add selected files to .hgignore" />
+    <option name="add" path="ActionManager" hit="Add to .hgignore" />
+    <option name="hgignore" path="ActionManager" hit="Add to .hgignore" />
+    <option name="to" path="ActionManager" hit="Add to .hgignore" />
+    <option name="apply" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="history" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="into" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="mq" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="patches" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="repository" path="ActionManager" hit="Apply mq patches into repository history" />
+    <option name="apply" path="ActionManager" hit="Apply only selected patch" />
+    <option name="only" path="ActionManager" hit="Apply only selected patch" />
+    <option name="patch" path="ActionManager" hit="Apply only selected patch" />
+    <option name="selected" path="ActionManager" hit="Apply only selected patch" />
+    <option name="branches" path="ActionManager" hit="Branches…" />
+    <option name="and" path="ActionManager" hit="Commit and Push…" />
+    <option name="commit" path="ActionManager" hit="Commit and Push…" />
+    <option name="push" path="ActionManager" hit="Commit and Push…" />
+    <option name="bookmark" path="ActionManager" hit="Compare with Branch/Bookmark…" />
+    <option name="branch" path="ActionManager" hit="Compare with Branch/Bookmark…" />
+    <option name="compare" path="ActionManager" hit="Compare with Branch/Bookmark…" />
+    <option name="with" path="ActionManager" hit="Compare with Branch/Bookmark…" />
+    <option name="continue" path="ActionManager" hit="Continue Grafting" />
+    <option name="grafting" path="ActionManager" hit="Continue Grafting" />
+    <option name="continue" path="ActionManager" hit="Continue Rebasing" />
+    <option name="rebasing" path="ActionManager" hit="Continue Rebasing" />
+    <option name="create" path="ActionManager" hit="Create Mercurial Repository" />
+    <option name="mercurial" path="ActionManager" hit="Create Mercurial Repository" />
+    <option name="repository" path="ActionManager" hit="Create Mercurial Repository" />
+    <option name="a" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="create" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="current" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="for" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="revision" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="tag" path="ActionManager" hit="Create a tag for current revision" />
+    <option name="branch" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="commit" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="create" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="from" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="new" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="selected" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="starting" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="the" path="ActionManager" hit="Create new branch starting from the selected commit" />
+    <option name="commit" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="create" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="new" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="pointing" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="tag" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="this" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="to" path="ActionManager" hit="Create new tag pointing to this commit" />
+    <option name="finish" path="ActionManager" hit="Finish Patches" />
+    <option name="patches" path="ActionManager" hit="Finish Patches" />
+    <option name="fold" path="ActionManager" hit="Fold" />
+    <option name="fold" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="one" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="patch" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="selected" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="the" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="to" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="top" path="ActionManager" hit="Fold selected patch to the top one" />
+    <option name="goto" path="ActionManager" hit="Goto" />
+    <option name="goto" path="ActionManager" hit="Goto patch" />
+    <option name="patch" path="ActionManager" hit="Goto patch" />
+    <option name="import" path="ActionManager" hit="Import" />
+    <option name="all" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="commit" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="from" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="import" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="revisions" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="selected" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="starting" path="ActionManager" hit="Import all revisions starting from selected commit" />
+    <option name="as" path="ActionManager" hit="Mark as Resolved" />
+    <option name="mark" path="ActionManager" hit="Mark as Resolved" />
+    <option name="resolved" path="ActionManager" hit="Mark as Resolved" />
+    <option name="as" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="conflict" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="mark" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="marker" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="remove" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="resolved" path="ActionManager" hit="Mark as resolved, remove conflict marker" />
+    <option name="mercurial" path="ActionManager" hit="Mercurial" />
+    <option name="merge" path="ActionManager" hit="Merge With" />
+    <option name="with" path="ActionManager" hit="Merge With" />
+    <option name="existing" path="ActionManager" hit="Merge existing files" />
+    <option name="files" path="ActionManager" hit="Merge existing files" />
+    <option name="merge" path="ActionManager" hit="Merge existing files" />
+    <option name="merge" path="ActionManager" hit="Merge with selected revision" />
+    <option name="revision" path="ActionManager" hit="Merge with selected revision" />
+    <option name="selected" path="ActionManager" hit="Merge with selected revision" />
+    <option name="with" path="ActionManager" hit="Merge with selected revision" />
+    <option name="merge" path="ActionManager" hit="Merge…" />
+    <option name="and" path="ActionManager" hit="Move and Push" />
+    <option name="move" path="ActionManager" hit="Move and Push" />
+    <option name="push" path="ActionManager" hit="Move and Push" />
+    <option name="branch" path="ActionManager" hit="New Branch…" />
+    <option name="new" path="ActionManager" hit="New Branch…" />
+    <option name="new" path="ActionManager" hit="New Tag…" />
+    <option name="tag" path="ActionManager" hit="New Tag…" />
+    <option name="all" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="commit" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="from" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="pop" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="revisions" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="selected" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="starting" path="ActionManager" hit="Pop all revisions starting from selected commit" />
+    <option name="commits" path="ActionManager" hit="Pull incoming commits" />
+    <option name="incoming" path="ActionManager" hit="Pull incoming commits" />
+    <option name="pull" path="ActionManager" hit="Pull incoming commits" />
+    <option name="pull" path="ActionManager" hit="Pull…" />
+    <option name="above" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="all" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="one" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="patches" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="push" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="selected" path="ActionManager" hit="Push all patches above selected one" />
+    <option name="patch" path="ActionManager" hit="Rename Patch" />
+    <option name="rename" path="ActionManager" hit="Rename Patch" />
+    <option name="mq" path="ActionManager" hit="Rename mq patch" />
+    <option name="patch" path="ActionManager" hit="Rename mq patch" />
+    <option name="rename" path="ActionManager" hit="Rename mq patch" />
+    <option name="conflicts" path="ActionManager" hit="Resolve existing conflicts" />
+    <option name="existing" path="ActionManager" hit="Resolve existing conflicts" />
+    <option name="resolve" path="ActionManager" hit="Resolve existing conflicts" />
+    <option name="conflict" path="ActionManager" hit="Run Conflict Resolver" />
+    <option name="resolver" path="ActionManager" hit="Run Conflict Resolver" />
+    <option name="run" path="ActionManager" hit="Run Conflict Resolver" />
+    <option name="mq" path="ActionManager" hit="Show Mq Unapplied Patches…" />
+    <option name="patches" path="ActionManager" hit="Show Mq Unapplied Patches…" />
+    <option name="show" path="ActionManager" hit="Show Mq Unapplied Patches…" />
+    <option name="unapplied" path="ActionManager" hit="Show Mq Unapplied Patches…" />
+    <option name="repository" path="ActionManager" hit="Tag Repository…" />
+    <option name="tag" path="ActionManager" hit="Tag Repository…" />
+    <option name="changeset" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="directory" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="repository" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="s" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="specified" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="the" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="to" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="update" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="working" path="ActionManager" hit="Update the repository's working directory to the specified changeset." />
+    <option name="revision" path="ActionManager" hit="Update to Revision" />
+    <option name="to" path="ActionManager" hit="Update to Revision" />
+    <option name="update" path="ActionManager" hit="Update to Revision" />
+    <option name="to" path="ActionManager" hit="Update to…" />
+    <option name="update" path="ActionManager" hit="Update to…" />
+  </configurable>
+  <configurable id="vcs.Mercurial" configurable_name="Mercurial">
+    <option name="and" hit="Check for incoming and outgoing changesets" />
+    <option name="changesets" hit="Check for incoming and outgoing changesets" />
+    <option name="check" hit="Check for incoming and outgoing changesets" />
+    <option name="for" hit="Check for incoming and outgoing changesets" />
+    <option name="incoming" hit="Check for incoming and outgoing changesets" />
+    <option name="outgoing" hit="Check for incoming and outgoing changesets" />
+    <option name="all" hit="Execute Branch Operations on All Roots" />
+    <option name="branch" hit="Execute Branch Operations on All Roots" />
+    <option name="execute" hit="Execute Branch Operations on All Roots" />
+    <option name="on" hit="Execute Branch Operations on All Roots" />
+    <option name="operations" hit="Execute Branch Operations on All Roots" />
+    <option name="roots" hit="Execute Branch Operations on All Roots" />
+    <option name="annotations" hit="Ignore whitespace differences in annotations" />
+    <option name="differences" hit="Ignore whitespace differences in annotations" />
+    <option name="ignore" hit="Ignore whitespace differences in annotations" />
+    <option name="in" hit="Ignore whitespace differences in annotations" />
+    <option name="whitespace" hit="Ignore whitespace differences in annotations" />
+    <option name="mercurial" hit="Mercurial" />
+    <option name="" hit="Path to Mercurial executable:" />
+    <option name="executable" hit="Path to Mercurial executable:" />
+    <option name="mercurial" hit="Path to Mercurial executable:" />
+    <option name="path" hit="Path to Mercurial executable:" />
+    <option name="to" hit="Path to Mercurial executable:" />
+    <option name="current" hit="Set this path only for the current project" />
+    <option name="for" hit="Set this path only for the current project" />
+    <option name="only" hit="Set this path only for the current project" />
+    <option name="path" hit="Set this path only for the current project" />
+    <option name="project" hit="Set this path only for the current project" />
+    <option name="set" hit="Set this path only for the current project" />
+    <option name="the" hit="Set this path only for the current project" />
+    <option name="this" hit="Set this path only for the current project" />
+    <option name="test" hit="Test" />
+  </configurable>
+</options>

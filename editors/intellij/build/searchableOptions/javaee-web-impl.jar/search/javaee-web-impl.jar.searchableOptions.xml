@@ -1,0 +1,60 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="creates" path="ActionManager" hit="Creates new JSP/JSPX page" />
+    <option name="jsp" path="ActionManager" hit="Creates new JSP/JSPX page" />
+    <option name="jspx" path="ActionManager" hit="Creates new JSP/JSPX page" />
+    <option name="new" path="ActionManager" hit="Creates new JSP/JSPX page" />
+    <option name="page" path="ActionManager" hit="Creates new JSP/JSPX page" />
+    <option name="filter" path="ActionManager" hit="Filter..." />
+    <option name="jsp" path="ActionManager" hit="JSP/JSPX Page" />
+    <option name="jspx" path="ActionManager" hit="JSP/JSPX Page" />
+    <option name="page" path="ActionManager" hit="JSP/JSPX Page" />
+    <option name="servlet" path="ActionManager" hit="Servlet..." />
+    <option name="jsp" path="ActionManager" hit="Validate JSP" />
+    <option name="validate" path="ActionManager" hit="Validate JSP" />
+    <option name="files" path="ActionManager" hit="Validate selected JSP files" />
+    <option name="jsp" path="ActionManager" hit="Validate selected JSP files" />
+    <option name="selected" path="ActionManager" hit="Validate selected JSP files" />
+    <option name="validate" path="ActionManager" hit="Validate selected JSP files" />
+    <option name="page" path="ActionManager" hit="Web Page" />
+    <option name="web" path="ActionManager" hit="Web Page" />
+  </configurable>
+  <configurable id="Web Contexts" configurable_name="Web Contexts">
+    <option name="" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="a" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="add" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="and" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="change" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="choose" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="context" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="directory" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="drop-down" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="entire" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="file" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="for" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="from" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="html" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="idea" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="if" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="in" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="its" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="jsp" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="list" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="necessary" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="or" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="path" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="paths" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="project" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="resolve" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="settings" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="that" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="the" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="then" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="to" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="uses" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="web" hit=" To change Web Context settings that IDEA uses to resolve web paths in HTML and JSP for a file, a directory, or the entire project, add its path if necessary and then choose a context from the drop-down list.   " />
+    <option name="contexts" hit="Web Contexts" />
+    <option name="web" hit="Web Contexts" />
+  </configurable>
+</options>

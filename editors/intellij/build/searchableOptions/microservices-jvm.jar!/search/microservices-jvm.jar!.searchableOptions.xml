@@ -1,0 +1,5 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="retrofit" hit="Retrofit" />
+  </configurable>
+</options>

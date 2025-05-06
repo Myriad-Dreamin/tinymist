@@ -1,0 +1,59 @@
+<options>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Micronaut EL" configurable_name="Micronaut EL">
+    <option name="el" hit="Micronaut EL" />
+    <option name="micronaut" hit="Micronaut EL" />
+    <option name="background" hit="Background" />
+    <option name="bean" hit="Bean prefix" />
+    <option name="prefix" hit="Bean prefix" />
+    <option name="and" hit="Braces and Operators//Braces" />
+    <option name="braces" hit="Braces and Operators//Braces" />
+    <option name="operators" hit="Braces and Operators//Braces" />
+    <option name="and" hit="Braces and Operators//Brackets" />
+    <option name="braces" hit="Braces and Operators//Brackets" />
+    <option name="brackets" hit="Braces and Operators//Brackets" />
+    <option name="operators" hit="Braces and Operators//Brackets" />
+    <option name="and" hit="Braces and Operators//Colon" />
+    <option name="braces" hit="Braces and Operators//Colon" />
+    <option name="colon" hit="Braces and Operators//Colon" />
+    <option name="operators" hit="Braces and Operators//Colon" />
+    <option name="and" hit="Braces and Operators//Comma" />
+    <option name="braces" hit="Braces and Operators//Comma" />
+    <option name="comma" hit="Braces and Operators//Comma" />
+    <option name="operators" hit="Braces and Operators//Comma" />
+    <option name="and" hit="Braces and Operators//Dot" />
+    <option name="braces" hit="Braces and Operators//Dot" />
+    <option name="dot" hit="Braces and Operators//Dot" />
+    <option name="operators" hit="Braces and Operators//Dot" />
+    <option name="and" hit="Braces and Operators//Operation sign" />
+    <option name="braces" hit="Braces and Operators//Operation sign" />
+    <option name="operation" hit="Braces and Operators//Operation sign" />
+    <option name="operators" hit="Braces and Operators//Operation sign" />
+    <option name="sign" hit="Braces and Operators//Operation sign" />
+    <option name="and" hit="Braces and Operators//Parentheses" />
+    <option name="braces" hit="Braces and Operators//Parentheses" />
+    <option name="operators" hit="Braces and Operators//Parentheses" />
+    <option name="parentheses" hit="Braces and Operators//Parentheses" />
+    <option name="bounds" hit="Expression bounds" />
+    <option name="expression" hit="Expression bounds" />
+    <option name="identifier" hit="Identifier" />
+    <option name="keyword" hit="Keyword" />
+    <option name="call" hit="Method call" />
+    <option name="method" hit="Method call" />
+    <option name="number" hit="Number" />
+    <option name="key" hit="Property key" />
+    <option name="property" hit="Property key" />
+    <option name="qualified" hit="Qualified type" />
+    <option name="type" hit="Qualified type" />
+    <option name="field" hit="Static field" />
+    <option name="static" hit="Static field" />
+    <option name="string" hit="String text" />
+    <option name="text" hit="String text" />
+  </configurable>
+  <configurable id="micronaut" configurable_name="Micronaut">
+    <option name="automatically" hit="Create run configuration automatically" />
+    <option name="configuration" hit="Create run configuration automatically" />
+    <option name="create" hit="Create run configuration automatically" />
+    <option name="run" hit="Create run configuration automatically" />
+    <option name="micronaut" hit="Micronaut" />
+  </configurable>
+</options>

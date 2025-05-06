@@ -1,0 +1,134 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add Review Comment" />
+    <option name="comment" path="ActionManager" hit="Add Review Comment" />
+    <option name="review" path="ActionManager" hit="Add Review Comment" />
+    <option name="api" path="ActionManager" hit="Break GitHub API Requests" />
+    <option name="break" path="ActionManager" hit="Break GitHub API Requests" />
+    <option name="github" path="ActionManager" hit="Break GitHub API Requests" />
+    <option name="requests" path="ActionManager" hit="Break GitHub API Requests" />
+    <option name="check" path="ActionManager" hit="Check for new timeline events" />
+    <option name="events" path="ActionManager" hit="Check for new timeline events" />
+    <option name="for" path="ActionManager" hit="Check for new timeline events" />
+    <option name="new" path="ActionManager" hit="Check for new timeline events" />
+    <option name="timeline" path="ActionManager" hit="Check for new timeline events" />
+    <option name="copy" path="ActionManager" hit="Copy Link to GitHub Repository" />
+    <option name="github" path="ActionManager" hit="Copy Link to GitHub Repository" />
+    <option name="link" path="ActionManager" hit="Copy Link to GitHub Repository" />
+    <option name="repository" path="ActionManager" hit="Copy Link to GitHub Repository" />
+    <option name="to" path="ActionManager" hit="Copy Link to GitHub Repository" />
+    <option name="copy" path="ActionManager" hit="Copy Pull Request URL" />
+    <option name="pull" path="ActionManager" hit="Copy Pull Request URL" />
+    <option name="request" path="ActionManager" hit="Copy Pull Request URL" />
+    <option name="url" path="ActionManager" hit="Copy Pull Request URL" />
+    <option name="create" path="ActionManager" hit="Create Gist…" />
+    <option name="gist" path="ActionManager" hit="Create Gist…" />
+    <option name="create" path="ActionManager" hit="Create GitHub gist" />
+    <option name="gist" path="ActionManager" hit="Create GitHub gist" />
+    <option name="github" path="ActionManager" hit="Create GitHub gist" />
+    <option name="create" path="ActionManager" hit="Create Pull Request…" />
+    <option name="pull" path="ActionManager" hit="Create Pull Request…" />
+    <option name="request" path="ActionManager" hit="Create Pull Request…" />
+    <option name="a" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="and" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="commits" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="create" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="github" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="on" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="push" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="repository" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="there" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="your" path="ActionManager" hit="Create a repository on GitHub and push your commits there" />
+    <option name="as" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="mark" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="not" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="viewed" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="as" path="ActionManager" hit="Mark as Viewed" />
+    <option name="mark" path="ActionManager" hit="Mark as Viewed" />
+    <option name="viewed" path="ActionManager" hit="Mark as Viewed" />
+    <option name="browser" path="ActionManager" hit="Open Pull Request in Browser" />
+    <option name="in" path="ActionManager" hit="Open Pull Request in Browser" />
+    <option name="open" path="ActionManager" hit="Open Pull Request in Browser" />
+    <option name="pull" path="ActionManager" hit="Open Pull Request in Browser" />
+    <option name="request" path="ActionManager" hit="Open Pull Request in Browser" />
+    <option name="browser" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="corresponding" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="in" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="link" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="open" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="github" path="ActionManager" hit="Open on GitHub" />
+    <option name="on" path="ActionManager" hit="Open on GitHub" />
+    <option name="open" path="ActionManager" hit="Open on GitHub" />
+    <option name="forked" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="github" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="origin" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="rebase" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="relative" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="repository" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="the" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="to" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="your" path="ActionManager" hit="Rebase your GitHub forked repository relative to the origin" />
+    <option name="list" path="ActionManager" hit="Refresh List" />
+    <option name="refresh" path="ActionManager" hit="Refresh List" />
+    <option name="pull" path="ActionManager" hit="Refresh Pull Request" />
+    <option name="refresh" path="ActionManager" hit="Refresh Pull Request" />
+    <option name="request" path="ActionManager" hit="Refresh Pull Request" />
+    <option name="comments" path="ActionManager" hit="Refresh Pull Request Comments" />
+    <option name="pull" path="ActionManager" hit="Refresh Pull Request Comments" />
+    <option name="refresh" path="ActionManager" hit="Refresh Pull Request Comments" />
+    <option name="request" path="ActionManager" hit="Refresh Pull Request Comments" />
+    <option name="refresh" path="ActionManager" hit="Refresh Timeline" />
+    <option name="timeline" path="ActionManager" hit="Refresh Timeline" />
+    <option name="github" path="ActionManager" hit="Share Project on GitHub" />
+    <option name="on" path="ActionManager" hit="Share Project on GitHub" />
+    <option name="project" path="ActionManager" hit="Share Project on GitHub" />
+    <option name="share" path="ActionManager" hit="Share Project on GitHub" />
+    <option name="discussions" path="ActionManager" hit="Show Review Discussions" />
+    <option name="review" path="ActionManager" hit="Show Review Discussions" />
+    <option name="show" path="ActionManager" hit="Show Review Discussions" />
+    <option name="pull" path="ActionManager" hit="Submit pull request review" />
+    <option name="request" path="ActionManager" hit="Submit pull request review" />
+    <option name="review" path="ActionManager" hit="Submit pull request review" />
+    <option name="submit" path="ActionManager" hit="Submit pull request review" />
+    <option name="fork" path="ActionManager" hit="Sync Fork" />
+    <option name="sync" path="ActionManager" hit="Sync Fork" />
+    <option name="pull" path="ActionManager" hit="View Pull Request" />
+    <option name="request" path="ActionManager" hit="View Pull Request" />
+    <option name="view" path="ActionManager" hit="View Pull Request" />
+    <option name="pull" path="ActionManager" hit="View Pull Requests" />
+    <option name="requests" path="ActionManager" hit="View Pull Requests" />
+    <option name="view" path="ActionManager" hit="View Pull Requests" />
+    <option name="timeline" path="ActionManager" hit="View Timeline" />
+    <option name="view" path="ActionManager" hit="View Timeline" />
+    <option name="and" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="information" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="pull" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="request" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="timeline" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="view" path="ActionManager" hit="View pull request information and timeline" />
+    <option name="pull" path="ActionManager" hit="View pull request timeline" />
+    <option name="request" path="ActionManager" hit="View pull request timeline" />
+    <option name="timeline" path="ActionManager" hit="View pull request timeline" />
+    <option name="view" path="ActionManager" hit="View pull request timeline" />
+  </configurable>
+  <configurable id="org.jetbrains.plugins.github.ui.GithubSettingsConfigurable" configurable_name="GitHub">
+    <option name="clone" hit="Clone git repositories using ssh" />
+    <option name="git" hit="Clone git repositories using ssh" />
+    <option name="repositories" hit="Clone git repositories using ssh" />
+    <option name="ssh" hit="Clone git repositories using ssh" />
+    <option name="using" hit="Clone git repositories using ssh" />
+    <option name="configure" hit="Configure password store" />
+    <option name="password" hit="Configure password store" />
+    <option name="store" hit="Configure password store" />
+    <option name="connection" hit="Connection timeout:" />
+    <option name="timeout" hit="Connection timeout:" />
+    <option name="be" hit="Credentials will not be persisted:" />
+    <option name="credentials" hit="Credentials will not be persisted:" />
+    <option name="not" hit="Credentials will not be persisted:" />
+    <option name="persisted" hit="Credentials will not be persisted:" />
+    <option name="will" hit="Credentials will not be persisted:" />
+    <option name="github" hit="GitHub" />
+    <option name="seconds" hit="seconds" />
+  </configurable>
+</options>

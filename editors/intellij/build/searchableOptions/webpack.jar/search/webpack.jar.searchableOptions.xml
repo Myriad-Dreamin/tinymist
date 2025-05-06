@@ -1,0 +1,17 @@
+<options>
+  <configurable id="settings.webpack" configurable_name="Webpack">
+    <option name="automatically" hit="Automatically" />
+    <option name="configuration" hit="Configuration file:" />
+    <option name="file" hit="Configuration file:" />
+    <option name="configuration" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="detect" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="files" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="for" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="module" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="resolution" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="webpack" hit="Detect Webpack configuration files for module resolution:" />
+    <option name="disabled" hit="Disabled" />
+    <option name="manually" hit="Manually" />
+    <option name="webpack" hit="Webpack" />
+  </configurable>
+</options>

@@ -1,0 +1,13 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="8" hit="Cucumber Java 8 Step Definition" />
+    <option name="cucumber" hit="Cucumber Java 8 Step Definition" />
+    <option name="definition" hit="Cucumber Java 8 Step Definition" />
+    <option name="java" hit="Cucumber Java 8 Step Definition" />
+    <option name="step" hit="Cucumber Java 8 Step Definition" />
+    <option name="cucumber" hit="Cucumber Java Step Definition" />
+    <option name="definition" hit="Cucumber Java Step Definition" />
+    <option name="java" hit="Cucumber Java Step Definition" />
+    <option name="step" hit="Cucumber Java Step Definition" />
+  </configurable>
+</options>

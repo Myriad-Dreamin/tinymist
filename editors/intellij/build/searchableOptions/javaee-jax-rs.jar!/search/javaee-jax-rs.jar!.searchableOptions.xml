@@ -1,0 +1,15 @@
+<options>
+  <configurable id="fileTemplates" configurable_name="File and Code Templates">
+    <option name="client" hit="JAX-RS Client" />
+    <option name="jax-rs" hit="JAX-RS Client" />
+    <option name="jax-rs" hit="JAX-RS Resource" />
+    <option name="resource" hit="JAX-RS Resource" />
+    <option name="cxf" hit="rest.cxf.webservice" />
+    <option name="rest" hit="rest.cxf.webservice" />
+    <option name="webservice" hit="rest.cxf.webservice" />
+    <option name="cxf" hit="rest.cxf.webservice.interface" />
+    <option name="interface" hit="rest.cxf.webservice.interface" />
+    <option name="rest" hit="rest.cxf.webservice.interface" />
+    <option name="webservice" hit="rest.cxf.webservice.interface" />
+  </configurable>
+</options>

@@ -1,0 +1,321 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="create" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="descriptor" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="file" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="jsp" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="library" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="new" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="tag" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="tld" path="ActionManager" hit="Create new JSP tag library descriptor (.tld file)" />
+    <option name="extract" path="ActionManager" hit="Extract JSP Tag" />
+    <option name="jsp" path="ActionManager" hit="Extract JSP Tag" />
+    <option name="tag" path="ActionManager" hit="Extract JSP Tag" />
+    <option name="function" path="ActionManager" hit="JSP Function..." />
+    <option name="jsp" path="ActionManager" hit="JSP Function..." />
+    <option name="descriptor" path="ActionManager" hit="JSP Tag Library Descriptor" />
+    <option name="jsp" path="ActionManager" hit="JSP Tag Library Descriptor" />
+    <option name="library" path="ActionManager" hit="JSP Tag Library Descriptor" />
+    <option name="tag" path="ActionManager" hit="JSP Tag Library Descriptor" />
+    <option name="jsp" path="ActionManager" hit="JSP Tag..." />
+    <option name="tag" path="ActionManager" hit="JSP Tag..." />
+  </configurable>
+  <configurable id="editor.breadcrumbs" configurable_name="Breadcrumbs">
+    <option name="jsp" hit="JSP" />
+  </configurable>
+  <configurable id="editor.breadcrumbs" configurable_name="Breadcrumbs">
+    <option name="jspx" hit="JSPX" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.JSP" configurable_name="JSP">
+    <option name="jsp" hit="JSP" />
+    <option name="action" hit="Action and directive content" />
+    <option name="and" hit="Action and directive content" />
+    <option name="content" hit="Action and directive content" />
+    <option name="directive" hit="Action and directive content" />
+    <option name="action" hit="Action and directive name" />
+    <option name="and" hit="Action and directive name" />
+    <option name="directive" hit="Action and directive name" />
+    <option name="name" hit="Action and directive name" />
+    <option name="attribute" hit="Attribute name" />
+    <option name="name" hit="Attribute name" />
+    <option name="attribute" hit="Attribute value" />
+    <option name="value" hit="Attribute value" />
+    <option name="comment" hit="Comment" />
+    <option name="background" hit="Expression Language//Background" />
+    <option name="expression" hit="Expression Language//Background" />
+    <option name="language" hit="Expression Language//Background" />
+    <option name="bounds" hit="Expression Language//Bounds" />
+    <option name="expression" hit="Expression Language//Bounds" />
+    <option name="language" hit="Expression Language//Bounds" />
+    <option name="brackets" hit="Expression Language//Brackets" />
+    <option name="expression" hit="Expression Language//Brackets" />
+    <option name="language" hit="Expression Language//Brackets" />
+    <option name="comma" hit="Expression Language//Comma" />
+    <option name="expression" hit="Expression Language//Comma" />
+    <option name="language" hit="Expression Language//Comma" />
+    <option name="dot" hit="Expression Language//Dot" />
+    <option name="expression" hit="Expression Language//Dot" />
+    <option name="language" hit="Expression Language//Dot" />
+    <option name="expression" hit="Expression Language//Identifier" />
+    <option name="identifier" hit="Expression Language//Identifier" />
+    <option name="language" hit="Expression Language//Identifier" />
+    <option name="expression" hit="Expression Language//Keyword" />
+    <option name="keyword" hit="Expression Language//Keyword" />
+    <option name="language" hit="Expression Language//Keyword" />
+    <option name="expression" hit="Expression Language//Number" />
+    <option name="language" hit="Expression Language//Number" />
+    <option name="number" hit="Expression Language//Number" />
+    <option name="expression" hit="Expression Language//Parentheses" />
+    <option name="language" hit="Expression Language//Parentheses" />
+    <option name="parentheses" hit="Expression Language//Parentheses" />
+    <option name="expression" hit="Expression Language//String" />
+    <option name="language" hit="Expression Language//String" />
+    <option name="string" hit="Expression Language//String" />
+    <option name="scripting" hit="Scripting" />
+  </configurable>
+  <configurable id="preferences.sourceCode.JSP" configurable_name="JSP">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="default" path="Wrapping" hit="Default: No" />
+    <option name="no" path="Wrapping" hit="Default: No" />
+    <option name="disable" hit="Disable" />
+    <option name="at" path="Wrapping" hit="Hard wrap at:" />
+    <option name="hard" path="Wrapping" hit="Hard wrap at:" />
+    <option name="wrap" path="Wrapping" hit="Hard wrap at:" />
+    <option name="imports" path="Imports" hit="Imports" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="jsp" hit="JSP" />
+    <option name="imports" path="Imports" hit="JSP Imports Layout" />
+    <option name="jsp" path="Imports" hit="JSP Imports Layout" />
+    <option name="layout" path="Imports" hit="JSP Imports Layout" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="no" path="Wrapping" hit="No" />
+    <option name="comma" path="Imports" hit="Prefer comma separated import list" />
+    <option name="import" path="Imports" hit="Prefer comma separated import list" />
+    <option name="list" path="Imports" hit="Prefer comma separated import list" />
+    <option name="prefer" path="Imports" hit="Prefer comma separated import list" />
+    <option name="separated" path="Imports" hit="Prefer comma separated import list" />
+    <option name="directive" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="import" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="one" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="page" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="per" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="prefer" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="statement" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="reset" path="Wrapping" hit="Reset" />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="120" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="80" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="guide" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="one" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="or" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="several" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="specify" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+    <option name="guides" path="Wrapping" hit="Visual guides:" />
+    <option name="visual" path="Wrapping" hit="Visual guides:" />
+    <option name="on" path="Wrapping" hit="Wrap on typing" />
+    <option name="typing" path="Wrapping" hit="Wrap on typing" />
+    <option name="wrap" path="Wrapping" hit="Wrap on typing" />
+    <option name="wrapping" path="Wrapping" hit="Wrapping" />
+    <option name="yes" path="Wrapping" hit="Yes" />
+    <option name="columns" path="Wrapping" hit="columns" />
+  </configurable>
+  <configurable id="preferences.sourceCode.JSPX" configurable_name="JSPX">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="default" path="Wrapping" hit="Default: No" />
+    <option name="no" path="Wrapping" hit="Default: No" />
+    <option name="disable" hit="Disable" />
+    <option name="at" path="Wrapping" hit="Hard wrap at:" />
+    <option name="hard" path="Wrapping" hit="Hard wrap at:" />
+    <option name="wrap" path="Wrapping" hit="Hard wrap at:" />
+    <option name="imports" path="Imports" hit="Imports" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="imports" path="Imports" hit="JSP Imports Layout" />
+    <option name="jsp" path="Imports" hit="JSP Imports Layout" />
+    <option name="layout" path="Imports" hit="JSP Imports Layout" />
+    <option name="jspx" hit="JSPX" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="no" path="Wrapping" hit="No" />
+    <option name="comma" path="Imports" hit="Prefer comma separated import list" />
+    <option name="import" path="Imports" hit="Prefer comma separated import list" />
+    <option name="list" path="Imports" hit="Prefer comma separated import list" />
+    <option name="prefer" path="Imports" hit="Prefer comma separated import list" />
+    <option name="separated" path="Imports" hit="Prefer comma separated import list" />
+    <option name="directive" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="import" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="one" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="page" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="per" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="prefer" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="statement" path="Imports" hit="Prefer one import statement per page directive" />
+    <option name="reset" path="Wrapping" hit="Reset" />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="120" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="80" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="guide" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="one" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="or" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="several" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="specify" path="Wrapping" hit="Specify one guide (80) or several (80, 120)" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+    <option name="guides" path="Wrapping" hit="Visual guides:" />
+    <option name="visual" path="Wrapping" hit="Visual guides:" />
+    <option name="on" path="Wrapping" hit="Wrap on typing" />
+    <option name="typing" path="Wrapping" hit="Wrap on typing" />
+    <option name="wrap" path="Wrapping" hit="Wrap on typing" />
+    <option name="wrapping" path="Wrapping" hit="Wrapping" />
+    <option name="yes" path="Wrapping" hit="Yes" />
+    <option name="columns" path="Wrapping" hit="columns" />
+  </configurable>
+  <configurable id="copyright.filetypes.JSP" configurable_name="JSP">
+    <option name="a" hit="Add blank line after" />
+    <option name="after" hit="Add blank line after" />
+    <option name="blank" hit="Add blank line after" />
+    <option name="dd" hit="Add blank line after" />
+    <option name="line" hit="Add blank line after" />
+    <option name="add" hit="Add blank line before" />
+    <option name="before" hit="Add blank line before" />
+    <option name="blank" hit="Add blank line before" />
+    <option name="line" hit="Add blank line before" />
+    <option name="afte" hit="After other comments" />
+    <option name="comments" hit="After other comments" />
+    <option name="other" hit="After other comments" />
+    <option name="r" hit="After other comments" />
+    <option name="before" hit="Before doctype" />
+    <option name="doctype" hit="Before doctype" />
+    <option name="bef" hit="Before other comments" />
+    <option name="comments" hit="Before other comments" />
+    <option name="ore" hit="Before other comments" />
+    <option name="other" hit="Before other comments" />
+    <option name="before" hit="Before root tag" />
+    <option name="root" hit="Before root tag" />
+    <option name="tag" hit="Before root tag" />
+    <option name="borders" hit="Borders" />
+    <option name="box" hit="Box" />
+    <option name="comment" hit="Comment Type" />
+    <option name="type" hit="Comment Type" />
+    <option name="jsp" hit="JSP" />
+    <option name="length" hit="Length:" />
+    <option name="file" hit="Location in File" />
+    <option name="in" hit="Location in File" />
+    <option name="location" hit="Location in File" />
+    <option name="copyright" hit="No copyright" />
+    <option name="no" hit="No copyright" />
+    <option name="each" hit="Prefix each line" />
+    <option name="line" hit="Prefix each line" />
+    <option name="prefix" hit="Prefix each line" />
+    <option name="location" hit="Relative Location" />
+    <option name="relative" hit="Relative Location" />
+    <option name="after" hit="Separator after" />
+    <option name="separator" hit="Separator after" />
+    <option name="before" hit="Separator before" />
+    <option name="separator" hit="Separator before" />
+    <option name="separator" hit="Separator:" />
+    <option name="block" hit="Use block comment" />
+    <option name="comment" hit="Use block comment" />
+    <option name="use" hit="Use block comment" />
+    <option name="custom" hit="Use custom formatting options" />
+    <option name="formatting" hit="Use custom formatting options" />
+    <option name="options" hit="Use custom formatting options" />
+    <option name="use" hit="Use custom formatting options" />
+    <option name="default" hit="Use default settings" />
+    <option name="settings" hit="Use default settings" />
+    <option name="use" hit="Use default settings" />
+    <option name="comment" hit="Use line comment" />
+    <option name="line" hit="Use line comment" />
+    <option name="use" hit="Use line comment" />
+  </configurable>
+  <configurable id="copyright.filetypes.JSPX" configurable_name="JSPX">
+    <option name="a" hit="Add blank line after" />
+    <option name="after" hit="Add blank line after" />
+    <option name="blank" hit="Add blank line after" />
+    <option name="dd" hit="Add blank line after" />
+    <option name="line" hit="Add blank line after" />
+    <option name="add" hit="Add blank line before" />
+    <option name="before" hit="Add blank line before" />
+    <option name="blank" hit="Add blank line before" />
+    <option name="line" hit="Add blank line before" />
+    <option name="afte" hit="After other comments" />
+    <option name="comments" hit="After other comments" />
+    <option name="other" hit="After other comments" />
+    <option name="r" hit="After other comments" />
+    <option name="before" hit="Before doctype" />
+    <option name="doctype" hit="Before doctype" />
+    <option name="bef" hit="Before other comments" />
+    <option name="comments" hit="Before other comments" />
+    <option name="ore" hit="Before other comments" />
+    <option name="other" hit="Before other comments" />
+    <option name="before" hit="Before root tag" />
+    <option name="root" hit="Before root tag" />
+    <option name="tag" hit="Before root tag" />
+    <option name="borders" hit="Borders" />
+    <option name="box" hit="Box" />
+    <option name="comment" hit="Comment Type" />
+    <option name="type" hit="Comment Type" />
+    <option name="jspx" hit="JSPX" />
+    <option name="length" hit="Length:" />
+    <option name="file" hit="Location in File" />
+    <option name="in" hit="Location in File" />
+    <option name="location" hit="Location in File" />
+    <option name="copyright" hit="No copyright" />
+    <option name="no" hit="No copyright" />
+    <option name="each" hit="Prefix each line" />
+    <option name="line" hit="Prefix each line" />
+    <option name="prefix" hit="Prefix each line" />
+    <option name="location" hit="Relative Location" />
+    <option name="relative" hit="Relative Location" />
+    <option name="after" hit="Separator after" />
+    <option name="separator" hit="Separator after" />
+    <option name="before" hit="Separator before" />
+    <option name="separator" hit="Separator before" />
+    <option name="separator" hit="Separator:" />
+    <option name="block" hit="Use block comment" />
+    <option name="comment" hit="Use block comment" />
+    <option name="use" hit="Use block comment" />
+    <option name="custom" hit="Use custom formatting options" />
+    <option name="formatting" hit="Use custom formatting options" />
+    <option name="options" hit="Use custom formatting options" />
+    <option name="use" hit="Use custom formatting options" />
+    <option name="default" hit="Use default settings" />
+    <option name="settings" hit="Use default settings" />
+    <option name="use" hit="Use default settings" />
+    <option name="comment" hit="Use line comment" />
+    <option name="line" hit="Use line comment" />
+    <option name="use" hit="Use line comment" />
+  </configurable>
+</options>

@@ -1,0 +1,31 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="documentation" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="for" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="generate" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="ktor" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="module" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="openapi" path="ActionManager" hit="Generate OpenAPI Documentation for Ktor Module" />
+    <option name="ktor" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+    <option name="latest" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+    <option name="migrate" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+    <option name="project" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+    <option name="to" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+    <option name="version" path="ActionManager" hit="Migrate Project to Latest Ktor Version…" />
+  </configurable>
+  <configurable id="ktor" configurable_name="Ktor">
+    <option name="automatically" hit="Create run configuration automatically" />
+    <option name="configuration" hit="Create run configuration automatically" />
+    <option name="create" hit="Create run configuration automatically" />
+    <option name="run" hit="Create run configuration automatically" />
+    <option name="ktor" hit="Ktor" />
+    <option name="automatically" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="documentation" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="on" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="openapi" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="project" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="reimport" hit="Update OpenAPI documentation automatically on project reimport" />
+    <option name="update" hit="Update OpenAPI documentation automatically on project reimport" />
+  </configurable>
+</options>

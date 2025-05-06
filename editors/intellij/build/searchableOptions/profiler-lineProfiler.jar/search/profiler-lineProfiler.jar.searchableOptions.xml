@@ -1,0 +1,20 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="annotations" path="ActionManager" hit="Hide Line Annotations" />
+    <option name="hide" path="ActionManager" hit="Hide Line Annotations" />
+    <option name="line" path="ActionManager" hit="Hide Line Annotations" />
+    <option name="hide" path="ActionManager" hit="Hide line profiler markers" />
+    <option name="line" path="ActionManager" hit="Hide line profiler markers" />
+    <option name="markers" path="ActionManager" hit="Hide line profiler markers" />
+    <option name="profiler" path="ActionManager" hit="Hide line profiler markers" />
+    <option name="annotations" path="ActionManager" hit="Show Line Profiler Annotations" />
+    <option name="line" path="ActionManager" hit="Show Line Profiler Annotations" />
+    <option name="profiler" path="ActionManager" hit="Show Line Profiler Annotations" />
+    <option name="show" path="ActionManager" hit="Show Line Profiler Annotations" />
+    <option name="detailed" path="ActionManager" hit="Show detailed per-line execution information" />
+    <option name="execution" path="ActionManager" hit="Show detailed per-line execution information" />
+    <option name="information" path="ActionManager" hit="Show detailed per-line execution information" />
+    <option name="per-line" path="ActionManager" hit="Show detailed per-line execution information" />
+    <option name="show" path="ActionManager" hit="Show detailed per-line execution information" />
+  </configurable>
+</options>

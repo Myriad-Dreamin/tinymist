@@ -1,0 +1,15 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="install" path="ActionManager" hit="Install VSCode Plugin..." />
+    <option name="plugin" path="ActionManager" hit="Install VSCode Plugin..." />
+    <option name="vscode" path="ActionManager" hit="Install VSCode Plugin..." />
+    <option name="for" path="ActionManager" hit="Installs plugin for VSCode" />
+    <option name="installs" path="ActionManager" hit="Installs plugin for VSCode" />
+    <option name="plugin" path="ActionManager" hit="Installs plugin for VSCode" />
+    <option name="vscode" path="ActionManager" hit="Installs plugin for VSCode" />
+  </configurable>
+  <configurable id="reference.settingsdialog.textmate.bundles" configurable_name="TextMate Bundles">
+    <option name="bundles" hit="TextMate Bundles" />
+    <option name="textmate" hit="TextMate Bundles" />
+  </configurable>
+</options>

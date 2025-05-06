@@ -1,0 +1,101 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="copy" path="ActionManager" hit="Copy Link to GitLab Repository" />
+    <option name="gitlab" path="ActionManager" hit="Copy Link to GitLab Repository" />
+    <option name="link" path="ActionManager" hit="Copy Link to GitLab Repository" />
+    <option name="repository" path="ActionManager" hit="Copy Link to GitLab Repository" />
+    <option name="to" path="ActionManager" hit="Copy Link to GitLab Repository" />
+    <option name="copy" path="ActionManager" hit="Copy Merge Request URL" />
+    <option name="merge" path="ActionManager" hit="Copy Merge Request URL" />
+    <option name="request" path="ActionManager" hit="Copy Merge Request URL" />
+    <option name="url" path="ActionManager" hit="Copy Merge Request URL" />
+    <option name="create" path="ActionManager" hit="Create Merge Request…" />
+    <option name="merge" path="ActionManager" hit="Create Merge Request…" />
+    <option name="request" path="ActionManager" hit="Create Merge Request…" />
+    <option name="create" path="ActionManager" hit="Create Snippet…" />
+    <option name="snippet" path="ActionManager" hit="Create Snippet…" />
+    <option name="a" path="ActionManager" hit="Create a GitLab snippet" />
+    <option name="create" path="ActionManager" hit="Create a GitLab snippet" />
+    <option name="gitlab" path="ActionManager" hit="Create a GitLab snippet" />
+    <option name="snippet" path="ActionManager" hit="Create a GitLab snippet" />
+    <option name="browser" path="ActionManager" hit="Open Merge Request in Browser" />
+    <option name="in" path="ActionManager" hit="Open Merge Request in Browser" />
+    <option name="merge" path="ActionManager" hit="Open Merge Request in Browser" />
+    <option name="open" path="ActionManager" hit="Open Merge Request in Browser" />
+    <option name="request" path="ActionManager" hit="Open Merge Request in Browser" />
+    <option name="browser" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="corresponding" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="in" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="link" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="open" path="ActionManager" hit="Open corresponding link in browser" />
+    <option name="gitlab" path="ActionManager" hit="Open on GitLab" />
+    <option name="on" path="ActionManager" hit="Open on GitLab" />
+    <option name="open" path="ActionManager" hit="Open on GitLab" />
+    <option name="list" path="ActionManager" hit="Refresh List" />
+    <option name="refresh" path="ActionManager" hit="Refresh List" />
+    <option name="merge" path="ActionManager" hit="Refresh Merge Request" />
+    <option name="refresh" path="ActionManager" hit="Refresh Merge Request" />
+    <option name="request" path="ActionManager" hit="Refresh Merge Request" />
+    <option name="mode" path="ActionManager" hit="Review Mode" />
+    <option name="review" path="ActionManager" hit="Review Mode" />
+    <option name="merge" path="ActionManager" hit="Show Merge Request" />
+    <option name="request" path="ActionManager" hit="Show Merge Request" />
+    <option name="show" path="ActionManager" hit="Show Merge Request" />
+    <option name="events" path="ActionManager" hit="Show Merge Request Events" />
+    <option name="merge" path="ActionManager" hit="Show Merge Request Events" />
+    <option name="request" path="ActionManager" hit="Show Merge Request Events" />
+    <option name="show" path="ActionManager" hit="Show Merge Request Events" />
+    <option name="in" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="merge" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="request" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="show" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="tool" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="window" path="ActionManager" hit="Show Merge Request in Tool Window" />
+    <option name="diff" path="ActionManager" hit="Show Review Diff" />
+    <option name="review" path="ActionManager" hit="Show Review Diff" />
+    <option name="show" path="ActionManager" hit="Show Review Diff" />
+    <option name="discussions" path="ActionManager" hit="Show Review Discussions" />
+    <option name="review" path="ActionManager" hit="Show Review Discussions" />
+    <option name="show" path="ActionManager" hit="Show Review Discussions" />
+    <option name="assignee" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="change" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="data" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="events" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="like" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="or" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="show" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="state" path="ActionManager" hit="Show data change events like state or assignee change" />
+    <option name="details" path="ActionManager" hit="Show merge request details" />
+    <option name="merge" path="ActionManager" hit="Show merge request details" />
+    <option name="request" path="ActionManager" hit="Show merge request details" />
+    <option name="show" path="ActionManager" hit="Show merge request details" />
+    <option name="changes" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="diff" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="in" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="review" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="selected" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="show" path="ActionManager" hit="Show selected changes in review diff" />
+    <option name="review" path="ActionManager" hit="Submit Review…" />
+    <option name="submit" path="ActionManager" hit="Submit Review…" />
+    <option name="enable" path="ActionManager" hit="Update to Enable Review Mode…" />
+    <option name="mode" path="ActionManager" hit="Update to Enable Review Mode…" />
+    <option name="review" path="ActionManager" hit="Update to Enable Review Mode…" />
+    <option name="to" path="ActionManager" hit="Update to Enable Review Mode…" />
+    <option name="update" path="ActionManager" hit="Update to Enable Review Mode…" />
+    <option name="merge" path="ActionManager" hit="View Merge Requests" />
+    <option name="requests" path="ActionManager" hit="View Merge Requests" />
+    <option name="view" path="ActionManager" hit="View Merge Requests" />
+  </configurable>
+  <configurable id="org.jetbrains.plugins.gitlab.GitLabSettingsConfigurable" configurable_name="GitLab">
+    <option name="configure" hit="Configure password store" />
+    <option name="password" hit="Configure password store" />
+    <option name="store" hit="Configure password store" />
+    <option name="be" hit="Credentials will not be persisted:" />
+    <option name="credentials" hit="Credentials will not be persisted:" />
+    <option name="not" hit="Credentials will not be persisted:" />
+    <option name="persisted" hit="Credentials will not be persisted:" />
+    <option name="will" hit="Credentials will not be persisted:" />
+    <option name="gitlab" hit="GitLab" />
+  </configurable>
+</options>

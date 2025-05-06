@@ -1,0 +1,15 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="browser" path="ActionManager" hit="Reload in Browser" />
+    <option name="in" path="ActionManager" hit="Reload in Browser" />
+    <option name="reload" path="ActionManager" hit="Reload in Browser" />
+    <option name="browser" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="currently" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="debugged" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="in" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="opened" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="page" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="reloads" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+    <option name="tab" path="ActionManager" hit="Reloads page currently opened in debugged browser tab" />
+  </configurable>
+</options>

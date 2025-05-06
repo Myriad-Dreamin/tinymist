@@ -1,0 +1,9 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="deploy" path="ActionManager" hit="Show Deploy Failure Dialog (Internal)" />
+    <option name="dialog" path="ActionManager" hit="Show Deploy Failure Dialog (Internal)" />
+    <option name="failure" path="ActionManager" hit="Show Deploy Failure Dialog (Internal)" />
+    <option name="internal" path="ActionManager" hit="Show Deploy Failure Dialog (Internal)" />
+    <option name="show" path="ActionManager" hit="Show Deploy Failure Dialog (Internal)" />
+  </configurable>
+</options>

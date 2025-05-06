@@ -1,0 +1,305 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="branch" path="ActionManager" hit="Branch or Tag…" />
+    <option name="or" path="ActionManager" hit="Branch or Tag…" />
+    <option name="tag" path="ActionManager" hit="Branch or Tag…" />
+    <option name="browse" path="ActionManager" hit="Browse Subversion Repository…" />
+    <option name="repository" path="ActionManager" hit="Browse Subversion Repository…" />
+    <option name="subversion" path="ActionManager" hit="Browse Subversion Repository…" />
+    <option name="a" path="ActionManager" hit="Browse a Subversion repository" />
+    <option name="browse" path="ActionManager" hit="Browse a Subversion repository" />
+    <option name="repository" path="ActionManager" hit="Browse a Subversion repository" />
+    <option name="subversion" path="ActionManager" hit="Browse a Subversion repository" />
+    <option name="cleanup" path="ActionManager" hit="Cleanup" />
+    <option name="cleanup" path="ActionManager" hit="Cleanup Project" />
+    <option name="project" path="ActionManager" hit="Cleanup Project" />
+    <option name="branch" path="ActionManager" hit="Compare with Branch…" />
+    <option name="compare" path="ActionManager" hit="Compare with Branch…" />
+    <option name="with" path="ActionManager" hit="Compare with Branch…" />
+    <option name="copy" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="directory" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="file" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="location" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="new" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="or" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="repository" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="selected" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="the" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="to" path="ActionManager" hit="Copy selected file or directory to the new repository location" />
+    <option name="create" path="ActionManager" hit="Create External…" />
+    <option name="external" path="ActionManager" hit="Create External…" />
+    <option name="edit" path="ActionManager" hit="Edit Properties" />
+    <option name="properties" path="ActionManager" hit="Edit Properties" />
+    <option name="comment" path="ActionManager" hit="Edit Revision Comment" />
+    <option name="edit" path="ActionManager" hit="Edit Revision Comment" />
+    <option name="revision" path="ActionManager" hit="Edit Revision Comment" />
+    <option name="comment" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="edit" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="is" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="message" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="previous" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="revision" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="rewritten" path="ActionManager" hit="Edit revision comment. Previous message is rewritten." />
+    <option name="ignore" path="ActionManager" hit="Ignore" />
+    <option name="import" path="ActionManager" hit="Import into Subversion…" />
+    <option name="into" path="ActionManager" hit="Import into Subversion…" />
+    <option name="subversion" path="ActionManager" hit="Import into Subversion…" />
+    <option name="branch" path="ActionManager" hit="Integrate to Branch" />
+    <option name="integrate" path="ActionManager" hit="Integrate to Branch" />
+    <option name="to" path="ActionManager" hit="Integrate to Branch" />
+    <option name="files" path="ActionManager" hit="Lock files" />
+    <option name="lock" path="ActionManager" hit="Lock files" />
+    <option name="lock" path="ActionManager" hit="Lock…" />
+    <option name="mark" path="ActionManager" hit="Mark Resolved…" />
+    <option name="resolved" path="ActionManager" hit="Mark Resolved…" />
+    <option name="conflict" path="ActionManager" hit="Mark Tree Conflict Resolved…" />
+    <option name="mark" path="ActionManager" hit="Mark Tree Conflict Resolved…" />
+    <option name="resolved" path="ActionManager" hit="Mark Tree Conflict Resolved…" />
+    <option name="tree" path="ActionManager" hit="Mark Tree Conflict Resolved…" />
+    <option name="and" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="as" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="conflicts" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="mark" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="properties" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="resolved" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="text" path="ActionManager" hit="Mark text and properties conflicts as resolved" />
+    <option name="all" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="cleanup" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="copy" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="directories" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="for" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="in" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="perform" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="project" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="the" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="working" path="ActionManager" hit="Perform cleanup for all working copy directories in the project" />
+    <option name="refresh" path="ActionManager" hit="Refresh" />
+    <option name="copies" path="ActionManager" hit="Refresh working copies information" />
+    <option name="information" path="ActionManager" hit="Refresh working copies information" />
+    <option name="refresh" path="ActionManager" hit="Refresh working copies information" />
+    <option name="working" path="ActionManager" hit="Refresh working copies information" />
+    <option name="a" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="copy" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="different" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="relocate" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="to" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="url" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="working" path="ActionManager" hit="Relocate working copy to a different URL" />
+    <option name="relocate" path="ActionManager" hit="Relocate…" />
+    <option name="conflict" path="ActionManager" hit="Resolve Text Conflict…" />
+    <option name="resolve" path="ActionManager" hit="Resolve Text Conflict…" />
+    <option name="text" path="ActionManager" hit="Resolve Text Conflict…" />
+    <option name="conflict" path="ActionManager" hit="Resolve text conflict on file" />
+    <option name="file" path="ActionManager" hit="Resolve text conflict on file" />
+    <option name="on" path="ActionManager" hit="Resolve text conflict on file" />
+    <option name="resolve" path="ActionManager" hit="Resolve text conflict on file" />
+    <option name="text" path="ActionManager" hit="Resolve text conflict on file" />
+    <option name="add" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="and" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="checkout" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="external" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="it" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="optionally" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="property" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="select" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="svn" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="url" path="ActionManager" hit="Select URL, add svn:external property, and optionally checkout it" />
+    <option name="property" path="ActionManager" hit="Set Property…" />
+    <option name="set" path="ActionManager" hit="Set Property…" />
+    <option name="directory" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="file" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="on" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="or" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="property" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="set" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="versioned" path="ActionManager" hit="Set versioned property on file or directory" />
+    <option name="directory" path="ActionManager" hit="Share Directory…" />
+    <option name="share" path="ActionManager" hit="Share Directory…" />
+    <option name="project" path="ActionManager" hit="Share Project (Subversion)…" />
+    <option name="share" path="ActionManager" hit="Share Project (Subversion)…" />
+    <option name="subversion" path="ActionManager" hit="Share Project (Subversion)…" />
+    <option name="copies" path="ActionManager" hit="Show Working Copies" />
+    <option name="show" path="ActionManager" hit="Show Working Copies" />
+    <option name="working" path="ActionManager" hit="Show Working Copies" />
+    <option name="and" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="copies" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="copy" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="formats" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="information" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="shows" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="urls" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="working" path="ActionManager" hit="Shows working copies information: working copy formats and URLs" />
+    <option name="subversion" path="ActionManager" hit="Subversion" />
+    <option name="unlock" path="ActionManager" hit="Unlock" />
+    <option name="files" path="ActionManager" hit="Unlock files" />
+    <option name="unlock" path="ActionManager" hit="Unlock files" />
+    <option name="all" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="and" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="directories" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="incompleted" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="locked" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="operations" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="remaining" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="run" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+    <option name="unlock" path="ActionManager" hit="Unlock locked directories and run all remaining incompleted operations" />
+  </configurable>
+  <configurable id="vcs.Subversion" configurable_name="Subversion">
+    <option name="" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="and" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="are" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="behavior" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="certificates" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="commands" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="directly" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="emulates" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="executed" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="for" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="from" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="handle" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="https" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="in" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="interactive" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="invalid" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="is" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="mode" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="passphrase" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="password" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="prompts" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="repositories" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="required" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="server" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="subversion" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="svn+ssh" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="terminal" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="the" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="this" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="to" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="trust" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="when" hit=" Emulates the behavior when Subversion commands are executed directly from the terminal (in the interactive mode). This is required to handle password/passphrase prompts for svn+ssh repositories, and trust invalid server certificates for https repositories." />
+    <option name="auth" hit="Clear Auth Cache" />
+    <option name="cache" hit="Clear Auth Cache" />
+    <option name="clear" hit="Clear Auth Cache" />
+    <option name="all" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="and" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="credentials" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="delete" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="for" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="http" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="protocols" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="stored" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="svn" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="svn+ssh" hit="Delete all stored credentials for 'http', 'svn' and 'svn+ssh' protocols" />
+    <option name="enable" hit="Enable interactive mode" />
+    <option name="interactive" hit="Enable interactive mode" />
+    <option name="mode" hit="Enable interactive mode" />
+    <option name="executable" hit="Path to Subversion executable:" />
+    <option name="path" hit="Path to Subversion executable:" />
+    <option name="subversion" hit="Path to Subversion executable:" />
+    <option name="to" hit="Path to Subversion executable:" />
+    <option name="subversion" hit="Subversion" />
+    <option name="configuration" hit="Use custom configuration directory:" />
+    <option name="custom" hit="Use custom configuration directory:" />
+    <option name="directory" hit="Use custom configuration directory:" />
+    <option name="use" hit="Use custom configuration directory:" />
+  </configurable>
+  <configurable id="vcs.Subversion.Presentation" configurable_name="Presentation">
+    <option name="check" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="for" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="in" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="merge" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="mergeinfo" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="preparing" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="subtree" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="svn" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="target" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="when" hit="Check svn:mergeinfo in target subtree when preparing for merge" />
+    <option name="annotations" hit="Ignore whitespace differences in annotations" />
+    <option name="differences" hit="Ignore whitespace differences in annotations" />
+    <option name="ignore" hit="Ignore whitespace differences in annotations" />
+    <option name="in" hit="Ignore whitespace differences in annotations" />
+    <option name="whitespace" hit="Ignore whitespace differences in annotations" />
+    <option name="annotations" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="back" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="in" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="look" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="maximum" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="number" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="of" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="revisions" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="to" hit="Maximum number of revisions to look back in annotations:" />
+    <option name="presentation" hit="Presentation" />
+    <option name="and" hit="Show merge source in history and annotations" />
+    <option name="annotations" hit="Show merge source in history and annotations" />
+    <option name="history" hit="Show merge source in history and annotations" />
+    <option name="in" hit="Show merge source in history and annotations" />
+    <option name="merge" hit="Show merge source in history and annotations" />
+    <option name="show" hit="Show merge source in history and annotations" />
+    <option name="source" hit="Show merge source in history and annotations" />
+  </configurable>
+  <configurable id="vcs.Subversion.Network" configurable_name="Network">
+    <option name="all" hit="All" />
+    <option name="configuration" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="edit" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="file" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="runtime" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="servers" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="subversion" hit="Edit 'servers' Subversion runtime configuration file" />
+    <option name="edit" hit="Edit Network Options " />
+    <option name="network" hit="Edit Network Options " />
+    <option name="options" hit="Edit Network Options " />
+    <option name="http" hit="HTTP timeout:" />
+    <option name="timeout" hit="HTTP timeout:" />
+    <option name="general" hit="Navigate to general proxy settings" />
+    <option name="navigate" hit="Navigate to general proxy settings" />
+    <option name="proxy" hit="Navigate to general proxy settings" />
+    <option name="settings" hit="Navigate to general proxy settings" />
+    <option name="to" hit="Navigate to general proxy settings" />
+    <option name="network" hit="Network" />
+    <option name="as" hit="Only HTTP proxy can be used as default" />
+    <option name="be" hit="Only HTTP proxy can be used as default" />
+    <option name="can" hit="Only HTTP proxy can be used as default" />
+    <option name="default" hit="Only HTTP proxy can be used as default" />
+    <option name="http" hit="Only HTTP proxy can be used as default" />
+    <option name="only" hit="Only HTTP proxy can be used as default" />
+    <option name="proxy" hit="Only HTTP proxy can be used as default" />
+    <option name="used" hit="Only HTTP proxy can be used as default" />
+    <option name="connection" hit="SSH connection timeout:" />
+    <option name="ssh" hit="SSH connection timeout:" />
+    <option name="timeout" hit="SSH connection timeout:" />
+    <option name="read" hit="SSH read timeout:" />
+    <option name="ssh" hit="SSH read timeout:" />
+    <option name="timeout" hit="SSH read timeout:" />
+    <option name="protocols" hit="SSL protocols:" />
+    <option name="ssl" hit="SSL protocols:" />
+    <option name="sslv3" hit="SSLv3" />
+    <option name="tlsv1" hit="TLSv1" />
+    <option name="as" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="default" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="for" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="general" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="idea" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="proxy" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="settings" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="subversion" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="use" hit="Use IDEA general proxy settings as default for Subversion" />
+    <option name="seconds" hit="seconds" />
+  </configurable>
+  <configurable id="vcs.Subversion.SSH" configurable_name="SSH">
+    <option name="password" hit="Password" />
+    <option name="path" hit="Path:" />
+    <option name="port" hit="Port:" />
+    <option name="key" hit="Private key" />
+    <option name="private" hit="Private key" />
+    <option name="ssh" hit="SSH" />
+    <option name="executable" hit="SSH executable:" />
+    <option name="ssh" hit="SSH executable:" />
+    <option name="ssh" hit="SSH tunnel:" />
+    <option name="tunnel" hit="SSH tunnel:" />
+    <option name="config" hit="Subversion config" />
+    <option name="subversion" hit="Subversion config" />
+    <option name="update" hit="Update" />
+    <option name="name" hit="User name:" />
+    <option name="user" hit="User name:" />
+  </configurable>
+</options>

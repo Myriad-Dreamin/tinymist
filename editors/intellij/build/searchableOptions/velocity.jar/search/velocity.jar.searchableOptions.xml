@@ -1,0 +1,60 @@
+<options>
+  <configurable id="editor.breadcrumbs" configurable_name="Breadcrumbs">
+    <option name="vtl" hit="VTL" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.Velocity" configurable_name="Velocity">
+    <option name="velocity" hit="Velocity" />
+    <option name="bad" hit="Bad character" />
+    <option name="character" hit="Bad character" />
+    <option name="braces" hit="Braces" />
+    <option name="brackets" hit="Brackets" />
+    <option name="built-in" hit="Built-in directive" />
+    <option name="directive" hit="Built-in directive" />
+    <option name="comma" hit="Comma" />
+    <option name="comment" hit="Comment" />
+    <option name="dot" hit="Dot" />
+    <option name="character" hit="Escape character" />
+    <option name="escape" hit="Escape character" />
+    <option name="keyword" hit="Keyword" />
+    <option name="literal" hit="Number literal" />
+    <option name="number" hit="Number literal" />
+    <option name="operation" hit="Operation sign" />
+    <option name="sign" hit="Operation sign" />
+    <option name="parentheses" hit="Parentheses" />
+    <option name="and" hit="Reference and macro call" />
+    <option name="call" hit="Reference and macro call" />
+    <option name="macro" hit="Reference and macro call" />
+    <option name="reference" hit="Reference and macro call" />
+    <option name="background" hit="Scripting background" />
+    <option name="scripting" hit="Scripting background" />
+    <option name="semicolon" hit="Semicolon" />
+    <option name="literal" hit="String literal" />
+    <option name="string" hit="String literal" />
+  </configurable>
+  <configurable id="preferences.sourceCode.Velocity" configurable_name="Velocity">
+    <option name="continuation" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="indent" path="Tabs and Indents" hit="Continuation indent:" />
+    <option name="disable" hit="Disable" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="empty" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="indents" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="keep" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="lines" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="on" path="Tabs and Indents" hit="Keep indents on empty lines" />
+    <option name="loading" hit="Loading..." />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="smart" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="tabs" path="Tabs and Indents" hit="Smart tabs" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+    <option name="velocity" hit="Velocity" />
+  </configurable>
+</options>

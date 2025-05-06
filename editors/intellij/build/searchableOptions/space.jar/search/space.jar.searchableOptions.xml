@@ -1,0 +1,108 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add Review Comment" />
+    <option name="comment" path="ActionManager" hit="Add Review Comment" />
+    <option name="review" path="ActionManager" hit="Add Review Comment" />
+    <option name="clone" path="ActionManager" hit="Clone Repository…" />
+    <option name="repository" path="ActionManager" hit="Clone Repository…" />
+    <option name="code" path="ActionManager" hit="Code Reviews" />
+    <option name="reviews" path="ActionManager" hit="Code Reviews" />
+    <option name="copy" path="ActionManager" hit="Copy Link to Space" />
+    <option name="link" path="ActionManager" hit="Copy Link to Space" />
+    <option name="space" path="ActionManager" hit="Copy Link to Space" />
+    <option name="to" path="ActionManager" hit="Copy Link to Space" />
+    <option name="copy" path="ActionManager" hit="Copy link to Space" />
+    <option name="link" path="ActionManager" hit="Copy link to Space" />
+    <option name="space" path="ActionManager" hit="Copy link to Space" />
+    <option name="to" path="ActionManager" hit="Copy link to Space" />
+    <option name="code" path="ActionManager" hit="Create Code Review" />
+    <option name="create" path="ActionManager" hit="Create Code Review" />
+    <option name="review" path="ActionManager" hit="Create Code Review" />
+    <option name="create" path="ActionManager" hit="Create Merge Request" />
+    <option name="merge" path="ActionManager" hit="Create Merge Request" />
+    <option name="request" path="ActionManager" hit="Create Merge Request" />
+    <option name="code" path="ActionManager" hit="Create code review" />
+    <option name="create" path="ActionManager" hit="Create code review" />
+    <option name="review" path="ActionManager" hit="Create code review" />
+    <option name="create" path="ActionManager" hit="Create merge request" />
+    <option name="merge" path="ActionManager" hit="Create merge request" />
+    <option name="request" path="ActionManager" hit="Create merge request" />
+    <option name="documents" path="ActionManager" hit="Documents" />
+    <option name="go" path="ActionManager" hit="Go to Review…" />
+    <option name="review" path="ActionManager" hit="Go to Review…" />
+    <option name="to" path="ActionManager" hit="Go to Review…" />
+    <option name="issues" path="ActionManager" hit="Issues" />
+    <option name="in" path="ActionManager" hit="Log In to Space…" />
+    <option name="log" path="ActionManager" hit="Log In to Space…" />
+    <option name="space" path="ActionManager" hit="Log In to Space…" />
+    <option name="to" path="ActionManager" hit="Log In to Space…" />
+    <option name="log" path="ActionManager" hit="Log Out" />
+    <option name="out" path="ActionManager" hit="Log Out" />
+    <option name="as" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="mark" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="not" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="viewed" path="ActionManager" hit="Mark as Not Viewed" />
+    <option name="as" path="ActionManager" hit="Mark as Viewed" />
+    <option name="mark" path="ActionManager" hit="Mark as Viewed" />
+    <option name="viewed" path="ActionManager" hit="Mark as Viewed" />
+    <option name="merge" path="ActionManager" hit="New Merge Request..." />
+    <option name="new" path="ActionManager" hit="New Merge Request..." />
+    <option name="request" path="ActionManager" hit="New Merge Request..." />
+    <option name="browser" path="ActionManager" hit="Open link in browser" />
+    <option name="in" path="ActionManager" hit="Open link in browser" />
+    <option name="link" path="ActionManager" hit="Open link in browser" />
+    <option name="open" path="ActionManager" hit="Open link in browser" />
+    <option name="on" path="ActionManager" hit="Open on Space" />
+    <option name="open" path="ActionManager" hit="Open on Space" />
+    <option name="space" path="ActionManager" hit="Open on Space" />
+    <option name="packages" path="ActionManager" hit="Packages" />
+    <option name="refresh" path="ActionManager" hit="Refresh Reviews" />
+    <option name="reviews" path="ActionManager" hit="Refresh Reviews" />
+    <option name="on" path="ActionManager" hit="Share Project on Space" />
+    <option name="project" path="ActionManager" hit="Share Project on Space" />
+    <option name="share" path="ActionManager" hit="Share Project on Space" />
+    <option name="space" path="ActionManager" hit="Share Project on Space" />
+    <option name="discussions" path="ActionManager" hit="Show Review Discussions" />
+    <option name="review" path="ActionManager" hit="Show Review Discussions" />
+    <option name="show" path="ActionManager" hit="Show Review Discussions" />
+    <option name="space" path="ActionManager" hit="Space" />
+    <option name="environment" path="ActionManager" hit="Space: The Integrated Team Environment" />
+    <option name="integrated" path="ActionManager" hit="Space: The Integrated Team Environment" />
+    <option name="space" path="ActionManager" hit="Space: The Integrated Team Environment" />
+    <option name="team" path="ActionManager" hit="Space: The Integrated Team Environment" />
+    <option name="the" path="ActionManager" hit="Space: The Integrated Team Environment" />
+  </configurable>
+  <configurable id="settings.space" configurable_name="Space">
+    <option name="" hit="   Watch Space Overview" />
+    <option name="overview" hit="   Watch Space Overview" />
+    <option name="space" hit="   Watch Space Overview" />
+    <option name="watch" hit="   Watch Space Overview" />
+    <option name="and" hit="Clone and share repositories with:" />
+    <option name="clone" hit="Clone and share repositories with:" />
+    <option name="repositories" hit="Clone and share repositories with:" />
+    <option name="share" hit="Clone and share repositories with:" />
+    <option name="with" hit="Clone and share repositories with:" />
+    <option name="configure" hit="Configure password store" />
+    <option name="password" hit="Configure password store" />
+    <option name="store" hit="Configure password store" />
+    <option name="be" hit="Credentials will not be persisted:" />
+    <option name="credentials" hit="Credentials will not be persisted:" />
+    <option name="not" hit="Credentials will not be persisted:" />
+    <option name="persisted" hit="Credentials will not be persisted:" />
+    <option name="will" hit="Credentials will not be persisted:" />
+    <option name="explore" hit="Explore Space" />
+    <option name="space" hit="Explore Space" />
+    <option name="https" hit="HTTPS" />
+    <option name="in" hit="Log In" />
+    <option name="log" hit="Log In" />
+    <option name="in" hit="Log in to Space" />
+    <option name="log" hit="Log in to Space" />
+    <option name="space" hit="Log in to Space" />
+    <option name="to" hit="Log in to Space" />
+    <option name="organization" hit="Organization URL:" />
+    <option name="url" hit="Organization URL:" />
+    <option name="ssh" hit="SSH" />
+    <option name="space" hit="Space" />
+  </configurable>
+</options>

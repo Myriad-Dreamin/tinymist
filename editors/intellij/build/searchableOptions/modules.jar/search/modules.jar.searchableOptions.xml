@@ -1,0 +1,279 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="attach" path="ActionManager" hit="Attach Profiler" />
+    <option name="profiler" path="ActionManager" hit="Attach Profiler" />
+    <option name="attach" path="ActionManager" hit="Attach Profiler to Process..." />
+    <option name="process" path="ActionManager" hit="Attach Profiler to Process..." />
+    <option name="profiler" path="ActionManager" hit="Attach Profiler to Process..." />
+    <option name="to" path="ActionManager" hit="Attach Profiler to Process..." />
+    <option name="an" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="attach" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="available" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="process" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="profiler" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="to" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="with" path="ActionManager" hit="Attach to process with an available profiler" />
+    <option name="and" path="ActionManager" hit="CPU and Memory Live Charts" />
+    <option name="charts" path="ActionManager" hit="CPU and Memory Live Charts" />
+    <option name="cpu" path="ActionManager" hit="CPU and Memory Live Charts" />
+    <option name="live" path="ActionManager" hit="CPU and Memory Live Charts" />
+    <option name="memory" path="ActionManager" hit="CPU and Memory Live Charts" />
+    <option name="capture" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="memory" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Capture Memory Snapshot" />
+    <option name="clear" path="ActionManager" hit="Clear" />
+    <option name="clear" path="ActionManager" hit="Clear output" />
+    <option name="output" path="ActionManager" hit="Clear output" />
+    <option name="all" path="ActionManager" hit="Collapse All Cell Outputs" />
+    <option name="cell" path="ActionManager" hit="Collapse All Cell Outputs" />
+    <option name="collapse" path="ActionManager" hit="Collapse All Cell Outputs" />
+    <option name="outputs" path="ActionManager" hit="Collapse All Cell Outputs" />
+    <option name="all" path="ActionManager" hit="Collapse All Notebook Outputs" />
+    <option name="collapse" path="ActionManager" hit="Collapse All Notebook Outputs" />
+    <option name="notebook" path="ActionManager" hit="Collapse All Notebook Outputs" />
+    <option name="outputs" path="ActionManager" hit="Collapse All Notebook Outputs" />
+    <option name="cells" path="ActionManager" hit="Collapse Outputs of Selected Cells" />
+    <option name="collapse" path="ActionManager" hit="Collapse Outputs of Selected Cells" />
+    <option name="of" path="ActionManager" hit="Collapse Outputs of Selected Cells" />
+    <option name="outputs" path="ActionManager" hit="Collapse Outputs of Selected Cells" />
+    <option name="selected" path="ActionManager" hit="Collapse Outputs of Selected Cells" />
+    <option name="collapse" path="ActionManager" hit="Collapse Selected Output" />
+    <option name="output" path="ActionManager" hit="Collapse Selected Output" />
+    <option name="selected" path="ActionManager" hit="Collapse Selected Output" />
+    <option name="clipboard" path="ActionManager" hit="Copy image to clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy image to clipboard" />
+    <option name="image" path="ActionManager" hit="Copy image to clipboard" />
+    <option name="to" path="ActionManager" hit="Copy image to clipboard" />
+    <option name="clipboard" path="ActionManager" hit="Copy to Clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy to Clipboard" />
+    <option name="to" path="ActionManager" hit="Copy to Clipboard" />
+    <option name="call" path="ActionManager" hit="Exclude Call" />
+    <option name="exclude" path="ActionManager" hit="Exclude Call" />
+    <option name="exclude" path="ActionManager" hit="Exclude Subtree" />
+    <option name="subtree" path="ActionManager" hit="Exclude Subtree" />
+    <option name="call" path="ActionManager" hit="Focus On Call" />
+    <option name="focus" path="ActionManager" hit="Focus On Call" />
+    <option name="on" path="ActionManager" hit="Focus On Call" />
+    <option name="focus" path="ActionManager" hit="Focus On Subtree" />
+    <option name="on" path="ActionManager" hit="Focus On Subtree" />
+    <option name="subtree" path="ActionManager" hit="Focus On Subtree" />
+    <option name="dtd" path="ActionManager" hit="Generate DTD from XML File" />
+    <option name="file" path="ActionManager" hit="Generate DTD from XML File" />
+    <option name="from" path="ActionManager" hit="Generate DTD from XML File" />
+    <option name="generate" path="ActionManager" hit="Generate DTD from XML File" />
+    <option name="xml" path="ActionManager" hit="Generate DTD from XML File" />
+    <option name="document" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="from" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="generate" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="schema" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="xml" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="xsd" path="ActionManager" hit="Generate XML Document from XSD Schema..." />
+    <option name="file" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="from" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="generate" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="schema" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="xml" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="xsd" path="ActionManager" hit="Generate XSD Schema from XML File..." />
+    <option name="back" path="ActionManager" hit="Method Back Traces" />
+    <option name="method" path="ActionManager" hit="Method Back Traces" />
+    <option name="traces" path="ActionManager" hit="Method Back Traces" />
+    <option name="callees" path="ActionManager" hit="Method Merged Callees" />
+    <option name="merged" path="ActionManager" hit="Method Merged Callees" />
+    <option name="method" path="ActionManager" hit="Method Merged Callees" />
+    <option name="flame" path="ActionManager" hit="New Flame Graph View" />
+    <option name="graph" path="ActionManager" hit="New Flame Graph View" />
+    <option name="new" path="ActionManager" hit="New Flame Graph View" />
+    <option name="view" path="ActionManager" hit="New Flame Graph View" />
+    <option name="hprof" path="ActionManager" hit="Open Hprof Snapshot" />
+    <option name="open" path="ActionManager" hit="Open Hprof Snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Open Hprof Snapshot" />
+    <option name="open" path="ActionManager" hit="Open Profiler Snapshot" />
+    <option name="profiler" path="ActionManager" hit="Open Profiler Snapshot" />
+    <option name="snapshot" path="ActionManager" hit="Open Profiler Snapshot" />
+    <option name="a" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="back" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="in" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="method" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="new" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="open" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="selected" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="tab" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="traces" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="tree" path="ActionManager" hit="Open selected method Back Traces tree in a new tab" />
+    <option name="a" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="callees" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="in" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="merged" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="method" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="new" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="open" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="selected" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="tab" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="tree" path="ActionManager" hit="Open selected method Merged Callees tree in a new tab" />
+    <option name="a" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="in" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="new" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="open" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="selected" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="subtree" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="tab" path="ActionManager" hit="Open selected subtree in a new tab" />
+    <option name="process" path="ActionManager" hit="Profile the Process" />
+    <option name="profile" path="ActionManager" hit="Profile the Process" />
+    <option name="the" path="ActionManager" hit="Profile the Process" />
+    <option name="finder" path="ActionManager" hit="Reveal in Finder" />
+    <option name="in" path="ActionManager" hit="Reveal in Finder" />
+    <option name="reveal" path="ActionManager" hit="Reveal in Finder" />
+    <option name="as" path="ActionManager" hit="Save As" />
+    <option name="save" path="ActionManager" hit="Save As" />
+    <option name="as" path="ActionManager" hit="Save as" />
+    <option name="save" path="ActionManager" hit="Save as" />
+    <option name="new" path="ActionManager" hit="Start New UI Onboarding" />
+    <option name="onboarding" path="ActionManager" hit="Start New UI Onboarding" />
+    <option name="start" path="ActionManager" hit="Start New UI Onboarding" />
+    <option name="ui" path="ActionManager" hit="Start New UI Onboarding" />
+    <option name="validate" path="ActionManager" hit="Validate" />
+    <option name="current" path="ActionManager" hit="Validate the current XML file" />
+    <option name="file" path="ActionManager" hit="Validate the current XML file" />
+    <option name="the" path="ActionManager" hit="Validate the current XML file" />
+    <option name="validate" path="ActionManager" hit="Validate the current XML file" />
+    <option name="xml" path="ActionManager" hit="Validate the current XML file" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="1" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="chooser" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="product" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="show" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 1 Transfer: Show Product Chooser Dialog" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="1s" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="chooser" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="product" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="show" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="single" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 1s Transfer: Show Product Chooser Dialog Single" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="2" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="chooser" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="setting" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="show" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 2 Transfer: Show Setting Chooser Dialog" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="2s" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="chooser" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="setting" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="show" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="single" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 2s Transfer: Show Setting Chooser Dialog Single" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="3" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="import" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="progress" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 3 Transfer: Import Progress Dialog" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="3s" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="import" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="progress" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="single" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 3s Transfer: Import Progress Dialog Single" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="3simple" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="import" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="progress" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="simple" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 3simple Transfer: Simple Import Progress Dialog" />
+    <option name="" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="4" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="dialog" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="dispatcher" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="error" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="internal" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="single" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+    <option name="transfer" path="ActionManager" hit="[INTERNAL] 4 Transfer: Error Dispatcher Dialog Single" />
+  </configurable>
+  <configurable id="profiler.jvm" configurable_name="Java Profiler">
+    <option name="agent" hit="Agent options:" />
+    <option name="options" hit="Agent options:" />
+    <option name="agent" hit="Agent:" />
+    <option name="async" hit="Async profiler README.md" />
+    <option name="md" hit="Async profiler README.md" />
+    <option name="profiler" hit="Async profiler README.md" />
+    <option name="readme" hit="Async profiler README.md" />
+    <option name="calls" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="collect" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="etc" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="gc" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="jni" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="native" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="threads" hit="Collect native calls (GC threads, JNI calls, etc.)" />
+    <option name="java" hit="Java Profiler" />
+    <option name="profiler" hit="Java Profiler" />
+    <option name="name" hit="Name:" />
+  </configurable>
+  <configurable id="profiler.calltree.filter" configurable_name="Filters">
+    <option name="filters" hit="Filters" />
+  </configurable>
+  <configurable id="copyright.filetypes.SVG" configurable_name="SVG">
+    <option name="a" hit="Add blank line after" />
+    <option name="after" hit="Add blank line after" />
+    <option name="blank" hit="Add blank line after" />
+    <option name="dd" hit="Add blank line after" />
+    <option name="line" hit="Add blank line after" />
+    <option name="add" hit="Add blank line before" />
+    <option name="before" hit="Add blank line before" />
+    <option name="blank" hit="Add blank line before" />
+    <option name="line" hit="Add blank line before" />
+    <option name="afte" hit="After other comments" />
+    <option name="comments" hit="After other comments" />
+    <option name="other" hit="After other comments" />
+    <option name="r" hit="After other comments" />
+    <option name="bef" hit="Before other comments" />
+    <option name="comments" hit="Before other comments" />
+    <option name="ore" hit="Before other comments" />
+    <option name="other" hit="Before other comments" />
+    <option name="borders" hit="Borders" />
+    <option name="box" hit="Box" />
+    <option name="comment" hit="Comment Type" />
+    <option name="type" hit="Comment Type" />
+    <option name="length" hit="Length:" />
+    <option name="copyright" hit="No copyright" />
+    <option name="no" hit="No copyright" />
+    <option name="each" hit="Prefix each line" />
+    <option name="line" hit="Prefix each line" />
+    <option name="prefix" hit="Prefix each line" />
+    <option name="location" hit="Relative Location" />
+    <option name="relative" hit="Relative Location" />
+    <option name="svg" hit="SVG" />
+    <option name="after" hit="Separator after" />
+    <option name="separator" hit="Separator after" />
+    <option name="before" hit="Separator before" />
+    <option name="separator" hit="Separator before" />
+    <option name="separator" hit="Separator:" />
+    <option name="block" hit="Use block comment" />
+    <option name="comment" hit="Use block comment" />
+    <option name="use" hit="Use block comment" />
+    <option name="custom" hit="Use custom formatting options" />
+    <option name="formatting" hit="Use custom formatting options" />
+    <option name="options" hit="Use custom formatting options" />
+    <option name="use" hit="Use custom formatting options" />
+    <option name="default" hit="Use default settings" />
+    <option name="settings" hit="Use default settings" />
+    <option name="use" hit="Use default settings" />
+    <option name="comment" hit="Use line comment" />
+    <option name="line" hit="Use line comment" />
+    <option name="use" hit="Use line comment" />
+  </configurable>
+</options>

@@ -1,0 +1,307 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="add" path="ActionManager" hit="Add Component to Palette..." />
+    <option name="component" path="ActionManager" hit="Add Component to Palette..." />
+    <option name="palette" path="ActionManager" hit="Add Component to Palette..." />
+    <option name="to" path="ActionManager" hit="Add Component to Palette..." />
+    <option name="add" path="ActionManager" hit="Add Group" />
+    <option name="group" path="ActionManager" hit="Add Group" />
+    <option name="add" path="ActionManager" hit="Add Tab" />
+    <option name="tab" path="ActionManager" hit="Add Tab" />
+    <option name="a" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="add" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="new" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="pane" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="selected" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="tab" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="tabbed" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="the" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="to" path="ActionManager" hit="Add a new tab to the selected tabbed pane" />
+    <option name="add" path="ActionManager" hit="Add component" />
+    <option name="component" path="ActionManager" hit="Add component" />
+    <option name="add" path="ActionManager" hit="Add group" />
+    <option name="group" path="ActionManager" hit="Add group" />
+    <option name="a" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="add" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="buttongroup" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="buttons" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="selected" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="to" path="ActionManager" hit="Add selected buttons to a ButtonGroup" />
+    <option name="choose" path="ActionManager" hit="Choose UI Designer Form Locale" />
+    <option name="designer" path="ActionManager" hit="Choose UI Designer Form Locale" />
+    <option name="form" path="ActionManager" hit="Choose UI Designer Form Locale" />
+    <option name="locale" path="ActionManager" hit="Choose UI Designer Form Locale" />
+    <option name="ui" path="ActionManager" hit="Choose UI Designer Form Locale" />
+    <option name="a" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="add" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="and" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="choose" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="class" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="component" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="form" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="the" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="to" path="ActionManager" hit="Choose a component class and add the component to the form" />
+    <option name="choose" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="displaying" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="for" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="locale" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="localized" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="properties" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="string" path="ActionManager" hit="Choose locale for displaying localized string properties" />
+    <option name="a" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="class" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="component" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="convert" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="different" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="preserving" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="properties" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="the" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="to" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="while" path="ActionManager" hit="Convert the component to a different class while preserving properties" />
+    <option name="component" path="ActionManager" hit="Create Component" />
+    <option name="create" path="ActionManager" hit="Create Component" />
+    <option name="class" path="ActionManager" hit="Create Dialog Class" />
+    <option name="create" path="ActionManager" hit="Create Dialog Class" />
+    <option name="dialog" path="ActionManager" hit="Create Dialog Class" />
+    <option name="create" path="ActionManager" hit="Create Listener" />
+    <option name="listener" path="ActionManager" hit="Create Listener" />
+    <option name="an" path="ActionManager" hit="Create an empty GUI form" />
+    <option name="create" path="ActionManager" hit="Create an empty GUI form" />
+    <option name="empty" path="ActionManager" hit="Create an empty GUI form" />
+    <option name="form" path="ActionManager" hit="Create an empty GUI form" />
+    <option name="gui" path="ActionManager" hit="Create an empty GUI form" />
+    <option name="class" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="create" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="implementing" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="javax" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="jdialog" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="new" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="swing" path="ActionManager" hit="Create new class implementing javax.swing.JDialog" />
+    <option name="decrease" path="ActionManager" hit="Decrease Indent" />
+    <option name="indent" path="ActionManager" hit="Decrease Indent" />
+    <option name="component" path="ActionManager" hit="Decrease indent of selected component" />
+    <option name="decrease" path="ActionManager" hit="Decrease indent of selected component" />
+    <option name="indent" path="ActionManager" hit="Decrease indent of selected component" />
+    <option name="of" path="ActionManager" hit="Decrease indent of selected component" />
+    <option name="selected" path="ActionManager" hit="Decrease indent of selected component" />
+    <option name="component" path="ActionManager" hit="Delete Component" />
+    <option name="delete" path="ActionManager" hit="Delete Component" />
+    <option name="delete" path="ActionManager" hit="Delete Group" />
+    <option name="group" path="ActionManager" hit="Delete Group" />
+    <option name="component" path="ActionManager" hit="Delete component" />
+    <option name="delete" path="ActionManager" hit="Delete component" />
+    <option name="delete" path="ActionManager" hit="Delete group" />
+    <option name="group" path="ActionManager" hit="Delete group" />
+    <option name="and" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="container" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="contents" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="delete" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="its" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="move" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="parent" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="selected" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="to" path="ActionManager" hit="Delete selected container and move its contents to its parent container" />
+    <option name="duplicate" path="ActionManager" hit="Duplicate" />
+    <option name="components" path="ActionManager" hit="Duplicate components" />
+    <option name="duplicate" path="ActionManager" hit="Duplicate components" />
+    <option name="component" path="ActionManager" hit="Edit Component" />
+    <option name="edit" path="ActionManager" hit="Edit Component" />
+    <option name="edit" path="ActionManager" hit="Edit Group" />
+    <option name="group" path="ActionManager" hit="Edit Group" />
+    <option name="component" path="ActionManager" hit="Edit component" />
+    <option name="edit" path="ActionManager" hit="Edit component" />
+    <option name="edit" path="ActionManager" hit="Edit group" />
+    <option name="group" path="ActionManager" hit="Edit group" />
+    <option name="expand" path="ActionManager" hit="Expand Selection" />
+    <option name="selection" path="ActionManager" hit="Expand Selection" />
+    <option name="expand" path="ActionManager" hit="Expand selection structurally" />
+    <option name="selection" path="ActionManager" hit="Expand selection structurally" />
+    <option name="structurally" path="ActionManager" hit="Expand selection structurally" />
+    <option name="flatten" path="ActionManager" hit="Flatten" />
+    <option name="form" path="ActionManager" hit="Form Source" />
+    <option name="source" path="ActionManager" hit="Form Source" />
+    <option name="form" path="ActionManager" hit="Form main()" />
+    <option name="main" path="ActionManager" hit="Form main()" />
+    <option name="form" path="ActionManager" hit="GUI Form" />
+    <option name="gui" path="ActionManager" hit="GUI Form" />
+    <option name="a" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="and" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="attach" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="class" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="component" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="generate" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="it" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="listener" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="the" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="to" path="ActionManager" hit="Generate a listener class and attach it to the component" />
+    <option name="a" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="form" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="generate" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="main" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="method" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="show" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="the" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="to" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="ui" path="ActionManager" hit="Generate a main() method to show the UI form" />
+    <option name="go" path="ActionManager" hit="Go to Listener" />
+    <option name="listener" path="ActionManager" hit="Go to Listener" />
+    <option name="to" path="ActionManager" hit="Go to Listener" />
+    <option name="buttons" path="ActionManager" hit="Group Buttons" />
+    <option name="group" path="ActionManager" hit="Group Buttons" />
+    <option name="increase" path="ActionManager" hit="Increase Indent" />
+    <option name="indent" path="ActionManager" hit="Increase Indent" />
+    <option name="component" path="ActionManager" hit="Increase indent of selected component" />
+    <option name="increase" path="ActionManager" hit="Increase indent of selected component" />
+    <option name="indent" path="ActionManager" hit="Increase indent of selected component" />
+    <option name="of" path="ActionManager" hit="Increase indent of selected component" />
+    <option name="selected" path="ActionManager" hit="Increase indent of selected component" />
+    <option name="component" path="ActionManager" hit="Morph Component..." />
+    <option name="morph" path="ActionManager" hit="Morph Component..." />
+    <option name="a" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="attached" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="class" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="component" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="listener" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="navigate" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="the" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="to" path="ActionManager" hit="Navigate to a listener class attached to the component" />
+    <option name="pack" path="ActionManager" hit="Pack" />
+    <option name="preview" path="ActionManager" hit="Preview" />
+    <option name="form" path="ActionManager" hit="Preview form" />
+    <option name="preview" path="ActionManager" hit="Preview form" />
+    <option name="javadoc" path="ActionManager" hit="Quick JavaDoc" />
+    <option name="quick" path="ActionManager" hit="Quick JavaDoc" />
+    <option name="components" path="ActionManager" hit="Reload Custom Components" />
+    <option name="custom" path="ActionManager" hit="Reload Custom Components" />
+    <option name="reload" path="ActionManager" hit="Reload Custom Components" />
+    <option name="and" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="classes" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="component" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="custom" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="forms" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="modified" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="recreate" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="reload" path="ActionManager" hit="Reload modified custom component classes and recreate forms" />
+    <option name="a" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="buttongroup" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="buttons" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="from" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="remove" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="selected" path="ActionManager" hit="Remove selected buttons from a ButtonGroup" />
+    <option name="default" path="ActionManager" hit="Restore Default Value" />
+    <option name="restore" path="ActionManager" hit="Restore Default Value" />
+    <option name="value" path="ActionManager" hit="Restore Default Value" />
+    <option name="default" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="of" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="property" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="restore" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="selected" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="the" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="value" path="ActionManager" hit="Restore the default value of the selected property" />
+    <option name="component" path="ActionManager" hit="Show Component Tags" />
+    <option name="show" path="ActionManager" hit="Show Component Tags" />
+    <option name="tags" path="ActionManager" hit="Show Component Tags" />
+    <option name="grid" path="ActionManager" hit="Show Grid" />
+    <option name="show" path="ActionManager" hit="Show Grid" />
+    <option name="a" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="for" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="javadoc" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="popup" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="property" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="selected" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="show" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="window" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="with" path="ActionManager" hit="Show a popup window with JavaDoc for selected property" />
+    <option name="content" path="ActionManager" hit="Show form XML content" />
+    <option name="form" path="ActionManager" hit="Show form XML content" />
+    <option name="show" path="ActionManager" hit="Show form XML content" />
+    <option name="xml" path="ActionManager" hit="Show form XML content" />
+    <option name="selection" path="ActionManager" hit="Shrink Selection" />
+    <option name="shrink" path="ActionManager" hit="Shrink Selection" />
+    <option name="container" path="ActionManager" hit="Shrink container to minimum size" />
+    <option name="minimum" path="ActionManager" hit="Shrink container to minimum size" />
+    <option name="shrink" path="ActionManager" hit="Shrink container to minimum size" />
+    <option name="size" path="ActionManager" hit="Shrink container to minimum size" />
+    <option name="to" path="ActionManager" hit="Shrink container to minimum size" />
+    <option name="selection" path="ActionManager" hit="Shrink selection structurally" />
+    <option name="shrink" path="ActionManager" hit="Shrink selection structurally" />
+    <option name="structurally" path="ActionManager" hit="Shrink selection structurally" />
+    <option name="surround" path="ActionManager" hit="Surround With..." />
+    <option name="with" path="ActionManager" hit="Surround With..." />
+    <option name="a" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="container" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="controls" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="selected" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="surround" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="the" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="with" path="ActionManager" hit="Surround the selected controls with a container" />
+    <option name="components" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="large" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="no" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="of" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="on" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="tags" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="text" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="toggles" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="visibility" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="with" path="ActionManager" hit="Toggles visibility of tags on large components with no text" />
+    <option name="container" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="grid" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="layout" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="of" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="the" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="toggles" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="visibility" path="ActionManager" hit="Toggles visibility of the container layout grid" />
+    <option name="buttons" path="ActionManager" hit="Ungroup Buttons" />
+    <option name="ungroup" path="ActionManager" hit="Ungroup Buttons" />
+  </configurable>
+  <configurable id="project.propGUI" configurable_name="GUI Designer">
+    <option name="1" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="2020" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="allow" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="at" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="changing" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="locale" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="requires" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="runtime" hit="Allow changing locale at runtime (requires 2020.1)" />
+    <option name="automatically" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="classes" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="copy" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="directory" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="form" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="output" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="runtime" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="the" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="to" hit="Automatically copy form runtime classes to the output directory" />
+    <option name="binary" hit="Binary class files" />
+    <option name="class" hit="Binary class files" />
+    <option name="files" hit="Binary class files" />
+    <option name="accessibility" hit="Default accessibility for UI-bound fields:" />
+    <option name="default" hit="Default accessibility for UI-bound fields:" />
+    <option name="fields" hit="Default accessibility for UI-bound fields:" />
+    <option name="for" hit="Default accessibility for UI-bound fields:" />
+    <option name="ui-bound" hit="Default accessibility for UI-bound fields:" />
+    <option name="default" hit="Default layout manager:" />
+    <option name="layout" hit="Default layout manager:" />
+    <option name="manager" hit="Default layout manager:" />
+    <option name="designer" hit="GUI Designer" />
+    <option name="gui" hit="GUI Designer" />
+    <option name="generate" hit="Generate GUI into:" />
+    <option name="gui" hit="Generate GUI into:" />
+    <option name="into" hit="Generate GUI into:" />
+    <option name="code" hit="Java source code" />
+    <option name="java" hit="Java source code" />
+    <option name="source" hit="Java source code" />
+    <option name="and" hit="Resize column and row headers with mouse" />
+    <option name="column" hit="Resize column and row headers with mouse" />
+    <option name="headers" hit="Resize column and row headers with mouse" />
+    <option name="mouse" hit="Resize column and row headers with mouse" />
+    <option name="resize" hit="Resize column and row headers with mouse" />
+    <option name="row" hit="Resize column and row headers with mouse" />
+    <option name="with" hit="Resize column and row headers with mouse" />
+    <option name="package-private" hit="package-private" />
+    <option name="private" hit="private" />
+    <option name="protected" hit="protected" />
+    <option name="public" hit="public" />
+  </configurable>
+</options>

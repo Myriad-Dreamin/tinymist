@@ -1,0 +1,573 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="add" path="ActionManager" hit="Add Request" />
+    <option name="request" path="ActionManager" hit="Add Request" />
+    <option name="add" path="ActionManager" hit="Add to HTTP Client…" />
+    <option name="client" path="ActionManager" hit="Add to HTTP Client…" />
+    <option name="http" path="ActionManager" hit="Add to HTTP Client…" />
+    <option name="to" path="ActionManager" hit="Add to HTTP Client…" />
+    <option name="adds" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="auth" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="configuration" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="current" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="environment" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="new" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="the" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="to" path="ActionManager" hit="Adds new Auth configuration to the current environment" />
+    <option name="adds" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="auth" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="configuration" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="new" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="or" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="request" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="variable" path="ActionManager" hit="Adds new request, variable, or Auth configuration" />
+    <option name="adds" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="current" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="environment" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="new" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="the" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="to" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="variable" path="ActionManager" hit="Adds new variable to the current environment" />
+    <option name="allows" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="disabling" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="enabling" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="file" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="inline" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="or" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="pdf" path="ActionManager" hit="Allows disabling or enabling PDF file inline" />
+    <option name="auth" path="ActionManager" hit="Auth Configuration" />
+    <option name="configuration" path="ActionManager" hit="Auth Configuration" />
+    <option name="collection" path="ActionManager" hit="Convert Collection to .http File" />
+    <option name="convert" path="ActionManager" hit="Convert Collection to .http File" />
+    <option name="file" path="ActionManager" hit="Convert Collection to .http File" />
+    <option name="http" path="ActionManager" hit="Convert Collection to .http File" />
+    <option name="to" path="ActionManager" hit="Convert Collection to .http File" />
+    <option name="client" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="convert" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="environment" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="format" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="http" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="to" path="ActionManager" hit="Convert Environment to HTTP Client Format" />
+    <option name="client" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="convert" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="file" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="format" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="legacy" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="new" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="rest" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="to" path="ActionManager" hit="Convert Legacy REST Client File to New Format" />
+    <option name="client" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="convert" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="files" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="http" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="legacy" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="requests" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="rest" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="to" path="ActionManager" hit="Convert Legacy REST Client Files to HTTP Requests" />
+    <option name="convert" path="ActionManager" hit="Convert cURL to HTTP Request" />
+    <option name="curl" path="ActionManager" hit="Convert cURL to HTTP Request" />
+    <option name="http" path="ActionManager" hit="Convert cURL to HTTP Request" />
+    <option name="request" path="ActionManager" hit="Convert cURL to HTTP Request" />
+    <option name="to" path="ActionManager" hit="Convert cURL to HTTP Request" />
+    <option name="and" path="ActionManager" hit="Convert to cURL and Copy" />
+    <option name="convert" path="ActionManager" hit="Convert to cURL and Copy" />
+    <option name="copy" path="ActionManager" hit="Convert to cURL and Copy" />
+    <option name="curl" path="ActionManager" hit="Convert to cURL and Copy" />
+    <option name="to" path="ActionManager" hit="Convert to cURL and Copy" />
+    <option name="body" path="ActionManager" hit="Copy Response Body to Clipboard" />
+    <option name="clipboard" path="ActionManager" hit="Copy Response Body to Clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy Response Body to Clipboard" />
+    <option name="response" path="ActionManager" hit="Copy Response Body to Clipboard" />
+    <option name="to" path="ActionManager" hit="Copy Response Body to Clipboard" />
+    <option name="client" path="ActionManager" hit="Create Request in HTTP Client" />
+    <option name="create" path="ActionManager" hit="Create Request in HTTP Client" />
+    <option name="http" path="ActionManager" hit="Create Request in HTTP Client" />
+    <option name="in" path="ActionManager" hit="Create Request in HTTP Client" />
+    <option name="request" path="ActionManager" hit="Create Request in HTTP Client" />
+    <option name="create" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="environment" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="file" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="for" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="http" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="requests" path="ActionManager" hit="Create environment file for HTTP requests" />
+    <option name="create" path="ActionManager" hit="Create new HTTP Request file" />
+    <option name="file" path="ActionManager" hit="Create new HTTP Request file" />
+    <option name="http" path="ActionManager" hit="Create new HTTP Request file" />
+    <option name="new" path="ActionManager" hit="Create new HTTP Request file" />
+    <option name="request" path="ActionManager" hit="Create new HTTP Request file" />
+    <option name="create" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="environment" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="file" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="for" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="http" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="private" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="requests" path="ActionManager" hit="Create private HTTP environment file for HTTP requests" />
+    <option name="enable" path="ActionManager" hit="Enable PDF preview inline" />
+    <option name="inline" path="ActionManager" hit="Enable PDF preview inline" />
+    <option name="pdf" path="ActionManager" hit="Enable PDF preview inline" />
+    <option name="preview" path="ActionManager" hit="Enable PDF preview inline" />
+    <option name="client" path="ActionManager" hit="Generate Request in HTTP Client" />
+    <option name="generate" path="ActionManager" hit="Generate Request in HTTP Client" />
+    <option name="http" path="ActionManager" hit="Generate Request in HTTP Client" />
+    <option name="in" path="ActionManager" hit="Generate Request in HTTP Client" />
+    <option name="request" path="ActionManager" hit="Generate Request in HTTP Client" />
+    <option name="back" path="ActionManager" hit="Go Back" />
+    <option name="go" path="ActionManager" hit="Go Back" />
+    <option name="forward" path="ActionManager" hit="Go Forward" />
+    <option name="go" path="ActionManager" hit="Go Forward" />
+    <option name="environment" path="ActionManager" hit="HTTP Environment File" />
+    <option name="file" path="ActionManager" hit="HTTP Environment File" />
+    <option name="http" path="ActionManager" hit="HTTP Environment File" />
+    <option name="http" path="ActionManager" hit="HTTP Request" />
+    <option name="request" path="ActionManager" hit="HTTP Request" />
+    <option name="http" path="ActionManager" hit="Import HTTP Request" />
+    <option name="import" path="ActionManager" hit="Import HTTP Request" />
+    <option name="request" path="ActionManager" hit="Import HTTP Request" />
+    <option name="collection" path="ActionManager" hit="Import from Postman Collection File" />
+    <option name="file" path="ActionManager" hit="Import from Postman Collection File" />
+    <option name="from" path="ActionManager" hit="Import from Postman Collection File" />
+    <option name="import" path="ActionManager" hit="Import from Postman Collection File" />
+    <option name="postman" path="ActionManager" hit="Import from Postman Collection File" />
+    <option name="dev" path="ActionManager" hit="Open Dev Tools" />
+    <option name="open" path="ActionManager" hit="Open Dev Tools" />
+    <option name="tools" path="ActionManager" hit="Open Dev Tools" />
+    <option name="collection" path="ActionManager" hit="Open HTTP Requests Collection" />
+    <option name="http" path="ActionManager" hit="Open HTTP Requests Collection" />
+    <option name="open" path="ActionManager" hit="Open HTTP Requests Collection" />
+    <option name="requests" path="ActionManager" hit="Open HTTP Requests Collection" />
+    <option name="built-in" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="collection" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="http" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="of" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="opens" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="requests" path="ActionManager" hit="Opens built-in collection of HTTP Requests" />
+    <option name="executed" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="file" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="http" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="log" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="opens" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="requests" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="with" path="ActionManager" hit="Opens log file with executed HTTP Requests" />
+    <option name="all" path="ActionManager" hit="Run All Requests in File" />
+    <option name="file" path="ActionManager" hit="Run All Requests in File" />
+    <option name="in" path="ActionManager" hit="Run All Requests in File" />
+    <option name="requests" path="ActionManager" hit="Run All Requests in File" />
+    <option name="run" path="ActionManager" hit="Run All Requests in File" />
+    <option name="collection" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="conversion" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="file" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="format" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="http" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="of" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="postman" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="runs" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="to" path="ActionManager" hit="Runs conversion of Postman collection file format to .http format" />
+    <option name="conversion" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="environment" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="file" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="format" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="http" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="of" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="postman" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="runs" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="to" path="ActionManager" hit="Runs conversion of Postman environment file format to .http format" />
+    <option name="conversion" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="file" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="format" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="http" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="of" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="postman" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="runs" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="to" path="ActionManager" hit="Runs conversion of Postman file format to .http format" />
+    <option name="history" path="ActionManager" hit="Show HTTP Requests History" />
+    <option name="http" path="ActionManager" hit="Show HTTP Requests History" />
+    <option name="requests" path="ActionManager" hit="Show HTTP Requests History" />
+    <option name="show" path="ActionManager" hit="Show HTTP Requests History" />
+    <option name="preview" path="ActionManager" hit="Show Preview" />
+    <option name="show" path="ActionManager" hit="Show Preview" />
+    <option name="file" path="ActionManager" hit="Variable in Private File" />
+    <option name="in" path="ActionManager" hit="Variable in Private File" />
+    <option name="private" path="ActionManager" hit="Variable in Private File" />
+    <option name="variable" path="ActionManager" hit="Variable in Private File" />
+    <option name="file" path="ActionManager" hit="Variable in Public File" />
+    <option name="in" path="ActionManager" hit="Variable in Public File" />
+    <option name="public" path="ActionManager" hit="Variable in Public File" />
+    <option name="variable" path="ActionManager" hit="Variable in Public File" />
+    <option name="env" path="ActionManager" hit="http-client.env.json" />
+    <option name="http-client" path="ActionManager" hit="http-client.env.json" />
+    <option name="json" path="ActionManager" hit="http-client.env.json" />
+    <option name="env" path="ActionManager" hit="http-client.private.env.json" />
+    <option name="http-client" path="ActionManager" hit="http-client.private.env.json" />
+    <option name="json" path="ActionManager" hit="http-client.private.env.json" />
+    <option name="private" path="ActionManager" hit="http-client.private.env.json" />
+  </configurable>
+  <configurable id="reference.settingsdialog.IDE.editor.colors.HTTP Request" configurable_name="HTTP Request">
+    <option name="http" hit="HTTP Request" />
+    <option name="request" hit="HTTP Request" />
+    <option name="comment" hit="Comment" />
+    <option name="comment" hit="Comment tag" />
+    <option name="tag" hit="Comment tag" />
+    <option name="arguments" hit="Dynamic Variable//Number arguments" />
+    <option name="dynamic" hit="Dynamic Variable//Number arguments" />
+    <option name="number" hit="Dynamic Variable//Number arguments" />
+    <option name="variable" hit="Dynamic Variable//Number arguments" />
+    <option name="arguments" hit="Dynamic Variable//String arguments" />
+    <option name="dynamic" hit="Dynamic Variable//String arguments" />
+    <option name="string" hit="Dynamic Variable//String arguments" />
+    <option name="variable" hit="Dynamic Variable//String arguments" />
+    <option name="environment" hit="Environment Variable" />
+    <option name="variable" hit="Environment Variable" />
+    <option name="escaped" hit="Escaped Value" />
+    <option name="value" hit="Escaped Value" />
+    <option name="field" hit="Header Field Key" />
+    <option name="header" hit="Header Field Key" />
+    <option name="key" hit="Header Field Key" />
+    <option name="field" hit="Header Field Value" />
+    <option name="header" hit="Header Field Value" />
+    <option name="value" hit="Header Field Value" />
+    <option name="begin" hit="In-Place Variable//Variable begin" />
+    <option name="in-place" hit="In-Place Variable//Variable begin" />
+    <option name="variable" hit="In-Place Variable//Variable begin" />
+    <option name="in-place" hit="In-Place Variable//Variable name" />
+    <option name="name" hit="In-Place Variable//Variable name" />
+    <option name="variable" hit="In-Place Variable//Variable name" />
+    <option name="in-place" hit="In-Place Variable//Variable value" />
+    <option name="value" hit="In-Place Variable//Variable value" />
+    <option name="variable" hit="In-Place Variable//Variable value" />
+    <option name="file" hit="Input File Path" />
+    <option name="input" hit="Input File Path" />
+    <option name="path" hit="Input File Path" />
+    <option name="file" hit="Input File Sign" />
+    <option name="input" hit="Input File Sign" />
+    <option name="sign" hit="Input File Sign" />
+    <option name="method" hit="Method Type" />
+    <option name="type" hit="Method Type" />
+    <option name="boundary" hit="Multipart Boundary" />
+    <option name="multipart" hit="Multipart Boundary" />
+    <option name="body" hit="Request Body" />
+    <option name="request" hit="Request Body" />
+    <option name="name" hit="Request Name" />
+    <option name="request" hit="Request Name" />
+    <option name="name" hit="Request Parameter Name" />
+    <option name="parameter" hit="Request Parameter Name" />
+    <option name="request" hit="Request Parameter Name" />
+    <option name="parameter" hit="Request Parameter Value" />
+    <option name="request" hit="Request Parameter Value" />
+    <option name="value" hit="Request Parameter Value" />
+    <option name="port" hit="Request Port" />
+    <option name="request" hit="Request Port" />
+    <option name="requests" hit="Requests Separator" />
+    <option name="separator" hit="Requests Separator" />
+    <option name="and" hit="Response Handler and Pre-Request scripts" />
+    <option name="handler" hit="Response Handler and Pre-Request scripts" />
+    <option name="pre-request" hit="Response Handler and Pre-Request scripts" />
+    <option name="response" hit="Response Handler and Pre-Request scripts" />
+    <option name="scripts" hit="Response Handler and Pre-Request scripts" />
+    <option name="history" hit="Response History Path" />
+    <option name="path" hit="Response History Path" />
+    <option name="response" hit="Response History Path" />
+    <option name="history" hit="Response History Sign" />
+    <option name="response" hit="Response History Sign" />
+    <option name="sign" hit="Response History Sign" />
+    <option name="highlighting" hit="Semantic highlighting" />
+    <option name="semantic" hit="Semantic highlighting" />
+    <option name="braces" hit="Variable Braces" />
+    <option name="variable" hit="Variable Braces" />
+  </configurable>
+  <configurable id="preferences.sourceCode.HTTP Request" configurable_name="HTTP Request">
+    <option name="disable" hit="Disable" />
+    <option name="http" hit="HTTP Request" />
+    <option name="request" hit="HTTP Request" />
+    <option name="indent" path="Tabs and Indents" hit="Indent:" />
+    <option name="loading" hit="Loading..." />
+    <option name="scheme" hit="Scheme:" />
+    <option name="from" hit="Set from..." />
+    <option name="set" hit="Set from..." />
+    <option name="spaces" path="Spaces" hit="Spaces" />
+    <option name="size" path="Tabs and Indents" hit="Tab size:" />
+    <option name="tab" path="Tabs and Indents" hit="Tab size:" />
+    <option name="and" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indents" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="tabs" path="Tabs and Indents" hit="Tabs and Indents" />
+    <option name="indent" path="Tabs and Indents" hit="URL parts indent:" />
+    <option name="parts" path="Tabs and Indents" hit="URL parts indent:" />
+    <option name="url" path="Tabs and Indents" hit="URL parts indent:" />
+    <option name="character" path="Tabs and Indents" hit="Use tab character" />
+    <option name="tab" path="Tabs and Indents" hit="Use tab character" />
+    <option name="use" path="Tabs and Indents" hit="Use tab character" />
+    <option name="and" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="braces" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="wrapping" path="Wrapping and Braces" hit="Wrapping and Braces" />
+    <option name="" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="line" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="next" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="on" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="signs" path="Wrapping and Braces" hit="':' signs on next line" />
+    <option name="" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="and" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="line" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="next" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="on" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="signs" path="Wrapping and Braces" hit="'?' and ':' signs on next line" />
+    <option name="" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="catch" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'catch' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="do" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="while" path="Wrapping and Braces" hit="'do ... while()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="else" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'else' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="finally" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'finally' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="for" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'for()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="if" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'if()' statement" />
+    <option name="" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="switch" path="Wrapping and Braces" hit="'switch' statement" />
+    <option name="" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="try" path="Wrapping and Braces" hit="'try' statement" />
+    <option name="" path="Wrapping and Braces" hit="'try-with-resources'" />
+    <option name="try-with-resources" path="Wrapping and Braces" hit="'try-with-resources'" />
+    <option name="" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="while" path="Wrapping and Braces" hit="'while' on new line" />
+    <option name="" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="statement" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="while" path="Wrapping and Braces" hit="'while()' statement" />
+    <option name="" path="Spaces" hit="'x-www-form-urlencoded' parameters" />
+    <option name="parameters" path="Spaces" hit="'x-www-form-urlencoded' parameters" />
+    <option name="x-www-form-urlencoded" path="Spaces" hit="'x-www-form-urlencoded' parameters" />
+    <option name="align" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="method" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="start" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="throws" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="to" path="Wrapping and Braces" hit="Align 'throws' to method start" />
+    <option name="align" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="assignments" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align assignments in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="fields" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align fields in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="multiline" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="parenthesised" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="when" path="Wrapping and Braces" hit="Align parenthesised when multiline" />
+    <option name="align" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="methods" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="simple" path="Wrapping and Braces" hit="Align simple methods in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="columns" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="in" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="variables" path="Wrapping and Braces" hit="Align variables in columns" />
+    <option name="align" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="multiline" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="when" path="Wrapping and Braces" hit="Align when multiline" />
+    <option name="array" path="Wrapping and Braces" hit="Array initializer" />
+    <option name="initializer" path="Wrapping and Braces" hit="Array initializer" />
+    <option name="assert" path="Wrapping and Braces" hit="Assert statement" />
+    <option name="statement" path="Wrapping and Braces" hit="Assert statement" />
+    <option name="assignment" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="line" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="next" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="on" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="sign" path="Wrapping and Braces" hit="Assignment sign on next line" />
+    <option name="assignment" path="Wrapping and Braces" hit="Assignment statement" />
+    <option name="statement" path="Wrapping and Braces" hit="Assignment statement" />
+    <option name="binary" path="Wrapping and Braces" hit="Binary expressions" />
+    <option name="expressions" path="Wrapping and Braces" hit="Binary expressions" />
+    <option name="braces" path="Wrapping and Braces" hit="Braces placement" />
+    <option name="placement" path="Wrapping and Braces" hit="Braces placement" />
+    <option name="builder" path="Wrapping and Braces" hit="Builder methods" />
+    <option name="methods" path="Wrapping and Braces" hit="Builder methods" />
+    <option name="calls" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="chained" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="method" path="Wrapping and Braces" hit="Chained method calls" />
+    <option name="annotations" path="Wrapping and Braces" hit="Class annotations" />
+    <option name="class" path="Wrapping and Braces" hit="Class annotations" />
+    <option name="at" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="column" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="comment" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="first" path="Wrapping and Braces" hit="Comment at first column" />
+    <option name="comments" path="Wrapping and Braces" hit="Comments" />
+    <option name="control" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="statement" path="Wrapping and Braces" hit="Control statement in one line" />
+    <option name="a" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="case" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="each" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="line" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="on" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="separate" path="Wrapping and Braces" hit="Each 'case' on a separate line" />
+    <option name="ensure" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="exceeded" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="is" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="margin" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="not" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="right" path="Wrapping and Braces" hit="Ensure right margin is not exceeded" />
+    <option name="constants" path="Wrapping and Braces" hit="Enum constants" />
+    <option name="enum" path="Wrapping and Braces" hit="Enum constants" />
+    <option name="extends" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="implements" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="keyword" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="permits" path="Wrapping and Braces" hit="Extends/implements/permits keyword" />
+    <option name="extends" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="implements" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="list" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="permits" path="Wrapping and Braces" hit="Extends/implements/permits list" />
+    <option name="annotations" path="Wrapping and Braces" hit="Field annotations" />
+    <option name="field" path="Wrapping and Braces" hit="Field annotations" />
+    <option name="braces" path="Wrapping and Braces" hit="Force braces" />
+    <option name="force" path="Wrapping and Braces" hit="Force braces" />
+    <option name="declarations" path="Wrapping and Braces" hit="Group declarations" />
+    <option name="group" path="Wrapping and Braces" hit="Group declarations" />
+    <option name="at" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="hard" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="wrap" path="Wrapping and Braces" hit="Hard wrap at:" />
+    <option name="class" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In class declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="lambda" path="Wrapping and Braces" hit="In lambda declaration" />
+    <option name="declaration" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="in" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="method" path="Wrapping and Braces" hit="In method declaration" />
+    <option name="break" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="case" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="from" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="indent" path="Wrapping and Braces" hit="Indent 'break' from 'case'" />
+    <option name="branches" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="case" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="indent" path="Wrapping and Braces" hit="Indent 'case' branches" />
+    <option name="builder" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="indents" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="keep" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="methods" path="Wrapping and Braces" hit="Keep builder methods indents" />
+    <option name="keep" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="reformatting" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="when" path="Wrapping and Braces" hit="Keep when reformatting" />
+    <option name="breaks" path="Wrapping and Braces" hit="Line breaks" />
+    <option name="line" path="Wrapping and Braces" hit="Line breaks" />
+    <option name="annotations" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="local" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="variable" path="Wrapping and Braces" hit="Local variable annotations" />
+    <option name="annotations" path="Wrapping and Braces" hit="Method annotations" />
+    <option name="method" path="Wrapping and Braces" hit="Method annotations" />
+    <option name="arguments" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="call" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="method" path="Wrapping and Braces" hit="Method call arguments" />
+    <option name="declaration" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="method" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="parameters" path="Wrapping and Braces" hit="Method declaration parameters" />
+    <option name="method" path="Wrapping and Braces" hit="Method parentheses" />
+    <option name="parentheses" path="Wrapping and Braces" hit="Method parentheses" />
+    <option name="list" path="Wrapping and Braces" hit="Modifier list" />
+    <option name="modifier" path="Wrapping and Braces" hit="Modifier list" />
+    <option name="expressions" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="multiple" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Multiple expressions in one line" />
+    <option name="after" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="line" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="new" path="Wrapping and Braces" hit="New line after '('" />
+    <option name="after" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="line" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="new" path="Wrapping and Braces" hit="New line after '{'" />
+    <option name="line" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="next" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="on" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="operation" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="sign" path="Wrapping and Braces" hit="Operation sign on next line" />
+    <option name="other" path="Wrapping and Braces" hit="Other" />
+    <option name="annotations" path="Wrapping and Braces" hit="Parameter annotations" />
+    <option name="parameter" path="Wrapping and Braces" hit="Parameter annotations" />
+    <option name="line" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="place" path="Wrapping and Braces" hit="Place ')' on new line" />
+    <option name="line" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="new" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="on" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="place" path="Wrapping and Braces" hit="Place '}' on new line" />
+    <option name="blocks" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple blocks in one line" />
+    <option name="classes" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple classes in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="lambdas" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple lambdas in one line" />
+    <option name="in" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="line" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="methods" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="one" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="simple" path="Wrapping and Braces" hit="Simple methods in one line" />
+    <option name="before" path="Spaces" hit="Space before '&amp;'" />
+    <option name="space" path="Spaces" hit="Space before '&amp;'" />
+    <option name="around" path="Spaces" hit="Spaces around '='" />
+    <option name="spaces" path="Spaces" hit="Spaces around '='" />
+    <option name="else" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="if" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="special" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="treatment" path="Wrapping and Braces" hit="Special 'else if' treatment" />
+    <option name="call" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="chain" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="over" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="priority" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="take" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="wrapping" path="Wrapping and Braces" hit="Take priority over call chain wrapping" />
+    <option name="operation" path="Wrapping and Braces" hit="Ternary operation" />
+    <option name="ternary" path="Wrapping and Braces" hit="Ternary operation" />
+    <option name="keyword" path="Wrapping and Braces" hit="Throws keyword" />
+    <option name="throws" path="Wrapping and Braces" hit="Throws keyword" />
+    <option name="list" path="Wrapping and Braces" hit="Throws list" />
+    <option name="throws" path="Wrapping and Braces" hit="Throws list" />
+    <option name="guides" path="Wrapping and Braces" hit="Visual guides" />
+    <option name="visual" path="Wrapping and Braces" hit="Visual guides" />
+    <option name="after" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="list" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="modifier" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap after modifier list" />
+    <option name="at" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="margin" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="right" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap at right margin" />
+    <option name="call" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="first" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap first call" />
+    <option name="on" path="Wrapping and Braces" hit="Wrap on typing" />
+    <option name="typing" path="Wrapping and Braces" hit="Wrap on typing" />
+    <option name="wrap" path="Wrapping and Braces" hit="Wrap on typing" />
+  </configurable>
+</options>

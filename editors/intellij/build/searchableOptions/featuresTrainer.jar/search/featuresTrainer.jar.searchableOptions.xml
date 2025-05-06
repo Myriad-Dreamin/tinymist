@@ -1,0 +1,98 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="all" path="ActionManager" hit="Autorun All Lessons" />
+    <option name="autorun" path="ActionManager" hit="Autorun All Lessons" />
+    <option name="lessons" path="ActionManager" hit="Autorun All Lessons" />
+    <option name="autorun" path="ActionManager" hit="Autorun Current Lesson" />
+    <option name="current" path="ActionManager" hit="Autorun Current Lesson" />
+    <option name="lesson" path="ActionManager" hit="Autorun Current Lesson" />
+    <option name="clipboard" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="copy" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="course" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="ift" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="text" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="to" path="ActionManager" hit="Copy IFT Course Text to Clipboard" />
+    <option name="features" path="ActionManager" hit="Learn IDE Features" />
+    <option name="ide" path="ActionManager" hit="Learn IDE Features" />
+    <option name="learn" path="ActionManager" hit="Learn IDE Features" />
+    <option name="lesson" path="ActionManager" hit="Next Lesson" />
+    <option name="next" path="ActionManager" hit="Next Lesson" />
+    <option name="lesson" path="ActionManager" hit="Previous Lesson" />
+    <option name="previous" path="ActionManager" hit="Previous Lesson" />
+    <option name="learning" path="ActionManager" hit="Reset Learning Progress" />
+    <option name="progress" path="ActionManager" hit="Reset Learning Progress" />
+    <option name="reset" path="ActionManager" hit="Reset Learning Progress" />
+    <option name="feedback" path="ActionManager" hit="Reset Onboarding Feedback State" />
+    <option name="onboarding" path="ActionManager" hit="Reset Onboarding Feedback State" />
+    <option name="reset" path="ActionManager" hit="Reset Onboarding Feedback State" />
+    <option name="state" path="ActionManager" hit="Reset Onboarding Feedback State" />
+    <option name="lesson" path="ActionManager" hit="Restart Lesson" />
+    <option name="restart" path="ActionManager" hit="Restart Lesson" />
+    <option name="as" path="ActionManager" hit="Set Current Lesson as Passed" />
+    <option name="current" path="ActionManager" hit="Set Current Lesson as Passed" />
+    <option name="lesson" path="ActionManager" hit="Set Current Lesson as Passed" />
+    <option name="passed" path="ActionManager" hit="Set Current Lesson as Passed" />
+    <option name="set" path="ActionManager" hit="Set Current Lesson as Passed" />
+  </configurable>
+  <configurable id="FeaturesTrainerSettingsPanel" configurable_name="Features Trainer">
+    <option name="features" hit="Features Trainer" />
+    <option name="trainer" hit="Features Trainer" />
+    <option name="java" hit="Java" />
+    <option name="kotlin" hit="Kotlin" />
+    <option name="language" hit="Learning main programming language" />
+    <option name="learning" hit="Learning main programming language" />
+    <option name="main" hit="Learning main programming language" />
+    <option name="programming" hit="Learning main programming language" />
+    <option name="lessons" hit="Reset Lessons Progress" />
+    <option name="progress" hit="Reset Lessons Progress" />
+    <option name="reset" hit="Reset Lessons Progress" />
+    <option name="lessons" hit="Show notifications on new lessons" />
+    <option name="new" hit="Show notifications on new lessons" />
+    <option name="notifications" hit="Show notifications on new lessons" />
+    <option name="on" hit="Show notifications on new lessons" />
+    <option name="show" hit="Show notifications on new lessons" />
+  </configurable>
+  <configurable id="org.intellij.featuresSuggester.FeatureSuggesterConfigurable" configurable_name="Features Suggester">
+    <option name="a" hit="Choose a lookup item and replace" />
+    <option name="and" hit="Choose a lookup item and replace" />
+    <option name="choose" hit="Choose a lookup item and replace" />
+    <option name="item" hit="Choose a lookup item and replace" />
+    <option name="lookup" hit="Choose a lookup item and replace" />
+    <option name="replace" hit="Choose a lookup item and replace" />
+    <option name="comment" hit="Comment with line comments" />
+    <option name="comments" hit="Comment with line comments" />
+    <option name="line" hit="Comment with line comments" />
+    <option name="with" hit="Comment with line comments" />
+    <option name="a" hit="Edit a breakpoint" />
+    <option name="breakpoint" hit="Edit a breakpoint" />
+    <option name="edit" hit="Edit a breakpoint" />
+    <option name="features" hit="Features Suggester" />
+    <option name="suggester" hit="Features Suggester" />
+    <option name="file" hit="File structure" />
+    <option name="structure" hit="File structure" />
+    <option name="introduce" hit="Introduce variables" />
+    <option name="variables" hit="Introduce variables" />
+    <option name="breakpoints" hit="Mute breakpoints" />
+    <option name="mute" hit="Mute breakpoints" />
+    <option name="from" hit="Paste from history" />
+    <option name="history" hit="Paste from history" />
+    <option name="paste" hit="Paste from history" />
+    <option name="cursor" hit="Run to cursor" />
+    <option name="run" hit="Run to cursor" />
+    <option name="to" hit="Run to cursor" />
+    <option name="actions" hit="Show suggestions for the following actions:" />
+    <option name="following" hit="Show suggestions for the following actions:" />
+    <option name="for" hit="Show suggestions for the following actions:" />
+    <option name="show" hit="Show suggestions for the following actions:" />
+    <option name="suggestions" hit="Show suggestions for the following actions:" />
+    <option name="the" hit="Show suggestions for the following actions:" />
+    <option name="completion" hit="Show the completion popup" />
+    <option name="popup" hit="Show the completion popup" />
+    <option name="show" hit="Show the completion popup" />
+    <option name="the" hit="Show the completion popup" />
+    <option name="surround" hit="Surround with" />
+    <option name="with" hit="Surround with" />
+    <option name="unwrap" hit="Unwrap" />
+  </configurable>
+</options>

@@ -1,0 +1,64 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="push" path="ActionManager" hit="Push Settings" />
+    <option name="settings" path="ActionManager" hit="Push Settings" />
+    <option name="settings" path="ActionManager" hit="Settings Sync" />
+    <option name="sync" path="ActionManager" hit="Settings Sync" />
+    <option name="history" path="ActionManager" hit="Settings Sync History" />
+    <option name="settings" path="ActionManager" hit="Settings Sync History" />
+    <option name="sync" path="ActionManager" hit="Settings Sync History" />
+    <option name="settings" path="ActionManager" hit="Settings Sync Troubleshooting" />
+    <option name="sync" path="ActionManager" hit="Settings Sync Troubleshooting" />
+    <option name="troubleshooting" path="ActionManager" hit="Settings Sync Troubleshooting" />
+    <option name="settings" path="ActionManager" hit="Settings Sync..." />
+    <option name="sync" path="ActionManager" hit="Settings Sync..." />
+  </configurable>
+  <configurable id="settings.sync" configurable_name="Settings Sync">
+    <option name="all" hit="All JetBrains IDE products" />
+    <option name="ide" hit="All JetBrains IDE products" />
+    <option name="jetbrains" hit="All JetBrains IDE products" />
+    <option name="products" hit="All JetBrains IDE products" />
+    <option name="code" hit="Code settings" />
+    <option name="settings" hit="Code settings" />
+    <option name="configure" hit="Configure" />
+    <option name="configure" hit="Configure what to sync:" />
+    <option name="sync" hit="Configure what to sync:" />
+    <option name="to" hit="Configure what to sync:" />
+    <option name="what" hit="Configure what to sync:" />
+    <option name="disable" hit="Disable Settings Sync..." />
+    <option name="settings" hit="Disable Settings Sync..." />
+    <option name="sync" hit="Disable Settings Sync..." />
+    <option name="enable" hit="Enable Settings Sync..." />
+    <option name="settings" hit="Enable Settings Sync..." />
+    <option name="sync" hit="Enable Settings Sync..." />
+    <option name="idea" hit="IntelliJ IDEA instances only" />
+    <option name="instances" hit="IntelliJ IDEA instances only" />
+    <option name="intellij" hit="IntelliJ IDEA instances only" />
+    <option name="only" hit="IntelliJ IDEA instances only" />
+    <option name="keymaps" hit="Keymaps" />
+    <option name="account" hit="Log in with JetBrains Account..." />
+    <option name="in" hit="Log in with JetBrains Account..." />
+    <option name="jetbrains" hit="Log in with JetBrains Account..." />
+    <option name="log" hit="Log in with JetBrains Account..." />
+    <option name="with" hit="Log in with JetBrains Account..." />
+    <option name="enable" hit="Login to enable settings sync" />
+    <option name="login" hit="Login to enable settings sync" />
+    <option name="settings" hit="Login to enable settings sync" />
+    <option name="sync" hit="Login to enable settings sync" />
+    <option name="to" hit="Login to enable settings sync" />
+    <option name="plugins" hit="Plugins" />
+    <option name="settings" hit="Settings Sync" />
+    <option name="sync" hit="Settings Sync" />
+    <option name="disabled" hit="Sync disabled" />
+    <option name="sync" hit="Sync disabled" />
+    <option name="across" hit="Sync settings across:" />
+    <option name="settings" hit="Sync settings across:" />
+    <option name="sync" hit="Sync settings across:" />
+    <option name="settings" hit="System settings" />
+    <option name="system" hit="System settings" />
+    <option name="tools" hit="Tools" />
+    <option name="settings" hit="UI settings" />
+    <option name="ui" hit="UI settings" />
+  </configurable>
+</options>

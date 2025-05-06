@@ -1,0 +1,13 @@
+<options>
+  <configurable id="coverage" configurable_name="Coverage">
+    <option name="annotations" hit="Exclude annotations:" />
+    <option name="exclude" hit="Exclude annotations:" />
+    <option name="constructors" hit="Ignore implicitly declared default constructors" />
+    <option name="declared" hit="Ignore implicitly declared default constructors" />
+    <option name="default" hit="Ignore implicitly declared default constructors" />
+    <option name="ignore" hit="Ignore implicitly declared default constructors" />
+    <option name="implicitly" hit="Ignore implicitly declared default constructors" />
+    <option name="coverage" hit="Java Coverage" />
+    <option name="java" hit="Java Coverage" />
+  </configurable>
+</options>

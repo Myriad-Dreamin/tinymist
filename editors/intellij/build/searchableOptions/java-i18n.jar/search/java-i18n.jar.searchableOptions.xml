@@ -1,0 +1,19 @@
+<options>
+  <configurable id="preferences.keymap" configurable_name="Keymap">
+    <option name="" path="ActionManager" hit="" />
+    <option name="edit" path="ActionManager" hit="Edit Property Value..." />
+    <option name="property" path="ActionManager" hit="Edit Property Value..." />
+    <option name="value" path="ActionManager" hit="Edit Property Value..." />
+    <option name="internationalize" path="ActionManager" hit="Internationalize..." />
+    <option name="expression" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="internationalized" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="java" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="jsp" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="literal" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="or" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="replace" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="string" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="text" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+    <option name="with" path="ActionManager" hit="Replace Java string literal or JSP text with internationalized expression" />
+  </configurable>
+</options>
