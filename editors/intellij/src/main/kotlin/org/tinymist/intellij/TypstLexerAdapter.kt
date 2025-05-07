@@ -71,15 +71,3 @@ class TypstLexerAdapter : Lexer() {
 
     override fun getBufferEnd(): Int = endOffset
 }
-
-// Placeholder for the Flex lexer class (generated from .flex file)
-// This is no longer used directly by TypstLexerAdapter but kept for potential future Flex integration.
-class _TypstLexer(reader: java.io.Reader?) : com.intellij.lexer.FlexLexer {
-    // Parameter 'reader' is never used - This warning is expected for the placeholder
-    override fun yybegin(state: Int) {}
-    override fun yystate(): Int = 0
-    override fun getTokenStart(): Int = 0
-    override fun getTokenEnd(): Int = 0
-    override fun advance(): com.intellij.psi.tree.IElementType? = null
-    override fun reset(buf: CharSequence?, start: Int, end: Int, initialState: Int) {}
-} 
