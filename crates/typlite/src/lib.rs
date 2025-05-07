@@ -8,7 +8,9 @@ pub mod parser;
 pub mod tags;
 pub mod writer;
 
-use std::path::PathBuf;
+use core::fmt;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -35,7 +37,7 @@ pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MarkdownDocument {
     pub base: HtmlDocument,
     feat: TypliteFeat,
@@ -113,12 +115,39 @@ pub enum ColorTheme {
     Dark,
 }
 
+pub trait AssetsHandler: fmt::Debug + Send + Sync {
+    /// Handle the assets in the document.
+    fn add_asset(&self, path: &Path, data: &[u8]) -> io::Result<PathBuf>;
+}
+
+#[derive(Debug, Clone)]
+pub struct SystemAssetsHandler {
+    /// The path to the assets directory.
+    pub assets_path: PathBuf,
+}
+
+impl SystemAssetsHandler {
+    /// Create a new SystemAssetsHandler instance.
+    pub fn new(assets_path: PathBuf) -> Self {
+        Self { assets_path }
+    }
+}
+
+impl AssetsHandler for SystemAssetsHandler {
+    fn add_asset(&self, path: &Path, data: &[u8]) -> io::Result<PathBuf> {
+        let full_path = self.assets_path.join(path);
+        std::fs::create_dir_all(full_path.parent().unwrap())?;
+        std::fs::write(&full_path, data)?;
+        Ok(full_path)
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct TypliteFeat {
     /// The preferred color theme.
     pub color_theme: Option<ColorTheme>,
     /// The path of external assets directory.
-    pub assets_path: Option<PathBuf>,
+    pub assets_handler: Option<Arc<dyn AssetsHandler>>,
     /// Allows GFM (GitHub Flavored Markdown) markups.
     pub gfm: bool,
     /// Annotate the elements for identification.
@@ -196,17 +225,13 @@ impl Typlite {
         }
 
         let wrap_main_id = current.join("__wrap_md_main.typ");
-        let wrap_main_path = world
-            .path_for_id(wrap_main_id)
-            .map_err(|err| format!("getting source for main file: {err:?}"))?;
-
         let mut world = world.html_task().task(TaskInputs {
             entry: Some(entry.select_in_workspace(wrap_main_id.vpath().as_rooted_path())),
             inputs: None,
         });
 
         let markdown_id = FileId::new(
-            Some(typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0").unwrap()),
+            Some(typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0").unwrap()),
             VirtualPath::new("lib.typ"),
         );
 
@@ -224,10 +249,10 @@ impl Typlite {
             .map_err(|err| format!("cannot map markdown.typ: {err:?}"))?;
 
         world
-            .map_shadow(
-                wrap_main_path.as_path(),
+            .map_shadow_by_id(
+                wrap_main_id,
                 Bytes::from_string(format!(
-                    r#"#import "@local/markdown:0.1.0": md-doc, example
+                    r#"#import "@local/_markdown:0.1.0": md-doc, example
 #show: md-doc
 {}"#,
                     world.source(current).unwrap().text()
@@ -238,6 +263,7 @@ impl Typlite {
         let base = typst::compile(&world)
             .output
             .map_err(|err| format!("convert source for main file: {err:?}"))?;
+
         let mut feat = self.feat;
         feat.target = format;
         Ok(MarkdownDocument::new(base, feat))

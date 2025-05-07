@@ -15,7 +15,16 @@ input_file: crates/typlite/src/fixtures/integration/math_inline.typ
 =====
 \begin{document}
 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{frame_0.pdf}
+\caption{typst-frame}
+\end{figure}
+
 
 
 
 \end{document}
+
+=====
+frame_0.pdf

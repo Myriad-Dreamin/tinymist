@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/link2.typ
 ---
 <!DOCTYPE html>
@@ -14,3 +14,5 @@ input_file: crates/typlite/src/fixtures/integration/link2.typ
 
 =====
 [Content](https://example.com)
+
+=====

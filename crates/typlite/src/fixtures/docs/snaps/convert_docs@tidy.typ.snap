@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, true)"
+expression: "conv(world, ConvKind::Md { for_docs: true })"
 input_file: crates/typlite/src/fixtures/docs/tidy.typ
 ---
 <!DOCTYPE html>
@@ -29,3 +29,5 @@ See show-module() for outputting the results of this function.
 - <!-- typlite:begin:list-item 0 -->preamble (string): Code to prepend to all code snippets shown with `#example()`. This can for instance be used to import something from the scope.<!-- typlite:end:list-item 0 -->
 
 -> string
+
+=====
