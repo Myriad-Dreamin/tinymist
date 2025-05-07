@@ -1,5 +1,6 @@
 //! Semantic tokens (highlighting) support for LSP.
 
+use std::collections::HashMap;
 use std::{
     num::NonZeroUsize,
     ops::Range,
@@ -7,7 +8,6 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use hashbrown::HashMap;
 use lsp_types::SemanticToken;
 use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use parking_lot::Mutex;
@@ -309,7 +309,7 @@ pub(crate) struct Tokenizer {
     pos_offset: usize,
     output: Vec<SemanticToken>,
     source: Source,
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
     encoding: PositionEncoding,
 
     allow_multiline_token: bool,
@@ -320,7 +320,7 @@ pub(crate) struct Tokenizer {
 impl Tokenizer {
     pub fn new(
         source: Source,
-        ei: Arc<ExprInfo>,
+        ei: ExprInfo,
         allow_multiline_token: bool,
         encoding: PositionEncoding,
     ) -> Self {

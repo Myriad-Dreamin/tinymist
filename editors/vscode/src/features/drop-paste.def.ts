@@ -64,25 +64,25 @@ export const typstPasteLinkEditKind = vscode.DocumentDropOrPasteEditKind.Empty.a
 );
 
 /** Kind for normal markdown links, i.e. include "path/to/file.typ" */
-export const typstPasteUriEditKind = typstPasteLinkEditKind.append("uri");
+export const typstUriEditKind = typstPasteLinkEditKind.append("uri");
 
-export const typstPasteImageEditKind = typstPasteLinkEditKind.append("image");
+export const typstImageEditKind = typstPasteLinkEditKind.append("image");
 
 export const Mime = {
   textUriList: "text/uri-list",
   textPlain: "text/plain",
 } as const;
 
-export const mediaMimes = new Set([
+export const typstSupportedMimes = new Set([
   "image/avif",
   "image/bmp",
   "image/gif",
   "image/jpeg",
   "image/png",
   "image/webp",
-  "video/mp4",
-  "video/ogg",
-  "audio/mpeg",
-  "audio/aac",
-  "audio/x-wav",
+  // "video/mp4",
+  // "video/ogg",
+  // "audio/mpeg",
+  // "audio/aac",
+  // "audio/x-wav",
 ]);

@@ -4,7 +4,8 @@ pub use tinymist_world as base;
 pub use tinymist_world::args::*;
 pub use tinymist_world::config::CompileFontOpts;
 pub use tinymist_world::entry::*;
-pub use tinymist_world::{font, package, vfs};
+pub use tinymist_world::{font, package, system, vfs};
 pub use tinymist_world::{
-    CompilerUniverse, CompilerWorld, EntryOpts, EntryState, RevisingUniverse, TaskInputs,
+    with_main, CompilerUniverse, CompilerWorld, DiagnosticFormat, EntryOpts, EntryState,
+    RevisingUniverse, SourceWorld, TaskInputs,
 };

@@ -8,7 +8,7 @@ use crate::hash::Fingerprint;
 /// If there are too many shards, the memory overhead is unacceptable.
 const MAX_SHARD_SIZE: u32 = 512;
 
-/// Return a read-only default shard size.
+/// Returns a read-only default shard size.
 fn default_shard_size() -> NonZeroU32 {
     static ITEM_SHARD_SIZE: std::sync::OnceLock<NonZeroU32> = std::sync::OnceLock::new();
 
@@ -54,7 +54,7 @@ impl<V> Default for FingerprintMap<V> {
 }
 
 impl<V> FingerprintMap<V> {
-    /// Create a new `FingerprintMap` with the given shard size.
+    /// Creates a new `FingerprintMap` with the given shard size.
     pub fn new(shard_size: NonZeroU32) -> Self {
         let shard_size = shard_size.get().next_power_of_two();
         let shard_size = shard_size.min(MAX_SHARD_SIZE);
@@ -72,14 +72,14 @@ impl<V> FingerprintMap<V> {
         }
     }
 
-    /// Iterate over all items in the map.
+    /// Iterates over all items in the map.
     pub fn into_items(self) -> impl Iterator<Item = (Fingerprint, V)> {
         self.shards
             .into_iter()
             .flat_map(|shard| shard.into_inner().into_iter())
     }
 
-    /// Get the shard
+    /// Gets the shard
     pub fn shard(&self, fg: Fingerprint) -> &FMapBase<V> {
         let shards = &self.shards;
         let route_idx = (fg.lower32() & self.mask) as usize;
@@ -91,7 +91,7 @@ impl<V> FingerprintMap<V> {
         unsafe { shards.get_unchecked(route_idx) }
     }
 
-    /// Useful for parallel iteration
+    /// Gets the mutable shard slice useful for parallel iteration
     pub fn as_mut_slice(&mut self) -> &mut [FMapBase<V>] {
         &mut self.shards
     }

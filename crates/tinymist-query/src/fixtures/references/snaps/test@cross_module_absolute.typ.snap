@@ -2,10 +2,9 @@
 source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/cross_module_absolute.typ
-snapshot_kind: text
 ---
 [
- "/out/base.typ@0:23:0:24",
- "/out/main.typ@0:25:0:26",
- "/out/main.typ@1:1:1:2"
+ "out/base.typ@0:23:0:24",
+ "out/main.typ@0:25:0:26",
+ "out/main.typ@1:1:1:2"
 ]

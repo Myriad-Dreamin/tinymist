@@ -1,9 +1,11 @@
 use core::fmt::{self, Write};
 
+use tinymist_std::typst::TypstDocument;
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_link_exprs_in;
+use crate::bib::{render_citation_string, RenderedBibCitation};
 use crate::jump_from_cursor;
 use crate::prelude::*;
 use crate::upstream::{route_of_value, truncated_repr, Tooltip};
@@ -26,11 +28,8 @@ pub struct HoverRequest {
 impl StatefulRequest for HoverRequest {
     type Response = Hover;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.clone();
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
@@ -80,7 +79,7 @@ impl StatefulRequest for HoverRequest {
 struct HoverWorker<'a> {
     ctx: &'a mut LocalContext,
     source: Source,
-    doc: Option<VersionedDocument>,
+    doc: Option<TypstDocument>,
     cursor: usize,
     def: Vec<String>,
     value: Vec<String>,
@@ -127,14 +126,26 @@ impl HoverWorker<'_> {
         use Decl::*;
         match def.decl.as_ref() {
             Label(..) => {
-                self.def.push(format!("Label: {}\n", def.name()));
-                // todo: type repr
                 if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
-                    self.def.push(truncated_repr(&val).into());
+                    self.def.push(format!("Ref: `{}`\n", def.name()));
+                    self.def
+                        .push(format!("```typc\n{}\n```", truncated_repr(&val)));
+                } else {
+                    self.def.push(format!("Label: `{}`\n", def.name()));
                 }
             }
             BibEntry(..) => {
-                self.def.push(format!("Bibliography: @{}", def.name()));
+                if let Some(details) = try_get_bib_details(&self.doc, self.ctx, def.name()) {
+                    self.def.push(format!(
+                        "Bibliography: `{}` {}",
+                        def.name(),
+                        details.citation
+                    ));
+                    self.def.push(details.bib_item);
+                } else {
+                    // fallback: no additional information
+                    self.def.push(format!("Bibliography: `{}`", def.name()));
+                }
             }
             _ => {
                 let sym_docs = self.ctx.def_docs(&def);
@@ -250,19 +261,24 @@ impl HoverWorker<'_> {
         // Preview results
         let provider = self.ctx.analysis.periscope.clone()?;
         let doc = self.doc.as_ref()?;
-        let position = jump_from_cursor(&doc.document, &self.source, self.cursor);
+        let jump = |cursor| {
+            jump_from_cursor(doc, &self.source, cursor)
+                .into_iter()
+                .next()
+        };
+        let position = jump(self.cursor);
         let position = position.or_else(|| {
             for idx in 1..100 {
                 let next_cursor = self.cursor + idx;
                 if next_cursor < self.source.text().len() {
-                    let position = jump_from_cursor(&doc.document, &self.source, next_cursor);
+                    let position = jump(next_cursor);
                     if position.is_some() {
                         return position;
                     }
                 }
                 let prev_cursor = self.cursor.checked_sub(idx);
                 if let Some(prev_cursor) = prev_cursor {
-                    let position = jump_from_cursor(&doc.document, &self.source, prev_cursor);
+                    let position = jump(prev_cursor);
                     if position.is_some() {
                         return position;
                     }
@@ -274,10 +290,21 @@ impl HoverWorker<'_> {
 
         log::info!("telescope position: {position:?}");
 
-        let preview_content = provider.periscope_at(self.ctx, doc.clone(), position?)?;
+        let preview_content = provider.periscope_at(self.ctx, doc, position?)?;
         self.preview.push(preview_content);
         Some(())
     }
+}
+
+fn try_get_bib_details(
+    doc: &Option<TypstDocument>,
+    ctx: &LocalContext,
+    name: &str,
+) -> Option<RenderedBibCitation> {
+    let doc = doc.as_ref()?;
+    let support_html = !ctx.shared.analysis.remove_html;
+    let bib_info = ctx.analyze_bib(doc.introspector())?;
+    render_citation_string(&bib_info, name, support_html)
 }
 
 fn push_result_ty(
@@ -390,15 +417,19 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("hover", &|world, path| {
-            let source = world.source_by_path(&path).unwrap();
+        snapshot_testing("hover", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let graph = compile_doc_for_test(ctx, &properties);
 
             let request = HoverRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, None);
+            let result = request.request(ctx, graph);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

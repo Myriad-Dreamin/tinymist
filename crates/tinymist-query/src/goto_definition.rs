@@ -26,26 +26,23 @@ pub struct GotoDefinitionRequest {
 impl StatefulRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
-    fn request(
-        self,
-        ctx: &mut LocalContext,
-        doc: Option<VersionedDocument>,
-    ) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        let doc = graph.snap.success_doc.as_ref();
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
 
-        let def = ctx.def_of_syntax(&source, doc.as_ref(), syntax)?;
+        let def = ctx.def_of_syntax(&source, doc, syntax)?;
 
-        let (fid, def_range) = def.location(ctx.shared())?;
-        let uri = ctx.uri_for_id(fid).ok()?;
-        let range = ctx.to_lsp_range_(def_range, fid)?;
+        let fid = def.file_id()?;
+        let name_range = def.name_range(ctx.shared()).unwrap_or_default();
+        let full_range = def.full_range().unwrap_or_else(|| name_range.clone());
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
-            target_uri: uri,
-            target_range: range,
-            target_selection_range: range,
+            target_uri: ctx.uri_for_id(fid).ok()?,
+            target_range: ctx.to_lsp_range_(full_range, fid)?,
+            target_selection_range: ctx.to_lsp_range_(name_range, fid)?,
         }]));
 
         crate::log_debug_ct!("goto_definition: {fid:?} {res:?}");

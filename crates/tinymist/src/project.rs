@@ -19,19 +19,18 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::diag::print_diagnostics;
+use reflexo_typst::{diag::print_diagnostics, TypstDocument};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
-use reflexo::{hash::FxHashMap, path::unix_slash};
-use sync_lsp::{LspClient, TypedLspClient};
+use reflexo::hash::FxHashMap;
+use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
+use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
-    analysis::{Analysis, AnalysisRevLock, LocalContextGuard, PeriscopeProvider},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LocalContext, SemanticRequest,
-    StatefulRequest, VersionedDocument,
+    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
@@ -39,7 +38,7 @@ use tokio::sync::mpsc;
 use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
 use super::ServerState;
-use crate::actor::editor::{CompileStatus, CompileStatusEnum, EditorRequest, ProjVersion};
+use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 use crate::task::ExportUserConfig;
 use crate::{Config, ServerEvent};
@@ -57,7 +56,7 @@ impl ServerState {
     }
 
     /// Snapshots the project for tasks
-    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+    pub fn snapshot(&mut self) -> Result<LspComputeGraph> {
         self.project.snapshot()
     }
 
@@ -123,9 +122,8 @@ impl ServerState {
         dedicate: &str,
         entry: Option<ImmutPath>,
     ) -> Result<ProjectInsId> {
-        let entry = self.config.compile.entry_resolver.resolve(entry);
-        let enable_html = matches!(self.config.export_target, ExportTarget::Html);
-        self.project.restart_dedicate(dedicate, entry, enable_html)
+        let entry = self.config.entry_resolver.resolve(entry);
+        self.project.restart_dedicate(dedicate, entry)
     }
 
     /// Create a fresh [`ProjectState`].
@@ -145,7 +143,7 @@ impl ServerState {
         );
 
         // Create the compile handler for client consuming results.
-        let periscope_args = config.compile.periscope_args.clone();
+        let periscope_args = config.periscope_args.clone();
         let handle = Arc::new(CompileHandlerImpl {
             #[cfg(feature = "preview")]
             preview,
@@ -159,10 +157,11 @@ impl ServerState {
                 allow_multiline_token: const_config.tokens_multiline_token_support,
                 remove_html: !config.support_html_in_markdown,
                 completion_feat: config.completion.clone(),
-                color_theme: match config.compile.color_theme.as_deref() {
+                color_theme: match config.color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
                 },
+                lint: config.lint.when(),
                 periscope: periscope_args.map(|args| {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
@@ -179,19 +178,19 @@ impl ServerState {
         });
 
         let export_target = config.export_target;
-        let default_path = config.compile.entry_resolver.resolve_default();
-        let entry = config.compile.entry_resolver.resolve(default_path);
-        let inputs = config.compile.determine_inputs();
-        let cert_path = config.compile.determine_certification_path();
-        let package = config.compile.determine_package_opts();
+        let default_path = config.entry_resolver.resolve_default();
+        let entry = config.entry_resolver.resolve(default_path);
+        let inputs = config.inputs();
+        let cert_path = config.certification_path();
+        let package = config.package_opts();
+        let features = config.typst_features().unwrap_or_default();
 
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
-        let fonts = config.compile.determine_fonts();
-        let package_registry =
-            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+        let fonts = config.fonts();
+        let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
         let verse =
-            LspUniverseBuilder::build(entry, export_target, inputs, fonts, package_registry);
+            LspUniverseBuilder::build(entry, export_target, features, inputs, packages, fonts);
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
@@ -208,6 +207,7 @@ impl ServerState {
             dep_tx,
             CompileServerOpts {
                 handler: compile_handle,
+                export_target: config.export_target,
                 enable_watch: true,
             },
         );
@@ -240,7 +240,7 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
         compilation: &LspCompiledArtifact,
     ) {
-        let rev = compilation.world.revision().get();
+        let rev = compilation.world().revision().get();
         if self.notified_revision >= rev {
             return;
         }
@@ -262,7 +262,7 @@ impl ProjectInsStateExt {
             return false;
         };
 
-        let last_rev = last_compilation.world.revision();
+        let last_rev = last_compilation.world().revision();
         if last_rev != *revision {
             return false;
         }
@@ -272,8 +272,7 @@ impl ProjectInsStateExt {
             return false;
         }
         self.emitted_reasons.see(self.pending_reasons);
-        let mut last_compilation = last_compilation.clone();
-        last_compilation.snap.signal = pending_reasons.into();
+        let last_compilation = last_compilation.clone().with_signal(pending_reasons.into());
 
         handler.notify_compile(&last_compilation);
         self.pending_reasons = CompileReasons::default();
@@ -297,26 +296,19 @@ impl ProjectState {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&mut self) -> Result<LspCompileSnapshot> {
+    pub fn snapshot(&mut self) -> Result<LspComputeGraph> {
         Ok(self.compiler.snapshot())
     }
 
     /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<LspQuerySnapshot> {
         let snap = self.snapshot()?;
-        let analysis = self.analysis.clone();
-        let rev_lock = analysis.lock_revision(q);
-
-        Ok(LspQuerySnapshot {
-            snap,
-            analysis,
-            rev_lock,
-        })
+        Ok(self.analysis.clone().query_snapshot(snap, q))
     }
 
     pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
         if let Interrupt::Compiled(compiled) = &intr {
-            let proj = compiler.projects().find(|p| p.id == compiled.id);
+            let proj = compiler.projects().find(|p| &p.id == compiled.id());
             if let Some(proj) = proj {
                 proj.ext
                     .compiled(&proj.verse.revision, proj.handler.as_ref(), compiled);
@@ -338,9 +330,8 @@ impl ProjectState {
         &mut self,
         group: &str,
         entry: EntryState,
-        enable_html: bool,
     ) -> Result<ProjectInsId> {
-        self.compiler.restart_dedicate(group, entry, enable_html)
+        self.compiler.restart_dedicate(group, entry)
     }
 }
 
@@ -351,7 +342,7 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     fn periscope_at(
         &self,
         ctx: &mut LocalContext,
-        doc: VersionedDocument,
+        doc: &TypstDocument,
         pos: TypstPosition,
     ) -> Option<String> {
         self.0.render_marked(ctx, doc, pos)
@@ -439,30 +430,58 @@ impl CompileHandlerImpl {
             .log_error("failed to send diagnostics");
     }
 
-    fn notify_diagnostics(&self, snap: &LspCompiledArtifact) {
-        let world = &snap.world;
+    fn notify_diagnostics(&self, art: &LspCompiledArtifact) {
         let dv = ProjVersion {
-            id: snap.id.clone(),
-            revision: world.revision().get(),
+            id: art.id().clone(),
+            revision: art.world().revision().get(),
         };
-
         // todo: better way to remove diagnostics
-        // todo: check all errors in this file
-        let valid = !world.entry_state().is_inactive();
-        let diagnostics = valid.then(|| {
-            let errors = snap.doc.as_ref().err().into_iter().flatten();
-            let warnings = snap.warnings.as_ref();
-            let diagnostics = tinymist_query::convert_diagnostics(
-                world,
-                errors.chain(warnings),
-                self.analysis.position_encoding,
-            );
+        let valid = !art.world().entry_state().is_inactive();
+        if !valid {
+            self.push_diagnostics(dv, None);
+            return;
+        }
+
+        let should_lint = art
+            .snap
+            .signal
+            .should_run_task_dyn(self.analysis.lint, art.doc.as_ref())
+            .unwrap_or_default();
+        log::info!(
+            "Project: should_lint: {should_lint:?}, signal: {:?}",
+            art.snap.signal
+        );
+
+        if !should_lint {
+            let enc = self.analysis.position_encoding;
+            let diagnostics =
+                tinymist_query::convert_diagnostics(art.world(), art.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
-            diagnostics
-        });
 
-        self.push_diagnostics(dv, diagnostics);
+            self.editor_tx
+                .send(EditorRequest::Diag(dv, Some(diagnostics)))
+                .log_error("failed to send diagnostics");
+        } else {
+            let snap = art.clone();
+            let editor_tx = self.editor_tx.clone();
+            let analysis = self.analysis.clone();
+            rayon::spawn(move || {
+                let world = snap.world().clone();
+                let mut ctx = analysis.enter(world);
+
+                // todo: check all errors in this file
+                let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
+                    return;
+                };
+
+                log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+
+                editor_tx
+                    .send(EditorRequest::Diag(dv, Some(diagnostics)))
+                    .log_error("failed to send diagnostics");
+            });
+        }
     }
 }
 
@@ -491,7 +510,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                         break 'vfs_is_clean false;
                     };
 
-                    let last_rev = compilation.world.vfs().revision();
+                    let last_rev = compilation.world().vfs().revision();
                     let deps = compilation.depended_files().clone();
                     s.verse.vfs().is_clean_compile(last_rev.get(), &deps)
                 }
@@ -527,10 +546,10 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
     }
 
-    fn status(&self, revision: usize, id: &ProjectInsId, rep: CompileReport) {
+    fn status(&self, revision: usize, rep: CompileReport) {
         {
             let mut n_revs = self.status_revision.lock();
-            let n_rev = n_revs.entry(id.clone()).or_default();
+            let n_rev = n_revs.entry(rep.id.clone()).or_default();
             if *n_rev > revision {
                 log::info!("Project: outdated status for revision {revision} <= {n_rev}");
                 return;
@@ -538,50 +557,27 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             *n_rev = revision;
         }
 
-        // todo: seems to duplicate with CompileStatus
-        let status = match rep {
-            CompileReport::Suspend => {
-                let dv = ProjVersion {
-                    id: id.clone(),
-                    revision,
-                };
-                self.push_diagnostics(dv, None);
-                CompileStatusEnum::CompileSuccess
-            }
-            CompileReport::Stage(_, _, _) => CompileStatusEnum::Compiling,
-            CompileReport::CompileSuccess(_, _, _) => CompileStatusEnum::CompileSuccess,
-            CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                CompileStatusEnum::CompileError
-            }
-        };
-
-        let this = &self;
-        this.editor_tx
-            .send(EditorRequest::Status(CompileStatus {
-                id: id.clone(),
-                path: rep
-                    .compiling_id()
-                    .map(|s| unix_slash(s.vpath().as_rooted_path()))
-                    .unwrap_or_default(),
-                status,
-            }))
-            .unwrap();
+        if matches!(rep.status, tinymist_project::CompileStatusEnum::Suspend) {
+            let dv = ProjVersion {
+                id: rep.id.clone(),
+                revision,
+            };
+            self.push_diagnostics(dv, None);
+        }
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = this.preview.get(id) {
+        if let Some(inner) = self.preview.get(&rep.id) {
+            use tinymist_project::CompileStatusEnum::*;
             use typst_preview::CompileStatus;
 
-            let status = match rep {
-                CompileReport::Suspend => CompileStatus::CompileSuccess,
-                CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
-                CompileReport::CompileSuccess(_, _, _) => CompileStatus::CompileSuccess,
-                CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                    CompileStatus::CompileError
-                }
-            };
-
-            inner.status(status);
+            inner.status(match &rep.status {
+                Compiling => CompileStatus::Compiling,
+                Suspend | CompileSuccess { .. } => CompileStatus::CompileSuccess,
+                ExportError { .. } | CompileError { .. } => CompileStatus::CompileError,
+            });
         }
+
+        self.editor_tx.send(EditorRequest::Status(rep)).unwrap();
     }
 
     fn notify_removed(&self, id: &ProjectInsId) {
@@ -598,103 +594,44 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         self.push_diagnostics(dv, None);
     }
 
-    fn notify_compile(&self, snap: &LspCompiledArtifact) {
+    fn notify_compile(&self, art: &LspCompiledArtifact) {
         {
             let mut n_revs = self.notified_revision.lock();
-            let n_rev = n_revs.entry(snap.id.clone()).or_default();
-            if *n_rev >= snap.world.revision().get() {
+            let n_rev = n_revs.entry(art.id().clone()).or_default();
+            if *n_rev >= art.world().revision().get() {
                 log::info!(
                     "Project: already notified for revision {} <= {n_rev}",
-                    snap.world.revision(),
+                    art.world().revision(),
                 );
                 return;
             }
-            *n_rev = snap.world.revision().get();
+            *n_rev = art.world().revision().get();
         }
 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
         if self.is_standalone {
             print_diagnostics(
-                &snap.world,
-                snap.doc
-                    .as_ref()
-                    .err()
-                    .cloned()
-                    .iter()
-                    .flatten()
-                    .chain(snap.warnings.iter()),
+                art.world(),
+                art.diagnostics(),
                 reflexo_typst::DiagnosticFormat::Human,
             )
             .log_error("failed to print diagnostics");
         }
 
-        self.notify_diagnostics(snap);
-
-        self.client.interrupt(LspInterrupt::Compiled(snap.clone()));
-        self.export.signal(snap);
+        self.client.interrupt(LspInterrupt::Compiled(art.clone()));
+        self.export.signal(art);
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview.get(&snap.id) {
-            let snap = snap.clone();
-            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { snap }));
+        if let Some(inner) = self.preview.get(art.id()) {
+            let art = art.clone();
+            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { art }));
         } else {
-            log::info!("Project: no preview for {:?}", snap.id);
+            log::debug!("Project: no preview for {:?}", art.id());
         }
+
+        self.notify_diagnostics(art);
     }
 }
 
 pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
-
-pub struct LspQuerySnapshot {
-    pub snap: LspCompileSnapshot,
-    analysis: Arc<Analysis>,
-    rev_lock: AnalysisRevLock,
-}
-
-impl std::ops::Deref for LspQuerySnapshot {
-    type Target = LspCompileSnapshot;
-
-    fn deref(&self) -> &Self::Target {
-        &self.snap
-    }
-}
-
-impl LspQuerySnapshot {
-    pub fn task(mut self, inputs: TaskInputs) -> Self {
-        self.snap = self.snap.task(inputs);
-        self
-    }
-
-    pub fn run_stateful<T: StatefulRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        let doc = self.snap.success_doc.as_ref().map(|doc| VersionedDocument {
-            version: self.world.revision().get(),
-            document: doc.clone(),
-        });
-        self.run_analysis(|ctx| query.request(ctx, doc))
-            .map(wrapper)
-    }
-
-    pub fn run_semantic<T: SemanticRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
-    }
-
-    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world;
-        let Some(..) = world.main_id() else {
-            log::error!("Project: main file is not set");
-            bail!("main file is not set");
-        };
-
-        let mut analysis = self.analysis.snapshot_(world, self.rev_lock);
-        Ok(f(&mut analysis))
-    }
-}

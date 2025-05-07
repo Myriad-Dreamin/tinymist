@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/discard_join_partial2.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "This text is implicitly discarded by function return",
+   "range": "5:5:5:6",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

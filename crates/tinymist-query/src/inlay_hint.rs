@@ -110,18 +110,18 @@ impl InlayHintWorker<'_> {
         match node.kind() {
             // Type inlay hints
             SyntaxKind::LetBinding => {
-                log::trace!("let binding found: {:?}", node);
+                log::trace!("let binding found: {node:?}");
             }
             // Assignment inlay hints
             SyntaxKind::Eq => {
-                log::trace!("assignment found: {:?}", node);
+                log::trace!("assignment found: {node:?}");
             }
             SyntaxKind::DestructAssignment => {
-                log::trace!("destruct assignment found: {:?}", node);
+                log::trace!("destruct assignment found: {node:?}");
             }
             // Parameter inlay hints
             SyntaxKind::FuncCall => {
-                log::trace!("func call found: {:?}", node);
+                log::trace!("func call found: {node:?}");
                 let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                 crate::log_debug_ct!("got call_info {call_info:?}");
 
@@ -264,7 +264,7 @@ impl InlayHintWorker<'_> {
                 // todo: union signatures
             }
             SyntaxKind::Set => {
-                log::trace!("set rule found: {:?}", node);
+                log::trace!("set rule found: {node:?}");
             }
             _ => {}
         }

@@ -60,6 +60,7 @@ impl CompletionPair<'_, '_, '_> {
                 self.push_completion(Completion {
                     apply: Some(eco_format!("{}()${{}}", name)),
                     label: name,
+                    command: None,
                     ..base
                 });
             } else {

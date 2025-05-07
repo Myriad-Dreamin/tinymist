@@ -12,3 +12,4 @@ editors/lapce/out/
 
 *.pdf
 .vscode/*.code-workspace
+refs/

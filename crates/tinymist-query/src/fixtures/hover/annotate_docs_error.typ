@@ -2,8 +2,9 @@
 ///
 /// == Example
 ///
+/// // speaker-note
 /// #example(```typ
-/// #speaker-note[This is a speaker note]
+/// #box[This is a speaker note]
 /// ```)
 #let speaker-note(mode: "typ", setting: it => it, note) = {
   touying-fn-wrapper(utils.speaker-note, mode: mode, setting: setting, note)

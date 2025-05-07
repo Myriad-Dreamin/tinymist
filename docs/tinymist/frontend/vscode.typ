@@ -41,6 +41,15 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 }
 ```
 
+=== Configuring Linter
+<configuring-linter>
++ Open settings.
++ Search for "Tinymist Lint" and modify the value.
+  + Toggle "Enabled" to enable or disable the linter.
+  + Change "When" to configure when the linter runs.
+    - (Default) `onSave` run linting when you save the file.
+    - `onType` run linting as you type.
+
 === Configuring/Using Tinymist’s Activity Bar (Sidebar)
 <configuringusing-tinymists-activity-bar-sidebar>
 If you don’t like the activity bar, you can right-click on the activity bar and uncheck "Tinymist" to hide it.

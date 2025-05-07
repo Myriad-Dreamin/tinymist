@@ -20,70 +20,71 @@ There are seven basic analyzers:
 #let call-n = (4.3, 1);
 #let expr-n = (2.2, 0);
 #let type-n = (3.3, 0);
-#figure(
-  align(
-    center,
-    diagram(
-      node-stroke: 1pt,
-      edge-stroke: 1pt,
-      // edge("-|>", align(center)[Analysis\ Request], label-pos: 0.1),
-      pg-node((0.3, 0.2), [`Lexical`\ `Hierarchy`]),
-      edge("<|-", []),
-      pg-node((1.2, 0), [`Source`]),
-      edge("-|>", []),
-      pg-node(expr-n, [`ExprInfo`]),
-      edge("-|>"),
-      pg-node(type-n, [`TypeInfo`]),
-      edge("-|>"),
-      pg-node(def-n, [`Definition`]),
-      edge(expr-n, def-n, "-|>"),
-      pg-node(ref-n, [`References`]),
-      edge(def-n, ref-n, "-|>"),
-      edge(expr-n, ref-n, "-|>"),
-      pg-node(sig-n, [`Signature`]),
-      edge(def-n, sig-n, "-|>"),
-      edge(type-n, sig-n, "-|>"),
-      pg-node(call-n, [`Call`]),
-      edge(sig-n, call-n, "-|>"),
-      edge(type-n, call-n, "-|>"),
-      for i in range(9) {
-        let j = 1 + i * 0.25
-        edge((j, 1.4), (j, 1.8), "-|>")
-      },
-      pg-node(
-        (2, 2.3),
-        [`Extended`\
-          `Language Features`],
-      ),
-      // for i in (1, 3, 5) {
-      //   edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
-      // },
-      // edge(
-      //   (0.3, 0.4),
-      //   (0.3, 0),
-      //   "-|>",
-      //   align(center)[clone #typst-func("Source")],
-      //   label-anchor: "center",
-      //   label-pos: -0.5,
-      // ),
-      // edge(
-      //   (2, 0.4),
-      //   (2, 0),
-      //   "-|>",
-      //   align(center)[snapshot ```rs trait World```],
-      //   label-anchor: "center",
-      //   label-pos: -0.5,
-      // ),
-      // edge(
-      //   (4, 0.4),
-      //   (4, 0),
-      //   "-|>",
-      //   align(center)[acquire #typst-func("Document")],
-      //   label-anchor: "center",
-      //   label-pos: -0.5,
-      // ),
-    ),
+
+#let ana-graph = diagram(
+  node-stroke: 1pt,
+  edge-stroke: 1pt,
+  // edge("-|>", align(center)[Analysis\ Request], label-pos: 0.1),
+  pg-node((0.3, 0.2), [`Lexical`\ `Hierarchy`]),
+  edge("<|-", []),
+  pg-node((1.2, 0), [`Source`]),
+  edge("-|>", []),
+  pg-node(expr-n, [`ExprInfo`]),
+  edge("-|>"),
+  pg-node(type-n, [`TypeInfo`]),
+  edge("-|>"),
+  pg-node(def-n, [`Definition`]),
+  edge(expr-n, def-n, "-|>"),
+  pg-node(ref-n, [`References`]),
+  edge(def-n, ref-n, "-|>"),
+  edge(expr-n, ref-n, "-|>"),
+  pg-node(sig-n, [`Signature`]),
+  edge(def-n, sig-n, "-|>"),
+  edge(type-n, sig-n, "-|>"),
+  pg-node(call-n, [`Call`]),
+  edge(sig-n, call-n, "-|>"),
+  edge(type-n, call-n, "-|>"),
+  for i in range(9) {
+    let j = 1 + i * 0.25
+    edge((j, 1.4), (j, 1.8), "-|>")
+  },
+  pg-node(
+    (2, 2.3),
+    [`Extended`\
+      `Language Features`],
   ),
+  // for i in (1, 3, 5) {
+  //   edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
+  // },
+  // edge(
+  //   (0.3, 0.4),
+  //   (0.3, 0),
+  //   "-|>",
+  //   align(center)[clone #typst-func("Source")],
+  //   label-anchor: "center",
+  //   label-pos: -0.5,
+  // ),
+  // edge(
+  //   (2, 0.4),
+  //   (2, 0),
+  //   "-|>",
+  //   align(center)[snapshot ```rs trait World```],
+  //   label-anchor: "center",
+  //   label-pos: -0.5,
+  // ),
+  // edge(
+  //   (4, 0.4),
+  //   (4, 0),
+  //   "-|>",
+  //   align(center)[acquire #typst-func("Document")],
+  //   label-anchor: "center",
+  //   label-pos: -0.5,
+  // ),
+);
+
+
+#figure(
+  cond-image(ana-graph),
   caption: [The relationship of analyzers.],
 ) <fig:analyses-relationship>
 

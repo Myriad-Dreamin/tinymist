@@ -4,7 +4,7 @@ description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.13.2"
+version = "0.13.12"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -15,7 +15,10 @@ rust-version.workspace = true
 [dependencies]
 
 anyhow.workspace = true
-chrono.workspace = true
+chrono = { workspace = true, default-features = false, optional = true, features = [
+    "std",
+    "clock",
+] }
 clap.workspace = true
 codespan-reporting.workspace = true
 comemo.workspace = true
@@ -26,6 +29,7 @@ fontdb = { workspace = true, optional = true }
 hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true
+lsp-types.workspace = true
 parking_lot.workspace = true
 rayon.workspace = true
 reqwest = { workspace = true, optional = true }
@@ -37,34 +41,44 @@ serde-wasm-bindgen = { workspace = true, optional = true }
 sha2.workspace = true
 strum.workspace = true
 tar.workspace = true
+tinymist-package.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
 typst.workspace = true
 typst-assets.workspace = true
+ttf-parser.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
 
 [features]
 
 default = []
-browser-embedded-fonts = ["typst-assets/fonts"]
-http-registry = ["dep:reqwest"]
+fonts = ["typst-assets/fonts"]
+http-registry = ["reqwest"]
 web = [
+    "chrono",
+    "chrono/wasmbind",
     "wasm-bindgen",
     "web-sys",
     "js-sys",
     "serde-wasm-bindgen",
     "tinymist-std/web",
     "tinymist-vfs/web",
+    "tinymist-package/web",
 ]
-browser = ["tinymist-vfs/browser", "web"]
+browser = ["web", "tinymist-vfs/browser", "tinymist-package/browser"]
 system = [
-    "dep:dirs",
-    "dep:fontdb",
+    "dirs",
+    "fontdb",
+    "chrono",
     "http-registry",
     "tinymist-std/system",
     "tinymist-vfs/system",
+    "tinymist-package/system",
 ]
+
+[package.metadata.docs.rs]
+features = ["browser", "system"]
 
 [lints]
 workspace = true

@@ -1,13 +1,15 @@
 //! Completion kind analysis.
 
+use typst::foundations::Symbol;
+
 use super::*;
 
-pub(crate) struct CompletionKindChecker {
-    pub symbols: HashSet<char>,
-    pub functions: HashSet<Ty>,
+pub(crate) struct CompletionKindChecker<'a> {
+    pub symbols: HashSet<&'a Symbol>,
+    pub functions: HashSet<&'a Ty>,
 }
 
-impl CompletionKindChecker {
+impl<'a> CompletionKindChecker<'a> {
     /// Reset the checker status for a fresh checking.
     fn reset(&mut self) {
         self.symbols.clear();
@@ -15,29 +17,29 @@ impl CompletionKindChecker {
     }
 
     /// Check the completion kind of a type.
-    pub fn check(&mut self, ty: &Ty) {
+    pub fn check(&mut self, ty: &'a Ty) {
         self.reset();
         match ty {
             Ty::Value(val) => match &val.val {
                 Value::Type(t) if t.constructor().is_ok() => {
-                    self.functions.insert(ty.clone());
+                    self.functions.insert(ty);
                 }
                 Value::Func(..) => {
-                    self.functions.insert(ty.clone());
+                    self.functions.insert(ty);
                 }
                 Value::Symbol(s) => {
-                    self.symbols.insert(s.get());
+                    self.symbols.insert(s);
                 }
                 _ => {}
             },
             Ty::Func(..) | Ty::With(..) => {
-                self.functions.insert(ty.clone());
+                self.functions.insert(ty);
             }
             Ty::Builtin(BuiltinTy::TypeType(t)) if t.constructor().is_ok() => {
-                self.functions.insert(ty.clone());
+                self.functions.insert(ty);
             }
             Ty::Builtin(BuiltinTy::Element(..)) => {
-                self.functions.insert(ty.clone());
+                self.functions.insert(ty);
             }
             Ty::Let(bounds) => {
                 for bound in bounds.ubs.iter().chain(bounds.lbs.iter()) {

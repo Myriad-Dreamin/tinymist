@@ -6,18 +6,18 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
 };
 
-use chrono::{DateTime, Datelike, Local};
-use tinymist_std::error::prelude::*;
+use ecow::EcoVec;
+use tinymist_std::{error::prelude::*, ImmutPath};
 use tinymist_vfs::{
-    FsProvider, PathResolution, RevisingVfs, SourceCache, TypstFileId, Vfs, WorkspaceResolver,
+    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };
 use typst::{
     diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
-    syntax::{FileId, Source, Span, VirtualPath},
+    syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Library, World,
+    Features, Library, World,
 };
 
 use crate::{
@@ -50,10 +50,10 @@ pub struct CompilerUniverse<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
     entry: EntryState,
-    /// Whether to enable HTML features.
-    enable_html: bool,
     /// Additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
+    /// Features enabled for the compiler.
+    pub features: Features,
 
     /// Provides font management for typst compiler.
     pub font_resolver: Arc<F::FontResolver>,
@@ -76,21 +76,21 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     /// + See [`crate::TypstBrowserUniverse::new`] for browser environment.
     pub fn new_raw(
         entry: EntryState,
-        enable_html: bool,
+        features: Features,
         inputs: Option<Arc<LazyHash<Dict>>>,
         vfs: Vfs<F::AccessModel>,
-        registry: Arc<F::Registry>,
+        package_registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
     ) -> Self {
         Self {
             entry,
-            enable_html,
             inputs: inputs.unwrap_or_default(),
+            features,
 
             revision: NonZeroUsize::new(1).expect("initial revision is 1"),
 
             font_resolver,
-            registry,
+            registry: package_registry,
             vfs,
         }
     }
@@ -156,9 +156,9 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn snapshot_with(&self, mutant: Option<TaskInputs>) -> CompilerWorld<F> {
         let w = CompilerWorld {
             entry: self.entry.clone(),
-            enable_html: self.enable_html,
+            features: self.features.clone(),
             inputs: self.inputs.clone(),
-            library: create_library(self.inputs.clone(), self.enable_html),
+            library: create_library(self.inputs.clone(), self.features.clone()),
             font_resolver: self.font_resolver.clone(),
             registry: self.registry.clone(),
             vfs: self.vfs.snapshot(),
@@ -280,7 +280,7 @@ impl<F: CompilerFeat> ShadowApi for CompilerUniverse<F> {
         self.vfs.shadow_paths()
     }
 
-    fn shadow_ids(&self) -> Vec<TypstFileId> {
+    fn shadow_ids(&self) -> Vec<FileId> {
         self.vfs.shadow_ids()
     }
 
@@ -359,7 +359,7 @@ impl<F: CompilerFeat> Drop for RevisingUniverse<'_, F> {
 
             // The registry has changed affects the vfs cache.
             log::info!("resetting shadow registry_changed");
-            self.vfs().reset_cache();
+            self.vfs.reset_read();
         }
         let view_changed = view_changed || self.vfs_changed();
 
@@ -401,10 +401,10 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         self.view_changed = true;
 
         // Resets the cache if the workspace root has changed.
-        let root_changed = self.inner.entry.workspace_root() == state.workspace_root();
+        let root_changed = self.inner.entry.workspace_root() != state.workspace_root();
         if root_changed {
             log::info!("resetting shadow root_changed");
-            self.vfs().reset_cache();
+            self.vfs.reset_read();
         }
 
         self.inner.mutate_entry_(state)
@@ -432,14 +432,19 @@ fn is_revision_changed(a: Option<NonZeroUsize>, b: Option<NonZeroUsize>) -> bool
     a.is_none() || b.is_none() || a != b
 }
 
+#[cfg(any(feature = "web", feature = "system"))]
+type NowStorage = chrono::DateTime<chrono::Local>;
+#[cfg(not(any(feature = "web", feature = "system")))]
+type NowStorage = tinymist_std::time::UtcDateTime;
+
 pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
     entry: EntryState,
-    /// Whether to enable HTML features.
-    enable_html: bool,
     /// Additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
+    /// A selection of in-development features that should be enabled.
+    features: Features,
 
     /// Provides library for typst compiler.
     pub library: Arc<LazyHash<Library>>,
@@ -455,7 +460,7 @@ pub struct CompilerWorld<F: CompilerFeat> {
     source_db: SourceDb,
     /// The current datetime if requested. This is stored here to ensure it is
     /// always the same within one compilation. Reset between compilations.
-    now: OnceLock<DateTime<Local>>,
+    now: OnceLock<NowStorage>,
 }
 
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
@@ -478,7 +483,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         let library = mutant
             .inputs
             .clone()
-            .map(|inputs| create_library(inputs, self.enable_html));
+            .map(|inputs| create_library(inputs, self.features.clone()));
 
         let root_changed = if let Some(e) = mutant.entry.as_ref() {
             self.entry.workspace_root() != e.workspace_root()
@@ -487,7 +492,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         };
 
         let mut world = CompilerWorld {
-            enable_html: self.enable_html,
+            features: self.features.clone(),
             inputs: mutant.inputs.unwrap_or_else(|| self.inputs.clone()),
             library: library.unwrap_or_else(|| self.library.clone()),
             entry: mutant.entry.unwrap_or_else(|| self.entry.clone()),
@@ -500,20 +505,28 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         };
 
         if root_changed {
-            world.vfs.revise().reset_cache();
+            world.vfs.reset_read();
         }
 
         world
     }
 
-    pub fn take_cache(&mut self) -> SourceCache {
+    /// See [`Vfs::reset_read`].
+    pub fn reset_read(&mut self) {
+        self.vfs.reset_read();
+    }
+
+    /// See [`Vfs::take_source_cache`].
+    pub fn take_source_cache(&mut self) -> SourceCache {
         self.vfs.take_source_cache()
     }
 
-    pub fn clone_cache(&mut self) -> SourceCache {
+    /// See [`Vfs::clone_source_cache`].
+    pub fn clone_source_cache(&mut self) -> SourceCache {
         self.vfs.clone_source_cache()
     }
 
+    /// See [`SourceDb::take_state`].
     pub fn take_db(&mut self) -> SourceDb {
         self.source_db.take_state()
     }
@@ -533,39 +546,6 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.inputs.clone()
     }
 
-    /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
-        self.vfs.file_path(id)
-    }
-
-    /// Resolve the root of the workspace.
-    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
-        let root = self.entry.workspace_root()?;
-        Some(WorkspaceResolver::workspace_file(
-            Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
-        ))
-    }
-
-    /// Lookup a source file by id.
-    #[track_caller]
-    fn lookup(&self, id: FileId) -> Source {
-        self.source(id)
-            .expect("file id does not point to any source file")
-    }
-
-    fn map_source_or_default<T>(
-        &self,
-        id: FileId,
-        default_v: T,
-        f: impl FnOnce(Source) -> CodespanResult<T>,
-    ) -> CodespanResult<T> {
-        match World::source(self, id).ok() {
-            Some(source) => f(source),
-            None => Ok(default_v),
-        }
-    }
-
     pub fn revision(&self) -> NonZeroUsize {
         self.revision
     }
@@ -580,6 +560,53 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             .evict(self.vfs.revision(), threshold);
     }
 
+    /// Resolve the real path for a file id.
+    pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
+        self.vfs.file_path(id)
+    }
+
+    /// Resolve the root of the workspace.
+    pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
+        let root = self.entry.workspace_root()?;
+        Some(WorkspaceResolver::workspace_file(
+            Some(&root),
+            VirtualPath::new(path.strip_prefix(&root).ok()?),
+        ))
+    }
+
+    pub fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
+        // todo: source in packages
+        match self.id_for_path(path) {
+            Some(id) => Ok(id),
+            None => WorkspaceResolver::file_with_parent_root(path).ok_or_else(|| {
+                let reason = eco_format!("invalid path: {path:?}");
+                FileError::Other(Some(reason))
+            }),
+        }
+    }
+
+    pub fn source_by_path(&self, path: &Path) -> FileResult<Source> {
+        self.source(self.file_id_by_path(path)?)
+    }
+
+    pub fn depended_files(&self) -> EcoVec<FileId> {
+        let mut deps = EcoVec::new();
+        self.iter_dependencies(&mut |file_id| {
+            deps.push(file_id);
+        });
+        deps
+    }
+
+    pub fn depended_fs_paths(&self) -> EcoVec<ImmutPath> {
+        let mut deps = EcoVec::new();
+        self.iter_dependencies(&mut |file_id| {
+            if let Ok(path) = self.path_for_id(file_id) {
+                deps.push(path.as_path().into());
+            }
+        });
+        deps
+    }
+
     /// A list of all available packages and optionally descriptions for them.
     ///
     /// This function is optional to implement. It enhances the user experience
@@ -591,14 +618,15 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     }
 
     pub fn paged_task(&self) -> Cow<'_, CompilerWorld<F>> {
-        let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html);
+        let force_html = self.features.is_enabled(typst::Feature::Html);
+        let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html) || force_html;
 
         if enabled_paged {
             return Cow::Borrowed(self);
         }
 
         let mut world = self.clone();
-        world.library = create_library(world.inputs.clone(), false);
+        world.library = create_library(world.inputs.clone(), self.features.clone());
 
         Cow::Owned(world)
     }
@@ -610,8 +638,12 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             return Cow::Borrowed(self);
         }
 
+        // todo: We need some way to enable html features based on the features but
+        // typst doesn't give one.
+        let features = typst::Features::from_iter([typst::Feature::Html]);
+
         let mut world = self.clone();
-        world.library = create_library(world.inputs.clone(), true);
+        world.library = create_library(world.inputs.clone(), features);
 
         Cow::Owned(world)
     }
@@ -619,7 +651,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
 
 impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     #[inline]
-    fn shadow_ids(&self) -> Vec<TypstFileId> {
+    fn shadow_ids(&self) -> Vec<FileId> {
         self.vfs.shadow_ids()
     }
 
@@ -644,29 +676,29 @@ impl<F: CompilerFeat> ShadowApi for CompilerWorld<F> {
     }
 
     #[inline]
-    fn map_shadow_by_id(&mut self, file_id: TypstFileId, content: Bytes) -> FileResult<()> {
+    fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()> {
         self.vfs
             .revise()
             .map_shadow_by_id(file_id, Ok(content).into())
     }
 
     #[inline]
-    fn unmap_shadow_by_id(&mut self, file_id: TypstFileId) -> FileResult<()> {
+    fn unmap_shadow_by_id(&mut self, file_id: FileId) -> FileResult<()> {
         self.vfs.revise().remove_shadow_by_id(file_id);
         Ok(())
     }
 }
 
 impl<F: CompilerFeat> FsProvider for CompilerWorld<F> {
-    fn file_path(&self, file_id: TypstFileId) -> FileResult<PathResolution> {
+    fn file_path(&self, file_id: FileId) -> FileResult<PathResolution> {
         self.vfs.file_path(file_id)
     }
 
-    fn read(&self, file_id: TypstFileId) -> FileResult<Bytes> {
+    fn read(&self, file_id: FileId) -> FileResult<Bytes> {
         self.vfs.read(file_id)
     }
 
-    fn read_source(&self, file_id: TypstFileId) -> FileResult<Source> {
+    fn read_source(&self, file_id: FileId) -> FileResult<Source> {
         self.vfs.source(file_id)
     }
 }
@@ -721,12 +753,15 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     ///
     /// If this function returns `None`, Typst's `datetime` function will
     /// return an error.
+    #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        use chrono::{Datelike, Duration};
+        // todo: typst respects creation_timestamp, but we don't...
         let now = self.now.get_or_init(|| tinymist_std::time::now().into());
 
         let naive = match offset {
             None => now.naive_local(),
-            Some(o) => now.naive_utc() + chrono::Duration::try_hours(o)?,
+            Some(o) => now.naive_utc() + Duration::try_hours(o)?,
         };
 
         Datetime::from_ymd(
@@ -734,6 +769,31 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             naive.month().try_into().ok()?,
             naive.day().try_into().ok()?,
         )
+    }
+
+    /// Get the current date.
+    ///
+    /// If no offset is specified, the local date should be chosen. Otherwise,
+    /// the UTC date should be chosen with the corresponding offset in hours.
+    ///
+    /// If this function returns `None`, Typst's `datetime` function will
+    /// return an error.
+    #[cfg(not(any(feature = "web", feature = "system")))]
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        use tinymist_std::time::{now, to_typst_time, Duration};
+        // todo: typst respects creation_timestamp, but we don't...
+        let now = self.now.get_or_init(|| now().into());
+
+        let now = offset
+            .and_then(|offset| {
+                let dur = Duration::from_secs(offset.checked_mul(3600)? as u64)
+                    .try_into()
+                    .ok()?;
+                now.checked_add(dur)
+            })
+            .unwrap_or(*now);
+
+        Some(to_typst_time(now))
     }
 }
 
@@ -745,11 +805,147 @@ impl<F: CompilerFeat> EntryReader for CompilerWorld<F> {
 
 impl<F: CompilerFeat> WorldDeps for CompilerWorld<F> {
     #[inline]
-    fn iter_dependencies(&self, f: &mut dyn FnMut(TypstFileId)) {
+    fn iter_dependencies(&self, f: &mut dyn FnMut(FileId)) {
         self.source_db.iter_dependencies_dyn(f)
     }
 }
 
+/// Runs a world with a main file.
+pub fn with_main(world: &dyn World, id: FileId) -> WorldWithMain<'_> {
+    WorldWithMain { world, main: id }
+}
+
+pub struct WorldWithMain<'a> {
+    world: &'a dyn World,
+    main: FileId,
+}
+
+impl typst::World for WorldWithMain<'_> {
+    fn main(&self) -> FileId {
+        self.main
+    }
+
+    fn source(&self, id: FileId) -> FileResult<Source> {
+        self.world.source(id)
+    }
+
+    fn library(&self) -> &LazyHash<Library> {
+        self.world.library()
+    }
+
+    fn book(&self) -> &LazyHash<FontBook> {
+        self.world.book()
+    }
+
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        self.world.file(id)
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        self.world.font(index)
+    }
+
+    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+        self.world.today(offset)
+    }
+}
+
+pub trait SourceWorld: World {
+    fn as_world(&self) -> &dyn World;
+
+    fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError>;
+    fn lookup(&self, id: FileId) -> Source {
+        self.source(id)
+            .expect("file id does not point to any source file")
+    }
+}
+
+impl<F: CompilerFeat> SourceWorld for CompilerWorld<F> {
+    fn as_world(&self) -> &dyn World {
+        self
+    }
+
+    /// Resolve the real path for a file id.
+    fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
+        self.path_for_id(id)
+    }
+}
+
+pub struct CodeSpanReportWorld<'a> {
+    pub world: &'a dyn SourceWorld,
+}
+
+impl<'a> CodeSpanReportWorld<'a> {
+    pub fn new(world: &'a dyn SourceWorld) -> Self {
+        Self { world }
+    }
+}
+
+impl<'a> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a> {
+    /// A unique identifier for files in the file provider. This will be used
+    /// for rendering `diagnostic::Label`s in the corresponding source files.
+    type FileId = FileId;
+
+    /// The user-facing name of a file, to be displayed in diagnostics.
+    type Name = String;
+
+    /// The source code of a file.
+    type Source = Source;
+
+    /// The user-facing name of a file.
+    fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
+        Ok(match self.world.path_for_id(id) {
+            Ok(path) => path.as_path().display().to_string(),
+            Err(_) => format!("{id:?}"),
+        })
+    }
+
+    /// The source code of a file.
+    fn source(&'a self, id: FileId) -> CodespanResult<Self::Source> {
+        Ok(self.world.lookup(id))
+    }
+
+    /// See [`codespan_reporting::files::Files::line_index`].
+    fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
+        let source = self.world.lookup(id);
+        source
+            .byte_to_line(given)
+            .ok_or_else(|| CodespanError::IndexTooLarge {
+                given,
+                max: source.len_bytes(),
+            })
+    }
+
+    /// See [`codespan_reporting::files::Files::column_number`].
+    fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
+        let source = self.world.lookup(id);
+        source.byte_to_column(given).ok_or_else(|| {
+            let max = source.len_bytes();
+            if given <= max {
+                CodespanError::InvalidCharBoundary { given }
+            } else {
+                CodespanError::IndexTooLarge { given, max }
+            }
+        })
+    }
+
+    /// See [`codespan_reporting::files::Files::line_range`].
+    fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
+        match self.world.source(id).ok() {
+            Some(source) => {
+                source
+                    .line_to_range(given)
+                    .ok_or_else(|| CodespanError::LineTooLarge {
+                        given,
+                        max: source.len_lines(),
+                    })
+            }
+            None => Ok(0..0),
+        }
+    }
+}
+
+// todo: remove me
 impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld<F> {
     /// A unique identifier for files in the file provider. This will be used
     /// for rendering `diagnostic::Label`s in the corresponding source files.
@@ -763,62 +959,32 @@ impl<'a, F: CompilerFeat> codespan_reporting::files::Files<'a> for CompilerWorld
 
     /// The user-facing name of a file.
     fn name(&'a self, id: FileId) -> CodespanResult<Self::Name> {
-        Ok(match self.path_for_id(id) {
-            Ok(path) => path.as_path().display().to_string(),
-            Err(_) => format!("{id:?}"),
-        })
+        CodeSpanReportWorld::new(self).name(id)
     }
 
     /// The source code of a file.
     fn source(&'a self, id: FileId) -> CodespanResult<Self::Source> {
-        Ok(self.lookup(id))
+        CodeSpanReportWorld::new(self).source(id)
     }
 
     /// See [`codespan_reporting::files::Files::line_index`].
     fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
-        let source = self.lookup(id);
-        source
-            .byte_to_line(given)
-            .ok_or_else(|| CodespanError::IndexTooLarge {
-                given,
-                max: source.len_bytes(),
-            })
+        CodeSpanReportWorld::new(self).line_index(id, given)
     }
 
     /// See [`codespan_reporting::files::Files::column_number`].
     fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
-        let source = self.lookup(id);
-        source.byte_to_column(given).ok_or_else(|| {
-            let max = source.len_bytes();
-            if given <= max {
-                CodespanError::InvalidCharBoundary { given }
-            } else {
-                CodespanError::IndexTooLarge { given, max }
-            }
-        })
+        CodeSpanReportWorld::new(self).column_number(id, 0, given)
     }
 
     /// See [`codespan_reporting::files::Files::line_range`].
     fn line_range(&'a self, id: FileId, given: usize) -> CodespanResult<std::ops::Range<usize>> {
-        self.map_source_or_default(id, 0..0, |source| {
-            source
-                .line_to_range(given)
-                .ok_or_else(|| CodespanError::LineTooLarge {
-                    given,
-                    max: source.len_lines(),
-                })
-        })
+        CodeSpanReportWorld::new(self).line_range(id, given)
     }
 }
 
 #[comemo::memoize]
-fn create_library(inputs: Arc<LazyHash<Dict>>, enable_html: bool) -> Arc<LazyHash<Library>> {
-    let features = if enable_html {
-        typst::Features::from_iter([typst::Feature::Html])
-    } else {
-        typst::Features::default()
-    };
-
+fn create_library(inputs: Arc<LazyHash<Dict>>, features: Features) -> Arc<LazyHash<Library>> {
     let lib = typst::Library::builder()
         .with_inputs(inputs.deref().deref().clone())
         .with_features(features)

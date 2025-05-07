@@ -1,7 +1,6 @@
 //! Semantic static and dynamic analysis of the source code.
 
 mod bib;
-use std::path::Path;
 
 pub(crate) use bib::*;
 pub mod call;
@@ -24,30 +23,28 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-use tinymist_std::ImmutPath;
-use tinymist_world::vfs::WorkspaceResolver;
-use tinymist_world::WorldDeps;
-use typst::syntax::Source;
-use typst::World;
 mod post_tyck;
 mod tyck;
 pub(crate) use crate::ty::*;
 pub(crate) use post_tyck::*;
 pub(crate) use tyck::*;
-pub mod track_values;
-pub use track_values::*;
 mod prelude;
 
 mod global;
 pub use global::*;
 
-use ecow::{eco_format, EcoVec};
+use std::sync::Arc;
+
+use ecow::eco_format;
 use lsp_types::Url;
+use tinymist_project::LspComputeGraph;
+use tinymist_std::{bail, Result};
+use tinymist_world::{EntryReader, TaskInputs};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::path_res_to_url;
+use crate::{path_res_to_url, CompilerQueryResponse, SemanticRequest, StatefulRequest};
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -65,64 +62,74 @@ impl ToFunc for Value {
 
 /// Extension trait for `typst::World`.
 pub trait LspWorldExt {
-    /// Get file's id by its path
-    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId>;
-
-    /// Get the source of a file by file path.
-    fn source_by_path(&self, path: &Path) -> FileResult<Source>;
-
     /// Resolve the uri for a file id.
     fn uri_for_id(&self, fid: FileId) -> FileResult<Url>;
-
-    /// Get all depended file ids of a compilation, inclusively.
-    /// Note: must be called after compilation.
-    fn depended_files(&self) -> EcoVec<FileId>;
-
-    /// Get all depended paths in file system of a compilation, inclusively.
-    /// Note: must be called after compilation.
-    fn depended_fs_paths(&self) -> EcoVec<ImmutPath>;
 }
 
 impl LspWorldExt for tinymist_project::LspWorld {
-    fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
-        // todo: source in packages
-        match self.id_for_path(path) {
-            Some(id) => Ok(id),
-            None => WorkspaceResolver::file_with_parent_root(path).ok_or_else(|| {
-                let reason = eco_format!("invalid path: {path:?}");
-                FileError::Other(Some(reason))
-            }),
-        }
-    }
-
-    fn source_by_path(&self, path: &Path) -> FileResult<Source> {
-        // todo: source cache
-        self.source(self.file_id_by_path(path)?)
-    }
-
     fn uri_for_id(&self, fid: FileId) -> Result<Url, FileError> {
         let res = path_res_to_url(self.path_for_id(fid)?);
 
         crate::log_debug_ct!("uri_for_id: {fid:?} -> {res:?}");
         res.map_err(|err| FileError::Other(Some(eco_format!("convert to url: {err:?}"))))
     }
+}
 
-    fn depended_files(&self) -> EcoVec<FileId> {
-        let mut deps = EcoVec::new();
-        self.iter_dependencies(&mut |file_id| {
-            deps.push(file_id);
-        });
-        deps
+/// A snapshot for LSP queries.
+pub struct LspQuerySnapshot {
+    /// The using snapshot.
+    pub snap: LspComputeGraph,
+    /// The global shared analysis data.
+    analysis: Arc<Analysis>,
+    /// The revision lock for the analysis (cache).
+    rev_lock: AnalysisRevLock,
+}
+
+impl std::ops::Deref for LspQuerySnapshot {
+    type Target = LspComputeGraph;
+
+    fn deref(&self) -> &Self::Target {
+        &self.snap
+    }
+}
+
+impl LspQuerySnapshot {
+    /// Runs a query for another task.
+    pub fn task(mut self, inputs: TaskInputs) -> Self {
+        self.snap = self.snap.task(inputs);
+        self
     }
 
-    fn depended_fs_paths(&self) -> EcoVec<ImmutPath> {
-        let mut deps = EcoVec::new();
-        self.iter_dependencies(&mut |file_id| {
-            if let Ok(path) = self.path_for_id(file_id) {
-                deps.push(path.as_path().into());
-            }
-        });
-        deps
+    /// Runs a stateful query.
+    pub fn run_stateful<T: StatefulRequest>(
+        self,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> Result<CompilerQueryResponse> {
+        let graph = self.snap.clone();
+        self.run_analysis(|ctx| query.request(ctx, graph))
+            .map(wrapper)
+    }
+
+    /// Runs a semantic query.
+    pub fn run_semantic<T: SemanticRequest>(
+        self,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> Result<CompilerQueryResponse> {
+        self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
+    }
+
+    /// Runs a query.
+    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
+        let world = self.snap.world().clone();
+        let Some(..) = world.main_id() else {
+            log::error!("Project: main file is not set");
+            bail!("main file is not set");
+        };
+
+        let mut ctx = self.analysis.enter_(world, self.rev_lock);
+        Ok(f(&mut ctx))
     }
 }
 
@@ -390,7 +397,6 @@ mod type_check_tests {
 #[cfg(test)]
 mod post_type_check_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
@@ -426,7 +432,6 @@ mod post_type_check_tests {
 #[cfg(test)]
 mod type_describe_tests {
 
-    use insta::with_settings;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
@@ -598,5 +603,27 @@ mod call_info_tests {
 
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod lint_tests {
+    use std::collections::BTreeMap;
+
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("lint", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.lint(&source);
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_path_(&k), v))
+                .collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
     }
 }

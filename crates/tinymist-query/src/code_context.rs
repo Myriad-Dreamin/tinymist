@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
+use tinymist_analysis::analyze_expr;
 use tinymist_world::ShadowApi;
 use typst::foundations::{Bytes, IntoValue, StyleChain};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::analyze_expr,
     prelude::*,
     syntax::{interpret_mode_at, InterpretMode},
 };

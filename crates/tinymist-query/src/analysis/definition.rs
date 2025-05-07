@@ -1,13 +1,12 @@
 //! Linked definition analysis
 
-use typst::foundations::{IntoValue, Label, Selector, Type};
+use tinymist_std::typst::TypstDocument;
+use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
-use typst::model::BibliographyElem;
 
 use super::{prelude::*, InsTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
-use crate::VersionedDocument;
 
 /// A linked definition in the source code
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -35,22 +34,48 @@ impl Definition {
         self.decl.name()
     }
 
-    /// The location of the definition.
-    // todo: cache
-    pub(crate) fn location(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
-        let fid = self.decl.file_id()?;
-        let span = self.decl.span();
-        let range = (!span.is_detached()).then(|| ctx.source_by_id(fid).ok()?.range(span));
-        Some((fid, range.flatten().unwrap_or_default()))
+    /// Gets file location of the definition.
+    pub fn file_id(&self) -> Option<TypstFileId> {
+        self.decl.file_id()
     }
 
-    /// The range of the name of the definition.
+    /// Gets name range of the definition.
     pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
         self.decl.name_range(ctx)
     }
 
+    /// Gets full range of the definition.
+    pub fn full_range(&self) -> Option<Range<usize>> {
+        self.decl.full_range()
+    }
+
     pub(crate) fn value(&self) -> Option<Value> {
         self.term.as_ref()?.value()
+    }
+}
+
+trait HasNameRange {
+    /// Gets name range of the item.
+    fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>>;
+}
+
+impl HasNameRange for Decl {
+    fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
+        if let Decl::BibEntry(decl) = self {
+            return Some(decl.at.1.clone());
+        }
+
+        if !self.is_def() {
+            return None;
+        }
+
+        let span = self.span();
+        if let Some(range) = span.range() {
+            return Some(range.clone());
+        }
+
+        let src = ctx.source_by_id(self.file_id()?).ok()?;
+        src.range(span)
     }
 }
 
@@ -59,7 +84,7 @@ impl Definition {
 pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
-    document: Option<&VersionedDocument>,
+    document: Option<&TypstDocument>,
     syntax: SyntaxClass,
 ) -> Option<Definition> {
     match syntax {
@@ -70,24 +95,31 @@ pub fn definition(
             DefResolver::new(ctx, source)?.of_span(path.span())
         }
         SyntaxClass::Label {
-            node: r,
+            node,
             is_error: false,
         }
-        | SyntaxClass::Ref(r) => {
-            let ref_expr: ast::Expr = r.cast()?;
+        | SyntaxClass::Ref {
+            node,
+            suffix_colon: false,
+        } => {
+            let ref_expr: ast::Expr = node.cast()?;
             let name = match ref_expr {
                 ast::Expr::Ref(r) => r.target(),
                 ast::Expr::Label(r) => r.get(),
                 _ => return None,
             };
 
-            let introspector = &document?.document.introspector();
+            let introspector = &document?.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }
         SyntaxClass::Label {
             node: _,
             is_error: true,
+        }
+        | SyntaxClass::Ref {
+            node: _,
+            suffix_colon: true,
         }
         | SyntaxClass::Normal(..) => None,
     }
@@ -143,19 +175,18 @@ fn bib_definition(
     introspector: &Introspector,
     key: &str,
 ) -> Option<Definition> {
-    let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
-    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
-        return None;
-    };
-
-    let bib_paths = paths.into_iter().flat_map(|path| path.cast().ok());
-    let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
+    let bib_info = ctx.analyze_bib(introspector)?;
 
     let entry = bib_info.entries.get(key)?;
     crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");
 
     // todo: rename with regard to string format: yaml-key/bib etc.
-    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.span.clone());
+    let decl = Decl::bib_entry(
+        key.into(),
+        entry.file_id,
+        entry.name_range.clone(),
+        Some(entry.range.clone()),
+    );
     Some(Definition::new(decl.into(), None))
 }
 
@@ -323,7 +354,7 @@ fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> O
 }
 
 struct DefResolver {
-    ei: Arc<ExprInfo>,
+    ei: ExprInfo,
 }
 
 impl DefResolver {

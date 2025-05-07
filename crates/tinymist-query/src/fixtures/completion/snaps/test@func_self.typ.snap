@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_self.typ
     "kind": 3,
     "label": "flatten",
     "textEdit": {
-     "newText": "flatten(${1:})",
+     "newText": "flatten()${1:}",
      "range": {
       "end": {
        "character": 7,

@@ -39,7 +39,8 @@ impl<'a> DocumentHighlightWorker<'a> {
                 SyntaxKind::Arrow
                 | SyntaxKind::Params
                 | SyntaxKind::Return
-                | SyntaxKind::FuncReturn => return self.work_func(node),
+                | SyntaxKind::FuncReturn
+                | SyntaxKind::Contextual => return self.work_func(node),
                 _ => {}
             }
             node = node.parent()?;
@@ -50,8 +51,17 @@ impl<'a> DocumentHighlightWorker<'a> {
         let _ = self.ctx;
 
         // find the nearest loop node
-        let loop_node = node_ancestors(node)
-            .find(|node| matches!(node.kind(), SyntaxKind::ForLoop | SyntaxKind::WhileLoop))?;
+        let loop_node = 'find_loop: {
+            for anc in node_ancestors(node) {
+                if matches!(anc.kind(), SyntaxKind::Contextual | SyntaxKind::Closure) {
+                    return None;
+                }
+                if matches!(anc.kind(), SyntaxKind::ForLoop | SyntaxKind::WhileLoop) {
+                    break 'find_loop anc;
+                }
+            }
+            return None;
+        };
 
         // find the first key word of the loop node
         let keyword = loop_node.children().find(|node| node.kind().is_keyword());

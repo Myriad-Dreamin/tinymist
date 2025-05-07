@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -42,21 +40,8 @@ impl ExportTimings {
         timing: Option<TaskWhen>,
         docs: Option<&D>,
     ) -> Option<bool> {
-        let s = snap.signal;
-        let when = timing.unwrap_or(TaskWhen::Never);
-        if !matches!(when, TaskWhen::Never) && s.by_entry_update {
-            return Some(true);
-        }
-
-        match when {
-            TaskWhen::Never => Some(false),
-            TaskWhen::OnType => Some(s.by_mem_events),
-            TaskWhen::OnSave => Some(s.by_fs_events),
-            TaskWhen::OnDocumentHasTitle if s.by_fs_events => {
-                docs.map(|doc| doc.info().title.is_some())
-            }
-            TaskWhen::OnDocumentHasTitle => Some(false),
-        }
+        snap.signal
+            .should_run_task(timing.unwrap_or_default(), docs)
     }
 }
 

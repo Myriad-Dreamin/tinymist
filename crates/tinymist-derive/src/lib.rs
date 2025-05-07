@@ -96,3 +96,57 @@ pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+#[proc_macro_derive(TypliteAttr)]
+pub fn gen_typlite_element(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+
+    // extract the fields from the struct
+    let field_parsers = match &input.data {
+        syn::Data::Struct(data) => match &data.fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .map(|f| {
+                    let name = f.ident.as_ref().unwrap();
+
+                    let ty = &f.ty;
+
+                    quote! {
+                        md_attr::#name => {
+                            let value = <#ty>::parse_attr(content)?;
+                            result.#name = value;
+                        }
+                    }
+                })
+                .collect::<Vec<_>>(),
+            syn::Fields::Unnamed(_) => panic!("unnamed fields are not supported"),
+            syn::Fields::Unit => panic!("unit structs are not supported"),
+        },
+        _ => panic!("only structs are supported"),
+    };
+
+    let input_name = &input.ident;
+
+    // generate parse trait
+    let expanded = quote! {
+        impl TypliteAttrsParser for #input_name {
+            fn parse(attrs: &HtmlAttrs) -> Result<Self> {
+                let mut result = Self::default();
+                for (name, content) in attrs.0.iter() {
+                    match *name {
+                        #(#field_parsers)*
+                        _ => {
+                            return Err(format!("unknown attribute: {name}").into());
+                        }
+                    }
+                }
+
+                Ok(result)
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}

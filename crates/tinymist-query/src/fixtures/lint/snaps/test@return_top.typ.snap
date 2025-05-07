@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/return_top.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "`return` statement in a non-function context",
+   "range": "0:1:0:7",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

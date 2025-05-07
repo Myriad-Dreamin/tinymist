@@ -329,10 +329,10 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
       activeEditor,
       dataPlanePort,
       webviewPanel,
-      panelDispose() {
+      async panelDispose() {
         activeTask.delete(bindDocument);
         serverProcess.kill();
-        contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+        await contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
       },
     });
   }
@@ -678,3 +678,7 @@ export const revealDocumentCompat = async (args: any) => {
     });
   }
 };
+
+export const ejectPreviewPanelCompat = async () => {
+  vscode.window.showWarningMessage("Eject is not supported in compat mode");
+}

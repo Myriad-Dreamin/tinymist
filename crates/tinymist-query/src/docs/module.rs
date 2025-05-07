@@ -1,7 +1,6 @@
 //! Module documentation.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use ecow::{eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
@@ -10,10 +9,10 @@ use typst::diag::StrResult;
 use typst::syntax::package::PackageSpec;
 use typst::syntax::FileId;
 
+use crate::adt::interner::Interned;
 use crate::docs::file_id_repr;
 use crate::package::{get_manifest_id, PackageInfo};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
-use crate::ty::Interned;
 use crate::LocalContext;
 
 use super::DefDocs;
@@ -113,7 +112,7 @@ struct ScanDefCtx<'a> {
 }
 
 impl ScanDefCtx<'_> {
-    fn defs(&mut self, paths: EcoVec<&str>, ei: Arc<ExprInfo>) -> DefInfo {
+    fn defs(&mut self, paths: EcoVec<&str>, ei: ExprInfo) -> DefInfo {
         let name = {
             let stem = ei.fid.vpath().as_rooted_path().file_stem();
             stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))

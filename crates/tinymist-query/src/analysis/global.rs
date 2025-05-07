@@ -1,32 +1,41 @@
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
 use lsp_types::Url;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
-use tinymist_project::LspWorld;
-use tinymist_std::debug_loc::DataSource;
+use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::ty::term_value;
+use tinymist_analysis::{analyze_expr_, analyze_import_};
+use tinymist_lint::LintInfo;
+use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{hash128, FxDashMap};
+use tinymist_std::typst::TypstDocument;
+use tinymist_world::debug_loc::DataSource;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
-use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
-use typst::foundations::{Bytes, Module, Styles};
+use typst::diag::{
+    eco_format, At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult,
+};
+use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
+use typst::introspection::Introspector;
 use typst::layout::Position;
+use typst::model::BibliographyElem;
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{eval_compat, Eval};
 
+use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
-    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
-    TypeInfo,
+    analyze_signature, bib_info, definition, post_type_check, AnalysisStats, BibInfo,
+    CompletionFeat, Definition, PathPreference, QueryStatGuard, SemanticTokenCache,
+    SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty, TypeInfo,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
@@ -37,10 +46,7 @@ use crate::syntax::{
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
-    VersionedDocument,
 };
-
-use super::TypeEnv;
 
 macro_rules! interned_str {
     ($name:ident, $value:expr) => {
@@ -63,6 +69,8 @@ pub struct Analysis {
     pub completion_feat: CompletionFeat,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
+    /// When to trigger the lint.
+    pub lint: TaskWhen,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
@@ -78,13 +86,13 @@ pub struct Analysis {
 }
 
 impl Analysis {
-    /// Get a snapshot of the analysis data.
-    pub fn snapshot(&self, world: LspWorld) -> LocalContextGuard {
-        self.snapshot_(world, self.lock_revision(None))
+    /// Enters the analysis context.
+    pub fn enter(&self, world: LspWorld) -> LocalContextGuard {
+        self.enter_(world, self.lock_revision(None))
     }
 
-    /// Get a snapshot of the analysis data.
-    pub fn snapshot_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
+    /// Enters the analysis context.
+    pub(crate) fn enter_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
         let lifetime = self.caches.lifetime.fetch_add(1, Ordering::SeqCst);
         let slot = self
             .analysis_rev_cache
@@ -92,7 +100,7 @@ impl Analysis {
             .find_revision(world.revision(), &lg);
         let tokens = lg.tokens.take();
         LocalContextGuard {
-            rev_lock: lg,
+            _rev_lock: lg,
             local: LocalContext {
                 tokens,
                 caches: AnalysisLocalCaches::default(),
@@ -106,7 +114,21 @@ impl Analysis {
         }
     }
 
-    /// Lock the revision in *main thread*.
+    /// Gets a snapshot for language queries.
+    pub fn query_snapshot(
+        self: Arc<Self>,
+        snap: LspComputeGraph,
+        req: Option<&CompilerQueryRequest>,
+    ) -> LspQuerySnapshot {
+        let rev_lock = self.lock_revision(req);
+        LspQuerySnapshot {
+            snap,
+            analysis: self,
+            rev_lock,
+        }
+    }
+
+    /// Locks the revision in *main thread*.
     #[must_use]
     pub fn lock_revision(&self, req: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
         let mut grid = self.analysis_rev_cache.lock();
@@ -147,7 +169,7 @@ impl Analysis {
 
     /// Report the statistics of the allocation.
     pub fn report_alloc_stats(&self) -> String {
-        AllocStats::report(self)
+        AllocStats::report()
     }
 
     /// Get configured trigger suggest command.
@@ -195,7 +217,7 @@ pub trait PeriscopeProvider {
     fn periscope_at(
         &self,
         _ctx: &mut LocalContext,
-        _doc: VersionedDocument,
+        _doc: &TypstDocument,
         _pos: Position,
     ) -> Option<String> {
         None
@@ -207,7 +229,7 @@ pub struct LocalContextGuard {
     /// The guarded local context
     pub local: LocalContext,
     /// The revision lock
-    pub rev_lock: AnalysisRevLock,
+    _rev_lock: AnalysisRevLock,
 }
 
 impl Deref for LocalContextGuard {
@@ -428,12 +450,12 @@ impl LocalContext {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+    pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<ExprInfo> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage(&mut self, source: &Source) -> ExprInfo {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().expr_stage;
         cache.get_or_init(|| self.shared.expr_stage(source)).clone()
@@ -444,6 +466,10 @@ impl LocalContext {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().type_check;
         cache.get_or_init(|| self.shared.type_check(source)).clone()
+    }
+
+    pub(crate) fn lint(&mut self, source: &Source) -> EcoVec<SourceDiagnostic> {
+        self.shared.lint(source).diagnostics
     }
 
     /// Get the type check information of a source file.
@@ -690,12 +716,12 @@ impl SharedContext {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<ExprInfo> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
         self.expr_stage_(source, &mut route)
     }
@@ -705,7 +731,7 @@ impl SharedContext {
         self: &Arc<Self>,
         source: &Source,
         route: &mut ExprRoute,
-    ) -> Arc<ExprInfo> {
+    ) -> ExprInfo {
         use crate::syntax::expr_of;
         let guard = self.query_stat(source.id(), "expr_stage");
         self.slot.expr_stage.compute(hash128(&source), |prev| {
@@ -742,21 +768,24 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let guard = self.query_stat(source.id(), "type_check");
         self.slot.type_check.compute(hash128(&ei), |prev| {
-            let cache_hit = prev.and_then(|prev| {
-                // todo: recursively check changed scheme type
-                if prev.revision != ei.revision {
-                    return None;
-                }
-
-                Some(prev)
-            });
-
-            if let Some(prev) = cache_hit {
-                return prev.clone();
+            // todo: recursively check changed scheme type
+            if let Some(cache_hint) = prev.filter(|prev| prev.revision == ei.revision) {
+                return cache_hint;
             }
 
             guard.miss();
             type_check(self.clone(), ei, route)
+        })
+    }
+
+    /// Get the lint result of a source file.
+    pub(crate) fn lint(self: &Arc<Self>, source: &Source) -> LintInfo {
+        let ei = self.expr_stage(source);
+        let ti = self.type_check(source);
+        let guard = self.query_stat(source.id(), "lint");
+        self.slot.lint.compute(hash128(&(&ei, &ti)), |_prev| {
+            guard.miss();
+            tinymist_lint::lint_file(&self.world, &ei, ti)
         })
     }
 
@@ -781,7 +810,7 @@ impl SharedContext {
             return cached;
         }
 
-        let res = crate::analysis::term_value(val);
+        let res = term_value(val);
 
         self.analysis
             .caches
@@ -796,7 +825,7 @@ impl SharedContext {
     pub(crate) fn def_of_span(
         self: &Arc<Self>,
         source: &Source,
-        doc: Option<&VersionedDocument>,
+        doc: Option<&TypstDocument>,
         span: Span,
     ) -> Option<Definition> {
         let syntax = self.classify_span(source, span)?;
@@ -814,7 +843,7 @@ impl SharedContext {
     pub(crate) fn def_of_syntax(
         self: &Arc<Self>,
         source: &Source,
-        doc: Option<&VersionedDocument>,
+        doc: Option<&TypstDocument>,
         syntax: SyntaxClass,
     ) -> Option<Definition> {
         definition(self, source, doc, syntax)
@@ -869,16 +898,11 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(
-        &self,
-        span: Span,
-        bib_paths: impl Iterator<Item = EcoString>,
-    ) -> Option<Arc<BibInfo>> {
-        use comemo::Track;
-        let w = &self.world;
-        let w = (w as &dyn World).track();
+    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+        let world = &self.world;
+        let world = (world as &dyn World).track();
 
-        bib_info(w, span, bib_paths.collect())
+        analyze_bib(world, introspector.track())
     }
 
     /// Describe the item under the cursor.
@@ -1008,7 +1032,7 @@ impl SharedContext {
 }
 
 // Needed by recursive computation
-type DeferredCompute<T> = Arc<OnceCell<T>>;
+type DeferredCompute<T> = Arc<OnceLock<T>>;
 
 #[derive(Clone)]
 struct IncrCacheMap<K, V> {
@@ -1141,9 +1165,9 @@ pub struct AnalysisGlobalCaches {
 #[derive(Default)]
 pub struct AnalysisLocalCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisLocalCache>,
-    completion_files: OnceCell<Vec<TypstFileId>>,
-    root_files: OnceCell<Vec<TypstFileId>>,
-    module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
+    completion_files: OnceLock<Vec<TypstFileId>>,
+    root_files: OnceLock<Vec<TypstFileId>>,
+    module_deps: OnceLock<HashMap<TypstFileId, ModuleDependency>>,
 }
 
 /// A local cache for module-level analysis results of a module.
@@ -1152,8 +1176,8 @@ pub struct AnalysisLocalCaches {
 /// change.
 #[derive(Default)]
 pub struct ModuleAnalysisLocalCache {
-    expr_stage: OnceCell<Arc<ExprInfo>>,
-    type_check: OnceCell<Arc<TypeInfo>>,
+    expr_stage: OnceLock<ExprInfo>,
+    type_check: OnceLock<Arc<TypeInfo>>,
 }
 
 /// A revision-managed (per input change) cache for all level of analysis
@@ -1168,6 +1192,7 @@ impl RevisionManagerLike for AnalysisRevCache {
     fn gc(&mut self, rev: usize) {
         self.manager.gc(rev);
 
+        // todo: the following code are time consuming.
         {
             let mut max_ei = FxHashMap::default();
             let es = self.default_slot.expr_stage.global.lock();
@@ -1186,6 +1211,16 @@ impl RevisionManagerLike for AnalysisRevCache {
                 *rev = (*rev).max(r.1.revision);
             }
             ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
+        }
+
+        {
+            let mut max_li = FxHashMap::default();
+            let ts = self.default_slot.lint.global.lock();
+            for r in ts.iter() {
+                let rev: &mut usize = max_li.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            ts.retain(|_, r| r.1.revision == *max_li.get(&r.1.fid).unwrap_or(&0));
         }
     }
 }
@@ -1210,6 +1245,7 @@ impl AnalysisRevCache {
                     revision: slot.revision,
                     expr_stage: slot.data.expr_stage.crawl(revision.get()),
                     type_check: slot.data.type_check.crawl(revision.get()),
+                    lint: slot.data.lint.crawl(revision.get()),
                 })
                 .unwrap_or_else(|| self.default_slot.clone())
         })
@@ -1240,8 +1276,9 @@ impl Drop for AnalysisRevLock {
 #[derive(Default, Clone)]
 struct AnalysisRevSlot {
     revision: usize,
-    expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
+    expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
+    lint: IncrCacheMap<u128, LintInfo>,
 }
 
 impl Drop for AnalysisRevSlot {
@@ -1260,21 +1297,29 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 }
 
 #[comemo::memoize]
-fn bib_info(
-    w: Tracked<dyn World + '_>,
-    span: Span,
-    bib_paths: EcoVec<EcoString>,
+fn analyze_bib(
+    world: Tracked<dyn World + '_>,
+    introspector: Tracked<Introspector>,
 ) -> Option<Arc<BibInfo>> {
-    let id = span.id()?;
+    let bib_elem = BibliographyElem::find(introspector).ok()?;
 
-    let files = bib_paths
-        .iter()
-        .flat_map(|s| {
-            let id = resolve_id_by_path(w.deref(), id, s)?;
-            Some((id, w.file(id).ok()?))
-        })
-        .collect::<EcoVec<_>>();
-    analyze_bib(files)
+    // todo: it doesn't respect the style chain which can be get from
+    // `analyze_expr`
+    let csl_style = bib_elem.style(StyleChain::default()).derived;
+
+    let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
+        return None;
+    };
+    let elem_fid = bib_elem.span().id()?;
+    let files = paths
+        .into_iter()
+        .flat_map(|path| path.cast().ok())
+        .flat_map(|bib_path: EcoString| {
+            let bib_fid = resolve_id_by_path(world.deref(), elem_fid, &bib_path)?;
+            Some((bib_fid, world.file(bib_fid).ok()?))
+        });
+
+    bib_info(csl_style, files)
 }
 
 #[comemo::memoize]

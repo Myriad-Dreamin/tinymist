@@ -1,0 +1,16 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, true)"
+input_file: crates/typlite/src/fixtures/docs/indented_list.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><ul><li>inherited-scope (dictionary): Definitions that are made available to the entire parsed module. This parameter is only used internally.</li></ul></m1document></body>
+</html>
+
+=====
+- <!-- typlite:begin:list-item 0 -->inherited-scope (dictionary): Definitions that are made available to the entire parsed module. This parameter is only used internally.<!-- typlite:end:list-item 0 -->

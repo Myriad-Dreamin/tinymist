@@ -38,10 +38,16 @@ export function translateExternalURL(urlStr: string): string {
 
 export function activeTypstEditor() {
   const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "typst") {
+  if (!isTypstDocument(editor?.document)) {
     return;
   }
   return editor;
+}
+
+export function isTypstDocument(
+  document: vscode.TextDocument | undefined,
+): document is vscode.TextDocument & { languageId: "typst" } {
+  return document?.languageId === "typst" && !document.uri.scheme.startsWith("tinymist");
 }
 
 export function getTargetViewColumn(viewColumn: ViewColumn | undefined): ViewColumn {

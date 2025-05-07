@@ -1,0 +1,22 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on t \"/base.t||yp\"/* rang)"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/absolute_path_import.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "newText": "\"base.typ\"",
+      "range": "0:8:0:19"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to relative path"
+ }
+]

@@ -1,3 +1,3 @@
 /// contains: delta
 
-#strong(/* range after 1..2 */[]);
+#strong(/* range 0..1 */[]);

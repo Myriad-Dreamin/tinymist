@@ -10,7 +10,7 @@ Whenever you can get a web preview feature, it is recommended since it is much f
 
 == PDF Preview
 
-For non-vscode clients, neovim client as an example. One who uses `nvim-lspconfig` can place their configuration in the `servers.tinymist.settings` section. If you want to export PDF on typing and output files in `$root_dir/target` directory, please configure it like that:
+For non-vscode clients, Neovim client as an example. One who uses `nvim-lspconfig` can place their configuration in the `servers.tinymist.settings` section. If you want to export PDF on typing and output files in `$root_dir/target` directory, please configure it like that:
 
 ```lua
 return {

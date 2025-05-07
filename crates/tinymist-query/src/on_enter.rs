@@ -218,7 +218,7 @@ mod tests {
                 format!("{window_before}|{window_line}|{window_after}")
             };
 
-            insta::with_settings!({
+            with_settings!({
                 description => format!("On Enter on {annotated})"),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));

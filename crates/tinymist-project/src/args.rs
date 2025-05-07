@@ -157,14 +157,13 @@ pub struct TaskCompileArgs {
     #[arg(long = "pages", value_delimiter = ',')]
     pub pages: Option<Vec<Pages>>,
 
-    /// One (or multiple comma-separated) PDF standards that Typst will enforce
-    /// conformance with.
-    #[arg(long = "pdf-standard", value_delimiter = ',')]
-    pub pdf_standard: Vec<PdfStandard>,
+    /// The argument to export to PDF.
+    #[clap(flatten)]
+    pub pdf: PdfExportArgs,
 
-    /// The PPI (pixels per inch) to use for PNG export.
-    #[arg(long = "ppi", default_value_t = 144.0)]
-    pub ppi: f32,
+    /// The argument to export to PNG.
+    #[clap(flatten)]
+    pub png: PngExportArgs,
 
     /// The output format.
     #[clap(skip)]
@@ -215,12 +214,12 @@ impl TaskCompileArgs {
         let config = match output_format {
             OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
                 export,
-                pdf_standards: self.pdf_standard.clone(),
+                pdf_standards: self.pdf.pdf_standard.clone(),
                 creation_timestamp: None,
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
                 export,
-                ppi: self.ppi.try_into().unwrap(),
+                ppi: self.png.ppi.try_into().unwrap(),
                 fill: None,
             }),
             OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
@@ -233,4 +232,21 @@ impl TaskCompileArgs {
             task: config,
         })
     }
+}
+
+/// Declare arguments for exporting a document to PDF.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PdfExportArgs {
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with.
+    #[arg(long = "pdf-standard", value_delimiter = ',')]
+    pub pdf_standard: Vec<PdfStandard>,
+}
+
+/// Declare arguments for exporting a document to PNG.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PngExportArgs {
+    /// The PPI (pixels per inch) to use for PNG export.
+    #[arg(long = "ppi", default_value_t = 144.0)]
+    pub ppi: f32,
 }

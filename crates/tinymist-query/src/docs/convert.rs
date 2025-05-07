@@ -1,10 +1,8 @@
 use std::path::Path;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use ecow::{eco_format, EcoString};
 use tinymist_world::{EntryReader, ShadowApi, TaskInputs};
-use typlite::scopes::Scopes;
-use typlite::value::Value;
 use typlite::TypliteFeat;
 use typst::diag::StrResult;
 use typst::foundations::Bytes;
@@ -13,9 +11,6 @@ use typst::World;
 use crate::analysis::SharedContext;
 
 pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoString> {
-    static DOCS_LIB: LazyLock<Arc<Scopes<Value>>> =
-        LazyLock::new(|| Arc::new(typlite::library::docstring_lib()));
-
     let entry = ctx.world.entry_state();
     let entry = entry.select_in_workspace(Path::new("__tinymist_docs__.typ"));
 
@@ -28,7 +23,6 @@ pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoS
     w.take_db();
 
     let conv = typlite::Typlite::new(Arc::new(w))
-        .with_library(DOCS_LIB.clone())
         .with_feature(TypliteFeat {
             color_theme: Some(ctx.analysis.color_theme),
             annotate_elem: true,

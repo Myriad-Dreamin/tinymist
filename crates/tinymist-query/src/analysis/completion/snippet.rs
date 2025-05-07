@@ -6,6 +6,8 @@
 //! A postfix snippet is a snippet that modifies existing items by the dot
 //! accessor syntax. For example `$ RR.abs| $` is completed as `$ abs(RR) $`.
 
+use core::fmt;
+
 use super::*;
 
 impl CompletionPair<'_, '_, '_> {
@@ -76,7 +78,7 @@ impl CompletionPair<'_, '_, '_> {
             return None;
         }
 
-        let cursor_mode = interpret_mode_at(Some(node));
+        let cursor_mode = self.cursor.leaf_mode();
         let is_content = ty.is_content(&());
         crate::log_debug_ct!("post snippet is_content: {is_content}");
 
@@ -151,7 +153,7 @@ impl CompletionPair<'_, '_, '_> {
                 ..Default::default()
             };
             if let Some(node_before_before_cursor) = &node_before_before_cursor {
-                let node_content = node.get().clone().into_text();
+                let node_content = SnippetEscape(node.get().clone().into_text());
                 let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
                     new_text: EcoString::new(),
@@ -213,15 +215,15 @@ impl CompletionPair<'_, '_, '_> {
         let rb = if is_content_block { "" } else { ")" };
 
         // we don't check literal type here for faster completion
-        for (name, ty) in defines.defines {
+        for (name, ty) in &defines.defines {
             // todo: filter ty
             if name.is_empty() {
                 continue;
             }
 
-            kind_checker.check(&ty);
+            kind_checker.check(ty);
 
-            if kind_checker.symbols.iter().min().copied().is_some() {
+            if !kind_checker.symbols.is_empty() {
                 continue;
             }
             if kind_checker.functions.is_empty() {
@@ -242,7 +244,7 @@ impl CompletionPair<'_, '_, '_> {
                     .map(From::from),
                 ..Default::default()
             };
-            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter().copied());
 
             crate::log_debug_ct!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
 
@@ -268,7 +270,7 @@ impl CompletionPair<'_, '_, '_> {
             }
             let more_args = fn_feat.min_pos() > 1 || fn_feat.min_named() > 0;
             if self.worker.ctx.analysis.completion_feat.ufcs_left() && more_args {
-                let node_content = node.get().clone().into_text();
+                let node_content = SnippetEscape(node.get().clone().into_text());
                 let before = EcoTextEdit {
                     range: self.cursor.lsp_range_of(rng.start..self.cursor.from),
                     new_text: eco_format!("{name}{lb}"),
@@ -301,5 +303,20 @@ impl CompletionPair<'_, '_, '_> {
                 });
             }
         }
+    }
+}
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#snippet_syntax
+struct SnippetEscape(EcoString);
+
+impl fmt::Display for SnippetEscape {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // todo: poor performance
+        let escaped = self
+            .0
+            .replace("\\", "\\\\")
+            .replace("$", "\\$")
+            .replace("}", "\\}");
+        write!(f, "{escaped}")
     }
 }

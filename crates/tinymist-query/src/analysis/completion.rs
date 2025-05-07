@@ -7,9 +7,10 @@ use std::ops::Range;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
-use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
+use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
+use tinymist_analysis::{analyze_labels, func_signature, DynLabel};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
@@ -27,9 +28,7 @@ use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{
-    analyze_labels, func_signature, BuiltinTy, DynLabel, LocalContext, PathPreference, Ty,
-};
+use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
     EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,
@@ -84,6 +83,9 @@ pub struct CompletionFeat {
     #[serde(default)]
     pub trigger_suggest_and_parameter_hints: bool,
 
+    /// The Way to complete symbols.
+    pub symbol: Option<SymbolCompletionWay>,
+
     /// Whether to enable postfix completion.
     pub postfix: Option<bool>,
     /// Whether to enable ufcs completion.
@@ -128,6 +130,22 @@ impl CompletionFeat {
             .as_ref()
             .unwrap_or(&DEFAULT_POSTFIX_SNIPPET)
     }
+
+    pub(crate) fn is_stepless(&self) -> bool {
+        matches!(self.symbol, Some(SymbolCompletionWay::Stepless))
+    }
+}
+
+/// Whether to make symbol completion stepless. For example, `$ar|$` will be
+/// completed to `$arrow.r$`. Hint: Restarting the editor is required to change
+/// this setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SymbolCompletionWay {
+    /// Complete symbols step by step
+    Step,
+    /// Complete symbols steplessly
+    Stepless,
 }
 
 /// The struct describing how a completion worker views the editor's cursor.
@@ -174,16 +192,6 @@ impl<'a> CompletionCursor<'a> {
         let syntax_context = classify_context(leaf.clone(), Some(cursor));
         let surrounding_syntax = surrounding_syntax(&leaf);
 
-        // todo: don't match here?
-        if matches!(syntax, Some(SyntaxClass::Callee(..)))
-            && matches!(syntax_context.as_ref(), Some(
-                SyntaxContext::Element { container, .. } |
-                SyntaxContext::Arg { args: container, .. } |
-                SyntaxContext::Paren { container, .. }) if container.rightmost_leaf().map(|s| s.offset()) == Some(leaf.offset()))
-        {
-            return None;
-        }
-
         crate::log_debug_ct!("CompletionCursor: syntax {leaf:?} -> {syntax:#?}");
         crate::log_debug_ct!("CompletionCursor: context {leaf:?} -> {syntax_context:#?}");
         crate::log_debug_ct!("CompletionCursor: surrounding {leaf:?} -> {surrounding_syntax:#?}");
@@ -218,6 +226,11 @@ impl<'a> CompletionCursor<'a> {
         matches!(self.syntax, Some(SyntaxClass::Callee(..)))
     }
 
+    /// Gets the interpret mode at the cursor.
+    pub fn leaf_mode(&self) -> InterpretMode {
+        interpret_mode_at(Some(&self.leaf))
+    }
+
     /// Gets selected node under cursor.
     fn selected_node(&self) -> &Option<SelectedNode<'a>> {
         self.ident_cursor.get_or_init(|| {
@@ -242,7 +255,7 @@ impl<'a> CompletionCursor<'a> {
 
             // @identifier
             //  ^ from
-            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref(..)))
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref { .. }))
                 && self.leaf.offset() + 1 == self.from;
             if is_from_ref {
                 return Some(SelectedNode::Ref(self.leaf.clone()));
@@ -274,6 +287,7 @@ impl<'a> CompletionCursor<'a> {
                     | SyntaxContext::VarAccess(..)
                     | SyntaxContext::Paren { .. }
                     | SyntaxContext::Label { .. }
+                    | SyntaxContext::Ref { .. }
                     | SyntaxContext::Normal(..),
                 )
                 | None => {}
@@ -562,7 +576,7 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let surrounding_syntax = self.cursor.surrounding_syntax;
-        let mode = interpret_mode_at(Some(&self.cursor.leaf));
+        let mode = self.cursor.leaf_mode();
 
         // Special completions 2, we should remove them finally
         if matches!(surrounding_syntax, ImportList) {
@@ -604,7 +618,7 @@ impl CompletionPair<'_, '_, '_> {
 
                 self.cursor.from = field.offset(&self.cursor.source)?;
 
-                self.field_access_completions(&target);
+                self.doc_access_completions(&target);
                 return Some(());
             }
             Some(SyntaxContext::ImportPath(path) | SyntaxContext::IncludePath(path)) => {
@@ -628,8 +642,11 @@ impl CompletionPair<'_, '_, '_> {
                 return Some(());
             }
             // todo: complete reference by type
-            Some(SyntaxContext::Normal(node)) if (matches!(node.kind(), SyntaxKind::Ref)) => {
-                self.cursor.from = self.cursor.leaf.offset() + 1;
+            Some(SyntaxContext::Ref {
+                node,
+                suffix_colon: _,
+            }) => {
+                self.cursor.from = node.offset() + 1;
                 self.ref_completions();
                 return Some(());
             }
@@ -642,12 +659,21 @@ impl CompletionPair<'_, '_, '_> {
             | None => {}
         }
 
+        let cursor_pos = bad_completion_cursor(
+            self.cursor.syntax.as_ref(),
+            self.cursor.syntax_context.as_ref(),
+            &self.cursor.leaf,
+        );
+
         // Triggers a complete type checking.
         let ty = self
             .worker
             .ctx
             .post_type_of_node(self.cursor.leaf.clone())
-            .filter(|ty| !matches!(ty, Ty::Any));
+            .filter(|ty| !matches!(ty, Ty::Any))
+            // Forbids argument completion list if the cursor is in a bad position. This will
+            // prevent the completion list from showing up.
+            .filter(|_| !matches!(cursor_pos, Some(BadCompletionCursor::ArgListPos)));
 
         crate::log_debug_ct!(
             "complete_type: {:?} -> ({surrounding_syntax:?}, {ty:#?})",
@@ -885,8 +911,8 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     &s[rng]
 }
 
-static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
 
 /// Adds numbering to placeholders in snippets
 fn to_lsp_snippet(typst_snippet: &str) -> EcoString {

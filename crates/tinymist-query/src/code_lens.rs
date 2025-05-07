@@ -31,18 +31,33 @@ impl SemanticRequest for CodeLensRequest {
             data: None,
         };
 
-        res.push(doc_lens("Profile", vec!["profile".into()]));
-        res.push(doc_lens("Preview", vec!["preview".into()]));
+        res.push(doc_lens(
+            &tinymist_l10n::t!("tinymist-query.code-action.profile", "Profile"),
+            vec!["profile".into()],
+        ));
+        res.push(doc_lens(
+            &tinymist_l10n::t!("tinymist-query.code-action.preview", "Preview"),
+            vec!["preview".into()],
+        ));
 
         let is_html = ctx.world.library.features.is_enabled(typst::Feature::Html);
 
         if is_html {
-            res.push(doc_lens("Export HTML", vec!["export-html".into()]));
+            res.push(doc_lens(
+                &tinymist_l10n::t!("tinymist-query.code-action.exportHtml", "Export HTML"),
+                vec!["export-html".into()],
+            ));
         } else {
-            res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));
+            res.push(doc_lens(
+                &tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF"),
+                vec!["export-pdf".into()],
+            ));
         }
 
-        res.push(doc_lens("More ..", vec!["more".into()]));
+        res.push(doc_lens(
+            &tinymist_l10n::t!("tinymist-query.code-action.more", "More .."),
+            vec!["more".into()],
+        ));
 
         Some(res)
     }

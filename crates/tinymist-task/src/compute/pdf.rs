@@ -1,12 +1,12 @@
-use super::*;
-
-use crate::model::ExportPdfTask;
-use tinymist_world::args::convert_source_date_epoch;
-use typst::foundations::Datetime;
+use tinymist_std::time::ToUtcDateTime;
 pub use typst_pdf::pdf;
-use typst_pdf::PdfOptions;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
-use typst_pdf::Timestamp;
+
+use typst_pdf::{PdfOptions, PdfStandards, Timestamp};
+
+use super::*;
+use crate::model::ExportPdfTask;
+
 pub struct PdfExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
@@ -18,82 +18,37 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
         doc: &Arc<TypstPagedDocument>,
         config: &ExportPdfTask,
     ) -> Result<Bytes> {
-        // todo: timestamp world.now()
         let creation_timestamp = config
             .creation_timestamp
-            .map(convert_source_date_epoch)
-            .transpose()
-            .context_ut("parse pdf creation timestamp")?
-            .unwrap_or_else(chrono::Utc::now);
+            .map(|ts| ts.to_utc_datetime().context("timestamp is out of range"))
+            .transpose()?
+            .unwrap_or_else(tinymist_std::time::utc_now);
+        // todo: this seems different from `Timestamp::new_local` which also embeds the
+        // timezone information.
+        let timestamp = Timestamp::new_utc(tinymist_std::time::to_typst_time(creation_timestamp));
+
+        let standards = PdfStandards::new(
+            &config
+                .pdf_standards
+                .iter()
+                .map(|standard| match standard {
+                    tinymist_world::args::PdfStandard::V_1_7 => typst_pdf::PdfStandard::V_1_7,
+                    tinymist_world::args::PdfStandard::A_2b => typst_pdf::PdfStandard::A_2b,
+                    tinymist_world::args::PdfStandard::A_3b => typst_pdf::PdfStandard::A_3b,
+                })
+                .collect::<Vec<_>>(),
+        )
+        .context_ut("prepare pdf standards")?;
 
         // todo: Some(pdf_uri.as_str())
-
+        // todo: ident option
         Ok(Bytes::new(typst_pdf::pdf(
             doc,
             &PdfOptions {
-                timestamp: convert_datetime(creation_timestamp),
+                timestamp: Some(timestamp),
+                standards,
                 ..Default::default()
             },
         )?))
     }
 }
-
-/// Convert [`chrono::DateTime`] to [`Timestamp`]
-pub fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<Timestamp> {
-    use chrono::{Datelike, Timelike};
-    Some(Timestamp::new_utc(Datetime::from_ymd_hms(
-        date_time.year(),
-        date_time.month().try_into().ok()?,
-        date_time.day().try_into().ok()?,
-        date_time.hour().try_into().ok()?,
-        date_time.minute().try_into().ok()?,
-        date_time.second().try_into().ok()?,
-    )?))
-}
-
-// impl<F: CompilerFeat> WorldComputable<F> for PdfExport {
-//     type Output = Option<Bytes>;
-
-//     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-//         OptionDocumentTask::run_export::<F, Self>(graph)
-//     }
-// }
-
-// use std::sync::Arc;
-
-// use reflexo::typst::TypstPagedDocument;
-// use typst::{diag:: World;
-// use typst_pdf::{PdfOptions, PdfStandard, PdfStandards, Timestamp};
-
-// #[derive(Debug, Clone, Default)]
-// pub struct PdfDocExporter {
-//     ctime: Option<Timestamp>,
-//     standards: Option<PdfStandards>,
-// }
-
-// impl PdfDocExporter {
-//     pub fn with_ctime(mut self, v: Option<Timestamp>) -> Self {
-//         self.ctime = v;
-//         self
-//     }
-
-//     pub fn with_standard(mut self, v: Option<PdfStandard>) -> Self {
-//         self.standards = v.map(|v| PdfStandards::new(&[v]).unwrap());
-//         self
-//     }
-// }
-
-// impl Exporter<TypstPagedDocument, Vec<u8>> for PdfDocExporter {
-//     fn export(&self, _world: &dyn World, output: Arc<TypstPagedDocument>) ->
-// Vecu8>> {         // todo: ident option
-
-//         typst_pdf::pdf(
-//             output.as_ref(),
-//             &PdfOptions {
-//                 timestamp: self.ctime,
-//                 standards: self.standards.clone().unwrap_or_default(),
-//                 ..Default::default()
-//             },
-//         )
-//     }
-// }

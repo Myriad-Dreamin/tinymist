@@ -1,14 +1,14 @@
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use ecow::{eco_format, EcoString};
-use hashbrown::HashSet;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::adt::interner::Interned;
 use crate::prelude::*;
 use crate::syntax::{InterpretMode, SurroundingSyntax};
-use crate::ty::Interned;
 
 /// This is the poorman's type filter, which is less powerful but more steady.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,26 +5,30 @@ mod args;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
 use futures::future::MaybeDone;
-use lsp_server::RequestId;
-use once_cell::sync::Lazy;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
-use serde_json::Value as JsonValue;
-use sync_lsp::internal_error;
-use sync_lsp::transport::{with_stdio_transport, MirrorArgs};
-use sync_lsp::{LspBuilder, LspClientRoot, LspResult};
+use sync_ls::transport::{with_stdio_transport, MirrorArgs};
+use sync_ls::{
+    internal_error, DapBuilder, DapMessage, LspBuilder, LspClientRoot, LspMessage, LspResult,
+    RequestId,
+};
 use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
+use tinymist::tool::testing::{coverage_main, test_main};
 use tinymist::world::TaskInputs;
-use tinymist::{CompileConfig, Config, RegularInit, ServerState, SuperInit, UserActionTask};
+use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::{bail, error::prelude::*};
+
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
 
 use crate::args::*;
 
@@ -49,40 +53,56 @@ impl Default for Runtimes {
     }
 }
 
-static RUNTIMES: Lazy<Runtimes> = Lazy::new(Runtimes::default);
+static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 /// The main entry point.
 fn main() -> Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    // Parse command line arguments
+    // Parses command line arguments
     let args = CliArguments::parse();
 
-    let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+    // Probes soon to avoid other initializations causing errors
+    if matches!(args.command, Some(Commands::Probe)) {
+        return Ok(());
+    }
 
-    // Start logging
+    // Loads translations
+    #[cfg(feature = "l10n")]
+    set_translations(load_translations(tinymist_assets::L10N_DATA)?);
+
+    // Starts logging
     let _ = {
+        let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
+        let is_test_no_verbose =
+            matches!(&args.command, Some(Commands::Test(test)) if !test.verbose);
         use log::LevelFilter::*;
-        let base_level = if is_transient_cmd { Warn } else { Info };
+        let base_no_info = is_transient_cmd || is_test_no_verbose;
+        let base_level = if base_no_info { Warn } else { Info };
+        let preview_level = if is_test_no_verbose { Warn } else { Debug };
+        let diag_level = if is_test_no_verbose { Warn } else { Info };
 
         env_logger::builder()
             .filter_module("tinymist", base_level)
-            .filter_module("typst_preview", Debug)
+            .filter_module("typst_preview", preview_level)
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
-            .filter_module("sync_lsp", base_level)
+            .filter_module("sync_ls", base_level)
             .filter_module("reflexo_typst2vec::pass::span2vec", Error)
-            .filter_module("reflexo_typst::diag::console", Info)
+            .filter_module("reflexo_typst::diag::console", diag_level)
             .try_init()
     };
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Cov(args) => coverage_main(args),
+        Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
+        Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
@@ -119,13 +139,40 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
     log::info!("starting language server: {args:?}");
 
     let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        ServerState::install(LspBuilder::new(
+        ServerState::install_lsp(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
                 exec_cmds: Vec::new(),
+            },
+            client.weak(),
+        ))
+        .build()
+        .start(conn.receiver, is_replay)
+    })?;
+
+    log::info!("language server did shut down");
+    Ok(())
+}
+
+/// The main entry point for the language server.
+pub fn dap_main(args: DapArgs) -> Result<()> {
+    let pairs = LONG_VERSION.trim().split('\n');
+    let pairs = pairs
+        .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    log::info!("tinymist version information: {pairs:?}");
+    log::info!("starting debug adaptor: {args:?}");
+
+    let is_replay = !args.mirror.replay.is_empty();
+    with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
+        let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        ServerState::install_dap(DapBuilder::new(
+            DapRegularInit {
+                client: client.weak().to_typed(),
+                font_opts: args.font,
             },
             client.weak(),
         ))
@@ -156,23 +203,20 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    with_stdio_transport(args.mirror.clone(), |conn| {
+    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
         let roots = vec![ImmutPath::from(root_path)];
         let config = Config {
-            compile: CompileConfig {
-                entry_resolver: EntryResolver {
-                    roots,
-                    ..EntryResolver::default()
-                },
-                font_opts: args.compile.font,
-                ..CompileConfig::default()
+            entry_resolver: EntryResolver {
+                roots,
+                ..EntryResolver::default()
             },
+            font_opts: args.compile.font,
             ..Config::default()
         };
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
@@ -193,14 +237,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let request_received = reflexo::time::Instant::now();
 
         let req_id: RequestId = 0.into();
-        client.register_request(
-            &lsp_server::Request {
-                id: req_id.clone(),
-                method: "tinymistExt/documentProfiling".to_owned(),
-                params: JsonValue::Null,
-            },
-            request_received,
-        );
+        client.register_request("tinymistExt/documentProfiling", &req_id, request_received);
 
         let state = service.state_mut().unwrap();
 
@@ -209,7 +246,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let snap = state.snapshot().unwrap();
 
         RUNTIMES.tokio_runtime.block_on(async {
-            let w = snap.world.task(TaskInputs {
+            let w = snap.world().clone().task(TaskInputs {
                 entry: Some(entry),
                 inputs,
             });
@@ -227,14 +264,14 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
 pub fn query_main(cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
 
-    with_stdio_transport(MirrorArgs::default(), |conn| {
+    with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
 
         // todo: roots, inputs, font_opts
         let config = Config::default();
 
-        let mut service = ServerState::install(LspBuilder::new(
+        let mut service = ServerState::install_lsp(LspBuilder::new(
             SuperInit {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
@@ -259,9 +296,8 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
                 QueryCommands::PackageDocs(args) => {
                     let pkg = PackageSpec::from_str(&args.id).unwrap();
                     let path = args.path.map(PathBuf::from);
-                    let path = path.unwrap_or_else(|| {
-                        snap.world.registry.resolve(&pkg).unwrap().as_ref().into()
-                    });
+                    let path = path
+                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
 
                     let res = state
                         .resource_package_docs_(PackageInfo {
@@ -278,9 +314,8 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
                 QueryCommands::CheckPackage(args) => {
                     let pkg = PackageSpec::from_str(&args.id).unwrap();
                     let path = args.path.map(PathBuf::from);
-                    let path = path.unwrap_or_else(|| {
-                        snap.world.registry.resolve(&pkg).unwrap().as_ref().into()
-                    });
+                    let path = path
+                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
 
                     state
                         .check_package(PackageInfo {

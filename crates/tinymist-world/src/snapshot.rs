@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use crate::{CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
+use crate::{args::TaskWhen, CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
 use ecow::EcoString;
 use tinymist_std::typst::TypstDocument;
 
@@ -42,6 +42,38 @@ impl ExportSignal {
         self.by_mem_events |= other.by_mem_events;
         self.by_fs_events |= other.by_fs_events;
         self.by_entry_update |= other.by_entry_update;
+    }
+
+    pub fn should_run_task_dyn(
+        &self,
+        when: TaskWhen,
+        docs: Option<&TypstDocument>,
+    ) -> Option<bool> {
+        match docs {
+            Some(TypstDocument::Paged(doc)) => self.should_run_task(when, Some(doc.as_ref())),
+            Some(TypstDocument::Html(doc)) => self.should_run_task(when, Some(doc.as_ref())),
+            None => self.should_run_task::<typst::layout::PagedDocument>(when, None),
+        }
+    }
+
+    pub fn should_run_task<D: typst::Document>(
+        &self,
+        when: TaskWhen,
+        docs: Option<&D>,
+    ) -> Option<bool> {
+        if !matches!(when, TaskWhen::Never) && self.by_entry_update {
+            return Some(true);
+        }
+
+        match when {
+            TaskWhen::Never => Some(false),
+            TaskWhen::OnType => Some(self.by_mem_events),
+            TaskWhen::OnSave => Some(self.by_fs_events),
+            TaskWhen::OnDocumentHasTitle if self.by_fs_events => {
+                docs.map(|doc| doc.info().title.is_some())
+            }
+            TaskWhen::OnDocumentHasTitle => Some(false),
+        }
     }
 }
 

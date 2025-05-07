@@ -1,0 +1,21 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/discard_if2.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "This `set` expression is implicitly discarded by function return",
+   "range": "1:2:1:15",
+   "severity": 2,
+   "source": "typst"
+  },
+  {
+   "message": "This `set` expression is implicitly discarded by function return",
+   "range": "4:2:4:16",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

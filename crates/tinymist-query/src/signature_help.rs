@@ -1,4 +1,3 @@
-use once_cell::sync::OnceCell;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
@@ -52,7 +51,7 @@ impl SemanticRequest for SignatureHelpRequest {
         label.push('(');
 
         let mut real_offset = 0;
-        let focus_name = OnceCell::new();
+        let focus_name = OnceLock::new();
         for (idx, (param, ty)) in sig.params().enumerate() {
             if is_set && !param.attrs.settable {
                 continue;
@@ -142,14 +141,16 @@ mod tests {
     fn test() {
         snapshot_testing("signature_help", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
+            let (position, anno) = make_pos_annoation(&source);
 
-            let request = SignatureHelpRequest {
-                path: path.clone(),
-                position: find_test_position(&source),
-            };
+            let request = SignatureHelpRequest { path, position };
 
             let result = request.request(ctx);
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            with_settings!({
+                description => format!("signature help on {anno}"),
+            }, {
+                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            })
         });
     }
 }

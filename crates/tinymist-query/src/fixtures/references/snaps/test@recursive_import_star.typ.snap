@@ -2,10 +2,9 @@
 source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/recursive_import_star.typ
-snapshot_kind: text
 ---
 [
- "/base.typ@0:23:0:24",
- "/base2.typ@1:1:1:2",
- "/s0.typ@1:1:1:2"
+ "base.typ@0:23:0:24",
+ "base2.typ@1:1:1:2",
+ "s0.typ@1:1:1:2"
 ]

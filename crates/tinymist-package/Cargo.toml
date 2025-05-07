@@ -1,0 +1,65 @@
+[package]
+name = "tinymist-package"
+description = "Tinymist package support for Typst."
+categories = ["compilers"]
+keywords = ["api", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+base64.workspace = true
+comemo.workspace = true
+ecow.workspace = true
+flate2.workspace = true
+log.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tar.workspace = true
+typst.workspace = true
+tinymist-std.workspace = true
+
+toml = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+walkdir = { workspace = true, optional = true }
+fastrand = { workspace = true, optional = true }
+
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["console"] }
+
+[dev-dependencies]
+insta.workspace = true
+
+[features]
+
+default = []
+fs-pack = ["walkdir"]
+gitcl-pack = ["toml", "tinymist-std/system"]
+http-pack = ["http-registry"]
+release-pack = ["http-pack"]
+universe-pack = ["http-pack"]
+http-registry = ["reqwest", "dirs"]
+web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
+browser = ["web"]
+system = [
+    "http-registry",
+    "fs-pack",
+    "gitcl-pack",
+    "http-pack",
+    "release-pack",
+    "universe-pack",
+    "tinymist-std/system",
+]
+
+
+[lints]
+workspace = true

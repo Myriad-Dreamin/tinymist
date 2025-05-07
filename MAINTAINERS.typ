@@ -71,7 +71,7 @@
         Integrate tinymist server with popular editors like VS Code, Neovim, etc.
       ]
   - #language-service
-    - #scope("crates/tinymist/", "crates/tinymist-query/")
+    - #scope("crates/tinymist/", "crates/tinymist-analysis/", "crates/tinymist-query/")
     - #description[
         Perform code analysis and provide language support for Typst.
       ]
@@ -92,7 +92,7 @@
         Enrich the VS Code features with the client-side extension.
       ]
   - #nightly-releases
-    - #scope("crates/tinymist/", "typst-shim/")
+    - #scope("crates/tinymist/", "crates/typst-shim/")
     - #description[
         Build and Publish nightly releases of tinymist. The nightly releases are built upon the main branches of both tinymist and typst.
       ]

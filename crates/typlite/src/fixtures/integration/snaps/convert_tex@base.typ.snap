@@ -1,0 +1,23 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/base.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1heading level="1"><span style="display: inline-block;">Hello, World!</span></m1heading><p>This is a typst document.</p></m1document></body>
+</html>
+
+=====
+\begin{document}
+
+\section{Hello, World!}
+
+This is a typst document.
+
+
+\end{document}

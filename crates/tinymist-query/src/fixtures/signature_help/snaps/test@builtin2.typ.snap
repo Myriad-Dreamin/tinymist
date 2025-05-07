@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/signature_help.rs
+description: "signature help on underline(|/* loc 0, "
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/signature_help/builtin2.typ
-snapshot_kind: text
 ---
 {
  "activeSignature": 0,

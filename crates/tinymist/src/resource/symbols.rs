@@ -1,14 +1,15 @@
+use std::sync::LazyLock;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
-use sync_lsp::LspResult;
+use sync_ls::LspResult;
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
 use super::prelude::*;
-use crate::project::LspCompileSnapshot;
+use crate::project::LspComputeGraph;
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,7 +86,7 @@ struct FontItem {
 
 type ResourceSymbolMap = BTreeMap<String, ResourceSymbolItem>;
 
-static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
+static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
     use SymCategory::*;
 
     HashMap::from_iter([
@@ -948,12 +949,11 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 
 impl ServerState {
     /// Get the all valid symbols
-    pub async fn get_symbol_resources(snap: LspCompileSnapshot) -> LspResult<JsonValue> {
+    pub async fn get_symbol_resources(snap: LspComputeGraph) -> LspResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();
 
         let std = snap
-            .world
-            .library
+            .library()
             .std
             .read()
             .scope()
@@ -984,7 +984,7 @@ impl ServerState {
             writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
             o
         });
-        log::debug!("math shaping text: {text}", text = math_shaping_text);
+        log::debug!("math shaping text: {math_shaping_text}");
 
         let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
 
@@ -993,7 +993,7 @@ impl ServerState {
 
             let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
 
-            let mut forked = snap.world.task(TaskInputs {
+            let mut forked = snap.world().task(TaskInputs {
                 entry: Some(new_entry),
                 ..TaskInputs::default()
             });

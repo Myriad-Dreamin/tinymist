@@ -9,6 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "raw",
     "labelDetails": {
@@ -30,6 +34,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
     }
    },
    {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
     "kind": 3,
     "label": "raw.where",
     "labelDetails": {
@@ -51,6 +59,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
     }
    },
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 15,
     "label": "regex selector",
     "sortText": "140",

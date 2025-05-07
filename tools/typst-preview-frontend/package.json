@@ -13,8 +13,8 @@
     "unlink:local": "yarn unlink @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
   },
   "dependencies": {
-    "@myriaddreamin/typst-ts-renderer": "=0.5.5-rc7",
-    "@myriaddreamin/typst.ts": "=0.5.5-rc7",
+    "@myriaddreamin/typst-ts-renderer": "=0.6.0-rc1",
+    "@myriaddreamin/typst.ts": "=0.6.0-rc1",
     "typst-dom": "link:../typst-dom",
     "rxjs": "^7.8.1"
   }

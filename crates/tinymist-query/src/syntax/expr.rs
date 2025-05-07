@@ -1,9 +1,12 @@
+#![allow(missing_docs)]
+
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
+use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Type, Value},
@@ -15,12 +18,13 @@ use typst::{
 
 use crate::{
     analysis::{QueryStatGuard, SharedContext},
+    docs::DocString,
     prelude::*,
     syntax::{find_module_level_docs, resolve_id_by_path, DefKind},
-    ty::{BuiltinTy, InsTy, Interned, Ty},
+    ty::{BuiltinTy, InsTy, Ty},
 };
 
-use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
+use super::{compute_docstring, def::*, DocCommentMatcher, InterpretMode};
 
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
@@ -29,8 +33,8 @@ pub(crate) fn expr_of(
     source: Source,
     route: &mut ExprRoute,
     guard: QueryStatGuard,
-    prev: Option<Arc<ExprInfo>>,
-) -> Arc<ExprInfo> {
+    prev: Option<ExprInfo>,
+) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
 
     route.insert(source.id(), None);
@@ -117,7 +121,7 @@ pub(crate) fn expr_of(
         (root_scope, root)
     };
 
-    let info = ExprInfo {
+    let info = ExprInfoRepr {
         fid: source.id(),
         revision,
         source: source.clone(),
@@ -132,95 +136,7 @@ pub(crate) fn expr_of(
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
     route.remove(&info.fid);
-    Arc::new(info)
-}
-
-#[derive(Debug)]
-pub struct ExprInfo {
-    pub fid: TypstFileId,
-    pub revision: usize,
-    pub source: Source,
-    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
-    pub module_docstring: Arc<DocString>,
-    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
-    pub exprs: FxHashMap<Span, Expr>,
-    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
-    pub exports: Arc<LazyHash<LexicalScope>>,
-    pub root: Expr,
-}
-
-impl std::hash::Hash for ExprInfo {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.revision.hash(state);
-        self.source.hash(state);
-        self.exports.hash(state);
-        self.root.hash(state);
-        let mut imports = self.imports.iter().collect::<Vec<_>>();
-        imports.sort_by_key(|(fid, _)| *fid);
-        imports.hash(state);
-    }
-}
-
-impl ExprInfo {
-    pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
-        if decl.is_def() {
-            return Some(Expr::Decl(decl.clone()));
-        }
-        let resolved = self.resolves.get(&decl.span())?;
-        Some(Expr::Ref(resolved.clone()))
-    }
-
-    pub fn get_refs(
-        &self,
-        decl: Interned<Decl>,
-    ) -> impl Iterator<Item = (&Span, &Interned<RefExpr>)> {
-        let of = Some(Expr::Decl(decl.clone()));
-        self.resolves
-            .iter()
-            .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
-                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
-                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
-                (Decl::Label(..), _) => false,
-                _ => r.decl == decl || r.root == of,
-            })
-    }
-
-    pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
-        let of = Expr::Decl(decl.clone());
-        self.exports
-            .get(decl.name())
-            .is_some_and(|export| match export {
-                Expr::Ref(ref_expr) => ref_expr.root == Some(of),
-                exprt => *exprt == of,
-            })
-    }
-
-    #[allow(dead_code)]
-    fn show(&self) {
-        use std::io::Write;
-        let vpath = self
-            .fid
-            .vpath()
-            .resolve(Path::new("target/exprs/"))
-            .unwrap();
-        let root = vpath.with_extension("root.expr");
-        std::fs::create_dir_all(root.parent().unwrap()).unwrap();
-        std::fs::write(root, format!("{}", self.root)).unwrap();
-        let scopes = vpath.with_extension("scopes.expr");
-        std::fs::create_dir_all(scopes.parent().unwrap()).unwrap();
-        {
-            let mut scopes = std::fs::File::create(scopes).unwrap();
-            for (span, expr) in self.exprs.iter() {
-                writeln!(scopes, "{span:?} -> {expr}").unwrap();
-            }
-        }
-        let imports = vpath.with_extension("imports.expr");
-        std::fs::create_dir_all(imports.parent().unwrap()).unwrap();
-        std::fs::write(imports, format!("{:#?}", self.imports)).unwrap();
-        let exports = vpath.with_extension("exports.expr");
-        std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
-        std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
-    }
+    ExprInfo::new(info)
 }
 
 type ConcolicExpr = (Option<Expr>, Option<Ty>);
@@ -264,13 +180,20 @@ impl ExprWorker<'_> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
-            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+            ExprScope::empty(),
         ));
         let len = self.lexical.scopes.len();
         let result = f(self);
         self.lexical.scopes.truncate(len);
         self.lexical.last = self.lexical.scopes.pop().unwrap();
         result
+    }
+
+    fn push_scope(&mut self, scope: ExprScope) {
+        let last = std::mem::replace(&mut self.lexical.last, scope);
+        if !last.is_empty() {
+            self.lexical.scopes.push(last);
+        }
     }
 
     #[must_use]
@@ -280,7 +203,7 @@ impl ExprWorker<'_> {
         }
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
-            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+            ExprScope::empty(),
         ));
         self.lexical_scope_unchecked()
     }
@@ -717,7 +640,7 @@ impl ExprWorker<'_> {
             match imports {
                 ast::Imports::Wildcard => {
                     crate::log_debug_ct!("checking wildcard: {mod_expr:?}");
-                    self.lexical.scopes.push(scope);
+                    self.push_scope(scope);
                 }
                 ast::Imports::Items(items) => {
                     let module = Expr::Decl(mod_var.clone());

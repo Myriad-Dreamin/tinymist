@@ -1,0 +1,107 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/block-in-list-enum.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 4,
+   "startCharacter": 3,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 8,
+   "startCharacter": 3,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 12,
+   "startCharacter": 2,
+   "startLine": 10
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 12,
+   "startCharacter": 0,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 18,
+   "startCharacter": 3,
+   "startLine": 16
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 22,
+   "startCharacter": 3,
+   "startLine": 20
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 26,
+   "startCharacter": 2,
+   "startLine": 24
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 26,
+   "startCharacter": 0,
+   "startLine": 14
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 4,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endLine": 8,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endLine": 12,
+   "startLine": 10
+  },
+  {
+   "collapsedText": "",
+   "endLine": 12,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endLine": 18,
+   "startLine": 16
+  },
+  {
+   "collapsedText": "",
+   "endLine": 22,
+   "startLine": 20
+  },
+  {
+   "collapsedText": "",
+   "endLine": 26,
+   "startLine": 24
+  },
+  {
+   "collapsedText": "",
+   "endLine": 26,
+   "startLine": 14
+  }
+ ]
+}

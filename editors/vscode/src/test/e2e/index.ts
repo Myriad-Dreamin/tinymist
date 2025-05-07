@@ -58,9 +58,30 @@ type CompResponse = vscode.CompletionList | vscode.CompletionItem[];
 export class Context {
   expect!: typeof import("chai").expect;
 
-  public async suite(name: string, f: (ctx: Suite) => void): Promise<void> {
+  enabled: boolean = !vscode.workspace.workspaceFolders;
+
+  public workspaceCtx(workspace: string): Context {
+    this.enabled = !!vscode.workspace.workspaceFolders;
+    if (this.enabled) {
+      const filePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
+      const fileName = path.basename(filePath);
+      if (fileName !== workspace) {
+        console.log(`Skipping workspace ${workspace}`);
+        this.enabled = false;
+      } else {
+        console.log(`Continue workspace ${workspace}`);
+      }
+    }
+    return this;
+  }
+
+  public async suite(name: string, f: (ctx: Suite) => Promise<void>): Promise<void> {
+    if (!this.enabled) {
+      return;
+    }
+
     const ctx = new Suite();
-    f(ctx);
+    await f(ctx);
     try {
       ok(`⌛︎ ${name}`);
       await ctx.run();
@@ -124,7 +145,9 @@ export class Context {
     cnt: number,
     f: () => Promise<any> = Promise.resolve,
     timeout = 5000,
-  ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][]]> {
+  ): Promise<
+    [vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][], vscode.Diagnostic[]]
+  > {
     const diagNow = performance.now();
 
     this.diagTick += 1;
@@ -159,7 +182,7 @@ export class Context {
           console.log(`diagnostics[${tick}] took`, performance.now() - diagNow, "ms");
           diagnosticsHandler.dispose();
           clearTimeout(t);
-          resolve([e, d]);
+          resolve([e, d, diagnostics]);
         }
       });
       f().catch(doReject("error"));

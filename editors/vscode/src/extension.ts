@@ -11,35 +11,43 @@ import * as vscode from "vscode";
 import * as path from "path";
 
 import { loadTinymistConfig } from "./config";
-import { triggerStatusBar } from "./ui-extends";
-import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { activeTypstEditor } from "./util";
-import { LanguageState, tinymist } from "./lsp";
-import { extensionState } from "./state";
-
+import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { mirrorLogRe, machineChanges } from "./language";
+import { LanguageState, tinymist } from "./lsp";
+import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
+import { extensionState } from "./state";
+import { triggerStatusBar } from "./ui-extends";
+import { activeTypstEditor, isTypstDocument } from "./util";
+import { LanguageClient } from "vscode-languageclient/node";
+
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import { previewActivate, previewDeactivate } from "./features/preview";
 import { taskActivate } from "./features/tasks";
-import { devKitFeatureActivate } from "./features/dev-kit";
-import { labelFeatureActivate } from "./features/label";
-import { packageFeatureActivate } from "./features/package";
-import { toolFeatureActivate } from "./features/tool";
+import { devKitActivate } from "./features/dev-kit";
+import { labelActivate } from "./features/label";
+import { packageActivate } from "./features/package";
+import { toolActivate } from "./features/tool";
 import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste";
+import { testingActivate } from "./features/testing";
+import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
-import { LanguageClient } from "vscode-languageclient/node";
+import { commandShow, exportActivate, quickExports } from "./features/export";
 
 LanguageState.Client = LanguageClient;
 
 const systemActivateTable = (): FeatureEntry[] => [
-  [extensionState.features.label, labelFeatureActivate],
-  [extensionState.features.package, packageFeatureActivate],
-  [extensionState.features.tool, toolFeatureActivate],
+  [extensionState.features.label, labelActivate],
+  [extensionState.features.package, packageActivate],
+  [extensionState.features.tool, toolActivate],
   [extensionState.features.dragAndDrop, dragAndDropActivate],
   [extensionState.features.copyAndPaste, copyAndPasteActivate],
+  [extensionState.features.export, exportActivate],
   [extensionState.features.task, taskActivate],
-  [extensionState.features.devKit, devKitFeatureActivate],
+  [extensionState.features.testing, testingActivate],
+  [extensionState.features.testingDebug, testingDebugActivate],
+  [extensionState.features.devKit, devKitActivate],
   [extensionState.features.preview, previewActivateInTinymist, previewDeactivate],
   [extensionState.features.language, languageActivate],
 ];
@@ -62,7 +70,7 @@ export async function deactivate(): Promise<void> {
   });
 }
 
-function previewActivateInTinymist(context: ExtensionContext) {
+function previewActivateInTinymist(context: IContext) {
   const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
   if (typstPreviewExtension) {
     void vscode.window.showWarningMessage(
@@ -75,10 +83,10 @@ function previewActivateInTinymist(context: ExtensionContext) {
 
   // Runs Integrated preview extension
   previewSetIsTinymist();
-  previewActivate(context, false);
+  previewActivate(context.context, false);
 }
 
-async function languageActivate(context: ExtensionContext) {
+async function languageActivate(context: IContext) {
   const client = tinymist.client;
   if (!client) {
     console.warn("activating language feature without starting the tinymist language server");
@@ -89,7 +97,10 @@ async function languageActivate(context: ExtensionContext) {
   // todo: more general ways to do this.
   const isInterestingNonTypst = (doc: vscode.TextDocument) => {
     return (
-      doc.languageId !== "typst" && (doc.uri.scheme === "file" || doc.uri.scheme === "untitled")
+      doc.languageId !== "typst" &&
+      (doc.uri.scheme === "file" || doc.uri.scheme === "untitled") &&
+      !machineChanges.test(doc.uri.fsPath) &&
+      !mirrorLogRe.test(doc.fileName)
     );
   };
   context.subscriptions.push(
@@ -140,11 +151,11 @@ async function languageActivate(context: ExtensionContext) {
 
   // Find first document to focus
   const editor = window.activeTextEditor;
-  if (editor?.document.languageId === "typst" && editor.document.uri.fsPath) {
+  if (isTypstDocument(editor?.document)) {
     commandActivateDoc(editor.document);
   } else {
     window.visibleTextEditors.forEach((editor) => {
-      if (editor.document.languageId === "typst" && editor.document.uri.fsPath) {
+      if (isTypstDocument(editor.document)) {
         commandActivateDoc(editor.document);
       }
     });
@@ -155,12 +166,11 @@ async function languageActivate(context: ExtensionContext) {
       if (editor?.document.isUntitled) {
         return;
       }
-      const langId = editor?.document.languageId;
       // todo: plaintext detection
       // if (langId === "plaintext") {
       //     console.log("plaintext", langId, editor?.document.uri.fsPath);
       // }
-      if (langId !== "typst") {
+      if (!isTypstDocument(editor?.document)) {
         // console.log("not typst", langId, editor?.document.uri.fsPath);
         return commandActivateDoc(undefined);
       }
@@ -170,7 +180,7 @@ async function languageActivate(context: ExtensionContext) {
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-        if (doc.languageId === "typst") {
+        if (isTypstDocument(doc)) {
           return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
         } else {
           return commandActivateDoc(undefined);
@@ -190,19 +200,18 @@ async function languageActivate(context: ExtensionContext) {
   const initTemplateCommand =
     (inPlace: boolean) =>
     (...args: string[]) =>
-      initTemplate(context, inPlace, ...args);
+      initTemplate(context.context, inPlace, ...args);
 
   // prettier-ignore
   context.subscriptions.push(
     commands.registerCommand("tinymist.openInternal", openInternal),
     commands.registerCommand("tinymist.openExternal", openExternal),
 
-    commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
-    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
     commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
     commands.registerCommand("tinymist.clearCache", commandClearCache),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
+    commands.registerCommand("tinymist.viewAst", commandViewAst(context)),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
@@ -220,7 +229,7 @@ async function languageActivate(context: ExtensionContext) {
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
   );
   // context.subscriptions.push
-  const provider = new SymbolViewProvider(context);
+  const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );
@@ -234,31 +243,6 @@ async function openInternal(target: string): Promise<void> {
 async function openExternal(target: string): Promise<void> {
   const uri = Uri.parse(target);
   await vscode.env.openExternal(uri);
-}
-
-async function commandExport(
-  mode: "Pdf" | "Html" | "Svg" | "Png",
-  extraOpts?: any,
-): Promise<string | undefined> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
-    return;
-  }
-
-  const uri = activeEditor.document.uri.fsPath;
-
-  const handler = tinymist[`export${mode}`];
-
-  handler(uri, extraOpts);
-
-  const res = await tinymist.executeCommand<string | null>(`tinymist.export${mode}`, [
-    uri,
-    ...(extraOpts ? [extraOpts] : []),
-  ]);
-  if (res === null) {
-    return undefined;
-  }
-  return res;
 }
 
 async function commandGetCurrentDocumentMetrics(): Promise<any> {
@@ -276,6 +260,14 @@ async function commandGetCurrentDocumentMetrics(): Promise<any> {
   return res;
 }
 
+async function getNonEmptySelection(editor: TextEditor): Promise<any> {
+  if (editor.selection.isEmpty) {
+    return undefined;
+  }
+
+  return (await tinymist.clientPromise).code2ProtocolConverter.asRange(editor.selection);
+}
+
 async function commandCopyAnsiHighlight(): Promise<void> {
   const editor = activeTypstEditor();
   if (editor === undefined) {
@@ -283,7 +275,7 @@ async function commandCopyAnsiHighlight(): Promise<void> {
   }
 
   const res = await tinymist.exportAnsiHighlight(editor.document.uri.fsPath, {
-    range: editor.selection,
+    range: await getNonEmptySelection(editor),
   });
 
   if (res === null) {
@@ -294,71 +286,84 @@ async function commandCopyAnsiHighlight(): Promise<void> {
   await vscode.env.clipboard.writeText(res);
 }
 
-/**
- * Implements the functionality for the 'Show PDF' button shown in the editor title
- * if a `.typ` file is opened.
- */
-async function commandShow(kind: "Pdf" | "Html" | "Svg" | "Png", extraOpts?: any): Promise<void> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
-    return;
-  }
+function commandViewAst(ctx: IContext) {
+  const scheme = "tinymist-ast";
+  const uri = `${scheme}://viewAst/ast.typ`;
 
-  const conf = vscode.workspace.getConfiguration("tinymist");
-  const openIn: string = conf.get("showExportFileIn") || "editorTab";
-
-  // Telling the language server to open the file instead of using
-  // ```
-  // vscode.env.openExternal(exportUri);
-  // ```
-  // , which is buggy.
-  //
-  // See https://github.com/Myriad-Dreamin/tinymist/issues/837
-  // Also see https://github.com/microsoft/vscode/issues/85930
-  const openBySystemDefault = openIn === "systemDefault";
-  if (openBySystemDefault) {
-    extraOpts = extraOpts || {};
-    extraOpts.open = true;
-  }
-
-  // only create pdf if it does not exist yet
-  const exportPath = await commandExport(kind, extraOpts);
-
-  if (exportPath === undefined) {
-    // show error message
-    await window.showErrorMessage(`Failed to export ${kind}`);
-    return;
-  }
-
-  switch (openIn) {
-    case "systemDefault":
-      break;
-    default:
-      vscode.window.showWarningMessage(
-        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
+  const AstDoc = new (class implements vscode.TextDocumentContentProvider {
+    readonly uri = vscode.Uri.parse(uri);
+    readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
+    constructor() {
+      vscode.workspace.onDidChangeTextDocument(
+        this.onDidChangeTextDocument,
+        this,
+        ctx.subscriptions,
       );
-    // fall through
-    case "editorTab": {
-      // find and replace exportUri
-      const exportUri = Uri.file(exportPath);
-      const uriToFind = exportUri.toString();
-      findTab: for (const editor of vscode.window.tabGroups.all) {
-        for (const tab of editor.tabs) {
-          if ((tab.input as any)?.uri?.toString() === uriToFind) {
-            await vscode.window.tabGroups.close(tab, true);
-            break findTab;
-          }
-        }
-      }
-
-      // here we can be sure that the pdf exists
-      await commands.executeCommand("vscode.open", exportUri, {
-        viewColumn: ViewColumn.Beside,
-        preserveFocus: true,
-      } as vscode.TextDocumentShowOptions);
-      break;
+      vscode.window.onDidChangeActiveTextEditor(
+        this.onDidChangeActiveTextEditor,
+        this,
+        ctx.subscriptions,
+      );
+      vscode.window.onDidChangeTextEditorSelection(
+        this.onDidChangeTextSelection,
+        this,
+        ctx.subscriptions,
+      );
     }
-  }
+
+    emitChange() {
+      this.eventEmitter.fire(this.uri);
+    }
+
+    private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent) {
+      if (isTypstDocument(event.document)) {
+        // We need to order this after language server updates, but there's no API for that.
+        // Hence, good old sleep().
+        setTimeout(() => this.emitChange(), 10);
+      }
+    }
+
+    private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined) {
+      if (editor && isTypstDocument(editor.document)) {
+        this.emitChange();
+      }
+    }
+
+    private onDidChangeTextSelection(event: vscode.TextEditorSelectionChangeEvent) {
+      if (isTypstDocument(event.textEditor.document)) {
+        this.emitChange();
+      }
+    }
+
+    async provideTextDocumentContent(
+      _uri: vscode.Uri,
+      _ct: vscode.CancellationToken,
+    ): Promise<string> {
+      const editor = ctx.currentActiveEditor();
+      if (!editor) return "No active editor, change selection to view AST.";
+
+      const res = await tinymist.exportAst(editor.document.uri.fsPath, {
+        range: (await tinymist.clientPromise).code2ProtocolConverter.asRange(editor.selection),
+      });
+
+      return res || "Failed";
+    }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+      return this.eventEmitter.event;
+    }
+  })();
+
+  ctx.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(scheme, AstDoc));
+
+  return async () => {
+    const document = await vscode.workspace.openTextDocument(AstDoc.uri);
+    setTimeout(() => AstDoc.emitChange(), 10);
+    void (await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Two,
+      preserveFocus: true,
+    }));
+  };
 }
 
 async function commandClearCache(): Promise<void> {
@@ -502,14 +507,12 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
   }
 }
 
-async function commandActivateDoc(doc: vscode.TextDocument | undefined): Promise<void> {
-  await commandActivateDocPath(doc, doc?.uri.fsPath);
+function commandActivateDoc(doc: vscode.TextDocument | undefined) {
+  commandActivateDocPath(doc, doc?.uri.fsPath);
 }
 
-async function commandActivateDocPath(
-  doc: vscode.TextDocument | undefined,
-  fsPath: string | undefined,
-): Promise<void> {
+let focusMainTimeout: NodeJS.Timeout | undefined = undefined;
+function commandActivateDocPath(doc: vscode.TextDocument | undefined, fsPath: string | undefined) {
   // console.log("focus main", fsPath, new Error().stack);
   extensionState.mut.focusingFile = fsPath;
   if (fsPath) {
@@ -523,7 +526,13 @@ async function commandActivateDocPath(
   triggerStatusBar(
     !!formatString && !!(fsPath || extensionState.mut.focusingDoc?.isClosed === false),
   );
-  await tinymist.executeCommand("tinymist.focusMain", [fsPath]);
+
+  if (focusMainTimeout) {
+    clearTimeout(focusMainTimeout);
+  }
+  focusMainTimeout = setTimeout(() => {
+    tinymist.executeCommand("tinymist.focusMain", [fsPath]);
+  }, 100);
 }
 
 async function commandRunCodeLens(...args: string[]): Promise<void> {
@@ -561,15 +570,16 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   async function codeLensMore(): Promise<void> {
     const kBrowsing = "Browsing Preview Documents";
     const kPreviewIn = "Preview in ..";
-    const kExportAs = "Export as ..";
     const kProfileServer = "Profile Server";
-    const moreCodeLens = [kBrowsing, kPreviewIn, kExportAs, kProfileServer] as const;
+    const moreCodeLensOthers_ = [kBrowsing, kPreviewIn, kProfileServer] as const;
+    const moreCodeLensOthers = moreCodeLensOthers_.map((label) => ({ label }));
+    const moreCodeLens = [...moreCodeLensOthers, ...quickExports] as const;
 
     const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
       title: "More Actions",
     })) as (typeof moreCodeLens)[number] | undefined;
 
-    switch (moreAction) {
+    switch (moreAction?.label) {
       case kBrowsing: {
         void vscode.commands.executeCommand(`tinymist.browsingPreview`);
         return;
@@ -596,42 +606,13 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
         void vscode.commands.executeCommand(`typst-preview.${command}`);
         return;
       }
-      case kExportAs: {
-        enum FastKind {
-          PDF = "PDF",
-          SVG = "SVG (First Page)",
-          SVGMerged = "SVG (Merged)",
-          PNG = "PNG (First Page)",
-          PNGMerged = "PNG (Merged)",
+      default: {
+        if (!moreAction || !("exportKind" in moreAction)) {
+          return;
         }
 
-        const fmt = await vscode.window.showQuickPick(
-          [FastKind.PDF, FastKind.SVG, FastKind.SVGMerged, FastKind.PNG, FastKind.PNGMerged],
-          {
-            title: "Format to export as",
-          },
-        );
-
-        switch (fmt) {
-          case undefined:
-            return;
-          case FastKind.PDF:
-            await commandShow("Pdf");
-            return;
-          case FastKind.SVG:
-            await commandShow("Svg");
-            return;
-          case FastKind.SVGMerged:
-            await commandShow("Svg", { page: { merged: { gap: "0pt" } } });
-            return;
-          case FastKind.PNG:
-            await commandShow("Png");
-            return;
-          case FastKind.PNGMerged:
-            await commandShow("Png", { page: { merged: { gap: "0pt" } } });
-            return;
-        }
-
+        // A quick export action
+        await commandShow(moreAction.exportKind, moreAction.extraOpts);
         return;
       }
       case kProfileServer: {
