@@ -7,6 +7,7 @@ import { setupVscodeChannel } from "./vscode";
 type PageComponent =
   | "template-gallery"
   | "tracing"
+  | "profile-server"
   | "summary"
   | "diagnostics"
   | "symbol-view"

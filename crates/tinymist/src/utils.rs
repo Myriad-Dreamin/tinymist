@@ -1,5 +1,13 @@
 use core::fmt;
 
+use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpStream;
+
 #[derive(Clone)]
 pub struct Derived<T>(pub T);
 
@@ -44,6 +52,7 @@ macro_rules! get_arg_or_default {
     }};
 }
 pub(crate) use get_arg_or_default;
+use tokio_util::sync::CancellationToken;
 
 pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
     f()
@@ -59,4 +68,76 @@ pub fn exit_on_ctrl_c() {
         log::info!("Ctrl-C received, exiting");
         std::process::exit(0);
     });
+}
+
+#[derive(Default)]
+pub(crate) struct AliveLock(Arc<AtomicU64>);
+
+impl AliveLock {
+    pub fn hold(cnt: Arc<AtomicU64>) -> Self {
+        let held = cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        log::info!("alive lock held, count: {held}");
+        Self(cnt.clone())
+    }
+}
+
+impl Drop for AliveLock {
+    fn drop(&mut self) {
+        let cnt = self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+        log::info!("alive lock dropped, count: {cnt}");
+    }
+}
+
+pub(crate) struct ConnWithCancel {
+    stream: TcpStream,
+    pub cancel: CancellationToken,
+}
+
+impl ConnWithCancel {
+    pub fn new(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            cancel: CancellationToken::new(),
+        }
+    }
+}
+
+impl Drop for ConnWithCancel {
+    fn drop(&mut self) {
+        self.cancel.cancel()
+    }
+}
+
+impl AsyncRead for ConnWithCancel {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<tokio::io::Result<()>> {
+        Pin::new(&mut Pin::into_inner(self).stream).poll_read(context, buf)
+    }
+}
+
+impl AsyncWrite for ConnWithCancel {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, tokio::io::Error>> {
+        Pin::new(&mut Pin::into_inner(self).stream).poll_write(context, buf)
+    }
+
+    fn poll_flush(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Result<(), tokio::io::Error>> {
+        Pin::new(&mut Pin::into_inner(self).stream).poll_flush(context)
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        context: &mut Context<'_>,
+    ) -> Poll<Result<(), tokio::io::Error>> {
+        Pin::new(&mut Pin::into_inner(self).stream).poll_shutdown(context)
+    }
 }

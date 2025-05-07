@@ -8,7 +8,8 @@ import { FontView } from "./features/font-view";
 
 mainHarness({
   "template-gallery": TemplateGallery,
-  tracing: Tracing,
+  tracing: Tracing(false),
+  "profile-server": Tracing(true),
   summary: Summary,
   diagnostics: Diagnostics,
   "font-view": FontView,

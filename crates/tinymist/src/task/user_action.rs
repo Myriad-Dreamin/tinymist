@@ -1,21 +1,27 @@
 //! The actor that runs user actions.
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 
 use anyhow::bail;
 use base64::Engine;
+use futures::FutureExt;
+use hyper::body::Bytes;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
-use sync_ls::{just_future, LspClient, RequestId, SchedulableResponse};
+use sync_ls::{just_future, LspClient, LspResult, RequestId, SchedulableResponse};
 use tinymist_std::error::IgnoreLogging;
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 use typst::{syntax::Span, World};
 
 use crate::project::LspWorld;
-use crate::{internal_error, ServerState};
+use crate::{internal_error, AliveLock, ConnWithCancel, ServerState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,51 +50,42 @@ impl UserActionTask {
 
     /// Traces the entire server.
     pub fn trace_server(&self) -> (ServerTraceTask, SchedulableResponse<JsonValue>) {
-        let (stop_tx, mut stop_rx) = watch::channel(false);
-        let mut stop_rx2 = stop_rx.clone();
-
+        let (stop_tx, mut stop_rx) = mpsc::unbounded_channel();
         let (resp_tx, resp_rx) = oneshot::channel();
+        let (addr_tx, addr_rx) = oneshot::channel();
+
+        let stop_tx2 = stop_tx.clone();
         let task = ServerTraceTask { stop_tx, resp_rx };
 
         typst_timing::enable();
+        let timings = async move {
+            log::info!("before generate timings");
 
+            stop_rx.recv().await;
+            typst_timing::disable();
+
+            let mut writer = std::io::BufWriter::new(Vec::new());
+            // todo: resolve span correctly
+            let res = typst_timing::export_json(&mut writer, |_| ("unknown".to_string(), 0));
+
+            let timings = writer.into_inner().unwrap();
+            log::info!("after generate timings {res:?}");
+            log::info!("timings: {:?}", std::str::from_utf8(&timings));
+
+            resp_tx
+                .send(Ok(json!({})))
+                .ok()
+                .log_error("failed to send response");
+
+            Bytes::from_owner(timings)
+        };
+
+        log::info!("now make http server");
         let resp = just_future(async move {
-            let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
-            let t = tokio::spawn(async move {
-                log::info!("before generate timings");
-
-                let timings = async {
-                    stop_rx.wait_for(|stopped| *stopped).await.ok();
-                    typst_timing::disable();
-
-                    let mut writer = std::io::BufWriter::new(Vec::new());
-                    // todo: resolve span correctly
-                    let _ = typst_timing::export_json(&mut writer, |_| ("unknown".to_string(), 0));
-
-                    let timings = writer.into_inner().unwrap();
-
-                    // let timings_debug =
-                    // serde_json::from_slice::<serde_json::Value>(&timings).unwrap();
-                    // log::info!("timings: {:?}", timings_debug);
-
-                    timings
-                }
-                .await;
-
-                log::info!("after generate timings");
-                //log::info!("timings: {:?}", timings);
-
-                // let _ = resp_tx;
-                // let res = serde_json::to_value(TraceReport {
-                //     request: params,
-                //     messages,
-                //     stderr: base64::engine::general_purpose::STANDARD.encode(String::new()),
-                // })?;
-
-                log::info!("now make http server");
-
-                let static_file_addr = "127.0.0.1:0".to_owned();
+            let static_file_addr = "127.0.0.1:0".to_owned();
+            tokio::spawn(async move {
                 make_http_server(timings, static_file_addr, addr_tx).await;
+                stop_tx2.send(()).ok();
             });
 
             let addr = addr_rx.await.map_err(|err| {
@@ -97,37 +94,6 @@ impl UserActionTask {
             })?;
 
             log::info!("trace server has started at {addr}");
-
-            tokio::spawn(async move {
-                let selected = tokio::select! {
-                    a = stop_rx2.wait_for(|stopped| *stopped) => {
-                        log::info!("trace server task stopped by user");
-                        Ok(a)
-                    },
-                    b = t => {
-                        log::info!("trace server task stopped by timeout");
-                        Err(b)
-                    },
-                };
-
-                match selected {
-                    Ok(Err(err)) => {
-                        log::error!("Error occurs when trace server task stopped by user: {err:?}");
-                    }
-                    Err(Err(err)) => {
-                        log::error!("occurs when trace server task stopped by timeout: {err:?}");
-                    }
-                    Ok(Ok(_)) | Err(Ok(_)) => {}
-                };
-
-                resp_tx
-                    .send(Ok(json!({
-                        "tracingUrl": format!("http://{addr}"),  // send attr to stopServerProfiling message processor directly
-                    })))
-                    .ok()
-                    .log_error("failed to send response");
-            });
-
             Ok(serde_json::json!({
                 "tracingUrl": format!("http://{addr}"),  // not used
             }))
@@ -195,7 +161,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
 
     let stdout = child.stdout.take().expect("stdout missing");
 
-    let (msg_tx, msg_rx) = tokio::sync::oneshot::channel();
+    let (msg_tx, msg_rx) = oneshot::channel();
     std::thread::spawn(move || {
         let mut input_chan = std::io::BufReader::new(stdout);
         let mut has_response = false;
@@ -292,9 +258,10 @@ async fn trace_main(
             });
         }
         "http" => {
-            let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
+            let (addr_tx, addr_rx) = oneshot::channel();
             let t = tokio::spawn(async move {
                 let static_file_addr = "127.0.0.1:0".to_owned();
+                let timings = async { Bytes::from_owner(timings) };
                 make_http_server(timings, static_file_addr, addr_tx).await;
                 std::process::exit(0);
             });
@@ -322,7 +289,7 @@ async fn trace_main(
 /// The server trace task.
 pub struct ServerTraceTask {
     /// The sender to stop the trace.
-    pub stop_tx: watch::Sender<bool>,
+    pub stop_tx: mpsc::UnboundedSender<()>,
     /// The receiver to get the trace result.
     pub resp_rx: oneshot::Receiver<LspResult<JsonValue>>,
 }
@@ -330,23 +297,32 @@ pub struct ServerTraceTask {
 // todo: reuse code from tools preview
 /// Create a http server for the trace program.
 async fn make_http_server(
-    timings: Vec<u8>,
+    timings: impl Future<Output = Bytes> + Send + Sync + 'static,
     static_file_addr: String,
-    addr_tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>,
+    addr_tx: oneshot::Sender<std::net::SocketAddr>,
 ) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
+    let alive_cnt = Arc::<AtomicU64>::default();
+
     let (alive_tx, mut alive_rx) = tokio::sync::mpsc::unbounded_channel();
-    let timings = hyper::body::Bytes::from(timings);
-    let make_service = move || {
+    let timings = timings.shared();
+
+    let alive_cnt2 = alive_cnt.clone();
+    let make_service = move |cancel: CancellationToken| {
+        let alive_cnt = alive_cnt2.clone();
         let timings = timings.clone();
         let alive_tx = alive_tx.clone();
+
         service_fn(move |req: hyper::Request<Incoming>| {
+            let cancel = cancel.clone();
+            let alive_cnt = alive_cnt.clone();
             let timings = timings.clone();
             let _ = alive_tx.send(());
             async move {
+                let _alive_cnt = AliveLock::hold(alive_cnt);
                 // Make sure VSCode can connect to this http server but no malicious website a
                 // user might open in a browser. We recognize VSCode by an `Origin` header that
                 // starts with `vscode-webview://`. Malicious websites can (hopefully) not trick
@@ -367,6 +343,14 @@ async fn make_http_server(
                 let b = hyper::Response::builder()
                     .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, allowed_origin);
                 if req.uri().path() == "/" {
+                    let timings = tokio::select! {
+                        _ = cancel.cancelled() => {
+                            log::info!("client connection is dropped, exiting loop");
+                            anyhow::bail!("client connection is dropped")
+                        },
+                        timings = timings => timings,
+                    };
+
                     let res = if req.method() == hyper::Method::HEAD {
                         b.body(Full::<Bytes>::default()).unwrap()
                     } else {
@@ -395,7 +379,7 @@ async fn make_http_server(
     let addr = listener.local_addr().unwrap();
     log::info!("trace server listening on http://{addr}");
 
-    let (final_tx, final_rx) = tokio::sync::oneshot::channel();
+    let (final_tx, final_rx) = oneshot::channel();
 
     // the graceful watcher
     let graceful = hyper_util::server::graceful::GracefulShutdown::new();
@@ -409,7 +393,9 @@ async fn make_http_server(
             }
         };
 
-        let conn = server.serve_connection(TokioIo::new(stream), make_service());
+        let conn = ConnWithCancel::new(stream);
+        let cancel = conn.cancel.clone();
+        let conn = server.serve_connection(TokioIo::new(conn), make_service(cancel));
         let conn = graceful.watch(conn.into_owned());
         tokio::spawn(async move {
             conn.await.log_error("cannot serve http");
@@ -454,9 +440,14 @@ async fn make_http_server(
                     break;
                 },
                 _ = tokio::time::sleep(reflexo::time::Duration::from_secs(15)) => {
-                    log::info!("trace-server: No activity for 15 seconds, shutting down");
-                    final_tx.send(()).ok();
-                    break;
+                    let held = alive_cnt.load(std::sync::atomic::Ordering::SeqCst);
+                    if held == 0 {
+                        log::info!("trace-server: No activity for 15 seconds, shutting down");
+                        final_tx.send(()).ok();
+                        break;
+                    } else {
+                        log::info!("trace-server: still {held} active connections");
+                    }
                 },
                 _ = alive_rx.recv() => {
                     log::info!("trace-server: Activity detected, resetting timer");

@@ -555,6 +555,8 @@ impl ServerState {
         let (task, resp) = self.user_action.trace_server();
         *task_cell = Some(task);
 
+        log::info!("server trace started");
+
         resp
     }
 
@@ -565,6 +567,7 @@ impl ServerState {
             .as_ref()
             .is_some_and(|task| task.stop_tx.is_closed())
         {
+            log::info!("server trace is dropped");
             *task_cell = None;
         }
 
@@ -572,10 +575,11 @@ impl ServerState {
             return Err(internal_error("server trace is not started or stopped"));
         };
 
-        if task.stop_tx.send(true).is_err() {
+        if task.stop_tx.send(()).is_err() {
             return Err(internal_error("cannot send stop signal to server trace"));
         }
 
+        log::info!("server trace stopping");
         just_future(async move { task.resp_rx.await.map_err(internal_error)? })
     }
 
