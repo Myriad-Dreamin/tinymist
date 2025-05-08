@@ -41,7 +41,7 @@ The goal of this project is to provide comprehensive Typst language support for 
 *   **Missing File Type Icon:** `TypstFileType` has a `TODO` to add a dedicated file icon for `.typ` files.
 *   **Hardcoded Configuration Defaults:** `TinymistInitializationOptions` uses some hardcoded default values (e.g., `colorTheme`). These will become configurable via the settings panel planned in Phase 4.
 *   **Incomplete Parser Definition Features:** `TypstParserDefinition` contains `TODO` markers for defining comment and string literal token sets. Implementing these could improve basic editor interactions.
-*   **Unused `_TypstLexer` Code:** The `TypstLexerAdapter.kt` file contains a `_TypstLexer` class that appears to be a remnant of a previous JFlex-based approach and is currently unused. This should be reviewed and potentially removed.
+*   **Unused `_TypstLexer` Code:** The `TypstLexerAdapter.kt` file contains a `_TypstLexer` class that appears to be a remnant of a previous JFlex-based approach and is currently unused. This should be reviewed and potentially removed. - **COMPLETED**
 *   **JCEF Preview Placeholder Content:** Both `TypstPreviewFileEditor` (for the split preview) and `TypstPreviewToolWindowFactory` (for the currently disabled tool window) use placeholder HTML/UI. Full integration with `tinymist`'s preview rendering is a major part of Phase 4.
 
 **Phase 4: Implement Settings, Improve User Experience, and Advanced Features**
@@ -52,6 +52,78 @@ The goal of this project is to provide comprehensive Typst language support for 
         *   This will involve handling custom LSP messages/notifications from `tinymist` like `tinymist/previewStart`, `tinymist/updatePreview`, potentially `window/showDocument` requests if the server uses them to suggest opening a preview, and custom commands like `tinymist.doStartPreview` or `tinymist.scrollPreview`.
         *   Determine how the preview content (likely HTML or SVG served by `tinymist`) will be loaded and rendered within the JCEF browser.
         *   Implement communication between plugin and JCEF JavaScript using `JBCefJSQuery` if needed for interactivity (e.g., scroll sync).
+
+        **Typst Preview Architecture (Insights from `typst-preview-arch` and VS Code):**
+
+        *   **Core Components:**
+            *   **Typst Preview Server (Rust, part of `tinymist` LSP):** Watches files, recompiles, handles Typst world, and serves compiled/rendered data.
+            *   **Typst Preview Client (Web - TypeScript/WASM):** Renders the document in a webview. Uses `typst-ts-renderer` for incremental rendering via a Virtual DOM, receiving serialized data (rkyv format) from the server via WebSockets.
+            *   **Editor Extension (e.g., VS Code, our IntelliJ plugin):** Starts/manages the server, hosts the webview client, and relays editor events to the server and UI events (like theme changes) to the webview client.
+
+        *   **Communication Flow for Rendering:**
+            1.  IntelliJ Plugin (Editor Extension) requests a preview session from `tinymist` LSP.
+            2.  `tinymist` LSP prepares the session and (most likely) provides a way for the plugin to load the "Typst Preview Client" (HTML/JS/WASM frontend).
+                *   **Scenario 1 (LSP serves all):** `tinymist` runs an HTTP server and gives the IntelliJ plugin a URL to load in JCEF. This URL serves the `index.html` shell and all its assets (JS for `typst-ts-renderer`, WASM, CSS).
+                *   **Scenario 2 (LSP provides HTML shell, IntelliJ serves assets):** `tinymist` provides an `index.html` template. The IntelliJ plugin bundles the core static assets (like `typst-ts-renderer` JS/WASM, CSS) and serves them via a local `HttpRequestHandler`. The `index.html` template's asset paths are rewritten to point to this local handler.
+            3.  The JCEF panel in IntelliJ loads this `index.html` (either from `tinymist`'s URL or the plugin-massaged version).
+            4.  The JavaScript (Typst Preview Client) within JCEF establishes a **WebSocket connection** directly to the `tinymist` server.
+            5.  `tinymist` sends incremental rendering data (rkyv-serialized) over this WebSocket to the Typst Preview Client.
+            6.  The Typst Preview Client (using `typst-ts-renderer` and WASM) deserializes this data and updates its VDOM to render the preview.
+
+        *   **Role of IntelliJ Plugin for Preview Panel (`TypstPreviewFileEditor` with JCEF):**
+            *   **Host the Webview Client:** Load the `index.html` provided or constructed as per Scenario 1 or 2 above.
+            *   **Facilitate Asset Loading:** If Scenario 2, implement an `HttpRequestHandler` to serve bundled frontend assets (JS/WASM for `typst-ts-renderer`, CSS, fonts, images).
+                *   **Update:** Implemented `TypstPreviewResourceHandler.kt` as a basic `HttpRequestHandler`.
+                *   **Update:** Added `implementation("com.intellij.modules:platform-impl")` to `build.gradle.kts` dependencies to resolve `Unresolved reference 'Responses'` used in the resource handler.
+            *   **Side-Channel Communication (via `JBCefJSQuery` - our `window.typstIntellij` bridge):
+                *   **IntelliJ -> JCEF:** Send commands for theme changes (`applyTheme`), editor-initiated scrolling (`scrollToPercent`), or other UI interactions not covered by the primary WebSocket channel.
+                *   **JCEF -> IntelliJ:** Receive events from the webview client like specific user interactions (e.g., clicks on special links, fine-grained scroll position for editor sync) if the client is designed to send them.
+            *   **LSP Interaction:** Send requests to `tinymist` (e.g., to start a preview session, notify of editor scroll if `tinymist` needs it) and handle responses or custom notifications from `tinymist` related to the preview state.
+
+        *   **Implications for `TypstPreviewFileEditor.updateContent()`:** The previous idea of pushing full HTML snippets via `updateContent()` is likely incorrect for the main Typst rendering, as this is handled via the WebSocket and `typst-ts-renderer`. `updateContent()` might be repurposed for overlays or status info if needed, or removed for rendering purposes.
+
+        **API/Pattern Insights for JCEF Preview Panels (from Markdown Plugin Reference):**
+
+        *   **Editor Structure for Text + Preview:**
+            *   Utilize `com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider`: This IntelliJ Platform class is designed to create a side-by-side editor (standard text editor + a custom preview editor).
+            *   The provider is registered in `plugin.xml` for the relevant file type(s).
+            *   It requires a secondary `FileEditorProvider` that creates the custom preview `FileEditor`.
+            *   The custom `FileEditor` implementation will be responsible for hosting and managing the JCEF browser component.
+
+        *   **HTML Rendering Panel Abstraction (Optional but good practice):**
+            *   Define an interface (e.g., `MyHtmlPanel`) that outlines the contract for any HTML rendering component. This promotes flexibility if different rendering strategies (e.g., different JCEF configurations, fallbacks) are ever needed.
+            *   Key methods for such an interface typically include:
+                *   `getComponent(): JComponent`: Returns the Swing UI component of the panel.
+                *   `setHtml(htmlContent: String, baseUrlForResources: String?)`: To load/update the HTML. The `baseUrlForResources` is crucial for resolving relative paths (images, CSS) within the loaded HTML.
+                *   Mechanisms for JS <-> Kotlin communication (e.g., exposing a message-passing object).
+                *   Methods for controlling scroll position.
+            *   If multiple panel implementations are offered, an extension point (like `com.intellij.openapi.extensions.ExtensionPointName`) can be used to discover them, and settings can allow the user to choose.
+
+        *   **JCEF-Based Panel Implementation (e.g., `MyJCEFHtmlPanel` extending `com.intellij.ui.jcef.JCEFHtmlPanel`):**
+            *   **Core Component**: The panel will extend `com.intellij.ui.jcef.JCEFHtmlPanel` (or directly use `com.intellij.ui.jcef.JBCefBrowser`).
+            *   **Serving Local Static Assets (Base HTML, CSS, JS):**
+                *   If the preview requires a shell HTML page, custom CSS, or JavaScript files bundled with the plugin, these can be served using a custom `org.jetbrains.ide.HttpRequestHandler`.
+                *   This handler integrates with IntelliJ's built-in lightweight HTTP server.
+                *   It typically defines a unique URL prefix for the plugin (e.g., `http://localhost:<port>/myplugin_preview_static/...`).
+                *   It needs a way to map requested paths to actual plugin resources (e.g., files in `src/main/resources`).
+            *   **Loading Content into JCEF:**
+                *   **Scenario 1 (Language server provides URL):** If the language server (like `tinymist`) serves the preview content via its own HTTP endpoint, `JBCefBrowser.loadURL(...)` can be used directly.
+                *   **Scenario 2 (Language server provides HTML string):** Use `JBCefBrowser.loadHTML(htmlContent, baseUrlForResources)`. The `baseUrlForResources` (can be a `file:///` URL pointing to the document's directory or a URL from the local static server) is critical for resolving relative paths (images, etc.) in the HTML.
+                *   **Scenario 3 (Plugin-hosted shell + dynamic content):** Load a base HTML page from the local static server (if used), then use JavaScript (executed via `JBCefBrowser.executeJavaScript(...)`) to inject or update content dynamically. More advanced techniques (like virtual/incremental DOM patching via JS) can be used for performance but add complexity.
+            *   **Kotlin <-> JavaScript Communication:**
+                *   `com.intellij.ui.jcef.JBCefJSQuery` is the standard mechanism for two-way communication.
+                *   Define a clear message protocol (e.g., JSON strings with `type` and `payload` fields).
+                *   Kotlin side: Create `JBCefJSQuery` and add a handler to process messages from JS.
+                *   JS side: Use the function injected by `JBCefJSQuery` (available via `window.cefQuery(...)` or a custom name) to send messages to Kotlin. To receive messages from Kotlin, Kotlin calls `JBCefBrowser.executeJavaScript(...)` to invoke specific JS functions.
+            *   **Styling and Theming:**
+                *   Serve custom CSS files via the local static server or inject CSS strings using `executeJavaScript`.
+                *   Listen to IntelliJ theme changes (e.g., `com.intellij.ide.ui.UISettingsListener`) and use `executeJavaScript` to update CSS variables, apply/remove theme-specific classes, or re-load stylesheets in the JCEF panel.
+            *   **Resource Handling for Relative Paths:** Correctly set the base URL when loading HTML (via `loadHTML` or by loading from a specific URL) so that JCEF can resolve relative paths for images, fonts, etc. The local static server can be made to serve these resources from the project or plugin.
+
+        *   **Scroll Synchronization:**
+            *   Implement JS listeners for scroll events in the JCEF panel. These listeners use `JBCefJSQuery` to send the current scroll position/percentage to Kotlin.
+            *   Implement Kotlin functions that, when triggered (e.g., editor scroll, LSP request), call `JBCefBrowser.executeJavaScript(...)` to invoke a JS function that scrolls the JCEF panel to the desired location.
+
     2.  **Implement IntelliJ Settings Panel:**
         *   Create a dedicated settings/preferences page for Tinymist (e.g., under "Languages & Frameworks" or "Tools").
         *   Allow configuration of: Path to the `tinymist` executable, font paths, PDF export settings, preview-related settings, and other relevant options derived from `TinymistConfig` (VSCode) and `TinymistInitializationOptions`.

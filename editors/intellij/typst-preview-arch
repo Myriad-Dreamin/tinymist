@@ -1,0 +1,64 @@
+Architecture
+
+
+#
+
+
+Typst preview consists of three parts:
+1.
+The first one is the typst preview server, which watches events, recompiles the document and sends it to client. This part is written in rust and is the core of typst preview.
+2.
+The second one is the typst preview client, which is a web client that renders the preview pages. This part is written in typescript and wasm.
+3.
+The third one is the typst preview extension for VSCode. This part is written in typescript and is responsible for starting the server and sending/receive events to the server.
+These three parts communicate with each other through websockets. The server sends the compiled document to the client, and the client renders it.
+Typst Preview’s Server(Rust)Webview(Typescript+Wasm)Incremental rendering based on VDOM are usedto achieve high performance.Interact with the server using websockets.VSCode(Typescript(Node.js))The VSCode extension starts the server and sendevents like file update to the server.Interact with the server using websockets.Typst ActorRender ActorWebview ActorThere can be multiplewebview actorsin the system.Editor ActorCommunicate withVSCode using websocketand forward events.Figure 1: Typst Preview Architecture
+
+Rust Part of Typst Preview
+
+
+#
+
+
+
+
+Actors
+
+
+#
+
+
+The architecture of typst preview mainly follows the actor model. To be more specific, there are four actors in the system:
+1.
+Typst Actor: The typst actor is the main actor of the system. It is responsible for watching the file system, compiling the document and resolving cross jump requests. Basically everything related to typst’s World
+ is handled by this actor. There is exactly one typst actor in the system.
+2.
+Render Actor: The render actor is responsible for rendering the document. It receives the compiled document from the typst actor and renders it. There can be multiple render actors in the system. The number of render actors is equal to the number of clients connected to the server.
+3.
+Editor Actor: This actor listens to the events from the editor. It is responsible for sending the events to the typst actor. There is exactly one editor actor in the system. When the editor is closed, the editor actor will shutdown the whole program otherwise the program will keep running, resulting in process leak.
+4.
+Webview Actor: Webview actor is responsible for communicating with the webview client. It receives the events from the webview client and sends them to relevant actors. The number of webview actors is equal to the number of render actors.
+We can see that the first two actors are CPU heavy, while the last two actors are IO heavy. Therefore we use different runtimes for them. For each CPU heavy actor, we create a thread and run the actor on it. For each IO heavy actor, we create a tokio task and run the actor on it. These actors can send messages to each other using tokio::sync::mpsc
+.
+A dedicated thread for the first two actor is necessary because typst use comemo under the hood, which use thread local storage to cache intermediate results. If we run the first two actors on tokio tasks, the thread local storage will not work, resulting in unstable performance.
+
+
+Renderer
+
+
+#
+
+
+To achieve incremental and high performance rendering, we use typst.ts to render document. To be specific, we use the IncrementalSvgExporter
+. The IncrementalSvgExporter
+ will only output the changed part of the docu ment. The result is serialized to using rkyv. The serialized result is then sent to the client.
+
+
+Client Part of Typst Preview
+
+
+#
+
+
+The client part of typst preview is written in typescript and wasm. It is responsible for rendering the document. It receives the serialized document from the server, deserializes it using rkyv and apply the changes to the VDOM to get the latest document. This is done by typst-ts-renderer.
+For optimization, we maintains the visible rectangle of the document in the client. When the document is updated, we only re-render the visible part of the document.
