@@ -35,7 +35,9 @@ tinymist-world.workspace = true
 toml.workspace = true
 triomphe.workspace = true
 typst.workspace = true
+typst-macros.workspace = true
 typst-shim.workspace = true
+typst-timing.workspace = true
 unscanny.workspace = true
 
 [dev-dependencies]

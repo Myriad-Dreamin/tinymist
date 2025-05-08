@@ -50,6 +50,7 @@ impl CompletionPair<'_, '_, '_> {
         self.def_completions(defines, parens);
     }
 
+    #[typst_macros::time]
     pub fn scope_defs(&mut self) -> Option<Defines> {
         let mut defines = Defines {
             types: self.worker.ctx.type_check(&self.cursor.source),

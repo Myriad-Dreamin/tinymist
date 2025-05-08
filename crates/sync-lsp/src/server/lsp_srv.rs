@@ -354,7 +354,7 @@ where
 
     /// Handles an incoming notification.
     fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
-        self.client.start_notification(&not.method);
+        self.client.hook.start_notification(&not.method);
         let handle = |s, Notification { method, params }: Notification| {
             let Some(handler) = self.notifications.get(method.as_str()) else {
                 log::warn!("unhandled notification: {method}");
@@ -362,7 +362,9 @@ where
             };
 
             let result = handler(s, params);
-            self.client.stop_notification(&method, received_at, result);
+            self.client
+                .hook
+                .stop_notification(&method, received_at, result);
 
             Ok(())
         };

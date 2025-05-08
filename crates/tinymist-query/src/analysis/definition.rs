@@ -81,6 +81,7 @@ impl HasNameRange for Decl {
 
 // todo: field definition
 /// Finds the definition of a symbol.
+#[typst_macros::time(span = syntax.node().span())]
 pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,

@@ -137,6 +137,7 @@ reflexo-vec2svg = { version = "=0.6.0-rc1" }
 typst = "0.13.1"
 typst-html = "0.13.1"
 typst-library = "0.13.1"
+typst-macros = "0.13.1"
 typst-timing = "0.13.1"
 typst-svg = "0.13.1"
 typst-render = "0.13.1"
@@ -266,6 +267,7 @@ extend-exclude = ["/.git", "fixtures"]
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.10" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.10" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.10" }
 typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.10" }
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.13.10" }

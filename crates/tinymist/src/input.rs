@@ -25,6 +25,7 @@ impl ServerState {
 
     /// Creates a new source file.
     pub fn create_source(&mut self, path: ImmutPath, content: String) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("create_source");
         log::trace!("create source: {path:?}");
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
@@ -39,6 +40,7 @@ impl ServerState {
 
     /// Removes a source file.
     pub fn remove_source(&mut self, path: ImmutPath) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("remove_source");
         self.memory_changes.remove(&path);
         log::trace!("remove source: {path:?}");
 
@@ -55,6 +57,7 @@ impl ServerState {
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
     ) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("edit_source");
         let source = self
             .memory_changes
             .get_mut(&path)

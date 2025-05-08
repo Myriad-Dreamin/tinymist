@@ -115,6 +115,7 @@ impl<
                 }
                 Some(svg) = self.svg_receiver.recv() => {
                     log::trace!("WebviewActor: received svg from renderer");
+                    let _scope = typst_timing::TimingScope::new("webview_actor_send_svg");
                     self.webview_websocket_conn.send(Message::Binary(svg))
                     .await.log_error("WebViewActor");
                 }

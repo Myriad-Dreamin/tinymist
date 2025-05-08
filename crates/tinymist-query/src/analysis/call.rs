@@ -38,6 +38,7 @@ pub struct CallInfo {
 
 // todo: cache call
 /// Analyzes a function call.
+#[typst_macros::time(span = node.span())]
 pub fn analyze_call(
     ctx: &mut LocalContext,
     source: Source,

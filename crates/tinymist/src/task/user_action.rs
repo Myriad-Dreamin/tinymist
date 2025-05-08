@@ -11,6 +11,7 @@ use futures::FutureExt;
 use hyper::body::Bytes;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
+use reflexo_typst::vfs::WorkspaceResolver;
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
@@ -58,15 +59,21 @@ impl UserActionTask {
         let task = ServerTraceTask { stop_tx, resp_rx };
 
         typst_timing::enable();
+        // Empty trace array is not legal, so we add a root scope.
+        let _scope = typst_timing::TimingScope::new("server_trace");
         let timings = async move {
             log::info!("before generate timings");
 
             stop_rx.recv().await;
+            drop(_scope);
             typst_timing::disable();
 
             let mut writer = std::io::BufWriter::new(Vec::new());
-            // todo: resolve span correctly
-            let res = typst_timing::export_json(&mut writer, |_| ("unknown".to_string(), 0));
+            let res = typst_timing::export_json(&mut writer, |span| {
+                // todo: resolve line correctly
+                let file_id = Span::from_raw(span).id();
+                (WorkspaceResolver::display(file_id).to_string(), 0)
+            });
 
             let timings = writer.into_inner().unwrap();
             log::info!("after generate timings {res:?}");

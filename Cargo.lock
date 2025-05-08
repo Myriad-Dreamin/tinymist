@@ -4126,7 +4126,9 @@ dependencies = [
  "toml",
  "triomphe",
  "typst",
+ "typst-macros",
  "typst-shim",
+ "typst-timing",
  "unscanny",
 ]
 
@@ -4334,7 +4336,9 @@ dependencies = [
  "typlite",
  "typst",
  "typst-assets",
+ "typst-macros",
  "typst-shim",
+ "typst-timing",
  "unscanny",
  "walkdir",
  "yaml-rust2",
@@ -5000,6 +5004,8 @@ dependencies = [
  "tokio",
  "typst",
  "typst-assets",
+ "typst-macros",
+ "typst-timing",
 ]
 
 [[package]]

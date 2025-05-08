@@ -26,6 +26,7 @@ use crate::{
 pub type SemanticTokens = Arc<Vec<SemanticToken>>;
 
 /// Get the semantic tokens for a source.
+#[typst_macros::time(span = source.root().span())]
 pub(crate) fn get_semantic_tokens(ctx: &mut LocalContext, source: &Source) -> SemanticTokens {
     let mut tokenizer = Tokenizer::new(
         source.clone(),

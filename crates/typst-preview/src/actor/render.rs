@@ -151,21 +151,35 @@ impl RenderActor {
                 continue;
             };
 
-            let data = if has_full_render {
-                if let Some(data) = self.renderer.pack_current() {
-                    data
-                } else {
-                    self.renderer.pack_delta(&document)
-                }
-            } else {
-                self.renderer.pack_delta(&document)
-            };
+            let data = self.render(has_full_render, &document);
             let Ok(_) = self.svg_sender.send(data) else {
                 log::info!("RenderActor: svg_sender is dropped");
                 break;
             };
         }
         log::info!("RenderActor: exiting")
+    }
+
+    fn render(&mut self, has_full_render: bool, document: &TypstDocument) -> Vec<u8> {
+        if has_full_render {
+            if let Some(data) = self.render_full() {
+                data
+            } else {
+                self.render_delta(document)
+            }
+        } else {
+            self.render_delta(document)
+        }
+    }
+
+    #[typst_macros::time]
+    fn render_full(&mut self) -> Option<Vec<u8>> {
+        self.renderer.pack_current()
+    }
+
+    #[typst_macros::time]
+    fn render_delta(&mut self, document: &TypstDocument) -> Vec<u8> {
+        self.renderer.pack_delta(document)
     }
 
     fn view(&self) -> Option<Arc<dyn CompileView>> {

@@ -12,6 +12,7 @@ pub struct IndexInfo {
     pub(crate) identifiers: FxHashSet<Interned<str>>,
 }
 
+#[typst_macros::time(span = src.root().span())]
 #[comemo::memoize]
 pub fn get_index_info(src: &Source) -> Arc<IndexInfo> {
     let root = src.root();

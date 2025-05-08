@@ -779,6 +779,7 @@ impl SharedContext {
     }
 
     /// Get the lint result of a source file.
+    #[typst_macros::time(span = source.root().span())]
     pub(crate) fn lint(self: &Arc<Self>, source: &Source) -> LintInfo {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
@@ -1296,6 +1297,7 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
     cursor.min(text.len())
 }
 
+#[typst_macros::time]
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,

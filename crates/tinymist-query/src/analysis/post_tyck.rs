@@ -13,6 +13,7 @@ use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
+#[typst_macros::time(span = node.span())]
 pub(crate) fn post_type_check(
     ctx: Arc<SharedContext>,
     ti: &TypeInfo,
