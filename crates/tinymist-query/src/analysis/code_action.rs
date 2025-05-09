@@ -224,7 +224,7 @@ impl<'a> CodeActionWorker<'a> {
 
         let edit = self.create_file(new_file_url, false);
 
-        let file_to_create = unix_slash(&path_in_workspace.as_rooted_path());
+        let file_to_create = unix_slash(path_in_workspace.as_rooted_path());
         let action = CodeAction {
             title: format!("Create missing file at `{file_to_create}`"),
             kind: Some(CodeActionKind::QUICKFIX),

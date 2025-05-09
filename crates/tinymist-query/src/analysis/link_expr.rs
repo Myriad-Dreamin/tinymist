@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use lsp_types::Url;
 use tinymist_world::package::PackageSpec;
-use typst::syntax::VirtualPath;
 
 use super::prelude::*;
 
