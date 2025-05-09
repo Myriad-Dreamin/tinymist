@@ -27,3 +27,4 @@ out/
 *.swp
 *.bak
 .intellijPlatform
+intellij-community

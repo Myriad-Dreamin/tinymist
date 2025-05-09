@@ -1,65 +1,51 @@
 package org.tinymist.intellij.lsp
 
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.openapi.project.Project
-// import com.intellij.openapi.project.ProjectLocator // No longer directly used in getInitializationOptions
-import com.intellij.openapi.vfs.VirtualFile
-import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider
-import org.eclipse.lsp4j.services.LanguageServer
-import java.nio.file.Files
-import java.nio.file.Paths
+// Ensure these imports are present or adjust as needed
+import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider // Assuming this is the base class
+// Remove imports for the old data classes if they are no longer used elsewhere
+// import org.tinymist.intellij.lsp.BackgroundPreviewOptions
+// import org.tinymist.intellij.lsp.PreviewOptions
+// import org.tinymist.intellij.lsp.TinymistInitializationOptions
 
-// TinymistInitializationOptions and its sub-classes are now defined in their own file 
-// (e.g., TinymistInitializationOptions.kt if you created it separately)
+// Add other necessary imports
+import com.intellij.openapi.vfs.VirtualFile // Added for the updated signature
+import com.intellij.openapi.project.Project // Added for the constructor
 
+// Assuming your class looks something like this:
 class TinymistLspStreamConnectionProvider(private val project: Project) : ProcessStreamConnectionProvider() {
 
     init {
-        val executable = findTinymistExecutable()
-            ?: throw RuntimeException("Tinymist executable not found on PATH during initialization. Please configure the path or ensure it's on PATH.")
-        super.setCommands(mutableListOf(executable, "lsp"))
-        // super.setWorkingDirectory(project.basePath) // Example if commands are set here
+        // For now, assume tinymist is on the PATH
+        val executablePath = "tinymist"
+        super.setCommands(listOf(executablePath, "lsp"))
     }
 
-    private fun findTinymistExecutable(): String? {
-        val name = if (System.getProperty("os.name").startsWith("Windows")) "tinymist.exe" else "tinymist"
-        // TODO: Prioritize settings path if available
-        val pathVar = System.getenv("PATH") ?: return null
-        val paths = pathVar.split(System.getProperty("path.separator"))
-        for (dir in paths) {
-            val file = Paths.get(dir, name)
-            if (Files.exists(file) && Files.isExecutable(file)) {
-                return file.toString()
-            }
-        }
-        // TODO: Also check bundled location if distributing with the plugin
-        return null
+    override fun getInitializationOptions(uri: VirtualFile?): Any? {
+        // Construct the nested Map structure directly
+        val backgroundPreviewOpts = mapOf(
+            "enabled" to true
+            // "args" to listOf("--data-plane-host=127.0.0.1:23635", "--invert-colors=auto") // Example if needed
+        )
+        val previewOpts = mapOf(
+            "background" to backgroundPreviewOpts
+        )
+
+        // Build the final options map
+        // Add other top-level options expected by tinymist
+        val options = mutableMapOf<String, Any>(
+            "preview" to previewOpts,
+            "semanticTokens" to mapOf<String, Any>(),
+            "completion" to mapOf<String, Any>(),
+            "lint" to mapOf<String, Any>()
+            // Add other key-value pairs as needed
+        )
+
+        return options // Return the Map directly
     }
 
-    // getCommands() is no longer overridden as commands are set in init via super.setCommands()
-    // override fun getCommands(): MutableList<String> {
-    //     // DIAGNOSTIC: Temporarily return a harmless command to avoid exceptions during LSP registry initialization
-    //     // val executable = findTinymistExecutable()
-    //     //    ?: throw RuntimeException("Tinymist executable not found. Please configure the path or ensure it's on PATH.")
-    //     // return mutableListOf(executable, "lsp")
-    //     return mutableListOf("echo", "LSP server placeholder") // Simple command that should not throw an error
-    // }
+    // Add other necessary overrides like getWorkingDirectory()
+    // override fun getWorkingDirectory(projectRoot: Path?): String? { ... }
 
-    // getWorkingDirectory() can still be overridden if dynamic, or set in init via super.setWorkingDirectory()
-    // For now, let's keep it overridden if ProcessStreamConnectionProvider has it as abstract or open.
-    // If an explicit working directory is needed and is static (e.g. project root), set it in init.
-    // Otherwise, if null is acceptable, ProcessStreamConnectionProvider might default to project root or let server decide.
-    override fun getWorkingDirectory(): String? {
-         return project.basePath
-    }
-
-    override fun getInitializationOptions(virtualFile: VirtualFile): Any? {
-        // Construct with defaults defined in TinymistInitializationOptions.kt.
-        // Later, these defaults can be overridden by values from an IntelliJ settings panel.
-        return TinymistInitializationOptions()
-    }
-
-    fun getProvidedInterface(): Class<out LanguageServer> {
-        return LanguageServer::class.java
-    }
+    // Placeholder for executable finding logic
+    // private fun findTinymistExecutable(): String { ... }
 } 

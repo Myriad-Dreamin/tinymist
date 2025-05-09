@@ -22,6 +22,7 @@ kotlin {
 // Configure project's dependencies
 repositories {
     mavenCentral()
+    // maven("https://www.jetbrains.com/intellij-repository/releases") // Explicitly add JetBrains releases repository - REMOVING THIS
 
     // IntelliJ Platform Gradle Plugin Repositories Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html
     intellijPlatform {
@@ -36,7 +37,7 @@ dependencies {
 
     // Add explicit dependency on platform-impl using standard implementation scope
     // The repositories configured by the intellijPlatform plugin should contain this.
-    implementation("com.intellij.modules:platform-impl")
+    // implementation("com.intellij.modules:platform-impl")
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {

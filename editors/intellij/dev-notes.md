@@ -7,128 +7,85 @@ The goal of this project is to provide comprehensive Typst language support for 
 
 ## Current Status and Next Steps
 
-**Status as of 2025-05-07:**
+**Status as of 2025-05-07 (updated for new preview strategy):**
 *   **Phase 1: Resolve Server Startup Crash - COMPLETED**
-    *   The language server (`tinymist`) now starts successfully.
 *   **Phase 2: Achieve Basic Linting (Diagnostics) - COMPLETED**
-    *   LSP diagnostics (errors/warnings) are correctly displayed in the editor.
 *   **Phase 3: Implement Core LSP Features - MOSTLY COMPLETED**
     *   Step 1: Review/Implement `textDocument/definition` (Go To Definition) - **PARTIALLY WORKING** (Highlighting issue ON HOLD)
     *   Step 2: Review/Implement `textDocument/hover` (Hover Information) - **PARTIALLY WORKING** (Highlighting issue ON HOLD)
-    *   Step 3: Update `TinymistInitializationOptions.kt` - **COMPLETED**
+    *   Step 3: Update `TinymistInitializationOptions.kt` - **COMPLETED** (Now includes `preview.background.enabled`)
     *   Step 4: Review/Implement `textDocument/completion` (Code Completion) - **COMPLETED**
     *   Step 5: Review/Implement `textDocument/signatureHelp` (Signature Help) - **COMPLETED**
     *   Step 6: Review/Implement `textDocument/rename` (Rename Symbol) - **COMPLETED**
     *   Step 7: Review/Implement `textDocument/references` (Find Usages) - *TODO* (User prioritizes preview)
-    *   Step 8: Others (e.g., `documentHighlight`) - *PENDING / POTENTIALLY ON HOLD* (May be related to deferred highlighting issues)
+    *   Step 8: Others (e.g., `documentHighlight`) - *PENDING / POTENTIALLY ON HOLD*
 
 **Current Focus/Blockers:**
-1.  **Go-To-Definition Highlighting:** (ON HOLD) When Ctrl/Cmd-clicking a token, the navigation works, but the entire file content is visually marked. This is likely due to [lsp4ij issue #1018](https://github.com/redhat-developer/lsp4ij/issues/1018). A fix is available in `lsp4ij` nightly builds (e.g., `0.13.0-20250506-071038`), but Gradle had issues resolving/downloading it. **Decision:** Reverted to `lsp4ij 0.12.0` for now. Will attempt to update to `lsp4ij 0.13.0` (or later) once officially released and easily consumable via Gradle.
-2.  **Hover Highlighting:** (POTENTIALLY RELATED TO ABOVE) When hovering over a token, the correct information popup appears, but the token itself is not visually highlighted. This might also be resolved by the `lsp4ij` update.
+1.  **Go-To-Definition Highlighting:** (ON HOLD)
+2.  **Hover Highlighting:** (POTENTIALLY RELATED TO ABOVE)
+3.  **Preview Panel Integration:** Validating that `tinymist` LSP starts its background preview server when `preview.background.enabled=true` is passed via `TinymistInitializationOptions` and that `TypstPreviewFileEditor` correctly loads the content from `http://127.0.0.1:23635`.
 
 **Next LSP Features to Implement (from Phase 3):**
-*   `textDocument/completion` (Code Completion)
-*   `textDocument/signatureHelp` (Signature Help)
 *   `textDocument/references` (Find Usages)
-*   `textDocument/rename` (Rename Symbol)
 
 **Identified Technical Debt / Areas for Future Refinement:**
-*   **Minimal Client-Side Parsing/Lexing:** The `TypstLexerAdapter` and `TypstParserDefinition` are currently very basic, treating the entire file as a single token. While the LSP handles detailed analysis, enhancing the client-side lexer/parser could provide:
-    *   Rudimentary syntax highlighting (e.g., for keywords, comments, strings) even before the LSP initializes or if it's unavailable.
-    *   Better support for IntelliJ platform features that rely on PSI structure (e.g., more accurate breadcrumbs, structure view elements not solely dependent on LSP symbols).
-*   **Basic Client-Side Syntax Highlighter:** `TypstSyntaxHighlighter` provides only a single default style for all text, awaiting semantic tokens from the LSP for actual highlighting. This could be improved in conjunction with a better client-side lexer.
-*   **Rudimentary LSP Executable Error Handling:** `TinymistLspStreamConnectionProvider` currently throws a `RuntimeException` if the `tinymist` executable is not found. This is planned to be improved in Phase 4 with user-friendly notifications and a link to settings, but the current state is a known issue.
-*   **Missing File Type Icon:** `TypstFileType` has a `TODO` to add a dedicated file icon for `.typ` files.
-*   **Hardcoded Configuration Defaults:** `TinymistInitializationOptions` uses some hardcoded default values (e.g., `colorTheme`). These will become configurable via the settings panel planned in Phase 4.
-*   **Incomplete Parser Definition Features:** `TypstParserDefinition` contains `TODO` markers for defining comment and string literal token sets. Implementing these could improve basic editor interactions.
-*   **Unused `_TypstLexer` Code:** The `TypstLexerAdapter.kt` file contains a `_TypstLexer` class that appears to be a remnant of a previous JFlex-based approach and is currently unused. This should be reviewed and potentially removed. - **COMPLETED**
-*   **JCEF Preview Placeholder Content:** Both `TypstPreviewFileEditor` (for the split preview) and `TypstPreviewToolWindowFactory` (for the currently disabled tool window) use placeholder HTML/UI. Full integration with `tinymist`'s preview rendering is a major part of Phase 4.
+*   **Minimal Client-Side Parsing/Lexing**
+*   **Basic Client-Side Syntax Highlighter**
+*   **Rudimentary LSP Executable Error Handling**
+*   **Missing File Type Icon**
+*   **Hardcoded Configuration Defaults:** `TinymistInitializationOptions` (e.g., `colorTheme`, preview URL).
+*   **Incomplete Parser Definition Features**
+*   **JCEF Preview Placeholder Content (Largely addressed):** `TypstPreviewFileEditor` now loads a dynamic URL from `tinymist`. The placeholder aspect is resolved if `tinymist` serves its full UI.
 
 **Phase 4: Implement Settings, Improve User Experience, and Advanced Features**
-*   Once core LSP features are verified and stable (current state is good enough to proceed here):
-    1.  **Preview Panel Integration (PRIORITY):**
-        *   **Technology Choice:** JCEF (Java Chromium Embedded Framework) will be used, as it's the IntelliJ Platform standard for rendering HTML/web content (used by Markdown plugin, etc.).
-        *   Plan and implement an integrated preview panel for Typst documents, likely as an IntelliJ Tool Window.
-        *   This will involve handling custom LSP messages/notifications from `tinymist` like `tinymist/previewStart`, `tinymist/updatePreview`, potentially `window/showDocument` requests if the server uses them to suggest opening a preview, and custom commands like `tinymist.doStartPreview` or `tinymist.scrollPreview`.
-        *   Determine how the preview content (likely HTML or SVG served by `tinymist`) will be loaded and rendered within the JCEF browser.
-        *   Implement communication between plugin and JCEF JavaScript using `JBCefJSQuery` if needed for interactivity (e.g., scroll sync).
+*   Once core LSP features and the new preview integration are verified and stable:
+    1.  **Preview Panel Integration (PRIORITY - New Approach):**
+        *   **Strategy:** Leverage `tinymist`'s built-in preview server. The plugin will configure `tinymist` (via `TinymistInitializationOptions`) to start its background preview server (e.g., `tinymist preview --data-plane-host=127.0.0.1:23635 --invert-colors=auto`).
+        *   **IntelliJ Plugin Role:**
+            *   Pass `preview.background.enabled = true` (and potentially other preview args like default host/port if made configurable) in `TinymistInitializationOptions`.
+            *   `TypstPreviewFileEditor` will host a JCEF browser.
+            *   The JCEF browser will load the URL where `tinymist` serves its preview (e.g., `http://127.0.0.1:23635`). `tinymist` is expected to serve all necessary HTML, JS, WASM, and CSS assets for its preview client.
+            *   The plugin will no longer serve its own static assets for the preview via `TypstPreviewResourceHandler.kt` (which has been removed).
+        *   **LSP Interaction for Preview:** Continue to handle custom LSP messages/notifications from `tinymist` (e.g., `tinymist/updatePreview`, `tinymist.scrollPreview`) for interactivity like scroll sync, theme changes, etc., using `JBCefJSQuery` for communication between the JCEF panel and the plugin.
 
-        **Typst Preview Architecture (Insights from `typst-preview-arch` and VS Code):**
+        **Typst Preview Architecture (Updated Insights):**
 
-        *   **Core Components:**
-            *   **Typst Preview Server (Rust, part of `tinymist` LSP):** Watches files, recompiles, handles Typst world, and serves compiled/rendered data.
-            *   **Typst Preview Client (Web - TypeScript/WASM):** Renders the document in a webview. Uses `typst-ts-renderer` for incremental rendering via a Virtual DOM, receiving serialized data (rkyv format) from the server via WebSockets.
-            *   **Editor Extension (e.g., VS Code, our IntelliJ plugin):** Starts/manages the server, hosts the webview client, and relays editor events to the server and UI events (like theme changes) to the webview client.
+        *   **Core Components:** Remains largely the same (Tinymist Preview Server, Typst Preview Client, Editor Extension).
+        *   **Communication Flow for Rendering (Simplified for IntelliJ Plugin):**
+            1.  IntelliJ Plugin sends `initialize` request to `tinymist` LSP with `preview.background.enabled = true`.
+            2.  `tinymist` LSP starts/manages its own `tinymist preview` server, which listens on a known port (e.g., `127.0.0.1:23635`) and serves its complete web-based preview client (HTML, JS, WASM, CSS).
+            3.  The JCEF panel in `TypstPreviewFileEditor` in IntelliJ loads the URL from the `tinymist` preview server.
+            4.  The JavaScript (Typst Preview Client) within JCEF establishes a WebSocket connection directly to the `tinymist` server for dynamic rendering updates.
+            5.  (No change here) `tinymist` sends incremental rendering data.
+            6.  (No change here) Typst Preview Client renders updates.
 
-        *   **Communication Flow for Rendering:**
-            1.  IntelliJ Plugin (Editor Extension) requests a preview session from `tinymist` LSP.
-            2.  `tinymist` LSP prepares the session and (most likely) provides a way for the plugin to load the "Typst Preview Client" (HTML/JS/WASM frontend).
-                *   **Scenario 1 (LSP serves all):** `tinymist` runs an HTTP server and gives the IntelliJ plugin a URL to load in JCEF. This URL serves the `index.html` shell and all its assets (JS for `typst-ts-renderer`, WASM, CSS).
-                *   **Scenario 2 (LSP provides HTML shell, IntelliJ serves assets):** `tinymist` provides an `index.html` template. The IntelliJ plugin bundles the core static assets (like `typst-ts-renderer` JS/WASM, CSS) and serves them via a local `HttpRequestHandler`. The `index.html` template's asset paths are rewritten to point to this local handler.
-            3.  The JCEF panel in IntelliJ loads this `index.html` (either from `tinymist`'s URL or the plugin-massaged version).
-            4.  The JavaScript (Typst Preview Client) within JCEF establishes a **WebSocket connection** directly to the `tinymist` server.
-            5.  `tinymist` sends incremental rendering data (rkyv-serialized) over this WebSocket to the Typst Preview Client.
-            6.  The Typst Preview Client (using `typst-ts-renderer` and WASM) deserializes this data and updates its VDOM to render the preview.
+        *   **Role of IntelliJ Plugin for Preview Panel (`TypstPreviewFileEditor` with JCEF - Revised):**
+            *   **Host the Webview Client:** Load the URL served by `tinymist`'s background preview server (e.g., `http://127.0.0.1:23635`).
+            *   **No Asset Serving by Plugin:** The plugin no longer needs to implement an `HttpRequestHandler` (like the removed `TypstPreviewResourceHandler.kt`) to serve preview assets.
+            *   **Side-Channel Communication (via `JBCefJSQuery`):** Still relevant for theme changes, scroll sync, etc., if `tinymist` expects these via custom messages/commands.
+            *   **LSP Interaction:** Still relevant for managing the preview lifecycle if `tinymist` uses custom commands/notifications beyond the initial startup.
 
-        *   **Role of IntelliJ Plugin for Preview Panel (`TypstPreviewFileEditor` with JCEF):**
-            *   **Host the Webview Client:** Load the `index.html` provided or constructed as per Scenario 1 or 2 above.
-            *   **Facilitate Asset Loading:** If Scenario 2, implement an `HttpRequestHandler` to serve bundled frontend assets (JS/WASM for `typst-ts-renderer`, CSS, fonts, images).
-                *   **Update:** Implemented `TypstPreviewResourceHandler.kt` as a basic `HttpRequestHandler`.
-                *   **Update:** Added `implementation("com.intellij.modules:platform-impl")` to `build.gradle.kts` dependencies to resolve `Unresolved reference 'Responses'` used in the resource handler.
-            *   **Side-Channel Communication (via `JBCefJSQuery` - our `window.typstIntellij` bridge):
-                *   **IntelliJ -> JCEF:** Send commands for theme changes (`applyTheme`), editor-initiated scrolling (`scrollToPercent`), or other UI interactions not covered by the primary WebSocket channel.
-                *   **JCEF -> IntelliJ:** Receive events from the webview client like specific user interactions (e.g., clicks on special links, fine-grained scroll position for editor sync) if the client is designed to send them.
-            *   **LSP Interaction:** Send requests to `tinymist` (e.g., to start a preview session, notify of editor scroll if `tinymist` needs it) and handle responses or custom notifications from `tinymist` related to the preview state.
+        *   **Implications for `TypstPreviewFileEditor.updateContent()`:** This method is confirmed to be unnecessary for rendering the main preview content, as this is handled by `tinymist` serving its web application and subsequent WebSocket communication.
 
-        *   **Implications for `TypstPreviewFileEditor.updateContent()`:** The previous idea of pushing full HTML snippets via `updateContent()` is likely incorrect for the main Typst rendering, as this is handled via the WebSocket and `typst-ts-renderer`. `updateContent()` might be repurposed for overlays or status info if needed, or removed for rendering purposes.
+        **API/Pattern Insights for JCEF Preview Panels (from Markdown Plugin Reference - Adjusted):**
 
-        **API/Pattern Insights for JCEF Preview Panels (from Markdown Plugin Reference):**
-
-        *   **Editor Structure for Text + Preview:**
-            *   Utilize `com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider`: This IntelliJ Platform class is designed to create a side-by-side editor (standard text editor + a custom preview editor).
-            *   The provider is registered in `plugin.xml` for the relevant file type(s).
-            *   It requires a secondary `FileEditorProvider` that creates the custom preview `FileEditor`.
-            *   The custom `FileEditor` implementation will be responsible for hosting and managing the JCEF browser component.
-
-        *   **HTML Rendering Panel Abstraction (Optional but good practice):**
-            *   Define an interface (e.g., `MyHtmlPanel`) that outlines the contract for any HTML rendering component. This promotes flexibility if different rendering strategies (e.g., different JCEF configurations, fallbacks) are ever needed.
-            *   Key methods for such an interface typically include:
-                *   `getComponent(): JComponent`: Returns the Swing UI component of the panel.
-                *   `setHtml(htmlContent: String, baseUrlForResources: String?)`: To load/update the HTML. The `baseUrlForResources` is crucial for resolving relative paths (images, CSS) within the loaded HTML.
-                *   Mechanisms for JS <-> Kotlin communication (e.g., exposing a message-passing object).
-                *   Methods for controlling scroll position.
-            *   If multiple panel implementations are offered, an extension point (like `com.intellij.openapi.extensions.ExtensionPointName`) can be used to discover them, and settings can allow the user to choose.
-
-        *   **JCEF-Based Panel Implementation (e.g., `MyJCEFHtmlPanel` extending `com.intellij.ui.jcef.JCEFHtmlPanel`):**
-            *   **Core Component**: The panel will extend `com.intellij.ui.jcef.JCEFHtmlPanel` (or directly use `com.intellij.ui.jcef.JBCefBrowser`).
-            *   **Serving Local Static Assets (Base HTML, CSS, JS):**
-                *   If the preview requires a shell HTML page, custom CSS, or JavaScript files bundled with the plugin, these can be served using a custom `org.jetbrains.ide.HttpRequestHandler`.
-                *   This handler integrates with IntelliJ's built-in lightweight HTTP server.
-                *   It typically defines a unique URL prefix for the plugin (e.g., `http://localhost:<port>/myplugin_preview_static/...`).
-                *   It needs a way to map requested paths to actual plugin resources (e.g., files in `src/main/resources`).
+        *   **Editor Structure for Text + Preview:** Unchanged.
+        *   **HTML Rendering Panel Abstraction:** Less critical if `TypstPreviewFileEditor` directly uses `JBCefBrowser.loadURL()`.
+        *   **JCEF-Based Panel Implementation:**
+            *   **Core Component**: Unchanged (`JBCefBrowser`).
+            *   **Serving Local Static Assets:** This is **NO LONGER APPLICABLE** for the core preview, as `tinymist` serves its own assets. The plugin does not need its own `HttpRequestHandler` for this.
             *   **Loading Content into JCEF:**
-                *   **Scenario 1 (Language server provides URL):** If the language server (like `tinymist`) serves the preview content via its own HTTP endpoint, `JBCefBrowser.loadURL(...)` can be used directly.
-                *   **Scenario 2 (Language server provides HTML string):** Use `JBCefBrowser.loadHTML(htmlContent, baseUrlForResources)`. The `baseUrlForResources` (can be a `file:///` URL pointing to the document's directory or a URL from the local static server) is critical for resolving relative paths (images, etc.) in the HTML.
-                *   **Scenario 3 (Plugin-hosted shell + dynamic content):** Load a base HTML page from the local static server (if used), then use JavaScript (executed via `JBCefBrowser.executeJavaScript(...)`) to inject or update content dynamically. More advanced techniques (like virtual/incremental DOM patching via JS) can be used for performance but add complexity.
-            *   **Kotlin <-> JavaScript Communication:**
-                *   `com.intellij.ui.jcef.JBCefJSQuery` is the standard mechanism for two-way communication.
-                *   Define a clear message protocol (e.g., JSON strings with `type` and `payload` fields).
-                *   Kotlin side: Create `JBCefJSQuery` and add a handler to process messages from JS.
-                *   JS side: Use the function injected by `JBCefJSQuery` (available via `window.cefQuery(...)` or a custom name) to send messages to Kotlin. To receive messages from Kotlin, Kotlin calls `JBCefBrowser.executeJavaScript(...)` to invoke specific JS functions.
-            *   **Styling and Theming:**
-                *   Serve custom CSS files via the local static server or inject CSS strings using `executeJavaScript`.
-                *   Listen to IntelliJ theme changes (e.g., `com.intellij.ide.ui.UISettingsListener`) and use `executeJavaScript` to update CSS variables, apply/remove theme-specific classes, or re-load stylesheets in the JCEF panel.
-            *   **Resource Handling for Relative Paths:** Correctly set the base URL when loading HTML (via `loadHTML` or by loading from a specific URL) so that JCEF can resolve relative paths for images, fonts, etc. The local static server can be made to serve these resources from the project or plugin.
+                *   **Scenario (Primary):** Language server (`tinymist`) provides a URL. `JBCefBrowser.loadURL(...)` is used. This is our current approach.
+            *   **Kotlin <-> JavaScript Communication:** Still relevant for advanced interactivity via `JBCefJSQuery`.
+            *   **Styling and Theming:** Interactions for theming would likely be commands sent to the JCEF JS environment to ask `tinymist`'s client to adjust its theme, or `tinymist` might observe system theme via browser capabilities.
+            *   **Resource Handling for Relative Paths:** Handled by the `tinymist` server.
 
-        *   **Scroll Synchronization:**
-            *   Implement JS listeners for scroll events in the JCEF panel. These listeners use `JBCefJSQuery` to send the current scroll position/percentage to Kotlin.
-            *   Implement Kotlin functions that, when triggered (e.g., editor scroll, LSP request), call `JBCefBrowser.executeJavaScript(...)` to invoke a JS function that scrolls the JCEF panel to the desired location.
+        *   **Scroll Synchronization:** Unchanged (via `JBCefJSQuery` and potentially custom LSP messages).
 
     2.  **Implement IntelliJ Settings Panel:**
-        *   Create a dedicated settings/preferences page for Tinymist (e.g., under "Languages & Frameworks" or "Tools").
-        *   Allow configuration of: Path to the `tinymist` executable, font paths, PDF export settings, preview-related settings, and other relevant options derived from `TinymistConfig` (VSCode) and `TinymistInitializationOptions`.
+        *   Allow configuration of: Path to `tinymist`, font paths, PDF export, preview-related settings (e.g., if `tinymist` allows configuring its preview server port or behavior via `TinymistInitializationOptions` beyond just `preview.background.enabled`).
     3.  **Load Settings into `TinymistInitializationOptions`:**
-        *   In `TinymistLspStreamConnectionProvider#getInitializationOptions`, retrieve configured values from the settings panel and correctly populate the `TinymistInitializationOptions` data class.
+        *   Populate `previewBackgroundEnabled` and any other `tinymist` preview args from settings.
     4.  **Enhance `findTinymistExecutable()` in `TinymistLspStreamConnectionProvider` & Error Handling:**
         *   Modify the `init` block of `TinymistLspStreamConnectionProvider` (and `findTinymistExecutable`) to:
         *   Prioritize the path configured in IntelliJ settings.

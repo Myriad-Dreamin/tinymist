@@ -1,24 +1,31 @@
 package org.tinymist.intellij.preview
 
-import com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider
+import com.intellij.openapi.fileEditor.FileEditor
+import com.intellij.openapi.fileEditor.FileEditorPolicy
+import com.intellij.openapi.fileEditor.FileEditorProvider
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import org.tinymist.intellij.TypstFileType
 
-/**
- * This is the main provider registered in plugin.xml for Typst files.
- * It combines a standard text editor (PsiAwareTextEditorProvider) with our custom preview editor (TypstPreviewFileEditor).
- */
-class TypstTextEditorWithPreviewProvider : TextEditorWithPreviewProvider(
-    TypstPreviewFileEditor.Provider() // This is our FileEditorProvider for the preview
-), DumbAware {
-
-    /**
-     * Determines whether this TextEditorWithPreviewProvider should handle the given file.
-     * We only want to provide this combined editor for Typst files.
-     */
+class TypstPreviewFileEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean {
-        return file.fileType is TypstFileType || file.extension?.equals(TypstFileType.defaultExtension, ignoreCase = true) == true
+        // This provider is used as the secondary (preview) editor within TypstTextEditorWithPreviewProvider.
+        // The decision to open for a .typ file is handled by TypstTextEditorWithPreviewProvider.
+        // So, if createEditor is called on this provider, we should accept.
+        return true
     }
-} 
+
+    override fun createEditor(project: Project, file: VirtualFile): FileEditor {
+        return TypstPreviewFileEditor(project, file)
+    }
+
+    override fun getEditorTypeId(): String {
+        // This should be a unique ID for this editor type.
+        return "tinymist-preview-editor"
+    }
+
+    override fun getPolicy(): FileEditorPolicy {
+        // Defines where the editor is placed relative to others, etc.
+        return FileEditorPolicy.PLACE_AFTER_DEFAULT_EDITOR
+    }
+}
