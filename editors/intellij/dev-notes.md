@@ -23,7 +23,20 @@ The goal of this project is to provide comprehensive Typst language support for 
 **Current Focus/Blockers:**
 1.  **Go-To-Definition Highlighting:** (ON HOLD)
 2.  **Hover Highlighting:** (POTENTIALLY RELATED TO ABOVE)
-3.  **Preview Panel Integration:** Validating that `tinymist` LSP starts its background preview server when `preview.background.enabled=true` is passed via `TinymistInitializationOptions` and that `TypstPreviewFileEditor` correctly loads the content from `http://127.0.0.1:23635`.
+3.  **Preview Panel Scrolling Performance:**
+    *   **Issue:** Significant scrolling lag/input delay observed in the JCEF-based preview panel. The lag strangely disappears when JCEF DevTools or the FPS meter is active, suggesting a complex interaction with event processing or rendering.
+    *   **Current Investigation:** Attempting to diagnose bottlenecks in the `tinymist` frontend JavaScript (`tools/typst-preview-frontend/src/ws.ts`) by adding `console.time` logging around message processing.
+    *   **Frontend Build Workflow:** Confirmed the correct procedure to integrate frontend changes:
+        1.  Resolve `npm` dependencies and build the frontend using `yarn build:preview` (from the `tinymist` root). This copies the built `typst-preview.html` to `crates/tinymist-assets/src/`.
+        2.  Ensure the main `tinymist/Cargo.toml` file has the local path for `tinymist-assets` uncommented: `tinymist-assets = { path = "./crates/tinymist-assets/" }`.
+        3.  Rebuild `tinymist` using `cargo build`.
+    *   **Next Step (User):** Resolving `npm install` errors in `tools/typst-preview-frontend` to enable `yarn build:preview`, then rebuilding `tinymist` with the instrumented frontend to capture performance logs.
+    *   **Next Step (Paused):** Further debugging of frontend event handling. A GitHub issue has been drafted to seek input from `tinymist` maintainers regarding potential frontend bottlenecks or alternative event handling strategies (e.g., using `throttleTime` instead of `debounceTime` for scroll events, investigating `TypstDocument.addViewportChange()` behavior).
+        *   **GitHub Issue Summary:**
+            *   **Title:** Scrolling Input Lag / Jumpy Behavior in Typst Preview Frontend (Observed in Embedded Browser View)
+            *   **Key Points:** Lag disappears with DevTools, `processMessage` is fast, reducing scroll `debounceTime` helps but doesn't fully fix.
+            *   **Questions for Maintainers:** Other frontend delays? `TypstDocument.addViewportChange()` internals? `throttleTime` vs `debounceTime`? Why DevTools alters behavior?
+    *   **Previous State:** Validating that `tinymist` LSP starts its background preview server and that `TypstPreviewFileEditor` correctly loads content from `http://127.0.0.1:23635` (this basic functionality is confirmed, performance is the current issue).
 
 **Next LSP Features to Implement (from Phase 3):**
 *   `textDocument/references` (Find Usages)

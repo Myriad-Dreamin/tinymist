@@ -24,6 +24,9 @@ import javax.swing.JLabel
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefLoadHandler
 import com.intellij.openapi.util.registry.Registry
+import org.cef.handler.CefDisplayHandler
+import org.cef.handler.CefDisplayHandlerAdapter
+import org.cef.CefSettings
 
 // This version ONLY loads the fixed URL for the background tinymist preview server.
 
@@ -43,13 +46,15 @@ class TypstPreviewFileEditor(
     private var jcefUnsupportedLabel: JLabel? = null
 
     init {
-        println("TypstPreviewFileEditor: Initializing (as JCEFHtmlPanel, non-OSR)...")
+        val osrMode = isOsrEnabled() // Call it once
+        println("TypstPreviewFileEditor: Initializing (JCEFHtmlPanel, OSR: $osrMode)...")
 
         if (!JBCefApp.isSupported()) {
             println("TypstPreviewFileEditor: JCEF is not supported! Preview will show an error message.")
             jcefUnsupportedLabel = JLabel("JCEF browser is not supported in this environment.")
         } else {
             println("TypstPreviewFileEditor: JCEF is supported. Setting up browser.")
+            setupDisplayHandler()
             setupLoadHandler()
             waitForServerAndLoad()
         }
@@ -153,6 +158,29 @@ class TypstPreviewFileEditor(
         userData[key] = value
     }
 
+    override fun dispose() {
+        println("TypstPreviewFileEditor: Disposing...")
+        // JCEFHtmlPanel is Disposable, its dispose() will be called,
+        // which should handle browser cleanup and associated handlers.
+        // If other Disposables were created and registered with this FileEditor
+        // as parent, they would be disposed automatically.
+        // If custom listeners were added (not via CefClient.addXXXHandler with a Disposable parent),
+        // they would need to be removed here.
+        // Explicitly remove our display handler if it was added, though JCEFHtmlPanel might do this.
+        // Note: JCEFHtmlPanel's dispose seems to handle its client and handlers.
+    }
+
+    private fun setupDisplayHandler() {
+        this.jbCefClient.addDisplayHandler(object : CefDisplayHandlerAdapter() {
+            override fun onConsoleMessage(browser: CefBrowser, level: CefSettings.LogSeverity,
+                                          message: String, source: String, line: Int): Boolean {
+                val formattedMessage = "JS CONSOLE [$level] ($source:$line): $message"
+                println(formattedMessage)
+                return false // False to allow the message to also be processed by the default handler (e.g., DevTools)
+            }
+        }, this.cefBrowser)
+    }
+
     private fun setupLoadHandler() {
         this.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadingStateChange(browser: CefBrowser?, isLoading: Boolean, canGoBack: Boolean, canGoForward: Boolean) {
@@ -176,6 +204,10 @@ class TypstPreviewFileEditor(
     companion object {
         // Default to false (non-OSR) if the key isn't set.
         // Using the Markdown plugin's key for testing.
-        private fun isOsrEnabled(): Boolean = Registry.`is`("ide.browser.jcef.markdownView.osr.enabled", false)
+        private fun isOsrEnabled(): Boolean {
+            val osrEnabled = Registry.`is`("ide.browser.jcef.markdownView.osr.enabled", false) // Or use the general key if intended
+            println("TypstPreviewFileEditor: isOsrEnabled check for 'ide.browser.jcef.markdownView.osr.enabled' (default false) returning: $osrEnabled")
+            return osrEnabled
+        }
     }
 } 

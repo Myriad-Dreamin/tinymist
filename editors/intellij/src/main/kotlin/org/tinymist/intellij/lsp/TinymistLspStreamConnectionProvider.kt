@@ -16,7 +16,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
 
     init {
         // For now, assume tinymist is on the PATH
-        val executablePath = "tinymist"
+        val executablePath = "/Users/juliusschmitt/kotlin/tinymist/target/debug/tinymist"
         super.setCommands(listOf(executablePath, "lsp"))
     }
 
