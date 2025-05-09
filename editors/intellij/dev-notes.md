@@ -4,112 +4,81 @@
 
 The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs. This is achieved by integrating the `tinymist` language server ([https://github.com/Myzel394/tinymist](https://github.com/Myzel394/tinymist)) into the IntelliJ Platform using the `lsp4ij` plugin developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)). The plugin aims to offer features such as syntax highlighting, autocompletion, diagnostics, hover information, go-to-definition, and potentially more, mirroring the capabilities of the Tinymist VSCode extension.
 
+## Project Roadmap & Status
 
-## Current Status and Next Steps
+### I. Completed Milestones
+*   **Initial Server Integration:** Resolved server startup crashes.
+*   **Basic Diagnostics:** Implemented linting/diagnostics.
+*   **Core LSP Features (Majority):**
+    *   `textDocument/completion` (Code Completion)
+    *   `textDocument/signatureHelp` (Signature Help)
+    *   `textDocument/rename` (Rename Symbol)
+*   **Configuration:** Updated `TinymistInitializationOptions.kt` to support `preview.background.enabled` for `tinymist`'s preview server.
+*   **Preview Strategy Foundation:** Validated that `tinymist` LSP starts its background preview server and `TypstPreviewFileEditor` loads content from it (e.g., `http://127.0.0.1:23635`).
 
-**Status as of 2025-05-07 (updated for new preview strategy):**
-*   **Phase 1: Resolve Server Startup Crash - COMPLETED**
-*   **Phase 2: Achieve Basic Linting (Diagnostics) - COMPLETED**
-*   **Phase 3: Implement Core LSP Features - MOSTLY COMPLETED**
-    *   Step 1: Review/Implement `textDocument/definition` (Go To Definition) - **PARTIALLY WORKING** (Highlighting issue ON HOLD)
-    *   Step 2: Review/Implement `textDocument/hover` (Hover Information) - **PARTIALLY WORKING** (Highlighting issue ON HOLD)
-    *   Step 3: Update `TinymistInitializationOptions.kt` - **COMPLETED** (Now includes `preview.background.enabled`)
-    *   Step 4: Review/Implement `textDocument/completion` (Code Completion) - **COMPLETED**
-    *   Step 5: Review/Implement `textDocument/signatureHelp` (Signature Help) - **COMPLETED**
-    *   Step 6: Review/Implement `textDocument/rename` (Rename Symbol) - **COMPLETED**
-    *   Step 7: Review/Implement `textDocument/references` (Find Usages) - *TODO* (User prioritizes preview)
-    *   Step 8: Others (e.g., `documentHighlight`) - *PENDING / POTENTIALLY ON HOLD*
+### II. Current Focus & Active Debugging
+*   **Preview Panel Scrolling Performance:**
+    *   **Issue:** Significant scrolling lag/input delay in the JCEF-based preview panel. Lag is affected by JCEF DevTools/FPS meter.
+    *   **Active Investigation (User):** Resolving `npm install` errors in `tools/typst-preview-frontend` to enable `yarn build:preview`. Goal is to rebuild `tinymist` with an instrumented frontend to capture detailed performance logs related to scroll event handling.
+    *   **Frontend Build Workflow Confirmed:**
+        1.  Build frontend: `yarn build:preview` (from `tinymist` root) -> copies `typst-preview.html` to `crates/tinymist-assets/src/`.
+        2.  Configure `tinymist/Cargo.toml`: Use local path for `tinymist-assets` (`tinymist-assets = { path = "./crates/tinymist-assets/" }`).
+        3.  Rebuild `tinymist`: `cargo build`.
 
-**Current Focus/Blockers:**
-1.  **Go-To-Definition Highlighting:** (ON HOLD)
-2.  **Hover Highlighting:** (POTENTIALLY RELATED TO ABOVE)
-3.  **Preview Panel Scrolling Performance:**
-    *   **Issue:** Significant scrolling lag/input delay observed in the JCEF-based preview panel. The lag strangely disappears when JCEF DevTools or the FPS meter is active, suggesting a complex interaction with event processing or rendering.
-    *   **Current Investigation:** Attempting to diagnose bottlenecks in the `tinymist` frontend JavaScript (`tools/typst-preview-frontend/src/ws.ts`) by adding `console.time` logging around message processing.
-    *   **Frontend Build Workflow:** Confirmed the correct procedure to integrate frontend changes:
-        1.  Resolve `npm` dependencies and build the frontend using `yarn build:preview` (from the `tinymist` root). This copies the built `typst-preview.html` to `crates/tinymist-assets/src/`.
-        2.  Ensure the main `tinymist/Cargo.toml` file has the local path for `tinymist-assets` uncommented: `tinymist-assets = { path = "./crates/tinymist-assets/" }`.
-        3.  Rebuild `tinymist` using `cargo build`.
-    *   **Next Step (User):** Resolving `npm install` errors in `tools/typst-preview-frontend` to enable `yarn build:preview`, then rebuilding `tinymist` with the instrumented frontend to capture performance logs.
-    *   **Next Step (Paused):** Further debugging of frontend event handling. A GitHub issue has been drafted to seek input from `tinymist` maintainers regarding potential frontend bottlenecks or alternative event handling strategies (e.g., using `throttleTime` instead of `debounceTime` for scroll events, investigating `TypstDocument.addViewportChange()` behavior).
-        *   **GitHub Issue Summary:**
-            *   **Title:** Scrolling Input Lag / Jumpy Behavior in Typst Preview Frontend (Observed in Embedded Browser View)
-            *   **Key Points:** Lag disappears with DevTools, `processMessage` is fast, reducing scroll `debounceTime` helps but doesn't fully fix.
-            *   **Questions for Maintainers:** Other frontend delays? `TypstDocument.addViewportChange()` internals? `throttleTime` vs `debounceTime`? Why DevTools alters behavior?
-    *   **Previous State:** Validating that `tinymist` LSP starts its background preview server and that `TypstPreviewFileEditor` correctly loads content from `http://127.0.0.1:23635` (this basic functionality is confirmed, performance is the current issue).
+### III. On Hold / Blocked Tasks
+*   **Preview Panel Scrolling Performance (Further Frontend Debugging - PAUSED):**
+    *   **Reason:** Awaiting feedback/input on the drafted GitHub issue for `tinymist` maintainers.
+    *   **Issue Summary for GitHub:**
+        *   Title: Scrolling Input Lag / Jumpy Behavior in Typst Preview Frontend (Observed in Embedded Browser View)
+        *   Key Points: Lag affected by DevTools, `processMessage` is fast, reducing scroll `debounceTime` helps but doesn't fully fix.
+        *   Questions: Other frontend delays? `TypstDocument.addViewportChange()` internals? `throttleTime` vs `debounceTime`? Why DevTools alters behavior?
+*   **`textDocument/definition` (Go To Definition):** Partially working; highlighting issue.
+*   **`textDocument/hover` (Hover Information):** Partially working; highlighting issue (potentially related to Go-To-Definition).
+*   **`documentHighlight` (Other LSP Features):** Pending.
 
-**Next LSP Features to Implement (from Phase 3):**
-*   `textDocument/references` (Find Usages)
+### IV. Immediate Next Steps (High Priority - Post Current Debugging)
+*   **`textDocument/references` (Find Usages):** Implement this core LSP feature.
+*   **Stabilize Preview Panel Integration:**
+    *   Based on feedback from the GitHub issue and potential fixes, ensure smooth and reliable preview rendering and interaction.
+    *   Refine LSP interaction for preview if needed (e.g., scroll sync, theme changes via `JBCefJSQuery`).
 
-**Identified Technical Debt / Areas for Future Refinement:**
-*   **Minimal Client-Side Parsing/Lexing**
-*   **Basic Client-Side Syntax Highlighter**
-*   **Rudimentary LSP Executable Error Handling**
-*   **Missing File Type Icon**
-*   **Hardcoded Configuration Defaults:** `TinymistInitializationOptions` (e.g., `colorTheme`, preview URL).
-*   **Incomplete Parser Definition Features**
-*   **JCEF Preview Placeholder Content (Largely addressed):** `TypstPreviewFileEditor` now loads a dynamic URL from `tinymist`. The placeholder aspect is resolved if `tinymist` serves its full UI.
+### V. Planned Features & Enhancements (Longer Term)
+*   **IntelliJ Settings Panel:**
+    *   Configure path to `tinymist` executable.
+    *   Configure font paths, PDF export options.
+    *   Settings for `tinymist` preview server (e.g., host/port, if configurable beyond `preview.background.enabled`).
+*   **Robust `tinymist` Executable Handling:**
+    *   Prioritize configured path in settings for `findTinymistExecutable()`.
+    *   Fall back to searching `PATH`.
+    *   User-friendly notifications if not found (balloon notification with link to settings).
+    *   Consider bundling `tinymist` or providing clear download/setup instructions.
+*   **Full Server-Specific Interactions:**
+    *   Systematically implement robust handlers for: `workspace/configuration` requests, `textDocument/didOpen|Change|Close` for auxiliary files, focus tracking notifications.
+*   **Documentation:**
+    *   Update plugin `README.md` (setup, features, settings).
+    *   Keep `dev-notes.md` current.
 
-**Phase 4: Implement Settings, Improve User Experience, and Advanced Features**
-*   Once core LSP features and the new preview integration are verified and stable:
-    1.  **Preview Panel Integration (PRIORITY - New Approach):**
-        *   **Strategy:** Leverage `tinymist`'s built-in preview server. The plugin will configure `tinymist` (via `TinymistInitializationOptions`) to start its background preview server (e.g., `tinymist preview --data-plane-host=127.0.0.1:23635 --invert-colors=auto`).
-        *   **IntelliJ Plugin Role:**
-            *   Pass `preview.background.enabled = true` (and potentially other preview args like default host/port if made configurable) in `TinymistInitializationOptions`.
-            *   `TypstPreviewFileEditor` will host a JCEF browser.
-            *   The JCEF browser will load the URL where `tinymist` serves its preview (e.g., `http://127.0.0.1:23635`). `tinymist` is expected to serve all necessary HTML, JS, WASM, and CSS assets for its preview client.
-            *   The plugin will no longer serve its own static assets for the preview via `TypstPreviewResourceHandler.kt` (which has been removed).
-        *   **LSP Interaction for Preview:** Continue to handle custom LSP messages/notifications from `tinymist` (e.g., `tinymist/updatePreview`, `tinymist.scrollPreview`) for interactivity like scroll sync, theme changes, etc., using `JBCefJSQuery` for communication between the JCEF panel and the plugin.
+### VI. Technical Debt & Refinements
+*   Minimal Client-Side Parsing/Lexing (Evaluate if still relevant with LSP).
+*   Basic Client-Side Syntax Highlighter (Evaluate if still relevant with LSP semantic tokens).
+*   Rudimentary LSP Executable Error Handling (Partially addressed by "Robust `tinymist` Executable Handling" above).
+*   Missing File Type Icon.
+*   Hardcoded Configuration Defaults in `TinymistInitializationOptions` (e.g., `colorTheme`, preview URL - review what should be settings).
+*   Incomplete Parser Definition Features (Evaluate if still relevant).
+*   JCEF Preview Placeholder Content: Largely addressed as `tinymist` serves its own UI.
 
-        **Typst Preview Architecture (Updated Insights):**
+### VII. Preview Architecture Notes (Reference)
 
-        *   **Core Components:** Remains largely the same (Tinymist Preview Server, Typst Preview Client, Editor Extension).
-        *   **Communication Flow for Rendering (Simplified for IntelliJ Plugin):**
-            1.  IntelliJ Plugin sends `initialize` request to `tinymist` LSP with `preview.background.enabled = true`.
-            2.  `tinymist` LSP starts/manages its own `tinymist preview` server, which listens on a known port (e.g., `127.0.0.1:23635`) and serves its complete web-based preview client (HTML, JS, WASM, CSS).
-            3.  The JCEF panel in `TypstPreviewFileEditor` in IntelliJ loads the URL from the `tinymist` preview server.
-            4.  The JavaScript (Typst Preview Client) within JCEF establishes a WebSocket connection directly to the `tinymist` server for dynamic rendering updates.
-            5.  (No change here) `tinymist` sends incremental rendering data.
-            6.  (No change here) Typst Preview Client renders updates.
+*   **Strategy:** Leverage `tinymist`'s built-in preview server.
+*   **IntelliJ Plugin Role:**
+    *   Pass `preview.background.enabled = true` in `TinymistInitializationOptions`.
+    *   `TypstPreviewFileEditor` hosts JCEF browser, loads URL from `tinymist`'s preview server.
+    *   Plugin does NOT serve its own static assets for preview.
+*   **Communication:**
+    *   JCEF client JS establishes WebSocket to `tinymist` server for rendering updates.
+    *   `JBCefJSQuery` for side-channel communication (theme, scroll sync) if needed.
+*   `TypstPreviewFileEditor.updateContent()`: Confirmed unnecessary for main rendering.
 
-        *   **Role of IntelliJ Plugin for Preview Panel (`TypstPreviewFileEditor` with JCEF - Revised):**
-            *   **Host the Webview Client:** Load the URL served by `tinymist`'s background preview server (e.g., `http://127.0.0.1:23635`).
-            *   **No Asset Serving by Plugin:** The plugin no longer needs to implement an `HttpRequestHandler` (like the removed `TypstPreviewResourceHandler.kt`) to serve preview assets.
-            *   **Side-Channel Communication (via `JBCefJSQuery`):** Still relevant for theme changes, scroll sync, etc., if `tinymist` expects these via custom messages/commands.
-            *   **LSP Interaction:** Still relevant for managing the preview lifecycle if `tinymist` uses custom commands/notifications beyond the initial startup.
-
-        *   **Implications for `TypstPreviewFileEditor.updateContent()`:** This method is confirmed to be unnecessary for rendering the main preview content, as this is handled by `tinymist` serving its web application and subsequent WebSocket communication.
-
-        **API/Pattern Insights for JCEF Preview Panels (from Markdown Plugin Reference - Adjusted):**
-
-        *   **Editor Structure for Text + Preview:** Unchanged.
-        *   **HTML Rendering Panel Abstraction:** Less critical if `TypstPreviewFileEditor` directly uses `JBCefBrowser.loadURL()`.
-        *   **JCEF-Based Panel Implementation:**
-            *   **Core Component**: Unchanged (`JBCefBrowser`).
-            *   **Serving Local Static Assets:** This is **NO LONGER APPLICABLE** for the core preview, as `tinymist` serves its own assets. The plugin does not need its own `HttpRequestHandler` for this.
-            *   **Loading Content into JCEF:**
-                *   **Scenario (Primary):** Language server (`tinymist`) provides a URL. `JBCefBrowser.loadURL(...)` is used. This is our current approach.
-            *   **Kotlin <-> JavaScript Communication:** Still relevant for advanced interactivity via `JBCefJSQuery`.
-            *   **Styling and Theming:** Interactions for theming would likely be commands sent to the JCEF JS environment to ask `tinymist`'s client to adjust its theme, or `tinymist` might observe system theme via browser capabilities.
-            *   **Resource Handling for Relative Paths:** Handled by the `tinymist` server.
-
-        *   **Scroll Synchronization:** Unchanged (via `JBCefJSQuery` and potentially custom LSP messages).
-
-    2.  **Implement IntelliJ Settings Panel:**
-        *   Allow configuration of: Path to `tinymist`, font paths, PDF export, preview-related settings (e.g., if `tinymist` allows configuring its preview server port or behavior via `TinymistInitializationOptions` beyond just `preview.background.enabled`).
-    3.  **Load Settings into `TinymistInitializationOptions`:**
-        *   Populate `previewBackgroundEnabled` and any other `tinymist` preview args from settings.
-    4.  **Enhance `findTinymistExecutable()` in `TinymistLspStreamConnectionProvider` & Error Handling:**
-        *   Modify the `init` block of `TinymistLspStreamConnectionProvider` (and `findTinymistExecutable`) to:
-        *   Prioritize the path configured in IntelliJ settings.
-        *   Fall back to searching `PATH`.
-            *   If the executable is not found or invalid, display a user-friendly IntelliJ notification (e.g., a balloon notification with a link to settings) instead of throwing a `RuntimeException`. Prevent LSP connection attempts if the path is invalid.
-        *   Consider options for bundling `tinymist` or providing clear download/setup instructions within the settings UI.
-    5.  **Full Implementation of Server-Specific Interactions:**
-        *   Systematically implement robust handlers for: `workspace/configuration` requests, sending `textDocument/didOpen|Change|Close` for auxiliary files, and focus tracking notifications, based on a deeper understanding of `tinymist`'s requirements.
-    6.  **Documentation:**
-        *   Update the plugin's `README.md` with setup instructions, feature overview, and settings guide.
-        *   Ensure these development notes (`PLUGIN_DEV_NOTES.md`) are kept up-to-date.
 
 ## Project Architecture and File Overview
 
