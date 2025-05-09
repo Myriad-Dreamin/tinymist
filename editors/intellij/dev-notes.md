@@ -1,8 +1,54 @@
 # Tinymist IntelliJ Plugin Development Notes
+> WARNING: AI Code Slop ahead
+
 
 ## Project Scope
 
-The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs. This is achieved by integrating the `tinymist` language server ([https://github.com/Myzel394/tinymist](https://github.com/Myzel394/tinymist)) into the IntelliJ Platform using the `lsp4ij` plugin developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)). The plugin aims to offer features such as syntax highlighting, autocompletion, diagnostics, hover information, go-to-definition, and potentially more, mirroring the capabilities of the Tinymist VSCode extension.
+The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs.
+We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)).
+
+## Development Instructions
+
+1.  **Prerequisites:**
+    *   **IntelliJ IDEA:** For developing IntelliJ plugins, this is the most convenient IDE.
+
+
+2.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/Myriad-Dreamin/tinymist.git
+    cd tinymist/editors/intellij
+    ```
+
+3.  **Open in IntelliJ IDEA:**
+    *   Open IntelliJ IDEA.
+    *   Select "Open" and navigate to the `editors/intellij` directory of the cloned repository.
+    *   IntelliJ should automatically recognize it as a Gradle project. If not, you might need to import it as a Gradle project.
+
+
+4.  **Build the Plugin:**
+    *   Wait for Gradle sync to complete and download all dependencies.
+    *   You can build the plugin using the Gradle tool window in IntelliJ (Tasks > intellij > buildPlugin) or via the terminal:
+        ```bash
+        ./gradlew buildPlugin
+        ```
+
+5.  **Run/Debug:**
+    *   Use the Gradle task `runIde` (Tasks > intellij > runIde) from the Gradle tool window or terminal:
+        ```bash
+        ./gradlew runIde
+        ```
+    *   This will launch a blank IntelliJ IDEA instance with the Tinymist plugin installed.
+    *   You can then create or open a Typst project/file in this sandbox environment to test the plugin's features.
+    *   Standard debugging tools (breakpoints, etc.) can be used in your main IntelliJ IDEA instance where the plugin code is open.
+
+6.  **`tinymist` Language Server Path:**
+    *   The plugin currently relies on `TinymistLspStreamConnectionProvider.kt` to find the `tinymist` executable. It searches the system `PATH`.
+    *   Ensure that `tinymist` is installed on your system.
+
+7.  **Viewing Logs:**
+    *   **IntelliJ Plugin Logs:** Check the `idea.log` file of the sandboxed IntelliJ instance. You can find its location via "Help" > "Show Log in Finder/Explorer" in the sandbox IDE.
+    *   **LSP Communication Logs:** `lsp4ij` provides an "LSP Consoles" view in the sandbox IDE (usually accessible from the tool window bar at the bottom left). Set its verbosity (e.g., to "verbose") via `Languages & Frameworks > Language Servers` settings to see JSON-RPC messages between the plugin and `tinymist`.
+
 
 ## Project Roadmap & Status
 
@@ -18,9 +64,8 @@ The goal of this project is to provide comprehensive Typst language support for 
 
 ### II. Current Focus & Active Debugging
 *   **Preview Panel Scrolling Performance:**
-    *   **Issue:** Significant scrolling lag/input delay in the JCEF-based preview panel. Lag is affected by JCEF DevTools/FPS meter.
-    *   **Active Investigation (User):** Resolving `npm install` errors in `tools/typst-preview-frontend` to enable `yarn build:preview`. Goal is to rebuild `tinymist` with an instrumented frontend to capture detailed performance logs related to scroll event handling.
-    *   **Frontend Build Workflow Confirmed:**
+    *   **Issue:** Significant scrolling lag/input delay in the JCEF-based preview panel. Lag is affected by JCEF DevTools/FPS meter. https://github.com/Myriad-Dreamin/tinymist/issues/1746 
+    *   **Frontend Build Workflow Confirmed for printf debugging**
         1.  Build frontend: `yarn build:preview` (from `tinymist` root) -> copies `typst-preview.html` to `crates/tinymist-assets/src/`.
         2.  Configure `tinymist/Cargo.toml`: Use local path for `tinymist-assets` (`tinymist-assets = { path = "./crates/tinymist-assets/" }`).
         3.  Rebuild `tinymist`: `cargo build`.
@@ -36,13 +81,13 @@ The goal of this project is to provide comprehensive Typst language support for 
 *   **`textDocument/hover` (Hover Information):** Partially working; highlighting issue (potentially related to Go-To-Definition).
 *   **`documentHighlight` (Other LSP Features):** Pending.
 
-### IV. Immediate Next Steps (High Priority - Post Current Debugging)
+### IV. Next Steps
 *   **`textDocument/references` (Find Usages):** Implement this core LSP feature.
 *   **Stabilize Preview Panel Integration:**
     *   Based on feedback from the GitHub issue and potential fixes, ensure smooth and reliable preview rendering and interaction.
     *   Refine LSP interaction for preview if needed (e.g., scroll sync, theme changes via `JBCefJSQuery`).
 
-### V. Planned Features & Enhancements (Longer Term)
+### V. Planned Features & Enhancements
 *   **IntelliJ Settings Panel:**
     *   Configure path to `tinymist` executable.
     *   Configure font paths, PDF export options.
@@ -66,19 +111,6 @@ The goal of this project is to provide comprehensive Typst language support for 
 *   Hardcoded Configuration Defaults in `TinymistInitializationOptions` (e.g., `colorTheme`, preview URL - review what should be settings).
 *   Incomplete Parser Definition Features (Evaluate if still relevant).
 *   JCEF Preview Placeholder Content: Largely addressed as `tinymist` serves its own UI.
-
-### VII. Preview Architecture Notes (Reference)
-
-*   **Strategy:** Leverage `tinymist`'s built-in preview server.
-*   **IntelliJ Plugin Role:**
-    *   Pass `preview.background.enabled = true` in `TinymistInitializationOptions`.
-    *   `TypstPreviewFileEditor` hosts JCEF browser, loads URL from `tinymist`'s preview server.
-    *   Plugin does NOT serve its own static assets for preview.
-*   **Communication:**
-    *   JCEF client JS establishes WebSocket to `tinymist` server for rendering updates.
-    *   `JBCefJSQuery` for side-channel communication (theme, scroll sync) if needed.
-*   `TypstPreviewFileEditor.updateContent()`: Confirmed unnecessary for main rendering.
-
 
 ## Project Architecture and File Overview
 
@@ -107,15 +139,18 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
     *   **`TypstSyntaxHighlighter.kt` & `TypstSyntaxHighlighterFactory.kt`**:
         *   `TypstSyntaxHighlighterFactory` implements `com.intellij.openapi.fileTypes.SyntaxHighlighterFactory` and provides instances of `TypstSyntaxHighlighter`.
         *   `TypstSyntaxHighlighter` (subclass of `com.intellij.openapi.fileTypes.SyntaxHighlighterBase`) uses the `TypstLexerAdapter`. It assigns a default text attribute to the `TYPST_TEXT` token. Actual rich syntax highlighting is expected to come from the LSP server via semantic token support.
+    *   **`TypstFindUsagesProvider.kt`**: Implements `com.intellij.lang.findUsages.FindUsagesProvider`. Registered in `plugin.xml` to enable IntelliJ's "Find Usages" action for Typst files. Relies on `lsp4ij` and the language server to perform the actual search.
 
 3.  **LSP (Language Server Protocol) Integration (`lsp/` directory):**
-    *   **`TinymistLanguageServerFactory.kt`**: Implements `com.redhat.devtools.lsp4ij.LanguageServerFactory`. Its primary role is to create and provide an instance of the `StreamConnectionProvider` for the Tinymist language server. It instantiates `TinymistLspStreamConnectionProvider`. This factory is registered in `plugin.xml`.
+    *   **`TinymistLanguageServerFactory.kt`**: Implements `com.redhat.devtools.lsp4ij.LanguageServerFactory`. Its primary role is to create and provide instances of `TinymistLspStreamConnectionProvider` and `TinymistLanguageClient`. This factory is registered in `plugin.xml`.
     *   **`TinymistLspStreamConnectionProvider.kt`**: Extends `com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider`. This is a crucial class for managing the lifecycle and communication with the `tinymist` LSP executable.
         *   In its `init` block, it calls `findTinymistExecutable()` to locate the `tinymist` binary on the system's PATH.
         *   It then uses `super.setCommands()` to configure the command to start the server (e.g., `["path/to/tinymist", "lsp"]`).
         *   `getWorkingDirectory()`: Returns the project's base path as the working directory for the LSP server.
         *   `getInitializationOptions()`: Constructs and returns a `TinymistInitializationOptions` object. This object is serialized to JSON and sent to the LSP server as part of the `initialize` request. It allows passing client-specific configurations to the server on startup.
     *   **`TinymistInitializationOptions.kt`**: A Kotlin data class that defines the structure of the initialization options sent to the `tinymist` server. It includes fields like `font.fontPaths`, `semanticTokens`, `completion`, `lint`, etc., mirroring configurations available in the Tinymist VSCode extension.
+    *   **`TinymistLanguageClient.kt`**: Extends `com.redhat.devtools.lsp4ij.client.LanguageClientImpl`. This custom client is responsible for handling Tinymist-specific LSP notifications, such as `tinymist/documentOutline` and `tinymist/document`. It uses `@JsonNotification` annotations to map these notifications to handler methods.
+    *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TinymistDocumentOutlineParams`, `TinymistOutlineItem`) that represent the expected JSON structure of the `tinymist/documentOutline` notification. These classes are used for deserializing the notification payload.
 
 4.  **Preview Panel (`preview/` directory):**
     *   **`TypstPreviewFileEditor.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditor`. This class is responsible for rendering the Typst preview.
@@ -130,6 +165,15 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   Its registration in `plugin.xml` is currently commented out, suggesting the `TextEditorWithPreviewProvider` is the preferred method for preview.
         *   The current implementation creates a simple JPanel with a placeholder label.
 
+5.  **Structure View Integration (`structure/` directory):**
+    *   **`TypstStructureViewFactory.kt`**: Implements `com.intellij.lang.PsiStructureViewFactory`. Registered in `plugin.xml`, it provides a `StructureViewBuilder` for Typst files, which in turn creates the `TypstStructureViewModel`.
+        *   Contains a placeholder `OutlineDataHolder` object to temporarily store outline data received from the LSP. This is a basic mechanism and will need refinement for robust data propagation and view refresh.
+    *   **`TypstStructureViewModel.kt`**: Extends `com.intellij.ide.structureView.StructureViewModelBase`. It defines the data model for the structure view, using `TinymistOutlineItem` data. It's responsible for providing the root element and any sorters or filters.
+        *   Includes a nested `TypstStructureViewRootElement` which wraps the `PsiFile` and provides the top-level items based on `TinymistOutlineItem` data.
+        *   Has an `updateOutline()` method as a placeholder for refreshing the view when new outline data arrives (actual refresh mechanism TBD).
+    *   **`TypstStructureViewElement.kt`**: Implements `com.intellij.ide.structureView.StructureViewTreeElement` and `com.intellij.navigation.NavigationItem`. Represents each individual item (node) in the structure view tree, handling its presentation (text, icon) and navigation.
+        *   **Note**: Currently, the Structure View uses mock data (`OutlineDataHolder` in `TypstStructureViewFactory.kt`) if the actual data from `tinymist/documentOutline` is not available or is too sparse. This needs to be replaced with robust data fetching and updating from the `TinymistLanguageClient`.
+
 ### Resources (`src/main/resources/`)
 
 *   **`META-INF/plugin.xml`**: The plugin descriptor. This XML file declares the plugin's existence and its components to the IntelliJ Platform. Key declarations include:
@@ -138,6 +182,8 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   `fileType`: Associates `.typ` extension with `TypstFileType` and `TypstLanguage`.
         *   `lang.parserDefinition`: Registers `TypstParserDefinition` for `TypstLanguage`.
         *   `lang.syntaxHighlighterFactory`: Registers `TypstSyntaxHighlighterFactory` for `TypstLanguage`.
+        *   `lang.findUsagesProvider`: Registers `TypstFindUsagesProvider` for `TypstLanguage`.
+        *   `lang.psiStructureViewFactory`: Registers `TypstStructureViewFactory` for `TypstLanguage` to enable the Structure View.
         *   `fileEditorProvider`: Registers `TypstTextEditorWithPreviewProvider` to enable the split text/preview editor for Typst files.
     *   **`<extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">`**:
         *   `server`: Defines the "tinymistServer", specifying `TinymistLanguageServerFactory` as its factory.
@@ -161,5 +207,3 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
     *   Receives initialization options (`TinymistInitializationOptions`).
     *   Provides semantic information: diagnostics, completions, hover info, go-to-definition, semantic highlighting, etc.
     *   Expected to provide HTML/SVG content for the preview panel, or an HTTP endpoint from which the JCEF browser can load the preview. Interactions like `tinymist/previewStart`, `tinymist/updatePreview` will be handled by custom LSP message handlers (to be implemented or refined).
-
-This architecture relies heavily on LSP4IJ to bridge the IntelliJ Platform with the `tinymist` language server, allowing the plugin to focus on specific integrations like the JCEF preview and user settings, while leveraging `tinymist` for core language intelligence.
