@@ -23,6 +23,7 @@ pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opti
 }
 
 /// Try to determine a set of possible values for an expression.
+#[typst_macros::time(span = node.span())]
 pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
     let Some(expr) = node.cast::<ast::Expr>() else {
         return eco_vec![];
@@ -51,6 +52,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
 }
 
 /// Try to load a module from the current source file.
+#[typst_macros::time(span = source.span())]
 pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
     let source_span = source.span();
     let Some((source, _)) = analyze_expr_(world, source).into_iter().next() else {
@@ -109,6 +111,7 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
+#[typst_macros::time]
 pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 

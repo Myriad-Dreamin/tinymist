@@ -2,21 +2,24 @@
 
 mod args;
 
+use core::fmt;
+use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
 use futures::future::MaybeDone;
+use parking_lot::Mutex;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
 use sync_ls::transport::{with_stdio_transport, MirrorArgs};
 use sync_ls::{
-    internal_error, DapBuilder, DapMessage, LspBuilder, LspClientRoot, LspMessage, LspResult,
-    RequestId,
+    internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
+    LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
 use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
 use tinymist::tool::testing::{coverage_main, test_main};
@@ -25,10 +28,12 @@ use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, User
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
+use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
 
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
+use typst::ecow::EcoString;
 
 use crate::args::*;
 
@@ -140,7 +145,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
 
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
-        let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client = client_root(conn.sender);
         ServerState::install_lsp(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
@@ -168,7 +173,7 @@ pub fn dap_main(args: DapArgs) -> Result<()> {
 
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
-        let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client = client_root(conn.sender);
         ServerState::install_dap(DapBuilder::new(
             DapRegularInit {
                 client: client.weak().to_typed(),
@@ -204,7 +209,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
     }
 
     with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
-        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client_root = client_root(conn.sender);
         let client = client_root.weak();
         let roots = vec![ImmutPath::from(root_path)];
         let config = Config {
@@ -265,7 +270,7 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
 
     with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
-        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client_root = client_root(conn.sender);
         let client = client_root.weak();
 
         // todo: roots, inputs, font_opts
@@ -335,4 +340,67 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+/// Creates a new language server host.
+fn client_root<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
+    sender: TConnectionTx<M>,
+) -> LspClientRoot {
+    LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), sender)
+        .with_hook(Arc::new(TypstLsHook::default()))
+}
+
+#[derive(Default)]
+struct TypstLsHook(Mutex<FxHashMap<RequestId, typst_timing::TimingScope>>);
+
+impl fmt::Debug for TypstLsHook {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TypstLsHook").finish()
+    }
+}
+
+impl LsHook for TypstLsHook {
+    fn start_request(&self, req_id: &RequestId, method: &str) {
+        ().start_request(req_id, method);
+
+        if let Some(scope) = typst_timing::TimingScope::new(static_str(method)) {
+            let mut map = self.0.lock();
+            map.insert(req_id.clone(), scope);
+        }
+    }
+
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: std::time::Instant) {
+        ().stop_request(req_id, method, received_at);
+
+        if let Some(scope) = self.0.lock().remove(req_id) {
+            let _ = scope;
+        }
+    }
+
+    fn start_notification(&self, method: &str) {
+        ().start_notification(method);
+    }
+
+    fn stop_notification(
+        &self,
+        method: &str,
+        received_at: std::time::Instant,
+        result: LspResult<()>,
+    ) {
+        ().stop_notification(method, received_at, result);
+    }
+}
+
+fn static_str(s: &str) -> &'static str {
+    static STRS: Mutex<FxHashMap<EcoString, &'static str>> =
+        Mutex::new(HashMap::with_hasher(FxBuildHasher));
+
+    let mut strs = STRS.lock();
+    if let Some(&s) = strs.get(s) {
+        return s;
+    }
+
+    let static_ref: &'static str = String::from(s).leak();
+    strs.insert(static_ref.into(), static_ref);
+    static_ref
 }

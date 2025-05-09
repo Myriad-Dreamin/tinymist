@@ -54,7 +54,10 @@ export interface StyleAtCursor {
 
 // import { traceDataMock } from "./vscode.trace.mock";
 // export const traceData = van.state<TraceReport | undefined>(traceDataMock);
-export const traceData = van.state<TraceReport | undefined>(undefined);
+export const programTrace = van.state<TraceReport | undefined>(undefined);
+export const serverTrace = van.state<any | undefined>(undefined);
+
+export const didStartServerProfiling = van.state<boolean>(false);
 
 export const styleAtCursor = van.state<StyleAtCursor | undefined>(undefined);
 
@@ -66,7 +69,11 @@ export function setupVscodeChannel() {
     window.addEventListener("message", (event: any) => {
       switch (event.data.type) {
         case "traceData": {
-          traceData.val = event.data.data;
+          programTrace.val = event.data.data;
+          break;
+        }
+        case "didStartServerProfiling": {
+          serverTrace.val = event.data.data;
           break;
         }
         case "styleAtCursor": {
@@ -101,6 +108,11 @@ export function requestRevealPath(path: string) {
   }
 }
 
+export function stopServerProfiling() {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "stopServerProfiling" });
+  }
+}
 export interface TextEdit {
   range?: undefined;
   newText:
@@ -135,7 +147,7 @@ export function requestTextEdit(edit: TextEdit) {
     navigator.clipboard.writeText(
       typeof edit.newText === "string"
         ? edit.newText
-        : edit.newText.code || edit.newText.rest || ""
+        : edit.newText.code || edit.newText.rest || "",
     );
   }
 }

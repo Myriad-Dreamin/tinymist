@@ -29,6 +29,7 @@ pub struct TypeEnv {
 }
 
 /// Type checking at the source unit level.
+#[typst_macros::time(span = ei.source.root().span())]
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
     ei: ExprInfo,
@@ -228,14 +229,14 @@ impl TypeChecker<'_> {
         &mut self,
         sig: &Interned<SigTy>,
         args: &Interned<SigTy>,
-        withs: Option<&Vec<Interned<SigTy>>>,
+        with: Option<&Vec<Interned<SigTy>>>,
     ) {
-        let call_desc = (sig.clone(), args.clone(), withs.cloned());
+        let call_desc = (sig.clone(), args.clone(), with.cloned());
         if !self.call_cache.insert(call_desc) {
             return;
         }
 
-        for (arg_recv, arg_ins) in sig.matches(args, withs) {
+        for (arg_recv, arg_ins) in sig.matches(args, with) {
             self.constrain(arg_ins, arg_recv);
         }
     }

@@ -8,6 +8,7 @@ use tinymist_world::package::PackageSpec;
 use super::prelude::*;
 
 /// Get link expressions from a source.
+#[typst_macros::time(span = src.root().span())]
 #[comemo::memoize]
 pub fn get_link_exprs(src: &Source) -> Arc<LinkInfo> {
     let root = LinkedNode::new(src.root());

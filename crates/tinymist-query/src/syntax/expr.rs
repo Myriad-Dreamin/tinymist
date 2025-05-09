@@ -28,6 +28,7 @@ use super::{compute_docstring, def::*, DocCommentMatcher, InterpretMode};
 
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
+#[typst_macros::time(span = source.root().span())]
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,

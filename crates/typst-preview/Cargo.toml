@@ -12,6 +12,8 @@ rust-version.workspace = true
 
 [dependencies]
 typst.workspace = true
+typst-macros.workspace = true
+typst-timing.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
 typst-assets.workspace = true

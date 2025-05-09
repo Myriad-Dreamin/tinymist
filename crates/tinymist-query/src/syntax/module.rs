@@ -18,6 +18,7 @@ pub struct ModuleDependency {
 /// It will scan all the files in the context, using
 /// [`LocalContext::source_files`], and find the dependencies and dependents
 /// of each file.
+#[typst_macros::time]
 pub fn construct_module_dependencies(
     ctx: &mut LocalContext,
 ) -> HashMap<TypstFileId, ModuleDependency> {

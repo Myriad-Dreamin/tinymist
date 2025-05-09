@@ -30,6 +30,18 @@ pub enum SignatureTarget {
     Convert(Func),
 }
 
+impl SignatureTarget {
+    /// Returns the span of the callee node.
+    pub fn span(&self) -> Span {
+        match self {
+            SignatureTarget::Def(_, def) => def.decl.span(),
+            SignatureTarget::SyntaxFast(_, span) | SignatureTarget::Syntax(_, span) => *span,
+            SignatureTarget::Runtime(func) | SignatureTarget::Convert(func) => func.span(),
+        }
+    }
+}
+
+#[typst_macros::time(span = callee_node.span())]
 pub(crate) fn analyze_signature(
     ctx: &Arc<SharedContext>,
     callee_node: SignatureTarget,
@@ -41,6 +53,7 @@ pub(crate) fn analyze_signature(
     })
 }
 
+#[typst_macros::time(span = callee_node.span())]
 fn analyze_type_signature(
     ctx: &Arc<SharedContext>,
     callee_node: &SignatureTarget,
@@ -315,6 +328,7 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
     }
 }
 
+#[typst_macros::time(span = callee_node.span())]
 fn analyze_dyn_signature(
     ctx: &Arc<SharedContext>,
     callee_node: &SignatureTarget,

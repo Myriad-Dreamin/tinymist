@@ -199,8 +199,16 @@ impl LspClientRoot {
             msg_kind: M::get_message_kind(),
             sender: Arc::downgrade(&_strong),
             req_queue: Arc::new(Mutex::new(ReqQueue::default())),
+
+            hook: Arc::new(()),
         };
         Self { weak, _strong }
+    }
+
+    /// Sets the hook for the language server host.
+    pub fn with_hook(mut self, hook: Arc<dyn LsHook>) -> Self {
+        self.weak.hook = hook;
+        self
     }
 
     /// Returns the weak reference to the language server host.
@@ -221,6 +229,8 @@ pub struct LspClient {
     pub(crate) msg_kind: MessageKind,
     pub(crate) sender: Weak<ConnectionTx>,
     pub(crate) req_queue: Arc<Mutex<ReqQueue>>,
+
+    pub(crate) hook: Arc<dyn LsHook>,
 }
 
 impl LspClient {
@@ -290,7 +300,7 @@ impl LspClient {
     /// Registers an client2server request in the request queue.
     pub fn register_request(&self, method: &str, id: &RequestId, received_at: Instant) {
         let mut req_queue = self.req_queue.lock();
-        self.start_request(id, method);
+        self.hook.start_request(id, method);
         req_queue
             .incoming
             .register(id.clone(), (method.to_owned(), received_at));
@@ -327,7 +337,7 @@ impl LspClient {
             return;
         };
 
-        self.stop_request(&id, &method, received_at);
+        self.hook.stop_request(&id, &method, received_at);
 
         let Some(sender) = self.sender.upgrade() else {
             log::warn!("failed to send response ({method}, {id}): connection closed");
@@ -380,7 +390,19 @@ impl LspClient {
     }
 }
 
-impl LspClient {
+/// A trait that defines the hook for the language server.
+pub trait LsHook: fmt::Debug + Send + Sync {
+    /// Starts a request.
+    fn start_request(&self, req_id: &RequestId, method: &str);
+    /// Stops a request.
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant);
+    /// Starts a notification.
+    fn start_notification(&self, method: &str);
+    /// Stops a notification.
+    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>);
+}
+
+impl LsHook for () {
     fn start_request(&self, req_id: &RequestId, method: &str) {
         log::info!("handling {method} - ({req_id})");
     }

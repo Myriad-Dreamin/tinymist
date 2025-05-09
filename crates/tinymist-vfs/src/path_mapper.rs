@@ -281,6 +281,33 @@ impl fmt::Debug for Resolving {
     }
 }
 
+impl fmt::Display for Resolving {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use WorkspaceResolution::*;
+        let Some(id) = self.id else {
+            return write!(f, "unresolved-path");
+        };
+
+        let path = match WorkspaceResolver::resolve(id) {
+            Ok(Workspace(workspace)) => id.vpath().resolve(&workspace.path()),
+            Ok(UntitledRooted(..)) => Some(id.vpath().as_rootless_path().to_owned()),
+            Ok(Rootless | Package) | Err(_) => None,
+        };
+
+        if let Some(path) = path {
+            write!(f, "{}", path.display())
+        } else {
+            let pkg = id.package();
+            match pkg {
+                Some(pkg) => {
+                    write!(f, "{pkg}{}", id.vpath().as_rooted_path().display())
+                }
+                None => write!(f, "{}", id.vpath().as_rooted_path().display()),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

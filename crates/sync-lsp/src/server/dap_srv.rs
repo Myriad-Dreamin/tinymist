@@ -260,7 +260,7 @@ where
 
     /// Handles an incoming event.
     fn on_event(&mut self, received_at: Instant, not: dap::Event) -> anyhow::Result<()> {
-        self.client.start_notification(&not.event);
+        self.client.hook.start_notification(&not.event);
         let handle = |s,
                       dap::Event {
                           seq: _,
@@ -273,7 +273,9 @@ where
             };
 
             let result = handler(s, body);
-            self.client.stop_notification(&event, received_at, result);
+            self.client
+                .hook
+                .stop_notification(&event, received_at, result);
 
             Ok(())
         };

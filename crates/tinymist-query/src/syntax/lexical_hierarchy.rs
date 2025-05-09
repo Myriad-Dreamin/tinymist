@@ -11,6 +11,7 @@ use typst_shim::utils::LazyHash;
 
 use super::{is_mark, CommentGroupMatcher};
 
+#[typst_macros::time(span = source.root().span())]
 pub(crate) fn get_lexical_hierarchy(
     source: &Source,
     scope_kind: LexicalScopeKind,

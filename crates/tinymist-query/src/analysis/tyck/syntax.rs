@@ -12,6 +12,7 @@ static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
 impl TypeChecker<'_> {
+    #[typst_macros::time(span = expr.span())]
     pub(crate) fn check_syntax(&mut self, expr: &Expr) -> Option<Ty> {
         Some(match expr {
             Expr::Block(exprs) => self.check_block(exprs),
