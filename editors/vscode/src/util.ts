@@ -3,11 +3,21 @@ import * as path from "path";
 import { ViewColumn } from "vscode";
 import { readFile } from "fs/promises";
 import { isGitpod, translateGitpodURL } from "./gitpod";
+import { strict as nativeAssert } from "assert";
 
 export const typstDocumentSelector = [
   { scheme: "file", language: "typst" },
   { scheme: "untitled", language: "typst" },
 ];
+
+export function assert(condition: boolean, explanation: string): asserts condition {
+  try {
+    nativeAssert(condition, explanation);
+  } catch (err) {
+    console.error(`Assertion failed:`, explanation);
+    throw err;
+  }
+}
 
 const bytes2utf8 = new TextDecoder("utf-8");
 const utf82bytes = new TextEncoder();

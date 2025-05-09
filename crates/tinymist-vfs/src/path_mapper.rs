@@ -48,6 +48,15 @@ impl PathResolution {
             }
         }
     }
+
+    pub fn resolve_to(&self, path: &VirtualPath) -> Option<PathResolution> {
+        match self {
+            PathResolution::Resolved(root) => Some(PathResolution::Resolved(path.resolve(root)?)),
+            PathResolution::Rootless(root) => Some(PathResolution::Rootless(Cow::Owned(
+                VirtualPath::new(path.resolve(root.as_ref().as_rooted_path())?),
+            ))),
+        }
+    }
 }
 
 pub trait RootResolver {

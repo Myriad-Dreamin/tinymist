@@ -297,7 +297,7 @@ mod polymorphic {
         DocumentLink(Option<Vec<DocumentLink>>),
         DocumentHighlight(Option<Vec<DocumentHighlight>>),
         ColorPresentation(Option<Vec<ColorPresentation>>),
-        CodeAction(Option<Vec<CodeActionOrCommand>>),
+        CodeAction(Option<Vec<CodeAction>>),
         CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionList>),
         SignatureHelp(Option<SignatureHelp>),

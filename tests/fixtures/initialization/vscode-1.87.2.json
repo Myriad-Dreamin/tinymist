@@ -276,6 +276,7 @@
     "triggerParameterHints": true,
     "triggerSuggestAndParameterHints": true,
     "supportHtmlInMarkdown": true,
+    "supportExtendedCodeAction": true,
     "customizedShowDocument": true,
     "experimentalFormatterMode": "disable"
   },

@@ -7,14 +7,14 @@ pub use std::sync::{Arc, LazyLock, OnceLock};
 pub use ecow::{eco_vec, EcoVec};
 pub use itertools::Itertools;
 pub use lsp_types::{
-    request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
-    ColorInformation, ColorPresentation, Diagnostic, DiagnosticRelatedInformation,
-    DiagnosticSeverity, DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
-    Location as LspLocation, LocationLink, MarkedString, MarkupContent, MarkupKind,
-    ParameterInformation, Position as LspPosition, PrepareRenameResponse, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
-    SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
+    request::GotoDeclarationResponse, CodeActionKind, CodeLens, ColorInformation,
+    ColorPresentation, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
+    DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
+    FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint, Location as LspLocation,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, ParameterInformation,
+    Position as LspPosition, PrepareRenameResponse, SelectionRange, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
+    SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
 pub use serde_json::Value as JsonValue;
 pub use tinymist_project::LspComputeGraph;
@@ -29,6 +29,7 @@ pub use typst::World;
 pub use typst_shim::syntax::LinkedNodeExt;
 
 pub use crate::analysis::{Definition, LocalContext};
+pub use crate::code_action::proto::*;
 pub use crate::docs::DefDocs;
 pub use crate::lsp_typst_boundary::{
     path_to_url, to_lsp_position, to_lsp_range, to_typst_position, to_typst_range, LspRange,

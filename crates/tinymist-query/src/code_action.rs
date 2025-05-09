@@ -2,6 +2,8 @@ use lsp_types::CodeActionContext;
 
 use crate::{analysis::CodeActionWorker, prelude::*, SemanticRequest};
 
+pub(crate) mod proto;
+
 /// The [`textDocument/codeAction`] request is sent from the client to the
 /// server to compute commands for a given text document and range. These
 /// commands are typically code fixes to either fix problems or to
@@ -71,7 +73,7 @@ pub struct CodeActionRequest {
 }
 
 impl SemanticRequest for CodeActionRequest {
-    type Response = Vec<CodeActionOrCommand>;
+    type Response = Vec<CodeAction>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         log::info!("requested code action: {self:?}");
@@ -81,7 +83,8 @@ impl SemanticRequest for CodeActionRequest {
 
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
-        worker.work(root, range);
+        worker.autofix(&root, &range, &self.context);
+        worker.scoped(&root, &range);
 
         (!worker.actions.is_empty()).then_some(worker.actions)
     }

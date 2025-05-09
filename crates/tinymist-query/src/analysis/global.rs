@@ -65,6 +65,14 @@ pub struct Analysis {
     pub allow_multiline_token: bool,
     /// Whether to remove html from markup content in responses.
     pub remove_html: bool,
+    /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
+    /// side.
+    ///
+    /// The extended feature by `tinymist.resolveCodeAction`:
+    /// - supports Snippet edit.
+    ///
+    /// The example implementation can be found in the VS Code extension.
+    pub extended_code_action: bool,
     /// Tinymist's completion features.
     pub completion_feat: CompletionFeat,
     /// The editor's color theme.
