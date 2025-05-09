@@ -69,7 +69,6 @@ Enable or disable semantic tokens (LSP syntax highlighting)
 Enable or disable lint checks. Note: restarting the editor is required to change this setting.
 
 - **Type**: `boolean`
-- **Default**: `true`
 
 ## `tinymist.lint.when`
 

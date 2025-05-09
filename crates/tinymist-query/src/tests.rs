@@ -275,7 +275,7 @@ fn match_by_pos(mut n: LinkedNode, prev: bool, ident: bool) -> usize {
     n.offset()
 }
 
-pub fn make_pos_annoation(source: &Source) -> (LspPosition, String) {
+pub fn make_pos_annotation(source: &Source) -> (LspPosition, String) {
     let pos = find_test_typst_pos(source);
     let range_before = pos.saturating_sub(10)..pos;
     let range_after = pos..pos.saturating_add(10).min(source.text().len());
@@ -287,7 +287,7 @@ pub fn make_pos_annoation(source: &Source) -> (LspPosition, String) {
     (pos, format!("{window_before}|{window_after}"))
 }
 
-pub fn make_range_annoation(source: &Source) -> String {
+pub fn make_range_annotation(source: &Source) -> String {
     let range = find_test_range_(source);
     let range_before = range.start.saturating_sub(10)..range.start;
     let range_window = range.clone();

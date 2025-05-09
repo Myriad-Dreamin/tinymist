@@ -1,4 +1,8 @@
+use lsp_types::CodeActionContext;
+
 use crate::{analysis::CodeActionWorker, prelude::*, SemanticRequest};
+
+pub(crate) mod proto;
 
 /// The [`textDocument/codeAction`] request is sent from the client to the
 /// server to compute commands for a given text document and range. These
@@ -64,18 +68,23 @@ pub struct CodeActionRequest {
     pub path: PathBuf,
     /// The range of the document to get code actions for.
     pub range: LspRange,
+    /// The context of the code action request.
+    pub context: CodeActionContext,
 }
 
 impl SemanticRequest for CodeActionRequest {
-    type Response = Vec<CodeActionOrCommand>;
+    type Response = Vec<CodeAction>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
+        log::info!("requested code action: {self:?}");
+
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
-        worker.work(root, range);
+        worker.autofix(&root, &range, &self.context);
+        worker.scoped(&root, &range);
 
         (!worker.actions.is_empty()).then_some(worker.actions)
     }
@@ -94,12 +103,13 @@ mod tests {
             let request = CodeActionRequest {
                 path: path.clone(),
                 range: find_test_range(&source),
+                context: CodeActionContext::default(),
             };
 
             let result = request.request(ctx);
 
             with_settings!({
-                description => format!("Code Action on {}", make_range_annoation(&source)),
+                description => format!("Code Action on {}", make_range_annotation(&source)),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             })

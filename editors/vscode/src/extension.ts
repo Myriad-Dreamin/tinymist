@@ -34,6 +34,7 @@ import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { commandShow, exportActivate, quickExports } from "./features/export";
+import { resolveCodeAction } from "./lsp.code-action";
 
 LanguageState.Client = LanguageClient;
 
@@ -224,6 +225,8 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
     commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
 
+    // similar to `rust-analyzer.resolveCodeAction` from https://github.com/rust-lang/rust-analyzer
+    commands.registerCommand("tinymist.resolveCodeAction", resolveCodeAction()),
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),

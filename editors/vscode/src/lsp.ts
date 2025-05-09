@@ -2,6 +2,8 @@ import { spawnSync } from "child_process";
 import { resolve } from "path";
 
 import * as vscode from "vscode";
+import * as lc from "vscode-languageclient";
+import * as Is from "vscode-languageclient/lib/common/utils/is";
 import { ExtensionMode } from "vscode";
 import type {
   LanguageClient,
@@ -237,6 +239,46 @@ export class LanguageState {
 
           await hoverHandler.finish();
           return hover;
+        },
+        // Using custom handling of CodeActions to support action groups and snippet edits.
+        // Note that this means we have to re-implement lazy edit resolving ourselves as well.
+        async provideCodeActions(
+          document: vscode.TextDocument,
+          range: vscode.Range,
+          context: vscode.CodeActionContext,
+          token: vscode.CancellationToken,
+          _next: lc.ProvideCodeActionsSignature,
+        ) {
+          const params: lc.CodeActionParams = {
+            textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(document),
+            range: client.code2ProtocolConverter.asRange(range),
+            context: await client.code2ProtocolConverter.asCodeActionContext(context, token),
+          };
+          const callback = async (
+            values: (lc.Command | lc.CodeAction)[] | null,
+          ): Promise<(vscode.Command | vscode.CodeAction)[] | undefined> => {
+            if (values === null) return undefined;
+            const result: (vscode.CodeAction | vscode.Command)[] = [];
+            for (const item of values) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const kind = client.protocol2CodeConverter.asCodeActionKind((item as any).kind);
+              const action = new vscode.CodeAction(item.title, kind);
+              action.command = {
+                command: "tinymist.resolveCodeAction",
+                title: item.title,
+                arguments: [item],
+              };
+              // console.log("replace", action, "=>", action);
+
+              // Set a dummy edit, so that VS Code doesn't try to resolve this.
+              action.edit = new vscode.WorkspaceEdit();
+              result.push(action);
+            }
+            return result;
+          };
+          return client
+            .sendRequest(lc.CodeActionRequest.type, params, token)
+            .then(callback, (_error) => undefined);
         },
       },
     };
@@ -597,4 +639,17 @@ export interface SymbolInfo {
   name: string;
   kind: string;
   children: SymbolInfo[];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isCodeActionWithoutEditsAndCommands(value: any): boolean {
+  const candidate: lc.CodeAction = value;
+  return (
+    candidate &&
+    Is.string(candidate.title) &&
+    (candidate.diagnostics === void 0 || Is.typedArray(candidate.diagnostics, lc.Diagnostic.is)) &&
+    (candidate.kind === void 0 || Is.string(candidate.kind)) &&
+    candidate.edit === void 0 &&
+    candidate.command === void 0
+  );
 }

@@ -377,11 +377,11 @@ type Cursor<'a> = CompletionCursor<'a>;
 
 /// A node selected by [`CompletionCursor`].
 enum SelectedNode<'a> {
-    /// Selects an identifier, e.g. `foo|` or `fo|o`.
+    /// Selects an identifier, e.g. `foobar|` or `foo|bar`.
     Ident(LinkedNode<'a>),
-    /// Selects a label, e.g. `<foo|>` or `<fo|o>`.
+    /// Selects a label, e.g. `<foobar|>` or `<foo|bar>`.
     Label(LinkedNode<'a>),
-    /// Selects a reference, e.g. `@foo|` or `@fo|o`.
+    /// Selects a reference, e.g. `@foobar|` or `@foo|bar`.
     Ref(LinkedNode<'a>),
 }
 

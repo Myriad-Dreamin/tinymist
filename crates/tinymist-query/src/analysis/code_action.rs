@@ -1,8 +1,13 @@
 //! Provides code actions for the document.
 
+use ecow::eco_format;
+use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
 use regex::Regex;
-use tinymist_analysis::syntax::{adjust_expr, node_ancestors, SyntaxClass};
+use tinymist_analysis::syntax::{
+    adjust_expr, node_ancestors, previous_items, PreviousItem, SyntaxClass,
+};
 use tinymist_std::path::{diff, unix_slash};
+use typst::syntax::Side;
 
 use super::get_link_exprs_in;
 use crate::analysis::LinkTarget;
@@ -16,7 +21,7 @@ pub struct CodeActionWorker<'a> {
     /// The source document to analyze.
     source: Source,
     /// The code actions to provide.
-    pub actions: Vec<CodeActionOrCommand>,
+    pub actions: Vec<CodeAction>,
     /// The lazily calculated local URL to [`Self::source`].
     local_url: OnceLock<Option<Url>>,
 }
@@ -39,20 +44,200 @@ impl<'a> CodeActionWorker<'a> {
     }
 
     #[must_use]
-    fn local_edits(&self, edits: Vec<TextEdit>) -> Option<WorkspaceEdit> {
-        Some(WorkspaceEdit {
+    fn local_edits(&self, edits: Vec<EcoSnippetTextEdit>) -> Option<EcoWorkspaceEdit> {
+        Some(EcoWorkspaceEdit {
             changes: Some(HashMap::from_iter([(self.local_url()?.clone(), edits)])),
             ..Default::default()
         })
     }
 
     #[must_use]
-    fn local_edit(&self, edit: TextEdit) -> Option<WorkspaceEdit> {
+    fn local_edit(&self, edit: EcoSnippetTextEdit) -> Option<EcoWorkspaceEdit> {
         self.local_edits(vec![edit])
     }
 
+    pub(crate) fn autofix(
+        &mut self,
+        root: &LinkedNode<'_>,
+        range: &Range<usize>,
+        context: &lsp_types::CodeActionContext,
+    ) -> Option<()> {
+        if let Some(only) = &context.only {
+            if !only.is_empty()
+                && !only
+                    .iter()
+                    .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
+            {
+                return None;
+            }
+        }
+
+        for diag in &context.diagnostics {
+            if diag.source.as_ref().is_none_or(|t| t != "typst") {
+                continue;
+            }
+
+            match match_autofix_kind(diag.message.as_str()) {
+                Some(AutofixKind::UnknownVariable) => {
+                    self.autofix_unknown_variable(root, range);
+                }
+                Some(AutofixKind::FileNotFound) => {
+                    self.autofix_file_not_found(root, range);
+                }
+                _ => {}
+            }
+        }
+
+        Some(())
+    }
+
+    /// Automatically fixes unknown variable errors.
+    pub fn autofix_unknown_variable(
+        &mut self,
+        root: &LinkedNode,
+        range: &Range<usize>,
+    ) -> Option<()> {
+        let cursor = (range.start + 1).min(self.source.text().len());
+        let node = root.leaf_at_compat(cursor)?;
+
+        let ident = 'determine_ident: {
+            if let Some(ident) = node.cast::<ast::Ident>() {
+                break 'determine_ident ident.get().clone();
+            }
+            if let Some(ident) = node.cast::<ast::MathIdent>() {
+                break 'determine_ident ident.get().clone();
+            }
+
+            return None;
+        };
+
+        enum CreatePosition {
+            Before(usize),
+            After(usize),
+            Bad,
+        }
+
+        let previous_decl = previous_items(node, |item| {
+            match item {
+                PreviousItem::Parent(parent, ..) => match parent.kind() {
+                    SyntaxKind::LetBinding => {
+                        let mut create_before = parent.clone();
+                        while let Some(before) = create_before.prev_sibling() {
+                            if matches!(before.kind(), SyntaxKind::Hash) {
+                                create_before = before;
+                                continue;
+                            }
+
+                            break;
+                        }
+
+                        return Some(CreatePosition::Before(create_before.range().start));
+                    }
+                    SyntaxKind::CodeBlock | SyntaxKind::ContentBlock => {
+                        let child = parent.children().find(|child| {
+                            matches!(
+                                child.kind(),
+                                SyntaxKind::LeftBrace | SyntaxKind::LeftBracket
+                            )
+                        })?;
+
+                        return Some(CreatePosition::After(child.range().end));
+                    }
+                    SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                        return Some(CreatePosition::Bad);
+                    }
+                    _ => {}
+                },
+                PreviousItem::Sibling(node) => {
+                    if matches!(
+                        node.kind(),
+                        SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
+                    ) {
+                        // todo: hash
+                        return Some(CreatePosition::After(node.range().end));
+                    }
+                }
+            }
+
+            None
+        });
+
+        let (create_pos, side) = match previous_decl {
+            Some(CreatePosition::Before(pos)) => (pos, Side::Before),
+            Some(CreatePosition::After(pos)) => (pos, Side::After),
+            None => (0, Side::After),
+            Some(CreatePosition::Bad) => return None,
+        };
+
+        let pos_node = root.leaf_at(create_pos, side.clone());
+        let mode = match interpret_mode_at(pos_node.as_ref()) {
+            InterpretMode::Markup => "#",
+            _ => "",
+        };
+
+        let extend_assign = if self.ctx.analysis.extended_code_action {
+            " = ${1:none}$0"
+        } else {
+            ""
+        };
+        let new_text = if matches!(side, Side::Before) {
+            eco_format!("{mode}let {ident}{extend_assign}\n\n")
+        } else {
+            eco_format!("\n\n{mode}let {ident}{extend_assign}")
+        };
+
+        let range = self.ctx.to_lsp_range(create_pos..create_pos, &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
+        let action = CodeAction {
+            title: "Create missing variable".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+        Some(())
+    }
+
+    /// Automatically fixes file not found errors.
+    pub fn autofix_file_not_found(
+        &mut self,
+        root: &LinkedNode,
+        range: &Range<usize>,
+    ) -> Option<()> {
+        let cursor = (range.start + 1).min(self.source.text().len());
+        let node = root.leaf_at_compat(cursor)?;
+
+        let importing = node.cast::<ast::Str>()?.get();
+        if importing.starts_with('@') {
+            // todo: create local package?
+            // if importing.starts_with("@local") { return None; }
+
+            // This is a package import, not a file import.
+            return None;
+        }
+
+        let file_id = node.span().id()?;
+        let root_path = self.ctx.path_for_id(file_id.join("/")).ok()?;
+        let path_in_workspace = file_id.vpath().join(importing.as_str());
+        let new_path = path_in_workspace.resolve(root_path.as_path())?;
+        let new_file_url = path_to_url(&new_path).ok()?;
+
+        let edit = self.create_file(new_file_url, false);
+
+        let file_to_create = unix_slash(path_in_workspace.as_rooted_path());
+        let action = CodeAction {
+            title: format!("Create missing file at `{file_to_create}`"),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
     /// Starts to work.
-    pub fn work(&mut self, root: LinkedNode, range: Range<usize>) -> Option<()> {
+    pub fn scoped(&mut self, root: &LinkedNode, range: &Range<usize>) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
         let mut node = &node;
@@ -133,12 +318,12 @@ impl<'a> CodeActionWorker<'a> {
             let cur_path = id.vpath().as_rooted_path().parent().unwrap();
             let new_path = diff(path, cur_path)?;
             let edit = self.edit_str(node, unix_slash(&new_path))?;
-            let action = CodeActionOrCommand::CodeAction(CodeAction {
+            let action = CodeAction {
                 title: "Convert to relative path".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
                 edit: Some(edit),
                 ..CodeAction::default()
-            });
+            };
             self.actions.push(action);
         } else {
             // Convert relative path to absolute path
@@ -155,32 +340,32 @@ impl<'a> CodeActionWorker<'a> {
                 }
             }
             let edit = self.edit_str(node, unix_slash(&new_path))?;
-            let action = CodeActionOrCommand::CodeAction(CodeAction {
+            let action = CodeAction {
                 title: "Convert to absolute path".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
                 edit: Some(edit),
                 ..CodeAction::default()
-            });
+            };
             self.actions.push(action);
         }
 
         Some(())
     }
 
-    fn edit_str(&mut self, node: &LinkedNode, new_content: String) -> Option<WorkspaceEdit> {
+    fn edit_str(&mut self, node: &LinkedNode, new_content: String) -> Option<EcoWorkspaceEdit> {
         if !matches!(node.kind(), SyntaxKind::Str) {
             log::warn!("edit_str only works on string AST nodes: {:?}", node.kind());
             return None;
         }
 
-        self.local_edit(TextEdit {
-            range: self.ctx.to_lsp_range(node.range(), &self.source),
-            // todo: this is merely ocasionally correct, abusing string escape (`fmt::Debug`)
-            new_text: format!("{new_content:?}"),
-        })
+        self.local_edit(EcoSnippetTextEdit::new_plain(
+            self.ctx.to_lsp_range(node.range(), &self.source),
+            // todo: this is merely occasionally correct, abusing string escape (`fmt::Debug`)
+            eco_format!("{new_content:?}"),
+        ))
     }
 
-    fn wrap_actions(&mut self, node: &LinkedNode, range: Range<usize>) -> Option<()> {
+    fn wrap_actions(&mut self, node: &LinkedNode, range: &Range<usize>) -> Option<()> {
         if range.is_empty() {
             return None;
         }
@@ -191,24 +376,23 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         let edit = self.local_edits(vec![
-            TextEdit {
-                range: self
-                    .ctx
+            EcoSnippetTextEdit::new_plain(
+                self.ctx
                     .to_lsp_range(range.start..range.start, &self.source),
-                new_text: "#[".into(),
-            },
-            TextEdit {
-                range: self.ctx.to_lsp_range(range.end..range.end, &self.source),
-                new_text: "]".into(),
-            },
+                EcoString::inline("#["),
+            ),
+            EcoSnippetTextEdit::new_plain(
+                self.ctx.to_lsp_range(range.end..range.end, &self.source),
+                EcoString::inline("]"),
+            ),
         ])?;
 
-        let action = CodeActionOrCommand::CodeAction(CodeAction {
+        let action = CodeAction {
             title: "Wrap with content block".to_string(),
             kind: Some(CodeActionKind::REFACTOR_REWRITE),
             edit: Some(edit),
             ..CodeAction::default()
-        });
+        };
         self.actions.push(action);
 
         Some(())
@@ -226,28 +410,28 @@ impl<'a> CodeActionWorker<'a> {
 
         if depth > 1 {
             // Decrease depth of heading
-            let action = CodeActionOrCommand::CodeAction(CodeAction {
+            let action = CodeAction {
                 title: "Decrease depth of heading".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
-                edit: Some(self.local_edit(TextEdit {
-                    range: self.ctx.to_lsp_range(marker_range.clone(), &self.source),
-                    new_text: "=".repeat(depth - 1),
-                })?),
+                edit: Some(self.local_edit(EcoSnippetTextEdit::new_plain(
+                    self.ctx.to_lsp_range(marker_range.clone(), &self.source),
+                    EcoString::inline("=").repeat(depth - 1),
+                ))?),
                 ..CodeAction::default()
-            });
+            };
             self.actions.push(action);
         }
 
         // Increase depth of heading
-        let action = CodeActionOrCommand::CodeAction(CodeAction {
+        let action = CodeAction {
             title: "Increase depth of heading".to_string(),
             kind: Some(CodeActionKind::REFACTOR_REWRITE),
-            edit: Some(self.local_edit(TextEdit {
-                range: self.ctx.to_lsp_range(marker_range, &self.source),
-                new_text: "=".repeat(depth + 1),
-            })?),
+            edit: Some(self.local_edit(EcoSnippetTextEdit::new_plain(
+                self.ctx.to_lsp_range(marker_range, &self.source),
+                EcoString::inline("=").repeat(depth + 1),
+            ))?),
             ..CodeAction::default()
-        });
+        };
         self.actions.push(action);
 
         Some(())
@@ -302,10 +486,7 @@ impl<'a> CodeActionWorker<'a> {
             let ch_range = self
                 .ctx
                 .to_lsp_range(node_end..node_end + nx.len_utf8(), &self.source);
-            let remove_edit = TextEdit {
-                range: ch_range,
-                new_text: "".to_owned(),
-            };
+            let remove_edit = EcoSnippetTextEdit::new_plain(ch_range, EcoString::new());
             Some((nx, remove_edit))
         } else {
             None
@@ -313,22 +494,19 @@ impl<'a> CodeActionWorker<'a> {
 
         let rewrite_action = |title: &str, new_text: &str| {
             let mut edits = vec![
-                TextEdit {
-                    range: front_range,
-                    new_text: new_text.to_owned(),
-                },
-                TextEdit {
-                    range: back_range,
-                    new_text: if !new_text.is_empty() {
+                EcoSnippetTextEdit::new_plain(front_range, new_text.into()),
+                EcoSnippetTextEdit::new_plain(
+                    back_range,
+                    if !new_text.is_empty() {
                         if let Some((ch, _)) = &punc_modify {
-                            ch.to_string() + new_text
+                            EcoString::from(*ch) + new_text
                         } else {
-                            new_text.to_owned()
+                            new_text.into()
                         }
                     } else {
-                        "".to_owned()
+                        EcoString::new()
                     },
-                },
+                ),
             ];
 
             if !new_text.is_empty() {
@@ -337,12 +515,12 @@ impl<'a> CodeActionWorker<'a> {
                 }
             }
 
-            Some(CodeActionOrCommand::CodeAction(CodeAction {
+            Some(CodeAction {
                 title: title.to_owned(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
                 edit: Some(self.local_edits(edits)?),
                 ..CodeAction::default()
-            }))
+            })
         };
 
         // Prepare actions
@@ -360,4 +538,54 @@ impl<'a> CodeActionWorker<'a> {
 
         Some(())
     }
+
+    fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
+        let change_id = "Typst Create Missing Files".to_string();
+
+        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
+            uri,
+            options: Some(CreateFileOptions {
+                overwrite: Some(false),
+                ignore_if_exists: None,
+            }),
+            annotation_id: Some(change_id.clone()),
+        }));
+
+        let mut change_annotations = HashMap::new();
+        change_annotations.insert(
+            change_id.clone(),
+            ChangeAnnotation {
+                label: change_id,
+                needs_confirmation: Some(needs_confirmation),
+                description: Some("The file is missing but required by code".to_string()),
+            },
+        );
+
+        EcoWorkspaceEdit {
+            changes: None,
+            document_changes: Some(EcoDocumentChanges::Operations(vec![create_op])),
+            change_annotations: Some(change_annotations),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AutofixKind {
+    UnknownVariable,
+    FileNotFound,
+}
+
+fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
+    static PATTERNS: &[(&str, AutofixKind)] = &[
+        ("unknown variable", AutofixKind::UnknownVariable),
+        ("file not found", AutofixKind::FileNotFound),
+    ];
+
+    for (pattern, kind) in PATTERNS {
+        if msg.starts_with(pattern) {
+            return Some(*kind);
+        }
+    }
+
+    None
 }

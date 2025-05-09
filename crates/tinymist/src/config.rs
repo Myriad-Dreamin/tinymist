@@ -72,6 +72,9 @@ pub struct Config {
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,
+    /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
+    /// side.
+    pub extended_code_action: bool,
 
     /// The preferred color theme for rendering.
     pub color_theme: Option<String>,
@@ -323,6 +326,7 @@ impl Config {
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
 
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
