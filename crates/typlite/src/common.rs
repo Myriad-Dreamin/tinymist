@@ -20,6 +20,7 @@ pub enum Format {
     #[default]
     Md,
     LaTeX,
+    Text,
     #[cfg(feature = "docx")]
     Docx,
 }
