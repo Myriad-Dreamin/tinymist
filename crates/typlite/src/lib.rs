@@ -35,6 +35,7 @@ use crate::tinymist_std::typst::{LazyHash, TypstDict};
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
+pub use cmark_writer::ast;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
