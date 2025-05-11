@@ -11,7 +11,7 @@ import org.tinymist.intellij.TypstFileType
  * It combines a standard text editor (PsiAwareTextEditorProvider) with our custom preview editor (TypstPreviewFileEditor).
  */
 class TypstTextEditorWithPreviewProvider : TextEditorWithPreviewProvider(
-    TypstPreviewFileEditorProvider() // Changed to use the new standalone provider
+    TypstPreviewFileEditorProvider() // Use the restored provider class
 ), DumbAware {
 
     /**

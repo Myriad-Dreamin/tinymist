@@ -44,17 +44,15 @@
         <fileType name="Typst file" implementationClass="org.tinymist.intellij.TypstFileType" fieldName="INSTANCE" language="Typst" extensions="typ"/>
         <lang.parserDefinition language="Typst" implementationClass="org.tinymist.intellij.TypstParserDefinition"/>
         <lang.syntaxHighlighterFactory language="Typst" implementationClass="org.tinymist.intellij.TypstSyntaxHighlighterFactory"/>
+        <lang.findUsagesProvider language="Typst" implementationClass="org.tinymist.intellij.TypstFindUsagesProvider"/>
+        <lang.psiStructureViewFactory language="Typst" implementationClass="org.tinymist.intellij.structure.TypstStructureViewFactory"/>
         <!-- Add other simple extensions like commentProvider, foldingBuilder etc. if needed -->
 
         <!-- File editor provider for Text + Preview -->
         <fileEditorProvider implementation="org.tinymist.intellij.preview.TypstTextEditorWithPreviewProvider"/>
 
         <!-- Removed Tool Window for Typst Preview as it's replaced by the editor preview -->
-        <!--
-        <toolWindow id="TypstPreview"
-                    anchor="right"
-                    factoryClass="org.tinymist.intellij.preview.TypstPreviewToolWindowFactory" />
-        -->
+        
 
     </extensions>
 

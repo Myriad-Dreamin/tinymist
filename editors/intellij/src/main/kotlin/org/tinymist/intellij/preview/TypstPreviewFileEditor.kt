@@ -54,7 +54,7 @@ class TypstPreviewFileEditor(
             jcefUnsupportedLabel = JLabel("JCEF browser is not supported in this environment.")
         } else {
             println("TypstPreviewFileEditor: JCEF is supported. Setting up browser.")
-            setupDisplayHandler()
+            // setupDisplayHandler()
             setupLoadHandler()
             waitForServerAndLoad()
         }
