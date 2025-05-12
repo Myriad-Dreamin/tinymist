@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, true)"
+expression: "conv(world, ConvKind::Md { for_docs: true })"
 input_file: crates/typlite/src/fixtures/docs/indented_list.typ
 ---
 <!DOCTYPE html>
@@ -14,3 +14,5 @@ input_file: crates/typlite/src/fixtures/docs/indented_list.typ
 
 =====
 - <!-- typlite:begin:list-item 0 -->inherited-scope (dictionary): Definitions that are made available to the entire parsed module. This parameter is only used internally.<!-- typlite:end:list-item 0 -->
+
+=====

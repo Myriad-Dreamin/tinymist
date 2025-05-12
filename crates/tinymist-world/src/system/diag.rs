@@ -9,7 +9,7 @@ use codespan_reporting::{
 };
 use tinymist_std::Result;
 use tinymist_vfs::FileId;
-use typst::diag::{eco_format, Severity, SourceDiagnostic};
+use typst::diag::{eco_format, Severity, SourceDiagnostic, SourceResult, Warned};
 use typst::syntax::Span;
 use typst::WorldExt;
 
@@ -24,7 +24,30 @@ fn color_stream() -> StandardStream {
     })
 }
 
-/// Print diagnostic messages to the terminal.
+/// Prints compilation diagnostic messages to the terminal.
+pub fn print_compile_diagnostics<T>(
+    world: &dyn SourceWorld,
+    result: Warned<SourceResult<T>>,
+    diagnostic_format: DiagnosticFormat,
+) -> Result<Option<T>, codespan_reporting::files::Error> {
+    match result.output {
+        Ok(value) => {
+            if !result.warnings.is_empty() {
+                print_diagnostics(world, result.warnings.iter(), diagnostic_format)?;
+            }
+
+            Ok(Some(value))
+        }
+        Err(errors) => {
+            let diag = errors.iter().chain(result.warnings.iter());
+
+            print_diagnostics(world, diag, diagnostic_format)?;
+            Ok(None)
+        }
+    }
+}
+
+/// Prints diagnostic messages to the terminal.
 pub fn print_diagnostics<'d, 'files>(
     world: &'files dyn SourceWorld,
     errors: impl Iterator<Item = &'d SourceDiagnostic>,
