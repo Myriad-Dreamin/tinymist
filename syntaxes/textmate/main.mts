@@ -70,6 +70,12 @@ const MATH_OPENING = /[\[\(\{⌈⌊⌜⌞❲⟦⟨⟪⟬⟮⦃⦅⦇⦉⦋⦍⦏
 const MATH_CLOSING = /[\]\)\}⌉⌋⌝⌟❳⟧⟩⟫⟭⟯⦄⦆⦈⦊⦌⦎⦐⦒⦔⦖⦘⧙⧛⧽]/;
 
 /**
+ * A regex to match math shorthand.
+ */
+const MATH_SHORTHAND =
+  /\.\.\.|-|'|\*|~|!=|:=|::=|=:|<<|<<<|>>|>>>|<=|>=|->|-->|\|->|>->|->>|<-|<--|<-<|<<-|<->|<-->|~>|~~>|<~|<~~|=>|\|=>|==>|<==|<=>|<==>|\[\||\|\]|\|\|/u;
+
+/**
  * A regex depending on {@link FIXED_LENGTH_LOOK_BEHIND}.
  * If the grammar is run on oniguruma engine, the regex engine supports look-behind assertions of variable length, where
  * we can look behind the previous token.
@@ -373,7 +379,7 @@ const mathParen: textmate.Pattern = {
   endCaptures: {
     "0": { name: "markup.content.brace.typst" },
   },
-  patterns: [{ include: "#mathParen" }, { include: "#math" }],
+  patterns: [{ include: "#mathParen" }, { include: "#mathWithoutShorthand" }],
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -446,6 +452,25 @@ const experimentalMathRules: textmate.Pattern[] = [
 
 const math: textmate.Pattern = {
   patterns: [
+    {
+      match: MATH_SHORTHAND,
+      captures: {
+        "0": { name: "math.shorthand.typst" },
+      },
+    },
+    {
+      match: new RegExp(
+        `(?<=^|(?:${MATH_SHORTHAND.source}))((?:(?!${MATH_SHORTHAND.source}).)*)(?=(?:${MATH_SHORTHAND.source}|$))`,
+      ),
+      captures: {
+        "0": { patterns: [{ include: "#mathWithoutShorthand" }] },
+      },
+    },
+  ],
+};
+
+const mathWithoutShorthand: textmate.Pattern = {
+  patterns: [
     { include: "#markupEscape" },
     { include: "#stringLiteral" },
     { include: "#markupEnterCode" },
@@ -505,7 +530,9 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
       new RegExp(`(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` + /(?=\()/.source),
     ),
     end: replaceGroup(
-      /(?:(?<=[\)])(?![\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
+      new RegExp(
+        `${/(?:(?<=[\)])(?![\(\.]|[CallStart]))/.source}|(?=${/[\$\s;,\}\]\)]/.source}|${MATH_SHORTHAND.source}|$)`,
+      ),
       "[CallStart]",
       mathCallStart,
     ),
@@ -1392,7 +1419,7 @@ type _TypstGrammarPart = never;
 export const typst: textmate.Grammar = {
   repository: {
     common,
-    math,
+    math: mathWithoutShorthand,
     markup,
     shebang,
     code,
