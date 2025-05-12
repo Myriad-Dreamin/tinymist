@@ -104,8 +104,15 @@ We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redh
     *   Keep `dev-notes.md` current.
 
 ### VI. Technical Debt & Refinements
-*   Minimal Client-Side Parsing/Lexing (Evaluate if still relevant with LSP).
-*   Basic Client-Side Syntax Highlighter (Evaluate if still relevant with LSP semantic tokens).
+*   **Minimal Client-Side Parsing/Lexing**: These are currently implemented as minimal boilerplate (see `TypstLexerAdapter.kt`, `TypstParserDefinition.kt`) required by the IntelliJ Platform for basic file type recognition and PSI structure. The LSP handles rich parsing and structural understanding.
+*   **Basic Client-Side Syntax Highlighter**: Similarly, `TypstSyntaxHighlighter.kt` provides a very basic highlighter as IntelliJ Platform boilerplate. Rich syntax highlighting is provided by the LSP via semantic tokens.
+*   **LSP `tinymist/documentOutline` URI Issue & Mock Data:**
+    *   **Problem:** The `tinymist` LSP server currently does not consistently provide a usable `uri` in its `tinymist/documentOutline` notifications. This prevents the client from associating outline data with specific files.
+    *   **Current State:** `TinymistLanguageClient.kt` logs a warning and `OutlineDataHolder` falls back to providing mock data for the Structure View.
+    *   **Resolution:** Requires a server-side fix in `tinymist` to ensure a valid `file://` URI is always sent. A `TODO` tracks this in the client code.
+*   **`lsp4ij` `showMessageRequest` NullPointerException Workaround:**
+    *   **Problem:** The `lsp4ij` library can throw a `NullPointerException` if the LSP server sends a `window/showMessageRequest` with a `null` actions list.
+    *   **Workaround:** `TinymistLanguageClient.kt` overrides `showMessageRequest` to log the request and return a `CompletableFuture.completedFuture(null)`, bypassing the problematic `lsp4ij` handler and suppressing the UI for these messages.
 *   Rudimentary LSP Executable Error Handling (Partially addressed by "Robust `tinymist` Executable Handling" above).
 *   Missing File Type Icon.
 *   Hardcoded Configuration Defaults in `TinymistInitializationOptions` (e.g., `colorTheme`, preview URL - review what should be settings).
@@ -136,8 +143,8 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   Provides a basic `PsiParser` that creates a single root PSI node for the file. Again, this is minimal because the LSP server handles the heavy lifting of understanding the code structure.
         *   Defines how to create a `TypstFile` PSI element.
         *   Defines `TYPST_TEXT` as an `IElementType`.
-    *   **`TypstSyntaxHighlighter.kt` & `TypstSyntaxHighlighterFactory.kt`**:
-        *   `TypstSyntaxHighlighterFactory` implements `com.intellij.openapi.fileTypes.SyntaxHighlighterFactory` and provides instances of `TypstSyntaxHighlighter`.
+    *   **`TypstSyntaxHighlighter.kt` (contains `TypstSyntaxHighlighter` and `TypstSyntaxHighlighterFactory`)**:
+        *   `TypstSyntaxHighlighterFactory` (nested class) implements `com.intellij.openapi.fileTypes.SyntaxHighlighterFactory` and provides instances of `TypstSyntaxHighlighter`.
         *   `TypstSyntaxHighlighter` (subclass of `com.intellij.openapi.fileTypes.SyntaxHighlighterBase`) uses the `TypstLexerAdapter`. It assigns a default text attribute to the `TYPST_TEXT` token. Actual rich syntax highlighting is expected to come from the LSP server via semantic token support.
     *   **`TypstFindUsagesProvider.kt`**: Implements `com.intellij.lang.findUsages.FindUsagesProvider`. Registered in `plugin.xml` to enable IntelliJ's "Find Usages" action for Typst files. Relies on `lsp4ij` and the language server to perform the actual search.
 
@@ -149,7 +156,16 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   `getWorkingDirectory()`: Returns the project's base path as the working directory for the LSP server.
         *   `getInitializationOptions()`: Constructs and returns a `TinymistInitializationOptions` object. This object is serialized to JSON and sent to the LSP server as part of the `initialize` request. It allows passing client-specific configurations to the server on startup.
     *   **`TinymistInitializationOptions.kt`**: A Kotlin data class that defines the structure of the initialization options sent to the `tinymist` server. It includes fields like `font.fontPaths`, `semanticTokens`, `completion`, `lint`, etc., mirroring configurations available in the Tinymist VSCode extension.
-    *   **`TinymistLanguageClient.kt`**: Extends `com.redhat.devtools.lsp4ij.client.LanguageClientImpl`. This custom client is responsible for handling Tinymist-specific LSP notifications, such as `tinymist/documentOutline` and `tinymist/document`. It uses `@JsonNotification` annotations to map these notifications to handler methods.
+    *   **`TinymistLanguageClient.kt`**:
+        *   **Status:** This file has been created/restored and extends `com.redhat.devtools.lsp4ij.client.LanguageClientImpl`.
+        *   **Role:** It serves as a custom language client to handle Tinymist-specific LSP interactions and to customize behavior of the standard `lsp4ij` client.
+        *   **`onDocumentOutline(@JsonNotification("tinymist/documentOutline"))`**: Handles the `tinymist/documentOutline` notification from the server. It attempts to parse the URI and update `OutlineDataHolder` with the received outline items.
+            *   **Current Issue:** The `tinymist` server is currently sending this notification *without* a `uri` field, or with a `uri` that cannot be reliably mapped to a file path. This prevents the client from associating the outline with a specific document.
+            *   **Fallback:** Due to the missing URI, `OutlineDataHolder` currently falls back to displaying mock data. A `TODO` has been added in the client to indicate that a server-side fix is required for the URI.
+        *   **`showMessageRequest()` Override**: This method is overridden to intercept `window/showMessageRequest` calls from the LSP server.
+            *   **Purpose:** It logs the request details and then returns a `CompletableFuture.completedFuture(null)`.
+            *   **Reason:** This prevents a potential `NullPointerException` within `lsp4ij` if the server sends a request with a null `actions` list, and also suppresses the display of these specific messages in the UI for now.
+        *   **`publishDiagnostics()` Override**: This method is overridden to reformat diagnostic messages from the server (e.g., replacing newlines with `<br>`) for better rendering in IntelliJ's UI.
     *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TinymistDocumentOutlineParams`, `TinymistOutlineItem`) that represent the expected JSON structure of the `tinymist/documentOutline` notification. These classes are used for deserializing the notification payload.
 
 4.  **Preview Panel (`preview/` directory):**
@@ -161,9 +177,7 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   It is registered in `plugin.xml` as a `fileEditorProvider`.
         *   It takes an instance of `TypstPreviewFileEditor.Provider()` in its constructor to create the preview part of the editor.
         *   `accept()`: Ensures this provider is only used for Typst files.
-    *   **`TypstPreviewToolWindowFactory.kt`**: Implements `com.intellij.openapi.wm.ToolWindowFactory`. It's designed to create a separate "Typst Preview" tool window.
-        *   Its registration in `plugin.xml` is currently commented out, suggesting the `TextEditorWithPreviewProvider` is the preferred method for preview.
-        *   The current implementation creates a simple JPanel with a placeholder label.
+    *   **`TypstPreviewToolWindowFactory.kt` (Removed)**: This file, which previously implemented `com.intellij.openapi.wm.ToolWindowFactory` for a separate preview tool window, has been removed. The integrated `TypstTextEditorWithPreviewProvider` is the sole method for displaying previews.
 
 5.  **Structure View Integration (`structure/` directory):**
     *   **`TypstStructureViewFactory.kt`**: Implements `com.intellij.lang.PsiStructureViewFactory`. Registered in `plugin.xml`, it provides a `StructureViewBuilder` for Typst files, which in turn creates the `TypstStructureViewModel`.
@@ -172,7 +186,13 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   Includes a nested `TypstStructureViewRootElement` which wraps the `PsiFile` and provides the top-level items based on `TinymistOutlineItem` data.
         *   Has an `updateOutline()` method as a placeholder for refreshing the view when new outline data arrives (actual refresh mechanism TBD).
     *   **`TypstStructureViewElement.kt`**: Implements `com.intellij.ide.structureView.StructureViewTreeElement` and `com.intellij.navigation.NavigationItem`. Represents each individual item (node) in the structure view tree, handling its presentation (text, icon) and navigation.
-        *   **Note**: Currently, the Structure View uses mock data (`OutlineDataHolder` in `TypstStructureViewFactory.kt`) if the actual data from `tinymist/documentOutline` is not available or is too sparse. This needs to be replaced with robust data fetching and updating from the `TinymistLanguageClient`.
+        *   **Note on Data Source & Current Status:**
+            *   The Structure View relies on `OutlineDataHolder` (defined in `OutlineDataHolder.kt`, though historically noted in `TypstStructureViewFactory.kt`) to provide its data.
+            *   `OutlineDataHolder` is intended to be populated by the `tinymist/documentOutline` LSP notification, processed by `TinymistLanguageClient.kt`.
+            *   **Current Behavior:** Due to an ongoing issue where the `tinymist` server sends `documentOutline` notifications without a valid/usable `uri` field, `TinymistLanguageClient.kt` cannot reliably associate the outline with a specific file. 
+            *   **Fallback:** As a temporary measure, `OutlineDataHolder.getOutline()` now provides **mock data** if real data for the requested file path is not available. This allows the structure view to be tested with placeholder content.
+            *   **TODO (Server-Side):** The `tinymist` LSP server needs to be updated to consistently send a correct, resolvable `file://` URI in the `tinymist/documentOutline` notification params. This is tracked by a `TODO` in `TinymistLanguageClient.kt`.
+            *   The logic in `OutlineDataHolder.updateOutline()` to trigger a view refresh also needs to be fully implemented and tested once real data flow is reliable.
 
 ### Resources (`src/main/resources/`)
 
@@ -182,28 +202,4 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
         *   `fileType`: Associates `.typ` extension with `TypstFileType` and `TypstLanguage`.
         *   `lang.parserDefinition`: Registers `TypstParserDefinition` for `TypstLanguage`.
         *   `lang.syntaxHighlighterFactory`: Registers `TypstSyntaxHighlighterFactory` for `TypstLanguage`.
-        *   `lang.findUsagesProvider`: Registers `TypstFindUsagesProvider` for `TypstLanguage`.
-        *   `lang.psiStructureViewFactory`: Registers `TypstStructureViewFactory` for `TypstLanguage` to enable the Structure View.
-        *   `fileEditorProvider`: Registers `TypstTextEditorWithPreviewProvider` to enable the split text/preview editor for Typst files.
-    *   **`<extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">`**:
-        *   `server`: Defines the "tinymistServer", specifying `TinymistLanguageServerFactory` as its factory.
-        *   `fileNamePatternMapping`: Maps `*.typ` files to the "tinymistServer", enabling LSP features for these files.
-
-### API Interactions Summary
-
-*   **IntelliJ Platform API**:
-    *   **Language Support**: `Language`, `LanguageFileType`, `PsiFileBase`, `ParserDefinition`, `Lexer`, `PsiParser`, `SyntaxHighlighterFactory`, `SyntaxHighlighterBase`. These are used to provide basic recognition of the Typst language, though most heavy lifting is offloaded to the LSP.
-    *   **File System & Project Model**: `Project`, `VirtualFile`.
-    *   **Editors**: `FileEditor`, `FileEditorProvider`, `TextEditorWithPreviewProvider`. Used for creating the text editor and the preview panel.
-    *   **UI (JCEF)**: `JBCefApp`, `JBCefBrowser` for embedding the web-based preview.
-    *   **Tool Windows**: `ToolWindowFactory` (though currently not the primary preview mechanism).
-    *   **Plugin Descriptor (`plugin.xml`)**: Defines extension points to integrate custom components.
-*   **LSP4IJ API (`com.redhat.devtools.lsp4ij`)**:
-    *   `LanguageServerFactory`: Implemented by `TinymistLanguageServerFactory` to integrate the LSP.
-    *   `ProcessStreamConnectionProvider`: Extended by `TinymistLspStreamConnectionProvider` to manage the external `tinymist` process.
-    *   LSP4IJ handles the general LSP message passing (JSON-RPC) between IntelliJ and the `tinymist` server, translating LSP notifications and requests into IntelliJ actions (e.g., displaying diagnostics, showing completion items).
-*   **Tinymist LSP Server (External Process)**:
-    *   Communicates via standard input/output using the Language Server Protocol.
-    *   Receives initialization options (`TinymistInitializationOptions`).
-    *   Provides semantic information: diagnostics, completions, hover info, go-to-definition, semantic highlighting, etc.
-    *   Expected to provide HTML/SVG content for the preview panel, or an HTTP endpoint from which the JCEF browser can load the preview. Interactions like `tinymist/previewStart`, `tinymist/updatePreview` will be handled by custom LSP message handlers (to be implemented or refined).
+        *   `

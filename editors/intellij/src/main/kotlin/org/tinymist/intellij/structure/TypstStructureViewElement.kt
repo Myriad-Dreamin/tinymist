@@ -16,6 +16,36 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import org.tinymist.intellij.lsp.TinymistOutlineItem
 import javax.swing.Icon
+import com.intellij.openapi.util.TextRange
+import org.eclipse.lsp4j.Range
+
+// Helper to convert LSP Range to IntelliJ TextRange
+fun Range.toTextRange(document: Document): TextRange? {
+    try {
+        val startLine = this.start.line
+        val startChar = this.start.character
+        val endLine = this.end.line
+        val endChar = this.end.character
+
+        if (startLine < 0 || startLine >= document.lineCount || endLine < 0 || endLine >= document.lineCount) {
+            // Invalid line numbers
+            println("Error converting LSP range: Line numbers out of bounds. Start: $startLine, End: $endLine, Total lines: ${document.lineCount}")
+            return null
+        }
+
+        val startOffset = document.getLineStartOffset(startLine) + startChar
+        val endOffset = document.getLineStartOffset(endLine) + endChar
+        
+        if (startOffset > endOffset || startOffset < 0 || endOffset > document.textLength) {
+             println("Error converting LSP range: Offsets out of bounds or invalid. Start: $startOffset, End: $endOffset, Length: ${document.textLength}")
+            return null
+        }
+        return TextRange(startOffset, endOffset)
+    } catch (e: IndexOutOfBoundsException) {
+        println("Error converting LSP range to TextRange: ${e.message}. Range: Start(${this.start.line}, ${this.start.character}), End(${this.end.line}, ${this.end.character})")
+    }
+    return null
+}
 
 class TypstStructureViewElement(
     private val project: Project,
@@ -40,11 +70,14 @@ class TypstStructureViewElement(
 
     // NavigationItem & Navigatable implementation
     override fun navigate(requestFocus: Boolean) {
-        val range = item.selectionRange ?: item.range ?: return
-        val startOffset = getOffset(document, range.start.line, range.start.character)
-        // val endOffset = getOffset(document, range.end.line, range.end.character)
-        if (startOffset != -1) {
-            OpenFileDescriptor(project, containingFile.virtualFile, startOffset).navigate(requestFocus)
+        val project = containingFile.project
+        val virtualFile = containingFile.virtualFile ?: return
+
+        // Use the document member of this class
+        item.selectionRange?.toTextRange(document)?.let { textRange ->
+             OpenFileDescriptor(project, virtualFile, textRange.startOffset).navigate(requestFocus)
+        } ?: item.range?.toTextRange(document)?.let { textRange -> // Fallback to full range
+            OpenFileDescriptor(project, virtualFile, textRange.startOffset).navigate(requestFocus)
         }
     }
 
