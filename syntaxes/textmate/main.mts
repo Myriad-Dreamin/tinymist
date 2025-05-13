@@ -505,7 +505,7 @@ const mathFuncCallOrPropAccess = (): textmate.Pattern => {
       new RegExp(`(?:${oneOf(MATH_DOT_ACCESS, MATH_IDENTIFIER).source})` + /(?=\()/.source),
     ),
     end: replaceGroup(
-      /(?:(?<=[)])(?![(.]|[CallStart]))|(?=[$\s;,\}\]\)]|$)/u,
+      /(?:(?<=[\)])(?![\(\.]|[CallStart]))|(?=[\$\s;,\}\]\)]|$)/u,
       "[CallStart]",
       mathCallStart,
     ),
