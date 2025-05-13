@@ -134,7 +134,7 @@ const exprEndReg = (() => {
     lookBehind = `(?<!${cases.source})` + /(?=[\[\{])/u.source;
   }
 
-  return lookBehind + "|" + /(?=[;,\}\]\)\#\n]|$)/.source;
+  return lookBehind + "|" + /(?=[$;,\}\]\)\#\n]|$)/.source;
 })();
 const exprEndIfReg = exprEndReg;
 const exprEndWhileReg = exprEndReg;
@@ -142,7 +142,7 @@ const exprEndForReg = exprEndReg;
 
 const contextEndReg = () => {
   if (!FIXED_LENGTH_LOOK_BEHIND) {
-    return /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)#\n]|$)/;
+    return /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[$;\}\]\)#\n]|$)/;
   }
 
   return /(?<=[\}\]\d])|(?=[;\}\]\)#\n]|$)/u;
@@ -1107,7 +1107,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: metaName("meta.expr.if.typst"),
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*(else)\b(?!-)|[\[\{])|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=\}|\])(?!\s*(else)\b(?!-)|[\[\{])|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[$;\}\]\)\n]|$)/,
     patterns: [
       { include: "#comments" },
       { include: "#ifClause" },
@@ -1146,7 +1146,7 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b(?!-))\s*/),
-    end: /(?<=[\}\]])(?![\{\[])|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=[\}\]])(?![\{\[])|(?=[$;\}\]\)\n]|$)/,
     patterns: [
       { include: "#comments" },
       { include: "#forClause" },
@@ -1178,7 +1178,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
     begin: lookAhead(/(while\b(?!-))/),
-    end: /(?<=[\}\]])(?![\{\[])|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=[\}\]])(?![\{\[])|(?=[$;\}\]\)\n]|$)/,
     patterns: [
       { include: "#comments" },
       { include: "#whileClause" },
@@ -1209,7 +1209,7 @@ const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
     begin: lookAhead(new RegExp(/(set\b(?!-))\s*/.source + IDENTIFIER.source)),
-    end: /(?<=\))(?!\s*if\b)|(?=[\s;\{\[\}\]\)])/,
+    end: /(?<=\))(?!\s*if\b)|(?=[$\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       { include: "#comments" },
@@ -1223,7 +1223,7 @@ const setStatement = (): textmate.Grammar => {
   const setClause: textmate.Pattern = {
     // name: "meta.set.clause.bind.typst",
     begin: /(set\b)\s+/,
-    end: /(?=if)|(?=[\n;\{\[\}\]\)])/,
+    end: /(?=if)|(?=[$\n;\{\[\}\]\)])/,
     beginCaptures: {
       "1": { name: "keyword.control.other.typst" },
     },
@@ -1258,7 +1258,7 @@ const showStatement = (): textmate.Grammar => {
   const showStatement: textmate.Pattern = {
     name: "meta.expr.show.typst",
     begin: lookAhead(/(show\b(?!-))/),
-    end: /(?=[\s;\{\[\}\]\)])/,
+    end: /(?=[\$\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       { include: "#comments" },
@@ -1282,7 +1282,7 @@ const showStatement = (): textmate.Grammar => {
   const showSelectClause: textmate.Pattern = {
     // name: "meta.show.clause.select.typst",
     begin: /(show\b)\s*/,
-    end: /(?=[:;\}\]\n])/,
+    end: /(?=[$:;\}\]\n])/,
     beginCaptures: {
       "1": { name: "keyword.control.other.typst" },
     },
