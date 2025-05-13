@@ -3,11 +3,15 @@
 use std::{
     io::Write,
     path::{Path, PathBuf},
+    process::exit,
     sync::Arc,
 };
 
 use clap::Parser;
-use tinymist_project::WorldProvider;
+use tinymist_project::{
+    base::print_diagnostics, DiagnosticFormat, LspWorld, SourceWorld, WorldProvider,
+};
+use tinymist_std::error::prelude::*;
 use typlite::{common::Format, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 use typst::foundations::Bytes;
@@ -27,15 +31,22 @@ pub struct CompileArgs {
     pub assets_path: Option<String>,
 }
 
-fn main() -> typlite::Result<()> {
+fn main() -> tinymist_std::Result<()> {
     // Parse command line arguments
     let args = CompileArgs::parse();
 
+    let universe = args.compile.resolve()?;
+    let world = Arc::new(universe.snapshot());
+
+    print_diag_or_error(world.as_ref(), run(args, world.clone()))
+}
+
+fn run(args: CompileArgs, world: Arc<LspWorld>) -> tinymist_std::Result<()> {
     let input = args
         .compile
         .input
         .as_ref()
-        .ok_or("Missing required argument: INPUT")?;
+        .context("Missing required argument: INPUT")?;
 
     let is_stdout = args.output.as_deref() == Some("-");
     let output_path = args
@@ -56,7 +67,7 @@ fn main() -> typlite::Result<()> {
             let path = PathBuf::from(assets_path);
             if !path.exists() {
                 if let Err(e) = std::fs::create_dir_all(&path) {
-                    return Err(format!("failed to create assets directory: {}", e).into());
+                    bail!("failed to create assets directory: {e}");
                 }
             }
             Some(path)
@@ -64,10 +75,7 @@ fn main() -> typlite::Result<()> {
         None => None,
     };
 
-    let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
-    let world = universe.snapshot();
-
-    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+    let converter = Typlite::new(world).with_feature(TypliteFeat {
         assets_path: assets_path.clone(),
         ..Default::default()
     });
@@ -84,11 +92,26 @@ fn main() -> typlite::Result<()> {
     if is_stdout {
         std::io::stdout().write_all(result.as_slice()).unwrap();
     } else if let Err(err) = std::fs::write(&output_path, result.as_slice()) {
-        Err(format!(
-            "failed to write file {}: {err}",
-            output_path.display()
-        ))?;
+        bail!("failed to write file {output_path:?}: {err}");
     }
 
     Ok(())
+}
+
+fn print_diag_or_error<T>(
+    world: &impl SourceWorld,
+    result: tinymist_std::Result<T>,
+) -> tinymist_std::Result<T> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(err) => {
+            if let Some(diagnostics) = err.diagnostics() {
+                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
+                    .context_ut("print diagnostics")?;
+                exit(1);
+            }
+
+            Err(err)
+        }
+    }
 }
