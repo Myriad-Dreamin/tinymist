@@ -269,7 +269,6 @@ const constants: textmate.Pattern = {
       match: floatUnit(new RegExp(""), true),
     },
     { include: "#stringLiteral" },
-    { include: "#codeMath" },
   ],
 };
 
@@ -415,7 +414,7 @@ const markupMath: textmate.Pattern = {
 
 const codeMath: textmate.Pattern = {
   name: "markup.math.typst",
-  begin: /(?<!\)|\])\$/,
+  begin: /(?<![\)\]])\$/,
   end: /\$/,
   beginCaptures: {
     "0": { name: "punctuation.definition.string.begin.math.typst" },
@@ -692,10 +691,10 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
         ),
       ),
       // The hash starts a string or an identifier.
-      /(?<!#)(?=["\_])/,
+      /(?<!#)(?=["\_\+\-\{\[])/,
       // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
       /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
-      /(?=[\s,\}\]\)\#\$\*]|$)/,
+      /(?=[\s,\}\]\)\#\$\*\/\=]|$)/,
       /(;)/,
     ).source,
     beginCaptures: {
@@ -867,6 +866,7 @@ const expression: textmate.Pattern = {
     { include: "#keywordConstants" },
     { include: "#identifier" },
     { include: "#constants" },
+    { include: "#codeMath" },
     {
       match: /(as)\b(?!-)/,
       name: "keyword.control.typst",

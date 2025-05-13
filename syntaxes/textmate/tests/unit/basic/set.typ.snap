@@ -159,8 +159,8 @@
 #                ^ source.typst meta.expr.set.typst
 #                 ^ source.typst meta.expr.set.typst meta.brace.square.typst
 #                  ^ source.typst meta.expr.set.typst meta.brace.square.typst
-#                   ^ source.typst meta.brace.square.typst
-#                    ^ source.typst meta.brace.square.typst
+#                   ^ source.typst markup.content.brace.typst
+#                    ^ source.typst markup.content.brace.typst
 >#set text("") if ()()
 #^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
