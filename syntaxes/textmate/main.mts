@@ -269,7 +269,7 @@ const constants: textmate.Pattern = {
       match: floatUnit(new RegExp(""), true),
     },
     { include: "#stringLiteral" },
-    { include: "#markupMath" },
+    { include: "#codeMath" },
   ],
 };
 
@@ -399,6 +399,23 @@ const stringLiteral: textmate.PatternBeginEnd = {
 const markupMath: textmate.Pattern = {
   name: "markup.math.typst",
   begin: /\$/,
+  end: /\$/,
+  beginCaptures: {
+    "0": { name: "punctuation.definition.string.begin.math.typst" },
+  },
+  endCaptures: {
+    "0": { name: "punctuation.definition.string.end.math.typst" },
+  },
+  patterns: [
+    {
+      include: "#math",
+    },
+  ],
+};
+
+const codeMath: textmate.Pattern = {
+  name: "markup.math.typst",
+  begin: /(?<!\)|\])\$/,
   end: /\$/,
   beginCaptures: {
     "0": { name: "punctuation.definition.string.begin.math.typst" },
@@ -663,7 +680,7 @@ const markupHeading: textmate.Pattern = {
 
 const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
   return {
-    /// name: 'markup.expr.typst'
+    // name: "markup.expr.enter.typst",
     begin: new RegExp("#" + seek.source),
     end: oneOf(
       /(?<=;)/,
@@ -1398,6 +1415,7 @@ export const typst: textmate.Grammar = {
     code,
     comments,
     codeBlock,
+    codeMath,
     contentBlock,
 
     keywordConstants,
