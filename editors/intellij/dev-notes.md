@@ -69,6 +69,77 @@ We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redh
         1.  Build frontend: `yarn build:preview` (from `tinymist` root) -> copies `typst-preview.html` to `crates/tinymist-assets/src/`.
         2.  Configure `tinymist/Cargo.toml`: Use local path for `tinymist-assets` (`tinymist-assets = { path = "./crates/tinymist-assets/" }`).
         3.  Rebuild `tinymist`: `cargo build`.
+    *   **Detailed Frontend Logging for Input Lag Investigation:**
+        *   **Initial Problem:** Significant scrolling input lag and delayed visual updates in the JCEF-based Typst preview panel. The behavior is notably influenced by whether the JCEF DevTools (especially the FPS meter) are open, suggesting a performance bottleneck or an issue related to how the browser component handles rendering or event processing under certain conditions.
+        *   **Objective:** To pinpoint the cause of the input lag by instrumenting the frontend JavaScript with detailed performance and event logging. The goal is to understand if the JavaScript main thread is stalling, where time is being spent during critical operations (scrolling, resizing, WebSocket message processing), and how these timings correlate with the observed lag and the state of JCEF DevTools.
+        *   **Method:** Added extensive `console.log` and `console.time/timeEnd` statements to the frontend JavaScript (`tools/typst-preview-frontend/src/main.js` and `tools/typst-preview-frontend/src/ws.ts`).
+        *   **Hypotheses Under Investigation:**
+            1.  **Main Thread Stalls:** The JavaScript main thread is blocked by long-running synchronous operations during scroll or render updates, causing delayed event processing and visual updates. (Test via `requestAnimationFrame` delta logging).
+            2.  **Inefficient Scroll Event Handling:** The current `debounceTime` (or lack of `throttle`) in scroll event handling (`main.js` or `ws.ts`) is causing poor perceived performance or triggering updates inefficiently. (Tested by switching to `throttle`).
+            3.  **Costly `svgDoc.addViewportChange()`:** The function called by the scroll handler to notify the rendering engine about the viewport change is computationally expensive. (Test via `console.time/timeEnd`).
+            4.  **Costly Rendering Updates (`svgDoc.addChangement()`):** The actual application of document changes (diffs) by the rendering engine is too slow, especially for large or frequent updates. (Test via `console.time/timeEnd` around `addChangement` in `ws.ts`).
+            5.  **WebSocket Message Batching/Processing:** The way WebSocket messages are batched or processed sequentially introduces delays. (Test by examining `rxjs` `buffer` and `debounceTime(0)` behavior and `processMessage` loop).
+            6.  **JCEF/Browser Bottleneck:** The interaction between JS, rendering, and the JCEF environment itself creates a bottleneck, especially when DevTools are closed. (Indirectly tested by observing behavior with/without DevTools).
+            7.  **Selection-Related Performance Issue:** Changes to text selection might trigger expensive updates or computations, contributing to the lag (Hypothesis from GitHub issue comment).
+
+        *   **Log Analysis (15 May - After extensive logging additions):**
+            *   **Scroll Event Handling (`main.js`):**
+                *   Raw scroll events are frequent.
+                *   Debounced scroll handler (`svgDoc.addViewportChange`) execution is very fast (~0.1ms).
+                *   `requestAnimationFrame` heartbeat delta does not show significant JS main thread stalls during typical interaction.
+            *   **WebSocket Message Processing (`ws.ts`):**
+                *   `processMessage` (excluding `addChangement`) is generally fast.
+                *   `svgDoc.addChangement` (called within `processMessage` for `diff-v1` updates) shows variable execution time, ranging from ~1ms to ~15ms in observed logs. This is a key area of interest.
+            *   **WebSocket Stability & File Watcher:**
+                *   Frequent WebSocket disconnects (code `1006`) were observed.
+                *   These disconnects correlate strongly with `tinymist` backend errors: `NotifyActor: failed to get event, exiting...` (a file watcher issue).
+                *   This file watcher error seems to occur primarily during IDE/project shutdown or sometimes during initial project load, not consistently during active scrolling lag. It's likely a separate issue, possibly related to macOS file descriptor limits or `notify-rs` crate behavior.
+                *   Related GitHub issues for `tinymist` (#1614, #1534, etc.) point to this being a known problem on macOS, sometimes resolved by `notify-rs` updates.
+            *   **JCEF DevTools Impact:** The observation that lag significantly reduces or disappears when JCEF DevTools are open remains a strong indicator that the bottleneck is heavily influenced by the browser's rendering pipeline or event loop timing, which DevTools can alter.
+
+        *   **Current Status & Next Steps (Input Lag Investigation):**
+            *   **Linter Errors in `ws.ts`:** The most recent logging additions to `ws.ts` (for detailed `addChangement` timing) have introduced TypeScript linter errors that need to be resolved:
+                *   `All declarations of 'typstWebsocket' must have identical modifiers.`
+                *   `Subsequent property declarations must have the same type.  Property 'typstWebsocket' must be of type 'WebSocket', but here has type 'WebSocket | undefined'.`
+                *   `Type 'string | Uint8Array<ArrayBuffer>' is not assignable to type 'string'.` (for `svgDoc.addChangement([message[0], message[1]])`)
+            *   **Refined Hypothesis:** The input lag is likely not due to a single long-blocking JS function, but rather:
+                1.  The cumulative effect of frequent, moderately expensive rendering updates (`addChangement`) triggered by WebSocket messages.
+                2.  A bottleneck within the JCEF rendering/compositing process, exacerbated when DevTools are closed.
+            *   **Immediate Next Step:** Resolve the linter errors in `tools/typst-preview-frontend/src/ws.ts` to ensure accurate logging and type safety.
+            *   **Following Steps:**
+                1.  Re-run with corrected logging and capture logs specifically during scroll lag.
+                2.  Focus analysis on the frequency and duration of `addChangement` calls in relation to scroll events and perceived lag.
+                3.  Consider experiments to reduce `addChangement` frequency or payload if it's identified as the primary contributor.
+                4.  Continue to treat the WebSocket `1006` / file watcher error as a separate stability issue, though it might indirectly affect overall performance if it causes frequent preview reloads.
+        *   **Debugging Session (LATEST - 2024-05-16): Investigating `window.svgDoc` and Build Issues**
+            *   **Objective:** Ensure `window.svgDoc` is correctly initialized and accessible in `main.js` to allow scroll event handling, and resolve any build issues preventing this.
+            *   **Key Findings & Actions:**
+                *   **JCEF Logging Confirmed:** Successfully configured JCEF to output JavaScript `console.log` messages to `editors/intellij/logs.log`.
+                *   **`window.svgDoc` Initialization:**
+                    *   Identified that `svgDoc` (an instance of `TypstDocument`) was created in `tools/typst-preview-frontend/src/ws.ts` but not assigned to `window.svgDoc`.
+                    *   Added `window.svgDoc = svgDoc;` in `ws.ts` within the `plugin.runWithSession` callback.
+                    *   Updated the `declare global { interface Window { ... } }` block in `ws.ts` to include `svgDoc?: TypstDocument;`.
+                *   **Build Errors & Fixes (TypeScript):** Addressed several TypeScript errors in `ws.ts`.
+                *   **Build Successful:** After these changes, `yarn build:preview; cargo build` completed successfully.
+            *   **Current Status & Deeper Dive into Gray Screen (Update from current debugging session):**
+                *   The build remains successful, and the `window.svgDoc` assignment logic is in place.
+                *   **Persistent Issue (Gray Screen):** The JCEF preview panel consistently renders as a gray screen. This is the primary blocker.
+                    *   (Note: The original input lag issue is confirmed to be JCEF-specific, as the preview URL in a standalone regular browser does not exhibit the same lag. However, the gray screen prevents further lag analysis in JCEF.)
+                *   **Gray Screen Investigation So Far:**
+                    *   Initial JavaScript execution in `ws.ts` (`wsMain`) *is* occurring. Test code successfully found the `#typst-app` div and programmatically set its `innerHTML` to a test `<h1>` tag.
+                    *   Despite this JavaScript modification, the JCEF panel remains visually gray.
+                    *   DOM inspection using JCEF DevTools revealed that the `#typst-app` div was subsequently empty or reported 0x0 dimensions after `wsMain` proceeded through `createSvgDocumentAndSetup`.
+                    *   This implies:
+                        1.  The injected test `<h1>` is being cleared (most likely by the `hookedElem.innerHTML = "";` line within `createSvgDocumentAndSetup`).
+                        2.  Subsequently, `TypstDocument` (initialized in `createSvgDocumentAndSetup`) fails to render any visible content into `#typst-app`, or fails to ensure `#typst-app` receives non-zero dimensions.
+                    *   The `"Uncaught Error: Attempt to use a moved value"` (previously triggered when `svgDoc.reset()` was called on WebSocket open) is likely a symptom of an earlier initialization fault rather than the root cause of the gray screen, as the gray screen persists even when `svgDoc.reset()` is bypassed.
+                *   **Latest Action (End of This Session):** Added detailed logging in `tools/typst-preview-frontend/src/ws.ts` (within the `plugin.runWithSession` callback). This logging captures the `innerHTML` and `clientWidth`/`clientHeight` of the `#typst-app` div immediately *before* and *after* the `createSvgDocumentAndSetup(kModule)` call.
+                *   **Next Step (Next Session):**
+                    1.  Run the application with the latest logging additions.
+                    2.  Analyze the JCEF DevTools console output to observe the logged states of `#typst-app`:
+                        *   Confirm if the test `<h1>` (injected by `wsMain`) is present in `#typst-app`'s `innerHTML` *before* `createSvgDocumentAndSetup` is called.
+                        *   Examine the `innerHTML` and dimensions of `#typst-app` *after* `createSvgDocumentAndSetup` has executed. (Is it empty? Does it contain an `<svg>` element? What are its dimensions reported by `clientWidth`/`clientHeight`?).
+                    3.  Based on these logs, the goal is to determine more precisely whether `TypstDocument` fails to populate `#typst-app` after it's cleared, or if the content it adds is simply not visible/sized correctly.
 
 ### III. On Hold / Blocked Tasks
 *   **Preview Panel Scrolling Performance (Further Frontend Debugging - PAUSED):**
@@ -166,40 +237,13 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
             *   **Purpose:** It logs the request details and then returns a `CompletableFuture.completedFuture(null)`.
             *   **Reason:** This prevents a potential `NullPointerException` within `lsp4ij` if the server sends a request with a null `actions` list, and also suppresses the display of these specific messages in the UI for now.
         *   **`publishDiagnostics()` Override**: This method is overridden to reformat diagnostic messages from the server (e.g., replacing newlines with `<br>`) for better rendering in IntelliJ's UI.
-    *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TinymistDocumentOutlineParams`, `TinymistOutlineItem`) that represent the expected JSON structure of the `tinymist/documentOutline` notification. These classes are used for deserializing the notification payload.
+    *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TypstOutlineItem`, `TypstOutlineRange`, `TypstOutlineSeverity`) used to deserialize the JSON data from the `tinymist/documentOutline` notification.
 
-4.  **Preview Panel (`preview/` directory):**
-    *   **`TypstPreviewFileEditor.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditor`. This class is responsible for rendering the Typst preview.
-        *   It uses `com.intellij.ui.jcef.JBCefBrowser` to embed a Chromium-based browser panel.
-        *   It currently loads placeholder HTML but has methods like `updateContent(html: String)` and `loadURL(url: String)` which will be used to display the actual preview content received from or served by the `tinymist` server.
-        *   Contains a nested `Provider` class (`TypstPreviewFileEditor.Provider`) which implements `com.intellij.openapi.fileEditor.FileEditorProvider`. This nested provider is used by `TypstTextEditorWithPreviewProvider`.
-    *   **`TypstPreviewFileEditorProvider.kt`**: Defines `TypstTextEditorWithPreviewProvider` which extends `com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider`. This is the main mechanism for showing a side-by-side view of the Typst text editor and its preview.
-        *   It is registered in `plugin.xml` as a `fileEditorProvider`.
-        *   It takes an instance of `TypstPreviewFileEditor.Provider()` in its constructor to create the preview part of the editor.
-        *   `accept()`: Ensures this provider is only used for Typst files.
-    *   **`TypstPreviewToolWindowFactory.kt` (Removed)**: This file, which previously implemented `com.intellij.openapi.wm.ToolWindowFactory` for a separate preview tool window, has been removed. The integrated `TypstTextEditorWithPreviewProvider` is the sole method for displaying previews.
-
-5.  **Structure View Integration (`structure/` directory):**
-    *   **`TypstStructureViewFactory.kt`**: Implements `com.intellij.lang.PsiStructureViewFactory`. Registered in `plugin.xml`, it provides a `StructureViewBuilder` for Typst files, which in turn creates the `TypstStructureViewModel`.
-        *   Contains a placeholder `OutlineDataHolder` object to temporarily store outline data received from the LSP. This is a basic mechanism and will need refinement for robust data propagation and view refresh.
-    *   **`TypstStructureViewModel.kt`**: Extends `com.intellij.ide.structureView.StructureViewModelBase`. It defines the data model for the structure view, using `TinymistOutlineItem` data. It's responsible for providing the root element and any sorters or filters.
-        *   Includes a nested `TypstStructureViewRootElement` which wraps the `PsiFile` and provides the top-level items based on `TinymistOutlineItem` data.
-        *   Has an `updateOutline()` method as a placeholder for refreshing the view when new outline data arrives (actual refresh mechanism TBD).
-    *   **`TypstStructureViewElement.kt`**: Implements `com.intellij.ide.structureView.StructureViewTreeElement` and `com.intellij.navigation.NavigationItem`. Represents each individual item (node) in the structure view tree, handling its presentation (text, icon) and navigation.
-        *   **Note on Data Source & Current Status:**
-            *   The Structure View relies on `OutlineDataHolder` (defined in `OutlineDataHolder.kt`, though historically noted in `TypstStructureViewFactory.kt`) to provide its data.
-            *   `OutlineDataHolder` is intended to be populated by the `tinymist/documentOutline` LSP notification, processed by `TinymistLanguageClient.kt`.
-            *   **Current Behavior:** Due to an ongoing issue where the `tinymist` server sends `documentOutline` notifications without a valid/usable `uri` field, `TinymistLanguageClient.kt` cannot reliably associate the outline with a specific file. 
-            *   **Fallback:** As a temporary measure, `OutlineDataHolder.getOutline()` now provides **mock data** if real data for the requested file path is not available. This allows the structure view to be tested with placeholder content.
-            *   **TODO (Server-Side):** The `tinymist` LSP server needs to be updated to consistently send a correct, resolvable `file://` URI in the `tinymist/documentOutline` notification params. This is tracked by a `TODO` in `TinymistLanguageClient.kt`.
-            *   The logic in `OutlineDataHolder.updateOutline()` to trigger a view refresh also needs to be fully implemented and tested once real data flow is reliable.
-
-### Resources (`src/main/resources/`)
-
-*   **`META-INF/plugin.xml`**: The plugin descriptor. This XML file declares the plugin's existence and its components to the IntelliJ Platform. Key declarations include:
-    *   Plugin ID, name, version, description, and dependencies (e.g., `com.redhat.devtools.lsp4ij`).
-    *   **`<extensions defaultExtensionNs="com.intellij">`**:
-        *   `fileType`: Associates `.typ` extension with `TypstFileType` and `TypstLanguage`.
-        *   `lang.parserDefinition`: Registers `TypstParserDefinition` for `TypstLanguage`.
-        *   `lang.syntaxHighlighterFactory`: Registers `TypstSyntaxHighlighterFactory` for `TypstLanguage`.
-        *   `
+4.  **JCEF-based Preview (`preview/` directory):**
+    *   **`TypstPreviewFileEditorProvider.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditorProvider`. It checks if a given `VirtualFile` is a Typst file and if so, creates a `TypstPreviewFileEditor`. Registered in `plugin.xml`.
+    *   **`TypstPreviewFileEditor.kt`**:
+        *   Implements `com.intellij.openapi.fileEditor.FileEditor` and `com.intellij.openapi.project.DumbAware`. This is the core class for displaying the Typst preview.
+        *   Uses `com.intellij.ui.jcef.JBCefBrowser` to embed a web browser component.
+        *   **Loading Content:**
+            *   It attempts to load the preview from a URL like `http://127.0.0.1:23635` (the port is dynamically determined by `tinymist`). This URL is served by the `tinymist` language server's built-in preview server.
+            *   If loading fails (e.g., server not running, incorrect URL), it displays an error message (`loadHTML("<html><body>Error loading preview...</body></html>")`

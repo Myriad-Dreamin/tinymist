@@ -54,7 +54,7 @@ class TypstPreviewFileEditor(
             jcefUnsupportedLabel = JLabel("JCEF browser is not supported in this environment.")
         } else {
             println("TypstPreviewFileEditor: JCEF is supported. Setting up browser.")
-            // setupDisplayHandler()
+            setupDisplayHandler()
             setupLoadHandler()
             waitForServerAndLoad()
         }
@@ -171,14 +171,25 @@ class TypstPreviewFileEditor(
     }
 
     private fun setupDisplayHandler() {
+        if (!JBCefApp.isSupported()) return // Guard against calling if JCEF not supported
+
+        // Ensure cefBrowser is initialized before adding handlers.
+        // JCEFHtmlPanel initializes cefBrowser internally, usually before client code might call this.
+        // The 'if (this.cefBrowser == null)' check was removed as the compiler indicated it's always false,
+        // implying cefBrowser is already initialized here.
+
         this.jbCefClient.addDisplayHandler(object : CefDisplayHandlerAdapter() {
-            override fun onConsoleMessage(browser: CefBrowser, level: CefSettings.LogSeverity,
+            override fun onConsoleMessage(browser: CefBrowser?, level: CefSettings.LogSeverity,
                                           message: String, source: String, line: Int): Boolean {
-                val formattedMessage = "JS CONSOLE [$level] ($source:$line): $message"
-                println(formattedMessage)
-                return false // False to allow the message to also be processed by the default handler (e.g., DevTools)
+                val formattedMessage = "JCEF JS CONSOLE [$level]($source:$line): $message"
+                // Print to standard out, which should appear in runIde console.
+                // For more persistent logging, use IntelliJ's logger:
+                // Logger.getInstance(TypstPreviewFileEditor::class.java).info(formattedMessage)
+                println(formattedMessage) 
+                return false // False to allow the message to also be processed by other handlers (e.g., DevTools)
             }
-        }, this.cefBrowser)
+        }, this.cefBrowser) // Pass 'this.cefBrowser' if the handler is tied to a specific browser instance
+        println("TypstPreviewFileEditor: Custom CefDisplayHandler added to log JS console messages.")
     }
 
     private fun setupLoadHandler() {
