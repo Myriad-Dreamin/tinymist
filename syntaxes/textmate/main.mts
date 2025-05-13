@@ -373,7 +373,7 @@ const mathParen: textmate.Pattern = {
   endCaptures: {
     "0": { name: "markup.content.brace.typst" },
   },
-  patterns: [{ include: "#mathParen" }, { include: "#mathWithoutShorthand" }],
+  patterns: [{ include: "#mathParen" }, { include: "#math" }],
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
