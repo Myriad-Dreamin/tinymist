@@ -77,7 +77,7 @@
     number-align: center,
     width: page-width,
   ) if not (sys-is-html-target or is-html-target)
-  set page(numbering: "1") if is-pdf-target and not is-main and kind == "page"
+  set page(numbering: "1") if (not sys-is-html-target and is-pdf-target) and not is-main and kind == "page"
 
   // remove margins for web target
   set page(
