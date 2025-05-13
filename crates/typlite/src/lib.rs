@@ -89,12 +89,14 @@ impl MarkdownDocument {
     }
 
     /// Convert content to plain text string
-    pub fn to_text_string(&self) -> Result<ecow::EcoString> {
+    pub fn to_text_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::Text);
-        writer.write_eco(&ast, &mut output)?;
+        writer
+            .write_eco(&ast, &mut output)
+            .context_ut("failed to write")?;
 
         Ok(output)
     }
