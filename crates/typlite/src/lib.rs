@@ -18,6 +18,7 @@ use cmark_writer::ast::Node;
 use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
+use tinymist_std::error::prelude::*;
 use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst::World;
@@ -66,38 +67,42 @@ impl MarkdownDocument {
     }
 
     /// Parse HTML document to AST
-    pub fn parse(&self) -> Result<Node> {
+    pub fn parse(&self) -> tinymist_std::Result<Node> {
         if let Some(ast) = &self.ast {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone());
-        parser.parse(&self.base.root)
+        parser.parse(&self.base.root).context_ut("failed to parse")
     }
 
     /// Convert content to markdown string
-    pub fn to_md_string(&self) -> Result<ecow::EcoString> {
+    pub fn to_md_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::Md);
-        writer.write_eco(&ast, &mut output)?;
+        writer
+            .write_eco(&ast, &mut output)
+            .context_ut("failed to write")?;
 
         Ok(output)
     }
 
     /// Convert content to plain text string
-    pub fn to_text_string(&self) -> Result<ecow::EcoString> {
+    pub fn to_text_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::Text);
-        writer.write_eco(&ast, &mut output)?;
+        writer
+            .write_eco(&ast, &mut output)
+            .context_ut("failed to write")?;
 
         Ok(output)
     }
 
     /// Convert the content to a LaTeX string.
-    pub fn to_tex_string(&self, prelude: bool) -> Result<ecow::EcoString> {
+    pub fn to_tex_string(&self, prelude: bool) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
@@ -105,18 +110,20 @@ impl MarkdownDocument {
         if prelude {
             LaTeXWriter::default_prelude(&mut output);
         }
-        writer.write_eco(&ast, &mut output)?;
+        writer
+            .write_eco(&ast, &mut output)
+            .context_ut("failed to write")?;
 
         Ok(output)
     }
 
     /// Convert the content to a DOCX document
     #[cfg(feature = "docx")]
-    pub fn to_docx(&self) -> Result<Vec<u8>> {
+    pub fn to_docx(&self) -> tinymist_std::Result<Vec<u8>> {
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::Docx);
-        writer.write_vec(&ast)
+        writer.write_vec(&ast).context_ut("failed to write")
     }
 }
 
@@ -181,40 +188,40 @@ impl Typlite {
     }
 
     /// Convert the content to a markdown string.
-    pub fn convert(self) -> Result<ecow::EcoString> {
+    pub fn convert(self) -> tinymist_std::Result<ecow::EcoString> {
         match self.format {
             Format::Md => self.convert_doc(Format::Md)?.to_md_string(),
             Format::LaTeX => self.convert_doc(Format::LaTeX)?.to_tex_string(true),
             Format::Text => self.convert_doc(Format::Text)?.to_text_string(),
             #[cfg(feature = "docx")]
-            Format::Docx => Err("docx format is not supported".into()),
+            Format::Docx => bail!("docx format is not supported"),
         }
     }
 
     /// Convert the content to a DOCX document
     #[cfg(feature = "docx")]
-    pub fn to_docx(self) -> Result<Vec<u8>> {
+    pub fn to_docx(self) -> tinymist_std::Result<Vec<u8>> {
         if self.format != Format::Docx {
-            return Err("format is not DOCX".into());
+            bail!("format is not DOCX");
         }
         self.convert_doc(Format::Docx)?.to_docx()
     }
 
     /// Convert the content to a markdown document.
-    pub fn convert_doc(self, format: Format) -> Result<MarkdownDocument> {
+    pub fn convert_doc(self, format: Format) -> tinymist_std::Result<MarkdownDocument> {
         let entry = self.world.entry_state();
         let main = entry.main();
-        let current = main.ok_or("no main file in workspace")?;
+        let current = main.context("no main file in workspace")?;
         let world = self.world;
 
         if WorkspaceResolver::is_package_file(current) {
-            return Err("package file is not supported".into());
+            bail!("package file is not supported");
         }
 
         let wrap_main_id = current.join("__wrap_md_main.typ");
         let wrap_main_path = world
             .path_for_id(wrap_main_id)
-            .map_err(|err| format!("getting source for main file: {err:?}"))?;
+            .context_ut("getting source for main file")?;
 
         let task_inputs = TaskInputs {
             entry: Some(entry.select_in_workspace(wrap_main_id.vpath().as_rooted_path())),
@@ -239,13 +246,13 @@ impl Typlite {
                 markdown_id.join("typst.toml"),
                 Bytes::from_string(include_str!("markdown-typst.toml")),
             )
-            .map_err(|err| format!("cannot map markdown-typst.toml: {err:?}"))?;
+            .context_ut("cannot map markdown-typst.toml")?;
         world
             .map_shadow_by_id(
                 markdown_id,
                 Bytes::from_string(include_str!("markdown.typ")),
             )
-            .map_err(|err| format!("cannot map markdown.typ: {err:?}"))?;
+            .context_ut("cannot map markdown.typ")?;
 
         world
             .map_shadow(
@@ -257,11 +264,10 @@ impl Typlite {
                     world.source(current).unwrap().text()
                 )),
             )
-            .map_err(|err| format!("cannot map source for main file: {err:?}"))?;
+            .context_ut("cannot map source for main file")?;
 
-        let base = typst::compile(&world)
-            .output
-            .map_err(|err| format!("convert source for main file: {err:?}"))?;
+        // todo: ignoring warnings
+        let base = typst::compile(&world).output?;
         let mut feat = self.feat;
         feat.target = format;
         Ok(MarkdownDocument::new(base, feat))
