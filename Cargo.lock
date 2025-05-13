@@ -4772,7 +4772,6 @@ dependencies = [
  "insta",
  "regex",
  "resvg",
- "tinymist-analysis",
  "tinymist-derive",
  "tinymist-project",
  "tinymist-std",

@@ -25,7 +25,6 @@ base64.workspace = true
 clap = { workspace = true, optional = true }
 comemo.workspace = true
 ecow.workspace = true
-tinymist-analysis.workspace = true
 tinymist-std.workspace = true
 tinymist-derive.workspace = true
 tinymist-project = { workspace = true, features = ["lsp"] }

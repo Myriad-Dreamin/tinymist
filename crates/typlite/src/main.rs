@@ -45,6 +45,7 @@ fn main() -> typlite::Result<()> {
 
     let output_format = match output_path.extension() {
         Some(ext) if ext == std::ffi::OsStr::new("tex") => Format::LaTeX,
+        Some(ext) if ext == std::ffi::OsStr::new("txt") => Format::Text,
         #[cfg(feature = "docx")]
         Some(ext) if ext == std::ffi::OsStr::new("docx") => Format::Docx,
         _ => Format::Md,
@@ -75,6 +76,7 @@ fn main() -> typlite::Result<()> {
     let result = match output_format {
         Format::Md => Bytes::from_string(doc.to_md_string()?),
         Format::LaTeX => Bytes::from_string(doc.to_tex_string(true)?),
+        Format::Text => Bytes::from_string(doc.to_text_string()?),
         #[cfg(feature = "docx")]
         Format::Docx => Bytes::new(doc.to_docx()?),
     };

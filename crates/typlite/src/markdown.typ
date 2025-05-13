@@ -116,6 +116,25 @@
 
 #let example(code) = eval(code.text, mode: "markup")
 
+#let process-math-eq(item) = {
+  if type(item) == str {
+    return item
+  }
+  if type(item) == array {
+    if (
+      item.any(x => {
+        type(x) == content and x.func() == str
+      })
+    ) {
+      item.flatten()
+    } else {
+      item.map(x => process-math-eq(x)).flatten()
+    }
+  } else {
+    process-math-eq(item.fields().values().flatten().filter(x => type(x) == content or type(x) == str))
+  }
+}
+
 #let md-doc(body) = context {
   // distinguish parbreak from <p> tag
   show parbreak: it => if-not-paged(it, md-parbreak)
@@ -139,11 +158,21 @@
 
   show math.equation.where(block: false): it => if-not-paged(
     it,
-    html.elem("m1eqinline", html.frame(box(inset: 0.5em, it))),
+    html.elem(
+      "m1eqinline",
+      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(box(inset: 0.5em, it)) } else {
+        process-math-eq(it.body).flatten().join()
+      },
+    ),
   )
   show math.equation.where(block: true): it => if-not-paged(
     it,
-    html.elem("m1eqblock", html.frame(block(inset: 0.5em, it))),
+    html.elem(
+      "m1eqblock",
+      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(block(inset: 0.5em, it)) } else {
+        process-math-eq(it.body).flatten().join()
+      },
+    ),
   )
 
   // show linebreak: it => if-not-paged(it, md-linebreak)
