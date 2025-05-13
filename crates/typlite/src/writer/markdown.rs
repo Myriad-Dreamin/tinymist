@@ -20,7 +20,9 @@ impl MarkdownWriter {
 impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
         let mut writer = CommonMarkWriter::new();
-        writer.write(document).expect("Failed to write document");
+        writer
+            .write(document)
+            .map_err(|e| format!("failed to write document: {}", e))?;
         output.push_str(&writer.into_string());
         Ok(())
     }
