@@ -27,8 +27,8 @@
 #        ^ source.typst meta.expr.context.typst
 #         ^ source.typst meta.expr.context.typst meta.brace.square.typst
 #          ^ source.typst meta.expr.context.typst meta.brace.square.typst
-#           ^ source.typst markup.content.brace.typst
-#            ^ source.typst markup.content.brace.typst
+#           ^ source.typst meta.brace.square.typst
+#            ^ source.typst meta.brace.square.typst
 >#context {
 #^ source.typst keyword.control.hash.typst
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
