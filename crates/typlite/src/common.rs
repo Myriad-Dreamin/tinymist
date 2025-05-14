@@ -103,6 +103,38 @@ impl HighlightNode {
     }
 }
 
+/// Node for centered content
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node]
+pub struct CenterNode {
+    /// The content to be centered
+    pub content: Box<Node>,
+}
+
+impl CenterNode {
+    fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
+        let html_node = Node::HtmlElement(cmark_writer::ast::HtmlElement {
+            tag: "div".to_string(),
+            attributes: vec![cmark_writer::ast::HtmlAttribute {
+                name: "align".to_string(),
+                value: "center".to_string(),
+            }],
+            children: vec![*self.content.clone()],
+            self_closing: false,
+        });
+        let mut temp_writer = cmark_writer::writer::CommonMarkWriter::new();
+        temp_writer.write(&html_node)?;
+        let content = temp_writer.into_string();
+        writer.write_str(&content)?;
+        writer.write_str("\n")?;
+        Ok(())
+    }
+
+    fn is_block_custom(&self) -> bool {
+        true
+    }
+}
+
 /// Common writer interface for different formats
 pub trait FormatWriter {
     /// Write AST document to output format
