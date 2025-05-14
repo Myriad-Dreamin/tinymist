@@ -4,7 +4,7 @@ use cmark_writer::ast::Node;
 use typst::html::HtmlElement;
 
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
-use crate::common::{FigureNode, HighlightNode};
+use crate::common::{CenterNode, FigureNode, HighlightNode};
 use crate::Result;
 
 use super::core::HtmlToAstParser;
@@ -88,10 +88,14 @@ impl InlineParser {
         parser.convert_children_into(&mut body_content, element)?;
         let body = Box::new(Node::Paragraph(body_content));
 
-        // Create figure node using generic definition
-        parser
-            .blocks
-            .push(Node::Custom(Box::new(FigureNode { body, caption })));
+        // Create figure node with centering
+        let figure_node = Box::new(FigureNode { body, caption });
+        let centered_node = Box::new(CenterNode {
+            content: Box::new(Node::Custom(figure_node)),
+        });
+
+        // Add the centered figure to blocks
+        parser.blocks.push(Node::Custom(centered_node));
 
         Ok(())
     }

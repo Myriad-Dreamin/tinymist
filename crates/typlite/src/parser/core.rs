@@ -4,7 +4,7 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::ListState;
+use crate::common::{CenterNode, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -134,10 +134,12 @@ impl HtmlToAstParser {
             md_tag::math_equation_inline | md_tag::math_equation_block => {
                 if element.tag == md_tag::math_equation_block {
                     self.flush_inline_buffer();
-                }
-                self.convert_children(element)?;
-                if element.tag == md_tag::math_equation_block {
-                    self.flush_inline_buffer();
+                    let element_node = self.create_html_element(element)?;
+                    self.blocks.push(Node::Custom(Box::new(CenterNode {
+                        content: Box::new(element_node),
+                    })));
+                } else {
+                    self.convert_children(element)?;
                 }
                 Ok(())
             }
