@@ -167,12 +167,17 @@
   )
   show math.equation.where(block: true): it => if-not-paged(
     it,
-    html.elem(
-      "m1eqblock",
-      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(block(inset: 0.5em, it)) } else {
-        process-math-eq(it.body).flatten().join()
-      },
-    ),
+    if sys.inputs.at("x-remove-html", default: none) != "true" {
+      html.elem(
+        "m1eqblock",
+        html.frame(block(inset: 0.5em, it)),
+      )
+    } else {
+      html.elem(
+        "m1eqinline",
+        process-math-eq(it.body).flatten().join(),
+      )
+    },
   )
 
   // show linebreak: it => if-not-paged(it, md-linebreak)
