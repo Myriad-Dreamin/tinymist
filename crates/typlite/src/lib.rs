@@ -237,7 +237,10 @@ impl Typlite {
         let mut world = world.task(task_inputs).html_task().into_owned();
 
         let markdown_id = FileId::new(
-            Some(typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0").unwrap()),
+            Some(
+                typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0")
+                    .context_ut("failed to import markdown package")?,
+            ),
             VirtualPath::new("lib.typ"),
         );
 
@@ -261,7 +264,10 @@ impl Typlite {
                     r#"#import "@local/markdown:0.1.0": md-doc, example
 #show: md-doc
 {}"#,
-                    world.source(current).unwrap().text()
+                    world
+                        .source(current)
+                        .context_ut("failed to get main file content")?
+                        .text()
                 )),
             )
             .context_ut("cannot map source for main file")?;

@@ -90,7 +90,9 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> tinymist_std::Result<()> {
     };
 
     if is_stdout {
-        std::io::stdout().write_all(result.as_slice()).unwrap();
+        std::io::stdout()
+            .write_all(result.as_slice())
+            .context("failed to write to stdout")?;
     } else if let Err(err) = std::fs::write(&output_path, result.as_slice()) {
         bail!("failed to write file {output_path:?}: {err}");
     }
