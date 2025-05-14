@@ -96,15 +96,23 @@ indexmap = "2.7.0"
 rpds = "1"
 
 # Data/Text Format and Processing
+biblatex = "0.10"
+cmark-writer = { version = "0.6.3", features = ["gfm"] }
+docx-rs = { git = "https://github.com/Myriad-Dreamin/docx-rs", default-features = false, rev = "db49a729f68dbdb9e8e91857fbb1c3d414209871" }
+hayagriva = "0.8"
 hex = "0.4.3"
 flate2 = "1"
-tar = "0.4"
-biblatex = "0.10"
-hayagriva = "0.8"
+# typst can only support these formats.
+image = { version = "0.25.6", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+] }
 pathdiff = "0.2"
 percent-encoding = "2"
 rust_iso639 = "0.0.3"
 rust_iso3166 = "0.1.4"
+resvg = { version = "0.43.0" }
 rkyv = "0.7.42"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
@@ -113,6 +121,7 @@ serde_repr = "0.1"
 serde_with = { version = "3.6", features = ["base64"] }
 serde_yaml = "0.9"
 serde-wasm-bindgen = "^0.6"
+tar = "0.4"
 toml = { version = "0.8", default-features = false, features = [
     "parse",
     "display",
