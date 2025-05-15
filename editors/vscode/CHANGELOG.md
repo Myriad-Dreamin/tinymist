@@ -9,6 +9,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ## v0.13.14 - [2025-05-31]
 
 * Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
+* Bumped typstyle to v0.13.7. This version includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0137---2025-05-15
 
 ## v0.13.12 - [2025-04-30]
 

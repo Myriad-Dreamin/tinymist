@@ -119,7 +119,8 @@ pub struct Config {
     pub formatter_print_width: Option<u32>,
     /// Sets the indent size (using space) for the formatter.
     pub formatter_indent_size: Option<u32>,
-
+    /// Sets the hard line wrapping mode for the formatter.
+    pub formatter_prose_wrap: Option<bool>,
     /// The warnings during configuration update.
     pub warnings: Vec<CowStr>,
 }
@@ -321,6 +322,7 @@ impl Config {
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
+        assign_config!(formatter_prose_wrap := "formatterProseWrap"?: Option<bool>);
         assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
@@ -469,17 +471,22 @@ impl Config {
     pub fn formatter(&self) -> FormatUserConfig {
         let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
         let formatter_indent_size = self.formatter_indent_size.unwrap_or(2) as usize;
+        let formatter_line_wrap = self.formatter_prose_wrap.unwrap_or(false);
 
         FormatUserConfig {
             config: match self.formatter_mode {
-                FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
-                    typstyle_core::Config::default()
-                        .with_width(formatter_print_width)
-                        .with_tab_spaces(formatter_indent_size),
-                )),
+                FormatterMode::Typstyle => {
+                    FormatterConfig::Typstyle(Box::new(typstyle_core::Config {
+                        tab_spaces: formatter_indent_size,
+                        max_width: formatter_print_width,
+                        wrap_text: formatter_line_wrap,
+                        ..typstyle_core::Config::default()
+                    }))
+                }
                 FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
                     max_line_length: formatter_print_width,
                     indent_space: formatter_indent_size,
+                    line_wrap: formatter_line_wrap,
                     ..typstfmt::Config::default()
                 })),
                 FormatterMode::Disable => FormatterConfig::Disable,

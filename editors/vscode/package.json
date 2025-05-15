@@ -490,6 +490,12 @@
           "type": "number",
           "default": 2
         },
+        "tinymist.formatterProseWrap": {
+          "title": "%extension.tinymist.config.tinymist.formatterProseWrap.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.formatterProseWrap.desc%",
+          "type": "boolean",
+          "default": false
+        },
         "tinymist.showExportFileIn": {
           "title": "%extension.tinymist.config.tinymist.showExportFileIn.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.showExportFileIn.desc%",
