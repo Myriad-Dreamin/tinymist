@@ -198,52 +198,79 @@ This section outlines the architecture of the Tinymist IntelliJ plugin, detailin
 
 *   **`editors/intellij/`**: Root directory for the IntelliJ plugin.
     *   **`build.gradle.kts`**: Gradle build script for managing dependencies (like `lsp4ij`, IntelliJ Platform SDK) and plugin packaging.
-    *   **`src/main/kotlin/org/tinymist/intellij/`**: Contains the core Kotlin source code for the plugin.
-    *   **`src/main/resources/META-INF/plugin.xml`**: The plugin descriptor file, essential for IntelliJ to load and recognize the plugin and its components.
+    *   **`src/main/kotlin/org/tinymist/intellij/`**: Contains the core Kotlin source code for the plugin. This is further structured into sub-packages like `lsp`, `preview`, and `structure`.
+    *   **`src/main/resources/META-INF/plugin.xml`**: The plugin descriptor file, essential for IntelliJ to load and recognize the plugin and its components (e.g., language support, LSP integration, preview editors, structure view).
 
 ### Kotlin Source Files (`src/main/kotlin/org/tinymist/intellij/`)
 
-1.  **Basic Language Definition:**
-    *   **`TypstLanguage.kt`**: Defines the `TypstLanguage` object (subclass of `com.intellij.lang.Language`) and `TypstFileType` object (subclass of `com.intellij.openapi.fileTypes.LanguageFileType`). This is the most basic registration of "Typst" as a language within IntelliJ.
-    *   **`TypstFile.kt`**: Defines `TypstFile` (subclass of `com.intellij.extapi.psi.PsiFileBase`), representing a Typst file in the PSI (Program Structure Interface) tree.
+The source code is organized into the following main areas:
 
-2.  **Lexing and Parsing (Minimal Implementation):**
-    *   **`TypstLexerAdapter.kt`**: Implements `com.intellij.lexer.Lexer`. Provides a very basic lexer that treats the entire file content as a single token (`TYPST_TEXT`). This is a placeholder as the actual detailed lexing and parsing for features like syntax highlighting and code analysis are delegated to the `tinymist` LSP server.
+1.  **Base Language Support (`org.tinymist.intellij`)**
+    *   **`TypstLanguage.kt`**: Defines `TypstLanguage` (a subclass of `com.intellij.lang.Language`) and `TypstFileType` (a subclass of `com.intellij.openapi.fileTypes.LanguageFileType`). This is the fundamental registration of "Typst" as a recognized language and file type within the IntelliJ Platform.
+    *   **`TypstFile.kt`**: Defines `TypstFile` (a subclass of `com.intellij.extapi.psi.PsiFileBase`). This class represents a Typst file in IntelliJ's Program Structure Interface (PSI) tree, allowing the platform to understand it as a structured file.
+    *   **`TypstLexerAdapter.kt`**: Implements `com.intellij.lexer.Lexer`. It provides a very basic lexer that currently treats the entire file content as a single generic token (`TYPST_TEXT`). This is a minimal implementation, as detailed lexing for features like advanced syntax highlighting or code analysis is primarily handled by the `tinymist` LSP server.
     *   **`TypstParserDefinition.kt`**: Implements `com.intellij.lang.ParserDefinition`.
-        *   Returns the `TypstLexerAdapter`.
-        *   Provides a basic `PsiParser` that creates a single root PSI node for the file. Again, this is minimal because the LSP server handles the heavy lifting of understanding the code structure.
-        *   Defines how to create a `TypstFile` PSI element.
-        *   Defines `TYPST_TEXT` as an `IElementType`.
+        *   It supplies the `TypstLexerAdapter`.
+        *   It provides a basic `PsiParser` that creates a single root PSI node for the file. Similar to the lexer, this is kept minimal because the LSP server is responsible for the in-depth understanding of the code's structure.
+        *   It specifies how to create `TypstFile` PSI elements.
+        *   It defines `TYPST_TEXT` as an `IElementType` (a type for tokens).
     *   **`TypstSyntaxHighlighter.kt` (contains `TypstSyntaxHighlighter` and `TypstSyntaxHighlighterFactory`)**:
-        *   `TypstSyntaxHighlighterFactory` (nested class) implements `com.intellij.openapi.fileTypes.SyntaxHighlighterFactory` and provides instances of `TypstSyntaxHighlighter`.
-        *   `TypstSyntaxHighlighter` (subclass of `com.intellij.openapi.fileTypes.SyntaxHighlighterBase`) uses the `TypstLexerAdapter`. It assigns a default text attribute to the `TYPST_TEXT` token. Actual rich syntax highlighting is expected to come from the LSP server via semantic token support.
-    *   **`TypstFindUsagesProvider.kt`**: Implements `com.intellij.lang.findUsages.FindUsagesProvider`. Registered in `plugin.xml` to enable IntelliJ's "Find Usages" action for Typst files. Relies on `lsp4ij` and the language server to perform the actual search.
+        *   `TypstSyntaxHighlighterFactory` implements `com.intellij.openapi.fileTypes.SyntaxHighlighterFactory` and is responsible for providing instances of `TypstSyntaxHighlighter`.
+        *   `TypstSyntaxHighlighter` (a subclass of `com.intellij.openapi.fileTypes.SyntaxHighlighterBase`) uses the `TypstLexerAdapter`. It assigns a default text attribute (e.g., standard identifier color) to the `TYPST_TEXT` token. Rich, context-aware syntax highlighting is provided by the `tinymist` LSP server through semantic token support.
 
-3.  **LSP (Language Server Protocol) Integration (`lsp/` directory):**
-    *   **`TinymistLanguageServerFactory.kt`**: Implements `com.redhat.devtools.lsp4ij.LanguageServerFactory`. Its primary role is to create and provide instances of `TinymistLspStreamConnectionProvider` and `TinymistLanguageClient`. This factory is registered in `plugin.xml`.
-    *   **`TinymistLspStreamConnectionProvider.kt`**: Extends `com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider`. This is a crucial class for managing the lifecycle and communication with the `tinymist` LSP executable.
-        *   In its `init` block, it calls `findTinymistExecutable()` to locate the `tinymist` binary on the system's PATH.
-        *   It then uses `super.setCommands()` to configure the command to start the server (e.g., `["path/to/tinymist", "lsp"]`).
-        *   `getWorkingDirectory()`: Returns the project's base path as the working directory for the LSP server.
-        *   `getInitializationOptions()`: Constructs and returns a `TinymistInitializationOptions` object. This object is serialized to JSON and sent to the LSP server as part of the `initialize` request. It allows passing client-specific configurations to the server on startup.
-    *   **`TinymistInitializationOptions.kt`**: A Kotlin data class that defines the structure of the initialization options sent to the `tinymist` server. It includes fields like `font.fontPaths`, `semanticTokens`, `completion`, `lint`, etc., mirroring configurations available in the Tinymist VSCode extension.
-    *   **`TinymistLanguageClient.kt`**:
-        *   **Status:** This file has been created/restored and extends `com.redhat.devtools.lsp4ij.client.LanguageClientImpl`.
-        *   **Role:** It serves as a custom language client to handle Tinymist-specific LSP interactions and to customize behavior of the standard `lsp4ij` client.
-        *   **`onDocumentOutline(@JsonNotification("tinymist/documentOutline"))`**: Handles the `tinymist/documentOutline` notification from the server. It attempts to parse the URI and update `OutlineDataHolder` with the received outline items.
-            *   **Current Issue:** The `tinymist` server is currently sending this notification *without* a `uri` field, or with a `uri` that cannot be reliably mapped to a file path. This prevents the client from associating the outline with a specific document.
-            *   **Fallback:** Due to the missing URI, `OutlineDataHolder` currently falls back to displaying mock data. A `TODO` has been added in the client to indicate that a server-side fix is required for the URI.
-        *   **`showMessageRequest()` Override**: This method is overridden to intercept `window/showMessageRequest` calls from the LSP server.
-            *   **Purpose:** It logs the request details and then returns a `CompletableFuture.completedFuture(null)`.
-            *   **Reason:** This prevents a potential `NullPointerException` within `lsp4ij` if the server sends a request with a null `actions` list, and also suppresses the display of these specific messages in the UI for now.
-        *   **`publishDiagnostics()` Override**: This method is overridden to reformat diagnostic messages from the server (e.g., replacing newlines with `<br>`) for better rendering in IntelliJ's UI.
-    *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TypstOutlineItem`, `TypstOutlineRange`, `TypstOutlineSeverity`) used to deserialize the JSON data from the `tinymist/documentOutline` notification.
+2.  **LSP (Language Server Protocol) Integration (`org.tinymist.intellij.lsp`)**
+    *   **`TinymistLanguageServerFactory.kt`**: Implements `com.redhat.devtools.lsp4ij.LanguageServerFactory`. Its main role is to create and provide instances of `TinymistLspStreamConnectionProvider` (to connect to the server) and `TinymistLanguageClient` (to handle communication). This factory is registered in `plugin.xml` to enable LSP support for the Typst language.
+    *   **`TinymistLspStreamConnectionProvider.kt`**: Extends `com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider`. This class is critical for managing the lifecycle and communication with the `tinymist` LSP executable.
+        *   It locates the `tinymist` executable (currently hardcoded, but ideally from settings or PATH).
+        *   It configures the command to start the LSP server (e.g., `["/path/to/tinymist", "lsp"]`).
+        *   It provides initialization options (`getInitializationOptions()`) to the `tinymist` server when it starts. These options are sent as part of the LSP `initialize` request and can configure server behavior (e.g., enabling background preview).
+    *   **`TinymistLanguageClient.kt`**: Extends `com.redhat.devtools.lsp4ij.client.LanguageClientImpl`. This custom client handles Tinymist-specific LSP notifications and can customize how standard LSP messages are processed.
+        *   **`@JsonNotification("tinymist/documentOutline") onDocumentOutline(...)`**: Handles a custom notification from the `tinymist` server that provides document structure information (headings, labels, etc.). It parses this data and updates the `OutlineDataHolder` for use in the Structure View.
+        *   **`@JsonNotification("tinymist/document") handleDocument(...)`**: Placeholder for handling another custom notification, potentially for preview updates or other document-specific events.
+        *   **`publishDiagnostics(...)`**: Overrides the default handler to reformat diagnostic messages (errors, warnings) from the server (e.g., replacing newlines with `<br>`) for better display in IntelliJ's UI.
+        *   **`showMessageRequest(...)`**: Overrides the default to handle `window/showMessageRequest` from the server, mainly to log them and prevent potential NPEs in `lsp4ij` if actions are null.
+    *   **`TinymistOutlineModel.kt`**: Defines Kotlin data classes (`TinymistDocumentOutlineParams`, `TinymistOutlineItem`) used to deserialize the JSON payload of the `tinymist/documentOutline` notification. These classes model the structure of an outline item (name, kind, detail, range, children).
+    *   **`TypstFindUsagesProvider.kt`**: Implements `com.intellij.lang.findUsages.FindUsagesProvider`. Registered in `plugin.xml`, it integrates with IntelliJ's "Find Usages" feature. It relies on the LSP server (via `lsp4ij`) to perform the actual search for references.
 
-4.  **JCEF-based Preview (`preview/` directory):**
-    *   **`TypstPreviewFileEditorProvider.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditorProvider`. It checks if a given `VirtualFile` is a Typst file and if so, creates a `TypstPreviewFileEditor`. Registered in `plugin.xml`.
-    *   **`TypstPreviewFileEditor.kt`**:
-        *   Implements `com.intellij.openapi.fileEditor.FileEditor` and `com.intellij.openapi.project.DumbAware`. This is the core class for displaying the Typst preview.
-        *   Uses `com.intellij.ui.jcef.JBCefBrowser` to embed a web browser component.
-        *   **Loading Content:**
-            *   It attempts to load the preview from a URL like `http://127.0.0.1:23635` (the port is dynamically determined by `tinymist`). This URL is served by the `tinymist` language server's built-in preview server.
-            *   If loading fails (e.g., server not running, incorrect URL), it displays an error message (`loadHTML("<html><body>Error loading preview...</body></html>")`
+3.  **JCEF-based Preview (`org.tinymist.intellij.preview`)**
+    *   **`TypstPreviewFileEditor.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditor` and uses `com.intellij.ui.jcef.JCEFHtmlPanel` to embed a Chromium-based browser view. This editor displays the live preview of the Typst document.
+        *   It connects to a web server (e.g., `http://127.0.0.1:23635`) that is started and managed by the `tinymist` language server itself (when `preview.background.enabled` is true).
+        *   It includes logic to wait for the server to be available before attempting to load the URL.
+        *   It handles cases where JCEF might not be supported in the user's environment.
+    *   **`TypstPreviewFileEditorProvider.kt`**: Implements `com.intellij.openapi.fileEditor.FileEditorProvider`. This provider is responsible for creating instances of `TypstPreviewFileEditor` when IntelliJ needs to open a preview for a Typst file. It also defines the editor's ID and policy (e.g., where it should be placed relative to other editors).
+    *   **`TypstTextEditorWithPreviewProvider.kt`**: Extends `com.intellij.openapi.fileEditor.TextEditorWithPreviewProvider`. This class is the main entry point registered in `plugin.xml` for opening Typst files. It combines a standard text editor (provided by IntelliJ) with the custom `TypstPreviewFileEditor` (obtained via `TypstPreviewFileEditorProvider`), allowing for a side-by-side text and preview editing experience. It accepts files of type `TypstFileType`.
+
+4.  **Structure View Integration (`org.tinymist.intellij.structure`)**
+    *   **`TypstStructureViewFactory.kt`**: Implements `com.intellij.lang.PsiStructureViewFactory`. This factory is registered in `plugin.xml` for the `TypstLanguage`. When the user opens the Structure View for a Typst file, IntelliJ calls this factory to get a `StructureViewBuilder`.
+    *   **`TypstStructureViewModel.kt`**: Extends `com.intellij.ide.structureView.StructureViewModelBase`. It provides the data model for the Structure View tree.
+        *   It takes a `PsiFile` (the Typst file being viewed) and an optional `Editor`.
+        *   The root of the structure view is represented by `TypstStructureViewRootElement` (an inner class).
+        *   It populates the structure view by retrieving outline items from `OutlineDataHolder.getOutline(filePath)` and wrapping them in `TypstStructureViewElement` instances.
+    *   **`TypstStructureViewElement.kt`**: Implements `com.intellij.ide.structureView.StructureViewTreeElement`, `com.intellij.ide.util.treeView.smartTree.SortableTreeElement`, and `com.intellij.navigation.NavigationItem`. Each instance of this class represents a node in the Structure View (e.g., a heading).
+        *   It wraps a `TinymistOutlineItem` (from the LSP server).
+        *   It provides presentation details (text, icon, location string).
+        *   It handles navigation: when a user clicks an item in the Structure View, the `navigate()` method uses an `OpenFileDescriptor` to move the cursor to the corresponding location in the editor, converting LSP `Range` objects to IntelliJ `TextRange` objects.
+        *   It defines children recursively, building the tree structure.
+    *   **`OutlineDataHolder.kt`**: A singleton object (`object`) that acts as a cache for document outline data.
+        *   The `TinymistLanguageClient` calls `OutlineDataHolder.updateOutline(filePath, items)` when it receives new outline information from the LSP server via the `tinymist/documentOutline` notification.
+        *   `TypstStructureViewModel` calls `OutlineDataHolder.getOutline(filePath)` to retrieve the cached (or mock, if unavailable) outline items for a given file.
+        *   It includes logic to provide mock outline data if real data for a file path hasn't been received, which is useful for development or if the LSP server fails to send the outline.
+
+### Key Interactions
+
+*   **IntelliJ Platform & Plugin Startup**: IntelliJ reads `plugin.xml` to discover the plugin's capabilities. It registers `TypstLanguage` and `TypstFileType`.
+*   **Opening a Typst File**:
+    *   `TypstTextEditorWithPreviewProvider` is invoked, creating a split editor with a text part and a `TypstPreviewFileEditor`.
+    *   `TinymistLanguageServerFactory` is triggered, which starts `TinymistLspStreamConnectionProvider` to launch the `tinymist` LSP server process.
+    *   `TinymistLanguageClient` establishes communication with the server.
+*   **LSP Communication**:
+    *   The client and server exchange JSON-RPC messages for features like diagnostics, completion, hover, document outline, etc.
+    *   `TinymistLanguageClient` handles custom notifications like `tinymist/documentOutline`.
+*   **Structure View**:
+    *   When the user opens the Structure View, `TypstStructureViewFactory` creates `TypstStructureViewModel`.
+    *   The view model fetches data from `OutlineDataHolder` (populated by `TinymistLanguageClient`) and builds the tree using `TypstStructureViewElement` nodes.
+*   **Preview Panel**:
+    *   `TypstPreviewFileEditor` loads its content from the HTTP server run by the `tinymist` LSP (if `preview.background.enabled` is true in initialization options).
+    *   Updates to the preview are likely driven by the `tinymist` server itself, potentially triggered by `textDocument/didChange` notifications from the client or its own file watching.
+
+This architecture aims to delegate most of the complex language understanding and preview rendering to the external `tinymist` LSP server, while the IntelliJ plugin focuses on integrating these features into the IDE's UI and user experience, adhering to IntelliJ Platform and `lsp4ij` conventions.

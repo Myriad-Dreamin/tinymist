@@ -1,0 +1,236 @@
+{
+  // Meta-information for Grammar-Kit
+  parserClass="org.tinymist.intellij.language.parser.TypstParser"
+  psiClassPrefix="Typst"
+  psiImplClassSuffix="Impl"
+  psiPackage="org.tinymist.intellij.language.psi"
+  psiImplPackage="org.tinymist.intellij.language.psi.impl"
+  elementTypeHolderClass="org.tinymist.intellij.language.psi.TypstTypes"
+  elementTypeClass="org.tinymist.intellij.language.psi.TypstElementType"
+  tokenTypeClass="org.tinymist.intellij.language.psi.TypstTokenType"
+  psiVisitorName="TypstVisitor" // Specify to generate a visitor interface/class
+  generatePsi=true // Generate PSI interfaces and implementations
+  generateTokens=true // Generate token types from lexer
+  generateTokenAccessors=true // Generate accessors for token types
+  generateVisitor=true // Generate visitor for PSI tree
+  extends("root")=com.intellij.extapi.psi.ASTWrapperPsiElement // Default base for PSI Impls
+
+  // Optional: Specify a different base for specific PSI elements
+  // extends("namedElement")=org.tinymist.intellij.language.psi.impl.TypstNamedElementImpl
+
+  tokens = [
+    // Comments (from JFlex, but must be declared here for parser awareness if used in rules)
+    LINE_COMMENT="line_comment"
+    BLOCK_COMMENT="block_comment"
+
+    // Keywords (names should match constants in JFlex and TypstTypes)
+    KW_LET="#let"
+    KW_SET="#set"
+    KW_SHOW="#show"
+    KW_IF="#if"
+    KW_ELSE="#else"
+    KW_FOR="#for"
+    KW_IN="#in"
+    KW_WHILE="#while"
+    KW_BREAK="#break"
+    KW_CONTINUE="#continue"
+    KW_RETURN="#return"
+    KW_IMPORT="#import"
+    KW_INCLUDE="#include"
+    KW_AND="and"
+    KW_OR="or"
+    KW_NOT="not"
+
+    // Literals
+    BOOLEAN_LITERAL="boolean_literal"
+    NUMBER_LITERAL="number_literal"
+    STRING_LITERAL="string_literal"
+
+    // Identifier
+    IDENTIFIER="identifier"
+
+    // Symbols & Operators
+    HASH="#"
+    OP_STAR="*"
+    OP_UNDERSCORE="_"
+    BACKTICK="`"
+    OP_EQ_SIGN="=" // For assignment in #let, #set.
+    COLON=":"
+    COMMA=","
+    DOT="."
+    LPAREN="("
+    RPAREN=")"
+    LBRACE="{"
+    RBRACE="}"
+    LBRACKET="["
+    RBRACKET="]"
+    OP_PLUS="+"
+    OP_MINUS="-"
+    OP_SLASH="/"
+    OP_PERCENT="%"
+    OP_LT="<"
+    OP_GT=">"
+    OP_LE="<="
+    OP_GE=">="
+    OP_EQ="==" // For equality comparison in expressions
+    OP_NEQ="!="
+
+    // Text content (from JFlex)
+    TEXT_CONTENT="text_content"
+  ]
+
+  // External rules for JFlex integration
+  // Grammar-Kit needs to know how to call the lexer.
+  // Usually, `parserUtilClass` is not needed if you use the default generator settings.
+  // external LexerClass="org.tinymist.intellij.language.lexer.TypstLexerAdapter" // Your FlexAdapter
+  // external LexerFunction="nextToken"
+
+  // Grammar error messages
+  // rbrace_expected="'}' expected"
+  // item_expected="Item expected"
+}
+
+// Root rule: A Typst file is a sequence of top-level items
+root ::= item* 
+
+// Item can be a block element or markup, or code mode constructs
+// This is highly simplified for Typst. A real Typst grammar is much more complex
+// and context-sensitive (markup mode vs. code mode).
+private item ::= block_element | statement | expression | markup_element | TEXT_CONTENT | COMMENT
+
+// Block elements (simplified)
+block_element ::= heading | code_block | math_block | raw_block
+
+heading ::= HASH+ (markup_content | expression)* { methods=[getLevel getHeadingText] }
+// TODO: Define code_block, math_block, raw_block syntax properly
+code_block ::= LBRACE statement* RBRACE
+math_block ::= "$" (TEXT_CONTENT|expression)* "$" // Very simplified
+raw_block ::= BACKTICK{3, } IDENTIFIER? LineTerminator? TEXT_CONTENT* LineTerminator? BACKTICK{3,}
+
+// Markup elements (simplified examples)
+markup_element ::= strong_emphasis | weak_emphasis | link | label | ref
+
+// Content that can appear in markup (text, other inline markup, or expressions)
+markup_content ::= (TEXT_CONTENT | strong_emphasis | weak_emphasis | link | label | ref | HASH IDENTIFIER | code_inline)*
+
+strong_emphasis ::= OP_STAR markup_content OP_STAR
+weak_emphasis ::= OP_UNDERSCORE markup_content OP_UNDERSCORE
+
+// Simplified link, label, ref
+link ::= LBRACKET markup_content RBRACKET LPAREN STRING_LITERAL RPAREN
+label ::= OP_LT IDENTIFIER OP_GT
+ref ::= "@" IDENTIFIER
+
+// Statements (mostly for code mode)
+statement ::= let_statement | set_statement | show_statement | if_statement | for_statement | while_statement | break_statement | continue_statement | return_statement | import_statement | include_statement | expression_statement
+
+let_statement ::= KW_LET IDENTIFIER (LPAREN parameter_list? RPAREN)? (OP_EQ_SIGN expression)?
+set_statement ::= KW_SET expression (KW_IF expression)?
+show_statement ::= KW_SHOW (expression COLON)? expression
+
+if_statement ::= KW_IF condition_expr (block_content | expression) (KW_ELSE (block_content | expression))?
+condition_expr ::= expression // alias for clarity in if/while
+
+for_statement ::= KW_FOR pattern KW_IN iterable_expr (block_content | expression)
+pattern ::= IDENTIFIER // could be more complex e.g. (key, value)
+iterable_expr ::= expression // alias
+
+while_statement ::= KW_WHILE condition_expr (block_content | expression)
+
+break_statement ::= KW_BREAK
+continue_statement ::= KW_CONTINUE
+return_statement ::= KW_RETURN expression?
+
+import_statement ::= KW_IMPORT (expression (COLON import_items)?) | (expression AS IDENTIFIER)
+import_items ::= (IDENTIFIER | OP_STAR) (COMMA (IDENTIFIER | OP_STAR))*
+AS ::= 'as' // Define 'as' if it's a keyword token, otherwise it's an IDENTIFIER
+
+include_statement ::= KW_INCLUDE expression
+
+expression_statement ::= expression // An expression used as a statement
+
+// Expressions (simplified hierarchy)
+// Precedence: primary < unary < multiplicative < additive < comparative < logical_and < logical_or < assignment (not applicable here directly) < function_call
+// This is a common way to define expressions to handle operator precedence.
+
+// Primary expression is the highest precedence
+primary_expr ::=
+    literal_expr
+    | identifier_expr
+    | paren_expr
+    | array_expr
+    | dict_expr
+    | code_block // A code block can be an expression
+    | content_block // Special Typst construct
+    | HASH IDENTIFIER // # followed by identifier, can be a variable or a shorthand function call
+    | HASH primary_expr // # can also be a unary operator in some contexts (e.g. #text(...))
+
+literal_expr ::= STRING_LITERAL | NUMBER_LITERAL | BOOLEAN_LITERAL
+identifier_expr ::= IDENTIFIER {mixin="org.tinymist.intellij.language.psi.TypstNamedElement" methods=[getNameIdentifier getName setName]}
+
+paren_expr ::= LPAREN expression RPAREN
+
+array_expr ::= LBRACKET (expression (COMMA expression)* COMMA?)? RBRACKET
+dict_expr ::= LPAREN (key_value_pair (COMMA key_value_pair)* COMMA?)? RPAREN
+key_value_pair ::= (IDENTIFIER | STRING_LITERAL) COLON expression
+
+content_block ::= LBRACKET (item)* RBRACKET // Simplified representation of Typst's content blocks
+
+// Represents `code` mode expressions interpolated in markup, or simple code expressions.
+code_inline ::= HASH expression_no_call // To avoid ambiguity with #foo() style calls in markup vs function calls
+
+// Intermediate rule to help resolve call vs non-call for HASH expressions
+expression_no_call ::= primary_expr (DOT IDENTIFIER)* // Field access, no calls here
+                        | unary_expr_no_call
+                        | multiplicative_expr_no_call
+                        | additive_expr_no_call
+                        | comparative_expr_no_call
+                        | logical_and_expr_no_call
+                        | logical_or_expr_no_call
+
+// General expression starts from logical_or (lowest precedence among binary ops here)
+expression ::= logical_or_expr
+
+// Logical OR
+logical_or_expr ::= logical_and_expr (KW_OR logical_and_expr)*
+logical_or_expr_no_call ::= logical_and_expr_no_call (KW_OR logical_and_expr_no_call)*
+
+// Logical AND
+logical_and_expr ::= comparative_expr (KW_AND comparative_expr)*
+logical_and_expr_no_call ::= comparative_expr_no_call (KW_AND comparative_expr_no_call)*
+
+// Comparative expressions (==, !=, <, <=, >, >=)
+comparative_expr ::= additive_expr ( (OP_EQ | OP_NEQ | OP_LT | OP_LE | OP_GT | OP_GE) additive_expr )*
+comparative_expr_no_call ::= additive_expr_no_call ( (OP_EQ | OP_NEQ | OP_LT | OP_LE | OP_GT | OP_GE) additive_expr_no_call )*
+
+// Additive expressions (+, -)
+additive_expr ::= multiplicative_expr ( (OP_PLUS | OP_MINUS) multiplicative_expr )*
+additive_expr_no_call ::= multiplicative_expr_no_call ( (OP_PLUS | OP_MINUS) multiplicative_expr_no_call )*
+
+// Multiplicative expressions (*, /)
+multiplicative_expr ::= unary_expr ( (OP_STAR | OP_SLASH | OP_PERCENT) unary_expr )*
+multiplicative_expr_no_call ::= unary_expr_no_call ( (OP_STAR | OP_SLASH | OP_PERCENT) unary_expr_no_call )*
+
+// Unary expressions (e.g., -x, not y)
+unary_expr ::= (OP_MINUS | KW_NOT) unary_expr | call_field_expr
+unary_expr_no_call ::= (OP_MINUS | KW_NOT) unary_expr_no_call | field_access_expr
+
+// Calls and field access have higher precedence than unary operators
+call_field_expr ::= primary_expr ( (DOT IDENTIFIER) | call_arguments | content_block_argument )* 
+field_access_expr ::= primary_expr (DOT IDENTIFIER)* // Only field access, no calls
+
+call_arguments ::= LPAREN argument_list? RPAREN
+content_block_argument ::= content_block // A content block used as an argument, e.g. #rect[hello]
+
+argument_list ::= (named_argument | expression) (COMMA (named_argument | expression))* COMMA?
+named_argument ::= IDENTIFIER COLON expression
+
+parameter_list ::= parameter (COMMA parameter)* COMMA?
+parameter ::= IDENTIFIER (OP_EQ_SIGN default_value)?
+default_value ::= expression
+
+// block_content is used where either a single expression or a braced block of statements is allowed.
+block_content ::= LBRACE item* RBRACE | expression
+
+// For PSI elements that should be considered comments
+COMMENT ::= LINE_COMMENT | BLOCK_COMMENT 
