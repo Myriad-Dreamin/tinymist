@@ -9,13 +9,9 @@ Converts a subset of typst to markdown.
 typlite main.typ
 # specify output
 typlite main.typ output.md
-# multiple output formats
-typlite main.typ output.md output.tex output.docx
 ```
 
-<!-- ## Feature
-
-not implemented yet
+## Feature
 
 - **Contexual Content Rendering**: Contents begin with `context` keyword will be rendered as svg output. The svg output will be embedded inline in the output file as **base64** by default, if the `--assets-path` parameter is not specified. Otherwise, the svg output will be saved in the specified folder and the path will be embedded in the output file. By specify the `--assets-src-path` parameter, the source code of the context will also be saved in the specified folder.
 
@@ -36,4 +32,4 @@ not implemented yet
     └── main.typ # input file
     ```
 
-- **Raw Output**: Raw codes with `typlite` language will be directly output into the Markdown result. -->
+- **Raw Output**: Raw codes with `typlite` language will be directly output into the Markdown result.
