@@ -42,13 +42,9 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Basic language support -->
         <fileType name="Typst file" implementationClass="org.tinymist.intellij.TypstFileType" fieldName="INSTANCE" language="Typst" extensions="typ"/>
-        <!-- Add other simple extensions like commentProvider, foldingBuilder etc. if needed -->
 
         <!-- File editor provider for Text + Preview -->
         <fileEditorProvider implementation="org.tinymist.intellij.preview.TypstTextEditorWithPreviewProvider"/>
-
-        <!-- Removed Tool Window for Typst Preview as it's replaced by the editor preview -->
-        
 
     </extensions>
 
