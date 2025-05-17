@@ -90,12 +90,10 @@ impl InlineParser {
 
         // Create figure node with centering
         let figure_node = Box::new(FigureNode { body, caption });
-        let centered_node = Box::new(CenterNode {
-            content: Box::new(Node::Custom(figure_node)),
-        });
+        let centered_node = CenterNode::new(vec![Node::Custom(figure_node)]);
 
         // Add the centered figure to blocks
-        parser.blocks.push(Node::Custom(centered_node));
+        parser.blocks.push(Node::Custom(Box::new(centered_node)));
 
         Ok(())
     }

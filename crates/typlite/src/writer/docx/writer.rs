@@ -14,7 +14,8 @@ use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
 use super::styles::DocxStyles;
 
-/// DOCX writer that generates DOCX directly from AST (without intermediate representation)
+/// DOCX writer that generates DOCX directly from AST (without intermediate
+/// representation)
 pub struct DocxWriter {
     styles: DocxStyles,
     numbering: DocxNumbering,
@@ -420,7 +421,7 @@ impl DocxWriter {
                 } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
                 {
                     // Handle regular node but with center alignment
-                    match &*center_node.content {
+                    match &center_node.node {
                         Node::Paragraph(content) => {
                             docx = self.process_paragraph(docx, content, None)?;
                             // Get the last paragraph and center it

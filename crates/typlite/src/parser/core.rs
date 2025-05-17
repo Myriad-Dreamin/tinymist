@@ -134,10 +134,10 @@ impl HtmlToAstParser {
             md_tag::math_equation_inline | md_tag::math_equation_block => {
                 if element.tag == md_tag::math_equation_block {
                     self.flush_inline_buffer();
-                    let element_node = self.create_html_element(element)?;
-                    self.blocks.push(Node::Custom(Box::new(CenterNode {
-                        content: Box::new(element_node),
-                    })));
+                    self.convert_children(element)?;
+                    let content = std::mem::take(&mut self.inline_buffer);
+                    self.blocks
+                        .push(Node::Custom(Box::new(CenterNode::new(content))));
                 } else {
                     self.convert_children(element)?;
                 }

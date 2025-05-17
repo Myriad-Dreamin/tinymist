@@ -108,22 +108,27 @@ impl HighlightNode {
 #[custom_node]
 pub struct CenterNode {
     /// The content to be centered
-    pub content: Box<Node>,
+    pub node: Node,
 }
 
 impl CenterNode {
+    pub fn new(children: Vec<Node>) -> Self {
+        CenterNode {
+            node: Node::HtmlElement(cmark_writer::ast::HtmlElement {
+                tag: "p".to_string(),
+                attributes: vec![cmark_writer::ast::HtmlAttribute {
+                    name: "align".to_string(),
+                    value: "center".to_string(),
+                }],
+                children,
+                self_closing: false,
+            }),
+        }
+    }
+
     fn write_custom(&self, writer: &mut dyn CustomNodeWriter) -> WriteResult<()> {
-        let html_node = Node::HtmlElement(cmark_writer::ast::HtmlElement {
-            tag: "div".to_string(),
-            attributes: vec![cmark_writer::ast::HtmlAttribute {
-                name: "align".to_string(),
-                value: "center".to_string(),
-            }],
-            children: vec![*self.content.clone()],
-            self_closing: false,
-        });
         let mut temp_writer = cmark_writer::writer::CommonMarkWriter::new();
-        temp_writer.write(&html_node)?;
+        temp_writer.write(&self.node)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
         writer.write_str("\n")?;

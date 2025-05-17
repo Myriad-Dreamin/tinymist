@@ -295,7 +295,7 @@ impl LaTeXWriter {
                 } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
                 {
                     output.push_str("\\begin{center}\n");
-                    self.write_node(&center_node.content, output)?;
+                    self.write_node(&center_node.node, output)?;
                     output.push_str("\\end{center}\n\n");
                 } else if let Some(highlight_node) =
                     custom_node.as_any().downcast_ref::<HighlightNode>()
