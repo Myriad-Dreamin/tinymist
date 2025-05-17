@@ -7,14 +7,15 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{FigureNode, FormatWriter};
+use crate::common::{CenterNode, FigureNode, FormatWriter};
 use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
 use super::styles::DocxStyles;
 
-/// DOCX writer that generates DOCX directly from AST (without intermediate representation)
+/// DOCX writer that generates DOCX directly from AST (without intermediate
+/// representation)
 pub struct DocxWriter {
     styles: DocxStyles,
     numbering: DocxNumbering,
@@ -416,8 +417,30 @@ impl DocxWriter {
             }
             Node::Custom(custom_node) => {
                 if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    // Process figure node with special handling
                     docx = self.process_figure(docx, figure_node)?;
+                } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
+                {
+                    // Handle regular node but with center alignment
+                    match &center_node.node {
+                        Node::Paragraph(content) => {
+                            docx = self.process_paragraph(docx, content, None)?;
+                            // Get the last paragraph and center it
+                            if let Some(DocumentChild::Paragraph(para)) =
+                                docx.document.children.last_mut()
+                            {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                        other => {
+                            docx = self.process_node(docx, other)?;
+                            // Get the last element and center it if it's a paragraph
+                            if let Some(DocumentChild::Paragraph(para)) =
+                                docx.document.children.last_mut()
+                            {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                    }
                 } else if let Some(external_frame) = custom_node
                     .as_any()
                     .downcast_ref::<crate::common::ExternalFrameNode>(

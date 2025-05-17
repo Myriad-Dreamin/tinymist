@@ -65,7 +65,8 @@ namespace MyApplication
 
 Math inline:and block:
 
-
+\begin{center}
+\end{center}
 
 \begin{itemize}
 \item First item

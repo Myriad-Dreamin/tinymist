@@ -15,10 +15,13 @@ input_file: crates/typlite/src/fixtures/integration/figure_image.typ
 =====
 \begin{document}
 
+\begin{center}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.8\textwidth]{fig.svg}
 \end{figure}
+
+\end{center}
 
 
 \end{document}
