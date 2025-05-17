@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/math_block2.typ
 ---
 <!DOCTYPE html>
@@ -13,4 +13,4 @@ input_file: crates/typlite/src/fixtures/integration/math_block2.typ
 </html>
 
 =====
-<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
