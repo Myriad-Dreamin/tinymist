@@ -56,7 +56,14 @@ class TypstPreviewFileEditor(
             println("TypstPreviewFileEditor: JCEF is supported. Setting up browser.")
             // setupDisplayHandler()
             setupLoadHandler()
-            waitForServerAndLoad()
+            // Defer starting the server check and URL loading to allow JCEF panel to initialize
+            ApplicationManager.getApplication().invokeLater {
+                if (!isDisposed) { // Check if editor is already disposed before starting task
+                    waitForServerAndLoad()
+                } else {
+                    println("TypstPreviewFileEditor: Editor disposed before waitForServerAndLoad could be scheduled.")
+                }
+            }
         }
         println("TypstPreviewFileEditor: Initialization complete.")
     }
@@ -98,6 +105,12 @@ class TypstPreviewFileEditor(
             override fun onSuccess() {
                 if (!JBCefApp.isSupported()) return
 
+                // Check if the editor (JCEFHtmlPanel) is already disposed
+                if (this@TypstPreviewFileEditor.isDisposed) {
+                    println("TypstPreviewFileEditor: Editor disposed, skipping onSuccess URL load.")
+                    return
+                }
+
                 if (isServerReady) {
                     println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
                     this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
@@ -111,6 +124,12 @@ class TypstPreviewFileEditor(
 
             override fun onThrowable(error: Throwable) {
                 if (!JBCefApp.isSupported()) return
+
+                // Check if the editor (JCEFHtmlPanel) is already disposed
+                if (this@TypstPreviewFileEditor.isDisposed) {
+                    println("TypstPreviewFileEditor: Editor disposed, skipping onThrowable HTML load.")
+                    return
+                }
 
                 println("TypstPreviewFileEditor: Error waiting for server: ${error.message}")
                 ApplicationManager.getApplication().invokeLater {
@@ -160,14 +179,19 @@ class TypstPreviewFileEditor(
 
     override fun dispose() {
         println("TypstPreviewFileEditor: Disposing...")
-        // JCEFHtmlPanel is Disposable, its dispose() will be called,
-        // which should handle browser cleanup and associated handlers.
-        // If other Disposables were created and registered with this FileEditor
-        // as parent, they would be disposed automatically.
-        // If custom listeners were added (not via CefClient.addXXXHandler with a Disposable parent),
-        // they would need to be removed here.
-        // Explicitly remove our display handler if it was added, though JCEFHtmlPanel might do this.
-        // Note: JCEFHtmlPanel's dispose seems to handle its client and handlers.
+        try {
+            // Attempt to stop any ongoing load operations in the browser.
+            // This is a precaution; JCEFHtmlPanel.dispose() should handle cleanup.
+            if (JBCefApp.isSupported() && !isDisposed) { // Check if not already disposed
+                this.cefBrowser?.stopLoad()
+                println("TypstPreviewFileEditor: Called cefBrowser.stopLoad()")
+            }
+        } catch (e: Exception) {
+            // Log any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
+            println("TypstPreviewFileEditor: Exception during cefBrowser.stopLoad() in dispose: ${e.message}")
+        }
+        // super.dispose() will be called implicitly for JCEFHtmlPanel,
+        // which handles the actual browser disposal.
     }
 
     private fun setupDisplayHandler() {

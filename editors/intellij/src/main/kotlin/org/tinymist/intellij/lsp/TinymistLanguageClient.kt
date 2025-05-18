@@ -62,6 +62,16 @@ class TinymistLanguageClient(
         // Future implementation: Update preview or other document-related views.
     }
 
+    @JsonNotification("tinymist/documentOutline")
+    fun handleDocumentOutline(params: Any?) {
+        // TODO: Replace Any with the actual data class for outline parameters.
+        // For now, just log receipt of the notification.
+        LOG.info("Received tinymist/documentOutline notification with params: ${'$'}params")
+        // Example of what might be done:
+        // val outlineData = parseOutlineParams(params) // Implement parsing
+        // ProjectActivity.getInstance(project).updateOutlineView(outlineData) // Example: if you have a way to update a view
+    }
+
     override fun showMessageRequest(params: ShowMessageRequestParams): CompletableFuture<MessageActionItem> {
         LOG.warn("Received showMessageRequest from server. Type: ${params.type}, Message: '${params.message}'. Actions: ${params.actions}. Suppressing UI and returning null action item to avoid potential NPE in lsp4ij.")
         // Returning a completed future with null, effectively ignoring the request from UI perspective

@@ -46,6 +46,10 @@
         <!-- File editor provider for Text + Preview -->
         <fileEditorProvider implementation="org.tinymist.intellij.preview.TypstTextEditorWithPreviewProvider"/>
 
+        <!-- Settings -->
+        <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
+        <applicationConfigurable parentId="tools" instance="org.tinymist.intellij.settings.TinymistSettingsConfigurable" id="org.tinymist.intellij.settings.TinymistSettingsConfigurable" displayName="Tinymist LSP"/>
+
     </extensions>
 
     <!-- LSP4IJ specific extensions -->
