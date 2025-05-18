@@ -183,15 +183,19 @@ class TypstPreviewFileEditor(
             // Attempt to stop any ongoing load operations in the browser.
             // This is a precaution; JCEFHtmlPanel.dispose() should handle cleanup.
             if (JBCefApp.isSupported() && !isDisposed) { // Check if not already disposed
-                this.cefBrowser?.stopLoad()
+                // It's generally safer to access cefBrowser only if the panel is not yet disposed
+                // and JCEF is supported.
+                cefBrowser?.stopLoad()
                 println("TypstPreviewFileEditor: Called cefBrowser.stopLoad()")
             }
         } catch (e: Exception) {
             // Log any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
             println("TypstPreviewFileEditor: Exception during cefBrowser.stopLoad() in dispose: ${e.message}")
         }
-        // super.dispose() will be called implicitly for JCEFHtmlPanel,
-        // which handles the actual browser disposal.
+        // Explicitly call super.dispose() to ensure JCEFHtmlPanel cleans up its resources.
+        // This must be done.
+        super.dispose()
+        println("TypstPreviewFileEditor: super.dispose() called.")
     }
 
     private fun setupDisplayHandler() {
