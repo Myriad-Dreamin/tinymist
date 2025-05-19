@@ -581,9 +581,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc1ab386d66d4b1b8d72e925d7a6a58eae45e6e58a0c0913adfa2c3e1b3346d"
+checksum = "fb6dce3a4430a75a3903f4a25729ba67b4476c39e2ed6d907ab2e5bfcce03a36"
 dependencies = [
  "cmark-writer-macros",
  "env_logger",
@@ -593,9 +593,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer-macros"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b053f69945515577e5cac4fc8ed1ce48e0d9747cc299160a8b7ab1470bfc4f52"
+checksum = "6ee5c1417934f17ae1605a2f5f34fbb55dea86c728c717008395add125561f7a"
 dependencies = [
  "proc-macro2",
  "quote",
