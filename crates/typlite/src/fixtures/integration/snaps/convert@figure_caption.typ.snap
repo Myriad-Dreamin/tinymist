@@ -2,6 +2,7 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -13,7 +14,5 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 </html>
 
 =====
-<p align="center">![Content](./fig.svg)
-
-Caption
-</p>
+<p align="center"><figure class="figure"><p><img src="./fig.svg" alt="Content" /></p>
+</figure></p>
