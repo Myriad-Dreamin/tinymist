@@ -2,6 +2,7 @@
 
 use cmark_writer::ast::Node;
 use cmark_writer::writer::CommonMarkWriter;
+use cmark_writer::WriterOptions;
 use ecow::EcoString;
 
 use crate::common::FormatWriter;
@@ -19,7 +20,10 @@ impl MarkdownWriter {
 
 impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let mut writer = CommonMarkWriter::new();
+        let mut writer = CommonMarkWriter::with_options(WriterOptions {
+            strict: false,
+            ..Default::default()
+        });
         writer
             .write(document)
             .map_err(|e| format!("failed to write document: {}", e))?;

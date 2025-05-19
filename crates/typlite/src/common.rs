@@ -7,7 +7,9 @@ use cmark_writer::HtmlAttribute;
 use cmark_writer::HtmlElement;
 use cmark_writer::HtmlWriteResult;
 use cmark_writer::HtmlWriter;
+use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
+use cmark_writer::WriterOptions;
 use ecow::EcoString;
 use std::path::PathBuf;
 
@@ -42,7 +44,10 @@ pub struct FigureNode {
 
 impl FigureNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::new();
+        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
+            strict: false,
+            ..Default::default()
+        });
         temp_writer.write(&self.body)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
@@ -121,7 +126,10 @@ pub struct HighlightNode {
 
 impl HighlightNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::new();
+        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
+            strict: false,
+            ..Default::default()
+        });
         for node in &self.content {
             temp_writer.write(node)?;
         }
@@ -131,11 +139,13 @@ impl HighlightNode {
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        writer.start_tag("mark")?;
-        for node in &self.content {
-            writer.write_node(node)?;
-        }
-        writer.end_tag("mark")?;
+        let node = Node::HtmlElement(HtmlElement {
+            tag: "mark".to_string(),
+            attributes: vec![],
+            children: self.content.clone(),
+            self_closing: false,
+        });
+        writer.write_node(&node)?;
         Ok(())
     }
 }
@@ -164,7 +174,10 @@ impl CenterNode {
     }
 
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::new();
+        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
+            strict: false,
+            ..Default::default()
+        });
         temp_writer.write(&self.node)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
@@ -173,7 +186,10 @@ impl CenterNode {
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        let mut temp_writer = HtmlWriter::new();
+        let mut temp_writer = HtmlWriter::with_options(HtmlWriterOptions {
+            strict: false,
+            ..Default::default()
+        });
         temp_writer.write_node(&self.node)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
