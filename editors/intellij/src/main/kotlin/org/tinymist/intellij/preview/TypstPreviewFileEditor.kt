@@ -33,7 +33,7 @@ import org.cef.CefSettings
 class TypstPreviewFileEditor(
     private val project: Project,
     private val virtualFile: VirtualFile
-) : JCEFHtmlPanel(isOsrEnabled(), null, null), FileEditor {
+) : JCEFHtmlPanel(false, null, null), FileEditor {
 
     // Define the Tinymist preview URL (default background port)
     private val previewHost = "127.0.0.1"
@@ -175,6 +175,25 @@ class TypstPreviewFileEditor(
 
     override fun <T : Any?> putUserData(key: Key<T>, value: T?) {
         userData[key] = value
+    }
+
+    override fun selectNotify() {
+        println("TypstPreviewFileEditor: selectNotify called for ${virtualFile.name}")
+        // Reload the content when the editor is selected, if the server is ready
+        // and the JCEF component is supported and initialized.
+        if (JBCefApp.isSupported() && isServerReady && !isDisposed) {
+            println("TypstPreviewFileEditor: selectNotify - Server ready, reloading URL: $tinymistPreviewUrl")
+            this.loadURL(tinymistPreviewUrl)
+        } else {
+            if (!isServerReady) println("TypstPreviewFileEditor: selectNotify - Server not ready, not reloading.")
+            if (isDisposed) println("TypstPreviewFileEditor: selectNotify - Editor disposed, not reloading.")
+            if (!JBCefApp.isSupported()) println("TypstPreviewFileEditor: selectNotify - JCEF not supported, not reloading.")
+        }
+    }
+
+    override fun deselectNotify() {
+        // No specific action needed on deselect for this editor
+        println("TypstPreviewFileEditor: deselectNotify called for ${virtualFile.name}")
     }
 
     override fun dispose() {

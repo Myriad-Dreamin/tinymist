@@ -6,9 +6,10 @@ import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.project.DumbAware
+import org.tinymist.intellij.TypstFileType
 
 class TypstPreviewFileEditorProvider : FileEditorProvider, DumbAware {
-    override fun accept(project: Project, file: VirtualFile): Boolean = true // Accept all files for preview; filter if needed
+    override fun accept(project: Project, file: VirtualFile): Boolean = file.fileType == TypstFileType // Accept only Typst files
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         return TypstPreviewFileEditor(project, file)
