@@ -13,12 +13,7 @@ Run and configure tinymist in Emacs for Typst.
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
-
-  If you are using the latest version of
-  [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
-  you can use command `typst-ts-lsp-download-binary` to download the latest
-  stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).<br />If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
 Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
 

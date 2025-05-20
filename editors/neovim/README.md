@@ -11,24 +11,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - **Code Formatting**
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
 
-> [!NOTE]
-> 
->   Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
-
-
-## Installation
-- (Recommended) [mason.nvim](https://github.com/williamboman/mason.nvim).
-  ```lua
-  {
-    "williamboman/mason.nvim",
-    opts = {
-      ensure_installed = {
-        "tinymist",
-      },
-    },
-  }
-  ```
-- Or manually:
+<div>Work for full parity for all <code>tinymist</code> features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.</div>
 
 ### Installation
 
@@ -81,7 +64,7 @@ require("lspconfig")["tinymist"].setup {
 ```
 
 
-- Or with `Coc.nvim`:
+Or with `Coc.nvim`:
 
 ```json
 {
@@ -156,11 +139,7 @@ vim.api.nvim_create_user_command("OpenPdf", function()
 end, {})
 ```
 
-> [!NOTE]
-> 
->   For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue \#1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
-
-
+<div>For Neovim prior to v0.9.5, <code>os.execute</code> can be used instead. This is not suggested. See <a href="https://github.com/Myriad-Dreamin/tinymist/issues/1606">Issue #1606</a> for more information.</div>
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 

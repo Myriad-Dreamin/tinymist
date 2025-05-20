@@ -8,8 +8,7 @@ Normally, you should always create release candidates to avoid failures in the r
 
 ### Updating Version String to Release
 
-
-## Updating Version String to Release
+<div></div>
 
 - The `tinymist-assets` package
   

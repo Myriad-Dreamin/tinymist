@@ -74,10 +74,7 @@ Language service (LSP) features:
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
   
   - `Enter` inside triple-slash comments automatically inserts `///`
-  - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
-  - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
-  - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
-  - <kbd>Enter</kbd> inside equation markups automatically inserts indents.
+  - `Enter` in the middle or after a trailing space in `//` inserts `//`
   - `Enter` inside `//!` doc comments automatically inserts `//!`
   - `Enter` inside equation markups automatically inserts indents.
 
