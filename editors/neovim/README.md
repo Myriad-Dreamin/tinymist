@@ -3,7 +3,10 @@
 
 Run and configure `tinymist` in Neovim with support for all major distros and package managers.
 
-## Feature Integration
+### Feature Integration
+
+<div></div>
+
 - **Language service** (completion, definitions, etc.)
 - **Code Formatting**
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
@@ -27,68 +30,89 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   ```
 - Or manually:
 
+### Installation
+
+<div></div>
+
+(Recommended) [mason.nvim](https://github.com/williamboman/mason.nvim).
+
+```lua
+{
+  "williamboman/mason.nvim",
+  opts = {
+    ensure_installed = {
+      "tinymist",
+    },
+  },
+}
+```
+
+Or manually:
+
+### Finding Executable
+
+<div></div>To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+
+Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
+
+```bash
+cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
+```
+
+- - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
   
-## Finding Executable
+  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).<br />If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+  
 
-To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+### Configuration
 
-- Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
+<div></div>
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+With `lspconfig`:
 
-  If you are using the latest version of
-  [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
-  you can use command `typst-ts-lsp-download-binary` to download the latest
-  stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+```lua
+require("lspconfig")["tinymist"].setup {
+    settings = {
+        formatterMode = "typstyle",
+        exportPdf = "onType",
+        semanticTokens = "disable"
+    }
+}
+```
 
-- Build from source by cargo.
-  You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
-
-  ```bash
-  cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-  ```
-
-
-## Configuration
-- With `lspconfig`:
-  ```lua
-  require("lspconfig")["tinymist"].setup {
-      settings = {
-          formatterMode = "typstyle",
-          exportPdf = "onType",
-          semanticTokens = "disable"
-      }
-  }
-  ```
 
 - Or with `Coc.nvim`:
 
-  ```json
-  {
-    "languageserver": {
-      "tinymist": {
-        "command": "tinymist",
-        "filetypes": ["typst"],
-        "settings": { ... }
-      }
+```json
+{
+  "languageserver": {
+    "tinymist": {
+      "command": "tinymist",
+      "filetypes": ["typst"],
+      "settings": { ... }
     }
   }
-  ```
-- Or finally with the builtin lsp protocol:
+}
+```
 
-  ```lua
-  vim.lsp.config["tinymist"] = {
-      cmd = { "tinymist" },
-      filetypes = { "typst" },
-      settings = {
-          -- ...
-      }
-  }
-  ```
+Or finally with the builtin lsp protocol:
+
+```lua
+vim.lsp.config["tinymist"] = {
+    cmd = { "tinymist" },
+    filetypes = { "typst" },
+    settings = {
+        -- ...
+    }
+}
+```
+
 
 For a full list of available settings see [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md).
 
-## Formatting
+### Formatting
+
+<div></div>
 
 Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
 
@@ -96,8 +120,9 @@ Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can se
 formatterMode = "typstyle"
 ```
 
-## Live Preview
+### Live Preview
 
+<div></div>
 
 Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading ([zathura](https://pwmt.org/projects/zathura/) is good).
 
@@ -112,6 +137,7 @@ Live preview can be achieved with either a web preview or a pdf reader that supp
   opts = {}, -- lazy.nvim will implicitly calls `setup {}`
 }
 ```
+
 See [typst-preview](https://github.com/chomosuke/typst-preview.nvim) for more installation and configuration options.
 
 **Pdf Preview**
@@ -138,8 +164,9 @@ end, {})
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 
-### Working with Multiple-Files Projects
+#### Working with Multiple-Files Projects
 
+<div></div>
 
 Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
@@ -180,6 +207,7 @@ require("lspconfig")["tinymist"].setup { -- Alternatively, can be used `vim.lsp.
 Note that `vim.v.null` should be used instead of `nil` in the `arguments` table when unpinning. See [issue #1595](https://github.com/Myriad-Dreamin/tinymist/issues/1595).
 
 For Neovim versions prior to 0.11.0, `vim.lsp.buf.execute_command` should be used instead:
+
 ```lua
 -- pin the main file
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.api.nvim_buf_get_name(0) } })
@@ -187,18 +215,19 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.v.null } })
 ```
 
-
 It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
 This could be improved in the future.
 
-## Troubleshooting
+### Troubleshooting
 
+<div></div>
 
 Generally you can find in depth information via the `:mes` command. `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
 
-### tinymist not starting when creating/opening files
+#### tinymist not starting when creating/opening files
 
+<div></div>
 
 This is most commonly due to nvim not recognizing the `.typ` file extension as a `typst` source file. In most cases is can be resolved with:
 
@@ -212,6 +241,6 @@ In older versions of Neovim an autocommand may be necessary.
 autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
-## Contributing
+### Contributing
 
-You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
+<div></div>You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).

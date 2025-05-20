@@ -3,6 +3,8 @@
 
 See [typst.zed](https://github.com/WeetHet/typst.zed).
 
-## Getting Preview Feature
+### Getting Preview Feature
 
-[Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) is suitable in Zed.
+<div></div>
+
+<a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ&amp;label=background-45-preview">Background Preview Feature</a> is suitable in Zed.

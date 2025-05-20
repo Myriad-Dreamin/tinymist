@@ -3,33 +3,30 @@
 
 Run and configure tinymist in helix for Typst.
 
-## Features
+### Features
+
+<div></div>
 
 See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
+### Finding Executable
 
-## Finding Executable
-
-To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+<div></div>To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).<br />If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
-  If you are using the latest version of
-  [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
-  you can use command `typst-ts-lsp-download-binary` to download the latest
-  stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
 
-- Build from source by cargo.
-  You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
-
-  ```bash
-  cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-  ```
+```bash
+cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
+```
 
 
-## Setup Server
+### Setup Server
+
+<div></div>
 
 Update `.config/helix/languages.toml` to use tinymist.
 
@@ -42,13 +39,21 @@ name = "typst"
 language-servers = ["tinymist"]
 ```
 
-## Tips
+### Tips
 
-### Getting Preview Feature
+<div></div>
+
+#### Getting Preview Feature
+
+<div></div>
 
 [Default Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) are suitable in helix.
 
 ### Working with Multiple-File Projects
+
+#### Working with Multiple-File Projects
+
+<div></div>
 
 There is a way in [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md#multiple-file-project-support), but you cannot invoke related commands with arguments by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix. As a candidate solution, assuming your having following directory layout:
 
@@ -69,7 +74,9 @@ Then all diagnostics and autocompletion will be computed according to the `main.
 
 Note: With that configuration, if you’re seeing a file that is not reachable by `main.typ`, you will not get diagnostics and autocompletion correctly in that file.
 
-## Extra Settings
+### Extra Settings
+
+<div></div>
 
 To configure language server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
@@ -79,5 +86,4 @@ command = "tinymist"
 config = { exportPdf = "onType", outputPath = "$root/target/$dir/$name" }
 ```
 
-See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md)
-for references.
+See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md) for references.
