@@ -19,6 +19,7 @@
 #let is-html-target = is-html-target()
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
+#let is-md-target = target == "md"
 #let sys-is-html-target = ("target" in dictionary(std))
 
 #let part-counter = counter("shiroa-part-counter")
@@ -58,6 +59,54 @@
 #let heading-sizes = (26pt, 22pt, 14pt, 12pt, main-size)
 #let list-indent = 0.5em
 
+#let raw-rules(body) = {
+  /// HTML code block supported by zebraw.
+  show: if is-dark-theme {
+    zebraw-init.with(
+      // should vary by theme
+      background-color: if code-extra-colors.bg != none {
+        (code-extra-colors.bg, code-extra-colors.bg)
+      },
+      highlight-color: rgb("#3d59a1"),
+      comment-color: rgb("#394b70"),
+      lang-color: rgb("#3d59a1"),
+      lang: false,
+    )
+  } else {
+    zebraw-init.with(lang: false)
+  }
+
+
+  // code block setting
+  set raw(theme: theme-style.code-theme) if theme-style.code-theme.len() > 0
+  show raw: set text(font: code-font)
+  show raw.where(block: true): it => context if shiroa-sys-target() == "paged" {
+    rect(
+      width: 100%,
+      inset: (x: 4pt, y: 5pt),
+      radius: 4pt,
+      fill: code-extra-colors.bg,
+      [
+        #set text(fill: code-extra-colors.fg) if code-extra-colors.fg != none
+        #set par(justify: false)
+        // #place(right, text(luma(110), it.lang))
+        #it
+      ],
+    )
+  } else {
+    set text(fill: code-extra-colors.fg) if code-extra-colors.fg != none
+    set par(justify: false)
+    zebraw-html(
+      block-width: 100%,
+      line-width: 100%,
+      wrap: false,
+      it,
+    )
+  }
+
+  body
+}
+
 /// The project function defines how your document looks.
 /// It takes your content and some metadata and formats it.
 /// Go ahead and customize it to your liking!
@@ -66,7 +115,7 @@
   set document(
     author: authors,
     title: title,
-  ) if not is-pdf-target
+  ) if not is-pdf-target and not is-md-target
 
   // todo dirty hack to check is main
   let is-main = title == "Tinymist Documentation"
@@ -159,57 +208,21 @@
     it
   }
 
-  /// HTML code block supported by zebraw.
-  show: if is-dark-theme {
-    zebraw-init.with(
-      // should vary by theme
-      background-color: if code-extra-colors.bg != none {
-        (code-extra-colors.bg, code-extra-colors.bg)
-      },
-      highlight-color: rgb("#3d59a1"),
-      comment-color: rgb("#394b70"),
-      lang-color: rgb("#3d59a1"),
-      lang: false,
-    )
+  show: if is-md-target {
+    it => it
   } else {
-    zebraw-init.with(lang: false)
+    raw-rules
   }
 
-
-  // code block setting
-  set raw(theme: theme-style.code-theme) if theme-style.code-theme.len() > 0
-  show raw: set text(font: code-font)
-  show raw.where(block: true): it => context if shiroa-sys-target() == "paged" {
-    rect(
-      width: 100%,
-      inset: (x: 4pt, y: 5pt),
-      radius: 4pt,
-      fill: code-extra-colors.bg,
-      [
-        #set text(fill: code-extra-colors.fg) if code-extra-colors.fg != none
-        #set par(justify: false)
-        // #place(right, text(luma(110), it.lang))
-        #it
-      ],
-    )
-  } else {
-    set text(fill: code-extra-colors.fg) if code-extra-colors.fg != none
-    set par(justify: false)
-    zebraw-html(
-      block-width: 100%,
-      line-width: 100%,
-      wrap: false,
-      it,
-    )
-  }
-
-  context if shiroa-sys-target() == "html" {
-    show raw: it => html.elem("style", it.text)
-    ```css
-    .pseudo-image svg {
-      width: 100%
+  if not is-md-target {
+    context if shiroa-sys-target() == "html" {
+      show raw: it => html.elem("style", it.text)
+      ```css
+      .pseudo-image svg {
+        width: 100%
+      }
+      ```
     }
-    ```
   }
 
   show <typst-raw-func>: it => {
