@@ -1,6 +1,7 @@
 //! HTML parser core, containing main structures and general parsing logic
 
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
+use cmark_writer::{CommonMarkWriter, WriteResult};
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
@@ -260,10 +261,7 @@ impl CustomNode for Comment {
         self
     }
 
-    fn write(
-        &self,
-        writer: &mut dyn cmark_writer::CustomNodeWriter,
-    ) -> cmark_writer::WriteResult<()> {
+    fn write(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         writer.write_str("<!-- ")?;
         writer.write_str(&self.0)?;
         writer.write_str(" -->")?;
