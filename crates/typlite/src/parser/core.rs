@@ -98,7 +98,12 @@ impl HtmlToAstParser {
 
             md_tag::figure => InlineParser::convert_figure(self, element),
 
-            tag::p | tag::span | tag::br | tag::div => {
+            tag::br => {
+                self.inline_buffer.push(Node::HardBreak);
+                Ok(())
+            }
+
+            tag::p | tag::span | tag::div => {
                 self.convert_children(element)?;
                 Ok(())
             }
