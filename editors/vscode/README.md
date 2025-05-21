@@ -9,13 +9,13 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 ### Features
 
-<div></div>See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
+See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
 ### Usage Tips
 
 #### Initializing with a Template
 
-<div></div><div></div>To initialize a Typst project:
+To initialize a Typst project:
 
 - Use command `Typst init template` (tinymist.initTemplate) to initialize a new Typst project based on a template.
 - Use command `Typst show template` (tinymist.showTemplateGallery) to show available Typst templates for picking up a template to initialize.
@@ -26,11 +26,8 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 #### Configuring LSP-Enhanced Formatters
 
-<div></div>
-
 1. Open settings.
 2. Search for "Tinymist Formatter" and modify the value.
-   
    - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle).
    - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt).
 
@@ -46,32 +43,24 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 
 #### Configuring Linter
 
-<div></div>
-
 1. Open settings.
 2. Search for "Tinymist Lint" and modify the value.
-   
    1. Toggle "Enabled" to enable or disable the linter.
    2. Change "When" to configure when the linter runs.
-      
       - (Default) `onSave` run linting when you save the file.
       - `onType` run linting as you type.
 
 #### Configuring/Using Tinymist’s Activity Bar (Sidebar)
 
-<div></div>If you don’t like the activity bar, you can right-click on the activity bar and uncheck "Tinymist" to hide it.
+If you don’t like the activity bar, you can right-click on the activity bar and uncheck "Tinymist" to hide it.
 
 ##### Symbol View
-
-<div></div>
 
 - Search symbols by keywords, descriptions, or handwriting.
 - See symbols grouped by categories.
 - Click on a symbol, then it will be inserted into the editor.
 
 ##### Tool View
-
-<div></div>
 
 - Template Gallery: Show available Typst templates for picking up a template to initialize.
 - Document Summary: Show a summary of the current document.
@@ -81,40 +70,31 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 
 ##### Package View
 
-<div></div>
-
 - Create or open some local typst packages.
 - Show a list of available typst packages and invoke associated commands.
 
 ##### Content View
 
-<div></div>
-
 - Show thumbnail content of the current document, which is useful for creating slides.
 
 ##### Label View
-
-<div></div>
 
 - Show labels in the current workspace.
 
 ##### Outline View
 
-<div></div>
-
 - Show outline of exported document, viewing typst as a markup language.
-  
   - This is slightly different from the LSP-provided document outline, which shows the syntax structure of the document, viewing typst as a programming language.
 
 #### Preview Command
 
-<div></div>Open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
+Open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
 You can also use the shortcut (Ctrl+K V).
 
 #### Theme-aware template (previewing)
 
-<div></div>In short, there is a `sys.inputs` item added to the compiler when your document is under the context of _user editing or previewing task_. You can use it to configure your template:
+In short, there is a `sys.inputs` item added to the compiler when your document is under the context of _user editing or previewing task_. You can use it to configure your template:
 
 ```typ
 #let preview-args = json.decode(sys.inputs.at("x-preview", default: "{}"))
@@ -128,10 +108,9 @@ For details, please check [Preview’s sys.inputs](https://myriad-dreamin.github
 
 #### Configuring path to search fonts
 
-<div></div>To configure path to search fonts:
+To configure path to search fonts:
 
 1. Open settings.
-   
    - File -> Preferences -> Settings (Linux, Windows).
    - Code -> Preferences -> Settings (Mac).
 2. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
@@ -142,7 +121,7 @@ For details, please check [Preview’s sys.inputs](https://myriad-dreamin.github
 
 #### Configuring path to root directory
 
-<div></div>To configure the root path resolved for Typst compiler:
+To configure the root path resolved for Typst compiler:
 
 1. Open settings.
 2. Search for "Tinymist Root Path" and modify the value.
@@ -150,15 +129,13 @@ For details, please check [Preview’s sys.inputs](https://myriad-dreamin.github
 
 #### Managing Local Packages
 
-<div></div>
-
 1. Use `Typst: Create Typst Local Package` command to create a local package.
 2. Use `Typst: Open Typst Local Package` command to open a local package.
 3. View and manage a list of available local packages in the "PACKAGE" view in the activity bar.
 
 #### Compiling PDF
 
-<div></div>This extension compiles to PDF, but it doesn’t have a PDF viewer yet. To view the output as you work, install a PDF viewer extension, such as `vscode-pdf`.
+This extension compiles to PDF, but it doesn’t have a PDF viewer yet. To view the output as you work, install a PDF viewer extension, such as `vscode-pdf`.
 
 To find a way to compile PDF:
 
@@ -171,7 +148,6 @@ To configure when PDFs are compiled:
 1. Open settings.
 2. Search for "Tinymist Export PDF".
 3. Change the "Export PDF" setting.
-   
    - `onSave` makes a PDF after saving the Typst file.
    - `onType` makes PDF files live, as you type.
    - `never` disables PDF compilation.
@@ -182,7 +158,6 @@ To configure where PDFs are saved:
 1. Open settings.
 2. Search for "Tinymist Output Path".
 3. Change the "Output Path" setting. This is the path pattern to store artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration
-   
    - e.g. `$root/$dir/$name` (default) for `$root/path/to/main.pdf`.
    - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
    - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure that the output is always output to `target/foo.pdf`.
@@ -191,7 +166,7 @@ To configure where PDFs are saved:
 
 #### Exporting to Other Formats
 
-<div></div>You can export your documents to various other formats by lsp as well. Currently, the following formats are supported:
+You can export your documents to various other formats by lsp as well. Currently, the following formats are supported:
 
 - Official svg, png, and pdf.
 - Unofficial html, md (typlite), and txt
@@ -201,16 +176,16 @@ See [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/featur
 
 #### Working with Multiple-File Projects
 
-<div></div>You can pin a main file by command.
+You can pin a main file by command.
 
 - Use command `Typst Pin Main` (tinymist.pinMainToCurrent) to set the current file as the main file.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
-<div><code>tinymist.pinMain</code> is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).</div>
+`tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
 
 #### Passing Extra CLI Arguments
 
-<div></div>There is a **global** configuration `tinymist.typstExtraArgs` to pass extra arguments to tinymist LSP, like what you usually do with `typst-cli` CLI. For example, you can set it to `["--input=awa=1", "--input=abaaba=2", "main.typ"]` to configure `sys.inputs` and entry for compiler, which is equivalent to make LSP run like a `typst-cli` with such arguments:
+There is a **global** configuration `tinymist.typstExtraArgs` to pass extra arguments to tinymist LSP, like what you usually do with `typst-cli` CLI. For example, you can set it to `["--input=awa=1", "--input=abaaba=2", "main.typ"]` to configure `sys.inputs` and entry for compiler, which is equivalent to make LSP run like a `typst-cli` with such arguments:
 
 ```
 typst watch --input=awa=1 --input=abaaba=2 main.typ
@@ -219,7 +194,6 @@ typst watch --input=awa=1 --input=abaaba=2 main.typ
 Supported arguments:
 
 - entry file: The last string in the array will be treated as the entry file.
-  
   - This is used to specify the **default** entry file for the compiler, which may be overridden by other settings.
 - `--input`: Add a string key-value pair visible through `sys.inputs`.
 - `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
@@ -233,4 +207,4 @@ Supported arguments:
 
 ### Contributing
 
-<div></div>You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
+You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).

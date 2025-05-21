@@ -8,32 +8,22 @@ Normally, you should always create release candidates to avoid failures in the r
 
 ### Updating Version String to Release
 
-<div></div>
-
 - The `tinymist-assets` package
-  
   - package.json should be the version.
 - The VSCode Extension
-  
   - package.json should be the version.
 - The Language Server Binaries
-  
   - Cargo.toml should be the version.
 - The `tinymist-web` NPM package
-  
   - package.json should be the version.
 
 You can `grep` the version number in the repository to check if all the components are updated. Some CI script will also assert failing to help you catch the issue.
 
 ### Updating the Changelog
 
-<div></div>
-
 All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
 
 ### Generating the GitHub Release's Body (Content)
-
-<div></div>
 
 Run following commands to generate the body of the release announcement:
 
@@ -45,8 +35,6 @@ Please check the generated announcement in target/announcement.gen.md
 The `target/announcement.gen.md` first includes the changelog read from the `CHANGELOG.md` file, then attack the download script and available download links.
 
 ### Drafting the Release
-
-<div></div>
 
 Create a draft release on GitHub with the generated announcement.
 
@@ -60,13 +48,9 @@ Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme
 
 ### Checking the `Cargo.toml` and the `Cargo.lock`
 
-<div></div>
-
 A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This will cause the `Cargo.lock` file to be unstable and the build to fail. Use the `git` with `tag` dependencies instead.
 
 ### Checking publish tokens
-
-<div></div>
 
 Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
 
@@ -75,19 +59,13 @@ Please check the deadline of the publish tokens stored in the GitHub secrets. If
 
 ### Publishing the tinymist-assets crate
 
-<div></div>
-
 Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
 
 ### Dry running the CI
 
-<div></div>
-
 Dry running the `release.yml` and the `release-vscode.yml` if you feel necessary.
 
 ### Tagging the Release
-
-<div></div>
 
 Push a tag to the repository with the version number. For example, if you are releasing version `0.12.19`, you should run the following command:
 
@@ -99,8 +77,6 @@ $ git push --tag
 This step will trigger the `release-vscode.yml` CI to build and publish the VS Code extensions to the marketplace.
 
 ### Triggering the Binary Releases
-
-<div></div>
 
 The binary releases is triggered by the `release.yml` CI. You should trigger it after `release-vscode.yml` finished.
 

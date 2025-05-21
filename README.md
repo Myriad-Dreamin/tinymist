@@ -7,72 +7,54 @@ It contains:
 
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  
   - which provides a language server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-language-46-typ">Language Features</a>.
   - which provides a preview server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ">Preview Feature</a>.
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
 ### Features
 
-<div></div>
-
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
-  
   - The "semantic highlighting" is supplementary to ["syntax highlighting"](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
 - [Code actions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-code-actions)
-  
   - Also known as "quick fixes" or "refactorings".
 - [Formatting (Reformatting)](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#format-source-code-in-an-editor)
-  
   - Provide the user with support for formatting whole documents, using [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - [Document highlight](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#highlight-all-occurrences-of-a-symbol-in-a-document)
-  
   - Highlight all break points in a loop context.
   - (Todo) Highlight all exit points in a function context.
   - (Todo) Highlight all captures in a closure context.
   - (Todo) Highlight all occurrences of a symbol in a document.
 - [Document links](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink)
-  
   - Renders path or link references in the document, such as `image("path.png")` or `bibliography(style: "path.csl")`.
 - [Document symbols](https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view)
-  
   - Also known as "document outline" or "table of contents" _in Typst_.
 - [Folding ranges](https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections)
-  
   - You can collapse code/content blocks and headings.
 - [Goto definitions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
-  
   - Right-click on a symbol and select "Go to Definition".
   - Or ctrl+click on a symbol.
 - [References](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
-  
   - Right-click on a symbol and select "Go to References" or "Find References".
   - Or ctrl+click on a symbol.
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
-  
   - Also known as "hovering tooltip".
   - Render docs according to [tidy](https://github.com/Mc-Zen/tidy) style.
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
-  
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
 - [Color Provider](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators)
-  
   - View all inlay colorful label for color literals in your document.
   - Change the color literal's value by a color picker or its code presentation.
 - [Code Lens](https://code.visualstudio.com/blogs/2017/02/12/code-lens-roundup)
-  
   - Should give contextual buttons along with code. For example, a button for exporting your document to various formats at the start of the document.
 - [Rename symbols and embedded paths](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
 - [Help with function and method signatures](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#help-with-function-and-method-signatures)
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 - [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
-  
   - Increasing/Decreasing heading levels.
   - Turn equation into "inline", "block" or "multiple-line block" styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
-  
   - `Enter` inside triple-slash comments automatically inserts `///`
   - `Enter` in the middle or after a trailing space in `//` inserts `//`
   - `Enter` inside `//!` doc comments automatically inserts `//!`
@@ -86,14 +68,11 @@ Extra features:
 - Provides builtin linting. Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-linting-46-typ">Docs: Linting Features</a>.
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
-  
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).
 
 ### Versioning and Release Cycle
-
-<div></div>
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
 
@@ -108,8 +87,6 @@ The release cycle is as follows:
 
 ### Installation
 
-<div></div>
-
 Follow the instructions to enable tinymist in your favorite editor.
 
 - <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-vscode-46-typ">VS Cod(e,ium)</a>
@@ -121,42 +98,30 @@ Follow the instructions to enable tinymist in your favorite editor.
 
 ### Installing Regular/Nightly Prebuilds from GitHub
 
-<div></div>
-
 Note: if you are not knowing what is a regular/nightly release, please don't follow this section.
 
 Besides published releases specific for each editors, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
 
-Unix (Bash):
-
-```bash
-curl -sSL https://github.com/hongjr03/tinymist-nightly-installer/releases/latest/download/run.sh | bash
-```
-
-Windows (PowerShell):
-
-```bash
-iwr https://github.com/hongjr03/tinymist-nightly-installer/releases/latest/download/run.ps1 -UseBasicParsing | iex
-```
-
 - Regular prebuilts can be found in [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 - Nightly prebuilts can be found in [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
-  
   - (Suggested) Use the [tinymist-nightly-installer](https://github.com/hongjr03/tinymist-nightly-installer) to install the nightly prebuilts automatically.
-    
+    - Unix (Bash):
+      ```bash
+      curl -sSL https://github.com/hongjr03/tinymist-nightly-installer/releases/latest/download/run.sh | bash
+      ```
+    - Windows (PowerShell):
+      ```bash
+      iwr https://github.com/hongjr03/tinymist-nightly-installer/releases/latest/download/run.ps1 -UseBasicParsing | iex
+      ```
   - The prebuilts for other revisions can also be found manually. For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
 To install extension file (the file with `.vsix` extension) manually, please `Ctrl+Shift+X` in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ### Documentation
 
-<div></div>
-
 See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
 
 ### Packaging
-
-<div></div>
 
 Stable Channel:
 
@@ -168,17 +133,11 @@ Nightly Channel:
 
 ### Roadmap
 
-<div></div>
-
 #### Short Terms
-
-<div></div>
 
 To encourage contributions, we create many [Pull Requests](https://github.com/Myriad-Dreamin/tinymist/pulls) in draft to navigate short-term plans. They give you a hint of what or where to start in this large repository.
 
 #### Long Terms
-
-<div></div>
 
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
@@ -188,40 +147,30 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
 - Find references of dictionary fields and named function arguments.
 - Improve symbol view's appearance.
 - Improve package view.
-  
   - Navigate to symbols by clicking on the symbol name in the view.
   - Automatically locate the symbol item in the view when viewing local documentation.
   - Remember the recently invoked package commands, e.g. "Open Docs of @preview/cetz:0.3.1", "Open directory of @preview/touying:0.5.3".
 - Improve label view.
-  
   - Group labels.
   - Search labels.
   - Keep (persist) group preferences.
 - Improve Typst Preview.
-  
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
-  
   - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](harper) looks promise.
 
 If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)
 
 ### Contributing
 
-<div></div>
-
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
 
 ### Sponsoring
 
-<div></div>
-
 Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
 
 ### Acknowledgements
-
-<div></div>
 
 - Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
 - The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view) **offline** handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).

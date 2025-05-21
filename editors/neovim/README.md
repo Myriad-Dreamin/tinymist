@@ -5,97 +5,74 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 
 ### Feature Integration
 
-<div></div>
-
 - **Language service** (completion, definitions, etc.)
 - **Code Formatting**
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
 
-<div>Work for full parity for all <code>tinymist</code> features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.</div>
+Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
 
 ### Installation
 
-<div></div>
-
-(Recommended) [mason.nvim](https://github.com/williamboman/mason.nvim).
-
-```lua
-{
-  "williamboman/mason.nvim",
-  opts = {
-    ensure_installed = {
-      "tinymist",
+- (Recommended) [mason.nvim](https://github.com/williamboman/mason.nvim).
+  ```lua
+  {
+    "williamboman/mason.nvim",
+    opts = {
+      ensure_installed = {
+        "tinymist",
+      },
     },
-  },
-}
-```
-
-Or manually:
-
-### Finding Executable
-
-<div></div>To enable LSP, you must install `tinymist`. You can find `tinymist` by:
-
-Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
-
-```bash
-cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-```
-
-- - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
-  
-  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).<br />If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
-  
+  }
+  ```
+- Or manually:
+  ### Finding Executable
+  To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+  - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
+  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+  - Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
+    ```bash
+    cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
+    ```
 
 ### Configuration
 
-<div></div>
+- With `lspconfig`:
+  ```lua
+  require("lspconfig")["tinymist"].setup {
+      settings = {
+          formatterMode = "typstyle",
+          exportPdf = "onType",
+          semanticTokens = "disable"
+      }
+  }
+  ```
 
-With `lspconfig`:
-
-```lua
-require("lspconfig")["tinymist"].setup {
-    settings = {
-        formatterMode = "typstyle",
-        exportPdf = "onType",
-        semanticTokens = "disable"
-    }
-}
-```
-
-
-Or with `Coc.nvim`:
-
-```json
-{
-  "languageserver": {
-    "tinymist": {
-      "command": "tinymist",
-      "filetypes": ["typst"],
-      "settings": { ... }
+- Or with `Coc.nvim`:
+  ```json
+  {
+    "languageserver": {
+      "tinymist": {
+        "command": "tinymist",
+        "filetypes": ["typst"],
+        "settings": { ... }
+      }
     }
   }
-}
-```
-
-Or finally with the builtin lsp protocol:
-
-```lua
-vim.lsp.config["tinymist"] = {
-    cmd = { "tinymist" },
-    filetypes = { "typst" },
-    settings = {
-        -- ...
-    }
-}
-```
-
+  ```
+- Or finally with the builtin lsp protocol:
+  ```lua
+  vim.lsp.config["tinymist"] = {
+      cmd = { "tinymist" },
+      filetypes = { "typst" },
+      settings = {
+          -- ...
+      }
+  }
+  ```
 
 For a full list of available settings see [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md).
 
 ### Formatting
-
-<div></div>
 
 Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
 
@@ -104,8 +81,6 @@ formatterMode = "typstyle"
 ```
 
 ### Live Preview
-
-<div></div>
 
 Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading ([zathura](https://pwmt.org/projects/zathura/) is good).
 
@@ -139,13 +114,11 @@ vim.api.nvim_create_user_command("OpenPdf", function()
 end, {})
 ```
 
-<div>For Neovim prior to v0.9.5, <code>os.execute</code> can be used instead. This is not suggested. See <a href="https://github.com/Myriad-Dreamin/tinymist/issues/1606">Issue #1606</a> for more information.</div>
+For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 
 #### Working with Multiple-Files Projects
-
-<div></div>
 
 Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
@@ -200,13 +173,9 @@ This could be improved in the future.
 
 ### Troubleshooting
 
-<div></div>
-
 Generally you can find in depth information via the `:mes` command. `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
 
 #### tinymist not starting when creating/opening files
-
-<div></div>
 
 This is most commonly due to nvim not recognizing the `.typ` file extension as a `typst` source file. In most cases is can be resolved with:
 
@@ -222,4 +191,4 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 
 ### Contributing
 
-<div></div>You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
+You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
