@@ -2,10 +2,9 @@
 # Release Instructions
 
 Normally, you should always create release candidates to avoid failures in the release process. For example, if you are releasing version `0.12.19`, you should create a release candidate `0.12.19-rc1` first. This is because once you tag a version, you cannot delete it, otherwise the people in downstream that already pull the tag will have to force update their repository. The release candidates are canaries to test any potential poison in the release process. Two things to note:
+
 - At most 9 release candidates can be created for a version. This is because semver compares the version number as a string, and `rc9` is greater than `rc10` in sense of string comparison.
 - You must publish the release soon after a good release candidate is created, otherwise CI may fail tomorrow.
-
-
 
 ## Updating Version String to Release
 
@@ -46,7 +45,6 @@ Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 
-
 ## Checking the `Cargo.toml` and the `Cargo.lock`
 
 A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This will cause the `Cargo.lock` file to be unstable and the build to fail. Use the `git` with `tag` dependencies instead.
@@ -55,8 +53,8 @@ A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This wil
 
 Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
 
-- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the [Azure DevOps -- Use personal access tokens.](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows)
-- Renew the `OPENVSX_ACCESS_TOKEN` at the [Open VSX Registry -- Access Tokens.](https://open-vsx.org/user-settings/tokens)
+- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the [Azure DevOps – Use personal access tokens.](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows)
+- Renew the `OPENVSX_ACCESS_TOKEN` at the [Open VSX Registry – Access Tokens.](https://open-vsx.org/user-settings/tokens)
 
 ## Publishing the tinymist-assets crate
 

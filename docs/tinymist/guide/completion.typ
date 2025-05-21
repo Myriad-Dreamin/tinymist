@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [Code Completion])
 
-== Using LSP-Based Completion
+= Using LSP-Based Completion
 
 LSP will serve completion if you enter _trigger characters_ in the editor. Currently, the trigger characters are:
 + any valid identifier character, like ```js 'a'``` or ```js 'Z'```.
@@ -22,7 +22,7 @@ When an item is selected, it will be committed if some character is typed.
 3. press ```js ';'``` to commit one in code mode.
 4. press ```js ','``` to commit one in list.
 
-=== Label Completion
+== Label Completion
 
 The LSP will keep watching and compiling your documents to get available labels for completion. Thus, if it takes a long time to compile your document, there will be an expected delay after each editing labels in document.
 
@@ -46,7 +46,7 @@ A frequently asked question is how to completing labels in sub files when writin
   See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix#working-with-multiple-file-projects")[Helix: Working with Multiple File Projects].
 ]
 
-== Using Snippet-Based Completion
+= Using Snippet-Based Completion
 
 #pro-tip[
   === VSCode:

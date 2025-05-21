@@ -7,30 +7,20 @@ Run and configure tinymist in Emacs for Typst.
 
 See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
-
 ## Finding Executable
 
 To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
-  If you are using the latest version of
-  [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
-  you can use command `typst-ts-lsp-download-binary` to download the latest
-  stable binary of `tinymist` at `typst-ts-lsp-download-path`.
-
-- Build from source by cargo.
-  You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
-
+- Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
   ```bash
   cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
   ```
 
-
 ## Setup Server
-
 
 ```el
 (with-eval-after-load 'eglot
@@ -42,20 +32,15 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
                                           "typst-lsp"))))))
 ```
 
-Above code adds `tinymist` downloaded by `typst-ts-lsp-download-binary`, `tinymist` in
-your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-server-programs`.
-
+Above code adds `tinymist` downloaded by `typst-ts-lsp-download-binary`, `tinymist` in your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-server-programs`.
 
 ## Extra Settings
 
 ### Configuring Language Server
 
-
-You can either use `eglot-workspace-configuration` or specifying launch
-arguments for `tinymist`.
+You can either use `eglot-workspace-configuration` or specifying launch arguments for `tinymist`.
 
 #### eglot-workspace-configuration
-
 
 For example, if you want to export PDF on save:
 
@@ -64,12 +49,9 @@ For example, if you want to export PDF on save:
                 '(:tinymist (:exportPdf "onSave")))
 ```
 
-You can also have configuration per directory. Be sure to look at the
-documentation of `eglot-workspace-configuration` by [`describe-symbol`](https://www.gnu.org/software/emacs/manual/html_node/emacs/Name-Help.html)..
+You can also have configuration per directory. Be sure to look at the documentation of `eglot-workspace-configuration` by [`describe-symbol`](https://www.gnu.org/software/emacs/manual/html_node/emacs/Name-Help.html)..
 
-See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md)
-for references.
-
+See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md) for references.
 
 #### Launch Arguments
 
@@ -85,5 +67,4 @@ For example:
                                           "typst-lsp"))))))
 ```
 
-You can run command `tinymist help lsp` to view all available launch arguments for
-configuration.
+You can run command `tinymist help lsp` to view all available launch arguments for configuration.

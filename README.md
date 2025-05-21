@@ -4,22 +4,19 @@
 Tinymist [ˈtaɪni mɪst] is an integrated language service for [Typst](https://typst.app/) [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
 
 It contains:
+
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist/feature/language.html).
-  - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html).
+  - which provides a language server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-language-46-typ">Language Features</a>.
+  - which provides a preview server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ">Preview Feature</a>.
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
 ## Features
-
-
-
 
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
   - The "semantic highlighting" is supplementary to ["syntax highlighting"](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
-
 - [Code actions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-code-actions)
   - Also known as "quick fixes" or "refactorings".
 - [Formatting (Reformatting)](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#format-source-code-in-an-editor)
@@ -58,45 +55,46 @@ Language service (LSP) features:
   - Increasing/Decreasing heading levels.
   - Turn equation into "inline", "block" or "multiple-line block" styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
-  - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
-  - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
-  - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
-  - <kbd>Enter</kbd> inside equation markups automatically inserts indents.
+  - `Enter` inside triple-slash comments automatically inserts `///`
+  - `Enter` in the middle or after a trailing space in `//` inserts `//`
+  - `Enter` inside `//!` doc comments automatically inserts `//!`
+  - `Enter` inside equation markups automatically inserts indents.
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or other options). Check [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html).
+- Compiles to PDF on save (configurable to as-you-type, or other options). Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-export-46-typ">Docs: Exporting Documents</a>.
 - Also compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
-- Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
-- Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
+- Provides test, benchmark, coverage collecting on documents and modules. Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-testing-46-typ">Docs: Testing Features</a>.
+- Provides builtin linting. Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-linting-46-typ">Docs: Linting Features</a>.
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).
 
-
 ## Versioning and Release Cycle
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+
+- If a version is suffixed with `-rcN` (<img alt="typst-block" src="./assets/images/introduction.typ-inlined0.svg" />), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 
-
 The release cycle is as follows:
+
 - If there is a typst version update, a new major or minor version will be released intermediately. This means tinymist will always align the minor version with typst.
 - If there is at least a bug or feature added this week, a new patch version will be released.
 
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
-- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist/frontend/vscode.html)
-- [Neovim](https://myriad-dreamin.github.io/tinymist/frontend/neovim.html)
-- [Emacs](https://myriad-dreamin.github.io/tinymist/frontend/emacs.html)
-- [Sublime Text](https://myriad-dreamin.github.io/tinymist/frontend/sublime-text.html)
-- [Helix](https://myriad-dreamin.github.io/tinymist/frontend/helix.html)
-- [Zed](https://myriad-dreamin.github.io/tinymist/frontend/zed.html)
+
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-vscode-46-typ">VS Cod(e,ium)</a>
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-neovim-46-typ">Neovim</a>
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-emacs-46-typ">Emacs</a>
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-sublime-45-text-46-typ">Sublime Text</a>
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-helix-46-typ">Helix</a>
+- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-zed-46-typ">Zed</a>
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 
@@ -117,7 +115,7 @@ Besides published releases specific for each editors, you can also download the 
       ```
   - The prebuilts for other revisions can also be found manually. For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
-To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
+To install extension file (the file with `.vsix` extension) manually, please `Ctrl+Shift+X` in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ## Documentation
 
@@ -127,11 +125,11 @@ See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
 
 Stable Channel:
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
+[Packaging status](https://repology.org/project/tinymist/versions)
 
 Nightly Channel:
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg)](https://repology.org/project/tinymist-nightly/versions)
+[Packaging status](https://repology.org/project/tinymist-nightly/versions)
 
 ## Roadmap
 
@@ -151,7 +149,7 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
 - Improve package view.
   - Navigate to symbols by clicking on the symbol name in the view.
   - Automatically locate the symbol item in the view when viewing local documentation.
-  - Remember the recently invoked package commands, e.g. "Open Docs of \@preview/cetz:0.3.1", "Open directory of \@preview/touying:0.5.3".
+  - Remember the recently invoked package commands, e.g. "Open Docs of @preview/cetz:0.3.1", "Open directory of @preview/touying:0.5.3".
 - Improve label view.
   - Group labels.
   - Search labels.
@@ -159,7 +157,7 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
 - Improve Typst Preview.
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
-- ~~Spell checking: There is already a branch but no suitable (default) spell checking library is found.~~
+- Spell checking: There is already a branch but no suitable (default) spell checking library is found.
   - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](harper) looks promise.
 
 If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)

@@ -56,7 +56,8 @@
 } else {
   10.5pt
 }
-#let heading-sizes = (26pt, 22pt, 14pt, 12pt, main-size)
+// ,
+#let heading-sizes = (22pt, 18pt, 14pt, 12pt, main-size)
 #let list-indent = 0.5em
 
 #let raw-rules(body) = {
@@ -168,12 +169,9 @@
   // Render a dash to hint headings instead of bolding it as well if it's for web.
   show heading: set text(weight: "regular") if is-web-target
   show heading: it => {
-    let it = {
-      set text(size: heading-sizes.at(it.level))
-      if is-web-target {
-        heading-hash(it, hash-color: dash-color)
-      }
-      it
+    set text(size: heading-sizes.at(it.level))
+    if is-web-target {
+      heading-hash(it, hash-color: dash-color)
     }
 
     block(
@@ -230,7 +228,7 @@
   }
 
   if kind == "page" and is-pdf-target and not is-main {
-    [= #title]
+    heading(level: 1, numbering: none, text(size: 32pt, title))
   }
 
   // Main body.
@@ -240,7 +238,7 @@
 }
 
 #let part-style(it) = {
-  set text(size: heading-sizes.at(1))
+  set text(size: heading-sizes.at(0))
   set text(weight: "bold")
   set text(fill: main-color)
   part-counter.step()
