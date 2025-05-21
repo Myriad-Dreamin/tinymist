@@ -263,37 +263,37 @@ impl CustomNode for Comment {
 
 impl HtmlToAstParser {
     pub fn is_block_element(element: &HtmlElement) -> bool {
-        match element.tag {
+        matches!(
+            element.tag,
             tag::p
-            | tag::div
-            | tag::blockquote
-            | tag::h1
-            | tag::h2
-            | tag::h3
-            | tag::h4
-            | tag::h5
-            | tag::h6
-            | tag::hr
-            | tag::pre
-            | tag::table
-            | tag::section
-            | tag::article
-            | tag::header
-            | tag::footer
-            | tag::main
-            | tag::aside
-            | tag::nav
-            | tag::ul
-            | tag::ol
-            | md_tag::heading
-            | md_tag::quote
-            | md_tag::raw
-            | md_tag::parbreak
-            | md_tag::table
-            | md_tag::grid
-            | md_tag::figure => true,
-            _ => false,
-        }
+                | tag::div
+                | tag::blockquote
+                | tag::h1
+                | tag::h2
+                | tag::h3
+                | tag::h4
+                | tag::h5
+                | tag::h6
+                | tag::hr
+                | tag::pre
+                | tag::table
+                | tag::section
+                | tag::article
+                | tag::header
+                | tag::footer
+                | tag::main
+                | tag::aside
+                | tag::nav
+                | tag::ul
+                | tag::ol
+                | md_tag::heading
+                | md_tag::quote
+                | md_tag::raw
+                | md_tag::parbreak
+                | md_tag::table
+                | md_tag::grid
+                | md_tag::figure
+        )
     }
 
     pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Node>> {
