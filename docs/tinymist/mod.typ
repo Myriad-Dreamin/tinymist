@@ -18,7 +18,11 @@
   #raw(it + "()", lang: "typc") <typst-raw-func>
 ]
 
-#let kbd = raw
+#let kbd = if is-md-target {
+  html.elem.with("kbd")
+} else {
+  raw
+}
 #let md-alter(left, right) = left
 
 #let colors = (blue.lighten(10%), olive, eastern)

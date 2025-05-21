@@ -7,8 +7,8 @@ It contains:
 
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  - which provides a language server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-language-46-typ">Language Features</a>.
-  - which provides a preview server for Typst, see <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ">Preview Feature</a>.
+  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist/feature/language.html).
+  - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html).
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
 ## Features
@@ -55,17 +55,17 @@ Language service (LSP) features:
   - Increasing/Decreasing heading levels.
   - Turn equation into "inline", "block" or "multiple-line block" styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
-  - `Enter` inside triple-slash comments automatically inserts `///`
-  - `Enter` in the middle or after a trailing space in `//` inserts `//`
-  - `Enter` inside `//!` doc comments automatically inserts `//!`
-  - `Enter` inside equation markups automatically inserts indents.
+  - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
+  - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
+  - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
+  - <kbd>Enter</kbd> inside equation markups automatically inserts indents.
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or other options). Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-export-46-typ">Docs: Exporting Documents</a>.
+- Compiles to PDF on save (configurable to as-you-type, or other options). Check [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html).
 - Also compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
-- Provides test, benchmark, coverage collecting on documents and modules. Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-testing-46-typ">Docs: Testing Features</a>.
-- Provides builtin linting. Check <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-linting-46-typ">Docs: Linting Features</a>.
+- Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
+- Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
@@ -89,12 +89,12 @@ The release cycle is as follows:
 
 Follow the instructions to enable tinymist in your favorite editor.
 
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-vscode-46-typ">VS Cod(e,ium)</a>
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-neovim-46-typ">Neovim</a>
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-emacs-46-typ">Emacs</a>
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-sublime-45-text-46-typ">Sublime Text</a>
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-helix-46-typ">Helix</a>
-- <a class="typst-content-link" href="cross-link://jump?path-label=47-frontend-47-zed-46-typ">Zed</a>
+- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist/frontend/vscode.html)
+- [Neovim](https://myriad-dreamin.github.io/tinymist/frontend/neovim.html)
+- [Emacs](https://myriad-dreamin.github.io/tinymist/frontend/emacs.html)
+- [Sublime Text](https://myriad-dreamin.github.io/tinymist/frontend/sublime-text.html)
+- [Helix](https://myriad-dreamin.github.io/tinymist/frontend/helix.html)
+- [Zed](https://myriad-dreamin.github.io/tinymist/frontend/zed.html)
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 
@@ -115,7 +115,7 @@ Besides published releases specific for each editors, you can also download the 
       ```
   - The prebuilts for other revisions can also be found manually. For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
-To install extension file (the file with `.vsix` extension) manually, please `Ctrl+Shift+X` in the editor window and drop the downloaded vsix file into the opened extensions view.
+To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ## Documentation
 
