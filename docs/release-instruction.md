@@ -2,10 +2,9 @@
 # Release Instructions
 
 Normally, you should always create release candidates to avoid failures in the release process. For example, if you are releasing version `0.12.19`, you should create a release candidate `0.12.19-rc1` first. This is because once you tag a version, you cannot delete it, otherwise the people in downstream that already pull the tag will have to force update their repository. The release candidates are canaries to test any potential poison in the release process. Two things to note:
+
 - At most 9 release candidates can be created for a version. This is because semver compares the version number as a string, and `rc9` is greater than `rc10` in sense of string comparison.
 - You must publish the release soon after a good release candidate is created, otherwise CI may fail tomorrow.
-
-
 
 ## Updating Version String to Release
 
@@ -42,10 +41,10 @@ Create a draft release on GitHub with the generated announcement.
 If you are releasing a nightly version, please set the prerelease flag to true. Otherwise, if you are releasing a regular version, please set the prerelease flag to false. Some package registries relies on this flag to determine whether to update their stable channel.
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/release-instruction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/release-instruction.typ-inlined1.svg" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+
+- If a version is suffixed with `-rcN` (<img alt="typst-block" src="./assets/images/release-instruction.typ-inlined0.svg" />), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
-
 
 ## Checking the `Cargo.toml` and the `Cargo.lock`
 
@@ -55,8 +54,8 @@ A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This wil
 
 Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
 
-- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the [Azure DevOps -- Use personal access tokens.](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows)
-- Renew the `OPENVSX_ACCESS_TOKEN` at the [Open VSX Registry -- Access Tokens.](https://open-vsx.org/user-settings/tokens)
+- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the [Azure DevOps – Use personal access tokens.](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows)
+- Renew the `OPENVSX_ACCESS_TOKEN` at the [Open VSX Registry – Access Tokens.](https://open-vsx.org/user-settings/tokens)
 
 ## Publishing the tinymist-assets crate
 

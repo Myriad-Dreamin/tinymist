@@ -25,7 +25,7 @@ const yarn = (cmd, stdio = "inherit") => {
 const typlite = (input, output = "-") => {
   if (output === "-") {
     // return stdout
-    const res = yarn(`--silent typlite ${input} -`, "pipe");
+    const res = yarn(`--silent typlite --root ${root} ${input} -`, "pipe");
     return res.toString();
   }
 

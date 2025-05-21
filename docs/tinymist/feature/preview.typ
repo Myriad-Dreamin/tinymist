@@ -8,7 +8,7 @@ Two ways of previewing a Typst document are provided:
 
 Whenever you can get a web preview feature, it is recommended since it is much faster than PDF preview and provides bidirectional navigation feature, allowing jumping between the source code and the preview by clicking or lsp commands.
 
-== PDF Preview
+= PDF Preview
 
 For non-vscode clients, Neovim client as an example. One who uses `nvim-lspconfig` can place their configuration in the `servers.tinymist.settings` section. If you want to export PDF on typing and output files in `$root_dir/target` directory, please configure it like that:
 
@@ -49,9 +49,9 @@ Also see:
 - #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md")[VS Cod(e,ium): Tinymist Server Configuration]
 - #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/neovim/Configuration.md")[Neovim: Tinymist Server Configuration]
 
-== Builtin Preview Feature
+= Builtin Preview Feature
 
-=== Using `tinymist.startDefaultPreview` Command (Since Tinymist v0.13.6) <default-preview>
+== Using `tinymist.startDefaultPreview` Command (Since Tinymist v0.13.6) <default-preview>
 
 You can use `tinymist.startDefaultPreview` command to start a preview instance without arguments. This is used for the
 case where a client cannot pass arguments to the preview command, e.g. helix. Default Behaviors:
@@ -64,7 +64,7 @@ case where a client cannot pass arguments to the preview command, e.g. helix. De
 You can set the arguments to used by configuration `tinymist.preview.browsing.args` to *override* the default behavior. The default
 value is `["--data-plane-host=127.0.0.1:0", "--invert-colors=auto", "--open"]`. Intentionally, the name of the configuration is *not* `tinymist.defaultPreviewArgs` or `tinymist.preview.defaultArgs` to avoid confusion.
 
-=== Running preview server in background (Since Tinymist v0.13.6) <background-preview>
+== Running preview server in background (Since Tinymist v0.13.6) <background-preview>
 
 You can start a preview instance in background with configuration:
 ```jsonc
@@ -88,7 +88,7 @@ value is `["--data-plane-host=127.0.0.1:23635", "--invert-colors=auto"]`. Exampl
 }
 ```
 
-=== CLI Integration
+== CLI Integration
 
 ```bash
 typst-preview /abs-path/to/main.typ --partial-rendering
@@ -100,7 +100,7 @@ is equivalent to
 tinymist preview /abs-path/to/main.typ --partial-rendering
 ```
 
-=== Editor Integration
+== Editor Integration
 
 #pro-tip[
   === VSCode:
@@ -120,7 +120,7 @@ tinymist preview /abs-path/to/main.typ --partial-rendering
   You may seek #link("https://github.com/havarddj/typst-preview.el")[typst-preview.el] for the preview feature.
 ]
 
-=== `sys.inputs`
+== `sys.inputs`
 
 If the document is compiled by lsp, you can use `sys.inputs` to get the preview arguments:
 
@@ -137,11 +137,11 @@ There is a `version` field in the `preview-args` object, which will increase whe
 }
 ```
 
-=== Developer Guide
+== Developer Guide
 
 See #link("https://enter-tainer.github.io/typst-preview/arch.html")[Typst-Preview Developer Guide].
 
-==== Theme-aware template
+=== Theme-aware template
 
 The only two abstracted theme kinds are supported: `light` and `dark`. You can use the following code to get the theme:
 

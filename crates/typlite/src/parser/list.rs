@@ -17,9 +17,11 @@ impl ListParser {
         parser: &mut HtmlToAstParser,
         element: &HtmlElement,
     ) -> Result<Vec<ListItem>> {
-        let mut all_items = Vec::new();
+        parser.list_level += 1;
+
         let prev_buffer = std::mem::take(&mut parser.inline_buffer);
         let is_ordered = element.tag == tag::ol;
+        let mut all_items = Vec::new();
 
         for child in &element.children {
             if let HtmlNode::Element(li) = child {
@@ -27,50 +29,42 @@ impl ListParser {
                     let attrs = ListItemAttr::parse(&li.attrs)?;
                     let mut item_content = Vec::new();
 
-                    parser.begin_list();
+                    let mut li_buffer = Vec::new();
+
+                    if parser.feat.annotate_elem {
+                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(format!(
+                            "typlite:begin:list-item {}",
+                            parser.list_level - 1
+                        )))));
+                    }
 
                     for li_child in &li.children {
                         match li_child {
                             HtmlNode::Text(text, _) => {
-                                parser
-                                    .inline_buffer
-                                    .push(Node::Text(text.as_str().to_string()));
+                                li_buffer.push(Node::Text(text.as_str().to_string()));
                             }
                             HtmlNode::Element(child_elem) => {
-                                if child_elem.tag == tag::ul || child_elem.tag == tag::ol {
-                                    // Handle nested lists
-                                    if !parser.inline_buffer.is_empty() {
-                                        item_content.push(Node::Paragraph(std::mem::take(
-                                            &mut parser.inline_buffer,
-                                        )));
-                                    }
+                                let element_content =
+                                    parser.process_list_item_element(child_elem)?;
 
-                                    parser.list_level += 1;
-
-                                    let items = Self::convert_list(parser, child_elem)?;
-
-                                    parser.list_level -= 1;
-
-                                    if child_elem.tag == tag::ul {
-                                        item_content.push(Node::UnorderedList(items));
-                                    } else {
-                                        item_content.push(Node::OrderedList { start: 1, items });
-                                    }
-                                } else {
-                                    parser.convert_element(child_elem)?;
+                                if !element_content.is_empty() {
+                                    li_buffer.extend(element_content);
                                 }
                             }
                             _ => {}
                         }
                     }
 
-                    parser.end_list();
-
-                    if !parser.inline_buffer.is_empty() {
-                        item_content
-                            .push(Node::Paragraph(std::mem::take(&mut parser.inline_buffer)));
+                    if parser.feat.annotate_elem {
+                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(format!(
+                            "typlite:end:list-item {}",
+                            parser.list_level - 1
+                        )))));
                     }
 
+                    if !li_buffer.is_empty() {
+                        item_content.push(Node::Paragraph(li_buffer));
+                    }
                     if !item_content.is_empty() {
                         if is_ordered {
                             all_items.push(ListItem::Ordered {
@@ -88,6 +82,8 @@ impl ListParser {
         }
 
         parser.inline_buffer = prev_buffer;
+        parser.list_level -= 1;
+
         Ok(all_items)
     }
 }

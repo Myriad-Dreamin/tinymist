@@ -60,9 +60,7 @@ impl HtmlToAstParser {
 
             tag::ol => {
                 self.flush_inline_buffer();
-                self.list_level += 1;
                 let items = ListParser::convert_list(self, element);
-                self.list_level -= 1;
                 self.blocks.push(Node::OrderedList {
                     start: 1,
                     items: items?,
@@ -72,9 +70,7 @@ impl HtmlToAstParser {
 
             tag::ul => {
                 self.flush_inline_buffer();
-                self.list_level += 1;
                 let items = ListParser::convert_list(self, element);
-                self.list_level -= 1;
                 self.blocks.push(Node::UnorderedList(items?));
                 Ok(())
             }
@@ -102,7 +98,12 @@ impl HtmlToAstParser {
 
             md_tag::figure => InlineParser::convert_figure(self, element),
 
-            tag::p | tag::span => {
+            tag::br => {
+                self.inline_buffer.push(Node::HardBreak);
+                Ok(())
+            }
+
+            tag::p | tag::span | tag::div => {
                 self.convert_children(element)?;
                 Ok(())
             }
@@ -227,30 +228,10 @@ impl HtmlToAstParser {
         self.inline_buffer = prev_buffer;
         Ok(())
     }
-
-    pub(crate) fn begin_list(&mut self) {
-        if self.feat.annotate_elem {
-            self.inline_buffer
-                .push(Node::Custom(Box::new(Comment(format!(
-                    "typlite:begin:list-item {}",
-                    self.list_level - 1
-                )))))
-        }
-    }
-
-    pub(crate) fn end_list(&mut self) {
-        if self.feat.annotate_elem {
-            self.inline_buffer
-                .push(Node::Custom(Box::new(Comment(format!(
-                    "typlite:end:list-item {}",
-                    self.list_level - 1
-                )))))
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
-struct Comment(String);
+pub(crate) struct Comment(pub String);
 
 impl CustomNode for Comment {
     fn as_any(&self) -> &dyn std::any::Any {
@@ -286,6 +267,72 @@ impl CustomNode for Comment {
 }
 
 impl HtmlToAstParser {
+    pub fn is_block_element(element: &HtmlElement) -> bool {
+        matches!(
+            element.tag,
+            tag::p
+                | tag::div
+                | tag::blockquote
+                | tag::h1
+                | tag::h2
+                | tag::h3
+                | tag::h4
+                | tag::h5
+                | tag::h6
+                | tag::hr
+                | tag::pre
+                | tag::table
+                | tag::section
+                | tag::article
+                | tag::header
+                | tag::footer
+                | tag::main
+                | tag::aside
+                | tag::nav
+                | tag::ul
+                | tag::ol
+                | md_tag::heading
+                | md_tag::quote
+                | md_tag::raw
+                | md_tag::parbreak
+                | md_tag::table
+                | md_tag::grid
+                | md_tag::figure
+        )
+    }
+
+    pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Node>> {
+        if element.tag == tag::ul || element.tag == tag::ol {
+            let items = super::list::ListParser::convert_list(self, element)?;
+            if element.tag == tag::ul {
+                return Ok(vec![Node::UnorderedList(items)]);
+            } else {
+                return Ok(vec![Node::OrderedList { start: 1, items }]);
+            }
+        }
+
+        let prev_blocks = std::mem::take(&mut self.blocks);
+        let prev_buffer = std::mem::take(&mut self.inline_buffer);
+
+        self.convert_element(element)?;
+        let mut result = Vec::new();
+
+        if !self.blocks.is_empty() {
+            result.extend(std::mem::take(&mut self.blocks));
+        } else if !self.inline_buffer.is_empty() {
+            if Self::is_block_element(element) {
+                result.push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
+            } else {
+                result = std::mem::take(&mut self.inline_buffer);
+            }
+        }
+
+        self.blocks = prev_blocks;
+        self.inline_buffer = prev_buffer;
+
+        Ok(result)
+    }
+
     pub fn parse(mut self, root: &HtmlElement) -> Result<Node> {
         self.blocks.clear();
         self.inline_buffer.clear();

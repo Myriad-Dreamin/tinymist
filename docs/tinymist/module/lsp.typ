@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [LSP])
 
-== Architecture
+= Architecture
 
 Tinymist binary has multiple modes, and it may runs multiple actors in background. The actors could run as an async task, in a single thread, or in an isolated process.
 
@@ -38,7 +38,7 @@ They can construct and return resources in the `resource` directory.
 
 They may invoke tools in the `tool` directory.
 
-== Debugging with input mirroring
+= Debugging with input mirroring
 
 You can record the input during running the editors with Tinymist. You can then replay the input to debug the language server.
 
@@ -49,7 +49,7 @@ tinymist lsp --mirror input.txt
 tinymist lsp --replay input.txt
 ```
 
-== Analyze memory usage with DHAT
+= Analyze memory usage with DHAT
 
 You can build the program with `dhat-heap` feature to collect memory usage with DHAT. The DHAT will instrument the allocator dynamically, so it will slow down the program significantly.
 
@@ -70,6 +70,6 @@ dhat: The data has been saved to dhat-heap.json, and is viewable with dhat/dh_vi
 
 Once you have the `dhat-heap.json`, you can visualize the memory usage with #link("https://nnethercote.github.io/dh_view/dh_view.html")[the DHAT viewer].
 
-== Contributing
+= Contributing
 
 See #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md")[CONTRIBUTING.md].
