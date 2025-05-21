@@ -183,7 +183,9 @@ You can pin a main file by command.
 - Use command `Typst Pin Main` (tinymist.pinMainToCurrent) to set the current file as the main file.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
-`tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
+> [!NOTE]
+> 
+> `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
 
 ### Passing Extra CLI Arguments
 

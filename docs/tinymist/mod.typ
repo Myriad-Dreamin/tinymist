@@ -29,7 +29,9 @@
 #import fletcher.shapes: diamond
 
 #let fg-blue = main-color.mix(rgb("#0074d9"))
-#let pro-tip(content) = (
+#let pro-tip(content) = context if shiroa-sys-target() == "html" {
+  html.elem("m1protip", content)
+} else {
   context {
     block(
       width: 100%,
@@ -43,7 +45,7 @@
       },
     )
   }
-)
+}
 
 #let cond-image(img) = context if shiroa-sys-target() == "html" {
   html.elem("div", attrs: ("class": "pseudo-image"), html.frame(img))

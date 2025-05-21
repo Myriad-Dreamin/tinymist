@@ -5,7 +5,7 @@ use cmark_writer::{CommonMarkWriter, WriteResult};
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::{CenterNode, ListState};
+use crate::common::{CenterNode, ListState, ProtipNode};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -143,6 +143,15 @@ impl HtmlToAstParser {
                 } else {
                     self.convert_children(element)?;
                 }
+                Ok(())
+            }
+
+            md_tag::protip => {
+                self.flush_inline_buffer();
+                self.convert_children(element)?;
+                let content = std::mem::take(&mut self.inline_buffer);
+                self.blocks
+                    .push(Node::Custom(Box::new(ProtipNode { content })));
                 Ok(())
             }
 

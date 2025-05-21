@@ -197,6 +197,23 @@ impl CenterNode {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = false)]
+pub struct ProtipNode {
+    pub content: Vec<Node>,
+}
+
+impl ProtipNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        let protip = Node::BlockQuote(vec![
+            Node::Paragraph(vec![Node::Text("[!NOTE]".to_string())]),
+            Node::Paragraph(self.content.clone()),
+        ]);
+        writer.write(&protip)?;
+        Ok(())
+    }
+}
+
 /// Common writer interface for different formats
 pub trait FormatWriter {
     /// Write AST document to output format
