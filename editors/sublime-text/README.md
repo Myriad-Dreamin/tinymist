@@ -5,4 +5,4 @@ Follow the instructions in the [sublimelsp documentation](https://github.com/sub
 
 ## Getting Preview Feature
 
-[Default Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) and [Background Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html) are suitable in Sublime Text.
+<a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ&amp;label=default-45-preview">Default Preview Feature</a> and <a class="typst-content-link" href="cross-link://jump?path-label=47-feature-47-preview-46-typ&amp;label=background-45-preview">Background Preview Feature</a> are suitable in Sublime Text.
