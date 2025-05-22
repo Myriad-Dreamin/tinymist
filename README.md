@@ -158,7 +158,7 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
-  - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](harper) looks promise.
+  - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](https://github.com/Automattic/harper) looks promise.
 
 If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)
 
