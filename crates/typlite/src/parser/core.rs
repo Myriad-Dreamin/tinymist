@@ -88,11 +88,15 @@ impl HtmlToAstParser {
             }
 
             md_tag::quote => {
+                let prev_blocks = std::mem::take(&mut self.blocks);
                 self.flush_inline_buffer();
                 self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| {
-                    Node::BlockQuote(vec![Node::Paragraph(content)])
-                });
+                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
+                let mut quote = std::mem::take(&mut self.blocks);
+                quote.push(content);
+                self.blocks.clear();
+                self.blocks.extend(prev_blocks);
+                self.blocks.push(Node::BlockQuote(quote));
                 Ok(())
             }
 
