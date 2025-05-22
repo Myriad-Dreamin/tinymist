@@ -4,11 +4,12 @@ use std::sync::OnceLock;
 use parking_lot::Mutex;
 
 /// Represents a reference to some lazily executed query.
-/// The compute function should be pure enough during call the [`compute`] and [`compute_ref`] so that the query result
-/// is consistent through any implementations (the provided `f`).
+/// The compute function should be pure enough during call the [`compute`] and
+/// [`compute_with_context`] so that the query result is consistent through any
+/// implementations (the provided `f`).
 ///
 /// [`compute`]: Self::compute
-/// [`compute_ref`]: Self::compute_ref
+/// [`compute_with_context`]: Self::compute_with_context
 pub struct QueryRef<Res, Err, QueryContext = ()> {
     ctx: Mutex<Option<QueryContext>>,
     /// `None` means no value has been computed yet.

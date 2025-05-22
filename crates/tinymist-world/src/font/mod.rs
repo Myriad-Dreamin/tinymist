@@ -10,9 +10,9 @@
 //! The [`FontResolverImpl`] has a lot of [`FontSlot`] objects and allow to load
 //! font resources lazily.
 //!
-//! There are also other structs, which help store and load [`FontInfo`] objects
-//! in the local file system or the remote machine. See the [`cache`] and
-//! [`profile`] crates for more details.
+//! There are also other structs, which help store and load
+//! [`typst::text::FontInfo`] objects in the local file system or the remote
+//! machine. See the [`cache`] and `profile` crates for more details.
 
 pub mod cache;
 pub(crate) mod info;

@@ -164,10 +164,7 @@ pub struct Typlite {
 }
 
 impl Typlite {
-    /// Create a new Typlite instance from a [`World`].
-    ///
-    /// This is useful when you have a [`Source`] instance and you can avoid
-    /// reparsing the content.
+    /// Creates a new Typlite instance from a [`World`].
     pub fn new(world: Arc<LspWorld>) -> Self {
         Self {
             world,
@@ -176,7 +173,7 @@ impl Typlite {
         }
     }
 
-    /// Set conversion feature
+    /// Sets conversion features
     pub fn with_feature(mut self, feat: TypliteFeat) -> Self {
         self.feat = feat;
         self
