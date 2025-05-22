@@ -39,7 +39,5 @@ pub mod md_tag {
 
         doc -> m1document
         link -> m1link
-
-        protip -> m1protip
     }
 }

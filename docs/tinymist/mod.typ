@@ -29,8 +29,12 @@
 #import fletcher.shapes: diamond
 
 #let fg-blue = main-color.mix(rgb("#0074d9"))
-#let pro-tip(content) = context if shiroa-sys-target() == "html" {
-  html.elem("m1protip", content)
+#let pro-tip(content) = context if sys.inputs.at("x-target", default: none) == "md" {
+  quote[
+    [!NOTE]
+
+    #content
+  ]
 } else {
   context {
     block(
