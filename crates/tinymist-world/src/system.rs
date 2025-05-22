@@ -68,7 +68,7 @@ pub struct SystemUniverseBuilder;
 
 impl SystemUniverseBuilder {
     /// Create [`TypstSystemUniverse`] with the given options.
-    /// See [`LspCompilerFeat`] for instantiation details.
+    /// See [`SystemCompilerFeat`] for instantiation details.
     pub fn build(
         entry: EntryState,
         inputs: ImmutDict,

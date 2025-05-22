@@ -115,12 +115,10 @@ impl SourceDb {
         })
     }
 
-    pub(crate) fn take_state(&mut self) -> Self {
-        let slots = std::mem::take(&mut self.slots);
-
+    pub(crate) fn take(&mut self) -> Self {
         Self {
             is_compiling: self.is_compiling,
-            slots,
+            slots: std::mem::take(&mut self.slots),
         }
     }
 }
