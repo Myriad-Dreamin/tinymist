@@ -9,7 +9,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - **Code Formatting**
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
 
-> [!NOTE]
+> \[!NOTE\]
 > 
 > Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
 
@@ -116,7 +116,7 @@ vim.api.nvim_create_user_command("OpenPdf", function()
 end, {})
 ```
 
-> [!NOTE]
+> \[!NOTE\]
 > 
 > For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 

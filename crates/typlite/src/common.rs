@@ -9,7 +9,6 @@ use cmark_writer::HtmlWriteResult;
 use cmark_writer::HtmlWriter;
 use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
-use cmark_writer::WriterOptions;
 use ecow::EcoString;
 use std::path::PathBuf;
 
@@ -44,10 +43,7 @@ pub struct FigureNode {
 
 impl FigureNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         temp_writer.write(&self.body)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
@@ -126,10 +122,7 @@ pub struct HighlightNode {
 
 impl HighlightNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         for node in &self.content {
             temp_writer.write(node)?;
         }
@@ -174,10 +167,7 @@ impl CenterNode {
     }
 
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         temp_writer.write(&self.node)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
