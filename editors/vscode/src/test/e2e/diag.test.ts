@@ -4,13 +4,6 @@ import * as vscode from "vscode";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
-  // Skip this test on Windows due to unstable
-  // todo: restore this test on Windows
-  if (process.platform === "win32") {
-    console.warn("WARN: Skipping diagnostics test on Windows");
-    return;
-  }
-
   function parseTestFile(content: string): Record<string, string> {
     // 初始化结果对象
     const result: Record<string, string> = {};
