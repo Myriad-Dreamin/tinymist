@@ -170,14 +170,17 @@
   show heading: set text(weight: "regular") if is-web-target
   show heading: it => {
     set text(size: heading-sizes.at(it.level))
-    if is-web-target {
-      heading-hash(it, hash-color: dash-color)
-    }
 
     block(
       spacing: 0.7em * 1.5 * 1.2,
       below: 0.7em * 1.2,
-      it,
+      {
+        if is-web-target {
+          heading-hash(it, hash-color: dash-color)
+        }
+
+        it
+      },
     )
   }
   set heading(
