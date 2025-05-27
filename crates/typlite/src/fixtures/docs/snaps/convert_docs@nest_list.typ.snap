@@ -2,6 +2,7 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: true })"
 input_file: crates/typlite/src/fixtures/docs/nest_list.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -25,4 +26,4 @@ See show-module() for outputting the results of this function.
   - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 -->
   <!-- typlite:end:list-item 0 -->
 
--> string
+-\> string

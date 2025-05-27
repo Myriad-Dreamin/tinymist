@@ -30,11 +30,7 @@
 
 #let fg-blue = main-color.mix(rgb("#0074d9"))
 #let pro-tip(content) = context if sys.inputs.at("x-target", default: none) == "md" {
-  quote[
-    [!NOTE]
-
-    #content
-  ]
+  html.elem("m1alerts", attrs: ("class": "note"), content)
 } else {
   context {
     block(

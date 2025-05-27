@@ -111,8 +111,8 @@ For details, please check [Preview’s sys.inputs](https://myriad-dreamin.github
 To configure path to search fonts:
 
 1. Open settings.
-   - File -> Preferences -> Settings (Linux, Windows).
-   - Code -> Preferences -> Settings (Mac).
+   - File -\> Preferences -\> Settings (Linux, Windows).
+   - Code -\> Preferences -\> Settings (Mac).
 2. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
 3. Search for "Tinymist System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
 4. Reload the window or restart the vscode editor to make the settings take effect.

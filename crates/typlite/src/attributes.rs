@@ -29,6 +29,7 @@ pub mod md_attr {
         text -> text
         value -> value
         caption -> caption
+        class -> class
     }
 }
 
@@ -63,6 +64,11 @@ pub struct RawAttr {
 #[derive(TypliteAttr, Default)]
 pub struct ListItemAttr {
     pub value: Option<u32>,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct AlertsAttr {
+    pub class: EcoString,
 }
 
 pub trait TypliteAttrsParser {
