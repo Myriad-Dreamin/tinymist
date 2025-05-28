@@ -44,10 +44,7 @@ pub struct FigureNode {
 
 impl FigureNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         temp_writer.write(&self.body)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
@@ -126,10 +123,7 @@ pub struct HighlightNode {
 
 impl HighlightNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         for node in &self.content {
             temp_writer.write(node)?;
         }
@@ -174,10 +168,7 @@ impl CenterNode {
     }
 
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            ..Default::default()
-        });
+        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
         temp_writer.write(&self.node)?;
         let content = temp_writer.into_string();
         writer.write_str(&content)?;
@@ -192,6 +183,39 @@ impl CenterNode {
         });
         temp_writer.write_node(&self.node)?;
         let content = temp_writer.into_string();
+        writer.write_str(&content)?;
+        Ok(())
+    }
+}
+
+/// Alert node for alert messages
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = false)]
+pub struct AlertNode {
+    /// The content of the alert
+    pub content: Vec<Node>,
+    /// The class of the alert
+    pub class: EcoString,
+}
+
+impl AlertNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        let quote = Node::BlockQuote(vec![
+            Node::Paragraph(vec![Node::Text(
+                "[!".to_string() + &self.class.clone().to_string().to_ascii_uppercase() + "]",
+            )]),
+            Node::Paragraph(vec![Node::Text("".to_string())]),
+        ]);
+        let mut tmp_writer = CommonMarkWriter::with_options(WriterOptions {
+            escape_special_chars: false,
+            ..writer.options.clone()
+        });
+        tmp_writer.write(&quote)?;
+        let mut content = tmp_writer.into_string();
+        let quote = Node::BlockQuote(self.content.clone());
+        let mut tmp_writer = CommonMarkWriter::with_options(writer.options.clone());
+        tmp_writer.write(&quote)?;
+        content += &tmp_writer.into_string();
         writer.write_str(&content)?;
         Ok(())
     }
