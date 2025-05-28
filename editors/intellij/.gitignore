@@ -29,3 +29,6 @@ out/
 .intellijPlatform
 intellij-community
 .Kotlin
+
+./lsp4ij/
+./lsp4j/
