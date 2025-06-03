@@ -2,6 +2,7 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/ieee.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -15,7 +16,7 @@ input_file: crates/typlite/src/fixtures/integration/ieee.typ
 =====
 ## Introduction
 
-Scientific writing is a crucial part of the research process, allowing researchers to share their findings with the wider scientific community. However, the process of typesetting scientific documents can often be a frustrating and time-consuming affair, particularly when using outdated tools such as LaTeX. Despite being over 30 years old, it remains a popular choice for scientific writing due to its power and flexibility. However, it also comes with a steep learning curve, complex syntax, and long compile times, leading to frustration and despair for many researchers [1] [2].
+Scientific writing is a crucial part of the research process, allowing researchers to share their findings with the wider scientific community. However, the process of typesetting scientific documents can often be a frustrating and time-consuming affair, particularly when using outdated tools such as LaTeX. Despite being over 30 years old, it remains a popular choice for scientific writing due to its power and flexibility. However, it also comes with a steep learning curve, complex syntax, and long compile times, leading to frustration and despair for many researchers \[1\] \[2\].
 
 ### Paper overview
 
@@ -53,6 +54,6 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 ## Bibliography
 
-| [1] | R. Astley |  and  | L. Morris | ,  | “At-scale impact of the Net Wok: A culinarically holistic investigation of distributed dumplings,” |   | Armenian Journal of Proceedings | , vol.  | 61 | ,  | pp. |   | 192–219 | ,  | 2020 | . |
+| \[1\] | R. Astley |  and  | L. Morris | ,  | “At-scale impact of the Net Wok: A culinarically holistic investigation of distributed dumplings,” |   | Armenian Journal of Proceedings | , vol.  | 61 | ,  | pp. |   | 192–219 | ,  | 2020 | . |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [2] | L. Morris |  and  | R. Astley | ,  | “Net Wok++: Taking distributed dumplings to the cloud,” |   | Armenian Journal of Proceedings | , vol.  | 65 | ,  | pp. |   | 101–118 | ,  | 2022 | . |
+| \[2\] | L. Morris |  and  | R. Astley | ,  | “Net Wok++: Taking distributed dumplings to the cloud,” |   | Armenian Journal of Proceedings | , vol.  | 65 | ,  | pp. |   | 101–118 | ,  | 2022 | . |

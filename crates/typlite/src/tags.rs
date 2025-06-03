@@ -36,7 +36,7 @@ pub mod md_tag {
 
         math_equation_inline -> m1eqinline
         math_equation_block -> m1eqblock
-
+        alerts -> m1alerts
         doc -> m1document
         link -> m1link
     }

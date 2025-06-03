@@ -4,8 +4,8 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use cmark_writer::{CommonMarkWriter, WriteResult};
 use typst::html::{tag, HtmlElement, HtmlNode};
 
-use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::{CenterNode, ListState};
+use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
+use crate::common::{AlertNode, CenterNode, ListState};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -88,11 +88,15 @@ impl HtmlToAstParser {
             }
 
             md_tag::quote => {
+                let prev_blocks = std::mem::take(&mut self.blocks);
                 self.flush_inline_buffer();
                 self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| {
-                    Node::BlockQuote(vec![Node::Paragraph(content)])
-                });
+                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
+                let mut quote = std::mem::take(&mut self.blocks);
+                quote.push(content);
+                self.blocks.clear();
+                self.blocks.extend(prev_blocks);
+                self.blocks.push(Node::BlockQuote(quote));
                 Ok(())
             }
 
@@ -143,6 +147,24 @@ impl HtmlToAstParser {
                 } else {
                     self.convert_children(element)?;
                 }
+                Ok(())
+            }
+
+            md_tag::alerts => {
+                self.flush_inline_buffer();
+                let attrs = AlertsAttr::parse(&element.attrs)?;
+                let prev_blocks = std::mem::take(&mut self.blocks);
+                self.flush_inline_buffer();
+                self.convert_children(element)?;
+                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
+                let mut quote = std::mem::take(&mut self.blocks);
+                quote.push(content);
+                self.blocks.clear();
+                self.blocks.extend(prev_blocks);
+                self.blocks.push(Node::Custom(Box::new(AlertNode {
+                    content: quote,
+                    class: attrs.class,
+                })));
                 Ok(())
             }
 
