@@ -194,8 +194,8 @@ impl FontResolver for FontResolverImpl {
         &self.book
     }
 
-    fn slot(&self, idx: usize) -> Option<&FontSlot> {
-        self.slots.get(idx)
+    fn slot(&self, index: usize) -> Option<&FontSlot> {
+        self.slots.get(index)
     }
 
     fn font(&self, index: usize) -> Option<Font> {
