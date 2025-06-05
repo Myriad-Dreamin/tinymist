@@ -10,11 +10,11 @@ use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
 
-use super::{inline::InlineParser, list::ListParser, table::TableParser};
+use super::{list::ListParser, table::TableParser};
 
 /// HTML to AST parser implementation
 pub struct HtmlToAstParser {
-    pub frame_counter: usize,
+    pub asset_counter: usize,
     pub feat: TypliteFeat,
     pub list_state: Option<ListState>,
     pub list_level: usize,
@@ -26,7 +26,7 @@ impl HtmlToAstParser {
     pub fn new(feat: TypliteFeat) -> Self {
         Self {
             feat,
-            frame_counter: 0,
+            asset_counter: 0,
             list_level: 0,
             list_state: None,
             blocks: Vec::new(),
@@ -43,18 +43,16 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            md_tag::parbreak => {
-                self.flush_inline_buffer();
+            tag::p | tag::span | tag::div => {
+                self.convert_children(element)?;
                 Ok(())
             }
 
-            md_tag::heading => {
-                self.flush_inline_buffer();
-                let attrs = HeadingAttr::parse(&element.attrs)?;
-                self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| {
-                    Node::heading(attrs.level as u8 + 1, content)
-                });
+            tag::strong | md_tag::strong => self.convert_strong(element),
+            tag::em | md_tag::emph => self.convert_emphasis(element),
+
+            tag::br => {
+                self.inline_buffer.push(Node::HardBreak);
                 Ok(())
             }
 
@@ -72,6 +70,21 @@ impl HtmlToAstParser {
                 self.flush_inline_buffer();
                 let items = ListParser::convert_list(self, element);
                 self.blocks.push(Node::UnorderedList(items?));
+                Ok(())
+            }
+
+            md_tag::parbreak => {
+                self.flush_inline_buffer();
+                Ok(())
+            }
+
+            md_tag::heading => {
+                self.flush_inline_buffer();
+                let attrs = HeadingAttr::parse(&element.attrs)?;
+                self.convert_children(element)?;
+                self.flush_inline_buffer_as_block(|content| {
+                    Node::heading(attrs.level as u8 + 1, content)
+                });
                 Ok(())
             }
 
@@ -100,32 +113,20 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            md_tag::figure => InlineParser::convert_figure(self, element),
-
-            tag::br => {
-                self.inline_buffer.push(Node::HardBreak);
-                Ok(())
-            }
-
-            tag::p | tag::span | tag::div => {
-                self.convert_children(element)?;
-                Ok(())
-            }
-
-            tag::strong | md_tag::strong => InlineParser::convert_strong(self, element),
-
-            tag::em | md_tag::emph => InlineParser::convert_emphasis(self, element),
-
-            md_tag::highlight => InlineParser::convert_highlight(self, element),
-
-            md_tag::strike => InlineParser::convert_strikethrough(self, element),
-
-            md_tag::link => InlineParser::convert_link(self, element),
-
-            md_tag::image => InlineParser::convert_image(self, element),
+            md_tag::figure => self.convert_figure(element),
+            md_tag::highlight => self.convert_highlight(element),
+            md_tag::strike => self.convert_strikethrough(element),
+            md_tag::link => self.convert_link(element),
+            md_tag::image => self.convert_image(element),
 
             md_tag::linebreak => {
                 self.inline_buffer.push(Node::HardBreak);
+                Ok(())
+            }
+
+            md_tag::source => {
+                let src = self.convert_source(element);
+                self.inline_buffer.push(src);
                 Ok(())
             }
 

@@ -13,6 +13,7 @@
 #import templates: *
 #import "@preview/numbly:0.1.0": numbly
 #import "@preview/zebraw:0.4.5": zebraw-init, zebraw-html
+#import "theme.typ": theme-box
 
 // Metadata
 #let page-width = get-page-width()
@@ -36,6 +37,7 @@
   dash-color: dash-color,
   code-extra-colors: code-extra-colors,
 ) = book-theme-from(toml("theme-style.toml"), xml: it => xml(it))
+#let gh-dark-fg = rgb("#f0f6fc")
 
 // Fonts
 #let main-font = (
@@ -104,6 +106,36 @@
       it,
     )
   }
+
+  body
+}
+
+#let equation-rules(body) = {
+  // equation setting
+  show math.equation: set text(weight: 400)
+  show math.equation.where(block: true): it => context if shiroa-sys-target() == "html" {
+    div-frame(attrs: ("style": "display: flex; justify-content: center; overflow-x: auto;"), it)
+  } else {
+    it
+  }
+  show math.equation.where(block: false): it => context if shiroa-sys-target() == "html" {
+    span-frame(attrs: ("style": "overflow-x: auto;"), it)
+  } else {
+    it
+  }
+
+  body
+}
+
+#let md-equation-rules(body) = {
+  // equation setting
+  show math.equation: it => theme-box(
+    tag: if it.block { "p" } else { "span" },
+    theme => {
+      set text(fill: if theme.is-dark { gh-dark-fg } else { theme.main-color })
+      html.frame(it)
+    },
+  )
 
   body
 }
@@ -196,17 +228,10 @@
   // link setting
   show link: set text(fill: dash-color)
 
-  // math setting
-  show math.equation: set text(weight: 400)
-  show math.equation.where(block: true): it => context if shiroa-sys-target() == "html" {
-    div-frame(attrs: ("style": "display: flex; justify-content: center; overflow-x: auto;"), it)
+  show: if is-md-target {
+    md-equation-rules
   } else {
-    it
-  }
-  show math.equation.where(block: false): it => context if shiroa-sys-target() == "html" {
-    span-frame(attrs: ("style": "overflow-x: auto;"), it)
-  } else {
-    it
+    equation-rules
   }
 
   show: if is-md-target {

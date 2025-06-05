@@ -446,7 +446,7 @@ impl DocxWriter {
                     .downcast_ref::<crate::common::ExternalFrameNode>(
                 ) {
                     let data = base64::engine::general_purpose::STANDARD
-                        .decode(&external_frame.svg_data)
+                        .decode(&external_frame.svg)
                         .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
 
                     docx = self.image_processor.process_image_data(
