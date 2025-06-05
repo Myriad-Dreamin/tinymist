@@ -29,9 +29,9 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Test) Using snapshot testing and added more cases in https://github.com/Myriad-Dreamin/tinymist/pull/1717 and https://github.com/Myriad-Dreamin/tinymist/pull/1719
 * Reimplemented typlite by html export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1684, https://github.com/Myriad-Dreamin/tinymist/pull/1720, https://github.com/Myriad-Dreamin/tinymist/pull/1728, https://github.com/Myriad-Dreamin/tinymist/pull/1729, https://github.com/Myriad-Dreamin/tinymist/pull/1754, https://github.com/Myriad-Dreamin/tinymist/pull/1758, https://github.com/Myriad-Dreamin/tinymist/pull/1759, https://github.com/Myriad-Dreamin/tinymist/pull/1762, https://github.com/Myriad-Dreamin/tinymist/pull/1779, https://github.com/Myriad-Dreamin/tinymist/pull/1767, https://github.com/Myriad-Dreamin/tinymist/pull/1771, and https://github.com/Myriad-Dreamin/tinymist/pull/1772
-* Supporting LaTeX export in https://github.com/Myriad-Dreamin/tinymist/pull/1718
-* Supporting Docx export in https://github.com/Myriad-Dreamin/tinymist/pull/1727
-* Supporting Text output support by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1731
+* Supporting LaTeX export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1718
+* Supporting Docx export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1727
+* Supporting Text output support by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1731
 * Printing diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1753
 
 ### Code Action
