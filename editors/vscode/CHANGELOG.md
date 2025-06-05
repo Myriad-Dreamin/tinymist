@@ -12,60 +12,59 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Bumped typstyle from 0.13.3 to v0.13.9. This version includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0139---2025-05-25
 * feat: bump typstyle to v0.13.9 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737
 
-### Code Analysis
+### Editor
 
-* feat: add path conversion actions for absolute and relative paths by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1696
-* feat: re-identify ref colon syntax and perform IDE operations in https://github.com/Myriad-Dreamin/tinymist/pull/1735
-* feat: autofix `unknown variable: a` and `file not found (searched at a.typ)` by code action in https://github.com/Myriad-Dreamin/tinymist/pull/1743
-
-### Typlite
-
-* test: typlite use snapshot_testing in https://github.com/Myriad-Dreamin/tinymist/pull/1717
-* test(typlite): add more cases in https://github.com/Myriad-Dreamin/tinymist/pull/1719
-* feat: reimplement typlite by html export in https://github.com/Myriad-Dreamin/tinymist/pull/1684
-* fix: tests broken by new typlite in https://github.com/Myriad-Dreamin/tinymist/pull/1720
-* feat: typlite supports latex export in https://github.com/Myriad-Dreamin/tinymist/pull/1718
-* feat: typlite supports docx export in https://github.com/Myriad-Dreamin/tinymist/pull/1727
-* refactor: remove unused code in https://github.com/Myriad-Dreamin/tinymist/pull/1728
-* refactor: tidy up main and let converter know the target in https://github.com/Myriad-Dreamin/tinymist/pull/1729
-* feat: only complete if the next line is a function definition in https://github.com/Myriad-Dreamin/tinymist/pull/1740
-* fix: escape snippet syntax in the completing code in https://github.com/Myriad-Dreamin/tinymist/pull/1741
-* feat: forbid signature help in some cases in https://github.com/Myriad-Dreamin/tinymist/pull/1742
-* fix: checkout repository in publish step to get yarn.lock in https://github.com/Myriad-Dreamin/tinymist/pull/1722
-* feat: add command to profile the entire server in https://github.com/Myriad-Dreamin/tinymist/pull/1438
-* feat(typlite): add plain text output support by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1731
-* feat(typlite): print diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1753
-* fix(typlite): enhance error handling by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1758
-* fix: block math align center in https://github.com/Myriad-Dreamin/tinymist/pull/1762
-* fix(typlite): nodes nested in HTML element should render as HTML, disable strict mode by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1767
-* fix: readme generation in https://github.com/Myriad-Dreamin/tinymist/pull/1754
-* fix(typlite): recover readme in https://github.com/Myriad-Dreamin/tinymist/pull/1759
-* fix: heading-hash is broken by readme generation in https://github.com/Myriad-Dreamin/tinymist/pull/1779
-* fix: quote should work as a blocks container; escape special chars in text by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1771
-* feat: build theme-aware pictures (equations) in https://github.com/Myriad-Dreamin/tinymist/pull/1772
-
-### Syntax/Semantic Highlighting
-
-* fix: stop parsing markup call before math dollar by @sjfhsjfh in https://github.com/Myriad-Dreamin/tinymist/pull/1752
-* fix: terminate many expressions before dollar in https://github.com/Myriad-Dreamin/tinymist/pull/1755
-* fix: stop hash expressions before "operators" in https://github.com/Myriad-Dreamin/tinymist/pull/1756
+* Added command to profile the entire server in https://github.com/Myriad-Dreamin/tinymist/pull/1438
 
 ### Compiler
 
-* fix: try getting font index again (#1213, #1645) in https://github.com/Myriad-Dreamin/tinymist/pull/1790
+* (Fix) Fixed a panic when getting font index which is hit by comemo again (#1213, #1645) in https://github.com/Myriad-Dreamin/tinymist/pull/1790
+
+### Code Analysis
+
+* Added path conversion actions for absolute and relative paths by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1696
+* Re-identifying ref colon syntax and perform IDE operations in https://github.com/Myriad-Dreamin/tinymist/pull/1735
+
+### Typlite
+
+* (Test) Using snapshot testing and added more cases in https://github.com/Myriad-Dreamin/tinymist/pull/1717 and https://github.com/Myriad-Dreamin/tinymist/pull/1719
+* Reimplemented typlite by html export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1684, https://github.com/Myriad-Dreamin/tinymist/pull/1720, https://github.com/Myriad-Dreamin/tinymist/pull/1728, https://github.com/Myriad-Dreamin/tinymist/pull/1729, https://github.com/Myriad-Dreamin/tinymist/pull/1754, https://github.com/Myriad-Dreamin/tinymist/pull/1758, https://github.com/Myriad-Dreamin/tinymist/pull/1759, https://github.com/Myriad-Dreamin/tinymist/pull/1762, https://github.com/Myriad-Dreamin/tinymist/pull/1779, https://github.com/Myriad-Dreamin/tinymist/pull/1767, https://github.com/Myriad-Dreamin/tinymist/pull/1771, and https://github.com/Myriad-Dreamin/tinymist/pull/1772
+* Supporting LaTeX export in https://github.com/Myriad-Dreamin/tinymist/pull/1718
+* Supporting Docx export in https://github.com/Myriad-Dreamin/tinymist/pull/1727
+* Supporting Text output support by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1731
+* Printing diagnostics in https://github.com/Myriad-Dreamin/tinymist/pull/1753
+
+### Code Action
+
+* Autofixing `unknown variable: a` and `file not found (searched at a.typ)` by code action in https://github.com/Myriad-Dreamin/tinymist/pull/1743
+
+### Completion
+
+* (Fix) Escaping snippet syntax in the completing code in https://github.com/Myriad-Dreamin/tinymist/pull/1741
+* Completing function docs generation only if the next line is a function definition in https://github.com/Myriad-Dreamin/tinymist/pull/1740
+
+### Signature Help
+
+* Forbidding signature help in some cases in https://github.com/Myriad-Dreamin/tinymist/pull/1742
 
 ### Docstring
 
-* fix: don't count dedent on the empty comment lines in https://github.com/Myriad-Dreamin/tinymist/pull/1690
+* (Fix) Counting dedent of the empty comment lines correctly in https://github.com/Myriad-Dreamin/tinymist/pull/1690
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Stopping parsing markup call before math dollar by @sjfhsjfh in https://github.com/Myriad-Dreamin/tinymist/pull/1752
+* (Fix) Terminating many expressions before dollar in https://github.com/Myriad-Dreamin/tinymist/pull/1755
+* (Fix) Stopping hash expressions before "operators" in https://github.com/Myriad-Dreamin/tinymist/pull/1756
 
 ### Preview
 
-* feat: only scroll when selection is not adjacent in https://github.com/Myriad-Dreamin/tinymist/pull/1787
+* Triggering scroll only when selection is not adjacent in https://github.com/Myriad-Dreamin/tinymist/pull/1787
 
 ### Misc
 
-* build: rearrange and test dependency meta in https://github.com/Myriad-Dreamin/tinymist/pull/1760
-* fix: correct link to Automattic/haper in https://github.com/Myriad-Dreamin/tinymist/pull/1748
+* Rearranging and testing dependency meta in https://github.com/Myriad-Dreamin/tinymist/pull/1760
+* (Fix) Corrected link to Automattic/haper in https://github.com/Myriad-Dreamin/tinymist/pull/1748
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.12...v0.13.14
 
