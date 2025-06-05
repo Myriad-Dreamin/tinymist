@@ -463,15 +463,17 @@ impl DocxWriter {
                         Some(&external_frame.alt_text),
                         None,
                     );
-                } else if let Some(highlight_node) = custom_node.as_any().downcast_ref::<HighlightNode>() {
+                } else if let Some(highlight_node) =
+                    custom_node.as_any().downcast_ref::<HighlightNode>()
+                {
                     // Handle HighlightNode at block level (convert to paragraph)
                     let mut para = Paragraph::new();
                     let mut run = Run::new().highlight("yellow");
-                    
+
                     for child in &highlight_node.content {
                         run = self.process_inline_to_run(run, child)?;
                     }
-                    
+
                     if !run.children.is_empty() {
                         para = para.add_run(run);
                         docx = docx.add_paragraph(para);
