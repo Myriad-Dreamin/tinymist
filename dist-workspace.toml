@@ -62,6 +62,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 # Whether to cache builds
 cache-builds = true
 
+# todo: windows containers will be removed since Jun 30, 2025
 [dist.github-custom-runners]
 global = "ubuntu-22.04"
 aarch64-pc-windows-msvc = "windows-latest"
