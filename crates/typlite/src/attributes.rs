@@ -20,6 +20,7 @@ pub mod md_attr {
     }
 
     attrs! {
+        media -> media
         src -> src
         alt -> alt
         level -> level

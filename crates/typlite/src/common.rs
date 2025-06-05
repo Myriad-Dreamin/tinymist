@@ -78,7 +78,7 @@ pub struct ExternalFrameNode {
     /// Alternative text for the frame
     pub alt_text: String,
     /// Original SVG data (needed for DOCX that still embeds images)
-    pub svg_data: String,
+    pub svg: String,
 }
 
 impl ExternalFrameNode {

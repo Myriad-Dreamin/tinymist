@@ -29,6 +29,7 @@ pub mod md_tag {
         outline_entry -> m1outentry
         quote -> m1quote
         table -> m1table
+        source -> m1source
         // table_cell -> m1tablecell
         grid -> m1grid
         // grid_cell -> m1gridcell
