@@ -1,0 +1,22 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/highlight.typ
+snapshot_kind: text
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><span><m1highlight>highlight</m1highlight></span></m1document></body>
+</html>
+
+=====
+\begin{document}
+
+\colorbox{yellow}{highlight}
+
+
+\end{document}
