@@ -172,8 +172,6 @@ impl fmt::Display for SigHoverDocs<'_> {
                 write!(f, "```typc\ntype: {}\n```\n\n", t.2)?;
             }
 
-            f.write_str(docs.docs.trim())?;
-
             Ok(())
         }
 
