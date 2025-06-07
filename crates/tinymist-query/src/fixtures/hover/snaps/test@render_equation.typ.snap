@@ -20,7 +20,7 @@ Lambda constructor.
 
 Typing Rule:
 
-<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
 
 # Positional Parameters
 
@@ -31,7 +31,6 @@ type: type
 ```
 
 The type of the argument.
-  
   - <!-- typlite:begin:list-item 1 -->It can be also regarded as the condition of the proposition.<!-- typlite:end:list-item 1 -->
 
 ## B (positional)
@@ -41,5 +40,4 @@ type: type
 ```
 
 The type of the body.
-  
   - <!-- typlite:begin:list-item 1 -->It can be also regarded as the conclusion of the proposition.<!-- typlite:end:list-item 1 -->
