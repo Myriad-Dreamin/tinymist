@@ -125,7 +125,7 @@ fn malform(e: io::Error) -> PackageError {
 }
 
 fn other_io(e: impl Display) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, e.to_string())
+    io::Error::other(e.to_string())
 }
 
 fn other(e: impl Display) -> PackageError {
