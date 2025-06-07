@@ -1,10 +1,17 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/module_star.typ
-snapshot_kind: text
 ---
-{
- "contents": "This star imports line\n\n---\n\n### Sampled Values\n```typc\nnone\n```",
- "range": "0:41:0:42"
-}
+Range: 0:41:0:42
+
+This star imports line
+
+
+======
+
+
+### Sampled Values
+```typc
+none
+```

@@ -119,7 +119,7 @@ impl SemanticRequest for InteractCodeContextRequest {
                         .collect::<Vec<_>>();
                     cursor_styles.sort_by_key(|x| x.as_slice().len());
                     log::info!("style at styles {cursor_styles:?} . {style:?}");
-                    let cursor_style = cursor_styles.into_iter().last().unwrap_or_default();
+                    let cursor_style = cursor_styles.into_iter().next_back().unwrap_or_default();
                     let cursor_style = StyleChain::new(&cursor_style);
 
                     log::info!("style at style {cursor_style:?} . {style:?}");

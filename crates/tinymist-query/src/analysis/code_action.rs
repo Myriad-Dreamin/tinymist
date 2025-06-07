@@ -479,7 +479,7 @@ impl<'a> CodeActionWorker<'a> {
                 static IS_PUNCTUATION: LazyLock<Regex> =
                     LazyLock::new(|| Regex::new(r"\p{Punctuation}").unwrap());
                 (ch.is_ascii_punctuation()
-                    && ch_next.map_or(true, |ch_next| !ch_next.is_ascii_punctuation()))
+                    && ch_next.is_none_or(|ch_next| !ch_next.is_ascii_punctuation()))
                     || (!ch.is_ascii_punctuation() && IS_PUNCTUATION.is_match(&ch.to_string()))
             });
         let punc_modify = if let Some((nx, _)) = mark_after_equation {
