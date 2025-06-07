@@ -44,7 +44,8 @@ impl FormatTask {
             let formatted = match &c.config {
                 FormatterConfig::Typstyle(config) => {
                     typstyle_core::Typstyle::new(config.as_ref().clone())
-                        .format_source(&src)
+                        .format_source(src.clone())
+                        .render()
                         .ok()
                 }
                 FormatterConfig::Typstfmt(config) => Some(typstfmt::format(src.text(), **config)),
