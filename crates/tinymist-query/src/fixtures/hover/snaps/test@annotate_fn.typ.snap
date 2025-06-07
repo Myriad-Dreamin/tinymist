@@ -18,10 +18,7 @@ let touying-fn-wrapper(
 ======
 
 
-- <!-- typlite:begin:list-item 0 -->fn (function, fn): The `fn`.<!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->max-repetitions (int): The `max-repetitions`.<!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->repetitions (int): The `repetitions`.<!-- typlite:end:list-item 0 -->
-- <!-- typlite:begin:list-item 0 -->args (any, fn-args): The `args`.<!-- typlite:end:list-item 0 -->
+
 
 # Positional Parameters
 
@@ -31,7 +28,7 @@ let touying-fn-wrapper(
 type: (..: any) => any | function
 ```
 
-
+The `fn`.
 
 # Rest Parameters
 
@@ -41,7 +38,7 @@ type: (..: any) => any | function
 type: arguments
 ```
 
-
+The `args`.
 
 # Named Parameters
 
@@ -51,10 +48,12 @@ type: arguments
 type: int | none
 ```
 
-
+The `max-repetitions`.
 
 ## repetitions (named)
 
 ```typc
 type: int | none
 ```
+
+The `repetitions`.

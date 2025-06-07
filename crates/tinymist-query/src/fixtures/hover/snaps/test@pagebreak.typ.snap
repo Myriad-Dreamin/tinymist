@@ -56,7 +56,16 @@ In 1984, the first ...
 type: "even" | "odd" | none
 ```
 
+If given, ensures that the next page will be an even/odd page, with an
+empty page in between if necessary.
 
+```typ
+#set page(height: 30pt)
+
+First.
+#pagebreak(to: "odd")
+Third.
+```
 
 ## weak (named)
 
@@ -64,7 +73,8 @@ type: "even" | "odd" | none
 type: bool
 ```
 
-
+If `true`, the page break is skipped if the current page is already
+empty.
 
 
 ======

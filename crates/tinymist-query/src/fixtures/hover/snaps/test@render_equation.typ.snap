@@ -30,10 +30,16 @@ Typing Rule:
 type: type
 ```
 
-
+The type of the argument.
+  
+  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the condition of the proposition.<!-- typlite:end:list-item 1 -->
 
 ## B (positional)
 
 ```typc
 type: type
 ```
+
+The type of the body.
+  
+  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the conclusion of the proposition.<!-- typlite:end:list-item 1 -->

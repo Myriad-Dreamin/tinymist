@@ -58,7 +58,7 @@ $ f(x, y) := cases(
 type: content
 ```
 
-
+The branches of the case distinction.
 
 # Named Parameters
 
@@ -68,7 +68,16 @@ type: content
 type: array | none | str | symbol
 ```
 
+The delimiter to use.
 
+Can be a single character specifying the left delimiter, in which case
+the right delimiter is inferred. Otherwise, can be an array containing a
+left and a right delimiter.
+
+```typ
+#set math.cases(delim: "[")
+$ x = cases(1, 2) $
+```
 
 ## gap (named)
 
@@ -76,7 +85,12 @@ type: array | none | str | symbol
 type: relative
 ```
 
+The gap between branches.
 
+```typ
+#set math.cases(gap: 1em)
+$ x = cases(1, 2) $
+```
 
 ## reverse (named)
 
@@ -84,7 +98,12 @@ type: relative
 type: bool
 ```
 
+Whether the direction of cases should be reversed.
 
+```typ
+#set math.cases(reverse: true)
+$ cases(1, 2) = x $
+```
 
 
 ======

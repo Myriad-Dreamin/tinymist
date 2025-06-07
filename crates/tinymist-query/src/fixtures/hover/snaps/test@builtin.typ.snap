@@ -238,7 +238,9 @@ the appearance and the position of each cell.
 type: content
 ```
 
-
+The contents of the table cells, plus any extra table lines specified
+with the [`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and
+[`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline) elements.
 
 # Named Parameters
 
@@ -248,7 +250,21 @@ type: content
 type: alignment | array | auto | function
 ```
 
+How to align the cells' content.
 
+This can either be a single alignment, an array of alignments
+(corresponding to each column) or a function that returns an alignment.
+The function receives the cells' column and row indices, starting from
+zero. If set to `auto`, the outer alignment is used.
+
+```typ
+#table(
+  columns: 3,
+  align: (left, center, right),
+  [Hello], [Hello], [Hello],
+  [A], [B], [C],
+)
+```
 
 ## column-gutter (named)
 
@@ -256,7 +272,8 @@ type: alignment | array | auto | function
 type: array | auto | length | type
 ```
 
-
+The gaps between columns. Takes precedence over `gutter`. See the
+[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
 
 ## columns (named)
 
@@ -264,7 +281,8 @@ type: array | auto | length | type
 type: array | auto | length | type
 ```
 
-
+The column sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more
+information on track sizing.
 
 ## fill (named)
 
@@ -272,7 +290,28 @@ type: array | auto | length | type
 type: color
 ```
 
+How to fill the cells.
 
+This can be a color or a function that returns a color. The function
+receives the cells' column and row indices, starting from zero. This can
+be used to implement striped tables.
+
+```typ
+#table(
+  fill: (x, _) =>
+    if calc.odd(x) { luma(240) }
+    else { white },
+  align: (x, y) =>
+    if y == 0 { center }
+    else if x == 0 { left }
+    else { right },
+  columns: 4,
+  [], [*Q1*], [*Q2*], [*Q3*],
+  [Revenue:], [1000 €], [2000 €], [3000 €],
+  [Expenses:], [500 €], [1000 €], [1500 €],
+  [Profit:], [500 €], [1000 €], [1500 €],
+)
+```
 
 ## gutter (named)
 
@@ -280,7 +319,9 @@ type: color
 type: array | auto | length | type
 ```
 
-
+The gaps between rows and columns. This is a shorthand for setting
+`column-gutter` and `row-gutter` to the same value. See the [grid
+documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
 
 ## inset (named)
 
@@ -288,7 +329,25 @@ type: array | auto | length | type
 type: inset
 ```
 
+How much to pad the cells' content.
 
+```typ
+#table(
+  inset: 10pt,
+  [Hello],
+  [World],
+)
+
+#table(
+  columns: 2,
+  inset: (
+    x: 20pt,
+    y: 10pt,
+  ),
+  [Hello],
+  [World],
+)
+```
 
 ## row-gutter (named)
 
@@ -296,7 +355,8 @@ type: inset
 type: array | auto | length | type
 ```
 
-
+The gaps between rows. Takes precedence over `gutter`. See the
+[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
 
 ## rows (named)
 
@@ -304,7 +364,8 @@ type: array | auto | length | type
 type: array | auto | length | type
 ```
 
-
+The row sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more information
+on track sizing.
 
 ## stroke (named)
 
@@ -312,7 +373,18 @@ type: array | auto | length | type
 type: stroke
 ```
 
+How to [stroke] the cells.
 
+Strokes can be disabled by setting this to `none`.
+
+If it is necessary to place lines which can cross spacing between cells
+produced by the `gutter` option, or to override the stroke between
+multiple specific cells, consider specifying one or more of
+[`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and [`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline)
+alongside your table cells.
+
+See the [grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-stroke) for more information on
+strokes.
 
 
 ======

@@ -16,7 +16,7 @@ let show-example(
 ======
 
 
-- <!-- typlite:begin:list-item 0 -->inherited-scope (dictionary): Definitions that are made available to the entire parsed module. This parameter is only used internally.<!-- typlite:end:list-item 0 -->
+
 
 # Rest Parameters
 
@@ -35,3 +35,5 @@ type: arguments
 ```typc
 type: dictionary
 ```
+
+Definitions that are made available to the entire parsed module. This parameter is only used internally.
