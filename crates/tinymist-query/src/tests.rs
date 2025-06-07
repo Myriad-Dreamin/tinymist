@@ -242,7 +242,7 @@ fn match_by_pos(mut n: LinkedNode, prev: bool, ident: bool) -> usize {
                     .find(|n| matches!(n.kind(), SyntaxKind::Ident))
                     .unwrap();
             } else {
-                n = n.children().last().unwrap();
+                n = n.children().next_back().unwrap();
             }
             continue;
         }
@@ -442,8 +442,8 @@ pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
     };
     let uri = uri.to_file_path().unwrap();
     let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
-    let rel_path =
-        abs_path.unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().last().unwrap()));
+    let rel_path = abs_path
+        .unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().next_back().unwrap()));
 
     unix_slash(&rel_path)
 }
