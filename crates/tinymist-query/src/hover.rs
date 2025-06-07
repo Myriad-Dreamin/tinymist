@@ -100,7 +100,7 @@ impl HoverWorker<'_> {
         let source = self.source.clone();
         let leaf = LinkedNode::new(source.root()).leaf_at_compat(self.cursor)?;
 
-        self.definition()
+        self.definition(&leaf)
             .or_else(|| self.star(&leaf))
             .or_else(|| self.link(&leaf))
     }
@@ -116,8 +116,7 @@ impl HoverWorker<'_> {
     }
 
     /// Definition analysis results
-    fn definition(&mut self) -> Option<()> {
-        let leaf = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
+    fn definition(&mut self, leaf: &LinkedNode) -> Option<()> {
         let syntax = classify_syntax(leaf.clone(), self.cursor)?;
         let def = self
             .ctx

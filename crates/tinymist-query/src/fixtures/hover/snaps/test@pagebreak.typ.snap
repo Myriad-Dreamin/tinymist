@@ -30,24 +30,6 @@ more details on compound theory.
 In 1984, the first ...
 ```
 
-
-======
-
-
-A manual page break.
-
-Must not be used inside any containers.
-
-# Example
-```typ
-The next page contains
-more details on compound theory.
-#pagebreak()
-
-== Compound Theory
-In 1984, the first ...
-```
-
 # Named Parameters
 
 ## to
