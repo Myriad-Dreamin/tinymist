@@ -1,10 +1,73 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/pagebreak.typ
-snapshot_kind: text
 ---
-{
- "contents": "```typc\nlet pagebreak(\n  to: none | str = none,\n  weak: bool = false,\n);\n```\n\n---\n\nA manual page break.\n\nMust not be used inside any containers.\n\n# Example\n```typ\nThe next page contains\nmore details on compound theory.\n#pagebreak()\n\n== Compound Theory\nIn 1984, the first ...\n```\n\n---\n\nA manual page break.\n\nMust not be used inside any containers.\n\n# Example\n```typ\nThe next page contains\nmore details on compound theory.\n#pagebreak()\n\n== Compound Theory\nIn 1984, the first ...\n```\n\n# Named Parameters\n\n## to\n\n```typc\ntype: \"even\" | \"odd\" | none\n```\n\n\n\n## weak (named)\n\n```typc\ntype: bool\n```\n\n\n\n---\n\n[Open docs](https://typst.app/docs/reference/layout/pagebreak/)",
- "range": "0:20:0:29"
-}
+Range: 0:20:0:29
+
+```typc
+let pagebreak(
+  to: none | str = none,
+  weak: bool = false,
+);
+```
+
+
+======
+
+
+A manual page break.
+
+Must not be used inside any containers.
+
+# Example
+```typ
+The next page contains
+more details on compound theory.
+#pagebreak()
+
+== Compound Theory
+In 1984, the first ...
+```
+
+
+======
+
+
+A manual page break.
+
+Must not be used inside any containers.
+
+# Example
+```typ
+The next page contains
+more details on compound theory.
+#pagebreak()
+
+== Compound Theory
+In 1984, the first ...
+```
+
+# Named Parameters
+
+## to
+
+```typc
+type: "even" | "odd" | none
+```
+
+
+
+## weak (named)
+
+```typc
+type: bool
+```
+
+
+
+
+======
+
+
+[Open docs](https://typst.app/docs/reference/layout/pagebreak/)

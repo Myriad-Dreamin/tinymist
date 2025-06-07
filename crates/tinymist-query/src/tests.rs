@@ -331,6 +331,25 @@ impl JsonRepr {
         let s = serde_json::to_value(v).unwrap();
         Self(rm.redact(s))
     }
+
+    pub fn md_content(v: &str) -> Cow<'_, str> {
+        static REG: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
+        let v = REG.replace_all(v, |_captures: &regex::Captures| {
+            "data:image-hash/svg+xml;base64,redacted"
+        });
+
+        v
+    }
+
+    pub fn range(v: impl serde::Serialize) -> String {
+        let t = serde_json::to_value(v).unwrap();
+        Self::range_(&t)
+    }
+
+    pub fn range_(t: &Value) -> String {
+        format!("{}:{}", pos(&t["start"]), pos(&t["end"]))
+    }
 }
 
 impl fmt::Display for JsonRepr {
@@ -370,8 +389,6 @@ fn pos(v: &Value) -> String {
 
 impl Redact for RedactFields {
     fn redact(&self, json_val: Value) -> Value {
-        static REG: LazyLock<regex::Regex> =
-            LazyLock::new(|| regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
         match json_val {
             Value::Object(mut map) => {
                 for (_, val) in map.iter_mut() {
@@ -400,18 +417,11 @@ impl Redact for RedactFields {
                         | "originSelectionRange"
                         | "targetRange"
                         | "targetSelectionRange" => {
-                            map.insert(
-                                key.to_owned(),
-                                format!("{}:{}", pos(&t["start"]), pos(&t["end"])).into(),
-                            );
+                            map.insert(key.to_owned(), JsonRepr::range_(&t).into());
                         }
                         "contents" => {
                             let res = t.as_str().unwrap();
-                            let res = REG.replace_all(res, |_captures: &regex::Captures| {
-                                "data:image-hash/svg+xml;base64,redacted"
-                            });
-
-                            map.insert(key.to_owned(), res.into());
+                            map.insert(key.to_owned(), JsonRepr::md_content(res).into());
                         }
                         _ => {}
                     }
