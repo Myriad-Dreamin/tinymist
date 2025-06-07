@@ -15,11 +15,14 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 =====
 \begin{document}
 
+\begin{center}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.8\textwidth]{fig.svg}
 \caption{Caption}
 \end{figure}
+
+\end{center}
 
 
 \end{document}

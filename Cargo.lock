@@ -581,18 +581,21 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.6.3"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6cd7a429a8ab9b066867dcb420f71b4eb36566d05d764ffbfff5aee1a84b05"
+checksum = "a132e7fc9fddc446c3930910894eab669241332af90981e53eb1b782bd70b77a"
 dependencies = [
  "cmark-writer-macros",
+ "env_logger",
+ "html-escape",
+ "log",
 ]
 
 [[package]]
 name = "cmark-writer-macros"
-version = "0.6.3"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01be201bdfedabd81a11363ab87c1bc92baedf90039437bede5eee0ea9ece8d5"
+checksum = "d45366269a70c39928d4fd7d95045250757be31ac93b5e85e3a8469b2690d93a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1548,6 +1551,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "html-escape"
+version = "0.2.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
+dependencies = [
+ "utf8-width",
+]
 
 [[package]]
 name = "http"
@@ -5128,15 +5140,18 @@ dependencies = [
 
 [[package]]
 name = "typstyle-core"
-version = "0.13.3"
+version = "0.13.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64fafddba8b7f41ed38f1f1533443d93b49bb7b5960cd8b24012a15780e8f925"
+checksum = "fc8ecc7ad0df59098d1d761bc6e18237abb7a01ae3828bace26c33783f570a85"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
  "pretty",
  "rustc-hash 2.1.1",
+ "smallvec",
+ "thiserror 2.0.12",
  "typst-syntax",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -5307,6 +5322,12 @@ name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8232dd3cdaed5356e0f716d285e4b40b932ac434100fe9b7e0e8e935b9e6246"
+
+[[package]]
+name = "utf8-width"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86bd8d4e895da8537e5315b8254664e6b769c4ff3db18321b297a1e7004392e3"
 
 [[package]]
 name = "utf8_iter"

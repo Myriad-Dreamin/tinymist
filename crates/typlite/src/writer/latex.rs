@@ -6,7 +6,9 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
-use crate::common::{ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, ListState};
+use crate::common::{
+    CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, ListState,
+};
 use crate::Result;
 
 /// LaTeX writer implementation
@@ -290,6 +292,11 @@ impl LaTeXWriter {
                     }
 
                     output.push_str("\\end{figure}\n\n");
+                } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
+                {
+                    output.push_str("\\begin{center}\n");
+                    self.write_node(&center_node.node, output)?;
+                    output.push_str("\\end{center}\n\n");
                 } else if let Some(highlight_node) =
                     custom_node.as_any().downcast_ref::<HighlightNode>()
                 {

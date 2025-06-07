@@ -526,9 +526,9 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.vfs.clone_source_cache()
     }
 
-    /// See [`SourceDb::take_state`].
+    /// Takes the current state (cache) of the source database.
     pub fn take_db(&mut self) -> SourceDb {
-        self.source_db.take_state()
+        self.source_db.take()
     }
 
     pub fn vfs(&self) -> &Vfs<F::AccessModel> {

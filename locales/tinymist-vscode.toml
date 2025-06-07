@@ -1231,6 +1231,14 @@ zh = "格式化工具缩进长度"
 en = "Sets the indent size (using space) for the formatter."
 zh = "设置格式化工具的缩进长度（使用空格）。"
 
+[extension.tinymist.config.tinymist.formatterProseWrap.title]
+en = "Prose Wrapping Control"
+zh = "文本换行控制"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.desc]
+en = "Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces."
+zh = "控制格式化程序如何处理文本换行。如果启用，格式化程序将在指定的打印宽度处插入换行符。如果禁用，格式化程序将保留原始换行符和空格。"
+
 [extension.tinymist.config.tinymist.showExportFileIn.title]
 en = "Show Export File In"
 zh = "在哪里显示导出文件"

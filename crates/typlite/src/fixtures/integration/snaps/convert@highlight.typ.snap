@@ -1,7 +1,8 @@
 ---
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
-input_file: crates/typlite/src/fixtures/integration/math_block2.typ
+input_file: crates/typlite/src/fixtures/integration/highlight.typ
+snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -9,8 +10,8 @@ input_file: crates/typlite/src/fixtures/integration/math_block2.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1eqblock>redacted-frame</m1eqblock></m1document></body>
+  <body><m1document><span><m1highlight>highlight</m1highlight></span></m1document></body>
 </html>
 
 =====
-<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
+==highlight==

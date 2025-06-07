@@ -1,6 +1,4 @@
 
-== Finding Executable
-<finding-executable>
 To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].

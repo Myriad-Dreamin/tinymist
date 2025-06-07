@@ -6,19 +6,19 @@ Tinymist will read the documentation from the source code and display it in the 
 
 *Note: the feature is not yet officially supported.*
 
-== Status of the Feature
+= Status of the Feature
 
 - #sym.checkmark Syntax of Docstring's Content: We have reached consensus on the syntax of content. It MUST be written in Typst.
 - #sym.quest Annotations in Docstring's Content: We check the annotations in docstring by #link("https://typst.app/universe/package/tidy")[tidy style]. It's not an official standard.
 - #sym.crossmark Syntax of Docstring: We haven't reached consensus on the syntax of docstring. It's not clear whether we should distinguish the docstring from regular comments.
 
-== Format of Docstring
+= Format of Docstring
 
 A docstring is an object in source code associating with some typst definition, whose content is the documentation information of the definition. Documentation is placed on consecutive special comments using three forward slashes `///` and an optional space. These are called doc comments.
 
 While the #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/crates/tinymist-query/src/syntax/comment.rs")[`DocCommentMatcher`] matches doc comments in a looser way, we recommend using the strict syntax mentioned in the following sections.
 
-=== Example 1
+== Example 1
 
 The content MUST follow typst syntax instead of markdown syntax.
 
@@ -29,7 +29,7 @@ The content MUST follow typst syntax instead of markdown syntax.
 
 Explanation: The documentation of `foo` is "You can use *typst markup* in docstring."
 
-=== Example 2
+== Example 2
 
 The comments SHOULD be *line* comments starting with *three* forward slashes `///` and an optional space.
 
@@ -44,7 +44,7 @@ The comments SHOULD be *line* comments starting with *three* forward slashes `//
 
 Explanation: There SHOULD be no documentation for `foo` in the three cases. The first comment is not a line comment, the second and the third one don't start with exact three forward slashes. However, the language server will regard them as doc comments loosely.
 
-=== Example 3
+== Example 3
 
 The comments SHOULD be consecutively and exactly placed aside the associating definition.
 
@@ -74,11 +74,11 @@ Explanation: The documentation of `bar` is `"2"`, because there is a space betwe
 
 Explanation: There SHOULD be no documentation for `baz`, because the comments is not exactly placed before the let statement of the `baz`.
 
-=== Module-Level Docstring
+== Module-Level Docstring
 
 A module-level appears at the beginning of the module (file).
 
-=== Example 4
+== Example 4
 
 Given a file `foo.typ` containing code:
 
@@ -91,7 +91,7 @@ Given a file `foo.typ` containing code:
 
 Explanation: The documentation of the module `foo` (`foo.typ`) is `"1"`. It is not `"1\n2"`, because there is a space between `/// 1` and `/// 2`.
 
-=== Example 5
+== Example 5
 
 Given a file `foo.typ` containing code:
 
@@ -102,7 +102,7 @@ Given a file `foo.typ` containing code:
 
 Explanation: The documentation of the module `foo` (`foo.typ`) is `"1"`. It is not `"License: Apache 2.0\n1"`, because `// License: Apache 2.0` is not a strict doc comment.
 
-=== Variable Docstring
+== Variable Docstring
 
 A variable appears exactly before some let statement (the ast starting with `#let` or `let`). BNF Syntax:
 
@@ -110,7 +110,7 @@ A variable appears exactly before some let statement (the ast starting with `#le
 VAR_DOCSTRING_CONTENT ::= MARKUP { VAR_SUB_ANNOATATION } [ VAR_INIT_ANNOATATION ]
 ```
 
-=== Example 6
+== Example 6
 
 You can use an arrow `->` following a type annotation to mark the type of the _initializer expression_ of the let statement. The _initializer expression_ is the expression at the right side of the equal marker in the let statement. BNF Syntax:
 
@@ -132,7 +132,7 @@ Explanation: The docstring tells that the type of `{ /* code */ }` is `int`. Thu
 
 Explanation: The docstring tells that the type of `{ /* code */ }` is `float`. Thus, the *type* of the variable `G` is also annotated as `float`.
 
-=== Example 7
+== Example 7
 
 You can use a list item `- name (type): description` to document the related variable at the left side of the let statement. BNF Syntax:
 
@@ -155,11 +155,11 @@ Explanation: The docstring tells that the type of `x` is `int` and the documenta
 
 Explanation: The docstring tells that the type of `x` at the left side is `any` and its documentation is "The swapped value from `y`." The variables at the right side of the let statement are not documented by the docstring.
 
-=== Examples in Docstrings
+== Examples in Docstrings
 
 You can use `#example` function to provide examples in docstrings.
 
-=== Example 8
+== Example 8
 
 ````typ
 #example(`
@@ -188,7 +188,7 @@ The docstring tells that there is an associated example in the docstring. It wil
   rect(width: 100%, example)
 }
 
-=== Type Annotations in Docstrings
+== Type Annotations in Docstrings
 
 A type annotation is a comma separated list containing types. BNF Syntax:
 

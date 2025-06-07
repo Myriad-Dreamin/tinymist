@@ -29,6 +29,7 @@ pub mod md_tag {
         outline_entry -> m1outentry
         quote -> m1quote
         table -> m1table
+        source -> m1source
         // table_cell -> m1tablecell
         grid -> m1grid
         // grid_cell -> m1gridcell
@@ -36,7 +37,7 @@ pub mod md_tag {
 
         math_equation_inline -> m1eqinline
         math_equation_block -> m1eqblock
-
+        alerts -> m1alerts
         doc -> m1document
         link -> m1link
     }

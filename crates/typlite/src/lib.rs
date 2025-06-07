@@ -164,10 +164,7 @@ pub struct Typlite {
 }
 
 impl Typlite {
-    /// Create a new Typlite instance from a [`World`].
-    ///
-    /// This is useful when you have a [`Source`] instance and you can avoid
-    /// reparsing the content.
+    /// Creates a new Typlite instance from a [`World`].
     pub fn new(world: Arc<LspWorld>) -> Self {
         Self {
             world,
@@ -176,7 +173,7 @@ impl Typlite {
         }
     }
 
-    /// Set conversion feature
+    /// Sets conversion features
     pub fn with_feature(mut self, feat: TypliteFeat) -> Self {
         self.feat = feat;
         self
@@ -223,15 +220,15 @@ impl Typlite {
             .path_for_id(wrap_main_id)
             .context_ut("getting source for main file")?;
 
+        let mut dict = TypstDict::new();
+        dict.insert("x-target".into(), Str("md".into()));
+        if format == Format::Text || self.feat.remove_html {
+            dict.insert("x-remove-html".into(), Str("true".into()));
+        }
+
         let task_inputs = TaskInputs {
             entry: Some(entry.select_in_workspace(wrap_main_id.vpath().as_rooted_path())),
-            inputs: if format == Format::Text || self.feat.remove_html {
-                let mut dict = TypstDict::new();
-                dict.insert("x-remove-html".into(), Str("true".into()));
-                Some(Arc::new(LazyHash::new(dict)))
-            } else {
-                None
-            },
+            inputs: Some(Arc::new(LazyHash::new(dict))),
         };
 
         let mut world = world.task(task_inputs).html_task().into_owned();

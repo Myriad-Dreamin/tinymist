@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/outline.typ
 ---
 <!DOCTYPE html>
@@ -63,14 +63,12 @@ namespace MyApplication
 
 Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />and block:
 
-<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
 
 - First item
 - Second item
-  
   1. First sub-item
   2. Second sub-item
-     
      - First sub-sub-item
 
 <dl><dt>First term</dt><dd>First definition</dd></dl>

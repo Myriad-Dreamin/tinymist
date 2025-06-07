@@ -7,14 +7,15 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{FigureNode, FormatWriter};
+use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode};
 use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
 use super::styles::DocxStyles;
 
-/// DOCX writer that generates DOCX directly from AST (without intermediate representation)
+/// DOCX writer that generates DOCX directly from AST (without intermediate
+/// representation)
 pub struct DocxWriter {
     styles: DocxStyles,
     numbering: DocxNumbering,
@@ -198,12 +199,7 @@ impl DocxWriter {
             }
             Node::HtmlElement(element) => {
                 // Handle special HTML elements
-                if element.tag == "mark" {
-                    run = run.style("Highlight");
-                    for child in &element.children {
-                        run = self.process_inline_to_run(run, child)?;
-                    }
-                } else if element.tag == "img" && element.self_closing {
+                if element.tag == "img" && element.self_closing {
                     let is_typst_block = element
                         .attributes
                         .iter()
@@ -239,8 +235,21 @@ impl DocxWriter {
             Node::SoftBreak => {
                 run = run.add_text(" ");
             }
+            Node::Custom(custom_node) => {
+                if let Some(highlight_node) = custom_node.as_any().downcast_ref::<HighlightNode>() {
+                    run = run.highlight("yellow");
+                    for child in &highlight_node.content {
+                        run = self.process_inline_to_run(run, child)?;
+                    }
+                } else {
+                    // Handle other custom inline nodes if needed
+                    println!("Unhandled custom inline node: {:?}", custom_node);
+                }
+            }
             // Other inline element types
-            _ => {}
+            _ => {
+                println!("other inline element: {:?}", node);
+            }
         }
 
         Ok(run)
@@ -416,14 +425,36 @@ impl DocxWriter {
             }
             Node::Custom(custom_node) => {
                 if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    // Process figure node with special handling
                     docx = self.process_figure(docx, figure_node)?;
+                } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
+                {
+                    // Handle regular node but with center alignment
+                    match &center_node.node {
+                        Node::Paragraph(content) => {
+                            docx = self.process_paragraph(docx, content, None)?;
+                            // Get the last paragraph and center it
+                            if let Some(DocumentChild::Paragraph(para)) =
+                                docx.document.children.last_mut()
+                            {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                        other => {
+                            docx = self.process_node(docx, other)?;
+                            // Get the last element and center it if it's a paragraph
+                            if let Some(DocumentChild::Paragraph(para)) =
+                                docx.document.children.last_mut()
+                            {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                    }
                 } else if let Some(external_frame) = custom_node
                     .as_any()
                     .downcast_ref::<crate::common::ExternalFrameNode>(
                 ) {
                     let data = base64::engine::general_purpose::STANDARD
-                        .decode(&external_frame.svg_data)
+                        .decode(&external_frame.svg)
                         .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
 
                     docx = self.image_processor.process_image_data(
@@ -432,6 +463,21 @@ impl DocxWriter {
                         Some(&external_frame.alt_text),
                         None,
                     );
+                } else if let Some(highlight_node) =
+                    custom_node.as_any().downcast_ref::<HighlightNode>()
+                {
+                    // Handle HighlightNode at block level (convert to paragraph)
+                    let mut para = Paragraph::new();
+                    let mut run = Run::new().highlight("yellow");
+
+                    for child in &highlight_node.content {
+                        run = self.process_inline_to_run(run, child)?;
+                    }
+
+                    if !run.children.is_empty() {
+                        para = para.add_run(run);
+                        docx = docx.add_paragraph(para);
+                    }
                 } else {
                     // Fallback for unknown custom nodes - ignore or add placeholder
                     let placeholder = "[Unknown custom content]";

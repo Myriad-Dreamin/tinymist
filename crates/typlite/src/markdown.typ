@@ -65,9 +65,9 @@
   attrs: (level: str(level)),
   body,
 )
-#let md-quote(attribution: none, body) = html.elem(
+#let md-quote(/* attribution: none, */ body) = html.elem(
   "m1quote",
-  attrs: (attribution: attribution),
+  // attrs: (attribution: attribution),
   body,
 )
 #let md-table(it) = html.elem(
@@ -152,7 +152,7 @@
   show heading: it => if-not-paged(it, md-heading(level: it.level, it.body))
   show outline: it => if-not-paged(it, md-outline(it))
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
-  show quote: it => if-not-paged(it, md-quote(attribution: it.attribution, it.body))
+  show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
   show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
 
@@ -167,12 +167,17 @@
   )
   show math.equation.where(block: true): it => if-not-paged(
     it,
-    html.elem(
-      "m1eqblock",
-      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(block(inset: 0.5em, it)) } else {
-        process-math-eq(it.body).flatten().join()
-      },
-    ),
+    if sys.inputs.at("x-remove-html", default: none) != "true" {
+      html.elem(
+        "m1eqblock",
+        html.frame(block(inset: 0.5em, it)),
+      )
+    } else {
+      html.elem(
+        "m1eqinline",
+        process-math-eq(it.body).flatten().join(),
+      )
+    },
   )
 
   // show linebreak: it => if-not-paged(it, md-linebreak)

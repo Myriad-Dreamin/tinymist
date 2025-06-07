@@ -4,11 +4,11 @@
 
 The testing feature is available since `tinymist` v0.13.10.
 
-== IDE Support
+= IDE Support
 
 You can run tests and check coverage in the IDE or CLI.
 
-== Test Discovery <tinymist-test-discovery>
+= Test Discovery <tinymist-test-discovery>
 
 Given a file, tinymist will try to discover tests related to the file.
 - All dependent files in the same workspace will be checked.
@@ -47,13 +47,13 @@ Running test(panic-on-panic)
    Info All test cases passed...
 ```
 
-== Benchmarking
+= Benchmarking
 
 Since it requires some heavy framework to run benchmarks, a standalone tool is provided to run benchmarks.
 
 Check #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/crityp")[crityp] for more information.
 
-== Visualizing Coverage
+= Visualizing Coverage
 
 - Run and collect file coverage using command `tinymist.profileCurrentFileCoverage` in VS Cod(e,ium).
 - Run and collect test coverage using command `tinymist.profileCurrentTestCoverage` in VS Cod(e,ium).
@@ -61,7 +61,7 @@ Check #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/crityp"
 
 VS Cod(e,ium) will show the overall coverage in the editor.
 
-== CLI Support
+= CLI Support
 
 You can run tests and check coverage in the CLI.
 
@@ -88,7 +88,7 @@ h/r/u/c/q: help/run/update/quit
 
 For example, according to the help message, update the reference files using the command `u` (update).
 
-== Collecting Coverage with CLI
+= Collecting Coverage with CLI
 
 You can collect coverage using the `--coverage` option.
 
@@ -111,7 +111,7 @@ tinymist test tests/main.typ --coverage --print-coverage=full
    Info All test cases passed...
 ```
 
-== Debugging tests with CLI
+= Debugging tests with CLI
 
 If any test fails, the CLI will return a non-zero exit code.
 
@@ -137,7 +137,7 @@ tinymist test tests/main.typ 2> >(grep Hint) > >(grep "compare image")
 
 You can use your favorite image `diff` tool to compare the images, e.g. `magick compare`.
 
-== Tips: Reproducible Rendering
+= Tips: Reproducible Rendering
 
 To ensure that the rendering is reproducible, you can ignore system fonts.
 
@@ -151,7 +151,7 @@ Adds font paths using the `--font-paths` option if you want to use custom fonts:
 tinymist test tests/main.typ --font-paths /path/to/fonts
 ```
 
-== Continuous Integration
+= Continuous Integration
 
 `tinymist test` only compares hash files to check whether content is changed. Therefore, you can ignore rendered files and only keep the hash files to compare them on CI. Putting the following content in `.gitignore` will help you to ignore the files:
 
