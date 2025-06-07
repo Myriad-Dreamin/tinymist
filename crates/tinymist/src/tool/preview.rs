@@ -14,7 +14,7 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use lsp_types::notification::Notification;
 use lsp_types::Url;
 use reflexo_typst::error::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
@@ -23,7 +23,7 @@ use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use typst_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    PreviewArgs, PreviewBuilder, PreviewMode, PreviewViewport, Previewer, WsMessage,
 };
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -349,6 +349,12 @@ impl PreviewState {
                             send_show_document(&client, &s, &tid);
                         }
                     }
+                    UpdateViewport(pos) => {
+                        client.send_notification::<ReportViewport>(&PreviewViewportUpdate {
+                            task_id: tid.clone(),
+                            viewport: pos,
+                        })
+                    }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
                 }
             }
@@ -604,6 +610,20 @@ struct ScrollSource;
 impl Notification for ScrollSource {
     type Params = DocToSrcJumpInfo;
     const METHOD: &'static str = "tinymist/preview/scrollSource";
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewViewportUpdate {
+    pub task_id: String,
+    pub viewport: PreviewViewport,
+}
+
+struct ReportViewport;
+
+impl Notification for ReportViewport {
+    type Params = PreviewViewportUpdate;
+    const METHOD: &'static str = "tinymist/preview/updateViewport";
 }
 
 struct NotifDocumentOutline;
