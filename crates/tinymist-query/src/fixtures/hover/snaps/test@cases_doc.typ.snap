@@ -32,24 +32,6 @@ $ f(x, y) := cases(
 ) $
 ```
 
-
-======
-
-
-A case distinction.
-
-Content across different branches can be aligned with the `&` symbol.
-
-# Example
-```typ
-$ f(x, y) := cases(
-  1 "if" (x dot y)/2 <= 0,
-  2 "if" x "is even",
-  3 "if" x in NN,
-  4 "else",
-) $
-```
-
 # Rest Parameters
 
 ## children
