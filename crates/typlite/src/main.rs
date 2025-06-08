@@ -75,7 +75,7 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> tinymist_std::Result<()> {
         None => None,
     };
 
-    let converter = Typlite::new(world).with_feature(TypliteFeat {
+    let converter = Typlite::new(world.clone()).with_feature(TypliteFeat {
         assets_path: assets_path.clone(),
         ..Default::default()
     });
