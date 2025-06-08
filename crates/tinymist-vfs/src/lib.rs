@@ -591,7 +591,7 @@ impl EntryMap {
     }
 }
 
-/// A display wrapper for [`EntryMap`].
+/// A display wrapper for `EntryMap`.
 pub struct DisplayEntryMap<'a> {
     map: &'a EntryMap,
 }
@@ -647,7 +647,7 @@ impl PathMap {
     }
 }
 
-/// A display wrapper for [`PathMap`].
+/// A display wrapper for `PathMap`.
 pub struct DisplayPathMap<'a> {
     map: &'a PathMap,
 }

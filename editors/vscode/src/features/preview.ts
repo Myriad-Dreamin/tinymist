@@ -461,6 +461,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   return { message: "ok", taskId };
 
   async function invokeLspCommand() {
+    let prevSelection: EditorSelection | undefined = undefined;
+
     console.log(`Preview Command ${filePath}`);
     const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
       ? ["--partial-rendering"]
@@ -495,14 +497,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     }
 
     if (scrollSyncMode !== ScrollSyncModeEnum.never) {
-      // See comment of reportPosition function to get context about multi-file project related logic.
       const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
         const editor = e.textEditor;
         const kind = e.kind;
 
-        // console.log(
-        //     `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
-        // );
         const shouldScrollPanel =
           // scroll by mouse
           kind === vscode.TextEditorSelectionChangeKind.Mouse ||
@@ -511,7 +509,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             kind === vscode.TextEditorSelectionChangeKind.Keyboard);
         if (shouldScrollPanel) {
           // console.log(`selection changed, sending src2doc jump request`);
-          reportPosition(editor, "panelScrollTo");
+          mayReportPosition(editor, "panelScrollTo");
         }
 
         if (enableCursor) {
@@ -523,6 +521,53 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     }
 
     return { staticServerPort, dataPlanePort, isPrimary };
+
+    /**
+     * Reports the position of the editor when necessary.
+     */
+    function mayReportPosition(editor: vscode.TextEditor, event: "panelScrollTo") {
+      // For multiple selections, we don't try to scroll the preview panel.
+      if (editor.selections.length > 1) {
+        return;
+      }
+      // For adjacent selections, we don't try to scroll the preview panel.
+      if (adjacentSelection(editor, prevSelection)) {
+        return;
+      }
+      // Updates selection and reports the position.
+      prevSelection = {
+        uri: editor.document.uri,
+        start: editor.selection.start,
+        end: editor.selection.end,
+      };
+      return reportPosition(editor, event);
+    }
+  }
+
+  interface EditorSelection {
+    uri: vscode.Uri;
+    start: vscode.Position;
+    end: vscode.Position;
+  }
+
+  function adjacentSelection(editor: vscode.TextEditor, prevSelection?: EditorSelection): boolean {
+    // If there is no previous position, we cannot determine if the current position is adjacent.
+    // Or if the previous position is not from the same document, we cannot determine either.
+    // It is intended to compare uri equality by reference, not by value.
+    if (!prevSelection || prevSelection.uri !== editor.document.uri) {
+      return false;
+    }
+
+    // Any of the current selection start or end shares the same position with the previous
+    // selection start or end, we consider it as adjacent.
+    const currentStart = editor.selection.start;
+    const currentEnd = editor.selection.end;
+    return (
+      currentStart.isEqual(prevSelection.start) ||
+      currentEnd.isEqual(prevSelection.end) ||
+      currentStart.isEqual(prevSelection.end) ||
+      currentEnd.isEqual(prevSelection.start)
+    );
   }
 
   async function reportPosition(

@@ -35,8 +35,10 @@ import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { commandShow, exportActivate, quickExports } from "./features/export";
 import { resolveCodeAction } from "./lsp.code-action";
+import { HoverTmpStorage } from "./features/hover-storage.tmp";
 
 LanguageState.Client = LanguageClient;
+LanguageState.HoverTmpStorage = HoverTmpStorage;
 
 const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.label, labelActivate],

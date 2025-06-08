@@ -16,19 +16,20 @@ See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for
 ### Initializing with a Template
 
 To initialize a Typst project:
+
 - Use command `Typst init template` (tinymist.initTemplate) to initialize a new Typst project based on a template.
 - Use command `Typst show template` (tinymist.showTemplateGallery) to show available Typst templates for picking up a template to initialize.
 
-
 🎉 If your template contains only a single file, you can also insert the template content in place with command:
+
 - Use command `Typst template in place` (tinymist.initTemplateInPlace) and input a template specifier for initialization.
 
 ### Configuring LSP-Enhanced Formatters
 
 1. Open settings.
-1. Search for "Tinymist Formatter" and modify the value.
-  - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle).
-  - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt).
+2. Search for "Tinymist Formatter" and modify the value.
+   - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle).
+   - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt).
 
 Tips: to enable formatting on save, you should add extra settings for typst language:
 
@@ -43,11 +44,11 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 ### Configuring Linter
 
 1. Open settings.
-1. Search for "Tinymist Lint" and modify the value.
-  1. Toggle "Enabled" to enable or disable the linter.
-  1. Change "When" to configure when the linter runs.
-    - (Default) `onSave` run linting when you save the file.
-    - `onType` run linting as you type.
+2. Search for "Tinymist Lint" and modify the value.
+   1. Toggle "Enabled" to enable or disable the linter.
+   2. Change "When" to configure when the linter runs.
+      - (Default) `onSave` run linting when you save the file.
+      - `onType` run linting as you type.
 
 ### Configuring/Using Tinymist’s Activity Bar (Sidebar)
 
@@ -108,84 +109,83 @@ For details, please check [Preview’s sys.inputs](https://myriad-dreamin.github
 ### Configuring path to search fonts
 
 To configure path to search fonts:
-1. Open settings.
-  - File -\> Preferences -\> Settings (Linux, Windows).
-  - Code -\> Preferences -\> Settings (Mac).
-1. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
-1. Search for "Tinymist System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
-1. Reload the window or restart the vscode editor to make the settings take effect.
 
+1. Open settings.
+   - File -\> Preferences -\> Settings (Linux, Windows).
+   - Code -\> Preferences -\> Settings (Mac).
+2. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
+3. Search for "Tinymist System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
+4. Reload the window or restart the vscode editor to make the settings take effect.
 
 **Note:** you must provide absolute paths.
+
 **Note:** you can use vscode variables in the settings, see [vscode-variables](https://www.npmjs.com/package/vscode-variables) for more information.
 
 ### Configuring path to root directory
 
 To configure the root path resolved for Typst compiler:
+
 1. Open settings.
-1. Search for "Tinymist Root Path" and modify the value.
-1. Reload the window or restart the vscode editor to make the settings take effect. **Note:** you must provide absolute paths.
+2. Search for "Tinymist Root Path" and modify the value.
+3. Reload the window or restart the vscode editor to make the settings take effect. **Note:** you must provide absolute paths.
 
 ### Managing Local Packages
 
 1. Use `Typst: Create Typst Local Package` command to create a local package.
-1. Use `Typst: Open Typst Local Package` command to open a local package.
-1. View and manage a list of available local packages in the "PACKAGE" view in the activity bar.
+2. Use `Typst: Open Typst Local Package` command to open a local package.
+3. View and manage a list of available local packages in the "PACKAGE" view in the activity bar.
 
 ### Compiling PDF
 
 This extension compiles to PDF, but it doesn’t have a PDF viewer yet. To view the output as you work, install a PDF viewer extension, such as `vscode-pdf`.
 
 To find a way to compile PDF:
+
 - Click the code len `Export PDF` at the top of document, or use command `Typst Show PDF ...`, to show the current document to PDF.
 - Use command `Typst Export PDF` to export the current document to PDF.
 - There are code lens buttons at the start of the document to export your document to PDF or other formats.
 
 To configure when PDFs are compiled:
+
 1. Open settings.
-1. Search for "Tinymist Export PDF".
-1. Change the "Export PDF" setting.
-  - `onSave` makes a PDF after saving the Typst file.
-  - `onType` makes PDF files live, as you type.
-  - `never` disables PDF compilation.
-  - `onDocumentHasTitle` makes a PDF when the document has a title and, as you save.
+2. Search for "Tinymist Export PDF".
+3. Change the "Export PDF" setting.
+   - `onSave` makes a PDF after saving the Typst file.
+   - `onType` makes PDF files live, as you type.
+   - `never` disables PDF compilation.
+   - `onDocumentHasTitle` makes a PDF when the document has a title and, as you save.
 
 To configure where PDFs are saved:
 
 1. Open settings.
-1. Search for "Tinymist Output Path".
-1. Change the "Output Path" setting. This is the path pattern to store
-  artifacts, you can use `$root` or `$dir` or `$name` to do magic
-  configuration
-  - e.g. `$root/$dir/$name` (default) for `$root/path/to/main.pdf`.
-  - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
-  - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure
-    that the output is always output to `target/foo.pdf`.
+2. Search for "Tinymist Output Path".
+3. Change the "Output Path" setting. This is the path pattern to store artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration
+   - e.g. `$root/$dir/$name` (default) for `$root/path/to/main.pdf`.
+   - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
+   - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure that the output is always output to `target/foo.pdf`.
 
 **Note:** the output path should be substituted as an absolute path.
 
 ### Exporting to Other Formats
 
-You can export your documents to various other formats by lsp as well.
-Currently, the following formats are supported:
+You can export your documents to various other formats by lsp as well. Currently, the following formats are supported:
+
 - Official svg, png, and pdf.
 - Unofficial html, md (typlite), and txt
 - Query Results (into json, yaml, or txt), and pdfpc (by `typst query --selector <pdfpc-file>`, for [Touying](https://touying-typ.github.io/touying/))
 
-See
-[Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html)
-for more information.
+See [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html) for more information.
 
 ### Working with Multiple-File Projects
 
 You can pin a main file by command.
+
 - Use command `Typst Pin Main` (tinymist.pinMainToCurrent) to set the current file as the main file.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
 > [!NOTE]
 > 
->   `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
-
+> `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
 
 ### Passing Extra CLI Arguments
 
@@ -196,6 +196,7 @@ typst watch --input=awa=1 --input=abaaba=2 main.typ
 ```
 
 Supported arguments:
+
 - entry file: The last string in the array will be treated as the entry file.
   - This is used to specify the **default** entry file for the compiler, which may be overridden by other settings.
 - `--input`: Add a string key-value pair visible through `sys.inputs`.
@@ -204,11 +205,9 @@ Supported arguments:
 - `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a [UNIX timestamp](https://reproducible-builds.org/specs/source-date-epoch/).
 - `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
-**Note:** Fix entry to `main.typ` may help multiple-file projects
-but you may loss diagnostics and autocompletions in unrelated files.
+**Note:** Fix entry to `main.typ` may help multiple-file projects but you may loss diagnostics and autocompletions in unrelated files.
 
-**Note:** the arguments has quite low priority, and that may be overridden
-by other settings.
+**Note:** the arguments has quite low priority, and that may be overridden by other settings.
 
 ## Contributing
 

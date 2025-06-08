@@ -22,6 +22,7 @@ impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
         let mut writer = CommonMarkWriter::with_options(WriterOptions {
             strict: false,
+            escape_special_chars: true,
             ..Default::default()
         });
         writer

@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [Language Queries])
 
-== Base Analyses
+= Base Analyses
 
 There are seven basic analyzers:
 - _lexical hierarchy_ matches crucial lexical structures in the source file.
@@ -88,7 +88,7 @@ There are seven basic analyzers:
   caption: [The relationship of analyzers.],
 ) <fig:analyses-relationship>
 
-== Extending Language Features
+= Extending Language Features
 
 Typicial language features are implemented based on basic analyzers:
 
@@ -110,6 +110,6 @@ Typicial language features are implemented based on basic analyzers:
 
 - The `textDocument/rename` _finds definition and references_ and renamed them all.
 
-== Contributing
+= Contributing
 
 See #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md")[CONTRIBUTING.md].

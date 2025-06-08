@@ -178,9 +178,9 @@ impl FontResolverImpl {
         None
     }
 
-    /// Describes the source of a font by id.
-    pub fn describe_font_by_id(&self, id: usize) -> Option<Arc<DataSource>> {
-        self.slots[id].description.clone()
+    /// Describes the source of a font by index.
+    pub fn describe_font_by_id(&self, index: usize) -> Option<Arc<DataSource>> {
+        self.slot(index)?.description.clone()
     }
 
     pub fn with_font_paths(mut self, font_paths: Vec<PathBuf>) -> Self {
@@ -198,8 +198,8 @@ impl FontResolver for FontResolverImpl {
         self.slots.get(idx)
     }
 
-    fn font(&self, idx: usize) -> Option<Font> {
-        self.slots[idx].get_or_init()
+    fn font(&self, index: usize) -> Option<Font> {
+        self.slot(index)?.get_or_init()
     }
 
     fn get_by_info(&self, info: &FontInfo) -> Option<Font> {

@@ -65,9 +65,9 @@
   attrs: (level: str(level)),
   body,
 )
-#let md-quote(attribution: none, body) = html.elem(
+#let md-quote(/* attribution: none, */ body) = html.elem(
   "m1quote",
-  attrs: (attribution: attribution),
+  // attrs: (attribution: attribution),
   body,
 )
 #let md-table(it) = html.elem(
@@ -115,56 +115,34 @@
 }
 
 #let example(code) = {
-  /// Evaluate a `example`.
-  // pub fn example(mut args: Args) -> Result<Value> {
-  //     let body = get_pos_named!(args, body: &SyntaxNode);
-  //     let body = body
-  //         .cast::<ast::Raw>()
-  //         .ok_or_else(|| format!("expected raw, found {:?}", body.kind()))?;
+  let lang = if code.has("lang") and code.lang != none { code.lang } else { "typ" }
 
-  //     let lang = body.lang().map(|l| l.get().as_str()).unwrap_or("typ");
+  let lines = code.text.split("\n")
+  let display = ""
+  let compile = ""
 
-  //     // Handle example docs specially.
-  //     // <https://github.com/typst/typst/blob/070e3144b33e9a9e9839c138df2b0a13dde7abc7/docs/src/html.rs#L355>
-  //     let mut display = String::new();
-  //     let mut compile = String::new();
-  //     for line in body.lines() {
-  //         let line = line.get();
-  //         if let Some(suffix) = line.strip_prefix(">>>") {
-  //             compile.push_str(suffix);
-  //             compile.push('\n');
-  //         } else if let Some(suffix) = line.strip_prefix("<<< ") {
-  //             display.push_str(suffix);
-  //             display.push('\n');
-  //         } else {
-  //             display.push_str(line);
-  //             display.push('\n');
-  //             compile.push_str(line);
-  //             compile.push('\n');
-  //         }
-  //     }
+  for line in lines {
+    if line.starts-with(">>>") {
+      compile += line.slice(3) + "\n"
+    } else if line.starts-with("<<< ") {
+      display += line.slice(4) + "\n"
+    } else {
+      display += (line + "\n")
+      compile += (line + "\n")
+    }
+  }
 
-  //     let mut s = EcoString::new();
+  let result = raw(block: true, lang: lang, display)
 
-  //     s.push_str("```");
-  //     s.push_str(lang);
-  //     s.push('\n');
-  //     s.push_str(&display);
-  //     s.push('\n');
-  //     s.push_str("```");
-  //     s.push('\n');
+  result
+  if sys.inputs.at("x-remove-html", default: none) != "true" {
+    let mode = if lang == "typc" { "code" } else { "markup" }
 
-  //     if !args.vm.feat.remove_html {
-  //         let is_code = lang == "typc";
-  //         let rendered =
-  //             args.vm
-  //                 .render_code("", &compile, !is_code, "left", r#"width="500px""#, false)?;
-  //         s.push_str(&TypliteWorker::value(rendered));
-  //     }
-
-  //     Ok(Value::Content(s))
-  // }
-  eval(code.text, mode: "markup")
+    html.elem(
+      "m1idoc",
+      attrs: (src: compile, mode: mode),
+    )
+  }
 }
 
 #let process-math-eq(item) = {
@@ -203,7 +181,7 @@
   show heading: it => if-not-paged(it, md-heading(level: it.level, it.body))
   show outline: it => if-not-paged(it, md-outline(it))
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
-  show quote: it => if-not-paged(it, md-quote(attribution: it.attribution, it.body))
+  show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
   show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
 

@@ -48,5 +48,22 @@
 #get-book-meta()
 
 // re-export page template
-#import "/typ/templates/page.typ": project
+#import "/typ/templates/page.typ": project, is-md-target
 #let book-page = project
+#let cross-link = if is-md-target {
+  let md-cross-link(lnk, reference: none, content) = {
+    assert(lnk.ends-with(".typ"), message: "invalid link")
+    link(
+      {
+        "https://myriad-dreamin.github.io/tinymist"
+        lnk.slice(0, lnk.len() - 4)
+        ".html"
+      },
+      content,
+    )
+  }
+
+  md-cross-link
+} else {
+  cross-link
+}

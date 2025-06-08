@@ -91,7 +91,8 @@ impl ConvKind {
 }
 
 fn conv(world: LspWorld, kind: ConvKind) -> String {
-    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+    let world = Arc::new(world);
+    let converter = Typlite::new(world.clone()).with_feature(TypliteFeat {
         annotate_elem: kind.for_docs(),
         ..Default::default()
     });

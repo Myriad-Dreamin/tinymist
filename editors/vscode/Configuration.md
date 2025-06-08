@@ -179,6 +179,12 @@ Sets the indent size (using space) for the formatter.
 - **Type**: `number`
 - **Default**: `2`
 
+## `tinymist.formatterProseWrap`
+
+Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces.
+
+- **Type**: `boolean`
+
 ## `tinymist.showExportFileIn`
 
 Configures way of opening exported files, e.g. inside of editor tabs or using system application.

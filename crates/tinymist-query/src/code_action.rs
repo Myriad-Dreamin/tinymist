@@ -3,6 +3,7 @@ use lsp_types::CodeActionContext;
 use crate::{analysis::CodeActionWorker, prelude::*, SemanticRequest};
 
 pub(crate) mod proto;
+pub use proto::*;
 
 /// The [`textDocument/codeAction`] request is sent from the client to the
 /// server to compute commands for a given text document and range. These
