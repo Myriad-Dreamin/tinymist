@@ -57,7 +57,6 @@ class HoverStorageTmpFsHandler {
     const output = Uri.joinPath(this._baseUri, tmpImagePath);
     const outputContent = base64Decode(content);
     this.promises.push(fs.writeFile(output, Buffer.from(outputContent, "utf-8")));
-    console.log(`Stored hover image at ${tmpImagePath}`);
     return tmpImagePath;
   }
 
