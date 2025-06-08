@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/hover.rs
 expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/annotate_docs_error.typ
-snapshot_kind: text
 ---
 Range: 12:20:12:32
 
@@ -22,7 +21,11 @@ Speaker notes are a way to add additional information to your slides that is not
 
 ### Example
 
-This is a speaker note
+```typ
+#box[This is a speaker note]
+```
+
+<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
 
 # Positional Parameters
 
