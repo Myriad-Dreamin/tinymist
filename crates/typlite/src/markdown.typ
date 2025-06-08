@@ -134,21 +134,15 @@
 
   let result = raw(block: true, lang: lang, display)
 
-  if sys.inputs.at("x-remove-html", default: none) != "true" {
-    let is_code = lang == "typc"
-    let rendered = eval(compile, mode: if is_code { "code" } else { "markup" })
-
-    return {
-      result
-      html.elem(
-        "div",
-        attrs: (style: "width: 500px; text-align: left;"),
-        html.frame(rendered),
-      )
-    }
-  }
-
   result
+  if sys.inputs.at("x-remove-html", default: none) != "true" {
+    let mode = if lang == "typc" { "code" } else { "markup" }
+
+    html.elem(
+      "m1idoc",
+      attrs: (src: compile, mode: mode),
+    )
+  }
 }
 
 #let process-math-eq(item) = {

@@ -31,8 +31,9 @@ export class HoverTmpStorage {
       try {
         await vscode.workspace.fs.createDirectory(tmpImageDir);
         return new HoverStorageTmpFsHandler(Uri.joinPath(this.context.storageUri, "tmp/"));
-      } catch (_err) {
+      } catch (err) {
         // todo: handle errors safely
+        console.error("Failed to create hover image directory:", err);
       }
     }
 
@@ -56,6 +57,7 @@ class HoverStorageTmpFsHandler {
     const output = Uri.joinPath(this._baseUri, tmpImagePath);
     const outputContent = base64Decode(content);
     this.promises.push(fs.writeFile(output, Buffer.from(outputContent, "utf-8")));
+    console.log(`Stored hover image at ${tmpImagePath}`);
     return tmpImagePath;
   }
 

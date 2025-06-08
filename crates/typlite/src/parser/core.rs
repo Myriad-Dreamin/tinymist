@@ -1,7 +1,10 @@
 //! HTML parser core, containing main structures and general parsing logic
 
+use std::sync::Arc;
+
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::{CommonMarkWriter, WriteResult};
+use tinymist_project::LspWorld;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{HeadingAttr, RawAttr, TypliteAttrsParser};
@@ -16,6 +19,7 @@ use super::{inline::InlineParser, list::ListParser, table::TableParser};
 pub struct HtmlToAstParser {
     pub frame_counter: usize,
     pub feat: TypliteFeat,
+    pub world: Arc<LspWorld>,
     pub list_state: Option<ListState>,
     pub list_level: usize,
     pub blocks: Vec<Node>,
@@ -23,9 +27,10 @@ pub struct HtmlToAstParser {
 }
 
 impl HtmlToAstParser {
-    pub fn new(feat: TypliteFeat) -> Self {
+    pub fn new(feat: TypliteFeat, world: &Arc<LspWorld>) -> Self {
         Self {
             feat,
+            world: world.clone(),
             frame_counter: 0,
             list_level: 0,
             list_state: None,
@@ -129,6 +134,12 @@ impl HtmlToAstParser {
                 if let Some(table) = TableParser::convert_table(self, element)? {
                     self.blocks.push(table);
                 }
+                Ok(())
+            }
+
+            md_tag::idoc => {
+                let src = self.convert_idoc(element);
+                self.inline_buffer.push(src);
                 Ok(())
             }
 

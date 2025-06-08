@@ -27,9 +27,16 @@ pub mod md_attr {
         lang -> lang
         block -> block
         text -> text
+        mode -> mode
         value -> value
         caption -> caption
     }
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct IdocAttr {
+    pub src: EcoString,
+    pub mode: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
