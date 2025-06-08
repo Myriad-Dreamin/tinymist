@@ -9,8 +9,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ## v0.13.14 - [2025-06-08]
 
 * Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
-* Bumped typstyle from 0.13.3 to v0.13.9. This version includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0139---2025-05-25
-* feat: bump typstyle to v0.13.9 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737
+* Bumped typstyle to v0.13.10 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737 and https://github.com/Myriad-Dreamin/tinymist/pull/1797
+  * This includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v01310---2025-06-05
 
 ### Editor
 
