@@ -23,6 +23,7 @@ pub struct EcoSnippetTextEdit {
 }
 
 impl EcoSnippetTextEdit {
+    /// Creates a new plain text edit.
     pub fn new_plain(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
         EcoSnippetTextEdit {
             edit: EcoTextEdit::new(range, new_text),
@@ -30,6 +31,7 @@ impl EcoSnippetTextEdit {
         }
     }
 
+    /// Creates a new snippet text edit.
     pub fn new(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
         EcoSnippetTextEdit {
             edit: EcoTextEdit::new(range, new_text),
@@ -44,6 +46,7 @@ impl EcoSnippetTextEdit {
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EcoAnnotatedTextEdit {
+    /// The base text edit.
     #[serde(flatten)]
     pub text_edit: EcoSnippetTextEdit,
 
@@ -71,6 +74,8 @@ pub struct EcoTextDocumentEdit {
     pub edits: Vec<OneOf<EcoSnippetTextEdit, EcoAnnotatedTextEdit>>,
 }
 
+/// A code action represents to a single or multiple editor behaviors that can
+/// be triggered in a text document.
 #[derive(Debug, PartialEq, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeAction {
@@ -176,17 +181,29 @@ pub struct EcoWorkspaceEdit {
     pub change_annotations: Option<HashMap<ChangeAnnotationIdentifier, ChangeAnnotation>>,
 }
 
+/// The `documentChanges` property of a `WorkspaceEdit` can contain
+/// `TextDocumentEdit`s to express changes to n different text documents
+/// where each text document edit addresses a specific version of a text
+/// document. Or it can contain create, rename and delete file / folder
+/// operations.
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum EcoDocumentChanges {
+    /// Text document edits
     Edits(Vec<EcoTextDocumentEdit>),
+    /// Resource operations
     Operations(Vec<EcoDocumentChangeOperation>),
 }
 
+/// A resource operation represents changes to existing resources or
+/// creation of new resources. The operation can be a create, rename or
+/// delete operation.
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum EcoDocumentChangeOperation {
+    /// A resource operation.
     Op(ResourceOp),
+    /// A text document edit.
     Edit(EcoTextDocumentEdit),
 }
 

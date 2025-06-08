@@ -20,6 +20,6 @@ The extra features are exposed via LSP's #link("https://microsoft.github.io/lang
 
 // Two styles are made for stateful commands.
 
-=== Code Context
+== Code Context
 
 The code context requests are useful for _Editor Frontends_ to check syntax and semantic the multiple positions. For example an editor frontend can filter some completion list by acquire the code context at current position.

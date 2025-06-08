@@ -4,7 +4,7 @@
 
 Four principles are followed.
 
-== Multiple Actors
+= Multiple Actors
 
 The main component, #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist")[tinymist], starts as a thread or process, obeying the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol]. tinymist will bootstrap multiple actors, each of which provides some typst feature.
 
@@ -43,7 +43,7 @@ The `CompileServerActor`s are created for workspaces and main entries (files/doc
 
 The `RenderActor`s don't do compilations, but own project-specific rendering cache. They are designed for rendering documents in _low latency_. This is the last sink of `Hover` requests. A `RenderActor` will receive an additional compiled `Document` object, and render the compiled frames in needed. After finishing rendering, a response attached with the rendered picture is sent to the LSP response channel intermediately.
 
-== Multi-level Analysis
+= Multi-level Analysis
 
 he most critical features are lsp functions, built on the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query] crate. To achieve higher concurrency, functions are classified into different levels of analysis.
 + `query_source` – `SyntaxRequest` – locks and accesses a single source unit.
@@ -97,10 +97,10 @@ When an analysis request is coming, tinymist _upgrades_ it to a suitable level a
   caption: [The analyzer upgrades the level to acquire necessary resources],
 ) <fig:analysis-upgrading-level>
 
-== Optional Non-LSP Features
+= Optional Non-LSP Features
 
 All non-LSP features in tinymist are *optional*. They are optional, as they can be disabled *totally* on compiling the tinymist binary. The significant features are enabled by default, but you can disable them with feature flags. For example, `tinymist` provides preview server features powered by `typst-preview`.
 
-== Minimal Editor Frontends
+= Minimal Editor Frontends
 
 Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors")[editor folders]. They are minimal, meaning that LSP should finish its main LSP features as many as possible without help of editor frontends. The editor frontends just enhances your code experience. For example, the vscode frontend takes responsibility on providing some nice editor tools. It is recommended to install these editors frontend for your editors.

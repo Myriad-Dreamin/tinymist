@@ -13,11 +13,11 @@ It contains:
   - which provides a preview server for Typst, see #cross-link("/feature/preview.typ")[Preview Feature].
 - a VSCode extension for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/")[Tinymist VSCode Extension].
 
-== Features
+= Features
 
 #include "feature/language-content.typ"
 
-== Versioning and Release Cycle
+= Versioning and Release Cycle
 
 #include "versioning.typ"
 
@@ -25,7 +25,7 @@ The release cycle is as follows:
 - If there is a typst version update, a new major or minor version will be released intermediately. This means tinymist will always align the minor version with typst.
 - If there is at least a bug or feature added this week, a new patch version will be released.
 
-== Installation
+= Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/vscode.typ")[VS Cod(e,ium)]
@@ -35,7 +35,7 @@ Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/helix.typ")[Helix]
 - #cross-link("/frontend/zed.typ")[Zed]
 
-== Installing Regular/Nightly Prebuilds from GitHub
+= Installing Regular/Nightly Prebuilds from GitHub
 
 Note: if you are not knowing what is a regular/nightly release, please don't follow this section.
 
@@ -56,11 +56,11 @@ Besides published releases specific for each editors, you can also download the 
 
 To install extension file (the file with `.vsix` extension) manually, please #kbd("Ctrl+Shift+X") in the editor window and drop the downloaded vsix file into the opened extensions view.
 
-== Documentation
+= Documentation
 
 See #link("https://myriad-dreamin.github.io/tinymist/")[Online Documentation].
 
-== Packaging
+= Packaging
 
 Stable Channel:
 
@@ -82,13 +82,13 @@ Nightly Channel:
   ),
 )
 
-== Roadmap
+= Roadmap
 
-=== Short Terms
+== Short Terms
 
 To encourage contributions, we create many #link("https://github.com/Myriad-Dreamin/tinymist/pulls")[Pull Requests] in draft to navigate short-term plans. They give you a hint of what or where to start in this large repository.
 
-=== Long Terms
+== Long Terms
 
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
@@ -109,19 +109,19 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - #strike[Spell checking: There is already a branch but no suitable (default) spell checking library is found.]
-  - #link("https://github.com/crate-ci/typos")[typos] is great for typst. #link("harper")[harper] looks promise.
+  - #link("https://github.com/crate-ci/typos")[typos] is great for typst. #link("https://github.com/Automattic/harper")[harper] looks promise.
 
 If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub.]
 
-== Contributing
+= Contributing
 
 Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution guidelines.
 
-== Sponsoring
+= Sponsoring
 
 Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
-== Acknowledgements
+= Acknowledgements
 
 - Partially code is inherited from #link("https://github.com/nvarner/typst-lsp")[typst-lsp]
 - The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view")[integrating] *offline* handwritten-stroke recognizer is powered by #link("https://detypify.quarticcat.com/")[Detypify].

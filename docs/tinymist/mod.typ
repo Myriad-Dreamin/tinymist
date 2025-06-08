@@ -18,14 +18,20 @@
   #raw(it + "()", lang: "typc") <typst-raw-func>
 ]
 
-#let kbd = raw
+#let kbd = if is-md-target {
+  html.elem.with("kbd")
+} else {
+  raw
+}
 #let md-alter(left, right) = left
 
 #let colors = (blue.lighten(10%), olive, eastern)
 #import fletcher.shapes: diamond
 
 #let fg-blue = main-color.mix(rgb("#0074d9"))
-#let pro-tip(content) = (
+#let pro-tip(content) = context if sys.inputs.at("x-target", default: none) == "md" {
+  html.elem("m1alerts", attrs: ("class": "note"), content)
+} else {
   context {
     block(
       width: 100%,
@@ -39,7 +45,7 @@
       },
     )
   }
-)
+}
 
 #let cond-image(img) = context if shiroa-sys-target() == "html" {
   html.elem("div", attrs: ("class": "pseudo-image"), html.frame(img))

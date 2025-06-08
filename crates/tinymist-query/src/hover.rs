@@ -100,7 +100,7 @@ impl HoverWorker<'_> {
         let source = self.source.clone();
         let leaf = LinkedNode::new(source.root()).leaf_at_compat(self.cursor)?;
 
-        self.definition()
+        self.definition(&leaf)
             .or_else(|| self.star(&leaf))
             .or_else(|| self.link(&leaf))
     }
@@ -116,8 +116,7 @@ impl HoverWorker<'_> {
     }
 
     /// Definition analysis results
-    fn definition(&mut self) -> Option<()> {
-        let leaf = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
+    fn definition(&mut self, leaf: &LinkedNode) -> Option<()> {
         let syntax = classify_syntax(leaf.clone(), self.cursor)?;
         let def = self
             .ctx
@@ -430,7 +429,57 @@ mod tests {
             };
 
             let result = request.request(ctx, graph);
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            let content = HoverDisplay(result.as_ref())
+                .to_string()
+                .replace("\n---\n", "\n\n======\n\n");
+            let content = JsonRepr::md_content(&content);
+            assert_snapshot!(content);
         });
+    }
+
+    struct HoverDisplay<'a>(Option<&'a Hover>);
+
+    impl fmt::Display for HoverDisplay<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(Hover { range, contents }) = self.0 else {
+                return write!(f, "No hover information");
+            };
+
+            // write range
+            if let Some(range) = range {
+                writeln!(f, "Range: {}\n", JsonRepr::range(range))?;
+            } else {
+                writeln!(f, "No range")?;
+            };
+
+            // write contents
+            match contents {
+                HoverContents::Markup(content) => {
+                    writeln!(f, "{}", content.value)?;
+                }
+                HoverContents::Scalar(MarkedString::String(content)) => {
+                    writeln!(f, "{content}")?;
+                }
+                HoverContents::Scalar(MarkedString::LanguageString(lang_str)) => {
+                    writeln!(f, "=== {} ===\n{}", lang_str.language, lang_str.value)?
+                }
+                HoverContents::Array(contents) => {
+                    // interperse the contents with a divider
+                    let content = contents
+                        .iter()
+                        .map(|content| match content {
+                            MarkedString::String(text) => text.to_string(),
+                            MarkedString::LanguageString(lang_str) => {
+                                format!("=== {} ===\n{}", lang_str.language, lang_str.value)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n\n=====\n\n");
+                    writeln!(f, "{content}")?;
+                }
+            }
+
+            Ok(())
+        }
     }
 }

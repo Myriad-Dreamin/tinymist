@@ -1,10 +1,16 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/user.typ
-snapshot_kind: text
 ---
-{
- "contents": "```typc\nlet f() = int;\n```\n\n---\n\nTest",
- "range": "3:20:3:21"
-}
+Range: 3:20:3:21
+
+```typc
+let f() = int;
+```
+
+
+======
+
+
+Test

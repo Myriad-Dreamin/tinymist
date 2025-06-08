@@ -4,9 +4,9 @@
 
 The difference between typst-cli and tinymist-cli is that the latter one focuses on the features requiring code analysis or helping the language server. For example, `tinymist-cli` also provides a `compile` command, but it doesn't provide a `query` or `watch` command, which are provided by `typst-cli`. This is because `tinymist compile` also collects and saves the compilation commands needed by the language server.
 
-== Servers
+= Servers
 
-=== Starting a Language Server Following LSP Protocol
+== Starting a Language Server Following LSP Protocol
 
 To start a language server following the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol], please use the following command:
 
@@ -20,7 +20,7 @@ Or simply runs the CLI without any arguments:
 tinymist
 ```
 
-=== Starting a Preview Server
+== Starting a Preview Server
 
 To start a preview server, please use the following command:
 
@@ -30,7 +30,7 @@ tinymist preview path/to/main.typ
 
 See #link("https://enter-tainer.github.io/typst-preview/standalone.html")[Arguments].
 
-=== Starting a debug adapter Server Following DAP Protocol
+== Starting a debug adapter Server Following DAP Protocol
 
 To start a debug adapter following the #link("https://microsoft.github.io/debug-adapter-protocol//")[Debug Adapter Protocol], please use the following command:
 
@@ -38,9 +38,9 @@ To start a debug adapter following the #link("https://microsoft.github.io/debug-
 tinymist dap
 ```
 
-== Commands
+= Commands
 
-=== Compiling a Document
+== Compiling a Document
 
 The `tinymist compile` command is compatible with `typst compile`:
 
@@ -62,7 +62,7 @@ tinymist compile --lockfile some/tinymist.lock path/to/main.typ
 
 The lock file feature is in development. It is to help the language server to understand the structure of your projects. See #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md#tinymistprojectresolution")[Configuration: tinymist.projectResolution].
 
-=== Running Tests
+== Running Tests
 
 To run tests, you can use the `test` command, which is also compatible with `typst compile`:
 
@@ -78,7 +78,7 @@ The `test` command will defaultly run all the functions whose names are staring 
 
 See #cross-link("/feature/testing.typ")[Docs: Testing Features] for more information.
 
-=== Generating shell completion script
+== Generating shell completion script
 
 To generate a bash-compatible completion script:
 

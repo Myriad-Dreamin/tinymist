@@ -2,11 +2,11 @@
 
 #show: book-page.with(title: [LSP Inputs])
 
-== Prefer to Using LSP Configurations
+= Prefer to Using LSP Configurations
 
 Though tinymist doesn't refuse to keep state in your disk, it actually doesn't have any data to write to disk yet. All customized behaviors (user settings) are passed to the server by LSP configurations. This is a good practice to keep the server state clean and simple.
 
-== Handling Compiler Input Events
+= Handling Compiler Input Events
 
 The compilation triggers many side effects, but the behavior of compiler actor is still easy to predicate. This is achieved by accepting all compile inputs by events.
 
@@ -101,6 +101,6 @@ The only bad case can happen is that: When the two input sources are both active
 
 This is handled by tinymist by some tricks.
 
-=== Record and Replay
+== Record and Replay
 
 Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU.

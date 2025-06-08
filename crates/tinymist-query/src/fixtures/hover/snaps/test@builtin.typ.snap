@@ -1,10 +1,288 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/builtin.typ
-snapshot_kind: text
 ---
-{
- "contents": "```typc\nlet table(\n  ..children: content,\n  align: alignment | array | auto | function = auto,\n  column-gutter: array | auto | length | type = (),\n  columns: array | auto | length | type = (),\n  fill: color = none,\n  gutter: array | auto | length | type = (),\n  inset: inset = 0% + 5pt,\n  row-gutter: array | auto | length | type = (),\n  rows: array | auto | length | type = (),\n  stroke: stroke = 1pt + black,\n);\n```\n\n---\n\nA table of items.\n\nTables are used to arrange content in cells. Cells can contain arbitrary\ncontent, including multiple paragraphs and are specified in row-major order.\nFor a hands-on explanation of all the ways you can use and customize tables\nin Typst, check out the [table guide](https://typst.app/docs/guides/table-guide/).\n\nBecause tables are just grids with different defaults for some cell\nproperties (notably `stroke` and `inset`), refer to the [grid\ndocumentation](https://typst.app/docs/reference/layout/grid/) for more information on how to size the table tracks\nand specify the cell appearance properties.\n\nIf you are unsure whether you should be using a table or a grid, consider\nwhether the content you are arranging semantically belongs together as a set\nof related data points or similar or whether you are just want to enhance\nyour presentation by arranging unrelated content in a grid. In the former\ncase, a table is the right choice, while in the latter case, a grid is more\nappropriate. Furthermore, Typst will annotate its output in the future such\nthat screenreaders will announce content in `table` as tabular while a\ngrid's content will be announced no different than multiple content blocks\nin the document flow.\n\nNote that, to override a particular cell's properties or apply show rules on\ntable cells, you can use the [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) element. See its\ndocumentation for more information.\n\nAlthough the `table` and the `grid` share most properties, set and show\nrules on one of them do not affect the other.\n\nTo give a table a caption and make it [referenceable](https://typst.app/docs/reference/model/ref/), put it into a\n[figure].\n\n# Example\n\nThe example below demonstrates some of the most common table options.\n```typ\n#table(\n  columns: (1fr, auto, auto),\n  inset: 10pt,\n  align: horizon,\n  table.header(\n    [], [*Volume*], [*Parameters*],\n  ),\n  image(\"cylinder.svg\"),\n  $ pi h (D^2 - d^2) / 4 $,\n  [\n    $h$: height \\\n    $D$: outer radius \\\n    $d$: inner radius\n  ],\n  image(\"tetrahedron.svg\"),\n  $ sqrt(2) / 12 a^3 $,\n  [$a$: edge length]\n)\n```\n\nMuch like with grids, you can use [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) to customize\nthe appearance and the position of each cell.\n\n```typ\n>>> #set page(width: auto)\n>>> #set text(font: \"IBM Plex Sans\")\n>>> #let gray = rgb(\"#565565\")\n>>>\n#set table(\n  stroke: none,\n  gutter: 0.2em,\n  fill: (x, y) =>\n    if x == 0 or y == 0 { gray },\n  inset: (right: 1.5em),\n)\n\n#show table.cell: it => {\n  if it.x == 0 or it.y == 0 {\n    set text(white)\n    strong(it)\n  } else if it.body == [] {\n    // Replace empty cells with 'N/A'\n    pad(..it.inset)[_N/A_]\n  } else {\n    it\n  }\n}\n\n#let a = table.cell(\n  fill: green.lighten(60%),\n)[A]\n#let b = table.cell(\n  fill: aqua.lighten(60%),\n)[B]\n\n#table(\n  columns: 4,\n  [], [Exam 1], [Exam 2], [Exam 3],\n\n  [John], [], a, [],\n  [Mary], [], a, a,\n  [Robert], b, a, b,\n)\n```\n\n---\n\nA table of items.\n\nTables are used to arrange content in cells. Cells can contain arbitrary\ncontent, including multiple paragraphs and are specified in row-major order.\nFor a hands-on explanation of all the ways you can use and customize tables\nin Typst, check out the [table guide](https://typst.app/docs/guides/table-guide/).\n\nBecause tables are just grids with different defaults for some cell\nproperties (notably `stroke` and `inset`), refer to the [grid\ndocumentation](https://typst.app/docs/reference/layout/grid/) for more information on how to size the table tracks\nand specify the cell appearance properties.\n\nIf you are unsure whether you should be using a table or a grid, consider\nwhether the content you are arranging semantically belongs together as a set\nof related data points or similar or whether you are just want to enhance\nyour presentation by arranging unrelated content in a grid. In the former\ncase, a table is the right choice, while in the latter case, a grid is more\nappropriate. Furthermore, Typst will annotate its output in the future such\nthat screenreaders will announce content in `table` as tabular while a\ngrid's content will be announced no different than multiple content blocks\nin the document flow.\n\nNote that, to override a particular cell's properties or apply show rules on\ntable cells, you can use the [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) element. See its\ndocumentation for more information.\n\nAlthough the `table` and the `grid` share most properties, set and show\nrules on one of them do not affect the other.\n\nTo give a table a caption and make it [referenceable](https://typst.app/docs/reference/model/ref/), put it into a\n[figure].\n\n# Example\n\nThe example below demonstrates some of the most common table options.\n```typ\n#table(\n  columns: (1fr, auto, auto),\n  inset: 10pt,\n  align: horizon,\n  table.header(\n    [], [*Volume*], [*Parameters*],\n  ),\n  image(\"cylinder.svg\"),\n  $ pi h (D^2 - d^2) / 4 $,\n  [\n    $h$: height \\\n    $D$: outer radius \\\n    $d$: inner radius\n  ],\n  image(\"tetrahedron.svg\"),\n  $ sqrt(2) / 12 a^3 $,\n  [$a$: edge length]\n)\n```\n\nMuch like with grids, you can use [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) to customize\nthe appearance and the position of each cell.\n\n```typ\n>>> #set page(width: auto)\n>>> #set text(font: \"IBM Plex Sans\")\n>>> #let gray = rgb(\"#565565\")\n>>>\n#set table(\n  stroke: none,\n  gutter: 0.2em,\n  fill: (x, y) =>\n    if x == 0 or y == 0 { gray },\n  inset: (right: 1.5em),\n)\n\n#show table.cell: it => {\n  if it.x == 0 or it.y == 0 {\n    set text(white)\n    strong(it)\n  } else if it.body == [] {\n    // Replace empty cells with 'N/A'\n    pad(..it.inset)[_N/A_]\n  } else {\n    it\n  }\n}\n\n#let a = table.cell(\n  fill: green.lighten(60%),\n)[A]\n#let b = table.cell(\n  fill: aqua.lighten(60%),\n)[B]\n\n#table(\n  columns: 4,\n  [], [Exam 1], [Exam 2], [Exam 3],\n\n  [John], [], a, [],\n  [Mary], [], a, a,\n  [Robert], b, a, b,\n)\n```\n\n# Rest Parameters\n\n## children\n\n```typc\ntype: content\n```\n\nThe contents of the table cells, plus any extra table lines specified\nwith the [`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and\n[`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline) elements.\n\n# Named Parameters\n\n## align\n\n```typc\ntype: alignment | array | auto | function\n```\n\nHow to align the cells' content.\n\nThis can either be a single alignment, an array of alignments\n(corresponding to each column) or a function that returns an alignment.\nThe function receives the cells' column and row indices, starting from\nzero. If set to `auto`, the outer alignment is used.\n\n```typ\n#table(\n  columns: 3,\n  align: (left, center, right),\n  [Hello], [Hello], [Hello],\n  [A], [B], [C],\n)\n```\n\n## column-gutter (named)\n\n```typc\ntype: array | auto | length | type\n```\n\nThe gaps between columns. Takes precedence over `gutter`. See the\n[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.\n\n## columns (named)\n\n```typc\ntype: array | auto | length | type\n```\n\nThe column sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more\ninformation on track sizing.\n\n## fill (named)\n\n```typc\ntype: color\n```\n\nHow to fill the cells.\n\nThis can be a color or a function that returns a color. The function\nreceives the cells' column and row indices, starting from zero. This can\nbe used to implement striped tables.\n\n```typ\n#table(\n  fill: (x, _) =>\n    if calc.odd(x) { luma(240) }\n    else { white },\n  align: (x, y) =>\n    if y == 0 { center }\n    else if x == 0 { left }\n    else { right },\n  columns: 4,\n  [], [*Q1*], [*Q2*], [*Q3*],\n  [Revenue:], [1000 €], [2000 €], [3000 €],\n  [Expenses:], [500 €], [1000 €], [1500 €],\n  [Profit:], [500 €], [1000 €], [1500 €],\n)\n```\n\n## gutter (named)\n\n```typc\ntype: array | auto | length | type\n```\n\nThe gaps between rows and columns. This is a shorthand for setting\n`column-gutter` and `row-gutter` to the same value. See the [grid\ndocumentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.\n\n## inset (named)\n\n```typc\ntype: inset\n```\n\nHow much to pad the cells' content.\n\n```typ\n#table(\n  inset: 10pt,\n  [Hello],\n  [World],\n)\n\n#table(\n  columns: 2,\n  inset: (\n    x: 20pt,\n    y: 10pt,\n  ),\n  [Hello],\n  [World],\n)\n```\n\n## row-gutter (named)\n\n```typc\ntype: array | auto | length | type\n```\n\nThe gaps between rows. Takes precedence over `gutter`. See the\n[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.\n\n## rows (named)\n\n```typc\ntype: array | auto | length | type\n```\n\nThe row sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more information\non track sizing.\n\n## stroke (named)\n\n```typc\ntype: stroke\n```\n\nHow to [stroke] the cells.\n\nStrokes can be disabled by setting this to `none`.\n\nIf it is necessary to place lines which can cross spacing between cells\nproduced by the `gutter` option, or to override the stroke between\nmultiple specific cells, consider specifying one or more of\n[`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and [`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline)\nalongside your table cells.\n\nSee the [grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-stroke) for more information on\nstrokes.\n\n---\n\n[Open docs](https://typst.app/docs/reference/model/table/)",
- "range": "0:20:0:25"
+Range: 0:20:0:25
+
+```typc
+let table(
+  ..children: content,
+  align: alignment | array | auto | function = auto,
+  column-gutter: array | auto | length | type = (),
+  columns: array | auto | length | type = (),
+  fill: color = none,
+  gutter: array | auto | length | type = (),
+  inset: inset = 0% + 5pt,
+  row-gutter: array | auto | length | type = (),
+  rows: array | auto | length | type = (),
+  stroke: stroke = 1pt + black,
+);
+```
+
+
+======
+
+
+A table of items.
+
+Tables are used to arrange content in cells. Cells can contain arbitrary
+content, including multiple paragraphs and are specified in row-major order.
+For a hands-on explanation of all the ways you can use and customize tables
+in Typst, check out the [table guide](https://typst.app/docs/guides/table-guide/).
+
+Because tables are just grids with different defaults for some cell
+properties (notably `stroke` and `inset`), refer to the [grid
+documentation](https://typst.app/docs/reference/layout/grid/) for more information on how to size the table tracks
+and specify the cell appearance properties.
+
+If you are unsure whether you should be using a table or a grid, consider
+whether the content you are arranging semantically belongs together as a set
+of related data points or similar or whether you are just want to enhance
+your presentation by arranging unrelated content in a grid. In the former
+case, a table is the right choice, while in the latter case, a grid is more
+appropriate. Furthermore, Typst will annotate its output in the future such
+that screenreaders will announce content in `table` as tabular while a
+grid's content will be announced no different than multiple content blocks
+in the document flow.
+
+Note that, to override a particular cell's properties or apply show rules on
+table cells, you can use the [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) element. See its
+documentation for more information.
+
+Although the `table` and the `grid` share most properties, set and show
+rules on one of them do not affect the other.
+
+To give a table a caption and make it [referenceable](https://typst.app/docs/reference/model/ref/), put it into a
+[figure].
+
+# Example
+
+The example below demonstrates some of the most common table options.
+```typ
+#table(
+  columns: (1fr, auto, auto),
+  inset: 10pt,
+  align: horizon,
+  table.header(
+    [], [*Volume*], [*Parameters*],
+  ),
+  image("cylinder.svg"),
+  $ pi h (D^2 - d^2) / 4 $,
+  [
+    $h$: height \
+    $D$: outer radius \
+    $d$: inner radius
+  ],
+  image("tetrahedron.svg"),
+  $ sqrt(2) / 12 a^3 $,
+  [$a$: edge length]
+)
+```
+
+Much like with grids, you can use [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) to customize
+the appearance and the position of each cell.
+
+```typ
+>>> #set page(width: auto)
+>>> #set text(font: "IBM Plex Sans")
+>>> #let gray = rgb("#565565")
+>>>
+#set table(
+  stroke: none,
+  gutter: 0.2em,
+  fill: (x, y) =>
+    if x == 0 or y == 0 { gray },
+  inset: (right: 1.5em),
+)
+
+#show table.cell: it => {
+  if it.x == 0 or it.y == 0 {
+    set text(white)
+    strong(it)
+  } else if it.body == [] {
+    // Replace empty cells with 'N/A'
+    pad(..it.inset)[_N/A_]
+  } else {
+    it
+  }
 }
+
+#let a = table.cell(
+  fill: green.lighten(60%),
+)[A]
+#let b = table.cell(
+  fill: aqua.lighten(60%),
+)[B]
+
+#table(
+  columns: 4,
+  [], [Exam 1], [Exam 2], [Exam 3],
+
+  [John], [], a, [],
+  [Mary], [], a, a,
+  [Robert], b, a, b,
+)
+```
+
+# Rest Parameters
+
+## children
+
+```typc
+type: content
+```
+
+The contents of the table cells, plus any extra table lines specified
+with the [`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and
+[`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline) elements.
+
+# Named Parameters
+
+## align
+
+```typc
+type: alignment | array | auto | function
+```
+
+How to align the cells' content.
+
+This can either be a single alignment, an array of alignments
+(corresponding to each column) or a function that returns an alignment.
+The function receives the cells' column and row indices, starting from
+zero. If set to `auto`, the outer alignment is used.
+
+```typ
+#table(
+  columns: 3,
+  align: (left, center, right),
+  [Hello], [Hello], [Hello],
+  [A], [B], [C],
+)
+```
+
+## column-gutter (named)
+
+```typc
+type: array | auto | length | type
+```
+
+The gaps between columns. Takes precedence over `gutter`. See the
+[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+
+## columns (named)
+
+```typc
+type: array | auto | length | type
+```
+
+The column sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more
+information on track sizing.
+
+## fill (named)
+
+```typc
+type: color
+```
+
+How to fill the cells.
+
+This can be a color or a function that returns a color. The function
+receives the cells' column and row indices, starting from zero. This can
+be used to implement striped tables.
+
+```typ
+#table(
+  fill: (x, _) =>
+    if calc.odd(x) { luma(240) }
+    else { white },
+  align: (x, y) =>
+    if y == 0 { center }
+    else if x == 0 { left }
+    else { right },
+  columns: 4,
+  [], [*Q1*], [*Q2*], [*Q3*],
+  [Revenue:], [1000 €], [2000 €], [3000 €],
+  [Expenses:], [500 €], [1000 €], [1500 €],
+  [Profit:], [500 €], [1000 €], [1500 €],
+)
+```
+
+## gutter (named)
+
+```typc
+type: array | auto | length | type
+```
+
+The gaps between rows and columns. This is a shorthand for setting
+`column-gutter` and `row-gutter` to the same value. See the [grid
+documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+
+## inset (named)
+
+```typc
+type: inset
+```
+
+How much to pad the cells' content.
+
+```typ
+#table(
+  inset: 10pt,
+  [Hello],
+  [World],
+)
+
+#table(
+  columns: 2,
+  inset: (
+    x: 20pt,
+    y: 10pt,
+  ),
+  [Hello],
+  [World],
+)
+```
+
+## row-gutter (named)
+
+```typc
+type: array | auto | length | type
+```
+
+The gaps between rows. Takes precedence over `gutter`. See the
+[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+
+## rows (named)
+
+```typc
+type: array | auto | length | type
+```
+
+The row sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more information
+on track sizing.
+
+## stroke (named)
+
+```typc
+type: stroke
+```
+
+How to [stroke] the cells.
+
+Strokes can be disabled by setting this to `none`.
+
+If it is necessary to place lines which can cross spacing between cells
+produced by the `gutter` option, or to override the stroke between
+multiple specific cells, consider specifying one or more of
+[`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and [`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline)
+alongside your table cells.
+
+See the [grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-stroke) for more information on
+strokes.
+
+
+======
+
+
+[Open docs](https://typst.app/docs/reference/model/table/)
