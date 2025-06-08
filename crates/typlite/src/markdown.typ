@@ -114,7 +114,36 @@
   }
 }
 
-#let example(code) = eval(code.text, mode: "markup")
+#let example(code) = {
+  let lang = if code.has("lang") and code.lang != none { code.lang } else { "typ" }
+
+  let lines = code.text.split("\n")
+  let display = ""
+  let compile = ""
+
+  for line in lines {
+    if line.starts-with(">>>") {
+      compile += line.slice(3) + "\n"
+    } else if line.starts-with("<<< ") {
+      display += line.slice(4) + "\n"
+    } else {
+      display += (line + "\n")
+      compile += (line + "\n")
+    }
+  }
+
+  let result = raw(block: true, lang: lang, display)
+
+  result
+  if sys.inputs.at("x-remove-html", default: none) != "true" {
+    let mode = if lang == "typc" { "code" } else { "markup" }
+
+    html.elem(
+      "m1idoc",
+      attrs: (src: compile, mode: mode),
+    )
+  }
+}
 
 #let process-math-eq(item) = {
   if type(item) == str {

@@ -40,27 +40,35 @@ pub use cmark_writer::ast;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MarkdownDocument {
     pub base: HtmlDocument,
+    world: Arc<LspWorld>,
     feat: TypliteFeat,
     ast: Option<Node>,
 }
 
 impl MarkdownDocument {
     /// Create a new MarkdownDocument instance
-    pub fn new(base: HtmlDocument, feat: TypliteFeat) -> Self {
+    pub fn new(base: HtmlDocument, world: Arc<LspWorld>, feat: TypliteFeat) -> Self {
         Self {
             base,
+            world,
             feat,
             ast: None,
         }
     }
 
     /// Create a MarkdownDocument instance with pre-parsed AST
-    pub fn with_ast(base: HtmlDocument, feat: TypliteFeat, ast: Node) -> Self {
+    pub fn with_ast(
+        base: HtmlDocument,
+        world: Arc<LspWorld>,
+        feat: TypliteFeat,
+        ast: Node,
+    ) -> Self {
         Self {
             base,
+            world,
             feat,
             ast: Some(ast),
         }
@@ -71,7 +79,7 @@ impl MarkdownDocument {
         if let Some(ast) = &self.ast {
             return Ok(ast.clone());
         }
-        let parser = HtmlToAstParser::new(self.feat.clone());
+        let parser = HtmlToAstParser::new(self.feat.clone(), &self.world);
         parser.parse(&self.base.root).context_ut("failed to parse")
     }
 
@@ -209,6 +217,7 @@ impl Typlite {
         let entry = self.world.entry_state();
         let main = entry.main();
         let current = main.context("no main file in workspace")?;
+        let world_origin = self.world.clone();
         let world = self.world;
 
         if WorkspaceResolver::is_package_file(current) {
@@ -273,7 +282,7 @@ impl Typlite {
         let base = typst::compile(&world).output?;
         let mut feat = self.feat;
         feat.target = format;
-        Ok(MarkdownDocument::new(base, feat))
+        Ok(MarkdownDocument::new(base, world_origin, feat))
     }
 }
 

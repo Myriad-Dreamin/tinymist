@@ -122,6 +122,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 default: None,
                 docs: buf.into_iter().join("\n").into(),
             });
+            break_line = Some(line_width);
 
             break;
         }
@@ -306,16 +307,14 @@ See show-module() for outputting the results of this function.
 
     #[test]
     fn test_identify_tidy_docs4() {
-        insta::assert_snapshot!(var(r###"
-- <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
--> string"###), @r"
+        insta::assert_snapshot!(func(r###"
+- <!-- typlite:begin:list-item 0 -->fn (function, fn): The `fn`.<!-- typlite:end:list-item 0 -->"###), @r"
         >> docs:
 
-        - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
         << docs
-        >>return
-        string
-        <<return
+        >>arg fn: function, fn
+        The `fn`.
+        << arg
         ");
     }
 }

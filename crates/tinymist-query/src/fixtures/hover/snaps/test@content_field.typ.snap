@@ -1,9 +1,11 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/content_field.typ
 ---
-{
- "contents": "### Sampled Values\n```typc\n\"A\"\n```",
- "range": "2:23:2:27"
-}
+Range: 2:23:2:27
+
+### Sampled Values
+```typc
+"A"
+```
