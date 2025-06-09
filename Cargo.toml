@@ -154,7 +154,7 @@ typst-pdf = "0.13.1"
 typst-syntax = "0.13.1"
 typst-eval = "0.13.1"
 typst-assets = "0.13.1"
-typstfmt = { git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
+typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
 typstyle-core = { version = "=0.13.10", default-features = false }
 
@@ -162,7 +162,6 @@ typstyle-core = { version = "=0.13.10", default-features = false }
 crossbeam-channel = "0.5.12"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 dapts = "0.0.6"
-sync-ls = { path = "./crates/sync-lsp" }
 
 # CLI
 clap = { version = "4.5", features = ["derive", "env", "unicode"] }
@@ -200,6 +199,7 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.12" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
+sync-ls = { path = "./crates/sync-lsp", version = "0.13.14-rc1" }
 tinymist = { path = "./crates/tinymist/", version = "0.13.14-rc1" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.14-rc1" }
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.14-rc1", default-features = false }
@@ -207,8 +207,8 @@ tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.14-rc1" }
 tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.14-rc1" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.14-rc1" }
 tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.14-rc1" }
-typlite = { path = "./crates/typlite", version = "0.13.14-rc1" }
 tinymist-preview = { path = "./crates/typst-preview", version = "0.13.14-rc1" }
+typlite = { path = "./crates/typlite", version = "0.13.14-rc1" }
 
 [profile.dev.package.insta]
 opt-level = 3
