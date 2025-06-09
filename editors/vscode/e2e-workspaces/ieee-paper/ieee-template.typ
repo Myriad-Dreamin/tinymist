@@ -1,4 +1,6 @@
-#let sys-is-html-target = ("target" in dictionary(std))
+/// We test that whether current target is HTML (which is used by the converter).
+/// `ieee` will not style the document if `is-html-target` is true.
+#let is-html-target = ("target" in dictionary(std))
 
 // This function gets your whole document as its `body` and formats
 // it as an article in the style of the IEEE.
@@ -22,7 +24,7 @@
   figure-supplement: [Fig.],
   // The paper's content.
   body,
-) = if sys-is-html-target {
+) = if is-html-target {
   set heading(numbering: "I.A.a)")
   set math.equation(numbering: "(1)")
 
