@@ -226,17 +226,12 @@ pub fn package_docs_typ(doc: &PackageDoc) -> StrResult<String> {
     let mut out = String::new();
 
     let _ = writeln!(out, "{}", include_str!("package-doc.typ"));
-    // let _ = writeln!(out, "= #\"{title}\"");
 
-    // let package_meta = jbase64(&doc.meta);
-    // let _ = writeln!(out, "<!-- begin:package {package_meta} -->");
-
+    let pi = &doc.meta;
     let _ = writeln!(
         out,
-        "#package-doc(``````````````````````````````````````json
-{}
-``````````````````````````````````````)",
-        serde_json::to_string_pretty(&doc).unwrap()
+        "#package-doc(bytes(read(\"{}-{}-{}.json\")))",
+        pi.namespace, pi.name, pi.version,
     );
 
     Ok(out)
@@ -451,6 +446,11 @@ mod tests {
             };
             run_with_ctx(verse, path, &|a, _p| {
                 let docs = package_docs(a, &pi).unwrap();
+                let dest = format!(
+                    "../../target/{}-{}-{}.json",
+                    pi.namespace, pi.name, pi.version
+                );
+                std::fs::write(dest, serde_json::to_string_pretty(&docs).unwrap()).unwrap();
                 let typ = package_docs_typ(&docs).unwrap();
                 let dest = format!(
                     "../../target/{}-{}-{}.typ",

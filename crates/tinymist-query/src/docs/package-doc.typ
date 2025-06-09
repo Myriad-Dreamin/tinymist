@@ -132,7 +132,7 @@
   }
 }
 #let package-doc(info) = {
-  let info = json(bytes(info.text))
+  let info = json(info)
 
   let title = "@" + info.meta.namespace + "/" + info.meta.name + " " + info.meta.version
 
