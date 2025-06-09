@@ -25,7 +25,8 @@ jobs:
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
     steps:
       - name: Install dependencies
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
+        # bash is required by setup-rust-toolchain
+        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils bash
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
