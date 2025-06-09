@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use ecow::{EcoString, EcoVec};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_world::package::PackageSpec;
 use typst::diag::{eco_format, StrResult};
@@ -226,139 +225,19 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
 pub fn package_docs_typ(doc: &PackageDoc) -> StrResult<String> {
     let mut out = String::new();
 
-    let title = doc.meta.spec().to_string();
-
     let _ = writeln!(out, "{}", include_str!("package-doc.typ"));
-    let _ = writeln!(out, "= #\"{title}\"");
+    // let _ = writeln!(out, "= #\"{title}\"");
 
     // let package_meta = jbase64(&doc.meta);
     // let _ = writeln!(out, "<!-- begin:package {package_meta} -->");
 
-    let mut errors = vec![];
-    for (parent_ident, def, module_info) in &doc.modules {
-        let primary = &module_info.prefix;
-        let _ = writeln!(
-            out,
-            "#module-doc(
-  info: ````````````````json {}````````````````,",
-            json!((module_info))
-        );
-
-        crate::log_debug_ct!("module: {primary} -- {parent_ident}");
-
-        for child in &def.children {
-            let convert_err = None::<EcoString>;
-
-            let _ = writeln!(
-                out,
-                "symbol-doc(
-  in-module: {primary:?},
-  info: ````````````````json {}````````````````, [",
-                json!((child))
-            );
-
-            if let Some(DefDocs::Function(sig)) = &child.parsed_docs {
-                // let _ = writeln!(out, "<!-- begin:sig -->");
-                let _ = writeln!(out, "```typc");
-                let _ = write!(out, "let {}", child.name);
-                let _ = sig.print(&mut out);
-                let _ = writeln!(out, ";");
-                let _ = writeln!(out, "```");
-                // let _ = writeln!(out, "<!-- end:sig -->");
-            }
-
-            let mut printed_docs = false;
-            match (&child.parsed_docs, convert_err) {
-                (_, Some(err)) => {
-                    let err = format!("failed to convert docs in {title}: {err}").replace(
-                        "-->", "—>", // avoid markdown comment
-                    );
-                    // let _ = writeln!(out, "<!-- convert-error: {err} -->");
-                    errors.push(err);
-                }
-                (Some(docs), _) if !child.is_external => {
-                    let _ = writeln!(
-                        out,
-                        "#markdown-docs({:?})",
-                        remove_list_annotations(docs.docs())
-                    );
-                    printed_docs = true;
-                    if let DefDocs::Function(docs) = docs {
-                        for param in docs
-                            .pos
-                            .iter()
-                            .chain(docs.named.values())
-                            .chain(docs.rest.as_ref())
-                        {
-                            // let _ = writeln!(out, "<!-- begin:param {} -->", param.name);
-                            let ty = match &param.cano_type {
-                                Some((short, _, _)) => short,
-                                None => "unknown",
-                            };
-                            let title = format!("{} ({ty:?})", param.name);
-                            let _ = writeln!(
-                                out,
-                                "#labelled-heading(4, {title:?})\n\n#markdown-docs({:?})\n",
-                                param.docs
-                            );
-                            // let _ = writeln!(out, "<!-- end:param -->");
-                        }
-                    }
-                }
-                (_, None) => {}
-            }
-
-            if !printed_docs {
-                let plain_docs = child.docs.as_deref();
-                let plain_docs = plain_docs.or(child.oneliner.as_deref());
-
-                if let Some(docs) = plain_docs {
-                    let contains_code = docs.contains("```");
-                    if contains_code {
-                        let _ = writeln!(out, "`````typ");
-                    }
-                    let _ = writeln!(out, "{docs}");
-                    if contains_code {
-                        let _ = writeln!(out, "`````");
-                    }
-                }
-            }
-
-            if let Some(lnk) = &child.module_link {
-                match lnk.as_str() {
-                    "builtin" => {
-                        let _ = writeln!(out, "A Builtin Module");
-                    }
-                    _lnk => {
-                        // let _ = writeln!(out, "#link({})[Module Docs]\n",
-                        // TypstLink(lnk));
-                    }
-                }
-            }
-
-            // let _ = writeln!(out, "<!-- end:symbol {ident} -->");
-            let _ = writeln!(out, "]),");
-        }
-
-        // module-doc
-        let _ = writeln!(out, ")");
-    }
-
-    let res = ConvertResult { errors };
-    // let err = jbase64(&res);
-    // let _ = writeln!(out, "<!-- begin:errors {err} -->");
-    let _ = writeln!(out, "== Errors");
-    for errs in res.errors {
-        let _ = writeln!(out, "- {errs}");
-    }
-    // let _ = writeln!(out, "<!-- end:errors -->");
-
-    // let meta = PackageMetaEnd {
-    //     packages: doc.packages.clone(),
-    //     files: doc.files.clone(),
-    // };
-    // let package_meta = jbase64(&meta);
-    // let _ = writeln!(out, "<!-- end:package {package_meta} -->");
+    let _ = writeln!(
+        out,
+        "#package-doc(``````````````````````````````````````json
+{}
+``````````````````````````````````````)",
+        serde_json::to_string_pretty(&doc).unwrap()
+    );
 
     Ok(out)
 }
