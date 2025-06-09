@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Export to LaTeX (IEEE)",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": ["latex"]
+      }
+    },
+    {
+      "label": "Export to Word (IEEE)",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": ["word"]
+      }
+    }
+  ]
+}
