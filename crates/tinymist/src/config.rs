@@ -856,6 +856,8 @@ pub struct PreviewFeat {
     /// The background preview options.
     #[serde(default)]
     pub background: BackgroundPreviewOpts,
+    /// When to refresh the preview.
+    pub refresh: Option<TaskWhen>,
 }
 
 /// The lint features.
@@ -1151,6 +1153,48 @@ mod tests {
             "typstExtraArgs": ["--ignore-system-fonts"]
         })));
         assert!(!font_opts.ignore_system_fonts);
+    }
+
+    // "preview":{"refresh":"onType"}
+
+    #[test]
+    fn test_preview_opts() {
+        fn opts(update: Option<&JsonValue>) -> PreviewFeat {
+            let mut config = Config::default();
+            if let Some(update) = update {
+                good_config(&mut config, update);
+            }
+
+            config.preview
+        }
+
+        let preview = opts(Some(&json!({
+            "preview": {
+            }
+        })));
+        assert_eq!(preview.refresh, Some(TaskWhen::OnType));
+
+        let preview = opts(Some(&json!({
+            "preview": {
+                "refresh":"onType"
+            }
+        })));
+        assert_eq!(preview.refresh, Some(TaskWhen::OnType));
+
+        let preview = opts(Some(&json!({
+            "preview": {
+                "refresh":"onSave"
+            }
+        })));
+        assert_eq!(preview.refresh, Some(TaskWhen::OnSave));
+
+        panic!("preview opts from editors/vscode/src/features/preview-compat.ts should be implemented at server side");
+        //   const refreshStyle =
+        //     vscode.workspace.getConfiguration().get<string>("typst-preview.
+        // refresh") || "onSave";   const scrollSyncMode =
+        //     ScrollSyncModeEnum[
+        //       vscode.workspace.getConfiguration().get<ScrollSyncMode>("
+        // typst-preview.scrollSync") || "never"     ];
     }
 
     #[test]

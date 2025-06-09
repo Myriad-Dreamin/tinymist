@@ -408,6 +408,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   const taskId = Math.random().toString(36).substring(7);
   const filePath = bindDocument.uri.fsPath;
 
+  // todo: move me to the server side.
   const refreshStyle = getPreviewConfCompat<string>("refresh") || "onSave";
   const scrollSyncMode =
     ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
