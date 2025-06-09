@@ -1,5 +1,5 @@
 [package]
-name = "typst-preview"
+name = "tinymist-preview"
 description = "A previewer for the Typst typesetting system."
 license = "MIT"
 repository = "https://github.com/Enter-tainer/typst-preview"

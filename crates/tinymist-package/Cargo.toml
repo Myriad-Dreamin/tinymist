@@ -3,8 +3,9 @@ name = "tinymist-package"
 description = "Tinymist package support for Typst."
 categories = ["compilers"]
 keywords = ["api", "language", "typst"]
+# group: world
+version = "0.13.12"
 authors.workspace = true
-version.workspace = true
 license.workspace = true
 edition.workspace = true
 homepage.workspace = true

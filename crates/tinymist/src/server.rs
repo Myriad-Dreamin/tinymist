@@ -366,8 +366,8 @@ impl ServerState {
     }
 
     #[cfg(feature = "preview")]
-    pub(crate) fn infer_pos(&self) -> LspResult<typst_preview::ControlPlaneMessage> {
-        use typst_preview::{ControlPlaneMessage, ResolveSourceLocRequest};
+    pub(crate) fn infer_pos(&self) -> LspResult<tinymist_preview::ControlPlaneMessage> {
+        use tinymist_preview::{ControlPlaneMessage, ResolveSourceLocRequest};
 
         let focus_file = self.focusing.as_ref();
         let focus_file = focus_file.ok_or_else(|| invalid_request("no focusing file"))?;

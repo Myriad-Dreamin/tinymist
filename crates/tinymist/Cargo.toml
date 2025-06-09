@@ -73,7 +73,7 @@ typst-render.workspace = true
 typst-timing.workspace = true
 typst-html = { workspace = true, optional = true }
 typst-shim.workspace = true
-typst-preview = { workspace = true, optional = true }
+tinymist-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
 tinymist-task.workspace = true
 tinymist-debug.workspace = true
@@ -119,14 +119,14 @@ pdf = ["tinymist-task/pdf"]
 no-content-hint = [
     "tinymist-task/no-content-hint",
     "tinymist-project/no-content-hint",
-    "typst-preview/no-content-hint",
+    "tinymist-preview/no-content-hint",
     "reflexo-typst/no-content-hint",
     "reflexo-vec2svg/no-content-hint",
 ]
 
 preview = [
-    "typst-preview",
-    "typst-preview/clap",
+    "tinymist-preview",
+    "tinymist-preview/clap",
     "tinymist-assets/typst-preview",
     "hyper-tungstenite",
 ]

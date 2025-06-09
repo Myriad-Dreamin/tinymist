@@ -353,13 +353,17 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
 #[derive(Default, Clone)]
 pub struct ProjectPreviewState {
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<typst_preview::CompileWatcher>>>>,
+    pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<tinymist_preview::CompileWatcher>>>>,
 }
 
 #[cfg(feature = "preview")]
 impl ProjectPreviewState {
     #[must_use]
-    pub fn register(&self, id: &ProjectInsId, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+    pub fn register(
+        &self,
+        id: &ProjectInsId,
+        handle: &Arc<tinymist_preview::CompileWatcher>,
+    ) -> bool {
         let mut p = self.inner.lock();
 
         // Don't replace the existing watcher if it exists
@@ -377,7 +381,7 @@ impl ProjectPreviewState {
     }
 
     #[must_use]
-    pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<typst_preview::CompileWatcher>> {
+    pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<tinymist_preview::CompileWatcher>> {
         self.inner.lock().get(task_id).cloned()
     }
 }
@@ -568,8 +572,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.preview.get(&rep.id) {
+            use tinymist_preview::CompileStatus;
             use tinymist_project::CompileStatusEnum::*;
-            use typst_preview::CompileStatus;
 
             inner.status(match &rep.status {
                 Compiling => CompileStatus::Compiling,

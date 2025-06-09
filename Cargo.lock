@@ -4085,6 +4085,7 @@ dependencies = [
  "tinymist-core",
  "tinymist-debug",
  "tinymist-l10n",
+ "tinymist-preview",
  "tinymist-project",
  "tinymist-query",
  "tinymist-render",
@@ -4099,7 +4100,6 @@ dependencies = [
  "typst-ansi-hl",
  "typst-html",
  "typst-pdf",
- "typst-preview",
  "typst-render",
  "typst-shim",
  "typst-svg",
@@ -4221,7 +4221,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.14-rc1"
+version = "0.13.12"
 dependencies = [
  "anyhow",
  "clap",
@@ -4249,7 +4249,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.13.14-rc1"
+version = "0.13.12"
 dependencies = [
  "base64",
  "comemo",
@@ -4272,6 +4272,30 @@ dependencies = [
  "walkdir",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "tinymist-preview"
+version = "0.13.14-rc1"
+dependencies = [
+ "clap",
+ "comemo",
+ "env_logger",
+ "futures",
+ "indexmap 2.9.0",
+ "log",
+ "parking_lot",
+ "reflexo-typst",
+ "reflexo-vec2svg",
+ "serde",
+ "serde_json",
+ "tinymist-assets 0.13.12",
+ "tinymist-std",
+ "tokio",
+ "typst",
+ "typst-assets",
+ "typst-macros",
+ "typst-timing",
 ]
 
 [[package]]
@@ -4993,30 +5017,6 @@ dependencies = [
  "typst-timing",
  "typst-utils",
  "xmp-writer",
-]
-
-[[package]]
-name = "typst-preview"
-version = "0.13.14-rc1"
-dependencies = [
- "clap",
- "comemo",
- "env_logger",
- "futures",
- "indexmap 2.9.0",
- "log",
- "parking_lot",
- "reflexo-typst",
- "reflexo-vec2svg",
- "serde",
- "serde_json",
- "tinymist-assets 0.13.12",
- "tinymist-std",
- "tokio",
- "typst",
- "typst-assets",
- "typst-macros",
- "typst-timing",
 ]
 
 [[package]]

@@ -4,9 +4,9 @@ use lsp_types::notification::Notification;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::{internal_error, LspClient, LspResult};
+use tinymist_preview::{ControlPlaneMessage, Previewer};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
-use typst_preview::{ControlPlaneMessage, Previewer};
 
 use crate::project::ProjectPreviewState;
 use crate::tool::preview::{HttpServer, ProjectPreviewHandler};
