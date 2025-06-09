@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use ecow::{EcoString, EcoVec};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
+use tinymist_analysis::docs::tidy::remove_list_annotations;
+use tinymist_world::package::PackageSpec;
 use typst::diag::{eco_format, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, Span};
@@ -13,13 +15,29 @@ use crate::docs::{file_id_repr, module_docs, DefDocs, PackageDefInfo};
 use crate::package::{get_manifest_id, PackageInfo};
 use crate::LocalContext;
 
-use tinymist_analysis::docs::tidy::remove_list_annotations;
+/// Documentation Information about a package.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackageDoc {
+    meta: PackageMeta,
+    packages: Vec<PackageMeta>,
+    files: Vec<FileMeta>,
+    modules: Vec<(EcoString, crate::docs::DefInfo, ModuleInfo)>,
+}
+
+/// Documentation Information about a package module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ModuleInfo {
+    prefix: EcoString,
+    name: EcoString,
+    loc: Option<usize>,
+    parent_ident: EcoString,
+    aka: EcoVec<String>,
+}
 
 /// Generate full documents in markdown format
-pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<String> {
+pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<PackageDoc> {
     log::info!("generate_md_docs {spec:?}");
 
-    let mut md = String::new();
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
@@ -32,16 +50,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
 
     crate::log_debug_ct!("module_uses: {module_uses:#?}");
 
-    let title = for_spec.to_string();
-
-    let mut errors = vec![];
-
-    writeln!(md, "# {title}").unwrap();
-    md.push('\n');
-    writeln!(md, "This documentation is generated locally. Please submit issues to [tinymist](https://github.com/Myriad-Dreamin/tinymist/issues) if you see **incorrect** information in it.").unwrap();
-    md.push('\n');
-    md.push('\n');
-
     let manifest = ctx.get_manifest(toml_id)?;
 
     let meta = PackageMeta {
@@ -50,8 +58,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
         version: spec.version.to_string(),
         manifest: Some(manifest),
     };
-    let package_meta = jbase64(&meta);
-    let _ = writeln!(md, "<!-- begin:package {package_meta} -->");
 
     let mut modules_to_generate = vec![(root.name.clone(), root)];
     let mut generated_modules = HashSet::new();
@@ -72,10 +78,11 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
             .clone()
     };
 
+    let mut modules = vec![];
+
     while !modules_to_generate.is_empty() {
-        for (parent_ident, def) in std::mem::take(&mut modules_to_generate) {
+        for (parent_ident, mut def) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
-            let children = def.children;
 
             let module_val = def.decl.as_ref().unwrap();
             let fid = module_val.file_id();
@@ -84,32 +91,26 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
             // It is (primary) known to safe as a part of HTML string, so we don't have to
             // do sanitization here.
             let primary = aka.first().cloned().unwrap_or_default();
-            if !primary.is_empty() {
-                let _ = writeln!(md, "---\n## Module: {primary}");
-            }
-
-            crate::log_debug_ct!("module: {primary} -- {parent_ident}");
 
             let persist_fid = fid.map(|fid| file_ids.insert_full(fid).0);
 
-            #[derive(Serialize)]
-            struct ModuleInfo {
-                prefix: EcoString,
-                name: EcoString,
-                loc: Option<usize>,
-                parent_ident: EcoString,
-                aka: EcoVec<String>,
-            }
-            let module_info = jbase64(&ModuleInfo {
+            let module_info = ModuleInfo {
                 prefix: primary.as_str().into(),
                 name: def.name.clone(),
                 loc: persist_fid,
                 parent_ident: parent_ident.clone(),
                 aka,
-            });
-            let _ = writeln!(md, "<!-- begin:module {primary} {module_info} -->");
+            };
 
-            for mut child in children {
+            // if !module_info.prefix.is_empty() {
+            //     let _ = writeln!(md, "---\n## Module: {}", module_info.prefix);
+            // }
+
+            // crate::log_debug_ct!("module: {primary} -- {parent_ident}");
+            // let module_info = jbase64(&module_info);
+            // let _ = writeln!(md, "<!-- begin:module {primary} {module_info} -->");
+
+            for child in def.children.iter_mut() {
                 let span = child.decl.as_ref().map(|decl| decl.span());
                 let fid_range = span.and_then(|v| {
                     v.id().and_then(|fid| {
@@ -127,9 +128,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 });
                 child.loc = span;
 
-                let convert_err = None::<EcoString>;
-                if let Some(docs) = &child.parsed_docs {
-                    child.parsed_docs = Some(docs.clone());
+                if child.parsed_docs.is_some() {
                     child.docs = None;
                 }
 
@@ -138,7 +137,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 } else {
                     eco_format!("symbol-{}-{}", child.kind, child.name)
                 };
-                let _ = writeln!(md, "### {}: {} in {primary}", child.kind, child.name);
 
                 if child.is_external {
                     if let Some(fid) = child_fid {
@@ -163,111 +161,34 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                             child.external_link = Some(lnk.clone());
                             lnk
                         };
-                        let _ = writeln!(md, "[Symbol Docs]({lnk})\n");
+                        child.symbol_link = Some(lnk);
                     }
                 }
 
-                let child_children = std::mem::take(&mut child.children);
-                let head = jbase64(&child);
-                let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
-
-                if let Some(DefDocs::Function(sig)) = &child.parsed_docs {
-                    let _ = writeln!(md, "<!-- begin:sig -->");
-                    let _ = writeln!(md, "```typc");
-                    let _ = write!(md, "let {}", child.name);
-                    let _ = sig.print(&mut md);
-                    let _ = writeln!(md, ";");
-                    let _ = writeln!(md, "```");
-                    let _ = writeln!(md, "<!-- end:sig -->");
-                }
-
-                let mut printed_docs = false;
-                match (&child.parsed_docs, convert_err) {
-                    (_, Some(err)) => {
-                        let err = format!("failed to convert docs in {title}: {err}").replace(
-                            "-->", "—>", // avoid markdown comment
-                        );
-                        let _ = writeln!(md, "<!-- convert-error: {err} -->");
-                        errors.push(err);
-                    }
-                    (Some(docs), _) if !child.is_external => {
-                        let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
-                        printed_docs = true;
-                        if let DefDocs::Function(docs) = docs {
-                            for param in docs
-                                .pos
-                                .iter()
-                                .chain(docs.named.values())
-                                .chain(docs.rest.as_ref())
-                            {
-                                let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
-                                let ty = match &param.cano_type {
-                                    Some((short, _, _)) => short,
-                                    None => "unknown",
-                                };
-                                let _ = writeln!(
-                                    md,
-                                    "#### {} ({ty:?})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
-                                    param.name, param.name, param.docs, param.name
-                                );
-                                let _ = writeln!(md, "<!-- end:param -->");
-                            }
-                        }
-                    }
-                    (_, None) => {}
-                }
-
-                if !printed_docs {
-                    let plain_docs = child.docs.as_deref();
-                    let plain_docs = plain_docs.or(child.oneliner.as_deref());
-
-                    if let Some(docs) = plain_docs {
-                        let contains_code = docs.contains("```");
-                        if contains_code {
-                            let _ = writeln!(md, "`````typ");
-                        }
-                        let _ = writeln!(md, "{docs}");
-                        if contains_code {
-                            let _ = writeln!(md, "`````");
-                        }
-                    }
-                }
-
-                if !child_children.is_empty() {
+                if !child.children.is_empty() {
                     crate::log_debug_ct!("sub_fid: {child_fid:?}");
-                    match child_fid {
+                    let lnk = match child_fid {
                         Some(fid) => {
                             let aka = akas(fid);
                             let primary = aka.first().cloned().unwrap_or_default();
-                            let link = format!("module-{primary}").replace(".", "");
-                            let _ = writeln!(md, "[Module Docs](#{link})\n");
 
                             if generated_modules.insert(fid) {
-                                child.children = child_children;
-                                modules_to_generate.push((ident.clone(), child));
+                                modules_to_generate.push((ident.clone(), child.clone()));
                             }
-                        }
-                        None => {
-                            let _ = writeln!(md, "A Builtin Module");
-                        }
-                    }
-                }
 
-                let _ = writeln!(md, "<!-- end:symbol {ident} -->");
+                            let link = format!("module-{primary}").replace(".", "");
+                            format!("[Module Docs](#{link})\n")
+                        }
+                        None => "A Builtin Module".to_owned(),
+                    };
+
+                    child.module_link = Some(lnk);
+                }
             }
 
-            let _ = writeln!(md, "<!-- end:module {primary} -->");
+            modules.push((parent_ident, def, module_info));
         }
     }
-
-    let res = ConvertResult { errors };
-    let err = jbase64(&res);
-    let _ = writeln!(md, "<!-- begin:errors {err} -->");
-    let _ = writeln!(md, "## Errors");
-    for errs in res.errors {
-        let _ = writeln!(md, "- {errs}");
-    }
-    let _ = writeln!(md, "<!-- end:errors -->");
 
     let mut packages = IndexSet::new();
 
@@ -295,7 +216,147 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
         })
         .collect();
 
-    let meta = PackageMetaEnd { packages, files };
+    let doc = PackageDoc {
+        meta,
+        packages,
+        files,
+        modules,
+    };
+
+    Ok(doc)
+}
+
+/// Generate full documents in markdown format
+pub fn package_docs_md(doc: PackageDoc) -> StrResult<String> {
+    let mut md = String::new();
+
+    let title = doc.meta.spec().to_string();
+
+    writeln!(md, "# {title}").unwrap();
+    md.push('\n');
+    writeln!(md, "This documentation is generated locally. Please submit issues to [tinymist](https://github.com/Myriad-Dreamin/tinymist/issues) if you see **incorrect** information in it.").unwrap();
+    md.push('\n');
+    md.push('\n');
+
+    let package_meta = jbase64(&doc.meta);
+    let _ = writeln!(md, "<!-- begin:package {package_meta} -->");
+
+    let mut errors = vec![];
+    for (parent_ident, def, module_info) in doc.modules {
+        // parent_ident, symbols
+        let children = def.children;
+        let primary = &module_info.prefix;
+        if !module_info.prefix.is_empty() {
+            let _ = writeln!(md, "---\n## Module: {primary}");
+        }
+
+        crate::log_debug_ct!("module: {primary} -- {parent_ident}");
+        let module_info = jbase64(&module_info);
+        let _ = writeln!(md, "<!-- begin:module {primary} {module_info} -->");
+
+        for mut child in children {
+            let convert_err = None::<EcoString>;
+
+            let ident = if !primary.is_empty() {
+                eco_format!("symbol-{}-{primary}.{}", child.kind, child.name)
+            } else {
+                eco_format!("symbol-{}-{}", child.kind, child.name)
+            };
+            let _ = writeln!(md, "### {}: {} in {primary}", child.kind, child.name);
+
+            if let Some(lnk) = &child.symbol_link {
+                let _ = writeln!(md, "[Symbol Docs]({lnk})\n");
+            }
+
+            std::mem::take(&mut child.children);
+            let head = jbase64(&child);
+            let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
+
+            if let Some(DefDocs::Function(sig)) = &child.parsed_docs {
+                let _ = writeln!(md, "<!-- begin:sig -->");
+                let _ = writeln!(md, "```typc");
+                let _ = write!(md, "let {}", child.name);
+                let _ = sig.print(&mut md);
+                let _ = writeln!(md, ";");
+                let _ = writeln!(md, "```");
+                let _ = writeln!(md, "<!-- end:sig -->");
+            }
+
+            let mut printed_docs = false;
+            match (&child.parsed_docs, convert_err) {
+                (_, Some(err)) => {
+                    let err = format!("failed to convert docs in {title}: {err}").replace(
+                        "-->", "—>", // avoid markdown comment
+                    );
+                    let _ = writeln!(md, "<!-- convert-error: {err} -->");
+                    errors.push(err);
+                }
+                (Some(docs), _) if !child.is_external => {
+                    let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
+                    printed_docs = true;
+                    if let DefDocs::Function(docs) = docs {
+                        for param in docs
+                            .pos
+                            .iter()
+                            .chain(docs.named.values())
+                            .chain(docs.rest.as_ref())
+                        {
+                            let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
+                            let ty = match &param.cano_type {
+                                Some((short, _, _)) => short,
+                                None => "unknown",
+                            };
+                            let _ = writeln!(
+                                    md,
+                                    "#### {} ({ty:?})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
+                                    param.name, param.name, param.docs, param.name
+                                );
+                            let _ = writeln!(md, "<!-- end:param -->");
+                        }
+                    }
+                }
+                (_, None) => {}
+            }
+
+            if !printed_docs {
+                let plain_docs = child.docs.as_deref();
+                let plain_docs = plain_docs.or(child.oneliner.as_deref());
+
+                if let Some(docs) = plain_docs {
+                    let contains_code = docs.contains("```");
+                    if contains_code {
+                        let _ = writeln!(md, "`````typ");
+                    }
+                    let _ = writeln!(md, "{docs}");
+                    if contains_code {
+                        let _ = writeln!(md, "`````");
+                    }
+                }
+            }
+
+            if let Some(lnk) = &child.module_link {
+                let _ = writeln!(md, "{lnk}");
+            }
+
+            let _ = writeln!(md, "<!-- end:symbol {ident} -->");
+        }
+
+        let _ = writeln!(md, "<!-- end:module {primary} -->");
+    }
+
+    let res = ConvertResult { errors };
+    let err = jbase64(&res);
+    let _ = writeln!(md, "<!-- begin:errors {err} -->");
+    let _ = writeln!(md, "## Errors");
+    for errs in res.errors {
+        let _ = writeln!(md, "- {errs}");
+    }
+    let _ = writeln!(md, "<!-- end:errors -->");
+
+    let meta = PackageMetaEnd {
+        packages: doc.packages.clone(),
+        files: doc.files.clone(),
+    };
     let package_meta = jbase64(&meta);
     let _ = writeln!(md, "<!-- end:package {package_meta} -->");
 
@@ -309,7 +370,7 @@ fn jbase64<T: Serialize>(s: &T) -> String {
 }
 
 /// Information about a package.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageMeta {
     /// The namespace the package lives in.
     pub namespace: EcoString,
@@ -321,6 +382,17 @@ pub struct PackageMeta {
     pub manifest: Option<PackageManifest>,
 }
 
+impl PackageMeta {
+    /// Returns the package's full name, including namespace and version.
+    pub fn spec(&self) -> PackageSpec {
+        PackageSpec {
+            namespace: self.namespace.clone(),
+            name: self.name.clone(),
+            version: self.version.parse().expect("Invalid version format"),
+        }
+    }
+}
+
 /// Information about a package.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PackageMetaEnd {
@@ -329,7 +401,7 @@ pub struct PackageMetaEnd {
 }
 
 /// Information about a package.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMeta {
     package: Option<usize>,
     path: PathBuf,
@@ -344,7 +416,7 @@ struct ConvertResult {
 mod tests {
     use tinymist_world::package::{PackageRegistry, PackageSpec};
 
-    use super::{package_docs, PackageInfo};
+    use super::{package_docs, package_docs_md, PackageInfo};
     use crate::tests::*;
 
     fn test(pkg: PackageSpec) {
@@ -358,11 +430,12 @@ mod tests {
             };
             run_with_ctx(verse, path, &|a, _p| {
                 let docs = package_docs(a, &pi).unwrap();
+                let md = package_docs_md(docs).unwrap();
                 let dest = format!(
                     "../../target/{}-{}-{}.md",
                     pi.namespace, pi.name, pi.version
                 );
-                std::fs::write(dest, docs).unwrap();
+                std::fs::write(dest, md).unwrap();
             })
         })
     }
@@ -381,7 +454,7 @@ mod tests {
         test(PackageSpec {
             namespace: "preview".into(),
             name: "touying".into(),
-            version: "0.5.2".parse().unwrap(),
+            version: "0.6.0".parse().unwrap(),
         });
     }
 

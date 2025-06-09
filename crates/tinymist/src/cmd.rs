@@ -735,7 +735,10 @@ impl ServerState {
         info: PackageInfo,
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
         self.within_package(info.clone(), move |a| {
-            tinymist_query::docs::package_docs(a, &info)
+            let doc = tinymist_query::docs::package_docs(a, &info)
+                .map_err(map_string_err("failed to generate docs"))
+                .map_err(internal_error)?;
+            tinymist_query::docs::package_docs_md(doc)
                 .map_err(map_string_err("failed to generate docs"))
                 .map_err(internal_error)
         })

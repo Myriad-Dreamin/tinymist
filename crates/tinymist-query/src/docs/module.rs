@@ -74,6 +74,10 @@ pub struct DefInfo {
     pub loc: Option<(usize, usize, usize)>,
     /// Whether the definition external to the module.
     pub is_external: bool,
+    /// The module link to the definition
+    pub module_link: Option<String>,
+    /// The symbol link to the definition
+    pub symbol_link: Option<String>,
     /// The link to the definition if it is external.
     pub external_link: Option<String>,
     /// The one-line documentation of the definition.
@@ -90,7 +94,7 @@ pub struct DefInfo {
     #[serde(skip)]
     pub decl: Option<Interned<Decl>>,
     /// The children of the definition.
-    pub children: EcoVec<DefInfo>,
+    pub children: Vec<DefInfo>,
 }
 
 /// Information about the definitions in a package.
@@ -215,6 +219,8 @@ impl ScanDefCtx<'_> {
             children: children.unwrap_or_default(),
             loc: None,
             is_external: false,
+            module_link: None,
+            symbol_link: None,
             external_link: None,
             oneliner: None,
         };
