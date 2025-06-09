@@ -47,7 +47,7 @@ pub struct GenerateScriptArgs {
 }
 
 #[cfg(feature = "preview")]
-pub use typst_preview::{PreviewArgs, PreviewMode};
+pub use tinymist_preview::{PreviewArgs, PreviewMode};
 
 /// Project task commands.
 #[derive(Debug, Clone, clap::Subcommand)]

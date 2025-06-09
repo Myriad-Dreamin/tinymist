@@ -369,7 +369,7 @@ impl ServerState {
     /// Scroll preview instances.
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use typst_preview::ControlPlaneMessage;
+        use tinymist_preview::ControlPlaneMessage;
 
         if args.is_empty() {
             return self.preview.scroll_all(self.infer_pos()?);

@@ -18,13 +18,13 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::{LspPosition, LspRange};
-use tinymist_std::error::IgnoreLogging;
-use tokio::sync::{mpsc, oneshot};
-use typst_preview::{
+use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
     PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
 };
+use tinymist_query::{LspPosition, LspRange};
+use tinymist_std::error::IgnoreLogging;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
 use crate::project::{ProjectInsId, ProjectPreviewState, WorldProvider};
@@ -191,7 +191,7 @@ impl ServerState {
             ));
         }
 
-        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+        let previewer = tinymist_preview::PreviewBuilder::new(cli_args.preview.clone());
         let watcher = previewer.compile_watcher();
 
         let primary = &mut self.project.compiler.primary;
@@ -334,7 +334,7 @@ impl PreviewState {
         self.client.handle.spawn(async move {
             let mut resp_rx = resp_rx;
             while let Some(resp) = resp_rx.recv().await {
-                use typst_preview::ControlPlaneResponse::*;
+                use tinymist_preview::ControlPlaneResponse::*;
 
                 match resp {
                     // ignoring compile status per task.
@@ -609,7 +609,7 @@ impl Notification for ScrollSource {
 struct NotifDocumentOutline;
 
 impl Notification for NotifDocumentOutline {
-    type Params = typst_preview::Outline;
+    type Params = tinymist_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
 }
 

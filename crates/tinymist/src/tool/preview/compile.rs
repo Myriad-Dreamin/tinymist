@@ -4,14 +4,14 @@ use std::path::Path;
 
 use reflexo::debug_loc::SourceSpanOffset;
 use reflexo_typst::{error::prelude::*, Bytes, Error, TypstDocument};
+use tinymist_preview::{
+    CompileStatus, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
+};
 use tinymist_project::LspCompiledArtifact;
 use tinymist_query::{jump_from_click, jump_from_cursor};
 use typst::layout::{Abs, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
-use typst_preview::{
-    CompileStatus, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
-};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{LspInterrupt, ProjectClient, ProjectInsId};
@@ -91,7 +91,7 @@ pub struct PreviewCompileView {
     pub art: LspCompiledArtifact,
 }
 
-impl typst_preview::CompileView for PreviewCompileView {
+impl tinymist_preview::CompileView for PreviewCompileView {
     fn doc(&self) -> Option<TypstDocument> {
         self.art.doc.clone()
     }

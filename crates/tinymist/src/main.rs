@@ -90,7 +90,7 @@ fn main() -> Result<()> {
 
         env_logger::builder()
             .filter_module("tinymist", base_level)
-            .filter_module("typst_preview", preview_level)
+            .filter_module("tinymist_preview", preview_level)
             .filter_module("typlite", base_level)
             .filter_module("reflexo", base_level)
             .filter_module("sync_ls", base_level)
