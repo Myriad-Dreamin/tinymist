@@ -738,7 +738,7 @@ impl ServerState {
             let doc = tinymist_query::docs::package_docs(a, &info)
                 .map_err(map_string_err("failed to generate docs"))
                 .map_err(internal_error)?;
-            tinymist_query::docs::package_docs_md(doc)
+            tinymist_query::docs::package_docs_md(&doc)
                 .map_err(map_string_err("failed to generate docs"))
                 .map_err(internal_error)
         })
