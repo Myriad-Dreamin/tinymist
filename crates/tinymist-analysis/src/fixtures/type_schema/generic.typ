@@ -1,8 +1,8 @@
 
 #import "typings.typ": *
 
-#let T = tv();
-#let U = tv();
+#let T = tv("T");
+#let U = tv("U");
 
 /// Maps the elements of the array to a new array using the given function.
 ///
