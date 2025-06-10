@@ -11,7 +11,10 @@ use typst::{
 };
 
 use super::{term_value, Ty};
-use crate::ty::{BuiltinTy, Interned, TypeInfo};
+use crate::{
+    syntax::Decl,
+    ty::{BuiltinTy, Interned, TypeInfo, TypeVar},
+};
 
 pub struct TySchemeWorker<'a> {
     scheme: &'a mut TypeInfo,
@@ -62,6 +65,10 @@ impl TySchemeWorker<'_> {
         let kind = args.named::<Str>("kind").ok()??;
         Some(match kind.as_str() {
             "var" => self.define(k, &args.eat::<Value>().ok()??),
+            "tv" => Ty::Var(TypeVar::new(
+                k.into(),
+                Interned::new(Decl::lit_at(k, args.span)),
+            )),
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
                 Ty::Array(Interned::new(ty))
