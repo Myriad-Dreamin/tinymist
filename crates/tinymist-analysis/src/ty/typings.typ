@@ -13,4 +13,5 @@
 #let succ(..args) = typing-item.with(kind: "succ", ..args);
 #let union(..args) = typing-item.with(kind: "union", ..args);
 #let intersect(..args) = typing-item.with(kind: "intersect", ..args);
+#let interface(..args) = typing-item.with(kind: "interface", ..args);
 #let satisfy = intersect;

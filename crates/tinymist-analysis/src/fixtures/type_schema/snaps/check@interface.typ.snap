@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-analysis/src/ty/scheme.rs
+expression: result
+input_file: crates/tinymist-analysis/src/fixtures/type_schema/interface.typ
+---
+"mimath" = (Type(str)) => Type(content)
+"mitex" = Any
+"render" = (Type(str), "mitex": Any) => Type(content)

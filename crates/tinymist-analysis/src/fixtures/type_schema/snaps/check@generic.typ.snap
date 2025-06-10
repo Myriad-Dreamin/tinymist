@@ -5,4 +5,4 @@ input_file: crates/tinymist-analysis/src/fixtures/type_schema/generic.typ
 ---
 "T" = @T
 "U" = @U
-"map" = ("f": Any, "self": Any) => any
+"map" = (Array<@T>, (@T) => @U) => Array<@U>

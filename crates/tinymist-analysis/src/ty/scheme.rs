@@ -278,7 +278,7 @@ pub mod tests {
 
     #[test]
     fn test_check() {
-        snapshot_testing("", &|mut world, _path| {
+        snapshot_testing("type_schema", &|mut world, path| {
             let main_id = world.main();
             world
                 .map_shadow_by_id(
@@ -294,7 +294,9 @@ pub mod tests {
                 .unwrap();
             let source = world.source(main_id).unwrap();
 
-            let module = typst_shim::eval::eval_compat(&world, &source).unwrap();
+            let module = typst_shim::eval::eval_compat(&world, &source).unwrap_or_else(|err| {
+                panic!("Failed to evaluate module ({path:?}): {err:?}");
+            });
 
             let route = Route::default();
             let mut sink = Sink::default();
