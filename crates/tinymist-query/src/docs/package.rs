@@ -179,6 +179,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
 
                     child.module_link = Some(lnk);
                 }
+
+                child.id = ident;
             }
 
             modules.push((parent_ident, def, module_info));

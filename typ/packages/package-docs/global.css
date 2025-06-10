@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap");
+
 main {
   margin: 2em;
 }
@@ -14,6 +16,8 @@ main {
 }
 
 :root {
+  --mainLight: hsl(250, 68%, 74%);
+  --textDetailAccent: var(--mainLight);
   --main-color: #dfdfd6;
   --main-hover-color: #fff;
   --gray-color: #939da3;
@@ -24,9 +28,22 @@ main {
   --accent-dark: oklch(51.51% 0.2307 257.85);
   --vp-font-family-mono: ui-monospace, "Menlo", "Monaco", "Consolas", "Liberation Mono",
     "Courier New", monospace;
-  --vp-font-family-base: "Inter Variable", "Inter", "Noto Sans SC",
-   "PingFang SC", "Microsoft Yahei", ui-sans-serif, system-ui, sans-serif,
-   "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --vp-font-family-base: 
+    Merriweather,
+    serif,
+    "Inter var experimental",
+    "Inter var",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Fira Sans",
+    "Droid Sans",
+    "Helvetica Neue",
+    sans-serif;
 }
 body {
   margin: 0;
@@ -236,4 +253,71 @@ figcaption {
   display: grid;
   place-items: center;
   overflow-x: auto;
+}
+
+.detail-header {
+  margin: 1em 0;
+  margin-top: 1.5em;
+  padding: 0.5em 1em;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--textDetailAccent);
+  font-size: 1em;
+  position: relative;
+}
+
+.detail-header h4 {
+  font-size: 1em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.detail-header code {
+  background-color: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+.detail-header span > p {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+}
+
+.type-int {
+  color: #e7d9ff;
+}
+
+.type-float {
+  color: #e7d9ff;
+}
+
+.type-builtin {
+  color: #d2a8ff;
+}
+
+.type-none {
+  color: #ff6d00;
+}
+
+.code-kw,
+.type-auto {
+  color: #ff6d00;
+}
+
+.code-func {
+  color: #79c0ff;
+}
+
+.code-op {
+  color: #79c0ff;
+}
+
+.type-inferred-as,
+.code-kw.type-inferred {
+  transition: background-color 0.1s;
+}
+
+.type-inferred-as:hover,
+.code-kw.type-inferred:hover {
+  background-color: #344134;
 }

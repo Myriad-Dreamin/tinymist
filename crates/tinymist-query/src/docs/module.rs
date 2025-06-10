@@ -66,6 +66,8 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
 /// Information about a definition.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DefInfo {
+    /// The raw documentation of the definition.
+    pub id: EcoString,
     /// The name of the definition.
     pub name: EcoString,
     /// The kind of the definition.
@@ -210,6 +212,7 @@ impl ScanDefCtx<'_> {
         };
 
         let mut head = DefInfo {
+            id: EcoString::new(),
             name: key.to_string().into(),
             kind: decl.kind(),
             constant: expr.map(|expr| expr.repr()),
