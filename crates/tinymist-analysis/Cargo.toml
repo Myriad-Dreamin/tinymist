@@ -43,7 +43,7 @@ unscanny.workspace = true
 [dev-dependencies]
 insta.workspace = true
 regex.workspace = true
-tinymist-project = { workspace = true, features = ["lsp"] }
+tinymist-project = { workspace = true, features = ["lsp", "no-content-hint"] }
 tinymist-tests.workspace = true
 
 [lints]

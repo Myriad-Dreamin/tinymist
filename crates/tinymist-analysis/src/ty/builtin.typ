@@ -1,8 +1,8 @@
 
 #import "typings.typ": *
 
-#let T = var();
-#let U = var();
+#let T = tv();
+#let U = tv();
 
 /// Creates a new color from the given RGB components.
 ///
