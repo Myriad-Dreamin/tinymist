@@ -19,11 +19,12 @@ pub use insta::{Settings, assert_debug_snapshot, assert_snapshot, glob, with_set
 #[macro_export]
 macro_rules! snapshot_testing {
     ($name:expr, $f:expr) => {
+        const FIXTURE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/fixtures");
         let name = $name;
         let name = if name.is_empty() { "playground" } else { name };
         let mut settings = $crate::Settings::new();
         settings.set_prepend_module_to_snapshot(false);
-        settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
+        settings.set_snapshot_path(format!("{FIXTURE_DIR}/{name}/snaps"));
         settings.bind(|| {
             let glob_path = format!("fixtures/{name}/*.typ");
             $crate::glob!(&glob_path, |path| {
