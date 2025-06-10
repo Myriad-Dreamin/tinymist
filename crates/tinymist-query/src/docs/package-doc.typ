@@ -81,7 +81,7 @@
     html.elem("div", attrs: (class: "detail-header doc-symbol-" + info.kind), [=== #title])
 
     if info.oneliner != none {
-      par(info.oneliner)
+      markdown-docs(info.oneliner)
     }
 
     return
