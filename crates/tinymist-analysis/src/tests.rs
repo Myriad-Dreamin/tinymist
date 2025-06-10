@@ -21,7 +21,7 @@ impl fmt::Debug for TypeCheckSnapshot<'_> {
         exports.sort_by(|x, y| x.0.cmp(y.0));
 
         for (name, bounds) in exports {
-            writeln!(f, "{name:?} = {:?}", info.simplify(bounds.clone(), true))?;
+            writeln!(f, "{name:?} = {bounds:?}")?;
         }
 
         Ok(())
