@@ -35,11 +35,10 @@ macro_rules! snapshot_testing {
         let mut settings = $crate::Settings::new();
         settings.set_prepend_module_to_snapshot(false);
 
-        let snapshot_dir = format!("{base_dir}/fixtures/{name}/snaps");
+        let snapshot_dir = format!("{}/src/fixtures/{name}/snaps", env!("CARGO_MANIFEST_DIR"));
         settings.set_snapshot_path(snapshot_dir);
         settings.bind(|| {
             let glob_path = format!("fixtures/{name}/*.typ");
-            println!("Running snapshot tests for: {glob_path}");
             $crate::glob!(base_dir, &glob_path, |path| {
                 let contents = std::fs::read_to_string(path).unwrap();
                 #[cfg(windows)]
