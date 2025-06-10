@@ -4,19 +4,25 @@ use core::fmt;
 use std::{path::Path, sync::OnceLock};
 
 use comemo::Track;
+use tinymist_world::args;
 use typst::{
     engine::Engine,
-    foundations::{func::Repr, Args, Context, Func, Str, Value},
-    syntax::Source,
+    foundations::{func::Repr, Args, Closure, Context, Func, Str, Value},
+    syntax::{ast, Source, Span},
 };
 
-use super::{term_value, Ty};
+use super::Ty;
 use crate::{
+    func_signature,
     syntax::Decl,
-    ty::{BuiltinTy, Interned, TypeInfo, TypeVar},
+    ty::{
+        is_plain_value, BuiltinTy, InsTy, Interned, ParamAttrs, ParamTy, RecordTy, SigTy, TypeInfo,
+        TypeVar,
+    },
 };
 
 pub struct TySchemeWorker<'a> {
+    engine: Engine<'a>,
     scheme: &'a mut TypeInfo,
 }
 
@@ -65,10 +71,13 @@ impl TySchemeWorker<'_> {
         let kind = args.named::<Str>("kind").ok()??;
         Some(match kind.as_str() {
             "var" => self.define(k, &args.eat::<Value>().ok()??),
-            "tv" => Ty::Var(TypeVar::new(
-                k.into(),
-                Interned::new(Decl::lit_at(k, args.span)),
-            )),
+            "tv" => {
+                let name = args.eat::<Str>().ok()??;
+                Ty::Var(TypeVar::new(
+                    name.as_str().into(),
+                    Interned::new(Decl::lit_at(name.as_str(), args.span)),
+                ))
+            }
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
                 Ty::Array(Interned::new(ty))
@@ -81,16 +90,173 @@ impl TySchemeWorker<'_> {
                     .collect::<Vec<_>>();
                 Ty::Tuple(Interned::new(values))
             }
+            "pos" => {
+                let ty = self.define(k, &args.eat::<Value>().ok()??);
+                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::positional()))
+            }
+            "named" => {
+                let ty = self.define(k, &args.eat::<Value>().ok()??);
+                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::named()))
+            }
+            "rest" => {
+                let ty = self.define(k, &args.eat::<Value>().ok()??);
+                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::variadic()))
+            }
             _ => Ty::Any,
         })
     }
 
-    fn define_value(&self, v: &Value) -> Ty {
-        let ty = term_value(v);
-        match ty {
-            Ty::Builtin(BuiltinTy::TypeType(ty)) => Ty::Builtin(BuiltinTy::Type(ty)),
-            ty => ty,
+    fn define_value(&mut self, v: &Value) -> Ty {
+        self.term_value(v)
+    }
+
+    /// Gets the type of a value.
+    fn term_value(&mut self, value: &Value) -> Ty {
+        match value {
+            Value::Array(a) => {
+                let values = a
+                    .iter()
+                    .map(|v| self.term_value_rec(v, Span::detached()))
+                    .collect::<Vec<_>>();
+                Ty::Tuple(values.into())
+            }
+            // todo: term arguments
+            Value::Args(..) => Ty::Builtin(BuiltinTy::Args),
+            Value::Dict(dict) => {
+                let values = dict
+                    .iter()
+                    .map(|(k, v)| (k.as_str().into(), self.term_value_rec(v, Span::detached())))
+                    .collect();
+                Ty::Dict(RecordTy::new(values))
+            }
+            Value::Module(module) => {
+                let values = module
+                    .scope()
+                    .iter()
+                    .map(|(k, b)| (k.into(), self.term_value_rec(b.read(), b.span())))
+                    .collect();
+                Ty::Dict(RecordTy::new(values))
+            }
+            Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            Value::Dyn(dyn_val) => Ty::Builtin(BuiltinTy::Type(dyn_val.ty())),
+            Value::Func(func) => match func.inner() {
+                Repr::Closure(closure) => self.term_sig(func, closure).unwrap_or(Ty::Any),
+                Repr::With(..) | Repr::Native(..) | Repr::Element(..) | Repr::Plugin(..) => {
+                    Ty::Func(func_signature(func.clone()).type_sig())
+                }
+            },
+            _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
+            _ => Ty::Any,
         }
+    }
+
+    fn term_value_rec(&mut self, value: &Value, s: Span) -> Ty {
+        match value {
+            Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
+            Value::None
+            | Value::Auto
+            | Value::Array(..)
+            | Value::Args(..)
+            | Value::Dict(..)
+            | Value::Module(..)
+            | Value::Func(..)
+            | Value::Label(..)
+            | Value::Bool(..)
+            | Value::Int(..)
+            | Value::Float(..)
+            | Value::Decimal(..)
+            | Value::Length(..)
+            | Value::Angle(..)
+            | Value::Ratio(..)
+            | Value::Relative(..)
+            | Value::Fraction(..)
+            | Value::Color(..)
+            | Value::Gradient(..)
+            | Value::Tiling(..)
+            | Value::Symbol(..)
+            | Value::Version(..)
+            | Value::Str(..)
+            | Value::Bytes(..)
+            | Value::Datetime(..)
+            | Value::Duration(..)
+            | Value::Content(..)
+            | Value::Styles(..) => {
+                if !s.is_detached() {
+                    Ty::Value(InsTy::new_at(value.clone(), s))
+                } else {
+                    Ty::Value(InsTy::new(value.clone()))
+                }
+            }
+        }
+    }
+
+    fn term_sig(&mut self, func: &Func, closure: &Closure) -> Option<Ty> {
+        let ret_value = func
+            .call::<Vec<Value>>(&mut self.engine, Context::default().track(), vec![])
+            .ok()?;
+
+        let mut pos = vec![];
+        let mut named = vec![];
+        let mut rest_left = None;
+        let mut rest_right = None;
+        let ret = self.define("ret", &ret_value);
+
+        let syntax = closure.node.cast::<ast::Closure>()?;
+        let name = syntax.name().unwrap_or_default().get();
+        let mut defaults = closure.defaults.iter();
+
+        for param in syntax.params().children() {
+            match param {
+                ast::Param::Pos(p) => {
+                    pos.push(Ty::Any);
+                }
+                ast::Param::Spread(r) => {
+                    if pos.is_empty() {
+                        rest_left = Some(Ty::Any);
+                    } else {
+                        rest_right = Some(Ty::Any);
+                    }
+                }
+                ast::Param::Named(n) => {
+                    let default = defaults.next();
+                    let ty = if let Some(default) = default {
+                        self.define(n.name().get(), default)
+                    } else {
+                        Ty::Any
+                    };
+
+                    match ty {
+                        Ty::Param(p) => {
+                            if p.attrs.positional {
+                                pos.push(p.ty.clone());
+                            } else if p.attrs.named {
+                                named.push((p.name.clone(), p.ty.clone()));
+                            } else if p.attrs.variadic {
+                                if pos.is_empty() {
+                                    rest_left = Some(p.ty.clone());
+                                } else {
+                                    rest_right = Some(p.ty.clone());
+                                }
+                            }
+                        }
+                        _ => {
+                            named.push((n.name().get().into(), ty));
+                        }
+                    }
+                }
+            }
+        }
+
+        if rest_left.is_some() && rest_right.is_none() && pos.is_empty() {
+            // If we have a rest left but no positional parameters, we treat it as a
+            // rest right.
+            rest_right = rest_left.take();
+        }
+
+        Some(Ty::Func(
+            SigTy::new(pos.into_iter(), named, rest_left, rest_right, Some(ret)).into(),
+        ))
     }
 }
 
@@ -112,7 +278,7 @@ pub mod tests {
 
     #[test]
     fn test_check() {
-        snapshot_testing("type_schema", &|mut world, _path| {
+        snapshot_testing("", &|mut world, _path| {
             let main_id = world.main();
             world
                 .map_shadow_by_id(
@@ -130,8 +296,22 @@ pub mod tests {
 
             let module = typst_shim::eval::eval_compat(&world, &source).unwrap();
 
+            let route = Route::default();
+            let mut sink = Sink::default();
+            let introspector = Introspector::default();
+            let traced = Traced::default();
+            let engine = Engine {
+                routines: &typst::ROUTINES,
+                world: ((&world) as &dyn World).track(),
+                introspector: introspector.track(),
+                traced: traced.track(),
+                sink: sink.track_mut(),
+                route,
+            };
+
             let mut scheme = TypeInfo::default();
             let mut w = TySchemeWorker {
+                engine,
                 scheme: &mut scheme,
             };
             for (k, v) in module.scope().iter() {
