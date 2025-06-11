@@ -333,6 +333,12 @@ pub mod tests {
 
     use crate::{tests::*, ty::TypeInfo};
 
+    macro_rules! typ_path {
+        ($path:expr) => {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/../../typ/", $path)
+        };
+    }
+
     #[test]
     fn test_check() {
         snapshot_testing("type_schema", &|mut world, path| {
@@ -340,13 +346,16 @@ pub mod tests {
             world
                 .map_shadow_by_id(
                     main_id.join("/typings.typ"),
-                    Bytes::from_string(include_str!("typings.typ")),
+                    Bytes::from_string(include_str!(typ_path!("packages/typings/lib.typ"))),
                 )
                 .unwrap();
             world
                 .map_shadow_by_id(
-                    main_id.join("/builtin.typ"),
-                    Bytes::from_string(include_str!("builtin.typ")),
+                    main_id.join("/std.typ"),
+                    Bytes::from_string(
+                        include_str!(typ_path!("typings/std.typ"))
+                            .replace("/typ/packages/typings/lib.typ", "typings.typ"),
+                    ),
                 )
                 .unwrap();
             let source = world.source(main_id).unwrap();
