@@ -39,11 +39,17 @@
 #let union(..args) = typing-item.with(kind: "union", ..args);
 /// An intersection type.
 #let intersect(..args) = typing-item.with(kind: "intersect", ..args);
+/// An invariant type.
+#let invariant(..args) = typing-item.with(kind: "invariant", ..args);
 
 /// Op
 #let op = typing-item.with(kind: "op");
 /// Op add
 #let add(..args) = op.with(op: "add", ..args);
+/// Op eq
+#let eq(..args) = op.with(op: "eq", ..args);
+/// Op neq
+#let neq(..args) = op.with(op: "neq", ..args);
 
 #let any = var();
 #let never = typing-item.with(kind: "never");

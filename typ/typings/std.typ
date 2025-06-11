@@ -83,7 +83,7 @@
 
 
 #let assert = union(
-  (condition: pos(bool), message: named(str)) => never,
-  eq: (left: pos(any), right: pos(any), message: named(str)) => never,
-  ne: (left: pos(any), right: pos(any), message: named(str)) => never,
+  (condition: pos(bool), message: named(str)) => invariant(condition),
+  eq: (left: pos(any), right: pos(any), message: named(str)) => invariant(eq(left, right)),
+  ne: (left: pos(any), right: pos(any), message: named(str)) => invariant(neq(left, right)),
 );
