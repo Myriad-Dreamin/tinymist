@@ -3,4 +3,4 @@ source: crates/tinymist-analysis/src/ty/scheme.rs
 expression: result
 input_file: crates/tinymist-analysis/src/fixtures/type_schema/poly.typ
 ---
-"rgb" = () => Any
+"rgb" = (((Type(float) | Type(ratio)), (Type(float) | Type(ratio)), (Type(float) | Type(ratio))) => Type(color) | (Type(str)) => Type(color) | (Any) => Type(color))

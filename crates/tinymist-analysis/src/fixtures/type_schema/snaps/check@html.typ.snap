@@ -3,4 +3,4 @@ source: crates/tinymist-analysis/src/ty/scheme.rs
 expression: result
 input_file: crates/tinymist-analysis/src/fixtures/type_schema/html.typ
 ---
-"elem" = () => Any
+"elem" = (("svg", Type(content), "attrs": Any) => "ret": Type(content) | ("a", Type(content), "attrs": Any) => "ret": Type(content))
