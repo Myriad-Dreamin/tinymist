@@ -5,6 +5,7 @@
 #let var(..args) = typing-item.with(kind: "var", ..args);
 #let tv(..args) = typing-item.with(kind: "tv", ..args);
 #let arr(..args) = typing-item.with(kind: "arr", ..args);
+#let dict(..args) = typing-item.with(kind: "dict", ..args);
 #let tuple(..args) = typing-item.with(kind: "tuple", ..args);
 #let pos(..args) = typing-item.with(kind: "pos", ..args);
 #let named(..args) = typing-item.with(kind: "named", ..args);

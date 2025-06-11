@@ -21,6 +21,22 @@ use crate::{
     },
 };
 
+enum TyMark {
+    Norm(Ty),
+    Sig(Ty),
+    Any,
+}
+
+impl TyMark {
+    fn ty(self) -> Ty {
+        match self {
+            TyMark::Any => Ty::Any,
+            TyMark::Norm(ty) => ty,
+            TyMark::Sig(ty) => ty,
+        }
+    }
+}
+
 pub struct TySchemeWorker<'a> {
     engine: Engine<'a>,
     scheme: &'a mut TypeInfo,
@@ -34,6 +50,10 @@ impl TySchemeWorker<'_> {
 
 impl TySchemeWorker<'_> {
     pub fn define(&mut self, k: &str, v: &Value) -> Ty {
+        self.define_with_mark(k, v).ty()
+    }
+
+    fn define_with_mark(&mut self, k: &str, v: &Value) -> TyMark {
         if !self.is_typing_item(v) {
             self.define_value(v)
         } else {
@@ -41,36 +61,66 @@ impl TySchemeWorker<'_> {
         }
     }
 
-    fn define_typing_value(&mut self, k: &str, v: &Value) -> Ty {
+    fn define_typing_value(&mut self, k: &str, v: &Value) -> TyMark {
         let closure = match v {
             Value::Func(f) => f,
-            _ => return Ty::Any,
+            _ => return TyMark::Any,
         };
 
         let with = match closure.inner() {
             Repr::With(c) => c,
-            _ => return Ty::Any,
+            _ => return TyMark::Any,
         };
 
         self.define_typing(k, &with.0, with.1.clone())
     }
 
-    fn define_typing(&mut self, k: &str, func: &Func, mut args: Args) -> Ty {
+    fn define_typing(&mut self, k: &str, func: &Func, mut args: Args) -> TyMark {
         match func.inner() {
-            Repr::Native(..) | Repr::Element(..) | Repr::Plugin(..) => Ty::Any,
+            Repr::Native(..) | Repr::Element(..) | Repr::Plugin(..) => TyMark::Any,
             Repr::With(with) => {
                 args.items = with.1.items.iter().cloned().chain(args.items).collect();
                 self.define_typing(k, &with.0, args)
             }
-            Repr::Closure(closure) => self.ty_cons(k, args).unwrap_or(Ty::Any),
+            Repr::Closure(closure) => self.ty_cons(k, args).unwrap_or(TyMark::Any),
         }
     }
 
-    fn ty_cons(&mut self, k: &str, mut args: Args) -> Option<Ty> {
+    fn ty_cons(&mut self, k: &str, mut args: Args) -> Option<TyMark> {
         crate::log_debug_ct!("ty_cons({k}) args: {args:?}");
         let kind = args.named::<Str>("kind").ok()??;
-        Some(match kind.as_str() {
+        let ty = match kind.as_str() {
             "var" => self.define(k, &args.eat::<Value>().ok()??),
+            "union" => {
+                let mut candidates = vec![];
+                for arg in args.all::<Value>().ok()? {
+                    candidates.push(self.define(k, &arg));
+                }
+
+                if candidates.is_empty() {
+                    return Some(TyMark::Any);
+                }
+                if candidates.len() == 1 {
+                    return Some(TyMark::Norm(candidates.pop().unwrap()));
+                }
+
+                return Some(TyMark::Norm(Ty::Union(Interned::new(candidates))));
+            }
+            "sig" => {
+                let mut candidates = vec![];
+                for arg in args.all::<Value>().ok()? {
+                    candidates.push(self.define(k, &arg));
+                }
+
+                if candidates.is_empty() {
+                    return Some(TyMark::Any);
+                }
+                if candidates.len() == 1 {
+                    return Some(TyMark::Norm(candidates.pop().unwrap()));
+                }
+
+                return Some(TyMark::Sig(Ty::Union(Interned::new(candidates))));
+            }
             "tv" => {
                 let name = args.eat::<Str>().ok()??;
                 Ty::Var(TypeVar::new(
@@ -103,11 +153,12 @@ impl TySchemeWorker<'_> {
                 Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::variadic()))
             }
             _ => Ty::Any,
-        })
+        };
+        Some(TyMark::Norm(ty))
     }
 
-    fn define_value(&mut self, v: &Value) -> Ty {
-        self.term_value(v)
+    fn define_value(&mut self, v: &Value) -> TyMark {
+        TyMark::Norm(self.term_value(v))
     }
 
     /// Gets the type of a value.
@@ -200,7 +251,13 @@ impl TySchemeWorker<'_> {
         let mut named = vec![];
         let mut rest_left = None;
         let mut rest_right = None;
-        let ret = self.define("ret", &ret_value);
+        let ret = self.define_with_mark("ret", &ret_value);
+
+        let ret = match ret {
+            TyMark::Any => None,
+            TyMark::Norm(ty) => Some(ty),
+            TyMark::Sig(ty) => return Some(ty),
+        };
 
         let syntax = closure.node.cast::<ast::Closure>()?;
         let name = syntax.name().unwrap_or_default().get();
@@ -255,7 +312,7 @@ impl TySchemeWorker<'_> {
         }
 
         Some(Ty::Func(
-            SigTy::new(pos.into_iter(), named, rest_left, rest_right, Some(ret)).into(),
+            SigTy::new(pos.into_iter(), named, rest_left, rest_right, ret).into(),
         ))
     }
 }
