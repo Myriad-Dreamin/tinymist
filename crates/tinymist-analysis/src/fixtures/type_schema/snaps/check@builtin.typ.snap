@@ -3,4 +3,6 @@ source: crates/tinymist-analysis/src/ty/scheme.rs
 expression: result
 input_file: crates/tinymist-analysis/src/fixtures/type_schema/builtin.typ
 ---
-
+"array-type" = ("V": @V) => Any
+"assert" = (Type(bool), "message": Type(str)) => Any
+"dict-type" = ("V": @V) => Any
