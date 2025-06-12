@@ -215,8 +215,7 @@ impl TableParser {
                 if (cell.tag == tag::td || cell.tag == tag::th)
                     && cell.attrs.0.iter().any(|(name, _)| {
                         let name = name.into_inner();
-                        name == PicoStr::constant("colspan")
-                            || name == PicoStr::constant("rowspan")
+                        name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
                     })
                 {
                     return true;
