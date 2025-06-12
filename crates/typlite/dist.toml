@@ -1,3 +1,4 @@
 
 [dist]
-dist = false
+dist = true
+features = ["cli"]
