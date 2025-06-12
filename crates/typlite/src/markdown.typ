@@ -72,12 +72,27 @@
 )
 #let md-table(it) = html.elem(
   "m1table",
-  // TODO: table.header make table render nothing
   it,
 )
-#let md-grid(columns: auto, ..children) = html.elem(
+#let md-grid(columns: auto, children) = html.elem(
   "m1grid",
-  table(columns: columns, ..children.pos().map(it => table.cell(it))),
+  {
+    let children = children
+    let header = if children.first().func() == grid.header {
+      (table.header(..children.first().children.map(cell => table.cell(cell.body))),)
+      children = children.slice(1)
+    } else {
+      ()
+    }
+    let footer = if children.last().func() == grid.footer {
+      (table.footer(..children.last().children.map(cell => table.cell(cell.body))),)
+      children = children.slice(0, -1)
+    } else {
+      ()
+    }
+
+    table(columns: columns, ..header, ..children.map(it => table.cell(it)), ..footer)
+  },
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
@@ -184,7 +199,7 @@
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
   show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
+  show grid: it => if-not-paged(it, md-grid(columns: it.columns, it.children))
 
   show math.equation.where(block: false): it => if-not-paged(
     it,
