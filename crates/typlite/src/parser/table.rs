@@ -5,6 +5,7 @@ use cmark_writer::gfm::TableAlignment;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::utils::PicoStr;
 
+use crate::common::InlineNode;
 use crate::tags::md_tag;
 use crate::Result;
 
@@ -88,8 +89,8 @@ impl TableParser {
     fn extract_table_content(
         parser: &mut HtmlToAstParser,
         table: &HtmlElement,
-        headers: &mut Vec<Vec<Node>>,
-        rows: &mut Vec<Vec<Vec<Node>>>,
+        headers: &mut Vec<Node>,
+        rows: &mut Vec<Vec<Node>>,
         is_header: &mut bool,
     ) -> Result<()> {
         // Process table structure (direct rows or thead/tbody)
@@ -127,8 +128,8 @@ impl TableParser {
     fn process_table_section(
         parser: &mut HtmlToAstParser,
         section: &HtmlElement,
-        headers: &mut Vec<Vec<Node>>,
-        rows: &mut Vec<Vec<Vec<Node>>>,
+        headers: &mut Vec<Node>,
+        rows: &mut Vec<Vec<Node>>,
         is_header_section: bool,
     ) -> Result<()> {
         for row_node in &section.children {
@@ -150,8 +151,8 @@ impl TableParser {
         parser: &mut HtmlToAstParser,
         row_elem: &HtmlElement,
         is_header: bool,
-        headers: &mut Vec<Vec<Node>>,
-    ) -> Result<Vec<Vec<Node>>> {
+        headers: &mut Vec<Node>,
+    ) -> Result<Vec<Node>> {
         let mut current_row = Vec::new();
 
         // Process cells in this row
@@ -161,17 +162,29 @@ impl TableParser {
                     let mut cell_content = Vec::new();
                     parser.convert_children_into(&mut cell_content, cell)?;
 
+                    // Merge cell content into a single node
+                    let merged_cell = Self::merge_cell_content(cell_content);
+
                     // Add to appropriate section
                     if is_header || cell.tag == tag::th {
-                        headers.push(cell_content);
+                        headers.push(merged_cell);
                     } else {
-                        current_row.push(cell_content);
+                        current_row.push(merged_cell);
                     }
                 }
             }
         }
 
         Ok(current_row)
+    }
+
+    /// Merge cell content nodes into a single node
+    fn merge_cell_content(content: Vec<Node>) -> Node {
+        match content.len() {
+            0 => Node::Text("".to_string()),
+            1 => content.into_iter().next().unwrap(),
+            _ => Node::Custom(Box::new(InlineNode { content })),
+        }
     }
 
     /// Check if the table has complex cells (rowspan/colspan)
@@ -225,24 +238,15 @@ impl TableParser {
         false
     }
 
-    fn create_table_node(
-        headers: Vec<Vec<Node>>,
-        rows: Vec<Vec<Vec<Node>>>,
-    ) -> Result<Option<Node>> {
+    fn create_table_node(headers: Vec<Node>, rows: Vec<Vec<Node>>) -> Result<Option<Node>> {
         // Create alignment array (default to None for all columns)
         let alignments = vec![TableAlignment::None; headers.len().max(1)];
 
         // If there is content, add the table to blocks
         if !headers.is_empty() || !rows.is_empty() {
-            let flattened_headers = headers.into_iter().flatten().collect();
-            let flattened_rows: Vec<_> = rows
-                .into_iter()
-                .map(|row| row.into_iter().flatten().collect())
-                .collect();
-
             return Ok(Some(Node::Table {
-                headers: flattened_headers,
-                rows: flattened_rows,
+                headers,
+                rows,
                 alignments,
             }));
         }

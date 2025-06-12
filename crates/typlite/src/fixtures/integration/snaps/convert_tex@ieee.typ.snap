@@ -53,9 +53,9 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{cccc}
+\begin{tabular}{cc}
 \hline
-Planet & Distance &   & (million km) \\
+Planet & [Unknown custom node] \\
 \hline
 Mercury & 57.9 \\
 Venus & 108.2 \\
@@ -87,11 +87,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 \begin{table}[htbp]
 \centering
-\begin{tabular}{ccccccccccccccccc}
+\begin{tabular}{cc}
 \hline
-[1] & R. Astley &  and  & L. Morris & ,  & “At-scale impact of the Net Wok: A culinarically holistic investigation of distributed dumplings,” &   & Armenian Journal of Proceedings & , vol.  & 61 & ,  & pp. &   & 192–219 & ,  & 2020 & . \\
+[1] & [Unknown custom node] \\
 \hline
-[2] & L. Morris &  and  & R. Astley & ,  & “Net Wok++: Taking distributed dumplings to the cloud,” &   & Armenian Journal of Proceedings & , vol.  & 65 & ,  & pp. &   & 101–118 & ,  & 2022 & . \\
+[2] & [Unknown custom node] \\
 \hline
 \end{tabular}
 \end{table}
