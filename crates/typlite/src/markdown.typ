@@ -72,6 +72,7 @@
 )
 #let md-table(it) = html.elem(
   "m1table",
+  // TODO: table.header make table render nothing
   it,
 )
 #let md-grid(columns: auto, ..children) = html.elem(
