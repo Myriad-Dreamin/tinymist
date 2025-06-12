@@ -7,7 +7,7 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode};
+use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode};
 use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
@@ -241,6 +241,11 @@ impl DocxWriter {
                     for child in &highlight_node.content {
                         run = self.process_inline_to_run(run, child)?;
                     }
+                } else if let Some(inline_node) = custom_node.as_any().downcast_ref::<InlineNode>()
+                {
+                    for child in &inline_node.content {
+                        run = self.process_inline_to_run(run, child)?;
+                    }
                 } else {
                     // Handle other custom inline nodes if needed
                     println!("Unhandled custom inline node: {:?}", custom_node);
@@ -471,6 +476,20 @@ impl DocxWriter {
                     let mut run = Run::new().highlight("yellow");
 
                     for child in &highlight_node.content {
+                        run = self.process_inline_to_run(run, child)?;
+                    }
+
+                    if !run.children.is_empty() {
+                        para = para.add_run(run);
+                        docx = docx.add_paragraph(para);
+                    }
+                } else if let Some(inline_node) = custom_node.as_any().downcast_ref::<InlineNode>()
+                {
+                    // Handle InlineNode at block level (convert to paragraph)
+                    let mut para = Paragraph::new();
+                    let mut run = Run::new();
+
+                    for child in &inline_node.content {
                         run = self.process_inline_to_run(run, child)?;
                     }
 

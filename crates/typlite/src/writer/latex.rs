@@ -7,7 +7,7 @@ use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
 use crate::common::{
-    CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, ListState,
+    CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, InlineNode, ListState,
 };
 use crate::Result;
 
@@ -305,6 +305,12 @@ impl LaTeXWriter {
                         self.write_node(child, output)?;
                     }
                     output.push_str("}");
+                } else if let Some(inline_node) = custom_node.as_any().downcast_ref::<InlineNode>()
+                {
+                    // Process all child nodes inline
+                    for child in &inline_node.content {
+                        self.write_node(child, output)?;
+                    }
                 } else {
                     // Fallback for unknown custom nodes
                     output.push_str("[Unknown custom node]");
