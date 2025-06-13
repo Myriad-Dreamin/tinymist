@@ -46,7 +46,7 @@
 
   let symlink(body) = if info.symbol_link != none {
     // let _ = writeln!(out, "#link({})[Symbol Docs]\n", TypstLink(lnk));
-    par(html.elem("a", attrs: (href: info.symbol_link, class: "symbol-link"), body))
+    html.elem("a", attrs: (href: info.symbol_link, class: "symbol-link"), body)
   } else {
     body
   }
@@ -65,11 +65,11 @@
         code(file.path)
       }
 
-      box(symlink(code(title)))
+      symlink(code(title))
     } else {
       // keyword("extern")
       // code(" ")
-      box(symlink(code(info.name)))
+      symlink(code(info.name))
       if info.kind == "function" {
         code("()")
       } else {
