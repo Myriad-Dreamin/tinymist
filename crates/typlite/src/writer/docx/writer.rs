@@ -7,7 +7,7 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode};
+use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode};
 use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
@@ -235,15 +235,17 @@ impl DocxWriter {
             Node::SoftBreak => {
                 run = run.add_text(" ");
             }
-            Node::Custom(custom_node) => {
-                if let Some(highlight_node) = custom_node.as_any().downcast_ref::<HighlightNode>() {
-                    run = run.highlight("yellow");
-                    for child in &highlight_node.content {
-                        run = self.process_inline_to_run(run, child)?;
-                    }
-                } else {
-                    // Handle other custom inline nodes if needed
-                    println!("Unhandled custom inline node: {:?}", custom_node);
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                run = run.highlight("yellow");
+                for child in &highlight_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                for child in &inline_node.content {
+                    run = self.process_inline_to_run(run, child)?;
                 }
             }
             // Other inline element types
@@ -423,65 +425,76 @@ impl DocxWriter {
             Node::Image { url, title: _, alt } => {
                 docx = self.process_image(docx, url, alt)?;
             }
-            Node::Custom(custom_node) => {
-                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    docx = self.process_figure(docx, figure_node)?;
-                } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
-                {
-                    // Handle regular node but with center alignment
-                    match &center_node.node {
-                        Node::Paragraph(content) => {
-                            docx = self.process_paragraph(docx, content, None)?;
-                            // Get the last paragraph and center it
-                            if let Some(DocumentChild::Paragraph(para)) =
-                                docx.document.children.last_mut()
-                            {
-                                para.property = para.property.clone().align(AlignmentType::Center);
-                            }
-                        }
-                        other => {
-                            docx = self.process_node(docx, other)?;
-                            // Get the last element and center it if it's a paragraph
-                            if let Some(DocumentChild::Paragraph(para)) =
-                                docx.document.children.last_mut()
-                            {
-                                para.property = para.property.clone().align(AlignmentType::Center);
-                            }
+            node if node.is_custom_type::<FigureNode>() => {
+                let figure_node = node.as_custom_type::<FigureNode>().unwrap();
+                docx = self.process_figure(docx, figure_node)?;
+            }
+            node if node.is_custom_type::<CenterNode>() => {
+                let center_node = node.as_custom_type::<CenterNode>().unwrap();
+                // Handle regular node but with center alignment
+                match &center_node.node {
+                    Node::Paragraph(content) => {
+                        docx = self.process_paragraph(docx, content, None)?;
+                        // Get the last paragraph and center it
+                        if let Some(DocumentChild::Paragraph(para)) =
+                            docx.document.children.last_mut()
+                        {
+                            para.property = para.property.clone().align(AlignmentType::Center);
                         }
                     }
-                } else if let Some(external_frame) = custom_node
-                    .as_any()
-                    .downcast_ref::<crate::common::ExternalFrameNode>(
-                ) {
-                    let data = base64::engine::general_purpose::STANDARD
-                        .decode(&external_frame.svg)
-                        .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
-
-                    docx = self.image_processor.process_image_data(
-                        docx,
-                        &data,
-                        Some(&external_frame.alt_text),
-                        None,
-                    );
-                } else if let Some(highlight_node) =
-                    custom_node.as_any().downcast_ref::<HighlightNode>()
-                {
-                    // Handle HighlightNode at block level (convert to paragraph)
-                    let mut para = Paragraph::new();
-                    let mut run = Run::new().highlight("yellow");
-
-                    for child in &highlight_node.content {
-                        run = self.process_inline_to_run(run, child)?;
+                    other => {
+                        docx = self.process_node(docx, other)?;
+                        // Get the last element and center it if it's a paragraph
+                        if let Some(DocumentChild::Paragraph(para)) =
+                            docx.document.children.last_mut()
+                        {
+                            para.property = para.property.clone().align(AlignmentType::Center);
+                        }
                     }
+                }
+            }
+            node if node.is_custom_type::<crate::common::ExternalFrameNode>() => {
+                let external_frame = node
+                    .as_custom_type::<crate::common::ExternalFrameNode>()
+                    .unwrap();
+                let data = base64::engine::general_purpose::STANDARD
+                    .decode(&external_frame.svg)
+                    .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
 
-                    if !run.children.is_empty() {
-                        para = para.add_run(run);
-                        docx = docx.add_paragraph(para);
-                    }
-                } else {
-                    // Fallback for unknown custom nodes - ignore or add placeholder
-                    let placeholder = "[Unknown custom content]";
-                    let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
+                docx = self.image_processor.process_image_data(
+                    docx,
+                    &data,
+                    Some(&external_frame.alt_text),
+                    None,
+                );
+            }
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                // Handle HighlightNode at block level (convert to paragraph)
+                let mut para = Paragraph::new();
+                let mut run = Run::new().highlight("yellow");
+
+                for child in &highlight_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+
+                if !run.children.is_empty() {
+                    para = para.add_run(run);
+                    docx = docx.add_paragraph(para);
+                }
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                // Handle InlineNode at block level (convert to paragraph)
+                let mut para = Paragraph::new();
+                let mut run = Run::new();
+
+                for child in &inline_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+
+                if !run.children.is_empty() {
+                    para = para.add_run(run);
                     docx = docx.add_paragraph(para);
                 }
             }
