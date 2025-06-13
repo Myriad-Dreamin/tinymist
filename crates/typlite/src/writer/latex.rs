@@ -231,89 +231,87 @@ impl LaTeXWriter {
                 output.push_str("\\end{tabular}\n");
                 output.push_str("\\end{table}\n\n");
             }
-            Node::Custom(custom_node) => {
-                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    // Start figure environment
-                    output.push_str("\\begin{figure}[htbp]\n\\centering\n");
+            node if node.is_custom_type::<FigureNode>() => {
+                let figure_node = node.as_custom_type::<FigureNode>().unwrap();
+                // Start figure environment
+                output.push_str("\\begin{figure}[htbp]\n\\centering\n");
 
-                    // Handle the body content (typically an image)
-                    match &*figure_node.body {
-                        Node::Paragraph(content) => {
-                            for node in content {
-                                // Special handling for image nodes in figures
-                                if let Node::Image {
-                                    url,
-                                    title: _,
-                                    alt: _,
-                                } = node
-                                {
-                                    // Path to the image file
-                                    let path = unix_slash(Path::new(url));
+                // Handle the body content (typically an image)
+                match &*figure_node.body {
+                    Node::Paragraph(content) => {
+                        for node in content {
+                            // Special handling for image nodes in figures
+                            if let Node::Image {
+                                url,
+                                title: _,
+                                alt: _,
+                            } = node
+                            {
+                                // Path to the image file
+                                let path = unix_slash(Path::new(url));
 
-                                    // Write includegraphics command
-                                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
-                                    output.push_str(&path);
-                                    output.push_str("}\n");
-                                } else {
-                                    // For non-image content, just render it normally
-                                    self.write_node(node, output)?;
-                                }
+                                // Write includegraphics command
+                                output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                                output.push_str(&path);
+                                output.push_str("}\n");
+                            } else {
+                                // For non-image content, just render it normally
+                                self.write_node(node, output)?;
                             }
                         }
-                        // Directly handle the node if it's not in a paragraph
-                        node => self.write_node(node, output)?,
                     }
+                    // Directly handle the node if it's not in a paragraph
+                    node => self.write_node(node, output)?,
+                }
 
-                    // Add caption if present
-                    if !figure_node.caption.is_empty() {
-                        output.push_str("\\caption{");
-                        output.push_str(&escape_latex(&figure_node.caption));
-                        output.push_str("}\n");
-                    }
-
-                    // Close figure environment
-                    output.push_str("\\end{figure}\n\n");
-                } else if let Some(external_frame) =
-                    custom_node.as_any().downcast_ref::<ExternalFrameNode>()
-                {
-                    // Handle externally stored frames
-                    let path = unix_slash(&external_frame.file_path);
-
-                    output.push_str("\\begin{figure}[htbp]\n");
-                    output.push_str("\\centering\n");
-                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
-                    output.push_str(&path);
+                // Add caption if present
+                if !figure_node.caption.is_empty() {
+                    output.push_str("\\caption{");
+                    output.push_str(&escape_latex(&figure_node.caption));
                     output.push_str("}\n");
+                }
 
-                    if !external_frame.alt_text.is_empty() {
-                        output.push_str("\\caption{");
-                        output.push_str(&escape_latex(&external_frame.alt_text));
-                        output.push_str("}\n");
-                    }
+                // Close figure environment
+                output.push_str("\\end{figure}\n\n");
+            }
+            node if node.is_custom_type::<ExternalFrameNode>() => {
+                let external_frame = node.as_custom_type::<ExternalFrameNode>().unwrap();
+                // Handle externally stored frames
+                let path = unix_slash(&external_frame.file_path);
 
-                    output.push_str("\\end{figure}\n\n");
-                } else if let Some(center_node) = custom_node.as_any().downcast_ref::<CenterNode>()
-                {
-                    output.push_str("\\begin{center}\n");
-                    self.write_node(&center_node.node, output)?;
-                    output.push_str("\\end{center}\n\n");
-                } else if let Some(highlight_node) =
-                    custom_node.as_any().downcast_ref::<HighlightNode>()
-                {
-                    output.push_str("\\colorbox{yellow}{");
-                    for child in &highlight_node.content {
-                        self.write_node(child, output)?;
-                    }
-                    output.push_str("}");
-                } else if let Some(inline_node) = custom_node.as_any().downcast_ref::<InlineNode>()
-                {
-                    // Process all child nodes inline
-                    for child in &inline_node.content {
-                        self.write_node(child, output)?;
-                    }
-                } else {
-                    // Fallback for unknown custom nodes
-                    output.push_str("[Unknown custom node]");
+                output.push_str("\\begin{figure}[htbp]\n");
+                output.push_str("\\centering\n");
+                output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                output.push_str(&path);
+                output.push_str("}\n");
+
+                if !external_frame.alt_text.is_empty() {
+                    output.push_str("\\caption{");
+                    output.push_str(&escape_latex(&external_frame.alt_text));
+                    output.push_str("}\n");
+                }
+
+                output.push_str("\\end{figure}\n\n");
+            }
+            node if node.is_custom_type::<CenterNode>() => {
+                let center_node = node.as_custom_type::<CenterNode>().unwrap();
+                output.push_str("\\begin{center}\n");
+                self.write_node(&center_node.node, output)?;
+                output.push_str("\\end{center}\n\n");
+            }
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                output.push_str("\\colorbox{yellow}{");
+                for child in &highlight_node.content {
+                    self.write_node(child, output)?;
+                }
+                output.push_str("}");
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                // Process all child nodes inline
+                for child in &inline_node.content {
+                    self.write_node(child, output)?;
                 }
             }
             Node::Text(text) => {
