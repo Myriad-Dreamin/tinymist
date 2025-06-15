@@ -41,7 +41,7 @@ impl ListParser {
                     for li_child in &li.children {
                         match li_child {
                             HtmlNode::Text(text, _) => {
-                                li_buffer.push(Node::Text(text.as_str().to_string()));
+                                li_buffer.push(Node::Text(text.into()));
                             }
                             HtmlNode::Element(child_elem) => {
                                 let element_content =

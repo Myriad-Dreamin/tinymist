@@ -2,6 +2,7 @@
 
 use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
+use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::utils::PicoStr;
 
@@ -181,7 +182,7 @@ impl TableParser {
     /// Merge cell content nodes into a single node
     fn merge_cell_content(content: Vec<Node>) -> Node {
         match content.len() {
-            0 => Node::Text("".to_string()),
+            0 => Node::Text(EcoString::new()),
             1 => content.into_iter().next().unwrap(),
             _ => Node::Custom(Box::new(InlineNode { content })),
         }
