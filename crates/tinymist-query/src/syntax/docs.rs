@@ -54,8 +54,8 @@ static EMPTY_MODULE: LazyLock<Module> =
 
 impl DocsChecker<'_> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
-        let converted =
-            convert_docs(self.ctx, &docs).and_then(|converted| identify_pat_docs(&converted));
+        let converted = convert_docs(self.ctx, &docs, Some(self.fid))
+            .and_then(|converted| identify_pat_docs(&converted));
 
         let converted = match Self::fallback_docs(converted, &docs) {
             Ok(docs) => docs,
@@ -89,7 +89,8 @@ impl DocsChecker<'_> {
     }
 
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).and_then(identify_tidy_module_docs);
+        let converted =
+            convert_docs(self.ctx, &docs, Some(self.fid)).and_then(identify_tidy_module_docs);
 
         let converted = match Self::fallback_docs(converted, &docs) {
             Ok(docs) => docs,
