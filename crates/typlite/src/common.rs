@@ -188,6 +188,30 @@ impl CenterNode {
     }
 }
 
+/// Inline node for flattened inline content (useful for table cells)
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = false, html_impl = true)]
+pub struct InlineNode {
+    /// The inline content nodes
+    pub content: Vec<Node>,
+}
+
+impl InlineNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        for node in &self.content {
+            writer.write(node)?;
+        }
+        Ok(())
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        for node in &self.content {
+            writer.write_node(node)?;
+        }
+        Ok(())
+    }
+}
+
 /// Alert node for alert messages
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = true, html_impl = false)]

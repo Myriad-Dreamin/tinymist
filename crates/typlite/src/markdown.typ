@@ -76,7 +76,23 @@
 )
 #let md-grid(columns: auto, ..children) = html.elem(
   "m1grid",
-  table(columns: columns, ..children.pos().map(it => table.cell(it))),
+  {
+    let children = children.pos()
+    let header = if children.first().func() == grid.header {
+      (table.header(..children.first().children.map(cell => table.cell(cell.body))),)
+      children = children.slice(1)
+    } else {
+      ()
+    }
+    let footer = if children.last().func() == grid.footer {
+      (table.footer(..children.last().children.map(cell => table.cell(cell.body))),)
+      children = children.slice(0, -1)
+    } else {
+      ()
+    }
+
+    table(columns: columns, ..header, ..children.map(it => table.cell(it)), ..footer)
+  },
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
