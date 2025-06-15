@@ -24,7 +24,6 @@ import javax.swing.JLabel
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefLoadHandler
 import com.intellij.openapi.util.registry.Registry
-import org.cef.handler.CefDisplayHandler
 import org.cef.handler.CefDisplayHandlerAdapter
 import org.cef.CefSettings
 
@@ -38,7 +37,11 @@ class TypstPreviewFileEditor(
     // Define the Tinymist preview URL (default background port)
     private val previewHost = "127.0.0.1"
     private val previewPort = 23635
-    private val tinymistPreviewUrl = "http://$previewHost:$previewPort"
+    private val tinymistPreviewUrl: String
+        get() {
+            val encodedPath = java.net.URLEncoder.encode(virtualFile.path, "UTF-8")
+            return "http://$previewHost:$previewPort?file=$encodedPath"
+        }
 
     // Flag to track if the server check is complete and successful
     @Volatile
@@ -46,8 +49,8 @@ class TypstPreviewFileEditor(
     private var jcefUnsupportedLabel: JLabel? = null
 
     init {
-        val osrMode = isOsrEnabled() // Call it once
-        println("TypstPreviewFileEditor: Initializing (JCEFHtmlPanel, OSR: $osrMode)...")
+        // Register this editor in the active previews map
+        registerPreviewEditor(virtualFile.path, this)
 
         if (!JBCefApp.isSupported()) {
             println("TypstPreviewFileEditor: JCEF is not supported! Preview will show an error message.")
@@ -112,8 +115,14 @@ class TypstPreviewFileEditor(
                 }
 
                 if (isServerReady) {
-                    println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
-                    this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
+                    // Check if this is still the registered editor for this file
+                    val registeredEditor = getPreviewEditor(virtualFile.path)
+                    if (registeredEditor == this@TypstPreviewFileEditor) {
+                        println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
+                        this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
+                    } else {
+                        println("TypstPreviewFileEditor: This is no longer the registered editor for ${virtualFile.path}, not loading URL")
+                    }
                 } else {
                     println("TypstPreviewFileEditor: Server not ready. Displaying error.")
                     ApplicationManager.getApplication().invokeLater {
@@ -179,6 +188,14 @@ class TypstPreviewFileEditor(
 
     override fun selectNotify() {
         println("TypstPreviewFileEditor: selectNotify called for ${virtualFile.name}")
+
+        // Check if this is the registered preview editor for this file
+        val registeredEditor = getPreviewEditor(virtualFile.path)
+        if (registeredEditor != this) {
+            println("TypstPreviewFileEditor: selectNotify - This is not the registered editor for ${virtualFile.path}, registering it")
+            registerPreviewEditor(virtualFile.path, this)
+        }
+
         // Reload the content when the editor is selected, if the server is ready
         // and the JCEF component is supported and initialized.
         if (JBCefApp.isSupported() && isServerReady && !isDisposed) {
@@ -211,6 +228,10 @@ class TypstPreviewFileEditor(
             // Log any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
             println("TypstPreviewFileEditor: Exception during cefBrowser.stopLoad() in dispose: ${e.message}")
         }
+
+        // Unregister this editor from the active previews map
+        unregisterPreviewEditor(virtualFile.path)
+
         // Explicitly call super.dispose() to ensure JCEFHtmlPanel cleans up its resources.
         // This must be done.
         super.dispose()
@@ -249,12 +270,26 @@ class TypstPreviewFileEditor(
     }
 
     companion object {
-        // Default to false (non-OSR) if the key isn't set.
-        // Using the Markdown plugin's key for testing.
-        private fun isOsrEnabled(): Boolean {
-            val osrEnabled = Registry.`is`("ide.browser.jcef.markdownView.osr.enabled", false) // Or use the general key if intended
-            println("TypstPreviewFileEditor: isOsrEnabled check for 'ide.browser.jcef.markdownView.osr.enabled' (default false) returning: $osrEnabled")
-            return osrEnabled
+
+
+        // Map to track active previews per document
+        private val activePreviewEditors = mutableMapOf<String, TypstPreviewFileEditor>()
+
+        // Register a preview editor for a document
+        fun registerPreviewEditor(filePath: String, editor: TypstPreviewFileEditor) {
+            activePreviewEditors[filePath] = editor
+            println("TypstPreviewFileEditor: Registered preview editor for $filePath")
+        }
+
+        // Unregister a preview editor for a document
+        fun unregisterPreviewEditor(filePath: String) {
+            activePreviewEditors.remove(filePath)
+            println("TypstPreviewFileEditor: Unregistered preview editor for $filePath")
+        }
+
+        // Get the preview editor for a document
+        fun getPreviewEditor(filePath: String): TypstPreviewFileEditor? {
+            return activePreviewEditors[filePath]
         }
     }
 } 
