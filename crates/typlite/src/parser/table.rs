@@ -5,6 +5,7 @@ use cmark_writer::gfm::TableAlignment;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::utils::PicoStr;
 
+use crate::common::InlineNode;
 use crate::tags::md_tag;
 use crate::Result;
 
@@ -88,21 +89,56 @@ impl TableParser {
     fn extract_table_content(
         parser: &mut HtmlToAstParser,
         table: &HtmlElement,
-        headers: &mut Vec<Vec<Node>>,
-        rows: &mut Vec<Vec<Vec<Node>>>,
+        headers: &mut Vec<Node>,
+        rows: &mut Vec<Vec<Node>>,
         is_header: &mut bool,
     ) -> Result<()> {
-        // Process rows in the table
-        for row_node in &table.children {
+        // Process table structure (direct rows or thead/tbody)
+        for child_node in &table.children {
+            if let HtmlNode::Element(element) = child_node {
+                match element.tag {
+                    tag::thead => {
+                        // Process header rows
+                        Self::process_table_section(parser, element, headers, rows, true)?;
+                        *is_header = false;
+                    }
+                    tag::tbody => {
+                        // Process body rows
+                        Self::process_table_section(parser, element, headers, rows, false)?;
+                    }
+                    tag::tr => {
+                        // Direct row (no thead/tbody structure)
+                        let current_row =
+                            Self::process_table_row(parser, element, *is_header, headers)?;
+
+                        // After the first row, treat remaining rows as data rows
+                        if *is_header {
+                            *is_header = false;
+                        } else if !current_row.is_empty() {
+                            rows.push(current_row);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn process_table_section(
+        parser: &mut HtmlToAstParser,
+        section: &HtmlElement,
+        headers: &mut Vec<Node>,
+        rows: &mut Vec<Vec<Node>>,
+        is_header_section: bool,
+    ) -> Result<()> {
+        for row_node in &section.children {
             if let HtmlNode::Element(row_elem) = row_node {
                 if row_elem.tag == tag::tr {
                     let current_row =
-                        Self::process_table_row(parser, row_elem, *is_header, headers)?;
+                        Self::process_table_row(parser, row_elem, is_header_section, headers)?;
 
-                    // After the first row, treat remaining rows as data rows
-                    if *is_header {
-                        *is_header = false;
-                    } else if !current_row.is_empty() {
+                    if !is_header_section && !current_row.is_empty() {
                         rows.push(current_row);
                     }
                 }
@@ -115,22 +151,25 @@ impl TableParser {
         parser: &mut HtmlToAstParser,
         row_elem: &HtmlElement,
         is_header: bool,
-        headers: &mut Vec<Vec<Node>>,
-    ) -> Result<Vec<Vec<Node>>> {
+        headers: &mut Vec<Node>,
+    ) -> Result<Vec<Node>> {
         let mut current_row = Vec::new();
 
         // Process cells in this row
         for cell_node in &row_elem.children {
             if let HtmlNode::Element(cell) = cell_node {
-                if cell.tag == tag::td {
+                if cell.tag == tag::td || cell.tag == tag::th {
                     let mut cell_content = Vec::new();
                     parser.convert_children_into(&mut cell_content, cell)?;
 
+                    // Merge cell content into a single node
+                    let merged_cell = Self::merge_cell_content(cell_content);
+
                     // Add to appropriate section
-                    if is_header {
-                        headers.push(cell_content);
+                    if is_header || cell.tag == tag::th {
+                        headers.push(merged_cell);
                     } else {
-                        current_row.push(cell_content);
+                        current_row.push(merged_cell);
                     }
                 }
             }
@@ -139,48 +178,75 @@ impl TableParser {
         Ok(current_row)
     }
 
+    /// Merge cell content nodes into a single node
+    fn merge_cell_content(content: Vec<Node>) -> Node {
+        match content.len() {
+            0 => Node::Text("".to_string()),
+            1 => content.into_iter().next().unwrap(),
+            _ => Node::Custom(Box::new(InlineNode { content })),
+        }
+    }
+
     /// Check if the table has complex cells (rowspan/colspan)
     fn table_has_complex_cells(table: &HtmlElement) -> bool {
-        for row_node in &table.children {
-            if let HtmlNode::Element(row_elem) = row_node {
-                if row_elem.tag == tag::tr {
-                    for cell_node in &row_elem.children {
-                        if let HtmlNode::Element(cell) = cell_node {
-                            if (cell.tag == tag::td || cell.tag == tag::th)
-                                && cell.attrs.0.iter().any(|(name, _)| {
-                                    let name = name.into_inner();
-                                    name == PicoStr::constant("colspan")
-                                        || name == PicoStr::constant("rowspan")
-                                })
-                            {
-                                return true;
-                            }
+        for child_node in &table.children {
+            if let HtmlNode::Element(element) = child_node {
+                match element.tag {
+                    tag::thead | tag::tbody => {
+                        // Check rows within thead/tbody
+                        if Self::check_section_for_complex_cells(element) {
+                            return true;
                         }
                     }
+                    tag::tr => {
+                        // Direct row
+                        if Self::check_row_for_complex_cells(element) {
+                            return true;
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
         false
     }
 
-    fn create_table_node(
-        headers: Vec<Vec<Node>>,
-        rows: Vec<Vec<Vec<Node>>>,
-    ) -> Result<Option<Node>> {
+    fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
+        for row_node in &section.children {
+            if let HtmlNode::Element(row_elem) = row_node {
+                if row_elem.tag == tag::tr && Self::check_row_for_complex_cells(row_elem) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> bool {
+        for cell_node in &row_elem.children {
+            if let HtmlNode::Element(cell) = cell_node {
+                if (cell.tag == tag::td || cell.tag == tag::th)
+                    && cell.attrs.0.iter().any(|(name, _)| {
+                        let name = name.into_inner();
+                        name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
+                    })
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn create_table_node(headers: Vec<Node>, rows: Vec<Vec<Node>>) -> Result<Option<Node>> {
         // Create alignment array (default to None for all columns)
         let alignments = vec![TableAlignment::None; headers.len().max(1)];
 
         // If there is content, add the table to blocks
         if !headers.is_empty() || !rows.is_empty() {
-            let flattened_headers = headers.into_iter().flatten().collect();
-            let flattened_rows: Vec<_> = rows
-                .into_iter()
-                .map(|row| row.into_iter().flatten().collect())
-                .collect();
-
             return Ok(Some(Node::Table {
-                headers: flattened_headers,
-                rows: flattened_rows,
+                headers,
+                rows,
                 alignments,
             }));
         }
