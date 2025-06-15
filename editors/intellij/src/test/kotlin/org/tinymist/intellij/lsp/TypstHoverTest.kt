@@ -23,7 +23,6 @@ class TypstHoverTest : BasePlatformTestCase() {
      * This test opens a Typst file with a simple function definition,
      * places the caret on a parameter, and simulates a hover event.
      */
-    @Test
     fun testHoverOnParameter() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -78,7 +77,6 @@ class TypstHoverTest : BasePlatformTestCase() {
     /**
      * Test that hover works for a function call.
      */
-    @Test
     fun testHoverOnFunctionCall() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"

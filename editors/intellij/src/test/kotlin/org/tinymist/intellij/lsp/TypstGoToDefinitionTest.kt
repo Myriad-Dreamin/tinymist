@@ -49,19 +49,12 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
         // Calculate the expected position where the caret should move to
         val functionDefinitionOffset = fileContent.indexOf("#let highlight")
 
-        // If the LSP server is running and configured correctly, the caret should move
-        // But since we're not mocking the server, this might fail in a CI environment
-        if (newOffset != initialOffset) {
-            // Assert that the caret moved to the function definition
-            assertEquals("Caret did not move to the function definition", functionDefinitionOffset, newOffset)
+        // Assert that the caret moved to the function definition
+        assertEquals("Caret did not move to the function definition", functionDefinitionOffset, newOffset)
 
-            // Log for debugging
-            println("[DEBUG_LOG] Caret moved from $initialOffset to $newOffset")
-            println("[DEBUG_LOG] Function definition is at offset $functionDefinitionOffset")
-        } else {
-            // Log that the caret did not move, but don't fail the test
-            println("[DEBUG_LOG] Caret did not move. This is expected if the LSP server is not running or not configured correctly.")
-        }
+        // Log for debugging
+        println("[DEBUG_LOG] Caret moved from $initialOffset to $newOffset")
+        println("[DEBUG_LOG] Function definition is at offset $functionDefinitionOffset")
     }
 
     /**

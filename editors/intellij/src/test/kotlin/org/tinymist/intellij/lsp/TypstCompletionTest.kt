@@ -7,7 +7,7 @@ import org.junit.Assert.assertNotNull
 
 /**
  * Test for completion functionality in Typst files.
- * 
+ *
  * This test verifies that the completion functionality works correctly
  * by opening a Typst file and checking that completion suggestions are displayed.
  */
@@ -15,12 +15,11 @@ class TypstCompletionTest : BasePlatformTestCase() {
 
     /**
      * Test that completion works for a simple Typst file.
-     * 
+     *
      * This test opens a Typst file with a simple function call,
      * places the caret after the # character, and verifies that
      * completion suggestions are displayed when the completion action is triggered.
      */
-    @Test
     fun testCompletionAfterHash() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -30,7 +29,7 @@ class TypstCompletionTest : BasePlatformTestCase() {
             = Hello, Typst!
 
             This is a simple Typst document for testing.
-
+            
             #
             """
 
@@ -38,7 +37,7 @@ class TypstCompletionTest : BasePlatformTestCase() {
         myFixture.configureByText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger completion
-        myFixture.editor.caretModel.moveToOffset(fileContent.lastIndexOf("#") + 1)
+        myFixture.editor.caretModel.moveToOffset(fileContent.lastIndexOf("#"))
 
         // Wait for the LSP server to start and be ready
         Thread.sleep(2000)
@@ -46,30 +45,23 @@ class TypstCompletionTest : BasePlatformTestCase() {
         // Trigger completion at the current position
         val lookupElements = myFixture.completeBasic()
 
-        // If the LSP server is running and configured correctly, we should get some completion results
-        // But since we're not mocking the server, this might fail in a CI environment
-        if (lookupElements != null && lookupElements.isNotEmpty()) {
-            // Log for debugging
-            println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
-            println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
+        // Log for debugging
+        println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
+        println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
 
-            // Assert that the completion results contain expected items
-            // This is a simplified check that just verifies that we got some results
-            assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
-        } else {
-            // Log that no completion results were returned, but don't fail the test
-            println("[DEBUG_LOG] No completion elements returned. This is expected if the LSP server is not running or not configured correctly.")
-        }
+        // Assert that the completion results contain expected items
+        // This is a simplified check that just verifies that we got some results
+        assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
+
     }
 
     /**
      * Test that completion works for function parameters.
-     * 
+     *
      * This test opens a Typst file with a function call,
      * places the caret inside the function call, and verifies that
      * completion suggestions for parameters are displayed.
      */
-    @Test
     fun testCompletionForParameters() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -85,7 +77,7 @@ class TypstCompletionTest : BasePlatformTestCase() {
         myFixture.configureByText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger completion
-        myFixture.editor.caretModel.moveToOffset(fileContent.length)
+        myFixture.editor.caretModel.moveToOffset(20)
 
         // Wait for the LSP server to start and be ready
         Thread.sleep(2000)
@@ -93,19 +85,13 @@ class TypstCompletionTest : BasePlatformTestCase() {
         // Trigger completion at the current position
         val lookupElements = myFixture.completeBasic()
 
-        // If the LSP server is running and configured correctly, we should get some completion results
-        // But since we're not mocking the server, this might fail in a CI environment
-        if (lookupElements != null && lookupElements.isNotEmpty()) {
-            // Log for debugging
-            println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
-            println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
+        // Log for debugging
+        println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
+        println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
 
-            // Assert that the completion results contain expected items
-            // This is a simplified check that just verifies that we got some results
-            assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
-        } else {
-            // Log that no completion results were returned, but don't fail the test
-            println("[DEBUG_LOG] No completion elements returned. This is expected if the LSP server is not running or not configured correctly.")
-        }
+        // Assert that the completion results contain expected items
+        // This is a simplified check that just verifies that we got some results
+        assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
+
     }
 }
