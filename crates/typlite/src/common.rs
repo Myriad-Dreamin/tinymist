@@ -10,6 +10,7 @@ use cmark_writer::HtmlWriter;
 use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
 use cmark_writer::WriterOptions;
+use ecow::eco_format;
 use ecow::EcoString;
 use std::path::PathBuf;
 
@@ -56,10 +57,10 @@ impl FigureNode {
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let body = self.body.clone();
         let node = Node::HtmlElement(HtmlElement {
-            tag: "figure".into(),
+            tag: EcoString::inline("figure"),
             attributes: vec![HtmlAttribute {
-                name: "class".into(),
-                value: "figure".into(),
+                name: EcoString::inline("class"),
+                value: EcoString::inline("figure"),
             }],
             children: vec![*body],
             self_closing: false,
@@ -76,7 +77,7 @@ pub struct ExternalFrameNode {
     /// The path to the external file containing the frame
     pub file_path: PathBuf,
     /// Alternative text for the frame
-    pub alt_text: String,
+    pub alt_text: EcoString,
     /// Original SVG data (needed for DOCX that still embeds images)
     pub svg: String,
 }
@@ -94,15 +95,15 @@ impl ExternalFrameNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "img".into(),
+            tag: EcoString::inline("img"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "src".into(),
+                    name: EcoString::inline("src"),
                     value: self.file_path.display().to_string().into(),
                 },
                 HtmlAttribute {
-                    name: "alt".into(),
-                    value: self.alt_text.clone().into(),
+                    name: EcoString::inline("alt"),
+                    value: self.alt_text.clone(),
                 },
             ],
             children: vec![],
@@ -134,7 +135,7 @@ impl HighlightNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "mark".into(),
+            tag: EcoString::inline("mark"),
             attributes: vec![],
             children: self.content.clone(),
             self_closing: false,
@@ -156,10 +157,10 @@ impl CenterNode {
     pub fn new(children: Vec<Node>) -> Self {
         CenterNode {
             node: Node::HtmlElement(cmark_writer::ast::HtmlElement {
-                tag: "p".into(),
+                tag: EcoString::inline("p"),
                 attributes: vec![cmark_writer::ast::HtmlAttribute {
-                    name: "align".into(),
-                    value: "center".into(),
+                    name: EcoString::inline("align"),
+                    value: EcoString::inline("center"),
                 }],
                 children,
                 self_closing: false,
@@ -225,9 +226,10 @@ pub struct AlertNode {
 impl AlertNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         let quote = Node::BlockQuote(vec![
-            Node::Paragraph(vec![Node::Text(
-                ecow::EcoString::from("[!") + self.class.clone().to_ascii_uppercase() + "]",
-            )]),
+            Node::Paragraph(vec![Node::Text(eco_format!(
+                "[!{}]",
+                self.class.to_ascii_uppercase()
+            ))]),
             Node::Paragraph(vec![Node::Text("".into())]),
         ]);
         let mut tmp_writer = CommonMarkWriter::with_options(WriterOptions {

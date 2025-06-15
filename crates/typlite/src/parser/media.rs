@@ -47,19 +47,16 @@ impl HtmlToAstParser {
         if element.children.len() != 1 {
             // Construct error node
             return Node::HtmlElement(CmarkHtmlElement {
-                tag: "div".into(),
+                tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
-                    name: "class".into(),
-                    value: "error".into(),
+                    name: EcoString::inline("class"),
+                    value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(
-                    format!(
-                        "source contains not only one child: {}, whose attrs: {:?}",
-                        element.children.len(),
-                        element.attrs
-                    )
-                    .into(),
-                )],
+                children: vec![Node::Text(eco_format!(
+                    "source contains not only one child: {}, whose attrs: {:?}",
+                    element.children.len(),
+                    element.attrs
+                ))],
                 self_closing: false,
             });
         }
@@ -67,14 +64,15 @@ impl HtmlToAstParser {
         let Some(HtmlNode::Frame(frame)) = element.children.first() else {
             // todo: utils to remove duplicated error construction
             return Node::HtmlElement(CmarkHtmlElement {
-                tag: "div".into(),
+                tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
-                    name: "class".into(),
-                    value: "error".into(),
+                    name: EcoString::inline("class"),
+                    value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(
-                    format!("source contains not a frame, but: {:?}", element.children).into(),
-                )],
+                children: vec![Node::Text(eco_format!(
+                    "source contains not a frame, but: {:?}",
+                    element.children
+                ))],
                 self_closing: false,
             });
         };
@@ -85,12 +83,12 @@ impl HtmlToAstParser {
             Err(e) => {
                 // Construct error node
                 return Node::HtmlElement(CmarkHtmlElement {
-                    tag: "div".into(),
+                    tag: EcoString::inline("div"),
                     attributes: vec![HtmlAttribute {
-                        name: "class".into(),
-                        value: "error".into(),
+                        name: EcoString::inline("class"),
+                        value: EcoString::inline("error"),
                     }],
-                    children: vec![Node::Text(format!("Error creating source URL: {e}").into())],
+                    children: vec![Node::Text(eco_format!("Error creating source URL: {e}"))],
                     self_closing: false,
                 });
             }
@@ -105,14 +103,14 @@ impl HtmlToAstParser {
         });
 
         Node::HtmlElement(CmarkHtmlElement {
-            tag: "source".into(),
+            tag: EcoString::inline("source"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "media".into(),
+                    name: EcoString::inline("media"),
                     value: media.unwrap_or_else(|| "all".into()),
                 },
                 HtmlAttribute {
-                    name: "srcset".into(),
+                    name: EcoString::inline("srcset"),
                     value: frame_url.to_string().into(),
                 },
             ],
@@ -139,7 +137,7 @@ impl HtmlToAstParser {
             Ok(url @ AssetUrl::Embedded(..)) => Self::create_embedded_frame(&url),
             Ok(AssetUrl::External(file_path)) => Node::Custom(Box::new(ExternalFrameNode {
                 file_path,
-                alt_text: "typst-frame".into(),
+                alt_text: EcoString::inline("typst-frame"),
                 svg,
             })),
             Err(e) => {
@@ -149,14 +147,12 @@ impl HtmlToAstParser {
                 } else {
                     // Construct error node
                     Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".into(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".into(),
-                            value: "error".into(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(
-                            format!("Error creating frame URL: {}", e).into(),
-                        )],
+                        children: vec![Node::Text(eco_format!("Error creating frame URL: {e}"))],
                         self_closing: false,
                     })
                 }
@@ -167,14 +163,14 @@ impl HtmlToAstParser {
     /// Create embedded frame node
     fn create_embedded_frame(url: &AssetUrl) -> Node {
         Node::HtmlElement(CmarkHtmlElement {
-            tag: "img".into(),
+            tag: EcoString::inline("img"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "alt".into(),
-                    value: "typst-block".into(),
+                    name: EcoString::inline("alt"),
+                    value: EcoString::inline("typst-block"),
                 },
                 HtmlAttribute {
-                    name: "src".into(),
+                    name: EcoString::inline("src"),
                     value: url.to_string().into(),
                 },
             ],
@@ -221,18 +217,18 @@ impl HtmlToAstParser {
             Ok(attrs) => attrs,
             Err(e) => {
                 if self.feat.soft_error {
-                    return Node::Text(format!("Error parsing idoc attributes: {e}").into());
+                    return Node::Text(eco_format!("Error parsing idoc attributes: {e}"));
                 } else {
                     // Construct error node
                     return Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".into(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".into(),
-                            value: "error".into(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(
-                            format!("Error parsing idoc attributes: {e}").into(),
-                        )],
+                        children: vec![Node::Text(eco_format!(
+                            "Error parsing idoc attributes: {e}"
+                        ))],
                         self_closing: false,
                     });
                 }
@@ -279,16 +275,16 @@ impl HtmlToAstParser {
             Ok(doc) => doc,
             Err(e) => {
                 if self.feat.soft_error {
-                    return Node::Text(format!("Error compiling idoc: {e:?}").into());
+                    return Node::Text(eco_format!("Error compiling idoc: {e:?}"));
                 } else {
                     // Construct error node
                     return Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".into(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".into(),
-                            value: "error".into(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(format!("Error compiling idoc: {e:?}").into())],
+                        children: vec![Node::Text(eco_format!("Error compiling idoc: {e:?}"))],
                         self_closing: false,
                     });
                 }

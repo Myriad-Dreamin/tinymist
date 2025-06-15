@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::{CommonMarkWriter, WriteResult};
+use ecow::EcoString;
 use tinymist_project::LspWorld;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
@@ -201,8 +202,8 @@ impl HtmlToAstParser {
             .0
             .iter()
             .map(|(name, value)| HtmlAttribute {
-                name: name.to_string().into(),
-                value: value.into(),
+                name: name.resolve().to_string().into(),
+                value: value.clone(),
             })
             .collect();
 
@@ -235,7 +236,7 @@ impl HtmlToAstParser {
         for child in &element.children {
             match child {
                 HtmlNode::Text(text, _) => {
-                    self.inline_buffer.push(Node::Text(text.into()));
+                    self.inline_buffer.push(Node::Text(text.clone()));
                 }
                 HtmlNode::Element(element) => {
                     self.convert_element(element)?;
@@ -264,7 +265,7 @@ impl HtmlToAstParser {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Comment(pub String);
+pub(crate) struct Comment(pub EcoString);
 
 impl CustomNode for Comment {
     fn as_any(&self) -> &dyn std::any::Any {

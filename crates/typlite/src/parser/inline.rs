@@ -59,9 +59,8 @@ impl HtmlToAstParser {
     /// Convert image element
     pub fn convert_image(&mut self, element: &HtmlElement) -> Result<()> {
         let attrs = ImageAttr::parse(&element.attrs)?;
-        let src = attrs.src.as_str();
         self.inline_buffer.push(Node::Image {
-            url: src.into(),
+            url: attrs.src,
             title: None,
             alt: vec![Node::Text(attrs.alt)],
         });

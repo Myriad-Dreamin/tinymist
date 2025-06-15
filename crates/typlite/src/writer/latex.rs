@@ -248,7 +248,7 @@ impl LaTeXWriter {
                             } = node
                             {
                                 // Path to the image file
-                                let path = unix_slash(Path::new(&url.to_string()));
+                                let path = unix_slash(Path::new(url.as_str()));
 
                                 // Write includegraphics command
                                 output.push_str("\\includegraphics[width=0.8\\textwidth]{");
@@ -352,7 +352,7 @@ impl LaTeXWriter {
                     "".into()
                 };
 
-                let path = unix_slash(Path::new(&url.to_string()));
+                let path = unix_slash(Path::new(&url.as_str()));
 
                 output.push_str("\\begin{figure}\n");
                 output.push_str("\\centering\n");
