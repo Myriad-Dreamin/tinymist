@@ -49,7 +49,7 @@ impl HtmlToAstParser {
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
         self.inline_buffer.push(Node::Link {
-            url: attrs.dest.into(),
+            url: attrs.dest,
             title: None,
             content,
         });
@@ -61,9 +61,9 @@ impl HtmlToAstParser {
         let attrs = ImageAttr::parse(&element.attrs)?;
         let src = attrs.src.as_str();
         self.inline_buffer.push(Node::Image {
-            url: src.to_string(),
+            url: src.into(),
             title: None,
-            alt: vec![Node::Text(attrs.alt.into())],
+            alt: vec![Node::Text(attrs.alt)],
         });
         Ok(())
     }

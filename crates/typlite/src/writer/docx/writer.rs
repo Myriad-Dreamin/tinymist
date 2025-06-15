@@ -81,7 +81,7 @@ impl DocxWriter {
                     } = node
                     {
                         // Process the image
-                        if let Ok(img_data) = fs::read(url) {
+                        if let Ok(img_data) = fs::read(url.to_string()) {
                             let alt_text = figure_node.caption.clone();
                             // Add the image with caption
                             docx = self.image_processor.process_image_data(
@@ -191,7 +191,7 @@ impl DocxWriter {
                 title: _,
                 alt: _,
             } => {
-                if let Ok(img_data) = fs::read(url) {
+                if let Ok(img_data) = fs::read(url.to_string()) {
                     run = self.image_processor.process_inline_image(run, &img_data)?;
                 } else {
                     run = run.add_text(format!("[Image not found: {}]", url));

@@ -56,10 +56,10 @@ impl FigureNode {
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let body = self.body.clone();
         let node = Node::HtmlElement(HtmlElement {
-            tag: "figure".to_string(),
+            tag: "figure".into(),
             attributes: vec![HtmlAttribute {
-                name: "class".to_string(),
-                value: "figure".to_string(),
+                name: "class".into(),
+                value: "figure".into(),
             }],
             children: vec![*body],
             self_closing: false,
@@ -94,15 +94,15 @@ impl ExternalFrameNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "img".to_string(),
+            tag: "img".into(),
             attributes: vec![
                 HtmlAttribute {
-                    name: "src".to_string(),
-                    value: self.file_path.display().to_string(),
+                    name: "src".into(),
+                    value: self.file_path.display().to_string().into(),
                 },
                 HtmlAttribute {
-                    name: "alt".to_string(),
-                    value: self.alt_text.clone(),
+                    name: "alt".into(),
+                    value: self.alt_text.clone().into(),
                 },
             ],
             children: vec![],
@@ -134,7 +134,7 @@ impl HighlightNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "mark".to_string(),
+            tag: "mark".into(),
             attributes: vec![],
             children: self.content.clone(),
             self_closing: false,
@@ -156,10 +156,10 @@ impl CenterNode {
     pub fn new(children: Vec<Node>) -> Self {
         CenterNode {
             node: Node::HtmlElement(cmark_writer::ast::HtmlElement {
-                tag: "p".to_string(),
+                tag: "p".into(),
                 attributes: vec![cmark_writer::ast::HtmlAttribute {
-                    name: "align".to_string(),
-                    value: "center".to_string(),
+                    name: "align".into(),
+                    value: "center".into(),
                 }],
                 children,
                 self_closing: false,
@@ -226,9 +226,9 @@ impl AlertNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         let quote = Node::BlockQuote(vec![
             Node::Paragraph(vec![Node::Text(
-                "[!".to_string() + &self.class.clone().to_string().to_ascii_uppercase() + "]",
+                ecow::EcoString::from("[!") + self.class.clone().to_ascii_uppercase() + "]",
             )]),
-            Node::Paragraph(vec![Node::Text("".to_string())]),
+            Node::Paragraph(vec![Node::Text("".into())]),
         ]);
         let mut tmp_writer = CommonMarkWriter::with_options(WriterOptions {
             escape_special_chars: false,
@@ -239,7 +239,7 @@ impl AlertNode {
         let quote = Node::BlockQuote(self.content.clone());
         let mut tmp_writer = CommonMarkWriter::with_options(writer.options.clone());
         tmp_writer.write(&quote)?;
-        content += &tmp_writer.into_string();
+        content += tmp_writer.into_string();
         writer.write_str(&content)?;
         Ok(())
     }
