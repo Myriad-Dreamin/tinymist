@@ -256,16 +256,23 @@ impl HtmlToAstParser {
 
         const PRELUDE: &str = r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
             #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";"##;
+
+        let import_prefix = if let Some(ref import_ctx) = self.feat.import_context {
+            format!("{}\n", import_ctx)
+        } else {
+            String::new()
+        };
+
         world
             .map_shadow_by_id(
                 main,
                 Bytes::from_string(match mode.as_str() {
-                    "code" => eco_format!("{PRELUDE}#{{{src}}}"),
-                    "math" => eco_format!("{PRELUDE}${src}$"),
-                    "markup" => eco_format!("{PRELUDE}#[{}]", src),
+                    "code" => eco_format!("{}{PRELUDE}#{{{src}}}", import_prefix),
+                    "math" => eco_format!("{}{PRELUDE}${src}$", import_prefix),
+                    "markup" => eco_format!("{}{PRELUDE}#[{}]", import_prefix, src),
                     // todo check mode
                     //  "markup" |
-                    _ => eco_format!("{PRELUDE}#[{}]", src),
+                    _ => eco_format!("{}{PRELUDE}#[{}]", import_prefix, src),
                 }),
             )
             .unwrap();
