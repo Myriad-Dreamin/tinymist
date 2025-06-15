@@ -10,6 +10,7 @@ use cmark_writer::HtmlWriter;
 use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
 use cmark_writer::WriterOptions;
+use ecow::eco_format;
 use ecow::EcoString;
 use std::path::PathBuf;
 
@@ -56,10 +57,10 @@ impl FigureNode {
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let body = self.body.clone();
         let node = Node::HtmlElement(HtmlElement {
-            tag: "figure".to_string(),
+            tag: EcoString::inline("figure"),
             attributes: vec![HtmlAttribute {
-                name: "class".to_string(),
-                value: "figure".to_string(),
+                name: EcoString::inline("class"),
+                value: EcoString::inline("figure"),
             }],
             children: vec![*body],
             self_closing: false,
@@ -76,7 +77,7 @@ pub struct ExternalFrameNode {
     /// The path to the external file containing the frame
     pub file_path: PathBuf,
     /// Alternative text for the frame
-    pub alt_text: String,
+    pub alt_text: EcoString,
     /// Original SVG data (needed for DOCX that still embeds images)
     pub svg: String,
 }
@@ -94,14 +95,14 @@ impl ExternalFrameNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "img".to_string(),
+            tag: EcoString::inline("img"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "src".to_string(),
-                    value: self.file_path.display().to_string(),
+                    name: EcoString::inline("src"),
+                    value: self.file_path.display().to_string().into(),
                 },
                 HtmlAttribute {
-                    name: "alt".to_string(),
+                    name: EcoString::inline("alt"),
                     value: self.alt_text.clone(),
                 },
             ],
@@ -134,7 +135,7 @@ impl HighlightNode {
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let node = Node::HtmlElement(HtmlElement {
-            tag: "mark".to_string(),
+            tag: EcoString::inline("mark"),
             attributes: vec![],
             children: self.content.clone(),
             self_closing: false,
@@ -156,10 +157,10 @@ impl CenterNode {
     pub fn new(children: Vec<Node>) -> Self {
         CenterNode {
             node: Node::HtmlElement(cmark_writer::ast::HtmlElement {
-                tag: "p".to_string(),
+                tag: EcoString::inline("p"),
                 attributes: vec![cmark_writer::ast::HtmlAttribute {
-                    name: "align".to_string(),
-                    value: "center".to_string(),
+                    name: EcoString::inline("align"),
+                    value: EcoString::inline("center"),
                 }],
                 children,
                 self_closing: false,
@@ -225,10 +226,11 @@ pub struct AlertNode {
 impl AlertNode {
     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
         let quote = Node::BlockQuote(vec![
-            Node::Paragraph(vec![Node::Text(
-                "[!".to_string() + &self.class.clone().to_string().to_ascii_uppercase() + "]",
-            )]),
-            Node::Paragraph(vec![Node::Text("".to_string())]),
+            Node::Paragraph(vec![Node::Text(eco_format!(
+                "[!{}]",
+                self.class.to_ascii_uppercase()
+            ))]),
+            Node::Paragraph(vec![Node::Text("".into())]),
         ]);
         let mut tmp_writer = CommonMarkWriter::with_options(WriterOptions {
             escape_special_chars: false,
@@ -239,7 +241,7 @@ impl AlertNode {
         let quote = Node::BlockQuote(self.content.clone());
         let mut tmp_writer = CommonMarkWriter::with_options(writer.options.clone());
         tmp_writer.write(&quote)?;
-        content += &tmp_writer.into_string();
+        content += tmp_writer.into_string();
         writer.write_str(&content)?;
         Ok(())
     }

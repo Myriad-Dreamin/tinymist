@@ -1,6 +1,7 @@
 //! HTML list parsing module, handling conversion of ordered and unordered lists
 
 use cmark_writer::ast::{ListItem, Node};
+use ecow::eco_format;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{ListItemAttr, TypliteAttrsParser};
@@ -32,7 +33,7 @@ impl ListParser {
                     let mut li_buffer = Vec::new();
 
                     if parser.feat.annotate_elem {
-                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(format!(
+                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
                             "typlite:begin:list-item {}",
                             parser.list_level - 1
                         )))));
@@ -41,7 +42,7 @@ impl ListParser {
                     for li_child in &li.children {
                         match li_child {
                             HtmlNode::Text(text, _) => {
-                                li_buffer.push(Node::Text(text.as_str().to_string()));
+                                li_buffer.push(Node::Text(text.clone()));
                             }
                             HtmlNode::Element(child_elem) => {
                                 let element_content =
@@ -56,7 +57,7 @@ impl ListParser {
                     }
 
                     if parser.feat.annotate_elem {
-                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(format!(
+                        li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
                             "typlite:end:list-item {}",
                             parser.list_level - 1
                         )))));

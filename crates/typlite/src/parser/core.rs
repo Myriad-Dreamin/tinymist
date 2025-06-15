@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::{CommonMarkWriter, WriteResult};
+use ecow::EcoString;
 use tinymist_project::LspWorld;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
@@ -98,9 +99,9 @@ impl HtmlToAstParser {
                 if attrs.block {
                     self.flush_inline_buffer();
                     self.blocks
-                        .push(Node::code_block(Some(attrs.lang.into()), attrs.text.into()));
+                        .push(Node::code_block(Some(attrs.lang), attrs.text));
                 } else {
-                    self.inline_buffer.push(Node::InlineCode(attrs.text.into()));
+                    self.inline_buffer.push(Node::InlineCode(attrs.text));
                 }
                 Ok(())
             }
@@ -201,8 +202,8 @@ impl HtmlToAstParser {
             .0
             .iter()
             .map(|(name, value)| HtmlAttribute {
-                name: name.to_string(),
-                value: value.to_string(),
+                name: name.resolve().to_string().into(),
+                value: value.clone(),
             })
             .collect();
 
@@ -210,7 +211,7 @@ impl HtmlToAstParser {
         self.convert_children_into(&mut children, element)?;
 
         Ok(Node::HtmlElement(CmarkHtmlElement {
-            tag: element.tag.resolve().to_string(),
+            tag: element.tag.resolve().to_string().into(),
             attributes,
             children,
             self_closing: element.children.is_empty(),
@@ -235,8 +236,7 @@ impl HtmlToAstParser {
         for child in &element.children {
             match child {
                 HtmlNode::Text(text, _) => {
-                    self.inline_buffer
-                        .push(Node::Text(text.as_str().to_string()));
+                    self.inline_buffer.push(Node::Text(text.clone()));
                 }
                 HtmlNode::Element(element) => {
                     self.convert_element(element)?;
@@ -265,7 +265,7 @@ impl HtmlToAstParser {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Comment(pub String);
+pub(crate) struct Comment(pub EcoString);
 
 impl CustomNode for Comment {
     fn as_any(&self) -> &dyn std::any::Any {

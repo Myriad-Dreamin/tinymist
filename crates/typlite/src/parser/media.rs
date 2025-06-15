@@ -6,7 +6,7 @@ use std::sync::{Arc, LazyLock};
 
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
-use ecow::eco_format;
+use ecow::{eco_format, EcoString};
 use tinymist_project::{base::ShadowApi, EntryReader, TaskInputs, MEMORY_MAIN_ENTRY};
 use typst::{
     foundations::{Bytes, Dict, IntoValue},
@@ -47,12 +47,12 @@ impl HtmlToAstParser {
         if element.children.len() != 1 {
             // Construct error node
             return Node::HtmlElement(CmarkHtmlElement {
-                tag: "div".to_string(),
+                tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
-                    name: "class".to_string(),
-                    value: "error".to_string(),
+                    name: EcoString::inline("class"),
+                    value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(format!(
+                children: vec![Node::Text(eco_format!(
                     "source contains not only one child: {}, whose attrs: {:?}",
                     element.children.len(),
                     element.attrs
@@ -64,12 +64,12 @@ impl HtmlToAstParser {
         let Some(HtmlNode::Frame(frame)) = element.children.first() else {
             // todo: utils to remove duplicated error construction
             return Node::HtmlElement(CmarkHtmlElement {
-                tag: "div".to_string(),
+                tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
-                    name: "class".to_string(),
-                    value: "error".to_string(),
+                    name: EcoString::inline("class"),
+                    value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(format!(
+                children: vec![Node::Text(eco_format!(
                     "source contains not a frame, but: {:?}",
                     element.children
                 ))],
@@ -83,12 +83,12 @@ impl HtmlToAstParser {
             Err(e) => {
                 // Construct error node
                 return Node::HtmlElement(CmarkHtmlElement {
-                    tag: "div".to_string(),
+                    tag: EcoString::inline("div"),
                     attributes: vec![HtmlAttribute {
-                        name: "class".to_string(),
-                        value: "error".to_string(),
+                        name: EcoString::inline("class"),
+                        value: EcoString::inline("error"),
                     }],
-                    children: vec![Node::Text(format!("Error creating source URL: {e}"))],
+                    children: vec![Node::Text(eco_format!("Error creating source URL: {e}"))],
                     self_closing: false,
                 });
             }
@@ -103,17 +103,15 @@ impl HtmlToAstParser {
         });
 
         Node::HtmlElement(CmarkHtmlElement {
-            tag: "source".to_string(),
+            tag: EcoString::inline("source"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "media".to_string(),
-                    value: media
-                        .map(|m| m.to_string())
-                        .unwrap_or_else(|| "all".to_string()),
+                    name: EcoString::inline("media"),
+                    value: media.unwrap_or_else(|| "all".into()),
                 },
                 HtmlAttribute {
-                    name: "srcset".to_string(),
-                    value: frame_url.to_string(),
+                    name: EcoString::inline("srcset"),
+                    value: frame_url.to_string().into(),
                 },
             ],
             children: vec![],
@@ -125,7 +123,7 @@ impl HtmlToAstParser {
     pub fn convert_frame(&mut self, frame: &Frame) -> Node {
         if self.feat.remove_html {
             // todo: make error silent is not good.
-            return Node::Text(String::new());
+            return Node::Text(EcoString::new());
         }
 
         let svg = typst_svg::svg_frame(frame);
@@ -139,7 +137,7 @@ impl HtmlToAstParser {
             Ok(url @ AssetUrl::Embedded(..)) => Self::create_embedded_frame(&url),
             Ok(AssetUrl::External(file_path)) => Node::Custom(Box::new(ExternalFrameNode {
                 file_path,
-                alt_text: "typst-frame".to_string(),
+                alt_text: EcoString::inline("typst-frame"),
                 svg,
             })),
             Err(e) => {
@@ -149,12 +147,12 @@ impl HtmlToAstParser {
                 } else {
                     // Construct error node
                     Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".to_string(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".to_string(),
-                            value: "error".to_string(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(format!("Error creating frame URL: {}", e))],
+                        children: vec![Node::Text(eco_format!("Error creating frame URL: {e}"))],
                         self_closing: false,
                     })
                 }
@@ -165,15 +163,15 @@ impl HtmlToAstParser {
     /// Create embedded frame node
     fn create_embedded_frame(url: &AssetUrl) -> Node {
         Node::HtmlElement(CmarkHtmlElement {
-            tag: "img".to_string(),
+            tag: EcoString::inline("img"),
             attributes: vec![
                 HtmlAttribute {
-                    name: "alt".to_string(),
-                    value: "typst-block".to_string(),
+                    name: EcoString::inline("alt"),
+                    value: EcoString::inline("typst-block"),
                 },
                 HtmlAttribute {
-                    name: "src".to_string(),
-                    value: url.to_string(),
+                    name: EcoString::inline("src"),
+                    value: url.to_string().into(),
                 },
             ],
             children: vec![],
@@ -213,22 +211,24 @@ impl HtmlToAstParser {
         if self.feat.remove_html {
             eprintln!("Removing idoc element due to remove_html feature");
             // todo: make error silent is not good.
-            return Node::Text(String::new());
+            return Node::Text(EcoString::new());
         }
         let attrs = match IdocAttr::parse(&element.attrs) {
             Ok(attrs) => attrs,
             Err(e) => {
                 if self.feat.soft_error {
-                    return Node::Text(format!("Error parsing idoc attributes: {e}"));
+                    return Node::Text(eco_format!("Error parsing idoc attributes: {e}"));
                 } else {
                     // Construct error node
                     return Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".to_string(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".to_string(),
-                            value: "error".to_string(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(format!("Error parsing idoc attributes: {e}"))],
+                        children: vec![Node::Text(eco_format!(
+                            "Error parsing idoc attributes: {e}"
+                        ))],
                         self_closing: false,
                     });
                 }
@@ -275,16 +275,16 @@ impl HtmlToAstParser {
             Ok(doc) => doc,
             Err(e) => {
                 if self.feat.soft_error {
-                    return Node::Text(format!("Error compiling idoc: {e:?}"));
+                    return Node::Text(eco_format!("Error compiling idoc: {e:?}"));
                 } else {
                     // Construct error node
                     return Node::HtmlElement(CmarkHtmlElement {
-                        tag: "div".to_string(),
+                        tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
-                            name: "class".to_string(),
-                            value: "error".to_string(),
+                            name: EcoString::inline("class"),
+                            value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(format!("Error compiling idoc: {e:?}"))],
+                        children: vec![Node::Text(eco_format!("Error compiling idoc: {e:?}"))],
                         self_closing: false,
                     });
                 }
