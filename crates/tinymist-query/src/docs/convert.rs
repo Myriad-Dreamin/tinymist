@@ -35,10 +35,10 @@ pub(crate) fn convert_docs(
             //     // TODO: This cause an error if working dir does not include `typst.toml`.
             //     imports.push(format!("#import \"{}\": *", pkg));
             // }
-            imports.push(format!("#import \"{}\": *", path));
+            imports.push(format!("#import \"{path}\": *"));
             let imports = imports.join("\n");
             let content_with_import: String = if !imports.is_empty() {
-                format!("{}\n\n{}", imports, content)
+                format!("{imports}\n\n{content}")
             } else {
                 content.to_owned()
             };

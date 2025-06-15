@@ -256,14 +256,13 @@ impl HtmlToAstParser {
 
         const PRELUDE: &str = r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
             #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";"##;
-        
-        // Add import context if available
+
         let import_prefix = if let Some(ref import_ctx) = self.feat.import_context {
             format!("{}\n", import_ctx)
         } else {
             String::new()
         };
-        
+
         world
             .map_shadow_by_id(
                 main,
