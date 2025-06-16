@@ -159,6 +159,8 @@ pub struct TypliteFeat {
     pub remove_html: bool,
     /// The target to convert
     pub target: Format,
+    /// Import context for code examples (e.g., "#import \"/path/to/file.typ\": *")
+    pub import_context: Option<String>,
 }
 
 /// Task builder for converting a typst document to Markdown.
