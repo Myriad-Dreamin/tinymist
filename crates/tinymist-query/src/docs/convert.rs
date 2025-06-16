@@ -95,9 +95,9 @@ fn get_import_path_for_file(ctx: &SharedContext, source_fid: FileId) -> StrResul
     match resolver_result {
         Ok(Some(_)) => {
             let vpath = source_fid.vpath();
-            let path = vpath.as_rooted_path();
-            let path_str = path.to_string_lossy();
-            Ok(Some(path_str.to_string()))
+            let path = vpath.as_rootless_path();
+            let path_str = path.to_string_lossy().replace('\\', "/");
+            Ok(Some(path_str))
         }
         Ok(None) => Ok(None),
         Err(_) => Ok(None),
