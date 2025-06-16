@@ -13,8 +13,8 @@ With new approach to converting typst to other markup, we fully supported typst 
 There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/ieee-paper) ([Permalink](https://github.com/Myriad-Dreamin/tinymist/tree/5a2509327d160830d68c5962181b4a1687fe367a/editors/vscode/e2e-workspaces/ieee-paper)) to test the LaTeX export for creating IEEE papers.
 
 * Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
-* Bumped typstyle to v0.13.10 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737 and https://github.com/Myriad-Dreamin/tinymist/pull/1797
-  * This includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v01310---2025-06-05
+* Bumped typstyle to v0.13.11 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737, https://github.com/Myriad-Dreamin/tinymist/pull/1797 and https://github.com/Myriad-Dreamin/tinymist/pull/1814
+  * This includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v01311---2025-06-14
 
 ### Editor
 
