@@ -1,6 +1,5 @@
 package org.tinymist.intellij.lsp
 
-// Ensure these imports are present or adjust as needed
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider // Assuming this is the base class
 // Remove imports for the old data classes if they are no longer used elsewhere
 // import org.tinymist.intellij.lsp.BackgroundPreviewOptions
@@ -14,14 +13,11 @@ import com.intellij.openapi.diagnostic.Logger
 import org.tinymist.intellij.settings.TinymistSettingsService
 import java.io.File
 
-// Assuming your class looks something like this:
 class TinymistLspStreamConnectionProvider(private val project: Project) : ProcessStreamConnectionProvider() {
 
     companion object {
         private val LOG = Logger.getInstance(TinymistLspStreamConnectionProvider::class.java)
         private const val TINYMIST_EXECUTABLE_NAME = "tinymist"
-        // Ultimate fallback for development, should be removed or handled better in production
-        private const val DEV_FALLBACK_PATH = "/Users/juliusschmitt/kotlin/tinymist/target/debug/tinymist"
     }
 
     init {
@@ -43,17 +39,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
             if (resolvedExecutablePath != null) {
                 LOG.info("Found Tinymist executable on PATH: $resolvedExecutablePath")
             } else {
-                LOG.warn("Tinymist executable not found in settings or on PATH. Trying development fallback.")
-                // Development fallback - consider removing or improving this for production
-                val devFallbackFile = File(DEV_FALLBACK_PATH)
-                if (devFallbackFile.exists() && devFallbackFile.isFile && devFallbackFile.canExecute()) {
-                    LOG.warn("Using DEVELOPMENT FALLBACK Tinymist executable path: $DEV_FALLBACK_PATH. Please configure the path in settings.")
-                    resolvedExecutablePath = DEV_FALLBACK_PATH
-                } else {
-                    LOG.error("Tinymist executable not found. Please configure the path in 'Settings -> Tools -> Tinymist LSP' or ensure it's on your PATH. Development fallback also failed: $DEV_FALLBACK_PATH")
-                    // Do not set commands if no valid executable is found.
-                    // LSP server will not start, error is logged.
-                }
+                LOG.error("Could not find Tinymist executable on PATH.")
             }
         }
         // Only set commands if a valid executable path was resolved
@@ -105,10 +91,4 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
 
         return options // Return the Map directly
     }
-
-    // Add other necessary overrides like getWorkingDirectory()
-    // override fun getWorkingDirectory(projectRoot: Path?): String? { ... }
-
-    // Placeholder for executable finding logic
-    // private fun findTinymistExecutable(): String { ... }
 } 

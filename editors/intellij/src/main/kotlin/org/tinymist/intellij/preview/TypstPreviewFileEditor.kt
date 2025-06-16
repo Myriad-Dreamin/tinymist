@@ -7,7 +7,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import org.cef.browser.CefBrowser
@@ -23,11 +22,6 @@ import com.intellij.ui.jcef.JCEFHtmlPanel
 import javax.swing.JLabel
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefLoadHandler
-import com.intellij.openapi.util.registry.Registry
-import org.cef.handler.CefDisplayHandlerAdapter
-import org.cef.CefSettings
-
-// This version ONLY loads the fixed URL for the background tinymist preview server.
 
 class TypstPreviewFileEditor(
     private val project: Project,
@@ -37,11 +31,7 @@ class TypstPreviewFileEditor(
     // Define the Tinymist preview URL (default background port)
     private val previewHost = "127.0.0.1"
     private val previewPort = 23635
-    private val tinymistPreviewUrl: String
-        get() {
-            val encodedPath = java.net.URLEncoder.encode(virtualFile.path, "UTF-8")
-            return "http://$previewHost:$previewPort?file=$encodedPath"
-        }
+    private val tinymistPreviewUrl = "http://$previewHost:$previewPort"
 
     // Flag to track if the server check is complete and successful
     @Volatile
@@ -49,8 +39,6 @@ class TypstPreviewFileEditor(
     private var jcefUnsupportedLabel: JLabel? = null
 
     init {
-        // Register this editor in the active previews map
-        registerPreviewEditor(virtualFile.path, this)
 
         if (!JBCefApp.isSupported()) {
             println("TypstPreviewFileEditor: JCEF is not supported! Preview will show an error message.")
@@ -71,19 +59,8 @@ class TypstPreviewFileEditor(
         println("TypstPreviewFileEditor: Initialization complete.")
     }
 
-    private fun isServerReady(): Boolean {
-        return try {
-            Socket().use { socket ->
-                socket.connect(InetSocketAddress(previewHost, previewPort), 50)
-                true
-            }
-        } catch (e: IOException) {
-            false
-        }
-    }
-
     private fun waitForServerAndLoad() {
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Waiting for Tinymist Server", false) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "WaitingForTinymistServer", false) {
             override fun run(indicator: ProgressIndicator) {
                 var attempts = 0
                 val maxAttempts = 60
@@ -97,7 +74,7 @@ class TypstPreviewFileEditor(
                             println("TypstPreviewFileEditor: Tinymist server is ready at $previewHost:$previewPort.")
                             serverFound = true
                         }
-                    } catch (e: IOException) {
+                    } catch (_: IOException) {
                         attempts++
                         indicator.text2 = "Attempt $attempts/$maxAttempts to connect to $previewHost:$previewPort"
                         Thread.sleep(500)
@@ -115,14 +92,8 @@ class TypstPreviewFileEditor(
                 }
 
                 if (isServerReady) {
-                    // Check if this is still the registered editor for this file
-                    val registeredEditor = getPreviewEditor(virtualFile.path)
-                    if (registeredEditor == this@TypstPreviewFileEditor) {
-                        println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
-                        this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
-                    } else {
-                        println("TypstPreviewFileEditor: This is no longer the registered editor for ${virtualFile.path}, not loading URL")
-                    }
+                    println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
+                    this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
                 } else {
                     println("TypstPreviewFileEditor: Server not ready. Displaying error.")
                     ApplicationManager.getApplication().invokeLater {
@@ -188,14 +159,6 @@ class TypstPreviewFileEditor(
 
     override fun selectNotify() {
         println("TypstPreviewFileEditor: selectNotify called for ${virtualFile.name}")
-
-        // Check if this is the registered preview editor for this file
-        val registeredEditor = getPreviewEditor(virtualFile.path)
-        if (registeredEditor != this) {
-            println("TypstPreviewFileEditor: selectNotify - This is not the registered editor for ${virtualFile.path}, registering it")
-            registerPreviewEditor(virtualFile.path, this)
-        }
-
         // Reload the content when the editor is selected, if the server is ready
         // and the JCEF component is supported and initialized.
         if (JBCefApp.isSupported() && isServerReady && !isDisposed) {
@@ -221,32 +184,17 @@ class TypstPreviewFileEditor(
             if (JBCefApp.isSupported() && !isDisposed) { // Check if not already disposed
                 // It's generally safer to access cefBrowser only if the panel is not yet disposed
                 // and JCEF is supported.
-                cefBrowser?.stopLoad()
+                cefBrowser.stopLoad()
                 println("TypstPreviewFileEditor: Called cefBrowser.stopLoad()")
             }
         } catch (e: Exception) {
             // Log any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
             println("TypstPreviewFileEditor: Exception during cefBrowser.stopLoad() in dispose: ${e.message}")
         }
-
-        // Unregister this editor from the active previews map
-        unregisterPreviewEditor(virtualFile.path)
-
         // Explicitly call super.dispose() to ensure JCEFHtmlPanel cleans up its resources.
         // This must be done.
         super.dispose()
         println("TypstPreviewFileEditor: super.dispose() called.")
-    }
-
-    private fun setupDisplayHandler() {
-        this.jbCefClient.addDisplayHandler(object : CefDisplayHandlerAdapter() {
-            override fun onConsoleMessage(browser: CefBrowser, level: CefSettings.LogSeverity,
-                                          message: String, source: String, line: Int): Boolean {
-                val formattedMessage = "JS CONSOLE [$level] ($source:$line): $message"
-                println(formattedMessage)
-                return false // False to allow the message to also be processed by the default handler (e.g., DevTools)
-            }
-        }, this.cefBrowser)
     }
 
     private fun setupLoadHandler() {
@@ -268,28 +216,4 @@ class TypstPreviewFileEditor(
             }
         }, this.cefBrowser)
     }
-
-    companion object {
-
-
-        // Map to track active previews per document
-        private val activePreviewEditors = mutableMapOf<String, TypstPreviewFileEditor>()
-
-        // Register a preview editor for a document
-        fun registerPreviewEditor(filePath: String, editor: TypstPreviewFileEditor) {
-            activePreviewEditors[filePath] = editor
-            println("TypstPreviewFileEditor: Registered preview editor for $filePath")
-        }
-
-        // Unregister a preview editor for a document
-        fun unregisterPreviewEditor(filePath: String) {
-            activePreviewEditors.remove(filePath)
-            println("TypstPreviewFileEditor: Unregistered preview editor for $filePath")
-        }
-
-        // Get the preview editor for a document
-        fun getPreviewEditor(filePath: String): TypstPreviewFileEditor? {
-            return activePreviewEditors[filePath]
-        }
-    }
-} 
+}
