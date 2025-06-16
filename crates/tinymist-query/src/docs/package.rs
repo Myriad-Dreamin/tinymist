@@ -392,6 +392,15 @@ mod tests {
     }
 
     #[test]
+    fn fletcher() {
+        test(PackageSpec {
+            namespace: "preview".into(),
+            name: "fletcher".into(),
+            version: "0.5.8".parse().unwrap(),
+        });
+    }
+
+    #[test]
     fn cetz() {
         test(PackageSpec {
             namespace: "preview".into(),
