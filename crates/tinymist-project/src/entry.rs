@@ -202,7 +202,11 @@ mod entry_tests {
 
     #[test]
     fn test_entry_resolution() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root"
+        } else {
+            "/dummy-root"
+        });
 
         let entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
@@ -210,9 +214,9 @@ mod entry_tests {
         };
 
         let entry = entry.resolve(if cfg!(windows) {
-            Some(Path::new("C:\\root\\main.typ").into())
+            Some(Path::new("C:\\dummy-root\\main.typ").into())
         } else {
-            Some(Path::new("/root/main.typ").into())
+            Some(Path::new("/dummy-root/main.typ").into())
         });
 
         assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
@@ -227,8 +231,16 @@ mod entry_tests {
 
     #[test]
     fn test_entry_resolution_multi_root() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
-        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+        let root_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root"
+        } else {
+            "/dummy-root"
+        });
+        let root2_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root2"
+        } else {
+            "/dummy-root2"
+        });
 
         let entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
@@ -238,9 +250,9 @@ mod entry_tests {
 
         {
             let entry = entry.resolve(if cfg!(windows) {
-                Some(Path::new("C:\\root\\main.typ").into())
+                Some(Path::new("C:\\dummy-root\\main.typ").into())
             } else {
-                Some(Path::new("/root/main.typ").into())
+                Some(Path::new("/dummy-root/main.typ").into())
             });
 
             assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
@@ -255,9 +267,9 @@ mod entry_tests {
 
         {
             let entry = entry.resolve(if cfg!(windows) {
-                Some(Path::new("C:\\root2\\main.typ").into())
+                Some(Path::new("C:\\dummy-root2\\main.typ").into())
             } else {
-                Some(Path::new("/root2/main.typ").into())
+                Some(Path::new("/dummy-root2/main.typ").into())
             });
 
             assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
@@ -273,8 +285,16 @@ mod entry_tests {
 
     #[test]
     fn test_entry_resolution_default_multi_root() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
-        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+        let root_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root"
+        } else {
+            "/dummy-root"
+        });
+        let root2_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root2"
+        } else {
+            "/dummy-root2"
+        });
 
         let mut entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
@@ -284,9 +304,9 @@ mod entry_tests {
 
         {
             entry.entry = if cfg!(windows) {
-                Some(Path::new("C:\\root\\main.typ").into())
+                Some(Path::new("C:\\dummy-root\\main.typ").into())
             } else {
-                Some(Path::new("/root/main.typ").into())
+                Some(Path::new("/dummy-root/main.typ").into())
             };
 
             let default_entry = entry.resolve_default();
@@ -302,9 +322,9 @@ mod entry_tests {
             assert_eq!(
                 default_entry,
                 if cfg!(windows) {
-                    Some(Path::new("C:\\root\\main.typ").into())
+                    Some(Path::new("C:\\dummy-root\\main.typ").into())
                 } else {
-                    Some(Path::new("/root/main.typ").into())
+                    Some(Path::new("/dummy-root/main.typ").into())
                 }
             );
         }

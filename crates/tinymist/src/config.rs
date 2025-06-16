@@ -905,7 +905,11 @@ mod tests {
     fn test_config_update() {
         let mut config = Config::default();
 
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root"
+        } else {
+            "/dummy-root"
+        });
 
         let update = json!({
             "outputPath": "out",

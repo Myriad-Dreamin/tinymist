@@ -446,9 +446,9 @@ pub(crate) fn file_path(uri: &str) -> String {
 
 pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
     let root = if cfg!(windows) {
-        PathBuf::from("C:\\root")
+        PathBuf::from("C:\\dummy-root")
     } else {
-        PathBuf::from("/root")
+        PathBuf::from("/dummy-root")
     };
     let uri = uri.to_file_path().unwrap();
     let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
