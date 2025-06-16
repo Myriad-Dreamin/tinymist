@@ -52,9 +52,9 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     });
 
     let root = if cfg!(windows) {
-        PathBuf::from("C:\\root")
+        PathBuf::from("C:\\dummy-root")
     } else {
-        PathBuf::from("/root")
+        PathBuf::from("/dummy-root")
     };
     let mut verse = LspUniverseBuilder::build(
         EntryState::new_rooted(root.as_path().into(), None),
