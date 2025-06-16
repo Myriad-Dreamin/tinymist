@@ -40,7 +40,7 @@ typlite main.typ --post-process @preview/typlite-mdx output.mdx
 The `sys.input.x-target` can be used distinguish with normal HTML export.
 
 ```typ
-#let x-target = sys.input.at("x-target", default: "pdf")
+#let x-target = sys.inputs.at("x-target", default: "pdf")
 
 #let my-function = if x-target == "md" {
   md-impl
