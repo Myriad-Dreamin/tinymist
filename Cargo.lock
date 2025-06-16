@@ -581,9 +581,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f10f0b392cc21023a462ef0972118edbf4616f5eb8546f3434c53353ba12f9a"
+checksum = "455314fe1e891d575c1b853f7765488ed9fc6a6e16a953ba21bbea931dc337f3"
 dependencies = [
  "cmark-writer-macros",
  "ecow",
@@ -594,9 +594,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer-macros"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be7dbe651b0dee1bfd8a1a93efe76a43d6bbdee978b802102a9c14d070e8221c"
+checksum = "71313c3ee31ef1b5e7f043248fbc1cff399a28fa88634caf1264852ee16f359a"
 dependencies = [
  "proc-macro2",
  "quote",

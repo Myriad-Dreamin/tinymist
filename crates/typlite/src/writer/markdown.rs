@@ -23,6 +23,7 @@ impl FormatWriter for MarkdownWriter {
         let mut writer = CommonMarkWriter::with_options(WriterOptions {
             strict: false,
             escape_special_chars: true,
+            trim_paragraph_trailing_hard_breaks: true,
             ..Default::default()
         });
         writer
