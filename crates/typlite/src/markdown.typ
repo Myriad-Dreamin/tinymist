@@ -225,7 +225,7 @@
     },
   )
 
-  // show linebreak: it => if-not-paged(it, md-linebreak)
+  show linebreak: it => if-not-paged(it, md-linebreak)
   show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption))
 
   html.elem("m1document", body)

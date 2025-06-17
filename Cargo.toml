@@ -97,7 +97,7 @@ rpds = "1"
 
 # Data/Text Format and Processing
 biblatex = "0.10"
-cmark-writer = { version = "0.7.6", features = ["gfm"] }
+cmark-writer = { version = "0.7.7", features = ["gfm"] }
 docx-rs = { version = "0.4.18-rc19", git = "https://github.com/Myriad-Dreamin/docx-rs", default-features = false, rev = "db49a729f68dbdb9e8e91857fbb1c3d414209871" }
 hayagriva = "0.8"
 hex = "0.4.3"

@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+expression: hash
+input_file: crates/typlite/src/fixtures/integration/linebreak.typ
+snapshot_kind: text
+---
+siphash128_13:11003fd26842db430e7341d9aad00927
