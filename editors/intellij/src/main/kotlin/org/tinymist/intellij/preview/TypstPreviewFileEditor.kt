@@ -63,7 +63,7 @@ class TypstPreviewFileEditor(
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "WaitingForTinymistServer", false) {
             override fun run(indicator: ProgressIndicator) {
                 var attempts = 0
-                val maxAttempts = 60
+                val maxAttempts = 5
                 var serverFound = false
                 while (attempts < maxAttempts && !serverFound && JBCefApp.isSupported()) {
                     indicator.checkCanceled()
