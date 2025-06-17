@@ -216,9 +216,9 @@
       spacing: 0.7em * 1.5 * 1.2,
       below: 0.7em * 1.2,
       {
-        if is-web-target {
-          heading-hash(it, hash-color: dash-color)
-        }
+        // if is-web-target {
+        //   heading-hash(it, hash-color: dash-color)
+        // }
 
         it
       },

@@ -66,6 +66,8 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
 /// Information about a definition.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DefInfo {
+    /// The raw documentation of the definition.
+    pub id: EcoString,
     /// The name of the definition.
     pub name: EcoString,
     /// The kind of the definition.
@@ -74,6 +76,10 @@ pub struct DefInfo {
     pub loc: Option<(usize, usize, usize)>,
     /// Whether the definition external to the module.
     pub is_external: bool,
+    /// The module link to the definition
+    pub module_link: Option<String>,
+    /// The symbol link to the definition
+    pub symbol_link: Option<String>,
     /// The link to the definition if it is external.
     pub external_link: Option<String>,
     /// The one-line documentation of the definition.
@@ -90,7 +96,7 @@ pub struct DefInfo {
     #[serde(skip)]
     pub decl: Option<Interned<Decl>>,
     /// The children of the definition.
-    pub children: EcoVec<DefInfo>,
+    pub children: Vec<DefInfo>,
 }
 
 /// Information about the definitions in a package.
@@ -206,6 +212,7 @@ impl ScanDefCtx<'_> {
         };
 
         let mut head = DefInfo {
+            id: EcoString::new(),
             name: key.to_string().into(),
             kind: decl.kind(),
             constant: expr.map(|expr| expr.repr()),
@@ -215,6 +222,8 @@ impl ScanDefCtx<'_> {
             children: children.unwrap_or_default(),
             loc: None,
             is_external: false,
+            module_link: None,
+            symbol_link: None,
             external_link: None,
             oneliner: None,
         };
