@@ -7,7 +7,9 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode};
+use crate::common::{
+    CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode, VerbatimNode,
+};
 use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
@@ -247,6 +249,10 @@ impl DocxWriter {
                 for child in &inline_node.content {
                     run = self.process_inline_to_run(run, child)?;
                 }
+            }
+            node if node.is_custom_type::<VerbatimNode>() => {
+                let node = node.as_custom_type::<VerbatimNode>().unwrap();
+                eprintln!("Warning: `m1verbatim` is ignored {:?}.", node.content);
             }
             // Other inline element types
             _ => {

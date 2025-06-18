@@ -213,6 +213,21 @@ impl InlineNode {
     }
 }
 
+/// Verbatim node for raw text output
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = false)]
+pub struct VerbatimNode {
+    /// The content to directly output
+    pub content: EcoString,
+}
+
+impl VerbatimNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        writer.write_str(&self.content)?;
+        Ok(())
+    }
+}
+
 /// Alert node for alert messages
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = true, html_impl = false)]

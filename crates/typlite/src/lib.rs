@@ -23,7 +23,6 @@ use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst::World;
 use typst_syntax::VirtualPath;
-use writer::LaTeXWriter;
 
 use crate::common::Format;
 use crate::parser::HtmlToAstParser;
@@ -110,14 +109,11 @@ impl MarkdownDocument {
     }
 
     /// Convert the content to a LaTeX string.
-    pub fn to_tex_string(&self, prelude: bool) -> tinymist_std::Result<ecow::EcoString> {
+    pub fn to_tex_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
         let ast = self.parse()?;
 
         let mut writer = WriterFactory::create(Format::LaTeX);
-        if prelude {
-            LaTeXWriter::default_prelude(&mut output);
-        }
         writer
             .write_eco(&ast, &mut output)
             .context_ut("failed to write")?;
@@ -159,8 +155,27 @@ pub struct TypliteFeat {
     pub remove_html: bool,
     /// The target to convert
     pub target: Format,
-    /// Import context for code examples (e.g., "#import \"/path/to/file.typ\": *")
+    /// Import context for code examples (e.g., "#import \"/path/to/file.typ\":
+    /// *")
     pub import_context: Option<String>,
+    /// Specifies the package to process markup.
+    ///
+    /// ## `article` function
+    ///
+    /// The article function is used to wrap the typst content during
+    /// compilation.
+    ///
+    /// typlite exactly uses the `#article` function to process the content as
+    /// follow:
+    ///
+    /// ```typst
+    /// #import "@local/processor": article
+    /// #article(include "the-processed-content.typ")
+    /// ```
+    ///
+    /// It resembles the regular typst show rule function, like `#show:
+    /// article`.
+    pub processor: Option<String>,
 }
 
 /// Task builder for converting a typst document to Markdown.
@@ -198,7 +213,7 @@ impl Typlite {
     pub fn convert(self) -> tinymist_std::Result<ecow::EcoString> {
         match self.format {
             Format::Md => self.convert_doc(Format::Md)?.to_md_string(),
-            Format::LaTeX => self.convert_doc(Format::LaTeX)?.to_tex_string(true),
+            Format::LaTeX => self.convert_doc(Format::LaTeX)?.to_tex_string(),
             Format::Text => self.convert_doc(Format::Text)?.to_text_string(),
             #[cfg(feature = "docx")]
             Format::Docx => bail!("docx format is not supported"),
@@ -227,9 +242,19 @@ impl Typlite {
         }
 
         let wrap_main_id = current.join("__wrap_md_main.typ");
-        let wrap_main_path = world
-            .path_for_id(wrap_main_id)
-            .context_ut("getting source for main file")?;
+
+        let (main_id, main_content) = match self.feat.processor.as_ref() {
+            None => (wrap_main_id, None),
+            Some(processor) => {
+                let main_id = current.join("__md_main.typ");
+                let content = format!(
+                    r#"#import {processor:?}: article
+#article(include "__wrap_md_main.typ")"#
+                );
+
+                (main_id, Some(Bytes::from_string(content)))
+            }
+        };
 
         let mut dict = TypstDict::new();
         dict.insert("x-target".into(), Str("md".into()));
@@ -238,7 +263,7 @@ impl Typlite {
         }
 
         let task_inputs = TaskInputs {
-            entry: Some(entry.select_in_workspace(wrap_main_id.vpath().as_rooted_path())),
+            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path())),
             inputs: Some(Arc::new(LazyHash::new(dict))),
         };
 
@@ -266,8 +291,8 @@ impl Typlite {
             .context_ut("cannot map markdown.typ")?;
 
         world
-            .map_shadow(
-                wrap_main_path.as_path(),
+            .map_shadow_by_id(
+                wrap_main_id,
                 Bytes::from_string(format!(
                     r#"#import "@local/markdown:0.1.0": md-doc, example
 #show: md-doc
@@ -279,6 +304,12 @@ impl Typlite {
                 )),
             )
             .context_ut("cannot map source for main file")?;
+
+        if let Some(main_content) = main_content {
+            world
+                .map_shadow_by_id(main_id, main_content)
+                .context_ut("cannot map source for main file")?;
+        }
 
         // todo: ignoring warnings
         let base = typst::compile(&world).output?;

@@ -6,7 +6,11 @@
       "type": "typst",
       "command": "export",
       "export": {
-        "format": ["latex"]
+        "format": ["latex"],
+        // It is totally legal to use the processor in the current workspace,
+        // but we suggest make a local package and use the package spec instead.
+        // like: "package": "@local/ieee-tex:0.1.0"
+        "processor": "/ieee-tex.typ"
       }
     },
     {

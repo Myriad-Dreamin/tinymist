@@ -11,7 +11,7 @@ use clap::Parser;
 use tinymist_project::{
     base::print_diagnostics, DiagnosticFormat, LspWorld, SourceWorld, WorldProvider,
 };
-use tinymist_std::error::prelude::*;
+use tinymist_std::{error::prelude::*, Result};
 use typlite::{common::Format, TypliteFeat};
 use typlite::{CompileOnceArgs, Typlite};
 use typst::foundations::Bytes;
@@ -28,62 +28,76 @@ pub struct CompileArgs {
 
     /// Configures the path of assets directory
     #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
-    pub assets_path: Option<String>,
+    pub assets_path: Option<PathBuf>,
+
+    /// Specifies the package to process markup.
+    ///
+    /// ## `article` function
+    ///
+    /// The article function is used to wrap the typst content during
+    /// compilation.
+    ///
+    /// typlite exactly uses the `#article` function to process the content as
+    /// follow:
+    ///
+    /// ```typst
+    /// #import "@local/processor": article
+    /// #article(include "the-processed-content.typ")
+    /// ```
+    ///
+    /// It resembles the regular typst show rule function, like `#show:
+    /// article`.
+    #[clap(long = "processor", default_value = None, value_name = "PACKAGE_SPEC")]
+    pub processor: Option<String>,
 }
 
-fn main() -> tinymist_std::Result<()> {
+fn main() -> Result<()> {
     // Parse command line arguments
     let args = CompileArgs::parse();
 
-    let universe = args.compile.resolve()?;
-    let world = Arc::new(universe.snapshot());
+    let verse = args.compile.resolve()?;
+    let world = Arc::new(verse.snapshot());
 
     print_diag_or_error(world.as_ref(), run(args, world.clone()))
 }
 
-fn run(args: CompileArgs, world: Arc<LspWorld>) -> tinymist_std::Result<()> {
+fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
     let input = args
         .compile
         .input
-        .as_ref()
         .context("Missing required argument: INPUT")?;
 
     let is_stdout = args.output.as_deref() == Some("-");
     let output_path = args
         .output
         .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(input).with_extension("md"));
+        .unwrap_or_else(|| Path::new(&input).with_extension("md"));
 
-    let output_format = match output_path.extension() {
-        Some(ext) if ext == std::ffi::OsStr::new("tex") => Format::LaTeX,
-        Some(ext) if ext == std::ffi::OsStr::new("txt") => Format::Text,
+    let output_format = match output_path.extension().and_then(std::ffi::OsStr::to_str) {
+        Some("tex") => Format::LaTeX,
+        Some("txt") => Format::Text,
         #[cfg(feature = "docx")]
-        Some(ext) if ext == std::ffi::OsStr::new("docx") => Format::Docx,
+        Some("docx") => Format::Docx,
         _ => Format::Md,
     };
 
-    let assets_path = match args.assets_path {
-        Some(assets_path) => {
-            let path = PathBuf::from(assets_path);
-            if !path.exists() {
-                if let Err(e) = std::fs::create_dir_all(&path) {
-                    bail!("failed to create assets directory: {e}");
-                }
-            }
-            Some(path)
+    if let Some(assets_path) = args.assets_path.as_ref() {
+        if !assets_path.exists() {
+            std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
         }
-        None => None,
-    };
+    }
 
-    let converter = Typlite::new(world.clone()).with_feature(TypliteFeat {
-        assets_path: assets_path.clone(),
-        ..Default::default()
-    });
-    let doc = converter.convert_doc(output_format)?;
+    let doc = Typlite::new(world.clone())
+        .with_feature(TypliteFeat {
+            assets_path: args.assets_path,
+            processor: args.processor,
+            ..Default::default()
+        })
+        .convert_doc(output_format)?;
 
     let result = match output_format {
         Format::Md => Bytes::from_string(doc.to_md_string()?),
-        Format::LaTeX => Bytes::from_string(doc.to_tex_string(true)?),
+        Format::LaTeX => Bytes::from_string(doc.to_tex_string()?),
         Format::Text => Bytes::from_string(doc.to_text_string()?),
         #[cfg(feature = "docx")]
         Format::Docx => Bytes::new(doc.to_docx()?),
@@ -100,10 +114,7 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> tinymist_std::Result<()> {
     Ok(())
 }
 
-fn print_diag_or_error<T>(
-    world: &impl SourceWorld,
-    result: tinymist_std::Result<T>,
-) -> tinymist_std::Result<T> {
+fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
     match result {
         Ok(v) => Ok(v),
         Err(err) => {
