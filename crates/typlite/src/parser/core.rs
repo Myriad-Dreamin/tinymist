@@ -9,7 +9,7 @@ use tinymist_project::LspWorld;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{md_attr, AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::{AlertNode, CenterNode, ListState, VerbatimNode};
+use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -21,7 +21,6 @@ pub struct HtmlToAstParser {
     pub asset_counter: usize,
     pub feat: TypliteFeat,
     pub world: Arc<LspWorld>,
-    pub list_state: Option<ListState>,
     pub list_level: usize,
     pub blocks: Vec<Node>,
     pub inline_buffer: Vec<Node>,
@@ -34,7 +33,6 @@ impl HtmlToAstParser {
             world: world.clone(),
             asset_counter: 0,
             list_level: 0,
-            list_state: None,
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
         }
