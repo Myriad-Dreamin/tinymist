@@ -1,14 +1,14 @@
 
-#let git-head = read("/.git/HEAD")
+#let git-head = read("/.git/HEAD").trim()
 #let git-head-branch = if git-head.starts-with("ref: refs/heads/") {
-  git-head.slice("ref: refs/heads/".len()).trim()
+  git-head.slice("ref: refs/heads/".len())
 } else {
   none
 }
 #let git-head-hash = if git-head.starts-with("ref: ") {
-  read("/.git/" + git-head.slice(5).trim()).trim()
+  read("/.git/" + git-head.slice(5)).trim()
 } else {
-  git-head.trim()
+  git-head
 }
 
 // todo: read it from somewhere
