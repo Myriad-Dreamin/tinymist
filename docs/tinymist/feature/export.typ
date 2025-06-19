@@ -47,7 +47,17 @@ This requires the following configuration in your `tasks.json` file:
 }
 ```
 
-See the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/print-state")[Sample Workspace: print-state] for more details.
+See the #github-link("/editors/vscode/e2e-workspaces/print-state")[Sample Workspace: print-state] for more details.
+
+== IEEE Example (VSCode Tasks)
+
+This workspace gives an example to create and prepare IEEE papers using Typst, which exports typst documents to LaTeX.
+
+#raw(lang: "json", block: true, read("/editors/vscode/e2e-workspaces/ieee-paper/.vscode/tasks.json"))
+
+It uses #typst-func("export") to export the document to LaTeX.
+
+See the #github-link("/editors/vscode/e2e-workspaces/ieee-paper")[Sample Workspace: IEEE Paper] for more details.
 
 == Pdfpc Example (VSCode Tasks)
 
@@ -183,6 +193,7 @@ You can call the following export commands.
 - `tinymist.exportPdf`
 - `tinymist.exportHtml`
 - `tinymist.exportMarkdown`
+- `tinymist.exportTeX`
 - `tinymist.exportText`
 - `tinymist.exportQuery`
 

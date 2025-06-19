@@ -16,7 +16,7 @@ Tinymist will read the documentation from the source code and display it in the 
 
 A docstring is an object in source code associating with some typst definition, whose content is the documentation information of the definition. Documentation is placed on consecutive special comments using three forward slashes `///` and an optional space. These are called doc comments.
 
-While the #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/crates/tinymist-query/src/syntax/comment.rs")[`DocCommentMatcher`] matches doc comments in a looser way, we recommend using the strict syntax mentioned in the following sections.
+While the #github-link("/crates/tinymist-query/src/syntax/comment.rs")[`DocCommentMatcher`] matches doc comments in a looser way, we recommend using the strict syntax mentioned in the following sections.
 
 == Example 1
 

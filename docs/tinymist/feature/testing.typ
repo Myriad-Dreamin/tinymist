@@ -51,7 +51,7 @@ Running test(panic-on-panic)
 
 Since it requires some heavy framework to run benchmarks, a standalone tool is provided to run benchmarks.
 
-Check #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/crityp")[crityp] for more information.
+Check #github-link("/crates/crityp")[crityp] for more information.
 
 = Visualizing Coverage
 

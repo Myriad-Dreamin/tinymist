@@ -31,19 +31,19 @@ A frequently asked question is how to completing labels in sub files when writin
 #pro-tip[
   === VSCode:
 
-  See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#working-with-multiple-file-projects")[VS Code: Working with Multiple File Projects].
+  See #github-link("/editors/vscode#working-with-multiple-file-projects")[VS Code: Working with Multiple File Projects].
 ]
 
 #pro-tip[
   === Neovim:
 
-  See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim#working-with-multiple-file-projects")[Heovim: Working with Multiple File Projects].
+  See #github-link("/editors/neovim#working-with-multiple-file-projects")[Heovim: Working with Multiple File Projects].
 ]
 
 #pro-tip[
   === Helix:
 
-  See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix#working-with-multiple-file-projects")[Helix: Working with Multiple File Projects].
+  See #github-link("/editors/helix#working-with-multiple-file-projects")[Helix: Working with Multiple File Projects].
 ]
 
 = Using Snippet-Based Completion

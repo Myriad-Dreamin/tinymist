@@ -60,7 +60,7 @@ To save the compilation command to the lock file at the path `some/tinymist.lock
 tinymist compile --lockfile some/tinymist.lock path/to/main.typ
 ```
 
-The lock file feature is in development. It is to help the language server to understand the structure of your projects. See #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md#tinymistprojectresolution")[Configuration: tinymist.projectResolution].
+The lock file feature is in development. It is to help the language server to understand the structure of your projects. See #github-link("/editors/vscode/Configuration.md#tinymistprojectresolution")[Configuration: tinymist.projectResolution].
 
 == Running Tests
 

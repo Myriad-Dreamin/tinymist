@@ -7,11 +7,11 @@
 Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
 
 It contains:
-- an analyzing library for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query].
-- a CLI for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/")[tinymist].
+- an analyzing library for Typst, see #github-link("/crates/tinymist-query")[tinymist-query].
+- a CLI for Typst, see #github-link("/crates/tinymist/")[tinymist].
   - which provides a language server for Typst, see #cross-link("/feature/language.typ")[Language Features].
   - which provides a preview server for Typst, see #cross-link("/feature/preview.typ")[Preview Feature].
-- a VSCode extension for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/")[Tinymist VSCode Extension].
+- a VSCode extension for Typst, see #github-link("/editors/vscode/")[Tinymist VSCode Extension].
 
 = Features
 
@@ -119,11 +119,11 @@ Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution 
 
 = Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #github-link("/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
 = Acknowledgements
 
 - Partially code is inherited from #link("https://github.com/nvarner/typst-lsp")[typst-lsp]
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view")[integrating] *offline* handwritten-stroke recognizer is powered by #link("https://detypify.quarticcat.com/")[Detypify].
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview-command")[integrating] preview service is powered by #link("https://github.com/Enter-tainer/typst-preview")[typst-preview].
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#managing-local-packages")[integrating] local package management functions are adopted from #link("https://github.com/OrangeX4/vscode-typst-sync")[vscode-typst-sync].
+- The #github-link("/editors/vscode#symbol-view")[integrating] *offline* handwritten-stroke recognizer is powered by #link("https://detypify.quarticcat.com/")[Detypify].
+- The #github-link("/editors/vscode#preview-command")[integrating] preview service is powered by #link("https://github.com/Enter-tainer/typst-preview")[typst-preview].
+- The #github-link("/editors/vscode#managing-local-packages")[integrating] local package management functions are adopted from #link("https://github.com/OrangeX4/vscode-typst-sync")[vscode-typst-sync].
