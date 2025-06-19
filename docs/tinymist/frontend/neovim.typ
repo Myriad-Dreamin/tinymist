@@ -66,7 +66,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 
-For a full list of available settings see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration].
+For a full list of available settings see #github-link("/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration].
 
 = Formatting
 

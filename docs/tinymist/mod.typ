@@ -1,6 +1,7 @@
 
 #import "/docs/tinymist/book.typ": book-page, cross-link
 #import "/typ/templates/page.typ": *
+#import "/typ/templates/git.typ": *
 #import "@preview/fletcher:0.5.6" as fletcher: *
 #import "@preview/numbly:0.1.0": numbly
 

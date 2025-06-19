@@ -46,8 +46,8 @@ return {
 
 Also see:
 
-- #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md")[VS Cod(e,ium): Tinymist Server Configuration]
-- #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/neovim/Configuration.md")[Neovim: Tinymist Server Configuration]
+- #github-link("/editors/vscode/Configuration.md")[VS Cod(e,ium): Tinymist Server Configuration]
+- #github-link("/editors/neovim/Configuration.md")[Neovim: Tinymist Server Configuration]
 
 = Builtin Preview Feature
 

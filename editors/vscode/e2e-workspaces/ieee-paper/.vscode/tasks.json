@@ -14,6 +14,7 @@
         "assetsPath": "${workspaceFolder}/target"
       }
     },
+    // todo: not working
     {
       "label": "Export to Word (IEEE)",
       "type": "typst",
