@@ -51,7 +51,7 @@ For example, if you want to export PDF on save:
 You can also have configuration per directory. Be sure to look at the
 documentation of `eglot-workspace-configuration` by #link("https://www.gnu.org/software/emacs/manual/html_node/emacs/Name-Help.html")[`describe-symbol`]..
 
-See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration]
+See #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration]
 for references.
 
 
