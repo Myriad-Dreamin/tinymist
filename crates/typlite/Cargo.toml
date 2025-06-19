@@ -46,9 +46,11 @@ regex.workspace = true
 tinymist-tests.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "docx"]
+default = ["cli", "embed-fonts", "no-content-hint"]
 clap = ["dep:clap"]
-cli = ["clap", "clap/wrap_help"]
+# Note: this is the feature for typlite as a CLI, not for others.
+# `docx` is enabled in CLI mode, but not in library mode.
+cli = ["clap", "clap/wrap_help", "docx"]
 no-content-hint = ["tinymist-project/no-content-hint"]
 docx = ["docx-rs", "image", "resvg"]
 
