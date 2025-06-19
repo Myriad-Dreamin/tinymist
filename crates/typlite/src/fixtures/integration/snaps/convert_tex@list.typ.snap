@@ -13,12 +13,7 @@ input_file: crates/typlite/src/fixtures/integration/list.typ
 </html>
 
 =====
-\begin{document}
-
 \begin{itemize}
 \item Some \textbf{item}
 \item Another \textit{item}
 \end{itemize}
-
-
-\end{document}

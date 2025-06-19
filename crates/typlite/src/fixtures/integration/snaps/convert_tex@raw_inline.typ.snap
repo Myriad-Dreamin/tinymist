@@ -13,9 +13,4 @@ input_file: crates/typlite/src/fixtures/integration/raw_inline.typ
 </html>
 
 =====
-\begin{document}
-
 Some inlined raw \texttt{a}, \texttt{b}
-
-
-\end{document}

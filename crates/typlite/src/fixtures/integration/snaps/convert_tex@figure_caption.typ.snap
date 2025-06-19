@@ -13,8 +13,6 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 </html>
 
 =====
-\begin{document}
-
 \begin{center}
 \begin{figure}[htbp]
 \centering
@@ -23,6 +21,3 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 \end{figure}
 
 \end{center}
-
-
-\end{document}

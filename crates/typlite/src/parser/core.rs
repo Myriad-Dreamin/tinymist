@@ -8,8 +8,8 @@ use ecow::EcoString;
 use tinymist_project::LspWorld;
 use typst::html::{tag, HtmlElement, HtmlNode};
 
-use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::{AlertNode, CenterNode, ListState};
+use crate::attributes::{md_attr, AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
+use crate::common::{AlertNode, CenterNode, ListState, VerbatimNode};
 use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
@@ -177,6 +177,19 @@ impl HtmlToAstParser {
                 self.blocks.push(Node::Custom(Box::new(AlertNode {
                     content: quote,
                     class: attrs.class,
+                })));
+                Ok(())
+            }
+
+            md_tag::verbatim => {
+                self.inline_buffer.push(Node::Custom(Box::new(VerbatimNode {
+                    content: element
+                        .attrs
+                        .0
+                        .iter()
+                        .find(|(name, _)| *name == md_attr::src)
+                        .map(|(_, value)| value.clone())
+                        .unwrap_or_default(),
                 })));
                 Ok(())
             }

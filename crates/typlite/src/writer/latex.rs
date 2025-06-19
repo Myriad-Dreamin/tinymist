@@ -8,6 +8,7 @@ use tinymist_std::path::unix_slash;
 
 use crate::common::{
     CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, InlineNode, ListState,
+    VerbatimNode,
 };
 use crate::Result;
 
@@ -25,32 +26,6 @@ impl Default for LaTeXWriter {
 impl LaTeXWriter {
     pub fn new() -> Self {
         Self { list_state: None }
-    }
-
-    pub fn default_prelude(output: &mut EcoString) {
-        // Write LaTeX document preamble using the new method
-        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
-        output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n"); // For links
-        output.push_str("\\usepackage{graphicx}\n"); // For images
-        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
-        output.push_str("\\usepackage{listings}\n"); // For code blocks
-        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
-        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
-        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
-        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
-
-        // Set code highlighting style
-        output.push_str("\\lstset{\n");
-        output.push_str("  basicstyle=\\ttfamily\\small,\n");
-        output.push_str("  breaklines=true,\n");
-        output.push_str("  frame=single,\n");
-        output.push_str("  numbers=left,\n");
-        output.push_str("  numberstyle=\\tiny,\n");
-        output.push_str("  keywordstyle=\\color{blue},\n");
-        output.push_str("  commentstyle=\\color{green!60!black},\n");
-        output.push_str("  stringstyle=\\color{red}\n");
-        output.push_str("}\n\n");
     }
 
     fn write_inline_nodes(&mut self, nodes: &[Node], output: &mut EcoString) -> Result<()> {
@@ -314,6 +289,10 @@ impl LaTeXWriter {
                     self.write_node(child, output)?;
                 }
             }
+            node if node.is_custom_type::<VerbatimNode>() => {
+                let inline_node = node.as_custom_type::<VerbatimNode>().unwrap();
+                output.push_str(&inline_node.content);
+            }
             Node::Text(text) => {
                 output.push_str(&escape_latex(text));
             }
@@ -410,14 +389,8 @@ fn escape_latex(text: &str) -> String {
 
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        output.push_str("\\begin{document}\n\n");
-
         // Write the document content
         self.write_node(document, output)?;
-
-        // Add document ending
-        output.push_str("\n\\end{document}\n");
-
         Ok(())
     }
 

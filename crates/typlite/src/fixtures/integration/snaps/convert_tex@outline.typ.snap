@@ -28,8 +28,6 @@ namespace MyApplication
 </html>
 
 =====
-\begin{document}
-
 \section{Contents}
 
 \subsection{Heading 1}
@@ -97,6 +95,3 @@ First termFirst definition
 \hline
 \end{tabular}
 \end{table}
-
-
-\end{document}

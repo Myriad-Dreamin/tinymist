@@ -2,6 +2,11 @@
 /// `ieee` will not style the document if `is-html-target` is true.
 #let is-html-target = ("target" in dictionary(std))
 
+#let title-state = state("tex:title", "")
+#let authors-state = state("tex:authors", ())
+#let abstract-state = state("tex:abstract", "")
+#let bibliography-state = state("tex:bibliography", "")
+
 // This function gets your whole document as its `body` and formats
 // it as an article in the style of the IEEE.
 #let ieee(
@@ -27,10 +32,15 @@
 ) = if is-html-target {
   set heading(numbering: "I.A.a)")
   set math.equation(numbering: "(1)")
+  title-state.update(_ => title)
+  authors-state.update(_ => authors)
+  abstract-state.update(_ => abstract)
+  if bibliography != none {
+    bibliography-state.update(_ => bibliography.sources.at(0))
+  }
 
   body
 
-  // Display bibliography.
   bibliography
 } else {
   // Set document metadata.
