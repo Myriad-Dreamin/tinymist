@@ -24,7 +24,7 @@ use typst::html::HtmlDocument;
 use typst::World;
 use typst_syntax::VirtualPath;
 
-use crate::common::Format;
+pub use crate::common::Format;
 use crate::parser::HtmlToAstParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;

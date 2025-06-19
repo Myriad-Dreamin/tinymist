@@ -105,7 +105,7 @@
             "description": "Arguments for `export` command.",
             "properties": {
               "format": {
-                "description": "The format(s) to export the document to. Defaults to `pdf`.",
+                "description": "The format(s) to export the document to.",
                 "oneOf": [
                   {
                     "type": "string",
@@ -116,6 +116,7 @@
                       "svg",
                       "html",
                       "markdown",
+                      "tex",
                       "text",
                       "query",
                       "pdfpc"
@@ -126,6 +127,7 @@
                       "SVG",
                       "HTML",
                       "Markdown",
+                      "TeX",
                       "Plain Text",
                       "Query Result",
                       "Pdfpc (From Query)"
@@ -137,13 +139,14 @@
                     "description": "The formats to export the document to.",
                     "items": {
                       "type": "string",
-                      "description": "The format to export the document to. Defaults to `pdf`.",
+                      "description": "The format to export the document to.",
                       "enum": [
                         "pdf",
                         "png",
                         "svg",
                         "html",
                         "markdown",
+                        "tex",
                         "text",
                         "query",
                         "pdfpc"
@@ -154,6 +157,7 @@
                         "SVG",
                         "HTML",
                         "Markdown",
+                        "TeX",
                         "Plain Text",
                         "Query Result",
                         "Pdfpc (From Query)"
@@ -268,6 +272,51 @@
               "query.one": {
                 "type": "boolean",
                 "description": "Whether to only return one result. Defaults to `false`."
+              },
+              "processor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The processor to use for the markdown or TeX export.",
+                "default": null
+              },
+              "tex.processor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The processor to use for the TeX export.",
+                "default": null
+              },
+              "markdown.processor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The processor to use for the markdown export.",
+                "default": null
+              },
+              "assetsPath": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The path to output assets to use for the markdown or TeX export.",
+                "default": null
+              },
+              "tex.assetsPath": {
+                "type": "string",
+                "description": "The path to output assets to use for the TeX export.",
+                "default": "target"
+              },
+              "markdown.assetsPath": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The path to output assets to use for the markdown export.",
+                "default": null
               }
             }
           }

@@ -1,6 +1,6 @@
 //! Project task models.
 
-use std::hash::Hash;
+use std::{hash::Hash, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,6 +72,8 @@ pub enum ProjectTask {
     ExportSvgHtml(ExportHtmlTask),
     /// An export Markdown task.
     ExportMd(ExportMarkdownTask),
+    /// An export TeX task.
+    ExportTeX(ExportTeXTask),
     /// An export Text task.
     ExportText(ExportTextTask),
     /// An query task.
@@ -92,6 +94,7 @@ impl ProjectTask {
             | Self::ExportHtml(..)
             | Self::ExportSvgHtml(..)
             | Self::ExportMd(..)
+            | Self::ExportTeX(..)
             | Self::ExportText(..)
             | Self::Query(..) => self.as_export()?.when,
         })
@@ -106,6 +109,7 @@ impl ProjectTask {
             Self::ExportSvg(task) => &task.export,
             Self::ExportHtml(task) => &task.export,
             Self::ExportSvgHtml(task) => &task.export,
+            Self::ExportTeX(task) => &task.export,
             Self::ExportMd(task) => &task.export,
             Self::ExportText(task) => &task.export,
             Self::Query(task) => &task.export,
@@ -118,6 +122,7 @@ impl ProjectTask {
             Self::ExportPdf { .. } => "pdf",
             Self::Preview(..) | Self::ExportSvgHtml { .. } | Self::ExportHtml { .. } => "html",
             Self::ExportMd { .. } => "md",
+            Self::ExportTeX { .. } => "tex",
             Self::ExportText { .. } => "txt",
             Self::ExportSvg { .. } => "svg",
             Self::ExportPng { .. } => "png",
@@ -272,6 +277,23 @@ pub struct ExportHtmlTask {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportMarkdownTask {
+    /// The processor to use for the markdown export.
+    pub processor: Option<String>,
+    /// The path of external assets directory.
+    pub assets_path: Option<PathBuf>,
+    /// The shared export arguments.
+    #[serde(flatten)]
+    pub export: ExportTask,
+}
+
+/// An export TeX task specifier.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportTeXTask {
+    /// The processor to use for the TeX export.
+    pub processor: Option<String>,
+    /// The path of external assets directory.
+    pub assets_path: Option<PathBuf>,
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,

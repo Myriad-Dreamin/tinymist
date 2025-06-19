@@ -4,7 +4,7 @@ import { tinymist } from "../lsp";
 import { IContext } from "../context";
 import { commands } from "vscode";
 
-export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "Text" | "Query";
+export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "TeX" | "Text" | "Query";
 
 export function exportActivate(context: IContext) {
   context.subscriptions.push(
@@ -50,6 +50,11 @@ export const quickExports: QuickExportFormatMeta[] = [
     label: "Markdown",
     description: l10nMsg("Export as Markdown"),
     exportKind: "Markdown",
+  },
+  {
+    label: "TeX",
+    description: l10nMsg("Export as TeX"),
+    exportKind: "TeX",
   },
   {
     label: "Text",
@@ -101,6 +106,23 @@ async function askAndRun<T>(
 
   if (picked === undefined) {
     return;
+  }
+
+  if (picked.exportKind === "TeX") {
+    picked.extraOpts = picked.extraOpts || {};
+    const processor = await vscode.window.showInputBox({
+      title: l10nMsg("TeX processor"),
+      placeHolder: l10nMsg(
+        "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`",
+      ),
+      prompt: l10nMsg(
+        "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information.",
+      ),
+    });
+
+    if (processor) {
+      picked.extraOpts.processor = processor;
+    }
   }
 
   return cb(picked);

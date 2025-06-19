@@ -9,16 +9,21 @@ interface ExportArgs {
   format: ExportFormat | ExportFormat[];
   inputPath: string;
   outputPath: string;
+
   "pdf.creationTimestamp"?: string | null;
   "png.ppi"?: number;
+
   fill?: string;
   "png.fill"?: string;
+
   merged?: boolean;
   "svg.merged"?: boolean;
   "png.merged"?: boolean;
+
   "merged.gap"?: string;
   "png.merged.gap"?: string;
   "svg.merged.gap"?: string;
+
   "query.format"?: string;
   "query.outputExtension"?: string;
   "query.strict"?: boolean;
@@ -26,6 +31,13 @@ interface ExportArgs {
   "query.selector"?: string;
   "query.field"?: string;
   "query.one"?: boolean;
+
+  processor?: string;
+  "markdown.processor"?: string;
+  "tex.processor"?: string;
+  assetsPath?: string;
+  "markdown.assetsPath"?: string;
+  "tex.assetsPath"?: string;
 }
 
 export const runExport = (def: vscode.TaskDefinition) => {
@@ -140,9 +152,21 @@ const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => 
   },
   markdown: {
     opts() {
-      return {};
+      return {
+        processor: exportArgs["markdown.processor"] || exportArgs["processor"],
+        assetsPath: exportArgs["markdown.assetsPath"] || exportArgs["assetsPath"],
+      };
     },
     export: tinymist.exportMarkdown,
+  },
+  tex: {
+    opts() {
+      return {
+        processor: exportArgs["tex.processor"] || exportArgs["processor"],
+        assetsPath: exportArgs["tex.assetsPath"] || exportArgs["assetsPath"],
+      };
+    },
+    export: tinymist.exportTeX,
   },
   text: {
     opts() {

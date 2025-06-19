@@ -5,6 +5,10 @@
 en = " (Preview)"
 zh = " (预览)"
 
+["A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"]
+en = "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"
+zh = "提供一个帮助导出为 TeX 的 typst 文件，例如 `/ieee-tex.typ` 或 `@local/ieee-tex:0.1.0`"
+
 ["Export as HTML"]
 en = "Export as HTML"
 zh = "导出为 HTML"
@@ -25,6 +29,9 @@ zh = "导出为 PNG (并更新 tasks.json)"
 en = "Export as SVG (and update tasks.json)"
 zh = "导出为 SVG (并更新 tasks.json)"
 
+["Export as TeX"]
+en = "Export as TeX"
+
 ["Export as Text"]
 en = "Export as Text"
 zh = "导出为纯文本文件"
@@ -44,6 +51,10 @@ zh = "导出首页为单个 PNG"
 ["Export the first page as a single SVG"]
 en = "Export the first page as a single SVG"
 zh = "导出首页为单个 SVG"
+
+["Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."]
+en = "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."
+zh = "提示：您可以在侧边栏中创建和查找本地包。有关更多信息，请参见 https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper。"
 
 ["PNG (First Page)"]
 en = "PNG (First Page)"
@@ -87,3 +98,7 @@ zh = "SVG (合并)"
 ["SVG (Task)"]
 en = "SVG (Task)"
 zh = "SVG (任务)"
+
+["TeX processor"]
+en = "TeX processor"
+zh = "TeX 导出的处理脚本"
