@@ -13,9 +13,4 @@ input_file: crates/typlite/src/fixtures/integration/link3.typ
 </html>
 
 =====
-\begin{document}
-
 \href{https://example.com}{Reverse \textbf{the World}}
-
-
-\end{document}

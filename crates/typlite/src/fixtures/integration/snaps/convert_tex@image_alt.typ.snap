@@ -13,15 +13,8 @@ input_file: crates/typlite/src/fixtures/integration/image_alt.typ
 </html>
 
 =====
-\begin{document}
-
 \begin{figure}
 \centering
 \includegraphics[width=0.8\textwidth]{fig.svg}
 \caption{Content}
 \end{figure}
-
-
-
-
-\end{document}

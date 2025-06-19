@@ -2,7 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::LaTeX)"
 input_file: crates/typlite/src/fixtures/integration/highlight.typ
-snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -14,9 +13,4 @@ snapshot_kind: text
 </html>
 
 =====
-\begin{document}
-
 \colorbox{yellow}{highlight}
-
-
-\end{document}

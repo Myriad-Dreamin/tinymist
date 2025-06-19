@@ -13,12 +13,7 @@ input_file: crates/typlite/src/fixtures/integration/enum.typ
 </html>
 
 =====
-\begin{document}
-
 \begin{enumerate}
 \item A
 \item B
 \end{enumerate}
-
-
-\end{document}

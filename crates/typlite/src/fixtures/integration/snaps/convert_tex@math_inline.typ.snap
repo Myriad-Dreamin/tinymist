@@ -13,9 +13,3 @@ input_file: crates/typlite/src/fixtures/integration/math_inline.typ
 </html>
 
 =====
-\begin{document}
-
-
-
-
-\end{document}

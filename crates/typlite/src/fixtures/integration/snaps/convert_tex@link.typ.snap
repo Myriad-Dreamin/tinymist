@@ -13,9 +13,4 @@ input_file: crates/typlite/src/fixtures/integration/link.typ
 </html>
 
 =====
-\begin{document}
-
 \href{https://example.com}{https://example.com}
-
-
-\end{document}
