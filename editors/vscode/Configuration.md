@@ -69,7 +69,6 @@ Enable or disable semantic tokens (LSP syntax highlighting)
 Enable or disable lint checks. Note: restarting the editor is required to change this setting.
 
 - **Type**: `boolean`
-- **Default**: `false`
 
 ## `tinymist.lint.when`
 
@@ -182,10 +181,9 @@ Sets the indent size (using space) for the formatter.
 
 ## `tinymist.formatterProseWrap`
 
-Controls how the formatter handles prose line wrapping. Prose wrapping means inserting line breaks when a line exceeds the specified print width.
+Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces.
 
 - **Type**: `boolean`
-- **Default**: `false`
 
 ## `tinymist.showExportFileIn`
 

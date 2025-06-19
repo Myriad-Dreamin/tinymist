@@ -325,6 +325,7 @@ export class LanguageState {
   exportPng = exportCommand("tinymist.exportPng");
   exportHtml = exportCommand("tinymist.exportHtml");
   exportMarkdown = exportCommand("tinymist.exportMarkdown");
+  exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
   exportQuery = exportCommand("tinymist.exportQuery");
   exportAnsiHighlight = exportCommand("tinymist.exportAnsiHighlight");

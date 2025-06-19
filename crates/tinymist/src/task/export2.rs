@@ -7,11 +7,10 @@ use reflexo_vec2svg::DefaultExportFeature;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_task::{ExportTimings, TextExport};
-use typlite::Typlite;
-use typst::diag::SourceResult;
+use typlite::{Format, Typlite};
 
 use crate::project::{
-    ExportMarkdownTask, HtmlExport, LspCompilerFeat, PdfExport, PngExport, ProjectTask, SvgExport,
+    ExportTeXTask, HtmlExport, LspCompilerFeat, PdfExport, PngExport, ProjectTask, SvgExport,
     TaskWhen,
 };
 use crate::world::base::{
@@ -45,7 +44,7 @@ impl ProjectCompilation {
             .transpose()?
             .map(|config| config.export.when);
         let md: Option<TaskWhen> = graph
-            .get::<ConfigTask<ExportMarkdownTask>>()
+            .get::<ConfigTask<ExportTeXTask>>()
             .transpose()?
             .map(|config| config.export.when);
         let text: Option<TaskWhen> = graph
@@ -146,7 +145,7 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                 >(
                     graph, when, &ExportWebSvgHtmlTask::default()
                 ),
-                ExportMd(_config) => {
+                ExportMd(..) => {
                     let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
                     let doc = doc.as_ref();
                     let n =
@@ -156,6 +155,17 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                     }
 
                     Ok(TypliteMdExport::run(graph)?.map(Bytes::from_string))
+                }
+                ExportTeX(..) => {
+                    let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
+                    let doc = doc.as_ref();
+                    let n =
+                        ExportTimings::needs_run(&graph.snap, when, doc.as_deref()).unwrap_or(true);
+                    if !n {
+                        return Ok(None);
+                    }
+
+                    Ok(TypliteTeXExport::run(graph)?.map(Bytes::from_string))
                 }
                 ExportText(config) => Self::export_string::<_, TextExport>(graph, when, config),
                 Query(..) => todo!(),
@@ -174,22 +184,42 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
     }
 }
 
-pub struct TypliteMdExport(pub Option<SourceResult<String>>);
+pub struct TypliteExport<const FORMAT: char>;
 
-impl TypliteMdExport {
+const fn typlite_format(f: char) -> Format {
+    match f {
+        'm' => Format::Md,
+        'x' => Format::LaTeX,
+        _ => panic!("unsupported format for TypliteExport"),
+    }
+}
+
+const fn typlite_name(f: char) -> &'static str {
+    match f {
+        'm' => "Markdown",
+        'x' => "LaTeX",
+        _ => panic!("unsupported format for TypliteExport"),
+    }
+}
+
+impl<const F: char> TypliteExport<F> {
     fn run(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Option<String>> {
         let conv = Typlite::new(Arc::new(graph.snap.world.clone()))
+            .with_format(typlite_format(F))
             .convert()
-            .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("failed to convert to {}: {e}", typlite_name(F)))?;
 
         Ok(Some(conv.to_string()))
     }
 }
 
-impl WorldComputable<LspCompilerFeat> for TypliteMdExport {
+impl<const F: char> WorldComputable<LspCompilerFeat> for TypliteExport<F> {
     type Output = Option<String>;
 
     fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self::Output> {
         Self::run(graph)
     }
 }
+
+pub type TypliteMdExport = TypliteExport<'m'>;
+pub type TypliteTeXExport = TypliteExport<'x'>;

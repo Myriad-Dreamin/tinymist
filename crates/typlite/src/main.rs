@@ -35,18 +35,16 @@ pub struct CompileArgs {
     /// ## `article` function
     ///
     /// The article function is used to wrap the typst content during
-    /// compilation.
+    /// compilation. It resembles the regular typst show rule function, like
+    /// `#show: article`.
     ///
     /// typlite exactly uses the `#article` function to process the content as
     /// follow:
     ///
     /// ```typst
-    /// #import "@local/processor": article
+    /// #import "@local/ieee-tex:0.1.0": article
     /// #article(include "the-processed-content.typ")
     /// ```
-    ///
-    /// It resembles the regular typst show rule function, like `#show:
-    /// article`.
     #[clap(long = "processor", default_value = None, value_name = "PACKAGE_SPEC")]
     pub processor: Option<String>,
 }

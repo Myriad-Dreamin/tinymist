@@ -337,6 +337,9 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             ProjectTask::ExportMd(..) => {
                 cmd.push("--format=md");
             }
+            ProjectTask::ExportTeX(..) => {
+                cmd.push("--format=tex");
+            }
             ProjectTask::ExportPng(..) => {
                 cmd.push("--format=png");
             }

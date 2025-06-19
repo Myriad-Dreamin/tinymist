@@ -11,16 +11,16 @@ use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::typst::TypstDocument;
-use tinymist_task::{get_page_selection, ExportTarget, PdfExport, TextExport};
+use tinymist_task::{get_page_selection, ExportMarkdownTask, ExportTarget, PdfExport, TextExport};
 use tokio::sync::mpsc;
-use typlite::Typlite;
+use typlite::{Format, Typlite};
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
 
 use super::{FutureFolder, SyncTaskFactory};
 use crate::project::{
-    ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask, ExportMarkdownTask,
-    ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask, ExportTextTask,
+    ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask, ExportPdfTask, ExportPngTask,
+    ExportSvgTask, ExportTask as ProjectExportTask, ExportTeXTask, ExportTextTask,
     LspCompiledArtifact, ProjectTask, QueryTask, TaskWhen,
 };
 use crate::{actor::editor::EditorRequest, tool::word_count};
@@ -266,10 +266,39 @@ impl ExportTask {
                 ExportText(ExportTextTask { export: _ }) => {
                     Bytes::from_string(TextExport::run_on_doc(doc)?)
                 }
-                ExportMd(ExportMarkdownTask { export: _ }) => {
+                ExportMd(ExportMarkdownTask {
+                    processor,
+                    assets_path,
+                    export: _,
+                }) => {
                     let conv = Typlite::new(Arc::new(graph.world().clone()))
+                        .with_format(Format::Md)
+                        .with_feature(typlite::TypliteFeat {
+                            processor,
+                            assets_path,
+                            ..Default::default()
+                        })
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
+
+                    Bytes::from_string(conv)
+                }
+                // todo: duplicated code with ExportMd
+                ExportTeX(ExportTeXTask {
+                    processor,
+                    assets_path,
+                    export: _,
+                }) => {
+                    log::info!("ExportTask({export_id}): exporting to TeX with processor {processor:?} and assets path {assets_path:?}");
+                    let conv = Typlite::new(Arc::new(graph.world().clone()))
+                        .with_format(Format::LaTeX)
+                        .with_feature(typlite::TypliteFeat {
+                            processor,
+                            assets_path,
+                            ..Default::default()
+                        })
+                        .convert()
+                        .map_err(|e| anyhow::anyhow!("failed to convert to latex: {e}"))?;
 
                     Bytes::from_string(conv)
                 }

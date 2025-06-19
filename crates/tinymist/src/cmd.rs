@@ -10,12 +10,13 @@ use sync_ls::RequestId;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::{
-    ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask,
+    ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask, ExportTeXTask,
     ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
 };
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
+use tinymist_task::ExportMarkdownTask;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst::syntax::{LinkedNode, Source};
@@ -35,10 +36,23 @@ struct ExportOpts {
     page: PageSelection,
     /// Whether to open the exported file(s) after the export is done.
     open: Option<bool>,
+    // todo: we made a mistake that they will be snakecase, but they should be camelCase
     /// The creation timestamp for various outputs (in seconds).
     creation_timestamp: Option<String>,
     /// A PDF standard that Typst can enforce conformance with.
     pdf_standard: Option<Vec<PdfStandard>>,
+}
+
+/// See [`ProjectTask`].
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportTypliteOpts {
+    /// Whether to open the exported file(s) after the export is done.
+    open: Option<bool>,
+    /// The processor to use for the typlite export.
+    processor: Option<String>,
+    /// The path of external assets directory.
+    assets_path: Option<PathBuf>,
 }
 
 /// See [`ProjectTask`].
@@ -109,11 +123,31 @@ impl ServerState {
         req_id: RequestId,
         mut args: Vec<JsonValue>,
     ) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
             req_id,
-            ProjectTask::ExportMd(ExportMarkdownTask { export }),
+            ProjectTask::ExportMd(ExportMarkdownTask {
+                processor: opts.processor,
+                assets_path: opts.assets_path,
+                export,
+            }),
+            opts.open.unwrap_or_default(),
+            args,
+        )
+    }
+
+    /// Export the current document as Tex file(s).
+    pub fn export_tex(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
+        let export = self.config.export_task();
+        self.export(
+            req_id,
+            ProjectTask::ExportTeX(ExportTeXTask {
+                processor: opts.processor,
+                assets_path: opts.assets_path,
+                export,
+            }),
             opts.open.unwrap_or_default(),
             args,
         )
