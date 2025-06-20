@@ -55,12 +55,22 @@ Note: With that configuration, if you’re seeing a file that is not reachable b
 
 = Extra Settings
 
-To configure language server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+To configure the language server, edit the `language-server.tinymist` section.
+
+For example, to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```toml
 [language-server.tinymist]
 command = "tinymist"
 config = { exportPdf = "onType", outputPath = "$root/target/$dir/$name" }
+```
+
+To enable a live preview you can use the `preview.background`:
+
+```toml
+[language-server.tinymist]
+command = "tinymist"
+config = { preview.background.enabled = true", preview.background.args = ["--data-plane-host=127.0.0.1:23635", "--invert-colors=never", "--open"] }
 ```
 
 See #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration]
