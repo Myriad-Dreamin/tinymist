@@ -34,7 +34,7 @@ language-servers = ["tinymist"]
 
 == Working with Multiple-File Projects
 
-There is a way in #github-link("/editors/neovim/README.md#multiple-file-project-support")[Neovim];, but you cannot invoke related commands with arguments by #link("https://docs.helix-editor.com/commands.html")[:lsp-workspace-command] in helix. As a candidate solution, assuming your having following directory layout:
+There is a way in #github-link("/editors/neovim/README.md#working-with-multiple-file-projects")[Neovim];, but you cannot invoke related commands with arguments by #link("https://docs.helix-editor.com/commands.html")[:lsp-workspace-command] in helix. As a candidate solution, assuming your having following directory layout:
 
 ```plain
 ├── .helix

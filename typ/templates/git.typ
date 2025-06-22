@@ -1,4 +1,6 @@
 
+#import "target.typ": sys-is-html-target, is-md-target
+
 #let git-head = read("/.git/HEAD").trim()
 #let git-head-branch = if git-head.starts-with("ref: refs/heads/") {
   git-head.slice("ref: refs/heads/".len())
@@ -14,8 +16,14 @@
 // todo: read it from somewhere
 #let remote = "https://github.com/Myriad-Dreamin/tinymist"
 
-#let github-link(path, body, kind: "tree", permalink: true) = link(
-  {
+#let github-link(path, body, kind: none, permalink: true) = {
+  if kind == none {
+    kind = if path.ends-with("/") { "tree" } else { "blob" }
+  }
+
+  let dest = if is-md-target {
+    path
+  } else {
     remote
     "/"
     kind
@@ -31,6 +39,7 @@
     } else {
       path
     }
-  },
-  body,
-)
+  }
+
+  link(dest, body)
+}

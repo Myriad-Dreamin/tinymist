@@ -56,7 +56,7 @@ Extra features:
 - Provides test, benchmark, coverage collecting on documents and modules. Check #cross-link("/feature/testing.typ")[Docs: Testing Features].
 - Provides builtin linting. Check #cross-link("/feature/linting.typ")[Docs: Linting Features].
 - Provides a status bar item to show the current document's compilation status and words count.
-- #github-link("/tools/editor-tools")[Editor tools]:
+- #github-link("/tools/editor-tools/")[Editor tools]:
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).

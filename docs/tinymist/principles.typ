@@ -6,7 +6,7 @@ Four principles are followed.
 
 = Multiple Actors
 
-The main component, #github-link("/crates/tinymist")[tinymist], starts as a thread or process, obeying the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol]. tinymist will bootstrap multiple actors, each of which provides some typst feature.
+The main component, #github-link("/crates/tinymist/")[tinymist], starts as a thread or process, obeying the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol]. tinymist will bootstrap multiple actors, each of which provides some typst feature.
 
 The each actor holds and maintains some resources exclusively. For example, the compile server actor holds the well known ```rs trait World``` resource.
 
@@ -45,7 +45,7 @@ The `RenderActor`s don't do compilations, but own project-specific rendering cac
 
 = Multi-level Analysis
 
-he most critical features are lsp functions, built on the #github-link("/crates/tinymist-query")[tinymist-query] crate. To achieve higher concurrency, functions are classified into different levels of analysis.
+he most critical features are lsp functions, built on the #github-link("/crates/tinymist-query/")[tinymist-query] crate. To achieve higher concurrency, functions are classified into different levels of analysis.
 + `query_source` – `SyntaxRequest` – locks and accesses a single source unit.
 + `query_world` – `SemanticRequest` – locks and accesses multiple source units.
 + `query_state` – `StatefulRequest` – acquires to accesses a specific version of compile results.
@@ -103,4 +103,4 @@ All non-LSP features in tinymist are *optional*. They are optional, as they can 
 
 = Minimal Editor Frontends
 
-Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the #github-link("/editors")[editor folders]. They are minimal, meaning that LSP should finish its main LSP features as many as possible without help of editor frontends. The editor frontends just enhances your code experience. For example, the vscode frontend takes responsibility on providing some nice editor tools. It is recommended to install these editors frontend for your editors.
+Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the #github-link("/editors/")[editor folders]. They are minimal, meaning that LSP should finish its main LSP features as many as possible without help of editor frontends. The editor frontends just enhances your code experience. For example, the vscode frontend takes responsibility on providing some nice editor tools. It is recommended to install these editors frontend for your editors.

@@ -7,7 +7,7 @@
 Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
 
 It contains:
-- an analyzing library for Typst, see #github-link("/crates/tinymist-query")[tinymist-query].
+- an analyzing library for Typst, see #github-link("/crates/tinymist-query/")[tinymist-query].
 - a CLI for Typst, see #github-link("/crates/tinymist/")[tinymist].
   - which provides a language server for Typst, see #cross-link("/feature/language.typ")[Language Features].
   - which provides a preview server for Typst, see #cross-link("/feature/preview.typ")[Preview Feature].
