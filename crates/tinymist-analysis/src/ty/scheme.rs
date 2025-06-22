@@ -128,6 +128,10 @@ impl TySchemeWorker<'_> {
                     Interned::new(Decl::lit_at(name.as_str(), args.span)),
                 ))
             }
+            "rec" => {
+                // let ty = self.define(k, &args.eat::<Value>().ok()??);
+                todo!()
+            }
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
                 Ty::Array(Interned::new(ty))
