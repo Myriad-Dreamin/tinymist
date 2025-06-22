@@ -29,7 +29,8 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - Or manually:
   To enable LSP, you must install `tinymist`. You can find `tinymist` by:
   - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
-  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).\
+  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
+    \
     If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
   - Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
     ```bash
@@ -72,7 +73,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 
-For a full list of available settings see [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md).
+For a full list of available settings see [Tinymist Server Configuration](/tree/main/editors/neovim/Configuration.md).
 
 ## Formatting
 

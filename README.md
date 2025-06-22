@@ -5,11 +5,11 @@ Tinymist \[ˈtaɪni mɪst\] is an integrated language service for [Typst](https:
 
 It contains:
 
-- an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
-- a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
+- an analyzing library for Typst, see [tinymist-query](/crates/tinymist-query).
+- a CLI for Typst, see [tinymist](/crates/tinymist/).
   - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist/feature/language.html).
   - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html).
-- a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
+- a VSCode extension for Typst, see [Tinymist VSCode Extension](/editors/vscode/).
 
 ## Features
 
@@ -67,7 +67,7 @@ Extra features:
 - Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
 - Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
 - Provides a status bar item to show the current document's compilation status and words count.
-- [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
+- [Editor tools](/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).
@@ -168,11 +168,11 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guideli
 
 ## Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
 
 ## Acknowledgements
 
 - Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
-- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view) **offline** handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).
-- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview-command) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).
-- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#managing-local-packages) local package management functions are adopted from [vscode-typst-sync](https://github.com/OrangeX4/vscode-typst-sync).
+- The [integrating](/editors/vscode#symbol-view) **offline** handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).
+- The [integrating](/editors/vscode#preview-command) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).
+- The [integrating](/editors/vscode#managing-local-packages) local package management functions are adopted from [vscode-typst-sync](https://github.com/OrangeX4/vscode-typst-sync).

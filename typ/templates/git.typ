@@ -1,4 +1,6 @@
 
+#import "target.typ": sys-is-html-target, is-md-target
+
 #let git-head = read("/.git/HEAD").trim()
 #let git-head-branch = if git-head.starts-with("ref: refs/heads/") {
   git-head.slice("ref: refs/heads/".len())
@@ -15,7 +17,9 @@
 #let remote = "https://github.com/Myriad-Dreamin/tinymist"
 
 #let github-link(path, body, kind: "tree", permalink: true) = link(
-  {
+  if is-md-target {
+    path
+  } else {
     remote
     "/"
     kind

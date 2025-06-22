@@ -13,7 +13,8 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).\
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
+  \
   If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
 - Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
@@ -42,7 +43,7 @@ language-servers = ["tinymist"]
 
 ### Working with Multiple-File Projects
 
-There is a way in [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md#multiple-file-project-support), but you cannot invoke related commands with arguments by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix. As a candidate solution, assuming your having following directory layout:
+There is a way in [Neovim](/editors/neovim/README.md#multiple-file-project-support), but you cannot invoke related commands with arguments by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix. As a candidate solution, assuming your having following directory layout:
 
 ```plain
 ├── .helix
@@ -63,7 +64,7 @@ Note: With that configuration, if you’re seeing a file that is not reachable b
 
 ## Extra Settings
 
-To configure language server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+To configure the language server, edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```toml
 [language-server.tinymist]
@@ -71,4 +72,12 @@ command = "tinymist"
 config = { exportPdf = "onType", outputPath = "$root/target/$dir/$name" }
 ```
 
-See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md) for references.
+To enable a live preview you can use the `preview.background`:
+
+```toml
+[language-server.tinymist]
+command = "tinymist"
+config = { preview.background.enabled = true", preview.background.args = ["--data-plane-host=127.0.0.1:23635", "--invert-colors=never", "--open"] }
+```
+
+See [Tinymist Server Configuration](/editors/neovim/Configuration.md) for references.
