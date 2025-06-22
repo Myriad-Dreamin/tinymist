@@ -13,12 +13,13 @@ With new approach to converting typst to other markup, we fully supported typst 
 There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/ieee-paper) ([Permalink](https://github.com/Myriad-Dreamin/tinymist/tree/5a2509327d160830d68c5962181b4a1687fe367a/editors/vscode/e2e-workspaces/ieee-paper)) to test the LaTeX export for creating IEEE papers.
 
 * Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
-* Bumped typstyle to v0.13.11 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737, https://github.com/Myriad-Dreamin/tinymist/pull/1797 and https://github.com/Myriad-Dreamin/tinymist/pull/1814
+* Bumped typstyle to v0.13.11 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737, https://github.com/Myriad-Dreamin/tinymist/pull/1797, and https://github.com/Myriad-Dreamin/tinymist/pull/1814
   * This includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v01311---2025-06-14
 
 ### Editor
 
 * Added command to profile the entire server in https://github.com/Myriad-Dreamin/tinymist/pull/1438
+* Exporting to TeX markup by VS Code tasks in https://github.com/Myriad-Dreamin/tinymist/pull/1826
 
 ### Compiler
 
@@ -32,7 +33,7 @@ There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/ma
 ### Typlite
 
 * (Test) Using snapshot testing and added more cases in https://github.com/Myriad-Dreamin/tinymist/pull/1717 and https://github.com/Myriad-Dreamin/tinymist/pull/1719
-* Reimplemented typlite by html export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1684, https://github.com/Myriad-Dreamin/tinymist/pull/1720, https://github.com/Myriad-Dreamin/tinymist/pull/1728, https://github.com/Myriad-Dreamin/tinymist/pull/1729, https://github.com/Myriad-Dreamin/tinymist/pull/1754, https://github.com/Myriad-Dreamin/tinymist/pull/1758, https://github.com/Myriad-Dreamin/tinymist/pull/1759, https://github.com/Myriad-Dreamin/tinymist/pull/1762, https://github.com/Myriad-Dreamin/tinymist/pull/1779, https://github.com/Myriad-Dreamin/tinymist/pull/1767, https://github.com/Myriad-Dreamin/tinymist/pull/1771, and https://github.com/Myriad-Dreamin/tinymist/pull/1772
+* Reimplemented typlite by html export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1684, https://github.com/Myriad-Dreamin/tinymist/pull/1720, https://github.com/Myriad-Dreamin/tinymist/pull/1728, https://github.com/Myriad-Dreamin/tinymist/pull/1729, https://github.com/Myriad-Dreamin/tinymist/pull/1754, https://github.com/Myriad-Dreamin/tinymist/pull/1758, https://github.com/Myriad-Dreamin/tinymist/pull/1759, https://github.com/Myriad-Dreamin/tinymist/pull/1762, https://github.com/Myriad-Dreamin/tinymist/pull/1779, https://github.com/Myriad-Dreamin/tinymist/pull/1767, https://github.com/Myriad-Dreamin/tinymist/pull/1771, https://github.com/Myriad-Dreamin/tinymist/pull/1772, https://github.com/Myriad-Dreamin/tinymist/pull/1815, https://github.com/Myriad-Dreamin/tinymist/pull/1816, https://github.com/Myriad-Dreamin/tinymist/pull/1820, https://github.com/Myriad-Dreamin/tinymist/pull/1824, https://github.com/Myriad-Dreamin/tinymist/pull/1825, and https://github.com/Myriad-Dreamin/tinymist/pull/1828
 * Supporting LaTeX export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1718
 * Supporting Docx export by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1727
 * Supporting Text output support by @hongjr03 and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1731
@@ -67,8 +68,12 @@ There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/ma
 
 ### Misc
 
-* Rearranging and testing dependency meta in https://github.com/Myriad-Dreamin/tinymist/pull/1760
 * (Fix) Corrected link to Automattic/haper in https://github.com/Myriad-Dreamin/tinymist/pull/1748
+* (Fix) Running test as root by @hack3ric in https://github.com/Myriad-Dreamin/tinymist/pull/1817
+* Fixed small typo in typlite README by @bluss in https://github.com/Myriad-Dreamin/tinymist/pull/1819
+* Mentioning background preview in helix docs by @DVDTSB in https://github.com/Myriad-Dreamin/tinymist/pull/1829
+* Rearranging and testing dependency meta in https://github.com/Myriad-Dreamin/tinymist/pull/1760
+* Enabling typlite distribution in dist.toml by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1810
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.12...v0.13.14
 
