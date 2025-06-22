@@ -9,7 +9,7 @@
 #github-link("/crates/typlite/")[typlite] is a pure Rust library for converting Typst documents to other markup formats.
 
 
-typlite's goal is to convert docstrings in typst packages to LSP docs (Markdown Format). To achieve this, it runs HTML export and extract semantic information from the HTML document for markup conversion.
+typlite's goal is to convert docstrings in typst packages to LSP docs (Markdown format). To achieve this, it runs HTML export and extracts semantic information from the HTML document for markup conversion.
 
 #let pg-node = node.with(corner-radius: 2pt, shape: "rect");
 #let out-format = box.with(width: 5em)
@@ -37,47 +37,45 @@ typlite's goal is to convert docstrings in typst packages to LSP docs (Markdown 
 - [ ] Renders figures into PDF instead of SVG.
 - [ ] Converts typst equations, might use #link("https://github.com/jgm/texmath")[texmath] or #link("https://codeberg.org/akida/mathyml")[mathyml] plus #link("https://github.com/davidcarlisle/web-xslt/tree/main/pmml2tex")[pmml2tex].
 
-= Perfect Conversion
+= Example: Writing README in typst
 
-typlite is called "-ite" because it only ensures that nice docstrings are converted perfectly. Similarly, if your document looks nice, typlite can also convert it to other markup formats perfectly.
+To export to Markdown, run the command:
 
-This introduces concept of _Semantic Typst._ To help conversion, you should separate styling scripts and semantic content in your typst documents.
+```bash
+typlite README.typ README.md --assets-path assets
+```
 
-A good example in HTML is ```html <strong>``` v.s. ```html <b>```. Written in typst,
+== Assets Path
+
+You might love to use `html.frame` to render typst examples in `README.md`. By default, the examples are embedded in the output by data url. To externalize them, please specify the `--assets-path` option.
+
+== Implementing target-aware functions
+
+typlite will set `sys.inputs.x-target` to `md` if it is exporting to Markdown. You can use this variable to implement target-aware functions in your typst documents.
 
 ```typ
-#strong[Good Content]
-#text(weight: 700)[Bad Content]
+#let x-target = sys.inputs.at("x-target", default: "pdf")
+#let is-md-target = x-target == "md"
 ```
 
-typlite can convert "Good Content" perfectly, but not "Bad Content". This is because we can attach markup-specific styles to "Good Content" then, but "Bad Content" may be broken by some reasons, such as failing to find font weight when rendering the content.
-
-Let's show another example. We have a `main.typ`, which contains the abstract of our paper, and style it with the requirement of the journal. We write it like this:
-#let mixed-content = ```typ
-#align(center)[
-  #text(weight: 700, size: 1.5em)[ABSTRACT]
-  #text(size: 1.2em)[This is the abstract of my paper.]
-]
-```
-#mixed-content
-#eval(mixed-content.text, mode: "markup")
-
-typlite has capability to convert the above content to other markup formats, but it feel cursed. This is because we mix the styling scripts and semantic content together. To separate them, a function `abstract` is can be created:
-
+For example, you can implement a GitHub link function, which determines the link based on the target:
 ```typ
-// template.typ
-#let abstract(body) = align(center)[
-  #text(weight: 700, size: 1.5em)[ABSTRACT]
-  #text(size: 1.2em, body)
-]
-// main.typ
-#import "/template.typ": abstract
-#abstract[This is the abstract of my paper.]
+#let current-revision = read("/.git/" + read("/.git/HEAD").trim().slice(5)).trim()
+
+#let github-link(path, body, kind: none) = {
+  let dest = if is-md-target {
+    path
+  } else {
+    if kind == none {
+      kind = if path.ends-with("/") { "tree" } else { "blob" }
+    }
+    (remote, kind, current-revision, path).join("/")
+  }
+
+  link(dest, body)
+}
+
 ```
-
-The four function calls in the above example can well explain the difference between styling scripts and semantic content. calling `#abstract` from `main.typ` only provide "abstract material" and doesn't add any style, so it is a semantic content. while `#text(weight: 700)`, as a styling script, uses assigns styles to content and make difficult to understand the behind semantics.
-
-typlite will feel happy and make perfect conversion if you keep aware of keep pure semantics of `main.typ` documents in the above way. In fact, this is probably also the way of people abstract typst templates from their documents.
 
 = Example: Styling a Typst Document by IEEE LaTeX Template
 
@@ -85,17 +83,15 @@ typlite will feel happy and make perfect conversion if you keep aware of keep pu
 
 The `main.typ` in the #paper-file-link("/")[Sample Workspace: IEEE Paper] can be converted perfectly.
 
-- Run the command ```bash
+- Run the command： ```bash
   typlite main.typ main.tex --processor "/ieee-tex.typ"
   ```
 - Create a project on Overleaf, using the #link("https://www.overleaf.com/latex/templates/ieee-demo-template-for-computer-society-conferences/hzzszpqfkqky")[IEEE LaTeX Template.]
-- upload the `main.tex` file and exported PDF assets and it will get rendered and ready to submit.
+- Upload the `main.tex` file and exported PDF assets and it will get rendered and ready to submit.
 
-= The core of processors: `article` function
+== Processor Scripts
 
-There is a `--processor "/ieee-tex.typ"` option in the command line, which is not a flag of the official `typst-cli`. The option tells typlite to use a processor file to process the HTML export result.
-- `"/ieee-tex.typ"` is the file relative to the current workspace root.
-- `"@local/ieee-tex:0.1.0"` or `"@preview/ieee-tex:0.1.0"` can be used to get functions from local packages or #link("https://typst.app/universe/")[typst universe].
+The CLI command in the previous example uses the `--processor "/ieee-tex.typ"` option, which is not a flag of the official `typst-cli`. The option tells typlite to use a processor script to process the HTML export result for LaTeX export.
 
 typlite will show your main documents with the `article` function obtained from the processor file.
 
@@ -136,7 +132,41 @@ Hey, [CONTENT generated according to body]
 
 You can implement the `article` function for different markup formats, such as LaTeX, Markdown, DocX, and Plain Text.
 
+== Using Processor Packages
 
+The processor script can be not only a file, but also a package:
+
+- From current workspace: ```typc "/ieee-tex.typ"``` is the file relative to the current workspace root.
+- From a package: ```typc "@local/ieee-tex:0.1.0"``` or ```typc "@preview/ieee-tex:0.1.0"``` can be used to get functions from local packages or #link("https://typst.app/universe/")[typst universe.]
+
+= Perfect Conversion
+
+typlite is called "-ite" because it only ensures that nice docstrings are converted perfectly. Similarly, if your document looks nice, typlite can also convert it to other markup formats perfectly.
+
+This introduces concept of _Semantic Typst._ To help conversion, you should separate styling scripts and semantic content in your typst documents.
+
+A good example in HTML is ```html <strong>``` v.s. ```html <b>```. Written in typst,
+
+```typ
+#strong[Good Content]
+#text(weight: 700)[Bad Content]
+```
+
+typlite can convert "Good Content" perfectly, but not "Bad Content". This is because we can attach markup-specific styles to "Good Content" then, but "Bad Content" may be broken by some reasons, such as failing to find font weight when rendering the content.
+
+To style your typst documents, rewriting the bad content by show rule is suggested:
+
+```typ
+#show strong: it => if is-md-target {
+  // style for Markdown target, for example:
+  html.span(class: "my-strong", it.body)
+} else { // style for builtin Typst targets:
+  text(weight: 700, it.body)
+}
+#strong[Bad Content]
+```
+
+typlite will feel happy and make perfect conversion if you keep aware of keep pure semantics of `main.typ` documents in the above ways.
 
 = Implementing `abstract` for IEEE LaTeX Template
 
@@ -144,7 +174,7 @@ Let's explain how #paper-file-link("/ieee-tex.typ")[`/ieee-tex.typ`] works by th
 
 ```typ
 #let abstract-state = state("tex:abstract", "")
-#let abstract(body) = if is-html-target {
+#let abstract(body) = if is-md-target {
   abstract-state.update(_ => body)
 } else {
     // fallback to regular abstract
@@ -152,14 +182,14 @@ Let's explain how #paper-file-link("/ieee-tex.typ")[`/ieee-tex.typ`] works by th
 ```
 
 #note-box[
-  `is-html-target` already distinguishes regular typst PDF export and typlite export (which uses HTML export). We haven't decide a way to let your template aware of typlite export.
+  `is-md-target` already distinguishes regular typst PDF export and typlite export (which uses HTML export). We haven't decide a way to let your template aware of LaTeX export.
 
   Luckily, typst has `sys.input` mechanism so you can distinguish it by yourself:
 
   ```typ
-  // typst compile or typlite main.typ --input x-target=typlite
-  #let x-target = sys.inputs.at("x-target", default: "typst")
-  #x-target // "typst" or "typlite"
+  // typst compile or typlite main.typ --input exporter=typlite-tex
+  #let exporter = sys.inputs.at("exporter", default: "typst")
+  #exporter // "typst" or "typlite-tex"
   ```
 
   Or define a state that shares between the template and the processor script:
