@@ -47,7 +47,7 @@ This requires the following configuration in your `tasks.json` file:
 }
 ```
 
-See the #github-link("/editors/vscode/e2e-workspaces/print-state")[Sample Workspace: print-state] for more details.
+See the #github-link("/editors/vscode/e2e-workspaces/print-state/")[Sample Workspace: print-state] for more details.
 
 == IEEE Example (VSCode Tasks)
 
@@ -57,7 +57,7 @@ This workspace gives an example to create and prepare IEEE papers using Typst, w
 
 It uses #typst-func("export") to export the document to LaTeX.
 
-See the #github-link("/editors/vscode/e2e-workspaces/ieee-paper")[Sample Workspace: IEEE Paper] for more details.
+See the #github-link("/editors/vscode/e2e-workspaces/ieee-paper/")[Sample Workspace: IEEE Paper] for more details.
 
 == Pdfpc Example (VSCode Tasks)
 

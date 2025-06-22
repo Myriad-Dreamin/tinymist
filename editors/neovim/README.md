@@ -73,7 +73,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 
-For a full list of available settings see [Tinymist Server Configuration](/tree/main/editors/neovim/Configuration.md).
+For a full list of available settings see [Tinymist Server Configuration](/editors/neovim/Configuration.md).
 
 ## Formatting
 

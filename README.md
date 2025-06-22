@@ -5,7 +5,7 @@ Tinymist \[ˈtaɪni mɪst\] is an integrated language service for [Typst](https:
 
 It contains:
 
-- an analyzing library for Typst, see [tinymist-query](/crates/tinymist-query).
+- an analyzing library for Typst, see [tinymist-query](/crates/tinymist-query/).
 - a CLI for Typst, see [tinymist](/crates/tinymist/).
   - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist/feature/language.html).
   - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist/feature/preview.html).
@@ -67,7 +67,7 @@ Extra features:
 - Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
 - Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
 - Provides a status bar item to show the current document's compilation status and words count.
-- [Editor tools](/tools/editor-tools):
+- [Editor tools](/tools/editor-tools/):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).

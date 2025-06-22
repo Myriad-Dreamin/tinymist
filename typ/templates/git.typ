@@ -16,8 +16,12 @@
 // todo: read it from somewhere
 #let remote = "https://github.com/Myriad-Dreamin/tinymist"
 
-#let github-link(path, body, kind: "tree", permalink: true) = link(
-  if is-md-target {
+#let github-link(path, body, kind: none, permalink: true) = {
+  if kind == none {
+    kind = if path.ends-with("/") { "tree" } else { "blob" }
+  }
+
+  let dest = if is-md-target {
     path
   } else {
     remote
@@ -35,6 +39,7 @@
     } else {
       path
     }
-  },
-  body,
-)
+  }
+
+  link(dest, body)
+}

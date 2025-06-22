@@ -6,7 +6,7 @@
   This feature is currently in early development.
 ]
 
-#github-link("/crates/typlite")[typlite] is a pure Rust library for converting Typst documents to other markup formats.
+#github-link("/crates/typlite/")[typlite] is a pure Rust library for converting Typst documents to other markup formats.
 
 
 typlite's goal is to convert docstrings in typst packages to LSP docs (Markdown Format). To achieve this, it runs HTML export and extract semantic information from the HTML document for markup conversion.
