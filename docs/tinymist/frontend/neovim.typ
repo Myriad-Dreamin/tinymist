@@ -118,7 +118,7 @@ end, {})
 Make sure to change `exportPdf` to "onType" or "onSave".
 
 == Working with Multiple-Files Projects
-<working-with-multiple-file-projects>
+<working-with-multiple-files-projects>
 
 Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 

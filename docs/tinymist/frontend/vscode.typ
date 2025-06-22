@@ -178,7 +178,7 @@ See
 for more information.
 
 == Working with Multiple-File Projects
-<working-with-multiple-file-projects>
+<working-with-multiple-files-projects>
 You can pin a main file by command.
 - Use command `Typst Pin Main` (tinymist.pinMainToCurrent) to set the current file as the main file.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.

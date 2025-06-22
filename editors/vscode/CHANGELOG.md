@@ -8,7 +8,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.13.14 - [2025-06-08]
 
-With new approach to converting typst to other markup, we fully supported typst scripting with the conversion and introduced unofficial but tinymist-built-in support to export [LaTeX](https://github.com/Myriad-Dreamin/tinymist/pull/1718), [DocX](https://github.com/Myriad-Dreamin/tinymist/pull/1727), and [Plain Text](https://github.com/Myriad-Dreamin/tinymist/pull/1731).
+With new approach to converting typst to other markup, we provide unofficial support to export [LaTeX](https://github.com/Myriad-Dreamin/tinymist/pull/1718), [DocX](https://github.com/Myriad-Dreamin/tinymist/pull/1727), and [Plain Text](https://github.com/Myriad-Dreamin/tinymist/pull/1731), with full power of typst scripting.
 
 There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/ieee-paper) ([Permalink](https://github.com/Myriad-Dreamin/tinymist/tree/756075a1619321500501acec646e2c9a105763ab/editors/vscode/e2e-workspaces/ieee-paper)) to test the LaTeX export for creating IEEE papers.
 
