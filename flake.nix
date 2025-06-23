@@ -4,7 +4,7 @@
   inputs = {
     tinymist-unstable.url = "path:./contrib/nix/unstable";
     tinymist-dev.url = "path:./contrib/nix/dev";
-    tinymist-nixvim.url = "path:./editors/neovim";
+    tinymist-nixvim.url = "path:./editors/nixvim";
   };
 
   outputs =

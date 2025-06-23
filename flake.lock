@@ -257,11 +257,11 @@
         "nixvim": "nixvim"
       },
       "locked": {
-        "path": "./editors/neovim",
+        "path": "./editors/nixvim",
         "type": "path"
       },
       "original": {
-        "path": "./editors/neovim",
+        "path": "./editors/nixvim",
         "type": "path"
       },
       "parent": []
