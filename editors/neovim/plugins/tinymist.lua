@@ -23,7 +23,7 @@ return {
           root_dir = function()
             return vim.fn.getcwd()
           end,
-          --- See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/blob/main/Configuration.md) for references.
+          --- See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/neovim/Configuration.md) for references.
           settings = {
             --- You could set the formatter mode to use lsp-enhanced formatters.
             -- formatterMode = "typstyle",
