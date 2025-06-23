@@ -1,16 +1,22 @@
-# https://wiki.nixos.org/wiki/Flakes
+# Docs: ./docs/tinymist/nix.typ
 {
-  description = "A very basic flake";
-
+  description = "Collecting nix configurations in tinymist repository.";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    tinymist-unstable.url = "path:./contrib/nix/unstable";
+    tinymist-dev.url = "path:./contrib/nix/dev";
+    tinymist-nixvim.url = "path:./editors/neovim";
   };
 
-  outputs = { self, nixpkgs }: {
-
-    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-
-    packages.x86_64-linux.default = self.packages.x86_64-linux.hello;
-
-  };
+  outputs =
+    { self, tinymist-unstable, tinymist-dev, tinymist-nixvim, ... }@inputs:
+    {
+      devShells = {
+        # nix develop
+        x86_64-linux.default = tinymist-dev.devShells.x86_64-linux.default;
+        # nix develop .#unstable
+        x86_64-linux.unstable = tinymist-unstable.devShells.x86_64-linux.default;
+        # nix develop .#nixvim
+        x86_64-linux.nixvim = tinymist-nixvim.devShells.x86_64-linux.default;
+      };
+    };
 }
