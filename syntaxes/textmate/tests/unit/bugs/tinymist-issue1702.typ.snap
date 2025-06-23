@@ -12,9 +12,9 @@
 #                 ^^ source.typst meta.expr.let.typst markup.math.typst constant.character.escape.content.typst
 #                   ^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.hash.typst
 #                    ^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.typst
-#                     ^ source.typst meta.expr.let.typst markup.math.typst keyword.operator.arithmetic.typst
-#                      ^ source.typst meta.expr.let.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
-#                       ^^ source.typst meta.expr.let.typst markup.math.typst string.quoted.double.typst
+#                     ^^ source.typst meta.expr.let.typst markup.math.typst constant.character.escape.content.typst
+#                       ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.end.math.typst
 >Rest of code here...
-#^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst markup.math.typst string.quoted.double.typst
+#^^^^^^^^^^^^^^^^^ source.typst
+#                 ^^^ source.typst punctuation.definition.ellipsis.typst
 >
