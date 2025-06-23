@@ -48,6 +48,7 @@
   }
 }
 
+// todo: use theme-box, to solve theme issue of typst figures.
 #let cond-image(img) = context if shiroa-sys-target() == "html" {
   html.elem("div", attrs: ("class": "pseudo-image"), html.frame(img))
 } else {
