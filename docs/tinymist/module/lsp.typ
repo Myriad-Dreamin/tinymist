@@ -2,6 +2,8 @@
 
 #show: book-page.with(title: [LSP])
 
+// todo: server-level profiling
+
 = Architecture
 
 Tinymist binary has multiple modes, and it may runs multiple actors in background. The actors could run as an async task, in a single thread, or in an isolated process.

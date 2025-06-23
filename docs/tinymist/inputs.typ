@@ -104,3 +104,5 @@ This is handled by tinymist by some tricks.
 == Record and Replay
 
 Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU.
+
+// todo: link to /module/lsp.typ = Debugging with input mirroring

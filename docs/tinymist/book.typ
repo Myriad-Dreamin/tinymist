@@ -38,7 +38,7 @@
     - #chapter("type-system.typ")[Type System]
     = Service Development
     - #chapter("crate-docs.typ")[Crate Docs]
-    - #chapter("module/lsp.typ")[LSP and CLI]
+    - #chapter("module/lsp.typ")[Language Server]
     - #chapter("module/query.typ")[Language Queries]
     - #chapter("module/preview.typ")[Document Preview]
   ],
