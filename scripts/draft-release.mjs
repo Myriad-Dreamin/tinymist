@@ -40,31 +40,13 @@ const generateExtensionInstall = (version) => {
 
   /**
    * @param {string} name
-   * @returns {string}
-   */
-  const debugExt = (name) => {
-    return name.includes("darwin")
-      ? ".dwarf"
-      : name.includes("win32")
-        ? ".pdb"
-        : ".debug";
-  };
-
-  /**
-   * @param {string} name
    * @param {string} displayName
    * @returns {Platform}
    */
   const platform = (name, displayName) => ({
     name,
     displayName,
-    assets: [
-      { file: `tinymist-${name}${binExt(name)}`, displayName: "Binary" },
-      {
-        file: `tinymist-${name}${debugExt(name)}`,
-        displayName: "Debug Symbols",
-      },
-    ],
+    assets: [{ file: `tinymist-${name}${binExt(name)}`, displayName: "Binary" }],
   });
 
   /**
@@ -130,12 +112,10 @@ const main = async () => {
   }
 
   // read version from packages.json
-  const packageJson = JSON.parse(
-    fs.readFileSync("./editors/vscode/package.json", "utf8")
-  );
+  const packageJson = JSON.parse(fs.readFileSync("./editors/vscode/package.json", "utf8"));
   if (packageJson.version !== versionToUpload) {
     console.error(
-      `Version in Cargo.toml (${packageJson.version}) is different from the version to upload (${versionToUpload})`
+      `Version in Cargo.toml (${packageJson.version}) is different from the version to upload (${versionToUpload})`,
     );
     process.exit(1);
   }
@@ -149,7 +129,7 @@ const main = async () => {
   await run(DIST_CMD + " generate");
 
   const distManifest = await run(
-    DIST_CMD + " host --steps=upload --steps=release --output-format=json"
+    DIST_CMD + " host --steps=upload --steps=release --output-format=json",
   );
   const distData = JSON.parse(distManifest);
   const binInstallText = distData.announcement_github_body;
@@ -157,28 +137,23 @@ const main = async () => {
   fs.writeFileSync("target/announcement-dist.md", binInstallText);
 
   // parse-changelog .\editors\vscode\CHANGELOG.md
-  const changelogPlainRaw = await run(
-    "parse-changelog ./editors/vscode/CHANGELOG.md"
-  );
+  const changelogPlainRaw = await run("parse-changelog ./editors/vscode/CHANGELOG.md");
   // **Full Changelog**:
   // Patch the full changelog link
   const fullChangelogLine =
     /\*\*Full Changelog\*\*: https:\/\/github.com\/Myriad-Dreamin\/tinymist\/compare\/v(\d+\.\d+\.\d+)...v(\d+\.\d+\.\d+)/;
   let anyMatched = false;
-  const changelogPlain = changelogPlainRaw.replace(
-    fullChangelogLine,
-    (_match, p1, p2) => {
-      anyMatched = true;
-      if (!versionToUpload.startsWith(p2)) {
-        console.error(
-          `Failed to patch the full changelog link, expected version to upload to start with ${p2}, but got ${versionToUpload}`
-        );
-        process.exit(1);
-      }
-
-      return `\*\*Full Changelog\*\*: https://github.com/Myriad-Dreamin/tinymist/compare/v${p1}...v${versionToUpload}`;
+  const changelogPlain = changelogPlainRaw.replace(fullChangelogLine, (_match, p1, p2) => {
+    anyMatched = true;
+    if (!versionToUpload.startsWith(p2)) {
+      console.error(
+        `Failed to patch the full changelog link, expected version to upload to start with ${p2}, but got ${versionToUpload}`,
+      );
+      process.exit(1);
     }
-  );
+
+    return `\*\*Full Changelog\*\*: https://github.com/Myriad-Dreamin/tinymist/compare/v${p1}...v${versionToUpload}`;
+  });
   if (!anyMatched) {
     console.error("Failed to patch the full changelog link");
     process.exit(1);
@@ -189,20 +164,11 @@ const main = async () => {
   const extensionInstallText = generateExtensionInstall(versionToUpload);
   // concat and generate final announcement
   const binInstallSection = collapsed(binInstallText, `Download Binary`);
-  const extensionInstallSection = collapsed(
-    extensionInstallText,
-    `Download VS Code Extension`
-  );
-  const announcement = [
-    changelogPlain,
-    binInstallSection,
-    extensionInstallSection,
-  ].join("\n\n");
+  const extensionInstallSection = collapsed(extensionInstallText, `Download VS Code Extension`);
+  const announcement = [changelogPlain, binInstallSection, extensionInstallSection].join("\n\n");
   fs.writeFileSync("target/announcement.gen.md", announcement);
 
-  console.log(
-    "Please check the generated announcement in target/announcement.gen.md"
-  );
+  console.log("Please check the generated announcement in target/announcement.gen.md");
 };
 
 main();
