@@ -1,6 +1,6 @@
 # https://wiki.nixos.org/wiki/Flakes
 {
-  # description = "A flake configuration to use tinymist CLI from unstable nixpkgs";
+  description = "A flake configuration to use tinymist CLI from unstable nixpkgs";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
