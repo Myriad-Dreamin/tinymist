@@ -9,7 +9,8 @@ Tinymist will read the documentation from the source code and display it in the 
 = Status of the Feature
 
 - #sym.checkmark Syntax of Docstring's Content: We have reached consensus on the syntax of content. It MUST be written in Typst.
-- #sym.quest Annotations in Docstring's Content: We check the annotations in docstring by #link("https://typst.app/universe/package/tidy")[tidy style]. It's not an official standard.
+- #sym.quest Annotations in Docstring's Content: We check the annotations in docstring by #link("https://typst.app/universe/package/tidy")[tidy style] (*< v0.4.0*). It's not an official standard.
+  - Related Issue: #link("https://github.com/Mc-Zen/tidy/issues/53")[Tidy \#53: Long-term compatibility with `tinymist`.]
 - #sym.crossmark Syntax of Docstring: We haven't reached consensus on the syntax of docstring. It's not clear whether we should distinguish the docstring from regular comments.
 
 = Format of Docstring
