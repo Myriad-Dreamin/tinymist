@@ -1,89 +1,34 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    # nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    cargo2nix.url = "github:cargo2nix/cargo2nix/release-0.12";
+    # flake-utils.follows = "cargo2nix/flake-utils";
+    nixpkgs.follows = "cargo2nix/nixpkgs";
   };
 
-  outputs = inputs @ { self, flake-parts, nixpkgs, }:
+  outputs = inputs @ { self, flake-parts, cargo2nix, nixpkgs, }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = ["x86_64-linux"];
-      perSystem = {config, lib, pkgs, ...}: 
-      let tinymist = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
-          pname = "tinymist";
-          # Please update the corresponding vscode extension when updating
-          # this derivation.
-          version = "0.13.14";
-
-          src = pkgs.lib.cleanSource ../../..;
-
-          useFetchCargoVendor = true;
-          cargoHash = "sha256-aD50+awwVds9zwW5hM0Hgxv8NGV7J63BOSpU9907O+k=";
-
-          nativeBuildInputs = [
-            pkgs.installShellFiles
-            pkgs.pkg-config
-          ];
-
-          checkFlags = [
-            "--skip=e2e"
-
-            # Require internet access
-            "--skip=docs::package::tests::cetz"
-            "--skip=docs::package::tests::fletcher"
-            "--skip=docs::package::tests::tidy"
-            "--skip=docs::package::tests::touying"
-
-            # Tests are flaky for unclear reasons since the 0.12.3 release
-            # Reported upstream: https://github.com/Myriad-Dreamin/tinymist/issues/868
-            "--skip=analysis::expr_tests::scope"
-            "--skip=analysis::post_type_check_tests::test"
-            "--skip=analysis::type_check_tests::test"
-            "--skip=completion::tests::test_pkgs"
-            "--skip=folding_range::tests::test"
-            "--skip=goto_definition::tests::test"
-            "--skip=hover::tests::test"
-            "--skip=inlay_hint::tests::smart"
-            "--skip=prepare_rename::tests::prepare"
-            "--skip=references::tests::test"
-            "--skip=rename::tests::test"
-            "--skip=semantic_tokens_full::tests::test"
-          ];
-
-          postInstall = lib.optionalString (pkgs.stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages) (
-            let
-              emulator = pkgs.stdenv.hostPlatform.emulator pkgs.buildPackages;
-            in
-            ''
-              installShellCompletion --cmd tinymist \
-                --bash <(${emulator} $out/bin/tinymist completion bash) \
-                --fish <(${emulator} $out/bin/tinymist completion fish) \
-                --zsh <(${emulator} $out/bin/tinymist completion zsh)
-            ''
-          );
-
-          nativeInstallCheckInputs = [
-            pkgs.versionCheckHook
-          ];
-          versionCheckProgramArg = "-V";
-          doInstallCheck = true;
-
-          meta = {
-            description = "Tinymist is an integrated language service for Typst";
-            homepage = "https://github.com/Myriad-Dreamin/tinymist";
-            changelog = "https://github.com/Myriad-Dreamin/tinymist/blob/v${finalAttrs.version}/editors/vscode/CHANGELOG.md";
-            license = lib.licenses.asl20;
-            mainProgram = "tinymist";
-            maintainers = with lib.maintainers; [
-              GaetanLepage
-              lampros
-            ];
-          };
-        });
+      perSystem = {config, system, lib, pkgs, ...}: 
+      let 
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [cargo2nix.overlays.default];
+        };
+        rustPkgs = pkgs.rustBuilder.makePackageSet {
+          rustVersion = "1.85.0";
+          packageFun = import ../../../Cargo.nix;
+          target = "x86_64-unknown-linux-musl";
+          workspaceSrc = ../../..;
+        };
+        # replace hello-world with your package name
+        tinymist = (rustPkgs.workspace.tinymist {});
       in {
         # export the project devshell as the default devshell
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            tinymist
+            tinymist.bin
           ];
           shellHook = ''
             echo "Docs: docs/tinymist/nix.typ."

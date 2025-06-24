@@ -1,5 +1,43 @@
 {
   "nodes": {
+    "cargo2nix": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "flake-utils": "flake-utils",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1750364353,
+        "narHash": "sha256-l06DIwnB4JHwP1isUUXk85F+AHQkUSUyAWnAmRxXICg=",
+        "owner": "cargo2nix",
+        "repo": "cargo2nix",
+        "rev": "a709c74619e1a2b68ed12bb398e12fbe29d69657",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cargo2nix",
+        "ref": "release-0.12",
+        "repo": "cargo2nix",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696426674,
+        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -81,6 +119,24 @@
         "systems": "systems"
       },
       "locked": {
+        "lastModified": 1694529238,
+        "narHash": "sha256-zsNZZGTGnMOf9YpHKJqMSsa0dXbfmxeoJ7xHlrt+xmY=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "ff7b65b44d01cf9ba6a71320833626af21126384",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems_2"
+      },
+      "locked": {
         "lastModified": 1731533236,
         "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
@@ -126,16 +182,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1750506804,
-        "narHash": "sha256-VLFNc4egNjovYVxDGyBYTrvVCgDYgENp5bVi9fPTDYc=",
+        "lastModified": 1705099185,
+        "narHash": "sha256-SxJenKtvcrKJd0TyJQMO3p6VA7PEp+vmMnmlKFzWMNs=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "4206c4cb56751df534751b058295ea61357bbbaa",
+        "rev": "2bce5ccff0ad7abda23e8bb56434b6877a446694",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-unstable",
+        "ref": "release-23.11",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -225,7 +281,7 @@
           "nixpkgs"
         ],
         "nuschtosSearch": "nuschtosSearch",
-        "systems": "systems_2"
+        "systems": "systems_3"
       },
       "locked": {
         "lastModified": 1750691276,
@@ -243,7 +299,7 @@
     },
     "nuschtosSearch": {
       "inputs": {
-        "flake-utils": "flake-utils",
+        "flake-utils": "flake-utils_2",
         "ixx": "ixx",
         "nixpkgs": [
           "tinymist-nixvim",
@@ -271,6 +327,28 @@
         "tinymist-dev": "tinymist-dev",
         "tinymist-nixvim": "tinymist-nixvim",
         "tinymist-unstable": "tinymist-unstable"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "tinymist-dev",
+          "cargo2nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1740969088,
+        "narHash": "sha256-BajboqzFnDhxVT0SXTDKVJCKtFP96lZXccBlT/43mao=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "20fdb02098fdda9a25a2939b975abdd7bc03f62d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
       }
     },
     "systems": {
@@ -303,17 +381,37 @@
         "type": "github"
       }
     },
+    "systems_3": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    },
     "tinymist-dev": {
       "inputs": {
+        "cargo2nix": "cargo2nix",
         "flake-parts": "flake-parts_2",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": [
+          "tinymist-dev",
+          "cargo2nix",
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "path": "././././././././contrib/nix/dev",
+        "path": "contrib/nix/dev",
         "type": "path"
       },
       "original": {
-        "path": "././././././././contrib/nix/dev",
+        "path": "contrib/nix/dev",
         "type": "path"
       },
       "parent": []

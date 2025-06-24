@@ -5,7 +5,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     
     tinymist-unstable.url = "path:contrib/nix/unstable";
-    tinymist-dev.url = "path:././././././././contrib/nix/dev";
+    tinymist-dev.url = "path:contrib/nix/dev";
     tinymist-nixvim.url = "path:editors/nixvim";
   };
 
