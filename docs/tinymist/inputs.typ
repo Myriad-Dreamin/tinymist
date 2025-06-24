@@ -103,4 +103,5 @@ This is handled by tinymist by some tricks.
 
 == Record and Replay
 
-Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU.
+#let sub = [= Debugging with input mirroring]
+Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU. This concrete usage is documented in #cross-link("/module/lsp.typ", reference: heading-reference(sub))[Language Server: #sub.body.]

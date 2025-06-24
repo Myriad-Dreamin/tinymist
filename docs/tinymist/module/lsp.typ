@@ -1,6 +1,8 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: [LSP])
+#show: book-page.with(title: [Language Server])
+
+// todo: server-level profiling
 
 = Architecture
 
@@ -69,6 +71,14 @@ dhat: The data has been saved to dhat-heap.json, and is viewable with dhat/dh_vi
 ```
 
 Once you have the `dhat-heap.json`, you can visualize the memory usage with #link("https://nnethercote.github.io/dh_view/dh_view.html")[the DHAT viewer].
+
+= Server-Level Profiling
+
+In VS Code, you can get the profiling data of the language server by searching and running the "Typst: Profile server" command.
+
+#note-box[
+  To use this feature in other LSP clients, please check `/editors/vscode/src/features/tool.ts`. A client should #link("https://github.com/Myriad-Dreamin/tinymist/blob/4bfb5c22daf78076f24d0b198641730f388e46ed/editors/vscode/src/features/tool.ts#L347-L359")[start] and then #link("https://github.com/Myriad-Dreamin/tinymist/blob/4bfb5c22daf78076f24d0b198641730f388e46ed/editors/vscode/src/features/tool.ts#L286-L295")[stop] profiling to collect performance events inside the time window.
+]
 
 = Contributing
 
