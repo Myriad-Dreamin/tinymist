@@ -4,9 +4,9 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     
-    tinymist-unstable.url = "path:./contrib/nix/unstable";
-    tinymist-dev.url = "path:./contrib/nix/dev";
-    tinymist-nixvim.url = "path:./editors/nixvim";
+    tinymist-unstable.url = "path:contrib/nix/unstable";
+    tinymist-dev.url = "path:././././././contrib/nix/dev";
+    tinymist-nixvim.url = "path:editors/nixvim";
   };
 
   outputs = inputs@{
@@ -15,7 +15,7 @@
     perSystem =
       { system, ... }:
       {
-        apps.default = tinymist-dev.apps.${system}.default;
+        # apps.default = tinymist-dev.apps.${system}.default;
         
         devShells = {
           # nix develop
