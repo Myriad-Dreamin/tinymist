@@ -4506,6 +4506,8 @@ dependencies = [
  "rpds",
  "tinymist-std",
  "typst",
+ "typst-library",
+ "typst-syntax",
  "wasm-bindgen",
  "web-sys",
 ]

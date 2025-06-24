@@ -34,6 +34,7 @@ typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
 typst-html.workspace = true
+typst-library.workspace = true
 
 # Feature: docx
 docx-rs = { workspace = true, optional = true }

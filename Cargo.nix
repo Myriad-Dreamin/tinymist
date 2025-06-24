@@ -49,7 +49,7 @@ args@{
   cargoConfig ? {},
 }:
 let
-  nixifiedLockHash = "f836feb8afe9cede0a593a3ef6e180922b5765eac4afd1ed235cc9d33d5a22dc";
+  nixifiedLockHash = "aa4303ea29883dbb0ce223a6827c2fbe1836ea00fca5dceef21a5e4e9d9ae6d5";
   workspaceSrc = if args.workspaceSrc == null then ./. else args.workspaceSrc;
   currentLockHash = builtins.hashFile "sha256" (workspaceSrc + /Cargo.lock);
   lockHashIgnored = if ignoreLockHash
@@ -6537,6 +6537,8 @@ in
       rpds = (rustPackages."registry+https://github.com/rust-lang/crates.io-index".rpds."1.1.1" { inherit profileName; }).out;
       tinymist_std = (rustPackages."unknown".tinymist-std."0.13.12" { inherit profileName; }).out;
       typst = (rustPackages."git+https://github.com/Myriad-Dreamin/typst.git".typst."0.13.1" { inherit profileName; }).out;
+      typst_library = (rustPackages."git+https://github.com/Myriad-Dreamin/typst.git".typst-library."0.13.1" { inherit profileName; }).out;
+      typst_syntax = (rustPackages."git+https://github.com/Myriad-Dreamin/typst.git".typst-syntax."0.13.1" { inherit profileName; }).out;
       ${ if rootFeatures' ? "tinymist-core/default" || rootFeatures' ? "tinymist-core/web" || rootFeatures' ? "tinymist-vfs/browser" || rootFeatures' ? "tinymist-vfs/wasm-bindgen" || rootFeatures' ? "tinymist-vfs/web" || rootFeatures' ? "tinymist-world/browser" || rootFeatures' ? "tinymist-world/web" then "wasm_bindgen" else null } = (rustPackages."registry+https://github.com/rust-lang/crates.io-index".wasm-bindgen."0.2.100" { inherit profileName; }).out;
       ${ if rootFeatures' ? "tinymist-core/default" || rootFeatures' ? "tinymist-core/web" || rootFeatures' ? "tinymist-vfs/browser" || rootFeatures' ? "tinymist-vfs/web" || rootFeatures' ? "tinymist-vfs/web-sys" || rootFeatures' ? "tinymist-world/browser" || rootFeatures' ? "tinymist-world/web" then "web_sys" else null } = (rustPackages."registry+https://github.com/rust-lang/crates.io-index".web-sys."0.3.77" { inherit profileName; }).out;
     };

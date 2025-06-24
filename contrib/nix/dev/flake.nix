@@ -23,12 +23,12 @@
           workspaceSrc = ../../..;
         };
         # replace hello-world with your package name
-        tinymist = (rustPkgs.workspace.tinymist {});
+        typlite = (rustPkgs.workspace.typlite {});
       in {
         # export the project devshell as the default devshell
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            tinymist.bin
+            typlite
           ];
           shellHook = ''
             echo "Docs: docs/tinymist/nix.typ."
