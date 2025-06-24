@@ -67,7 +67,13 @@ impl FullTextDigest<'_> {
         use typst::html::HtmlNode::*;
         match node {
             Tag(_) => Ok(()),
-            Element(elem) => Self::export_element(f, elem),
+            Element(elem) => {
+                if elem.tag.resolve().as_str() == "style" {
+                    Ok(())
+                } else {
+                    Self::export_element(f, elem)
+                }
+            }
             Text(t, _) => f.write_str(t.as_str()),
             Frame(frame) => Self::export_frame(f, frame),
         }
