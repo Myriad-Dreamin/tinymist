@@ -14,7 +14,7 @@ There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/ma
 
 * Bumped MSRV to v1.85 in https://github.com/Myriad-Dreamin/tinymist/pull/1683
 * Bumped typstyle to v0.13.11 and add config for hard wrap by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1737, https://github.com/Myriad-Dreamin/tinymist/pull/1797, and https://github.com/Myriad-Dreamin/tinymist/pull/1814
-  * This includes few significant changes. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v01311---2025-06-14
+  * This includes few significant changes. For more details, see https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.11%20-%20[2025-06-14]
 
 ### Editor
 
@@ -82,7 +82,7 @@ There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/ma
 * Bumped world crates to v0.13.12
 * Bumped typst.ts to v0.6.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/1707
 * Bumped typstyle from v0.13.1 to v0.13.3 in https://github.com/Myriad-Dreamin/tinymist/pull/1651
-  * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://enter-tainer.github.io/typstyle/changelog/#v0133---2025-04-10.
+  * This version achieves full document formatting support. It now comprehensively processes previously skipped elements, such as markup lines mixed with equations or codes, equations with comments, math expressions containing `#` symbols, and math arguments. There are also a few minor bug fixes and enhancements related to equations and import items. For more details, see https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.3%20-%20[2025-04-10].
 
 ### Server
 
