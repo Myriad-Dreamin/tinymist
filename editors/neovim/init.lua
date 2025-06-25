@@ -53,7 +53,7 @@ if vim.env.SSH_TTY ~= nil then
 end
 
 -- important for running LSP servers
-vim.lsp.enable('tinymist')
+-- vim.lsp.enable('tinymist')
 
 vim.api.nvim_set_keymap("n", "gd", "<cmd>lua vim.lsp.buf.definition()<CR>", { noremap = true, silent = true })
 

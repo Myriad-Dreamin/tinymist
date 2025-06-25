@@ -1,8 +1,6 @@
 local this_file = debug.getinfo(1).source:match '@(.*)$'
 
--- local tinymist_root = vim.fs.joinpath(vim.fs.dirname(this_file), '../../..')
--- local root = vim.fs.joinpath(tinymist_root, 'tests/workspaces')
-local root = '/home/runner/workspaces'
+local root = vim.fs.joinpath(vim.fs.dirname(this_file), '../workspaces')
 local book_root = vim.fs.joinpath(root, 'book')
 local ind = vim.fs.joinpath(root, 'individuals')
 -- local indent = vim.fs.joinpath(root, 'indent')

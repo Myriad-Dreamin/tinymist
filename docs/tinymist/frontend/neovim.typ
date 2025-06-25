@@ -193,4 +193,5 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 
 = Contributing
 <contributing>
-You can submit issues or make PRs to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub];.
+
+Please check the #github-link("/editors/neovim/CONTRIBUTING.md")[contributing guide] for more information on how to contribute to the project.
