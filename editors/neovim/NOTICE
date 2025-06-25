@@ -1,0 +1,3 @@
+## Files in `lua` and `spec` directories
+
+- files in `lua/std` and `spec` are mostly copied from lean.nvim. They are licensed under [LICENSES-LEAN-NVIM](./LICENSES-LEAN-NVIM).
