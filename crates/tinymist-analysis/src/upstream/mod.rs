@@ -423,7 +423,7 @@ pub fn truncated_repr_<const SZ_LIMIT: usize>(value: &Value) -> EcoString {
 
 /// Get the representation but truncated to a certain size.
 pub fn truncated_repr(value: &Value) -> EcoString {
-    const _10MB: usize = 100 * 1024 * 1024;
+    const _10MB: usize = 10 * 1024 * 1024;
     truncated_repr_::<_10MB>(value)
 }
 
