@@ -1,0 +1,5 @@
+{
+  "name": "lazylean.nvim",
+  "build": { "dockerfile": "Dockerfile" },
+  "onCreateCommand": "git clone --filter=blob:none https://github.com/leanprover-community/Mathlib4.git && cd Mathlib4 && lake exe cache get! && nvim +quit"
+}

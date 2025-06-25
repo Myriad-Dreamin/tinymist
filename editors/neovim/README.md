@@ -195,5 +195,3 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
 ## Contributing
-
-You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
