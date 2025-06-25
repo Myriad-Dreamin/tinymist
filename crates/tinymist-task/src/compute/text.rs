@@ -1,5 +1,6 @@
 use core::fmt;
 use std::sync::Arc;
+use typst::html::{tag, HtmlNode::*};
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;
@@ -64,11 +65,11 @@ impl FullTextDigest<'_> {
     }
 
     fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst::html::HtmlNode) -> fmt::Result {
-        use typst::html::HtmlNode::*;
         match node {
             Tag(_) => Ok(()),
             Element(elem) => {
-                if elem.tag.resolve().as_str() == "style" {
+                // Skips certain tags that do not contribute to text content.
+                if matches!(elem.tag, tag::style | tag::script) {
                     Ok(())
                 } else {
                     Self::export_element(f, elem)
