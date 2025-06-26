@@ -4,7 +4,7 @@ members = ["cargo:."]
 # Config for 'dist'
 [dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.0-tinymist.8"
+cargo-dist-version = "0.28.6-tinymist.2"
 # A URL to use to install `cargo-dist` (with the installer script)
 cargo-dist-url-override = "https://github.com/Myriad-Dreamin/cargo-dist/releases/download/v0.28.0-tinymist.8"
 # CI backends to support
@@ -62,19 +62,12 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 # Whether to cache builds
 cache-builds = true
 
-# todo: windows containers will be removed since Jun 30, 2025
+[dist.min-glibc-version]
+# Override glibc version for specific target triplets.
+aarch64-unknown-linux-gnu = "2.28"
+riscv64gc-unknown-linux-gnu = "2.31"
+# Override all remaining glibc versions.
+"*" = "2.17"
+
 [dist.github-custom-runners]
-global = "ubuntu-22.04"
 aarch64-pc-windows-msvc = "windows-latest"
-aarch64-unknown-linux-gnu = "ubuntu-22.04"
-aarch64-unknown-linux-musl = "ubuntu-22.04"
-arm-unknown-linux-gnueabihf = "ubuntu-22.04"
-arm-unknown-linux-musleabihf = "ubuntu-22.04"
-armv7-unknown-linux-gnueabihf = "ubuntu-22.04"
-armv7-unknown-linux-musleabihf = "ubuntu-22.04"
-x86_64-unknown-linux-gnu = "ubuntu-22.04"
-x86_64-unknown-linux-musl = "ubuntu-22.04"
-# riscv64gc-unknown-linux-gnu = "ubuntu-22.04"
-riscv64gc-unknown-linux-musl = "ubuntu-22.04"
-loongarch64-unknown-linux-gnu = "ubuntu-22.04"
-loongarch64-unknown-linux-musl = "ubuntu-22.04"
