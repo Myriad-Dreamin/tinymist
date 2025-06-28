@@ -90,6 +90,15 @@ interface JumpInfo {
   end: [number, number] | null;
 }
 
+export interface PreviewViewport {
+  pageNo: number;
+  y: number;
+}
+interface PreviewViewportUpdate {
+  taskId: string;
+  viewport: PreviewViewport;
+}
+
 export class LanguageState {
   static Client: typeof LanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
@@ -508,6 +517,11 @@ export class LanguageState {
     // (Optional) The server requests to update the document outline
     client.onNotification("tinymist/documentOutline", async (data: any) => {
       previewProcessOutline(data);
+    });
+
+    // (Required) The server requests to report the current viewport of the preview page.
+    client.onNotification("tinymist/preview/updateViewport", (req: PreviewViewportUpdate) => {
+      extensionState.setPreviewViewport(req.taskId, req.viewport);
     });
   }
 
