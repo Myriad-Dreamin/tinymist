@@ -12,6 +12,8 @@ repository.workspace = true
 [dependencies]
 
 typst.workspace = true
+typst-syntax.workspace = true
+typst-library.workspace = true
 tinymist-std = { workspace = true, features = ["typst"] }
 parking_lot.workspace = true
 nohash-hasher.workspace = true
