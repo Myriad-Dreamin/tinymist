@@ -13,16 +13,6 @@ use crate::*;
 
 /// In memory source file management.
 impl ServerState {
-    /// A save is triggered by the client.
-    fn trigger_save(&mut self) -> Result<()> {
-        log::trace!("trigger save");
-
-        let intr = Interrupt::Save;
-        self.project.interrupt(intr);
-
-        Ok(())
-    }
-
     /// Updates a set of source files.
     fn update_sources(&mut self, files: FileChangeSet) -> Result<()> {
         log::trace!("update source: {files:?}");

@@ -514,7 +514,6 @@ mod tests {
             by_entry_update: true,
             by_fs_events: false,
             by_mem_events: false,
-            by_save_events: false,
         };
 
         let graph = WorldComputeGraph::new(snap);

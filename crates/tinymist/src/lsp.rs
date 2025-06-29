@@ -114,8 +114,6 @@ impl ServerState {
     }
 
     pub(crate) fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
-        self.on_save();
-
         Ok(())
     }
 }

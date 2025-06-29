@@ -241,8 +241,6 @@ pub enum Interrupt<F: CompilerFeat> {
     Memory(MemoryEvent),
     /// File system event.
     Fs(FilesystemEvent),
-    /// A project is saved.
-    Save,
 }
 
 impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
@@ -257,7 +255,6 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
             Interrupt::Font(..) => write!(f, "Font(..)"),
             Interrupt::Memory(..) => write!(f, "Memory(..)"),
             Interrupt::Fs(..) => write!(f, "Fs(..)"),
-            Interrupt::Save => write!(f, "Save"),
         }
     }
 }
@@ -269,8 +266,6 @@ pub struct CompileReasons {
     pub by_memory_events: bool,
     /// The snapshot is taken by the fs events.
     pub by_fs_events: bool,
-    /// The snapshot is taken by the save events.
-    pub by_save_events: bool,
     /// The snapshot is taken by the entry change.
     pub by_entry_update: bool,
 }
@@ -280,7 +275,6 @@ impl From<CompileReasons> for ExportSignal {
         Self {
             by_mem_events: value.by_memory_events,
             by_fs_events: value.by_fs_events,
-            by_save_events: value.by_save_events,
             by_entry_update: value.by_entry_update,
         }
     }
@@ -304,7 +298,6 @@ impl CompileReasons {
         Self {
             by_memory_events: self.by_memory_events && !excluded.by_memory_events,
             by_fs_events: self.by_fs_events && !excluded.by_fs_events,
-            by_save_events: self.by_save_events && !excluded.by_save_events,
             by_entry_update: self.by_entry_update && !excluded.by_entry_update,
         }
     }
@@ -324,13 +317,6 @@ fn reason_by_mem() -> CompileReasons {
 fn reason_by_fs() -> CompileReasons {
     CompileReasons {
         by_fs_events: true,
-        ..CompileReasons::default()
-    }
-}
-
-fn reason_by_save() -> CompileReasons {
-    CompileReasons {
-        by_save_events: true,
         ..CompileReasons::default()
     }
 }
@@ -463,7 +449,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             compilation: OnceLock::default(),
             latest_success_doc: None,
             deps: Default::default(),
-            last_save_revision: 0,
             committed_revision: 0,
         }
     }
@@ -701,17 +686,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     }
                 }
             }
-            Interrupt::Save => {
-                let projects = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
-
-                for proj in projects {
-                    // Increment the revision to save the project.
-                    if proj.verse.revision.get() != proj.last_save_revision {
-                        proj.last_save_revision = proj.verse.revision.get();
-                        proj.reason.see(reason_by_save());
-                    }
-                }
-            }
         }
     }
 
@@ -777,8 +751,6 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
-    /// The last save revision.
-    last_save_revision: usize,
 
     /// The latest successly compiled document.
     latest_success_doc: Option<TypstDocument>,
@@ -808,7 +780,6 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 by_entry_update: self.reason.by_entry_update,
                 by_mem_events: self.reason.by_memory_events,
                 by_fs_events: self.reason.by_fs_events,
-                by_save_events: self.reason.by_save_events,
             },
             success_doc: self.latest_success_doc.clone(),
         };
