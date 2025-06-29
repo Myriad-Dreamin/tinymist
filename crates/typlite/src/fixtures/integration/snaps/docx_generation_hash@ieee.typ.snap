@@ -4,4 +4,4 @@ expression: hash
 input_file: crates/typlite/src/fixtures/integration/ieee.typ
 snapshot_kind: text
 ---
-siphash128_13:914f20b049c227a73ad350294a7d79b3
+siphash128_13:5daae4241d4edc5d41621c9500517b3d
