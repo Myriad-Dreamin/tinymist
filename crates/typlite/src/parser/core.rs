@@ -268,9 +268,19 @@ impl HtmlToAstParser {
         element: &HtmlElement,
     ) -> Result<()> {
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
+        let prev_blocks = std::mem::take(&mut self.blocks);
+        
         self.convert_children(element)?;
-        target.append(&mut self.inline_buffer);
+        
+        let new_blocks = std::mem::take(&mut self.blocks);
+        let new_inline = std::mem::take(&mut self.inline_buffer);
+        
+        // Add new blocks first, then inline content
+        target.extend(new_blocks);
+        target.extend(new_inline);
+        
         self.inline_buffer = prev_buffer;
+        self.blocks = prev_blocks;
         Ok(())
     }
 }
