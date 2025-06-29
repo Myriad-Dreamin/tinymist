@@ -97,7 +97,7 @@ impl LockFileExt for LockFile {
             .map(|t| Id::new(t.clone()))
             .unwrap_or(doc_id.clone());
 
-        let when = args.when.unwrap_or(TaskWhen::OnType);
+        let when = args.when.clone().unwrap_or(TaskWhen::OnType);
         let task = ProjectTask::Preview(PreviewTask { when });
         let task = ApplyProjectTask {
             id: task_id.clone(),

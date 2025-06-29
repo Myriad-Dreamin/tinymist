@@ -236,7 +236,7 @@ macro_rules! display_possible_values {
 /// alias typst="tinymist compile --when=onSave"
 /// typst compile main.typ
 /// ```
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash, ValueEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Hash, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[clap(rename_all = "camelCase")]
 pub enum TaskWhen {
@@ -252,6 +252,8 @@ pub enum TaskWhen {
     ///
     /// Note: this is deprecating.
     OnDocumentHasTitle,
+    /// Checks by running a typst script.
+    Script,
 }
 
 impl TaskWhen {

@@ -162,7 +162,7 @@ impl ServerState {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
                 },
-                lint: config.lint.when(),
+                lint: config.lint.when().clone(),
                 periscope: periscope_args.map(|args| {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
@@ -450,7 +450,7 @@ impl CompileHandlerImpl {
         let should_lint = art
             .snap
             .signal
-            .should_run_task_dyn(self.analysis.lint, art.doc.as_ref())
+            .should_run_task_dyn(&self.analysis.lint, art.doc.as_ref())
             .unwrap_or_default();
         log::debug!(
             "Project: should_lint: {should_lint:?}, signal: {:?}",

@@ -37,11 +37,11 @@ pub struct ExportTimings;
 impl ExportTimings {
     pub fn needs_run<F: CompilerFeat, D: typst::Document>(
         snap: &CompileSnapshot<F>,
-        timing: Option<TaskWhen>,
+        timing: Option<&TaskWhen>,
         docs: Option<&D>,
     ) -> Option<bool> {
         snap.signal
-            .should_run_task(timing.unwrap_or_default(), docs)
+            .should_run_task(timing.unwrap_or(&TaskWhen::Never), docs)
     }
 }
 

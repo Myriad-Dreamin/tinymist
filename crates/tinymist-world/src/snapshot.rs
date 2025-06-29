@@ -46,7 +46,7 @@ impl ExportSignal {
 
     pub fn should_run_task_dyn(
         &self,
-        when: TaskWhen,
+        when: &TaskWhen,
         docs: Option<&TypstDocument>,
     ) -> Option<bool> {
         match docs {
@@ -58,11 +58,13 @@ impl ExportSignal {
 
     pub fn should_run_task<D: typst::Document>(
         &self,
-        when: TaskWhen,
+        when: &TaskWhen,
         docs: Option<&D>,
     ) -> Option<bool> {
         match when {
             TaskWhen::Never => Some(false),
+            // todo: by script
+            TaskWhen::Script => Some(self.by_entry_update),
             TaskWhen::OnType => Some(self.by_mem_events),
             TaskWhen::OnSave => Some(self.by_fs_events),
             TaskWhen::OnDocumentHasTitle if self.by_fs_events => {
