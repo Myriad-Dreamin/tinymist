@@ -209,7 +209,7 @@ impl ServerState {
             CompileServerOpts {
                 handler: compile_handle,
                 export_target: config.export_target,
-                enable_watch: true,
+                ignore_first_sync: true,
             },
         );
 

@@ -26,6 +26,6 @@ describe('Export', function()
     vim.cmd.sleep('300m')
     -- there *must not be* a pdf file created, because we only export on save
     local pdf_path = fixtures.project.some_existing_file:gsub('%.typ$', '.pdf')
-    assert.is_false(vim.loop.fs_stat(pdf_path), 'PDF file should not be created without saving because exportPdf = never')
+    assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created without saving because exportPdf = never')
   end)
 end)

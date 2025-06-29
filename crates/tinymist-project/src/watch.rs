@@ -186,7 +186,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 }
                 ActorEvent::Message(Some(SyncDependency(paths))) => {
                     if let Some(changeset) = self.update_watches(paths.as_ref()) {
-                        (self.interrupted_by_events)(FilesystemEvent::Update(changeset));
+                        (self.interrupted_by_events)(FilesystemEvent::Update(changeset, true));
                     }
                 }
                 ActorEvent::NotifyEvent(event) => {
@@ -343,7 +343,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
 
         // Send file updates.
         if !changeset.is_empty() {
-            (self.interrupted_by_events)(FilesystemEvent::Update(changeset));
+            (self.interrupted_by_events)(FilesystemEvent::Update(changeset, false));
         }
     }
 
@@ -494,7 +494,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                     let mut changeset = FileChangeSet::default();
                     changeset.inserts.push((event.path, payload));
 
-                    (self.interrupted_by_events)(FilesystemEvent::Update(changeset));
+                    (self.interrupted_by_events)(FilesystemEvent::Update(changeset, false));
                 }
             }
         };
