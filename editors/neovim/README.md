@@ -195,3 +195,5 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
 ## Contributing
+
+Please check the [contributing guide](/editors/neovim/CONTRIBUTING.md) for more information on how to contribute to the project.

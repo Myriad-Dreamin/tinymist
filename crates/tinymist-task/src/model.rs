@@ -85,9 +85,9 @@ pub enum ProjectTask {
 
 impl ProjectTask {
     /// Returns the timing of executing the task.
-    pub fn when(&self) -> Option<TaskWhen> {
+    pub fn when(&self) -> Option<&TaskWhen> {
         Some(match self {
-            Self::Preview(task) => task.when,
+            Self::Preview(task) => &task.when,
             Self::ExportPdf(..)
             | Self::ExportPng(..)
             | Self::ExportSvg(..)
@@ -96,7 +96,7 @@ impl ProjectTask {
             | Self::ExportMd(..)
             | Self::ExportTeX(..)
             | Self::ExportText(..)
-            | Self::Query(..) => self.as_export()?.when,
+            | Self::Query(..) => &self.as_export()?.when,
         })
     }
 

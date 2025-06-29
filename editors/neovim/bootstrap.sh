@@ -14,6 +14,12 @@ else
     exit 1
 fi
 
-cd ../.. && docker build -t myriaddreamin/tinymist:0.13.14 .
+(cd ../.. && docker build -t myriaddreamin/tinymist:0.13.14 .)
 docker build -t myriaddreamin/tinymist-nvim:0.13.14 .
-docker run --rm -it -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces -v $PWD:/home/runner/dev -v $PWD/target/.local:/home/runner/.local -v $PWD/target/.cache:/home/runner/.cache -w /home/runner/dev myriaddreamin/tinymist-nvim:0.13.14 $DOCKER_ARGS
+docker run --rm -it \
+  -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces \
+  -v $PWD:/home/runner/dev \
+  -v $PWD/target/.local:/home/runner/.local \
+  -v $PWD/target/.cache:/home/runner/.cache \
+  -w /home/runner/dev myriaddreamin/tinymist-nvim:0.13.14 \
+  $DOCKER_ARGS

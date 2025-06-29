@@ -468,45 +468,66 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
         &mut self.inner.access_model
     }
 
-    fn invalidate_path(&mut self, path: &Path) {
+    fn invalidate_path(&mut self, path: &Path, snap: Option<&FileSnapshot>) {
         if let Some(fids) = self.paths.get(path) {
             if fids.is_empty() {
                 return;
             }
 
-            self.view_changed = true;
+            // Always changes view if snap is none.
+            self.view_changed = snap.is_none();
             for fid in fids.clone() {
-                self.invalidate_file_id(fid);
+                self.invalidate_file_id(fid, snap);
             }
         }
     }
 
-    fn invalidate_file_id(&mut self, file_id: FileId) {
-        self.view_changed = true;
+    fn invalidate_file_id(&mut self, file_id: FileId, snap: Option<&FileSnapshot>) {
+        let mut changed = false;
         self.managed.slot(file_id, |e| {
+            if let Some(snap) = snap {
+                let may_read_bytes = e.bytes.get().map(|b| &b.2);
+                match (snap, may_read_bytes) {
+                    (FileSnapshot(Ok(snap)), Some(Ok(read))) if snap == read => {
+                        return;
+                    }
+                    (FileSnapshot(Err(snap)), Some(Err(read))) if snap.as_ref() == read => {
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+
             e.changed_at = self.goal_revision.get();
             e.bytes = Arc::default();
             e.source = Arc::default();
+            changed = true;
         });
+        self.view_changed = changed;
     }
 
     /// Reset the shadowing files in [`OverlayAccessModel`].
     pub fn reset_shadow(&mut self) {
         for path in self.am().inner.inner.file_paths() {
-            self.invalidate_path(&path);
+            self.invalidate_path(&path, None);
         }
         for fid in self.am().file_paths() {
-            self.invalidate_file_id(fid);
+            self.invalidate_file_id(fid, None);
         }
 
         self.am().clear_shadow();
         self.am().inner.inner.clear_shadow();
     }
 
+    /// Unconditionally changes the view of the vfs.
+    pub fn change_view(&mut self) -> FileResult<()> {
+        self.view_changed = true;
+        Ok(())
+    }
+
     /// Adds a shadowing file to the [`OverlayAccessModel`].
     pub fn map_shadow(&mut self, path: &Path, snap: FileSnapshot) -> FileResult<()> {
-        self.view_changed = true;
-        self.invalidate_path(path);
+        self.invalidate_path(path, Some(&snap));
         self.am().inner.inner.add_file(path, snap, |c| c.into());
 
         Ok(())
@@ -514,8 +535,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
 
     /// Removes a shadowing file from the [`OverlayAccessModel`].
     pub fn unmap_shadow(&mut self, path: &Path) -> FileResult<()> {
-        self.view_changed = true;
-        self.invalidate_path(path);
+        self.invalidate_path(path, None);
         self.am().inner.inner.remove_file(path);
 
         Ok(())
@@ -523,8 +543,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
 
     /// Adds a shadowing file to the [`OverlayAccessModel`] by file id.
     pub fn map_shadow_by_id(&mut self, file_id: FileId, snap: FileSnapshot) -> FileResult<()> {
-        self.view_changed = true;
-        self.invalidate_file_id(file_id);
+        self.invalidate_file_id(file_id, Some(&snap));
         self.am().add_file(&file_id, snap, |c| *c);
 
         Ok(())
@@ -532,8 +551,7 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
 
     /// Removes a shadowing file from the [`OverlayAccessModel`] by file id.
     pub fn remove_shadow_by_id(&mut self, file_id: FileId) {
-        self.view_changed = true;
-        self.invalidate_file_id(file_id);
+        self.invalidate_file_id(file_id, None);
         self.am().remove_file(&file_id);
     }
 
@@ -548,10 +566,10 @@ impl<M: PathAccessModel + Sized> RevisingVfs<'_, M> {
     /// See [`NotifyAccessModel`] for more information.
     pub fn notify_fs_changes(&mut self, event: FileChangeSet) {
         for path in &event.removes {
-            self.invalidate_path(path);
+            self.invalidate_path(path, None);
         }
-        for (path, _) in &event.inserts {
-            self.invalidate_path(path);
+        for (path, snap) in &event.inserts {
+            self.invalidate_path(path, Some(snap));
         }
 
         self.am().inner.inner.inner.notify(event);

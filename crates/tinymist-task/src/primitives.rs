@@ -128,7 +128,7 @@ impl PathPattern {
 
     #[comemo::memoize]
     fn substitute_impl(&self, root: Option<ImmutPath>, main: Option<FileId>) -> Option<ImmutPath> {
-        log::info!("Check path {main:?} and root {root:?} with output directory {self:?}");
+        log::debug!("Check path {main:?} and root {root:?} with output directory {self:?}");
 
         let (root, main) = root.zip(main)?;
 

@@ -25,37 +25,42 @@ impl ProjectCompilation {
     pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
         let paged_diag = Some(TaskWhen::OnType);
+        let paged_diag2 = Some(TaskWhen::Script);
         let html_diag = Some(TaskWhen::Never);
 
         let pdf: Option<TaskWhen> = graph
             .get::<ConfigTask<<PdfExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let svg: Option<TaskWhen> = graph
             .get::<ConfigTask<<SvgExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let png: Option<TaskWhen> = graph
             .get::<ConfigTask<<PngExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let html: Option<TaskWhen> = graph
             .get::<ConfigTask<<HtmlExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let md: Option<TaskWhen> = graph
             .get::<ConfigTask<ExportTeXTask>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let text: Option<TaskWhen> = graph
             .get::<ConfigTask<<TextExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
 
         let doc = None::<TypstPagedDocument>.as_ref();
-        let check = |timing| ExportTimings::needs_run(&graph.snap, timing, doc).unwrap_or(true);
+        let check = |timing: Option<TaskWhen>| {
+            ExportTimings::needs_run(&graph.snap, timing.as_ref(), doc).unwrap_or(true)
+        };
 
-        let compile_paged = [paged_diag, pdf, svg, png, text, md].into_iter().any(check);
+        let compile_paged = [paged_diag, paged_diag2, pdf, svg, png, text, md]
+            .into_iter()
+            .any(check);
         let compile_html = [html_diag, html].into_iter().any(check);
 
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(compile_paged)));
@@ -83,7 +88,7 @@ impl ProjectExport {
         T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
-        when: Option<TaskWhen>,
+        when: Option<&TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
         let doc = graph.compute::<OptionDocumentTask<D>>()?;
@@ -102,7 +107,7 @@ impl ProjectExport {
         T: ExportComputation<LspCompilerFeat, D, Output = String>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
-        when: Option<TaskWhen>,
+        when: Option<&TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
         let doc = graph.compute::<OptionDocumentTask<D>>()?;

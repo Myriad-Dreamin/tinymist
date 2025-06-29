@@ -41,7 +41,7 @@ pub struct UpstreamUpdateEvent {
 #[derive(Debug)]
 pub enum FilesystemEvent {
     /// Update file system files according to the given changeset
-    Update(FileChangeSet),
+    Update(FileChangeSet, /* is_sync */ bool),
     /// See [`UpstreamUpdateEvent`]
     UpstreamUpdate {
         /// New changeset produced by invalidation
@@ -60,7 +60,19 @@ impl FilesystemEvent {
                 changeset,
                 upstream_event,
             } => (changeset, upstream_event),
-            FilesystemEvent::Update(changeset) => (changeset, None),
+            FilesystemEvent::Update(changeset, ..) => (changeset, None),
+        }
+    }
+
+    /// Splits the filesystem event into a changeset and an optional upstream
+    /// event.
+    pub fn split_with_is_sync(self) -> (FileChangeSet, bool, Option<UpstreamUpdateEvent>) {
+        match self {
+            FilesystemEvent::UpstreamUpdate {
+                changeset,
+                upstream_event,
+            } => (changeset, false, upstream_event),
+            FilesystemEvent::Update(changeset, is_sync) => (changeset, is_sync, None),
         }
     }
 }

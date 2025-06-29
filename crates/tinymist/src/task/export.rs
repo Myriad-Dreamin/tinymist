@@ -68,18 +68,22 @@ impl ExportTask {
         let doc = artifact.doc.as_ref()?;
         let s = artifact.snap.signal;
 
-        let when = config.task.when().unwrap_or_default();
-        let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
-            || match when {
-                TaskWhen::Never => false,
-                TaskWhen::OnType => s.by_mem_events,
-                TaskWhen::OnSave => s.by_fs_events,
-                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
-            };
+        let when = config.task.when().unwrap_or(&TaskWhen::Never);
+        let need_export = match when {
+            TaskWhen::Never => false,
+            TaskWhen::Script => s.by_entry_update,
+            TaskWhen::OnType => s.by_mem_events,
+            TaskWhen::OnSave => s.by_fs_events,
+            TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
+        };
 
         if !need_export {
             return None;
         }
+        log::info!(
+            "ExportTask(when={when:?}): export for {} with signal: {s:?}",
+            artifact.id()
+        );
 
         let rev = artifact.world().revision().get();
         let fut = self.export_folder.spawn(rev, || {
@@ -455,7 +459,7 @@ mod tests {
     fn test_default_never() {
         let conf = ExportUserConfig::default();
         assert!(!conf.count_words);
-        assert_eq!(conf.task.when(), Some(TaskWhen::Never));
+        assert_eq!(conf.task.when(), Some(&TaskWhen::Never));
     }
 
     #[test]

@@ -340,8 +340,8 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat, Ext> {
     /// The compilation handler.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
-    /// Whether to enable file system watching.
-    pub enable_watch: bool,
+    /// Whether to ignoring the first fs sync event.
+    pub ignore_first_sync: bool,
     /// Specifies the current export target.
     pub export_target: ExportTarget,
 }
@@ -350,7 +350,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
     fn default() -> Self {
         Self {
             handler: Arc::new(std::marker::PhantomData),
-            enable_watch: false,
+            ignore_first_sync: false,
             export_target: ExportTarget::Paged,
         }
     }
@@ -364,8 +364,8 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     export_target: ExportTarget,
     /// Channel for sending interrupts to the compiler actor.
     dep_tx: mpsc::UnboundedSender<NotifyMessage>,
-    /// Whether to enable file system watching.
-    pub enable_watch: bool,
+    /// Whether to ignore the first sync event.
+    pub ignore_first_sync: bool,
 
     /// The current logical tick.
     logical_tick: usize,
@@ -389,7 +389,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         CompileServerOpts {
             handler,
-            enable_watch,
+            ignore_first_sync,
             export_target,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
@@ -402,13 +402,13 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         Self {
             handler,
             dep_tx,
-            enable_watch,
             export_target,
 
             logical_tick: 1,
             dirty_shadow_logical_tick: 0,
 
             estimated_shadow_files: Default::default(),
+            ignore_first_sync,
 
             primary,
             deps: Default::default(),
@@ -657,7 +657,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
                 // Apply file system changes.
                 let dirty_tick = &mut self.dirty_shadow_logical_tick;
-                let (changes, event) = event.split();
+                let (changes, watched, event) = event.split_with_is_sync();
                 let changes = std::iter::repeat_n(changes, 1 + self.dedicates.len());
                 let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
 
@@ -681,7 +681,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         verse.vfs_changed()
                     });
 
-                    if vfs_changed {
+                    if vfs_changed && (!self.ignore_first_sync || !watched) {
                         proj.reason.see(reason_by_fs());
                     }
                 }
@@ -911,7 +911,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             }
             world.evict_vfs(60);
             let elapsed = evict_start.elapsed();
-            log::info!("ProjectCompiler: evict cache in {elapsed:?}");
+            log::debug!("ProjectCompiler: evict cache in {elapsed:?}");
         });
 
         true

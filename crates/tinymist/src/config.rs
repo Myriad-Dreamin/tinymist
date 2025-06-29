@@ -498,7 +498,7 @@ impl Config {
     /// Gets the export task configuration.
     pub(crate) fn export_task(&self) -> ExportTask {
         ExportTask {
-            when: self.export_pdf,
+            when: self.export_pdf.clone(),
             output: Some(self.output_path.clone()),
             transform: vec![],
         }
@@ -813,12 +813,12 @@ pub struct LintFeat {
 
 impl LintFeat {
     /// When to trigger the lint checks.
-    pub fn when(&self) -> TaskWhen {
+    pub fn when(&self) -> &TaskWhen {
         if matches!(self.enabled, Some(false) | None) {
-            return TaskWhen::Never;
+            return &TaskWhen::Never;
         }
 
-        self.when.unwrap_or(TaskWhen::OnSave)
+        self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
     }
 }
 
