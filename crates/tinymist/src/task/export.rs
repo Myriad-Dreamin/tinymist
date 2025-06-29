@@ -69,14 +69,17 @@ impl ExportTask {
         let s = artifact.snap.signal;
 
         let when = config.task.when().unwrap_or_default();
-        let need_export = (!matches!(when, TaskWhen::Never) && s.by_entry_update)
-            || match when {
-                TaskWhen::Never => false,
-                TaskWhen::OnType => s.by_mem_events,
-                TaskWhen::OnSave => s.by_fs_events,
-                TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
-            };
+        let need_export = match when {
+            TaskWhen::Never => false,
+            TaskWhen::OnType => s.by_mem_events,
+            TaskWhen::OnSave => s.by_fs_events,
+            TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
+        };
 
+        log::info!(
+            "ExportTask(when={when:?}): export? {need_export}, for {} with signal: {s:?}",
+            artifact.id()
+        );
         if !need_export {
             return None;
         }
@@ -511,6 +514,7 @@ mod tests {
             by_entry_update: true,
             by_fs_events: false,
             by_mem_events: false,
+            by_save_events: false,
         };
 
         let graph = WorldComputeGraph::new(snap);

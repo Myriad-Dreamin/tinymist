@@ -12,7 +12,9 @@ RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovi
 USER root
 RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
 
-FROM myriaddreamin/tinymist:0.13.14
+FROM myriaddreamin/tinymist:0.13.14 as tinymist
+
+FROM debian:12
 
 COPY --from=builder /neovim/build/nvim-linux-x86_64.deb /tmp/nvim-linux-x86_64.deb
 RUN apt-get update && apt-get install -y curl git ripgrep build-essential unzip
@@ -26,6 +28,10 @@ WORKDIR /home/runner
 
 RUN for dependency in AndrewRadev/switch.vim andymass/vim-matchup neovim/nvim-lspconfig nvim-lua/plenary.nvim tomtom/tcomment_vim lewis6991/satellite.nvim; do git clone --quiet --filter=blob:none "https://github.com/$dependency" "packpath/$(basename $dependency)"; done
 RUN for dependency in Julian/inanis.nvim; do git clone --quiet --filter=blob:none "https://github.com/$dependency" "packpath/$(basename $dependency)"; done
+
+USER root
+COPY --from=tinymist /usr/local/bin/tinymist /usr/local/bin/tinymist
+USER runner
 
 ENV XDG_CONFIG_HOME=/home/runner/.config
 ENV XDG_DATA_HOME=/home/runner/.local/share

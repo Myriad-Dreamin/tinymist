@@ -18,7 +18,7 @@ ENV RUSTC_WRAPPER=sccache SCCACHE_DIR=/sccache
 # to download the toolchain
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo --version
+    rustup update 
 
 FROM base as planner
 WORKDIR app

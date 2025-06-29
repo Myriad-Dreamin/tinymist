@@ -32,6 +32,8 @@ pub struct ExportSignal {
     pub by_mem_events: bool,
     /// Whether the revision is annotated by file system events.
     pub by_fs_events: bool,
+    /// Whether the revision is annotated by save events.
+    pub by_save_events: bool,
     /// Whether the revision is annotated by entry update.
     pub by_entry_update: bool,
 }
@@ -41,6 +43,7 @@ impl ExportSignal {
     pub fn merge(&mut self, other: ExportSignal) {
         self.by_mem_events |= other.by_mem_events;
         self.by_fs_events |= other.by_fs_events;
+        self.by_save_events |= other.by_save_events;
         self.by_entry_update |= other.by_entry_update;
     }
 
@@ -61,15 +64,11 @@ impl ExportSignal {
         when: TaskWhen,
         docs: Option<&D>,
     ) -> Option<bool> {
-        if !matches!(when, TaskWhen::Never) && self.by_entry_update {
-            return Some(true);
-        }
-
         match when {
             TaskWhen::Never => Some(false),
             TaskWhen::OnType => Some(self.by_mem_events),
-            TaskWhen::OnSave => Some(self.by_fs_events),
-            TaskWhen::OnDocumentHasTitle if self.by_fs_events => {
+            TaskWhen::OnSave => Some(self.by_save_events),
+            TaskWhen::OnDocumentHasTitle if self.by_save_events => {
                 docs.map(|doc| doc.info().title.is_some())
             }
             TaskWhen::OnDocumentHasTitle => Some(false),
