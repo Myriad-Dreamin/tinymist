@@ -109,6 +109,12 @@ Sets the indent size (using space) for the formatter.
 - **Type**: `number`
 - **Default**: `2`
 
+## `formatterProseWrap`
+
+Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces.
+
+- **Type**: `boolean`
+
 ## `completion.triggerOnSnippetPlaceholders`
 
 Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.
