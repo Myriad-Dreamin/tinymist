@@ -14,9 +14,9 @@ else
     exit 1
 fi
 
-# (cd ../.. && docker build --network="host" -t myriaddreamin/tinymist:0.13.14 .)
-docker build --network="host" -t myriaddreamin/tinymist-nvim:0.13.14 .
-docker run --network="host" --rm -it \
+(cd ../.. && docker build -t myriaddreamin/tinymist:0.13.14 .)
+docker build -t myriaddreamin/tinymist-nvim:0.13.14 .
+docker run --rm -it \
   -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces \
   -v $PWD:/home/runner/dev \
   -v $PWD/target/.local:/home/runner/.local \
