@@ -262,6 +262,29 @@ impl AlertNode {
     }
 }
 
+/// Mixed content node for table cells that may contain both inline and block elements
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = true)]
+pub struct MixedContentNode {
+    pub content: Vec<Node>,
+}
+
+impl MixedContentNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        for node in &self.content {
+            writer.write(node)?;
+        }
+        Ok(())
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        for node in &self.content {
+            writer.write_node(node)?;
+        }
+        Ok(())
+    }
+}
+
 /// Common writer interface for different formats
 pub trait FormatWriter {
     /// Write AST document to output format
