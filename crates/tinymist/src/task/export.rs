@@ -76,13 +76,13 @@ impl ExportTask {
             TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
         };
 
-        log::info!(
-            "ExportTask(when={when:?}): export? {need_export}, for {} with signal: {s:?}",
-            artifact.id()
-        );
         if !need_export {
             return None;
         }
+        log::info!(
+            "ExportTask(when={when:?}): export for {} with signal: {s:?}",
+            artifact.id()
+        );
 
         let rev = artifact.world().revision().get();
         let fut = self.export_folder.spawn(rev, || {

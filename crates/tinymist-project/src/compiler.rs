@@ -264,7 +264,7 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
 pub struct CompileReasons {
     /// The snapshot is taken by the memory editing events.
     pub by_memory_events: bool,
-    /// The snapshot is taken by the fs events.
+    /// The snapshot is taken by the file system events.
     pub by_fs_events: bool,
     /// The snapshot is taken by the entry change.
     pub by_entry_update: bool,
