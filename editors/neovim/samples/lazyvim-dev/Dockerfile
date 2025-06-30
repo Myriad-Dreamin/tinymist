@@ -38,11 +38,11 @@ ENV XDG_DATA_HOME=/home/runner/.local/share
 ENV XDG_STATE_HOME=/home/runner/.local/state
 ENV XDG_CACHE_HOME=/home/runner/.cache
 
-COPY init.lua $XDG_CONFIG_HOME/nvim/init.lua
-COPY plugins/dev.lua $XDG_CONFIG_HOME/nvim/lua/plugins/dev.lua
-COPY plugins/lsp-folding.lua $XDG_CONFIG_HOME/nvim/lua/plugins/lsp-folding.lua
-COPY plugins/mason-workaround.lua $XDG_CONFIG_HOME/nvim/lua/plugins/mason-workaround.lua
-COPY plugins/tinymist.lua $XDG_CONFIG_HOME/nvim/lua/others/tinymist.lua
+COPY lazyvim-dev/init.lua $XDG_CONFIG_HOME/nvim/init.lua
+COPY lazyvim-dev/plugins/dev.lua $XDG_CONFIG_HOME/nvim/lua/plugins/dev.lua
+COPY lazyvim-dev/plugins/mason-workaround.lua $XDG_CONFIG_HOME/nvim/lua/plugins/mason-workaround.lua
+COPY lazyvim/plugins/lsp-folding.lua $XDG_CONFIG_HOME/nvim/lua/plugins/lsp-folding.lua
+COPY lazyvim/plugins/tinymist.lua $XDG_CONFIG_HOME/nvim/lua/others/tinymist.lua
 
 # SHELL isn't supported by OCI images
 ENTRYPOINT []

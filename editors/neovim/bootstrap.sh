@@ -15,7 +15,7 @@ else
 fi
 
 (cd ../.. && docker build -t myriaddreamin/tinymist:0.13.14 .)
-docker build -t myriaddreamin/tinymist-nvim:0.13.14 .
+(cd samples && docker build -t myriaddreamin/tinymist-nvim:0.13.14 -f lazyvim-dev/Dockerfile lazyvim-dev)
 docker run --rm -it \
   -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces \
   -v $PWD:/home/runner/dev \
