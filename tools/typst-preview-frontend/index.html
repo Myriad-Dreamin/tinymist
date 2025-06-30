@@ -23,9 +23,7 @@
          * @returns UTF-8 string
          */
         const base64Decode = (encoded) =>
-          bytes2utf8.decode(
-            Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0))
-          );
+          bytes2utf8.decode(Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0)));
         /// The string here is a placeholder
         /// It will be replaced by the actual preview mode.
         let state = `preview-arg:state:`;
@@ -55,10 +53,7 @@
         let deltaLKlsl = deltaL / 1.0;
         let deltaCkcsc = deltaC / sc;
         let deltaHkhsh = deltaH / sh;
-        let i =
-          deltaLKlsl * deltaLKlsl +
-          deltaCkcsc * deltaCkcsc +
-          deltaHkhsh * deltaHkhsh;
+        let i = deltaLKlsl * deltaLKlsl + deltaCkcsc * deltaCkcsc + deltaHkhsh * deltaHkhsh;
         return i < 0 ? 0 : Math.sqrt(i);
       }
 
@@ -93,28 +88,25 @@
       var defaultBackgroundColor = "rgb(82, 86, 89)";
       var previewBackgroundColor =
         getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-sideBar-background"
+          "--vscode-sideBar-background",
         ) || defaultBackgroundColor;
 
       var defaultToolbarFgColor = "#fff";
       var previewToolbarFgColor =
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-menu-foreground"
-        ) || defaultToolbarFgColor;
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-foreground") ||
+        defaultToolbarFgColor;
 
       var previewForegroundColor = previewToolbarFgColor;
 
       var defaultToolbarBorderColor = "rgba(0, 0, 0, 0)";
       var previewToolbarBorderColor =
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-menu-border"
-        ) || defaultToolbarBorderColor;
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-border") ||
+        defaultToolbarBorderColor;
 
       var defaultToolbarBgColor = "rgb(50, 54, 57)";
       var previewToolbarBgColor =
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-menu-background"
-        ) || defaultToolbarBgColor;
+        getComputedStyle(document.documentElement).getPropertyValue("--vscode-menu-background") ||
+        defaultToolbarBgColor;
 
       /// Perceptible distance between colors:
       /// 0~1: cannot distinguish by human eyes
@@ -128,23 +120,23 @@
       // append css variable --typst-preview-background-color
       document.documentElement.style.setProperty(
         "--typst-preview-background-color",
-        previewBackgroundColor
+        previewBackgroundColor,
       );
       document.documentElement.style.setProperty(
         "--typst-preview-foreground-color",
-        previewForegroundColor
+        previewForegroundColor,
       );
       document.documentElement.style.setProperty(
         "--typst-preview-toolbar-fg-color",
-        previewToolbarFgColor
+        previewToolbarFgColor,
       );
       document.documentElement.style.setProperty(
         "--typst-preview-toolbar-border-color",
-        previewToolbarBorderColor
+        previewToolbarBorderColor,
       );
       document.documentElement.style.setProperty(
         "--typst-preview-toolbar-bg-color",
-        previewToolbarBgColor
+        previewToolbarBgColor,
       );
     </script>
     <script type="module" src="/src/main.js"></script>
@@ -187,6 +179,7 @@
                 </g>
               </svg>
             </div>
+            <div id="typst-compile-error-indicator" style="display: none"></div>
             <div
               id="typst-top-help-button"
               class="typst-toolbar-icon"
@@ -210,16 +203,8 @@
 
             <span id="typst-toolbar-title"></span>
           </div>
-          <div
-            id="typst-top-toolbar-center"
-            class="flex-row"
-            style="align-items: center"
-          ></div>
-          <div
-            id="typst-top-toolbar-end"
-            class="flex-row-rev"
-            style="flex: 1; gap: 0.3rem"
-          >
+          <div id="typst-top-toolbar-center" class="flex-row" style="align-items: center"></div>
+          <div id="typst-top-toolbar-end" class="flex-row-rev" style="flex: 1; gap: 0.3rem">
             <div id="typst-page-next-selector" title="Next Page">
               <div class="typst-page-button">&gt;</div>
             </div>
@@ -229,16 +214,11 @@
                 style="--page-length-digits: 2"
                 title="Current Page"
               >
-                <input
-                  part="input"
-                  type="text"
-                  id="typst-page-selector"
-                  value="1"
-                /><span class="typst-page-selector-divider">&nbsp;/&nbsp;</span>
-                <span
-                  class="typst-page-number-indicator"
-                  title="Total Pages"
-                ></span>
+                <input part="input" type="text" id="typst-page-selector" value="1" /><span
+                  class="typst-page-selector-divider"
+                  >&nbsp;/&nbsp;</span
+                >
+                <span class="typst-page-number-indicator" title="Total Pages"></span>
               </div>
             </div>
             <div id="typst-page-prev-selector" title="Prev Page">
@@ -250,9 +230,7 @@
       <div id="typst-container-main">
         <div
           id="typst-app"
-          style="
-            background-color: var(--typst-preview-background-color) !important;
-          "
+          style="background-color: var(--typst-preview-background-color) !important"
         ></div>
       </div>
     </div>
@@ -268,12 +246,7 @@
           <div class="flex-row">
             <div
               class="flex-col"
-              style="
-                flex: 20;
-                min-width: 125px;
-                align-items: flex-end;
-                gap: 5px;
-              "
+              style="flex: 20; min-width: 125px; align-items: flex-end; gap: 5px"
             >
               <div class="key-binding-row">
                 <div class="key-binding-box">h</div>
@@ -301,35 +274,26 @@
             </div>
             <div style="flex: 10; max-width: 30px"></div>
             <div class="flex-col" style="flex: 70; gap: 5px">
-              <div class="key-binding-desc">
-                Toggle the help panel (key bindings).
-              </div>
+              <div class="key-binding-desc">Toggle the help panel (key bindings).</div>
               <div class="key-binding-desc">
                 Toggle content preview.
                 <span style="color: orange">(Coming soon)</span>
               </div>
               <div class="key-binding-desc">Goto the page by number.</div>
-              <div class="key-binding-desc">
-                Switch to next animation or slide.
-              </div>
-              <div class="key-binding-desc">
-                Switch to previous animation or slide.
-              </div>
+              <div class="key-binding-desc">Switch to next animation or slide.</div>
+              <div class="key-binding-desc">Switch to previous animation or slide.</div>
               <div class="key-binding-desc">
                 Switch to next slide.
                 <span style="color: orange"
                   >(currently just same as
-                  <span class="key-binding-box" style="margin: 0 2px"
-                    >right</span
-                  >)</span
+                  <span class="key-binding-box" style="margin: 0 2px">right</span>)</span
                 >
               </div>
               <div class="key-binding-desc">
                 Switch to previous slide.
                 <span style="color: orange"
                   >(currently just same as
-                  <span class="key-binding-box" style="margin: 0 2px">left</span
-                  >)</span
+                  <span class="key-binding-box" style="margin: 0 2px">left</span>)</span
                 >
               </div>
             </div>
