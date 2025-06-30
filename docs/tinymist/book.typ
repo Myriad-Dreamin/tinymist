@@ -1,5 +1,5 @@
 
-#import "@preview/shiroa:0.2.2": *
+#import "@preview/shiroa:0.2.3": *
 
 #show: book
 
@@ -7,6 +7,7 @@
   title: "Tinymist Docs",
   description: "The documentation for tinymist service",
   authors: ("Myriad-Dreamin",),
+  repository: "https://github.com/Myriad-Dreamin/tinymist",
   repository-edit: "https://github.com/Myriad-Dreamin/tinymist/edit/main/{path}",
   language: "en",
   summary: [
@@ -46,7 +47,7 @@
 
 #build-meta(dest-dir: "../../dist/tinymist")
 
-#get-book-meta()
+// #get-book-meta()
 
 // re-export page template
 #import "/typ/templates/page.typ": project, is-md-target

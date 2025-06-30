@@ -1,4 +1,4 @@
-#import "@preview/shiroa:0.2.2": *
+#import "@preview/shiroa:0.2.3": *
 #import "/typ/templates/page.typ": project, part-style, heading-sizes, main-color
 #import "tinymist-version.typ": tinymist-package
 
@@ -31,11 +31,13 @@
   [
     #tinymist-package.description
 
-    Visit tinymist repository: #link(tinymist-package.repository)[main branch, ] or #link({
-      tinymist-package.repository
-      "/tree/v"
-      tinymist-package.version
-    })[v#tinymist-package.version.]
+    Visit tinymist repository: #link(tinymist-package.repository)[main branch, ] or #link(
+      {
+        tinymist-package.repository
+        "/tree/v"
+        tinymist-package.version
+      },
+    )[v#tinymist-package.version.]
   ]
 
   {
