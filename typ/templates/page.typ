@@ -185,7 +185,6 @@
         set text(fill: code-extra-colors.fg) if use-fg
         set text(fill: if theme.is-dark { rgb("dfdfd6") } else { black }) if not use-fg
         set par(justify: false)
-        show: set-raw-theme.with(theme.style.code-theme)
         zebraw(
           block-width: 100%,
           // line-width: 100%,
@@ -203,7 +202,7 @@
     mk-raw(it, tag: "span", inline: true)
   }
   show raw.where(block: true, tab-size: 114): it => context if shiroa-sys-target() == "paged" {
-    show: set-raw-theme.with(theme-style.code-theme)
+    show raw: set-raw-theme.with(theme-style.code-theme)
     rect(
       width: 100%,
       inset: (x: 4pt, y: 5pt),
