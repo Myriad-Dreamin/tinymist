@@ -162,7 +162,7 @@
   web-theme: "starlight",
   theme-box: none,
 ) = {
-  import "supports-html.typ": add-styles
+  // import "supports-html.typ": add-styles
   let is-starlight-theme = web-theme == "starlight"
   let in-heading = state("shiroa:in-heading", false)
 
@@ -198,19 +198,19 @@
     it
   }
 
-  add-styles(
-    ```css
-    .inline-equation {
-      display: inline-block;
-      width: fit-content;
-    }
-    .block-equation {
-      display: grid;
-      place-items: center;
-      overflow-x: auto;
-    }
-    ```,
-  )
+  // add-styles(
+  //   ```css
+  //   .inline-equation {
+  //     display: inline-block;
+  //     width: fit-content;
+  //   }
+  //   .block-equation {
+  //     display: grid;
+  //     place-items: center;
+  //     overflow-x: auto;
+  //   }
+  //   ```,
+  // )
   body
 }
 
@@ -449,16 +449,39 @@
 
   body
 
+  // todo: ...
   // Put your custom CSS here.
-  add-styles(
-    ```css
-    .site-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      font-style: italic;
-    }
-    ```,
-  )
+  // add-styles(
+  //   ```css
+  //   .site-title {
+  //     font-size: 1.2rem;
+  //     font-weight: 600;
+  //     font-style: italic;
+  //   }
+  //   ```,
+
+  // Put your custom CSS here.
+  context if shiroa-sys-target() == "html" {
+    html.elem(
+      "style",
+      ```css
+      .inline-equation {
+        display: inline-block;
+        width: fit-content;
+      }
+      .block-equation {
+        display: grid;
+        place-items: center;
+        overflow-x: auto;
+      }
+      .site-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        font-style: italic;
+      }
+      ```.text,
+    )
+  }
 }
 
 #let part-style(it) = {
