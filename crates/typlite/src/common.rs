@@ -7,7 +7,6 @@ use cmark_writer::HtmlAttribute;
 use cmark_writer::HtmlElement;
 use cmark_writer::HtmlWriteResult;
 use cmark_writer::HtmlWriter;
-use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
 use cmark_writer::WriterOptions;
 use ecow::eco_format;
@@ -178,14 +177,7 @@ impl CenterNode {
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        let mut temp_writer = HtmlWriter::with_options(HtmlWriterOptions {
-            strict: false,
-            ..Default::default()
-        });
-        temp_writer.write_node(&self.node)?;
-        let content = temp_writer.into_string();
-        writer.write_str(&content)?;
-        Ok(())
+        writer.write_node(&self.node)
     }
 }
 

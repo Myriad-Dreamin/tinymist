@@ -20,7 +20,7 @@
 #table(
   columns: 2,
   [Header], [Row],
-  ```
+  ```rust
   Code line 1
   Code line 2
   ```,
