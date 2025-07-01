@@ -1,9 +1,9 @@
-#import "@preview/shiroa:0.2.3": templates, book-sys
+#import "@preview/shiroa:0.2.3": book-sys, templates
 #import templates: *
-#import "target.typ": sys-is-html-target, is-md-target
+#import "target.typ": is-md-target, sys-is-html-target
 
 // Theme (Colors)
-#let themes = theme-box-styles-from(toml("theme-style.toml"), xml: it => xml(it))
+#let themes = theme-box-styles-from(toml("theme-style.toml"), read: it => read(it))
 #let (
   default-theme: (
     style: theme-style,

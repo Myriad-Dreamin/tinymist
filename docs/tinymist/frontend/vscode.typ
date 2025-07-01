@@ -2,6 +2,8 @@
 
 #show: book-page.with(title: [VS Cod(e,ium)])
 
+#set heading(depth: 1)
+
 A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 - Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions];.

@@ -50,7 +50,7 @@
 // #get-book-meta()
 
 // re-export page template
-#import "/typ/templates/page.typ": project, is-md-target
+#import "/typ/templates/page.typ": is-md-target, project
 #let book-page = project
 #let cross-link = if is-md-target {
   let md-cross-link(lnk, reference: none, content) = {
