@@ -17,7 +17,7 @@ def run_tests(test_files=None):
         test_files = []
         for root, _, files in os.walk(os.path.dirname(__file__)):
             test_files.extend(
-                os.path.join(root, f) for f in files if f.endswith("spec.lua")
+                os.path.join(root, f) for f in files if f.endswith("_spec.lua")
             )
     test_files = " ".join(test_files)
 

@@ -19,9 +19,9 @@ use typst::visualize::Color;
 
 use super::{FutureFolder, SyncTaskFactory};
 use crate::project::{
-    ApplyProjectTask, CompiledArtifact, EntryReader, ExportHtmlTask, ExportPdfTask, ExportPngTask,
-    ExportSvgTask, ExportTask as ProjectExportTask, ExportTeXTask, ExportTextTask,
-    LspCompiledArtifact, ProjectTask, QueryTask, TaskWhen,
+    ApplyProjectTask, CompiledArtifact, DevEvent, DevExportEvent, EntryReader, ExportHtmlTask,
+    ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask, ExportTeXTask,
+    ExportTextTask, LspCompiledArtifact, ProjectClient, ProjectTask, QueryTask, TaskWhen,
 };
 use crate::{actor::editor::EditorRequest, tool::word_count};
 
@@ -53,10 +53,14 @@ impl ExportTask {
         self.factory.mutate(|data| *data = config);
     }
 
-    pub fn signal(&self, snap: &LspCompiledArtifact) {
+    pub(crate) fn signal(
+        &self,
+        snap: &LspCompiledArtifact,
+        client: &std::sync::Arc<(dyn ProjectClient + 'static)>,
+    ) {
         let config = self.factory.task();
 
-        self.signal_export(snap, &config);
+        self.signal_export(snap, &config, client);
         self.signal_count_word(snap, &config);
     }
 
@@ -64,6 +68,7 @@ impl ExportTask {
         &self,
         artifact: &LspCompiledArtifact,
         config: &Arc<ExportUserConfig>,
+        client: &std::sync::Arc<(dyn ProjectClient + 'static)>,
     ) -> Option<()> {
         let doc = artifact.doc.as_ref()?;
         let s = artifact.snap.signal;
@@ -77,20 +82,43 @@ impl ExportTask {
             TaskWhen::OnDocumentHasTitle => s.by_fs_events && doc.info().title.is_some(),
         };
 
+        let export_hook = config.development.then_some({
+            let client = client.clone();
+
+            let event = DevEvent::Export(DevExportEvent {
+                id: artifact.id().to_string(),
+                when: when.clone(),
+                need_export,
+                signal: s,
+                path: config
+                    .task
+                    .as_export()
+                    .and_then(|t| t.output.clone())
+                    .map(|p| p.to_string()),
+            });
+
+            move || client.dev_event(event)
+        });
+
         if !need_export {
+            if let Some(f) = export_hook {
+                f()
+            }
             return None;
         }
         log::info!(
             "ExportTask(when={when:?}): export for {} with signal: {s:?}",
             artifact.id()
         );
-
         let rev = artifact.world().revision().get();
         let fut = self.export_folder.spawn(rev, || {
             let task = config.task.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
                 log_err(Self::do_export(task, artifact, None).await);
+                if let Some(f) = export_hook {
+                    f()
+                }
                 Some(())
             })
         })?;
@@ -362,6 +390,8 @@ pub struct ExportUserConfig {
     pub export_target: ExportTarget,
     pub task: ProjectTask,
     pub count_words: bool,
+    /// Whether to run the server in development mode.
+    pub development: bool,
 }
 
 impl Default for ExportUserConfig {
@@ -378,6 +408,7 @@ impl Default for ExportUserConfig {
                 creation_timestamp: None,
             }),
             count_words: false,
+            development: false,
         }
     }
 }

@@ -13,4 +13,11 @@ function tinymist.setup(opts)
     vim.g.tinymist_config = opts
 end
 
+function tinymist.subscribeDevEvent(callback)
+    if type(callback) ~= 'function' then
+        error('callback must be a function')
+    end
+    require('tinymist.lsp').subscribeDevEvent(callback)
+end
+
 return tinymist

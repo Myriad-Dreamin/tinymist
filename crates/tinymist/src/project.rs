@@ -20,6 +20,7 @@
 #![allow(missing_docs)]
 
 use reflexo_typst::{diag::print_diagnostics, TypstDocument};
+use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
 
 use std::{num::NonZeroUsize, sync::Arc};
@@ -150,7 +151,7 @@ impl ServerState {
             is_standalone: false,
             export: export.clone(),
             editor_tx: editor_tx.clone(),
-            client: Box::new(client.clone().to_untyped()),
+            client: Arc::new(client.clone().to_untyped()),
             analysis: Arc::new(Analysis {
                 position_encoding: const_config.position_encoding,
                 allow_overlapping_token: const_config.tokens_overlapping_token_support,
@@ -397,15 +398,16 @@ pub struct CompileHandlerImpl {
 
     pub(crate) export: crate::task::ExportTask,
     pub(crate) editor_tx: EditorSender,
-    pub(crate) client: Box<dyn ProjectClient>,
+    pub(crate) client: Arc<dyn ProjectClient>,
 
     pub(crate) status_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
 }
 
-pub trait ProjectClient: Send + Sync + 'static {
+pub(crate) trait ProjectClient: Send + Sync + 'static {
     fn interrupt(&self, event: LspInterrupt);
     fn server_event(&self, event: ServerEvent);
+    fn dev_event(&self, event: DevEvent);
 }
 
 impl ProjectClient for LspClient {
@@ -416,6 +418,10 @@ impl ProjectClient for LspClient {
     fn server_event(&self, event: ServerEvent) {
         self.send_event(event);
     }
+
+    fn dev_event(&self, event: DevEvent) {
+        self.send_notification::<DevEvent>(&event);
+    }
 }
 
 impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
@@ -425,6 +431,12 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 
     fn server_event(&self, _event: ServerEvent) {
         log::warn!("ProjectClient: server_event is not implemented for mpsc::UnboundedSender<LspInterrupt>");
+    }
+
+    fn dev_event(&self, _event: DevEvent) {
+        log::warn!(
+            "ProjectClient: dev_event is not implemented for mpsc::UnboundedSender<LspInterrupt>"
+        );
     }
 }
 
@@ -625,7 +637,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
 
         self.client.interrupt(LspInterrupt::Compiled(art.clone()));
-        self.export.signal(art);
+        self.export.signal(art, &self.client);
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.preview.get(art.id()) {
@@ -640,3 +652,24 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 }
 
 pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DevExportEvent {
+    pub id: String,
+    pub when: TaskWhen,
+    pub need_export: bool,
+    pub signal: ExportSignal,
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub(crate) enum DevEvent {
+    Export(DevExportEvent),
+}
+
+impl lsp_types::notification::Notification for DevEvent {
+    const METHOD: &'static str = "tinymist/devEvent";
+    type Params = Self;
+}
