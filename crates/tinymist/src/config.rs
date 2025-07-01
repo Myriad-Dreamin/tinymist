@@ -35,6 +35,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "colorTheme",
     "compileStatus",
     "completion",
+    "development",
     "exportPdf",
     "exportTarget",
     "fontPaths",
@@ -75,6 +76,8 @@ pub struct Config {
     /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
     /// side.
     pub extended_code_action: bool,
+    /// Whether to run the server in development mode.
+    pub development: bool,
 
     /// The preferred color theme for rendering.
     pub color_theme: Option<String>,
@@ -329,6 +332,7 @@ impl Config {
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
+        assign_config!(development := "development"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
 
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
@@ -524,6 +528,7 @@ impl Config {
                 creation_timestamp: self.creation_timestamp(),
             }),
             count_words: self.notify_status,
+            development: self.development,
         }
     }
 

@@ -27,7 +27,7 @@ local helpers = { _clean_buffer_counter = 1 }
 function helpers.feed(contents, feed_opts)
   feed_opts = feed_opts or 'mtx'
   local to_feed = vim.api.nvim_replace_termcodes(contents, true, false, true)
-  vim.api.nvim_feedkeys(to_feed, feed_opts, true)
+  vim.api.nvim_feedkeys(to_feed, feed_opts, false)
 end
 
 ---Insert some text into the current buffer.

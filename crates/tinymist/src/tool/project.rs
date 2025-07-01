@@ -459,7 +459,7 @@ where
         is_standalone: true,
         export: crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export()),
         editor_tx,
-        client: Box::new(intr_tx.clone()),
+        client: Arc::new(intr_tx.clone()),
 
         analysis: opts.analysis,
         status_revision: Mutex::default(),

@@ -4,6 +4,7 @@ use core::fmt;
 
 use crate::{args::TaskWhen, CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
 use ecow::EcoString;
+use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
 
 /// Project instance id. This is slightly different from the project ids that
@@ -26,7 +27,8 @@ impl ProjectInsId {
 ///
 /// Whether to export depends on the current state of the document and the user
 /// settings.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportSignal {
     /// Whether the revision is annotated by memory events.
     pub by_mem_events: bool,
