@@ -103,7 +103,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-2019
+          - os: windows-2022
             rust-target: x86_64-pc-windows-msvc
             platform: win32
             arch: x64
