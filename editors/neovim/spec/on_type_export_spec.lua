@@ -32,7 +32,6 @@ async_tests.describe('Export', function()
   async_tests.it('pdf is created onType', function()
     local pdf_path = '/home/runner/test/main.pdf'
     assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created before testing')
-    print(vim.inspect(async))
 
     local pdf_exported = async.wrap(function(cb)
       require('tinymist').subscribeDevEvent(
