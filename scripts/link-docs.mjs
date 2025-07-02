@@ -113,34 +113,77 @@ const maintainerMd = async () => {
   await fs.promises.writeFile(outPath, outputContent);
 };
 
+const isCheck = process.argv.includes("--check");
+
+const tasks = [
+  {
+    input: "docs/tinymist/introduction.typ",
+    output: "README.md",
+    title: "Tinymist",
+  },
+  {
+    input: "docs/tinymist/release-instruction.typ",
+    output: "docs/release-instruction.md",
+    title: "Release Instructions",
+  },
+  {
+    input: "docs/tinymist/crates/typlite.typ",
+    output: "crates/typlite/README.md",
+    title: "Typlite",
+  },
+  {
+    input: "docs/tinymist/frontend/emacs.typ",
+    output: "editors/emacs/README.md",
+    title: "Tinymist Emacs Support for Typst",
+  },
+  {
+    input: "docs/tinymist/frontend/helix.typ",
+    output: "editors/helix/README.md",
+    title: "Tinymist Helix Support for Typst",
+  },
+  {
+    input: "docs/tinymist/frontend/neovim.typ",
+    output: "editors/neovim/README.md",
+    title: "Tinymist Neovim Support for Typst",
+  },
+  {
+    input: "docs/tinymist/frontend/sublime-text.typ",
+    output: "editors/sublime-text/README.md",
+    title: "Tinymist Sublime Support for Typst",
+  },
+  {
+    input: "docs/tinymist/frontend/vscode.typ",
+    output: "editors/vscode/README.md",
+    title: "Tinymist Typst VS Code Extension",
+  },
+  {
+    input: "docs/tinymist/frontend/zed.typ",
+    output: "editors/zed/README.md",
+    title: "Tinymist Zed Support for Typst",
+  },
+];
+
 const main = async () => {
   await Promise.all([
-    convert("docs/tinymist/introduction.typ", "README.md", {
-      before: "# Tinymist\n\n",
-    }),
-    convert("docs/tinymist/release-instruction.typ", "docs/release-instruction.md", {
-      before: "# Release Instructions\n\n",
-    }),
-    convert("docs/tinymist/frontend/emacs.typ", "editors/emacs/README.md", {
-      before: "# Tinymist Emacs Support for Typst\n\n",
-    }),
-    convert("docs/tinymist/frontend/helix.typ", "editors/helix/README.md", {
-      before: "# Tinymist Helix Support for Typst\n\n",
-    }),
-    convert("docs/tinymist/frontend/neovim.typ", "editors/neovim/README.md", {
-      before: "# Tinymist Neovim Support for Typst\n\n",
-    }),
-    convert("docs/tinymist/frontend/sublime-text.typ", "editors/sublime-text/README.md", {
-      before: "# Tinymist Sublime Support for Typst\n\n",
-    }),
-    convert("docs/tinymist/frontend/vscode.typ", "editors/vscode/README.md", {
-      before: "# Tinymist Typst VS Code Extension\n\n",
-    }),
-    convert("docs/tinymist/frontend/zed.typ", "editors/zed/README.md", {
-      before: "# Tinymist Zed Support for Typst\n\n",
-    }),
+    ...tasks.map((task) => convert(task.input, task.output, { before: `# ${task.title}\n\n` })),
     maintainerMd(),
   ]);
+
+  if (isCheck) {
+    // any dirty git files?
+    await Promise.all(
+      tasks.map(async (task) => {
+        const gitStatus = execSync(`git status --porcelain ${task.output}`, {
+          encoding: "utf-8",
+        }).trim();
+        if (gitStatus) {
+          throw new Error(
+            `The file ${task.output} is not up to date. Please run \`node scripts/link-docs.mjs\` to update it.`,
+          );
+        }
+      }),
+    );
+  }
 };
 
-main().catch(console.error);
+main();

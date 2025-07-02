@@ -51,6 +51,7 @@
 #let part-counter = counter("shiroa-part-counter")
 
 #let md-equation-rules(body) = {
+  let gh-dark-fg = rgb("#f0f6fc")
   // equation setting
   show math.equation: it => theme-box(
     tag: if it.block { "p" } else { "span" },
@@ -460,7 +461,7 @@
   //   ```,
 
   // Put your custom CSS here.
-  context if shiroa-sys-target() == "html" {
+  context if not is-md-target and shiroa-sys-target() == "html" {
     html.elem(
       "style",
       ```css
