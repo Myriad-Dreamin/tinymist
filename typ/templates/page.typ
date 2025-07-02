@@ -378,6 +378,7 @@
     starlight.with(
       include "/docs/tinymist/book.typ",
       title: title,
+      site-title: "Tinymist Docs",
       description: description,
       github-link: "https://github.com/Myriad-Dreamin/tinymist",
     )
