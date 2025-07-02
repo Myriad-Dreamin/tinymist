@@ -18,7 +18,7 @@ Converts a subset of typst to markdown.
 
 == Install prebuilt binaries via powershell script
 
-#raw(lang: "sh", block: true, {
+#raw(lang: "ps1", block: true, {
   "powershell -ExecutionPolicy Bypass -c \"irm https://github.com/Myriad-Dreamin/tinymist/releases/download/v"
   typlite-ver
   "/typlite-installer.ps1 | iex\""
