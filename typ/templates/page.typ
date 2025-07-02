@@ -477,6 +477,13 @@
         font-weight: 600;
         font-style: italic;
       }
+      figcaption {
+        margin: 0.5rem 0;
+        text-align: center;
+      }
+      figure {
+        margin: 1.5rem 0 1rem 0;
+      }
       ```.text,
     )
   }

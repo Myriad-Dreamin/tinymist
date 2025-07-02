@@ -16,8 +16,8 @@ Let us take reading files from physical file system as example of processing com
 #let pg-vert-sep = 0.7
 #let pg-adjust = 18pt
 
-#let sys-graph = move(
-  dx: pg-adjust,
+#let sys-graph(theme) = {
+  let (colors, node, edge) = fletcher-ctx(theme, node-shape: fletcher.shapes.rect)
   diagram(
     edge-stroke: 0.85pt,
     node-corner-radius: 3pt,
@@ -35,8 +35,7 @@ Let us take reading files from physical file system as example of processing com
       (0, -pg-vert-sep),
       "-}>",
       [didChange, \ didOpen, etc.],
-      label-anchor: "center",
-      label-pos: 0,
+      label-pos: 0.27,
     ),
     edge(
       (-0.8, pg-vert-sep),
@@ -44,7 +43,6 @@ Let us take reading files from physical file system as example of processing com
       (0, 0),
       "-}>",
       [readFile\ readDir, etc.],
-      label-anchor: "center",
       label-pos: 0,
     ),
     edge((-1, pg-vert-sep), (pg-hori-sep, pg-vert-sep), "-}>"),
@@ -64,30 +62,29 @@ Let us take reading files from physical file system as example of processing com
         (pg-hori-sep * 1.7, i * pg-vert-sep),
         "-}>",
         [source],
-        label-pos: 1,
+        label-pos: 0.7,
       )
     },
     node(
       (-1.3, 0),
-      rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Input Sources]),
+      rotate(-90deg, rect(
+        stroke: (bottom: (paint: theme.main-color, thickness: 1pt, dash: "dashed")),
+        width: 120pt,
+      )[Input Sources]),
+      stroke: none,
     ),
     node(
       (pg-hori-sep + 1.45, 0),
-      rotate(
-        90deg,
-        move(
-          dy: pg-adjust * 2,
-          rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Compiler World],
-        ),
-      ),
+      rotate(90deg, move(dy: pg-adjust * 2, rect(
+        stroke: (bottom: (paint: theme.main-color, thickness: 1pt, dash: "dashed")),
+        width: 120pt,
+      )[Compiler World])),
+      stroke: none,
     ),
-  ),
-);
+  )
+};
 
-#figure(
-  cond-image(sys-graph),
-  caption: [The overlay virtual file system (VFS)],
-) <fig:overlay-vfs>
+#figure(cond-image(sys-graph), caption: [The overlay virtual file system (VFS)]) <fig:overlay-vfs>
 
 The problem is to ensure that the compiler can read the content correctly from access models at the time.
 
