@@ -56,6 +56,8 @@ jobs:
       - run: scripts/feature-testing.sh
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
+      - run: yarn build:typlite
+      - run: node ./scripts/link-docs.mjs --check
       - name: Generate completions
         run: |
           mkdir -p completions/{zsh,bash,fish/vendor_completions.d,elvish/lib,nushell/vendor/autoload,powershell}/
