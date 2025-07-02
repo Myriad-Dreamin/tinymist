@@ -1,3 +1,5 @@
+#show raw.where(lang: "sh"): it => [#it#metadata(it.text)<shell-script>]
+
 Converts a subset of typst to markdown.
 
 = Installation
