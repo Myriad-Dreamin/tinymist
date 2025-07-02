@@ -50,6 +50,7 @@
 // todo: use theme-box, to solve theme issue of typst figures.
 #let cond-image(img) = context if shiroa-sys-target() == "html" {
   theme-box(class: "pseudo-image", theme => {
+    show raw.where(tab-size: 114): with-raw-theme.with(theme.style.code-theme)
     set text(fill: theme.main-color)
     set line(stroke: theme.main-color)
     html.frame(img(theme))
