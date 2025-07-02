@@ -212,6 +212,30 @@
   body
 }
 
+#let with-raw-theme = (theme, it) => {
+  if theme.len() > 0 {
+    raw(
+      align: it.align,
+      tab-size: 2,
+      block: it.block,
+      lang: it.lang,
+      syntaxes: it.syntaxes,
+      theme: theme,
+      it.text,
+    )
+  } else {
+    raw(
+      align: it.align,
+      tab-size: 2,
+      block: it.block,
+      lang: it.lang,
+      syntaxes: it.syntaxes,
+      theme: auto,
+      it.text,
+    )
+  }
+}
+
 #let code-block-rules(
   body,
   web-theme: "starlight",
@@ -220,30 +244,6 @@
   zebraw: "@preview/zebraw:0.5.5",
 ) = {
   import zebraw: zebraw, zebraw-init
-
-  let with-raw-theme = (theme, it) => {
-    if theme.len() > 0 {
-      raw(
-        align: it.align,
-        tab-size: 2,
-        block: it.block,
-        lang: it.lang,
-        syntaxes: it.syntaxes,
-        theme: theme,
-        it.text,
-      )
-    } else {
-      raw(
-        align: it.align,
-        tab-size: 2,
-        block: it.block,
-        lang: it.lang,
-        syntaxes: it.syntaxes,
-        theme: auto,
-        it.text,
-      )
-    }
-  }
 
   let (
     default-theme: (
@@ -476,6 +476,13 @@
         font-size: 1.2rem;
         font-weight: 600;
         font-style: italic;
+      }
+      figcaption {
+        margin: 0.5rem 0;
+        text-align: center;
+      }
+      figure {
+        margin: 1.5rem 0 1rem 0;
       }
       ```.text,
     )
