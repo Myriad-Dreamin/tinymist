@@ -11,22 +11,21 @@
 
 typlite's goal is to convert docstrings in typst packages to LSP docs (Markdown format). To achieve this, it runs HTML export and extracts semantic information from the HTML document for markup conversion.
 
-#let pg-node = node.with(corner-radius: 2pt, shape: "rect");
 #let out-format = box.with(width: 5em)
 #let typlite-convert-graph(theme) = {
   let (colors, node, edge) = fletcher-ctx(theme)
   diagram(
     node-stroke: 1pt,
     edge-stroke: 1pt,
-    pg-node((0.5, 0), [Typst Source Code]),
+    node((0.5, 0), [Typst Source Code]),
     edge("-|>", link("https://typst.app/docs/reference/html/")[HTML Export]),
-    pg-node((3, 0), [```xml <xml:typlite/>```]),
+    node((3, 0), [```xml <xml:typlite/>```]),
     edge("-|>"),
-    pg-node((5, 0), out-format[LaTeX]),
+    node((5, 0), out-format[LaTeX]),
     edge((3, 0), (5, -0.7), "-|>"),
-    pg-node((5, -0.7), out-format[Markdown]),
+    node((5, -0.7), out-format[Markdown]),
     edge((3, 0), (5, 0.7), "-|>"),
-    pg-node((5, 0.7), out-format[DocX]),
+    node((5, 0.7), out-format[DocX]),
   )
 }
 
