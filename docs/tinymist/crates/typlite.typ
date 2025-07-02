@@ -1,0 +1,67 @@
+Converts a subset of typst to markdown.
+
+= Installation
+
+#let typlite-ver = toml("/crates/typlite/Cargo.toml").package.version
+#if type(typlite-ver) == dictionary and typlite-ver.workspace == true {
+  typlite-ver = toml("/Cargo.toml").workspace.package.version
+}
+
+== Install prebuilt binaries via shell script
+
+#raw(lang: "sh", block: true, {
+  "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/tinymist/releases/download/v"
+  typlite-ver
+  "/typlite-installer.sh | sh"
+})
+
+
+== Install prebuilt binaries via powershell script
+
+#raw(lang: "sh", block: true, {
+  "powershell -ExecutionPolicy Bypass -c \"irm https://github.com/Myriad-Dreamin/tinymist/releases/download/v"
+  typlite-ver
+  "/typlite-installer.ps1 | iex\""
+})
+
+
+= Usage
+
+```shell
+# default output is main.md
+typlite main.typ
+# specify output
+typlite main.typ output.md
+```
+
+Supported format:
+
+- `output.txt`: Plain text
+- `output.md`: Markdown
+- `output.tex`: LaTeX
+- `output.docx`: Word
+
+Todo: We may support custom format by typst scripting in future, like:
+
+```shell
+# specify output
+typlite main.typ --post-process @preview/typlite-mdx output.mdx
+```
+
+= Feature
+
+- *Contexual Content Rendering*: Contents begin with `context` keyword will be rendered as svg output. The svg output will be embedded inline in the output file as *base64* by default, if the `--assets-path` parameter is not specified. Otherwise, the svg output will be saved in the specified folder and the path will be embedded in the output file.
+
+= Typlite-Specific `sys.inputs`
+
+The `sys.input.x-target` can be used distinguish with normal HTML export.
+
+```typ
+#let x-target = sys.inputs.at("x-target", default: "pdf")
+
+#let my-function = if x-target == "md" {
+  md-impl
+} else {
+  pdf-impl or html-impl
+}
+```
