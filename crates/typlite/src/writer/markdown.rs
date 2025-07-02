@@ -2,7 +2,7 @@
 
 use cmark_writer::ast::Node;
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::{WriterOptions, HtmlWriterOptions};
+use cmark_writer::{HtmlWriterOptions, WriterOptions};
 use ecow::EcoString;
 
 use crate::common::FormatWriter;
@@ -20,7 +20,8 @@ impl MarkdownWriter {
 
 impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let html_options = HtmlWriterOptions::default().with_code_block_prefix(Some(EcoString::from("language-")));
+        let html_options =
+            HtmlWriterOptions::default().with_code_block_prefix(Some(EcoString::from("language-")));
         let mut writer = CommonMarkWriter::with_options(WriterOptions {
             strict: false,
             escape_special_chars: true,
