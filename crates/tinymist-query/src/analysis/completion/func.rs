@@ -46,12 +46,17 @@ impl CompletionPair<'_, '_, '_> {
             });
         }
 
-        let bad_instantiate = matches!(
-            self.cursor.surrounding_syntax,
-            SurroundingSyntax::Selector | SurroundingSyntax::SetRule
-        ) && !fn_feat.is_element;
+        let bad_instantiate = match self.cursor.surrounding_syntax {
+            // todo: filter invalid function as a selector.
+            SurroundingSyntax::Selector => name == "with",
+            SurroundingSyntax::SetRule => !fn_feat.is_element,
+            _ => false,
+        };
         if !bad_instantiate {
-            if !parens || matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector) {
+            if !parens
+                || (matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector)
+                    && fn_feat.is_element)
+            {
                 self.push_completion(Completion {
                     label: name,
                     ..base
