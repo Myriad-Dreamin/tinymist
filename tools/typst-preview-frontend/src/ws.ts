@@ -72,11 +72,19 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         );
 
         if (!isContentPreview) {
+            const scroll$ = fromEvent(window, "scroll");
             subsribes.push(
-                fromEvent(window, "scroll").
+                scroll$.
                     pipe(debounceTime(500)).
-                    subscribe(() => svgDoc.addViewportChange())
+                    subscribe(() => svgDoc.addViewportChange()),
             );
+            if (previewMode === PreviewMode.Doc) {
+                subsribes.push(
+                    scroll$.
+                        pipe(debounceTime(1000)).
+                        subscribe(reportViewportUpdateToExtension),
+                );
+            }
         }
 
         // Handle messages sent from the extension to the webview
@@ -480,3 +488,40 @@ function ensureInvertColors(root: HTMLElement | null, strategy: StrategyKey | St
     }
 }
 
+function reportViewportUpdateToExtension() {
+    const docRoot = document.getElementById("typst-app")?.firstElementChild;
+    // Only SVG renderer is supported.
+    if (!docRoot || docRoot.tagName !== "svg")
+        return;
+
+    const pageNo = window.currentPosition(docRoot)?.page || 1;
+
+    const findElementWithPageNumber = (list: NodeListOf<Element>, pageNo: number) => {
+        for (const elem of list) {
+            const pageNumber = Number.parseInt(
+                elem.getAttribute("data-page-number")!
+            );
+
+            // NOTE: `data-page-number` uses 0-based index
+            if (pageNumber + 1 === pageNo)
+                return elem;
+        }
+        return undefined;
+    };
+
+    const curPageBg = findElementWithPageNumber(
+        docRoot.querySelectorAll(".typst-page-inner"),
+        pageNo
+    );
+    if (!curPageBg)
+        return;
+
+    const bbox = curPageBg.getBoundingClientRect();
+    const typstPageHeight = Number.parseFloat(curPageBg.getAttribute("data-page-height")!);
+    const pixelPageYOffset = 0 - bbox.top;
+    const pixelPageHeight = bbox.height;
+
+    const typstPageYOffset = typstPageHeight * pixelPageYOffset / pixelPageHeight;
+
+    window.typstWebsocket.send(`update-viewport,${pageNo} ${typstPageYOffset}`);
+}

@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use crate::actor::render::RenderActorRequest;
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
+use crate::PreviewViewport;
 use crate::{
     ChangeCursorPositionRequest, DocToSrcJumpInfo, EditorServer, MemoryFiles, MemoryFilesShort,
     ResolveSourceLocRequest,
@@ -39,6 +40,7 @@ pub enum EditorActorRequest {
     Shutdown,
     DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     DocToSrcJump(DocToSrcJumpInfo),
+    UpdateViewport(PreviewViewport),
     Outline(Outline),
     CompileStatus(CompileStatus),
 }
@@ -140,6 +142,8 @@ pub enum ControlPlaneMessage {
 pub enum ControlPlaneResponse {
     #[serde(rename = "editorScrollTo")]
     EditorScrollTo(DocToSrcJumpInfo),
+    #[serde(rename = "updateViewport")]
+    UpdateViewport(PreviewViewport),
     #[serde(rename = "syncEditorChanges")]
     SyncEditorChanges(()),
     #[serde(rename = "compileStatus")]
@@ -184,6 +188,9 @@ impl<T: EditorServer> EditorActor<T> {
                         },
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             self.editor_conn.resp_ctl_plane("DocToSrcJump", ControlPlaneResponse::EditorScrollTo(jump_info)).await
+                        },
+                        EditorActorRequest::UpdateViewport(pos) => {
+                            self.editor_conn.resp_ctl_plane("UpdateViewport", ControlPlaneResponse::UpdateViewport(pos)).await
                         },
                         EditorActorRequest::DocToSrcJumpResolve(req) => {
                             self.source_scroll_by_span(req.span)
