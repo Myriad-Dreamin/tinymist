@@ -1,5 +1,3 @@
-import { triggerRipple } from "typst-dom/typst-animation.mjs";
-
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
 // @param (callback): function to be run when done
@@ -240,6 +238,7 @@ window.currentPosition = function (elem: Element) {
   return result;
 };
 
+type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
 window.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
@@ -247,76 +246,12 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
     return;
   }
 
-  type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
-  const scrollTo = (pageRect: ScrollRect, innerLeft: number, innerTop: number) => {
-    const windowRoot = document.body || document.firstElementChild;
-    const basePos = windowRoot.getBoundingClientRect();
+  // scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number)
 
-    const left = innerLeft - basePos.left;
-    const top = innerTop - basePos.top;
-
-    // evaluate window viewport 1vw
-    const pw = window.innerWidth * 0.01;
-    const ph = window.innerHeight * 0.01;
-
-    const xOffsetInnerFix = 7 * pw;
-    const yOffsetInnerFix = 38.2 * ph;
-
-    const xOffset = left - xOffsetInnerFix;
-    const yOffset = top - yOffsetInnerFix;
-
-    const widthOccupied = (100 * 100 * pw) / pageRect.width;
-
-    const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
-    const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
-
-    // default single-column or multi-column layout
-    if (widthOccupied >= 90 || widthOccupied < 50) {
-      window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
-    } else {
-      // for double-column layout
-      // console.log('occupied adjustment', widthOccupied, page);
-
-      const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
-
-      window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+  const scrollTo = (pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number) => {
+    for (const doc of window.documents) {
+      doc.impl.scrollTo(pageRect, pageNo, innerLeft, innerTop);
     }
-
-    // grid ripple for debug vw
-    // triggerRipple(
-    //   windowRoot,
-    //   svgRect.left + 50 * vw,
-    //   svgRect.top + 1 * vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "green",
-    // );
-
-    // triggerRipple(
-    //   windowRoot,
-    //   pageRect.left - basePos.left + vw,
-    //   pageRect.top - basePos.top + vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "red",
-    // );
-
-    // triggerRipple(
-    //   windowRoot,
-    //   pageAdjust,
-    //   pageRect.top - basePos.top + vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "red",
-    // );
-
-    triggerRipple(
-      windowRoot,
-      left,
-      top,
-      "typst-jump-ripple",
-      "typst-jump-ripple-effect .4s linear",
-    );
   };
 
   const renderMode = docRoot.getAttribute("data-render-mode");
@@ -359,7 +294,7 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
 
     console.log("canvas mode jump", left, top, canvasRect, dataWidth, dataHeight, x, y);
 
-    scrollTo(canvasRect, left, top);
+    scrollTo(canvasRect, pageNo, left, top);
     return;
   }
 
@@ -394,7 +329,7 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
       const left = svgRect.left + (x / dataWidth) * svgRect.width;
       const top = svgRect.top + (y / dataHeight) * svgRect.height;
 
-      scrollTo(pageRect, left, top);
+      scrollTo(pageRect, pageNo, left, top);
       return;
     }
   }

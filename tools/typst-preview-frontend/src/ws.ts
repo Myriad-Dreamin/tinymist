@@ -218,6 +218,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
   }
 
   function setupSocket(svgDoc: TypstDocument): () => void {
+    window.documents.push(svgDoc);
+
     // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
     $ws = webSocket<ArrayBuffer>({
       url,
@@ -249,6 +251,10 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     const dispose = () => {
       disposed = true;
       svgDoc.dispose();
+      const index = window.documents.indexOf(svgDoc);
+      if (index >= 0) {
+        window.documents.splice(index, 1);
+      }
       for (const sub of subsribes.splice(0, subsribes.length)) {
         sub.unsubscribe();
       }

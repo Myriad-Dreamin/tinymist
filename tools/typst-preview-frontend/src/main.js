@@ -9,6 +9,8 @@ import "./styles/outline.css";
 import { wsMain, PreviewMode } from "./ws";
 import { setupDrag } from "./drag";
 
+window.documents = [];
+
 /// Main entry point of the frontend program.
 main();
 

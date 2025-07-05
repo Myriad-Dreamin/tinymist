@@ -463,6 +463,19 @@ export class TypstDocumentContext<O = any> {
   addViewportChange() {
     this.addChangement(["viewport-change", ""]);
   }
+
+  setPartialPageNumber(page: number): boolean {
+    if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
+      return false;
+    }
+    this.partialRenderPage = page - 1;
+    this.addViewportChange();
+    return true;
+  }
+
+  getPartialPageNumber(): number {
+    return this.partialRenderPage + 1;
+  }
 }
 
 export interface TypstDocument<T> {
@@ -536,16 +549,11 @@ export function provideDoc<T extends TypstDocumentContext>(
     }
 
     setPartialPageNumber(page: number): boolean {
-      if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
-        return false;
-      }
-      this.impl.partialRenderPage = page - 1;
-      this.addViewportChange();
-      return true;
+      return this.impl.setPartialPageNumber(page);
     }
 
     getPartialPageNumber(): number {
-      return this.impl.partialRenderPage + 1;
+      return this.impl.getPartialPageNumber();
     }
 
     setOutineData(outline: any) {

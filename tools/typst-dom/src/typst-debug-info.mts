@@ -1,5 +1,5 @@
 import { triggerRipple } from "./typst-animation.mjs";
-import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
+import { PreviewMode, type GConstructor, type TypstDocumentContext } from "./typst-doc.mjs";
 
 const enum SourceMappingType {
   Text = 0,
@@ -225,5 +225,83 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
         });
       }
     }
+
+    scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number) {
+      if (this.previewMode === PreviewMode.Slide) {
+        this.setPartialPageNumber(pageNo);
+        return;
+      }
+
+      const windowRoot = document.body || document.firstElementChild;
+      const basePos = windowRoot.getBoundingClientRect();
+
+      const left = innerLeft - basePos.left;
+      const top = innerTop - basePos.top;
+
+      // evaluate window viewport 1vw
+      const pw = window.innerWidth * 0.01;
+      const ph = window.innerHeight * 0.01;
+
+      const xOffsetInnerFix = 7 * pw;
+      const yOffsetInnerFix = 38.2 * ph;
+
+      const xOffset = left - xOffsetInnerFix;
+      const yOffset = top - yOffsetInnerFix;
+
+      const widthOccupied = (100 * 100 * pw) / pageRect.width;
+
+      const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
+      const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
+
+      // default single-column or multi-column layout
+      if (widthOccupied >= 90 || widthOccupied < 50) {
+        window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
+      } else {
+        // for double-column layout
+        // console.log('occupied adjustment', widthOccupied, page);
+
+        const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
+
+        window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+      }
+
+      // grid ripple for debug vw
+      // triggerRipple(
+      //   windowRoot,
+      //   svgRect.left + 50 * vw,
+      //   svgRect.top + 1 * vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "green",
+      // );
+
+      // triggerRipple(
+      //   windowRoot,
+      //   pageRect.left - basePos.left + vw,
+      //   pageRect.top - basePos.top + vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "red",
+      // );
+
+      // triggerRipple(
+      //   windowRoot,
+      //   pageAdjust,
+      //   pageRect.top - basePos.top + vh,
+      //   "typst-jump-ripple",
+      //   "typst-jump-ripple-effect .4s linear",
+      //   "red",
+      // );
+
+      triggerRipple(
+        windowRoot,
+        left,
+        top,
+        "typst-jump-ripple",
+        "typst-jump-ripple-effect .4s linear",
+      );
+    }
   };
 }
+
+type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
