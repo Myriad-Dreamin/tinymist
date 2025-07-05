@@ -96,7 +96,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   );
 
   const launchBrowsingPreview = launch("webview", "doc", { isBrowsing: true });
-  const launchDevPreview = launch("webview", "doc", { isDev: true });
+  const launchDevPreview = (mode: "doc" | "slide") => launch("webview", mode, { isDev: true });
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
     vscode.commands.registerCommand("tinymist.browsingPreview", launchBrowsingPreview),
@@ -104,16 +104,19 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-    vscode.commands.registerCommand("typst-preview.eject", isCompat ? ejectPreviewPanelCompat : ejectPreviewPanelLsp),
-    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
-    vscode.commands.registerCommand(
-      "typst-preview.revealDocument",
-      isCompat ? revealDocumentCompat : revealDocumentLsp,
-    ),
-    vscode.commands.registerCommand(
-      "typst-preview.sync",
-      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp,
-    ),
+    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview("doc")),
+    vscode.commands.registerCommand("tinymist.previewDevSlide", launchDevPreview("slide")),
+    ...(isCompat
+      ? [
+          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelCompat),
+          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentCompat),
+          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollCompat),
+        ]
+      : [
+          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelLsp),
+          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentLsp),
+          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollLsp),
+        ]),
     vscode.commands.registerCommand("tinymist.doInspectPreviewState", () => {
       const tasks = Array.from(activeTask.values()).map((t) => {
         return {
@@ -186,18 +189,23 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     };
   }
 
-  async function launchForURI(uri: vscode.Uri, kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
+  async function launchForURI(
+    uri: vscode.Uri,
+    kind: "browser" | "webview",
+    mode: "doc" | "slide",
+    opts?: LaunchOpts,
+  ) {
     const doc =
       vscode.workspace.textDocuments.find((doc) => {
         return doc.uri.toString() === uri.toString();
       }) || (await vscode.workspace.openTextDocument(uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-  
+
     const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
-  
+
     await launchImpl({
       kind,
       context,
@@ -209,7 +217,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       isNotPrimary,
     });
   }
-  
+
   /**
    * Ejects the preview panel to the external browser.
    */
@@ -220,10 +228,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       return;
     }
     const { panel, state } = focusingContext;
-  
+
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
-  
+
     await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
@@ -318,7 +326,7 @@ export async function openPreviewInWebView({
     uri: activeEditor.document.uri.toString(),
   };
 
-  const updateActivePanel =() => {
+  const updateActivePanel = () => {
     if (panel.active) {
       extensionState.mut.focusingPreviewPanelContext = {
         panel,

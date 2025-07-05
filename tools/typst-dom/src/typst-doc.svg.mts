@@ -350,7 +350,7 @@ export function provideSvgDoc<
         const height = Number.parseFloat(elem.getAttribute("data-page-height")!);
         maxWidth = Math.max(maxWidth, width);
         return {
-          index,
+          index: mode === PreviewMode.Slide ? this.partialRenderPage : index,
           elem,
           width,
           height,
