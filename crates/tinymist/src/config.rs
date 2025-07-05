@@ -42,6 +42,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "formatterMode",
     "formatterPrintWidth",
     "formatterIndentSize",
+    "formatterProseWrap",
     "hoverPeriscope",
     "outputPath",
     "preview",
