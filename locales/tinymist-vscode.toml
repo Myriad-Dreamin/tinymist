@@ -1041,7 +1041,7 @@ zh = "导出目标"
 
 [extension.tinymist.config.tinymist.exportTarget.desc]
 en = "The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code."
-zh = "导出文档的目标。默认为 `paged`。注意：即使设置为 `html`，您仍然可以导出 PDF。此配置仅影响语言服务器如何完成您的代码。"
+zh = "导出文档的目标。默认为 `paged`。注意：即使设置为 `html`，您仍然可以导出 PDF。此配置仅影响语言服务器如何补全您的代码。"
 
 [extension.tinymist.config.tinymist.exportTarget.string.enum.paged]
 en = "The current export target is for PDF, PNG, and SVG export."
