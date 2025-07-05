@@ -104,7 +104,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-    vscode.commands.registerCommand("typst-preview.eject", isCompat ? ejectPreviewPanelCompat : ejectPreviewPanelLsp),
+    vscode.commands.registerCommand(
+      "typst-preview.eject",
+      isCompat ? ejectPreviewPanelCompat : ejectPreviewPanelLsp,
+    ),
     vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
     vscode.commands.registerCommand(
       "typst-preview.revealDocument",
@@ -186,18 +189,23 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     };
   }
 
-  async function launchForURI(uri: vscode.Uri, kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
+  async function launchForURI(
+    uri: vscode.Uri,
+    kind: "browser" | "webview",
+    mode: "doc" | "slide",
+    opts?: LaunchOpts,
+  ) {
     const doc =
       vscode.workspace.textDocuments.find((doc) => {
         return doc.uri.toString() === uri.toString();
       }) || (await vscode.workspace.openTextDocument(uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-  
+
     const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
-  
+
     await launchImpl({
       kind,
       context,
@@ -209,7 +217,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       isNotPrimary,
     });
   }
-  
+
   /**
    * Ejects the preview panel to the external browser.
    */
@@ -220,10 +228,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       return;
     }
     const { panel, state } = focusingContext;
-  
+
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
-  
+
     await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
@@ -318,7 +326,7 @@ export async function openPreviewInWebView({
     uri: activeEditor.document.uri.toString(),
   };
 
-  const updateActivePanel =() => {
+  const updateActivePanel = () => {
     if (panel.active) {
       extensionState.mut.focusingPreviewPanelContext = {
         panel,
@@ -400,6 +408,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   const taskId = Math.random().toString(36).substring(7);
   const filePath = bindDocument.uri.fsPath;
 
+  // todo: move me to the server side.
   const refreshStyle = getPreviewConfCompat<string>("refresh") || "onSave";
   const scrollSyncMode =
     ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
