@@ -7,6 +7,7 @@ use std::sync::{Arc, LazyLock};
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{eco_format, EcoString};
+use tinymist_project::system::print_diagnostics_to_string;
 use tinymist_project::{base::ShadowApi, EntryReader, TaskInputs, MEMORY_MAIN_ENTRY};
 use typst::{
     foundations::{Bytes, Dict, IntoValue},
@@ -277,12 +278,22 @@ impl HtmlToAstParser {
             )
             .unwrap();
 
+        //todo: ignoring warnings
         let doc = typst::compile(&world);
         let doc = match doc.output {
             Ok(doc) => doc,
             Err(e) => {
+                let diag = doc.warnings.iter().chain(e.iter());
+
+                let e = print_diagnostics_to_string(
+                    &world,
+                    diag,
+                    tinymist_project::DiagnosticFormat::Human,
+                )
+                .unwrap_or_else(|e| e);
+
                 if self.feat.soft_error {
-                    return Node::Text(eco_format!("Error compiling idoc: {e:?}"));
+                    return Node::Text(eco_format!("Error compiling idoc: {e}"));
                 } else {
                     // Construct error node
                     return Node::HtmlElement(CmarkHtmlElement {
@@ -291,7 +302,7 @@ impl HtmlToAstParser {
                             name: EcoString::inline("class"),
                             value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(eco_format!("Error compiling idoc: {e:?}"))],
+                        children: vec![Node::Text(eco_format!("Error compiling idoc: {e}"))],
                         self_closing: false,
                     });
                 }

@@ -17,7 +17,7 @@ use typst::{
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Features, Library, World,
+    Features, Library, World, WorldExt,
 };
 
 use crate::{
@@ -857,6 +857,10 @@ pub trait SourceWorld: World {
     fn lookup(&self, id: FileId) -> Source {
         self.source(id)
             .expect("file id does not point to any source file")
+    }
+
+    fn source_range(&self, span: Span) -> Option<std::ops::Range<usize>> {
+        self.range(span)
     }
 }
 
