@@ -116,10 +116,7 @@ impl EntryState {
     pub fn try_select_path_in_workspace(&self, path: &Path) -> Result<Option<Self>> {
         Ok(match self.workspace_root() {
             Some(root) => match path.strip_prefix(&root) {
-                Ok(path) => Some(Self::new_rooted(
-                    root.clone(),
-                    Some(VirtualPath::new(path)),
-                )),
+                Ok(path) => Some(Self::new_rooted(root.clone(), Some(VirtualPath::new(path)))),
                 Err(err) => {
                     return Err(
                         error_once!("entry file is not in workspace", err: err, entry: path.display(), root: root.display()),

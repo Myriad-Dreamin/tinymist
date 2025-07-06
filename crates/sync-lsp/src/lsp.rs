@@ -179,10 +179,7 @@ impl Notification {
     }
 
     /// Extracts the typed parameters of the a notification accordingly.
-    pub fn extract<P: DeserializeOwned>(
-        self,
-        method: &str,
-    ) -> Result<P, ExtractError<Self>> {
+    pub fn extract<P: DeserializeOwned>(self, method: &str) -> Result<P, ExtractError<Self>> {
         if self.method != method {
             return Err(ExtractError::MethodMismatch(self));
         }

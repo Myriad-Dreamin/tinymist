@@ -224,10 +224,7 @@ impl ServerState {
                 &LspInterrupt::Compile(ProjectInsId::default()),
                 Self::compile_interrupt::<T>,
             )
-            .with_event(
-                &ServerEvent::UnpinPrimaryByPreview,
-                Self::server_event::<T>,
-            )
+            .with_event(&ServerEvent::UnpinPrimaryByPreview, Self::server_event::<T>)
             // lantency sensitive
             .with_request_::<Completion>(Self::completion)
             .with_request_::<SemanticTokensFullRequest>(Self::semantic_tokens_full)

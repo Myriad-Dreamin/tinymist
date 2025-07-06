@@ -43,18 +43,16 @@ impl PathResolution {
     pub fn join(&self, path: &str) -> FileResult<Self> {
         match self {
             Self::Resolved(root) => Ok(Self::Resolved(root.join(path))),
-            Self::Rootless(root) => {
-                Ok(Self::Rootless(Cow::Owned(root.join(path))))
-            }
+            Self::Rootless(root) => Ok(Self::Rootless(Cow::Owned(root.join(path)))),
         }
     }
 
     pub fn resolve_to(&self, path: &VirtualPath) -> Option<Self> {
         match self {
             Self::Resolved(root) => Some(Self::Resolved(path.resolve(root)?)),
-            Self::Rootless(root) => Some(Self::Rootless(Cow::Owned(
-                VirtualPath::new(path.resolve(root.as_ref().as_rooted_path())?),
-            ))),
+            Self::Rootless(root) => Some(Self::Rootless(Cow::Owned(VirtualPath::new(
+                path.resolve(root.as_ref().as_rooted_path())?,
+            )))),
         }
     }
 }
