@@ -50,8 +50,8 @@ pub enum PackFile<'a> {
 impl io::Read for PackFile<'_> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
-            PackFile::Data(data) => data.read(buf),
-            PackFile::Read(reader) => reader.read(buf),
+            Self::Data(data) => data.read(buf),
+            Self::Read(reader) => reader.read(buf),
         }
     }
 }

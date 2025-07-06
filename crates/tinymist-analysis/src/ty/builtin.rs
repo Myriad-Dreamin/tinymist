@@ -257,45 +257,45 @@ pub enum BuiltinTy {
 impl fmt::Debug for BuiltinTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BuiltinTy::Clause => f.write_str("Clause"),
-            BuiltinTy::Undef => f.write_str("Undef"),
-            BuiltinTy::Content(ty) => {
+            Self::Clause => f.write_str("Clause"),
+            Self::Undef => f.write_str("Undef"),
+            Self::Content(ty) => {
                 if let Some(ty) = ty {
                     write!(f, "Content({})", ty.name())
                 } else {
                     f.write_str("Content")
                 }
             }
-            BuiltinTy::Space => f.write_str("Space"),
-            BuiltinTy::None => f.write_str("None"),
-            BuiltinTy::Break => f.write_str("Break"),
-            BuiltinTy::Continue => f.write_str("Continue"),
-            BuiltinTy::Infer => f.write_str("Infer"),
-            BuiltinTy::FlowNone => f.write_str("FlowNone"),
-            BuiltinTy::Auto => f.write_str("Auto"),
+            Self::Space => f.write_str("Space"),
+            Self::None => f.write_str("None"),
+            Self::Break => f.write_str("Break"),
+            Self::Continue => f.write_str("Continue"),
+            Self::Infer => f.write_str("Infer"),
+            Self::FlowNone => f.write_str("FlowNone"),
+            Self::Auto => f.write_str("Auto"),
 
-            BuiltinTy::Args => write!(f, "Args"),
-            BuiltinTy::Color => write!(f, "Color"),
-            BuiltinTy::TextSize => write!(f, "TextSize"),
-            BuiltinTy::TextFont => write!(f, "TextFont"),
-            BuiltinTy::TextFeature => write!(f, "TextFeature"),
-            BuiltinTy::TextLang => write!(f, "TextLang"),
-            BuiltinTy::TextRegion => write!(f, "TextRegion"),
-            BuiltinTy::Dir => write!(f, "Dir"),
-            BuiltinTy::Length => write!(f, "Length"),
-            BuiltinTy::Label => write!(f, "Label"),
-            BuiltinTy::CiteLabel => write!(f, "CiteLabel"),
-            BuiltinTy::RefLabel => write!(f, "RefLabel"),
-            BuiltinTy::Float => write!(f, "Float"),
-            BuiltinTy::Stroke => write!(f, "Stroke"),
-            BuiltinTy::Margin => write!(f, "Margin"),
-            BuiltinTy::Inset => write!(f, "Inset"),
-            BuiltinTy::Outset => write!(f, "Outset"),
-            BuiltinTy::Radius => write!(f, "Radius"),
-            BuiltinTy::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
-            BuiltinTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
-            BuiltinTy::Element(elem) => elem.fmt(f),
-            BuiltinTy::Tag(tag) => {
+            Self::Args => write!(f, "Args"),
+            Self::Color => write!(f, "Color"),
+            Self::TextSize => write!(f, "TextSize"),
+            Self::TextFont => write!(f, "TextFont"),
+            Self::TextFeature => write!(f, "TextFeature"),
+            Self::TextLang => write!(f, "TextLang"),
+            Self::TextRegion => write!(f, "TextRegion"),
+            Self::Dir => write!(f, "Dir"),
+            Self::Length => write!(f, "Length"),
+            Self::Label => write!(f, "Label"),
+            Self::CiteLabel => write!(f, "CiteLabel"),
+            Self::RefLabel => write!(f, "RefLabel"),
+            Self::Float => write!(f, "Float"),
+            Self::Stroke => write!(f, "Stroke"),
+            Self::Margin => write!(f, "Margin"),
+            Self::Inset => write!(f, "Inset"),
+            Self::Outset => write!(f, "Outset"),
+            Self::Radius => write!(f, "Radius"),
+            Self::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
+            Self::Type(ty) => write!(f, "Type({})", ty.short_name()),
+            Self::Element(elem) => elem.fmt(f),
+            Self::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 if let Some(id) = id {
                     write!(f, "Tag({name:?}) of {id:?}")
@@ -303,8 +303,8 @@ impl fmt::Debug for BuiltinTy {
                     write!(f, "Tag({name:?})")
                 }
             }
-            BuiltinTy::Module(decl) => write!(f, "{decl:?}"),
-            BuiltinTy::Path(preference) => write!(f, "Path({preference:?})"),
+            Self::Module(decl) => write!(f, "{decl:?}"),
+            Self::Path(preference) => write!(f, "Path({preference:?})"),
         }
     }
 }
@@ -320,16 +320,16 @@ impl BuiltinTy {
 
     pub fn from_builtin(builtin: Type) -> Ty {
         if builtin == Type::of::<AutoValue>() {
-            return Ty::Builtin(BuiltinTy::Auto);
+            return Ty::Builtin(Self::Auto);
         }
         if builtin == Type::of::<NoneValue>() {
-            return Ty::Builtin(BuiltinTy::None);
+            return Ty::Builtin(Self::None);
         }
         if builtin == Type::of::<typst::visualize::Color>() {
             return Color.literally();
         }
         if builtin == Type::of::<bool>() {
-            return Ty::Builtin(BuiltinTy::None);
+            return Ty::Builtin(Self::None);
         }
         if builtin == Type::of::<f64>() {
             return Float.literally();
@@ -338,53 +338,53 @@ impl BuiltinTy {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return Ty::Builtin(BuiltinTy::Content(Option::None));
+            return Ty::Builtin(Self::Content(Option::None));
         }
 
-        BuiltinTy::Type(builtin).literally()
+        Self::Type(builtin).literally()
     }
 
     pub(crate) fn describe(&self) -> EcoString {
         let res = match self {
-            BuiltinTy::Clause => "any",
-            BuiltinTy::Undef => "any",
-            BuiltinTy::Content(ty) => {
+            Self::Clause => "any",
+            Self::Undef => "any",
+            Self::Content(ty) => {
                 return if let Some(ty) = ty {
                     eco_format!("content({})", ty.name())
                 } else {
                     "content".into()
                 };
             }
-            BuiltinTy::Space => "content",
-            BuiltinTy::None => "none",
-            BuiltinTy::Break => "break",
-            BuiltinTy::Continue => "continue",
-            BuiltinTy::Infer => "any",
-            BuiltinTy::FlowNone => "none",
-            BuiltinTy::Auto => "auto",
+            Self::Space => "content",
+            Self::None => "none",
+            Self::Break => "break",
+            Self::Continue => "continue",
+            Self::Infer => "any",
+            Self::FlowNone => "none",
+            Self::Auto => "auto",
 
-            BuiltinTy::Args => "arguments",
-            BuiltinTy::Color => "color",
-            BuiltinTy::TextSize => "text.size",
-            BuiltinTy::TextFont => "text.font",
-            BuiltinTy::TextFeature => "text.feature",
-            BuiltinTy::TextLang => "text.lang",
-            BuiltinTy::TextRegion => "text.region",
-            BuiltinTy::Dir => "dir",
-            BuiltinTy::Length => "length",
-            BuiltinTy::Float => "float",
-            BuiltinTy::Label => "label",
-            BuiltinTy::CiteLabel => "cite-label",
-            BuiltinTy::RefLabel => "ref-label",
-            BuiltinTy::Stroke => "stroke",
-            BuiltinTy::Margin => "margin",
-            BuiltinTy::Inset => "inset",
-            BuiltinTy::Outset => "outset",
-            BuiltinTy::Radius => "radius",
-            BuiltinTy::TypeType(..) => "type",
-            BuiltinTy::Type(ty) => ty.short_name(),
-            BuiltinTy::Element(ty) => ty.name(),
-            BuiltinTy::Tag(tag) => {
+            Self::Args => "arguments",
+            Self::Color => "color",
+            Self::TextSize => "text.size",
+            Self::TextFont => "text.font",
+            Self::TextFeature => "text.feature",
+            Self::TextLang => "text.lang",
+            Self::TextRegion => "text.region",
+            Self::Dir => "dir",
+            Self::Length => "length",
+            Self::Float => "float",
+            Self::Label => "label",
+            Self::CiteLabel => "cite-label",
+            Self::RefLabel => "ref-label",
+            Self::Stroke => "stroke",
+            Self::Margin => "margin",
+            Self::Inset => "inset",
+            Self::Outset => "outset",
+            Self::Radius => "radius",
+            Self::TypeType(..) => "type",
+            Self::Type(ty) => ty.short_name(),
+            Self::Element(ty) => ty.name(),
+            Self::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 return if let Some(id) = id {
                     eco_format!("tag {name} of {id:?}")
@@ -392,8 +392,8 @@ impl BuiltinTy {
                     eco_format!("tag {name}")
                 };
             }
-            BuiltinTy::Module(m) => return eco_format!("module({})", m.name()),
-            BuiltinTy::Path(s) => match s {
+            Self::Module(m) => return eco_format!("module({})", m.name()),
+            Self::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
                 PathPreference::Source { .. } => "[source]",

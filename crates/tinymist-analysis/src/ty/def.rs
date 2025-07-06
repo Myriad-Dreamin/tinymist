@@ -91,23 +91,23 @@ pub enum Ty {
 impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Ty::Any => f.write_str("Any"),
-            Ty::Builtin(ty) => write!(f, "{ty:?}"),
-            Ty::Args(args) => write!(f, "&({args:?})"),
-            Ty::Func(func) => write!(f, "{func:?}"),
-            Ty::Pattern(pat) => write!(f, "{pat:?}"),
-            Ty::Dict(record) => write!(f, "{record:?}"),
-            Ty::Array(arr) => write!(f, "Array<{arr:?}>"),
-            Ty::Tuple(elems) => {
+            Self::Any => f.write_str("Any"),
+            Self::Builtin(ty) => write!(f, "{ty:?}"),
+            Self::Args(args) => write!(f, "&({args:?})"),
+            Self::Func(func) => write!(f, "{func:?}"),
+            Self::Pattern(pat) => write!(f, "{pat:?}"),
+            Self::Dict(record) => write!(f, "{record:?}"),
+            Self::Array(arr) => write!(f, "Array<{arr:?}>"),
+            Self::Tuple(elems) => {
                 f.write_str("(")?;
                 for t in elems.iter() {
                     write!(f, "{t:?}, ")?;
                 }
                 f.write_str(")")
             }
-            Ty::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
-            Ty::Select(sel) => write!(f, "{sel:?}"),
-            Ty::Union(types) => {
+            Self::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
+            Self::Select(sel) => write!(f, "{sel:?}"),
+            Self::Union(types) => {
                 f.write_str("(")?;
                 if let Some((first, u)) = types.split_first() {
                     write!(f, "{first:?}")?;
@@ -117,14 +117,14 @@ impl fmt::Debug for Ty {
                 }
                 f.write_str(")")
             }
-            Ty::Let(bounds) => write!(f, "({bounds:?})"),
-            Ty::Param(param) => write!(f, "{:?}: {:?}", param.name, param.ty),
-            Ty::Var(var) => var.fmt(f),
-            Ty::Unary(unary) => write!(f, "{unary:?}"),
-            Ty::Binary(binary) => write!(f, "{binary:?}"),
-            Ty::If(if_expr) => write!(f, "{if_expr:?}"),
-            Ty::Value(ins_ty) => write!(f, "{:?}", ins_ty.val),
-            Ty::Boolean(truthiness) => {
+            Self::Let(bounds) => write!(f, "({bounds:?})"),
+            Self::Param(param) => write!(f, "{:?}: {:?}", param.name, param.ty),
+            Self::Var(var) => var.fmt(f),
+            Self::Unary(unary) => write!(f, "{unary:?}"),
+            Self::Binary(binary) => write!(f, "{binary:?}"),
+            Self::If(if_expr) => write!(f, "{if_expr:?}"),
+            Self::Value(ins_ty) => write!(f, "{:?}", ins_ty.val),
+            Self::Boolean(truthiness) => {
                 if let Some(truthiness) = truthiness {
                     write!(f, "{truthiness}")
                 } else {
@@ -138,12 +138,12 @@ impl fmt::Debug for Ty {
 impl Ty {
     /// Whether the type is a dictionary type
     pub fn is_dict(&self) -> bool {
-        matches!(self, Ty::Dict(..))
+        matches!(self, Self::Dict(..))
     }
 
     pub fn union(lhs: Option<Ty>, rhs: Option<Ty>) -> Option<Ty> {
         Some(match (lhs, rhs) {
-            (Some(lhs), Some(rhs)) => Ty::from_types([lhs, rhs].into_iter()),
+            (Some(lhs), Some(rhs)) => Self::from_types([lhs, rhs].into_iter()),
             (Some(ty), None) | (None, Some(ty)) => ty,
             (None, None) => return None,
         })
@@ -152,7 +152,7 @@ impl Ty {
     /// Create a union type from an iterator of types
     pub fn from_types(iter: impl ExactSizeIterator<Item = Ty>) -> Self {
         if iter.len() == 0 {
-            Ty::Any
+            Self::Any
         } else if iter.len() == 1 {
             let mut iter = iter;
             iter.next().unwrap()
@@ -165,20 +165,20 @@ impl Ty {
     pub fn iter_union(iter: impl IntoIterator<Item = Ty>) -> Self {
         let mut v: Vec<Ty> = iter.into_iter().collect();
         v.sort();
-        Ty::Union(Interned::new(v))
+        Self::Union(Interned::new(v))
     }
 
     /// Create an undefined type (which will emit an error)
     /// A that type is annotated if the syntax structure causes an type error
     pub const fn undef() -> Self {
-        Ty::Builtin(BuiltinTy::Undef)
+        Self::Builtin(BuiltinTy::Undef)
     }
 
     /// Get name of the type
     pub fn name(&self) -> Interned<str> {
         match self {
-            Ty::Var(v) => v.name.clone(),
-            Ty::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
+            Self::Var(v) => v.name.clone(),
+            Self::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
             ty => ty
                 .value()
                 .map(|_| Interned::new_str(&self.name()))
@@ -199,11 +199,11 @@ impl Ty {
         }
 
         match self {
-            Ty::Var(v) => v.def.span(),
-            Ty::Let(u) => seq(&u.ubs)
+            Self::Var(v) => v.def.span(),
+            Self::Let(u) => seq(&u.ubs)
                 .or_else(|| seq(&u.lbs))
                 .unwrap_or_else(Span::detached),
-            Ty::Union(u) => seq(u).unwrap_or_else(Span::detached),
+            Self::Union(u) => seq(u).unwrap_or_else(Span::detached),
             _ => Span::detached(),
         }
     }
@@ -211,9 +211,9 @@ impl Ty {
     /// Get value repr of the type
     pub fn value(&self) -> Option<Value> {
         match self {
-            Ty::Value(v) => Some(v.val.clone()),
-            Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
-            Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+            Self::Value(v) => Some(v.val.clone()),
+            Self::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
+            Self::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
             _ => None,
         }
     }
@@ -221,11 +221,11 @@ impl Ty {
     /// Get as element type
     pub fn element(&self) -> Option<Element> {
         match self {
-            Ty::Value(ins_ty) => match &ins_ty.val {
+            Self::Value(ins_ty) => match &ins_ty.val {
                 Value::Func(func) => func.element(),
                 _ => None,
             },
-            Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
+            Self::Builtin(BuiltinTy::Element(v)) => Some(*v),
             _ => None,
         }
     }
@@ -239,9 +239,9 @@ impl Ty {
         self.satisfy(ctx, |ty: &Ty, _pol| {
             res = res || {
                 match ty {
-                    Ty::Value(v) => is_content_builtin_type(&v.val.ty()),
-                    Ty::Builtin(BuiltinTy::Content(..)) => true,
-                    Ty::Builtin(BuiltinTy::Type(v)) => is_content_builtin_type(v),
+                    Self::Value(v) => is_content_builtin_type(&v.val.ty()),
+                    Self::Builtin(BuiltinTy::Content(..)) => true,
+                    Self::Builtin(BuiltinTy::Type(v)) => is_content_builtin_type(v),
                     _ => false,
                 }
             }
@@ -254,8 +254,8 @@ impl Ty {
         self.satisfy(ctx, |ty: &Ty, _pol| {
             res = res || {
                 match ty {
-                    Ty::Value(v) => is_str_builtin_type(&v.val.ty()),
-                    Ty::Builtin(BuiltinTy::Type(v)) => is_str_builtin_type(v),
+                    Self::Value(v) => is_str_builtin_type(&v.val.ty()),
+                    Self::Builtin(BuiltinTy::Type(v)) => is_str_builtin_type(v),
                     _ => false,
                 }
             }
@@ -268,9 +268,9 @@ impl Ty {
         self.satisfy(ctx, |ty: &Ty, _pol| {
             res = res || {
                 match ty {
-                    Ty::Value(v) => is_type_builtin_type(&v.val.ty()),
-                    Ty::Builtin(BuiltinTy::Type(ty)) => is_type_builtin_type(ty),
-                    Ty::Builtin(BuiltinTy::TypeType(..)) => true,
+                    Self::Value(v) => is_type_builtin_type(&v.val.ty()),
+                    Self::Builtin(BuiltinTy::Type(ty)) => is_type_builtin_type(ty),
+                    Self::Builtin(BuiltinTy::TypeType(..)) => true,
                     _ => false,
                 }
             }
