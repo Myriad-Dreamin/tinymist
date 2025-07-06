@@ -8,6 +8,7 @@ use comemo::{Track, Tracked};
 use lsp_types::Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
+use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
@@ -163,6 +164,7 @@ impl Analysis {
     /// Clear all cached resources.
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
+        self.caches.docstrings.clear();
         self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
@@ -289,6 +291,7 @@ impl LocalContextGuard {
         caches.static_signatures.retain(|(l, _)| retainer(*l));
         caches.terms.retain(|(l, _)| retainer(*l));
         caches.signatures.retain(|(l, _)| retainer(*l));
+        caches.docstrings.retain(|(l, _)| retainer(*l));
     }
 }
 
@@ -969,6 +972,23 @@ impl SharedContext {
         res.get_or_init(|| compute(self)).clone()
     }
 
+    pub(crate) fn compute_docstring(
+        self: &Arc<Self>,
+        fid: TypstFileId,
+        docs: String,
+        kind: DefKind,
+    ) -> Option<Arc<DocString>> {
+        let res = self
+            .analysis
+            .caches
+            .docstrings
+            .entry(hash128(&(fid, &docs, kind)), self.lifetime);
+        res.get_or_init(|| {
+            crate::syntax::docs::do_compute_docstring(self, fid, docs, kind).map(Arc::new)
+        })
+        .clone()
+    }
+
     /// Remove html tags from markup content if necessary.
     pub fn remove_html(&self, markup: EcoString) -> EcoString {
         if !self.analysis.remove_html {
@@ -1163,6 +1183,7 @@ pub struct AnalysisGlobalCaches {
     def_signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     static_signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     signatures: CacheMap<DeferredCompute<Option<Signature>>>,
+    docstrings: CacheMap<DeferredCompute<Option<Arc<DocString>>>>,
     terms: CacheMap<(Value, Ty)>,
 }
 

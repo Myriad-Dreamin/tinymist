@@ -24,7 +24,7 @@ use crate::{
     ty::{BuiltinTy, InsTy, Ty},
 };
 
-use super::{compute_docstring, def::*, DocCommentMatcher, InterpretMode};
+use super::{def::*, DocCommentMatcher, InterpretMode};
 
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
@@ -84,11 +84,9 @@ pub(crate) fn expr_of(
     let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
     let imports = imports_base.clone();
 
-    let module_docstring = Arc::new(
-        find_module_level_docs(&source)
-            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DefKind::Module))
-            .unwrap_or_default(),
-    );
+    let module_docstring = find_module_level_docs(&source)
+        .and_then(|docs| ctx.compute_docstring(source.id(), docs, DefKind::Module))
+        .unwrap_or_default();
 
     let (exports, root) = {
         let mut w = ExprWorker {
@@ -220,11 +218,9 @@ impl ExprWorker<'_> {
 
     fn check_docstring(&mut self, decl: &DeclExpr, docs: Option<String>, kind: DefKind) {
         if let Some(docs) = docs {
-            let docstring = compute_docstring(&self.ctx, self.fid, docs, kind);
+            let docstring = self.ctx.compute_docstring(self.fid, docs, kind);
             if let Some(docstring) = docstring {
-                self.docstrings
-                    .lock()
-                    .insert(decl.clone(), Arc::new(docstring));
+                self.docstrings.lock().insert(decl.clone(), docstring);
             }
         }
     }
