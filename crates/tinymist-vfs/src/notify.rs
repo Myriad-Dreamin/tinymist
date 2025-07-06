@@ -56,11 +56,11 @@ impl FilesystemEvent {
     /// event.
     pub fn split(self) -> (FileChangeSet, Option<UpstreamUpdateEvent>) {
         match self {
-            FilesystemEvent::UpstreamUpdate {
+            Self::UpstreamUpdate {
                 changeset,
                 upstream_event,
             } => (changeset, upstream_event),
-            FilesystemEvent::Update(changeset, ..) => (changeset, None),
+            Self::Update(changeset, ..) => (changeset, None),
         }
     }
 
@@ -68,11 +68,11 @@ impl FilesystemEvent {
     /// event.
     pub fn split_with_is_sync(self) -> (FileChangeSet, bool, Option<UpstreamUpdateEvent>) {
         match self {
-            FilesystemEvent::UpstreamUpdate {
+            Self::UpstreamUpdate {
                 changeset,
                 upstream_event,
             } => (changeset, false, upstream_event),
-            FilesystemEvent::Update(changeset, is_sync) => (changeset, is_sync, None),
+            Self::Update(changeset, is_sync) => (changeset, is_sync, None),
         }
     }
 }

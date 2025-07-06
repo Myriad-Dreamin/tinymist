@@ -61,7 +61,7 @@ trait HasNameRange {
 
 impl HasNameRange for Decl {
     fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
-        if let Decl::BibEntry(decl) = self {
+        if let Self::BibEntry(decl) = self {
             return Some(decl.at.1.clone());
         }
 
@@ -236,20 +236,20 @@ impl CallConvention {
     /// Get the function pointer of the call.
     pub fn method_this(&self) -> Option<&Value> {
         match self {
-            CallConvention::Static(_) => None,
-            CallConvention::Method(this, _) => Some(this),
-            CallConvention::With(_) => None,
-            CallConvention::Where(_) => None,
+            Self::Static(_) => None,
+            Self::Method(this, _) => Some(this),
+            Self::With(_) => None,
+            Self::Where(_) => None,
         }
     }
 
     /// Get the function pointer of the call.
     pub fn callee(self) -> Func {
         match self {
-            CallConvention::Static(func) => func,
-            CallConvention::Method(_, func) => func,
-            CallConvention::With(func) => func,
-            CallConvention::Where(func) => func,
+            Self::Static(func) => func,
+            Self::Method(_, func) => func,
+            Self::With(func) => func,
+            Self::Where(func) => func,
         }
     }
 }

@@ -33,7 +33,7 @@ pub enum ContextSelector<T> {
 
 impl<T> Default for ContextSelector<T> {
     fn default() -> Self {
-        ContextSelector::Positive(None)
+        Self::Positive(None)
     }
 }
 
@@ -47,19 +47,19 @@ where
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         match value {
-            serde_json::Value::Null => Ok(ContextSelector::Positive(None)),
+            serde_json::Value::Null => Ok(Self::Positive(None)),
             serde_json::Value::Object(map) => {
                 let negative = map
                     .get("negative")
                     .ok_or_else(|| serde::de::Error::custom("missing field `negative`"))?;
                 let negative = serde_json::from_value(negative.clone())
                     .map_err(|err| serde::de::Error::custom(err.to_string()))?;
-                Ok(ContextSelector::Negative(negative))
+                Ok(Self::Negative(negative))
             }
             _ => {
                 let value = serde_json::from_value(value)
                     .map_err(|err| serde::de::Error::custom(err.to_string()))?;
-                Ok(ContextSelector::Positive(Some(value)))
+                Ok(Self::Positive(Some(value)))
             }
         }
     }
@@ -74,14 +74,14 @@ where
         S: serde::ser::Serializer,
     {
         match self {
-            ContextSelector::Positive(value) => {
+            Self::Positive(value) => {
                 if let Some(value) = value {
                     value.serialize(serializer)
                 } else {
                     serde_json::Value::Null.serialize(serializer)
                 }
             }
-            ContextSelector::Negative(value) => {
+            Self::Negative(value) => {
                 let mut map = serde_json::Map::new();
                 map.insert("negative".into(), serde_json::to_value(value).unwrap());
                 serde_json::Value::Object(map).serialize(serializer)
@@ -114,7 +114,7 @@ pub struct CompletionContextKey(Interned<CompletionContextKeyRepr>);
 impl CompletionContextKey {
     /// Creates a new completion context key.
     pub fn new(mode: Option<InterpretMode>, syntax: Option<SurroundingSyntax>) -> Self {
-        CompletionContextKey(Interned::new(CompletionContextKeyRepr { mode, syntax }))
+        Self(Interned::new(CompletionContextKeyRepr { mode, syntax }))
     }
 }
 
@@ -224,7 +224,7 @@ struct ConstPrefixSnippet {
 
 impl From<&ConstPrefixSnippet> for Interned<PrefixSnippet> {
     fn from(snippet: &ConstPrefixSnippet) -> Self {
-        Interned::new(PrefixSnippet {
+        Self::new(PrefixSnippet {
             context: eco_vec![CompletionContext {
                 mode: ContextSelector::Positive(Some(snippet.context)),
                 syntax: ContextSelector::Positive(None),
@@ -248,7 +248,7 @@ struct ConstPrefixSnippetWithSuggest {
 
 impl From<&ConstPrefixSnippetWithSuggest> for Interned<PrefixSnippet> {
     fn from(snippet: &ConstPrefixSnippetWithSuggest) -> Self {
-        Interned::new(PrefixSnippet {
+        Self::new(PrefixSnippet {
             context: eco_vec![CompletionContext {
                 mode: ContextSelector::Positive(Some(snippet.context)),
                 syntax: ContextSelector::Positive(None),

@@ -23,8 +23,8 @@ pub struct ReqQueue<I, O> {
 }
 
 impl<I, O> Default for ReqQueue<I, O> {
-    fn default() -> ReqQueue<I, O> {
-        ReqQueue {
+    fn default() -> Self {
+        Self {
             incoming: Incoming {
                 pending: HashMap::default(),
             },

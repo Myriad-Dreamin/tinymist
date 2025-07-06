@@ -58,7 +58,7 @@ impl serde::Serialize for Fingerprint {
 impl<'de> serde::Deserialize<'de> for Fingerprint {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
-        Fingerprint::try_from_str(&s).map_err(serde::de::Error::custom)
+        Self::try_from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 

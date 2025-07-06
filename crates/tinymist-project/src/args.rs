@@ -95,7 +95,7 @@ pub struct DocIdArgs {
 impl From<&DocIdArgs> for Id {
     fn from(args: &DocIdArgs) -> Self {
         if let Some(id) = &args.name {
-            Id::new(id.clone())
+            Self::new(id.clone())
         } else {
             (&ResourcePath::from_user_sys(Path::new(&args.input))).into()
         }

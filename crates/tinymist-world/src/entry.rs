@@ -104,7 +104,7 @@ impl EntryState {
         }
     }
 
-    pub fn select_in_workspace(&self, path: &Path) -> EntryState {
+    pub fn select_in_workspace(&self, path: &Path) -> Self {
         let id = WorkspaceResolver::workspace_file(self.root.as_ref(), VirtualPath::new(path));
 
         Self {
@@ -113,10 +113,10 @@ impl EntryState {
         }
     }
 
-    pub fn try_select_path_in_workspace(&self, path: &Path) -> Result<Option<EntryState>> {
+    pub fn try_select_path_in_workspace(&self, path: &Path) -> Result<Option<Self>> {
         Ok(match self.workspace_root() {
             Some(root) => match path.strip_prefix(&root) {
-                Ok(path) => Some(EntryState::new_rooted(
+                Ok(path) => Some(Self::new_rooted(
                     root.clone(),
                     Some(VirtualPath::new(path)),
                 )),
@@ -126,7 +126,7 @@ impl EntryState {
                     )
                 }
             },
-            None => EntryState::new_rooted_by_parent(path.into()),
+            None => Self::new_rooted_by_parent(path.into()),
         })
     }
 
@@ -194,7 +194,7 @@ impl TryFrom<EntryOpts> for EntryState {
 
     fn try_from(value: EntryOpts) -> Result<Self, Self::Error> {
         match value {
-            EntryOpts::Workspace { root, main: entry } => Ok(EntryState::new_rooted(
+            EntryOpts::Workspace { root, main: entry } => Ok(Self::new_rooted(
                 root.as_path().into(),
                 entry.map(VirtualPath::new),
             )),
@@ -204,10 +204,10 @@ impl TryFrom<EntryOpts> for EntryState {
                 }
 
                 // todo: is there path that has no parent?
-                EntryState::new_rooted_by_parent(entry.as_path().into())
+                Self::new_rooted_by_parent(entry.as_path().into())
                     .ok_or_else(|| error_once!("entry path is invalid", path: entry.display()))
             }
-            EntryOpts::Detached => Ok(EntryState::new_detached()),
+            EntryOpts::Detached => Ok(Self::new_detached()),
         }
     }
 }

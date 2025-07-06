@@ -121,7 +121,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             "failed to create watcher",
         );
 
-        NotifyActor {
+        Self {
             inner: SystemAccessModel,
             // we start from 1 to distinguish from 0 (default value)
             lifetime: 1,

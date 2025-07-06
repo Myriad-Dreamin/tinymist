@@ -254,7 +254,7 @@ impl PreviewState {
     pub fn new(
         config: &Config,
         watchers: ProjectPreviewState,
-        client: TypedLspClient<PreviewState>,
+        client: TypedLspClient<Self>,
     ) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 

@@ -27,7 +27,7 @@ impl TryFrom<f32> for Scalar {
         if value.is_nan() {
             Err("NaN is not a valid scalar value")
         } else {
-            Ok(Scalar(value))
+            Ok(Self(value))
         }
     }
 }
@@ -73,7 +73,7 @@ pub struct Id(String);
 impl Id {
     /// Creates a new project Id.
     pub fn new(s: String) -> Self {
-        Id(s)
+        Self(s)
     }
 
     /// Creates a new project Id from a world.
@@ -88,7 +88,7 @@ impl Id {
 
 impl From<&ResourcePath> for Id {
     fn from(value: &ResourcePath) -> Self {
-        Id::new(value.to_string())
+        Self::new(value.to_string())
     }
 }
 
@@ -179,7 +179,7 @@ pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
 impl Pages {
     /// Selects the first page.
-    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=None);
+    pub const FIRST: Self = Self(NonZeroUsize::new(1)..=None);
 }
 
 impl FromStr for Pages {
@@ -195,18 +195,18 @@ impl FromStr for Pages {
             [] | [""] => Err("page export range must not be empty"),
             [single_page] => {
                 let page_number = parse_page_number(single_page)?;
-                Ok(Pages(Some(page_number)..=Some(page_number)))
+                Ok(Self(Some(page_number)..=Some(page_number)))
             }
             ["", ""] => Err("page export range must have start or end"),
-            [start, ""] => Ok(Pages(Some(parse_page_number(start)?)..=None)),
-            ["", end] => Ok(Pages(None..=Some(parse_page_number(end)?))),
+            [start, ""] => Ok(Self(Some(parse_page_number(start)?)..=None)),
+            ["", end] => Ok(Self(None..=Some(parse_page_number(end)?))),
             [start, end] => {
                 let start = parse_page_number(start)?;
                 let end = parse_page_number(end)?;
                 if start > end {
                     Err("page export range must end at a page after the start")
                 } else {
-                    Ok(Pages(Some(start)..=Some(end)))
+                    Ok(Self(Some(start)..=Some(end)))
                 }
             }
             [_, _, _, ..] => Err("page export range must have a single hyphen"),
@@ -276,7 +276,7 @@ impl FromStr for ResourcePath {
         if parts.next().is_some() {
             Err("too many colons")
         } else {
-            Ok(ResourcePath(scheme.into(), path.to_string()))
+            Ok(Self(scheme.into(), path.to_string()))
         }
     }
 }
@@ -310,17 +310,17 @@ impl ResourcePath {
             tinymist_std::path::diff(inp, &cwd).unwrap()
         };
         let rel = unix_slash(&rel);
-        ResourcePath("file".into(), rel.to_string())
+        Self("file".into(), rel.to_string())
     }
     /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
         let package = id.package();
         match package {
-            Some(package) => ResourcePath(
+            Some(package) => Self(
                 "file_id".into(),
                 format!("{package}{}", unix_slash(id.vpath().as_rooted_path())),
             ),
-            None => ResourcePath(
+            None => Self(
                 "file_id".into(),
                 format!("$root{}", unix_slash(id.vpath().as_rooted_path())),
             ),

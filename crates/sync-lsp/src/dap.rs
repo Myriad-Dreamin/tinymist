@@ -25,25 +25,25 @@ pub enum Message {
 
 impl From<Request> for Message {
     fn from(req: Request) -> Self {
-        Message::Request(req)
+        Self::Request(req)
     }
 }
 
 impl From<Response> for Message {
     fn from(resp: Response) -> Self {
-        Message::Response(resp)
+        Self::Response(resp)
     }
 }
 
 impl From<Event> for Message {
     fn from(event: Event) -> Self {
-        Message::Event(event)
+        Self::Event(event)
     }
 }
 
 impl Message {
     /// Reads a DAP message from the reader.
-    pub fn read(r: &mut impl io::BufRead) -> io::Result<Option<Message>> {
+    pub fn read(r: &mut impl io::BufRead) -> io::Result<Option<Self>> {
         let text = match read_msg_text(r)? {
             None => return Ok(None),
             Some(text) => text,
@@ -87,20 +87,20 @@ impl TryFrom<crate::Message> for Message {
 }
 
 impl From<Request> for crate::Message {
-    fn from(request: Request) -> crate::Message {
-        crate::Message::Dap(request.into())
+    fn from(request: Request) -> Self {
+        Self::Dap(request.into())
     }
 }
 
 impl From<Response> for crate::Message {
-    fn from(response: Response) -> crate::Message {
-        crate::Message::Dap(response.into())
+    fn from(response: Response) -> Self {
+        Self::Dap(response.into())
     }
 }
 
 impl From<Event> for crate::Message {
-    fn from(notification: Event) -> crate::Message {
-        crate::Message::Dap(notification.into())
+    fn from(notification: Event) -> Self {
+        Self::Dap(notification.into())
     }
 }
 

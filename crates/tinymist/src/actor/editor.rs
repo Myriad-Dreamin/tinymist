@@ -212,9 +212,9 @@ impl From<&tinymist_project::CompileStatusEnum> for CompileStatusEnum {
     fn from(value: &tinymist_project::CompileStatusEnum) -> Self {
         use tinymist_project::CompileStatusEnum::*;
         match value {
-            Compiling => CompileStatusEnum::Compiling,
-            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
-            ExportError { .. } | CompileError { .. } => CompileStatusEnum::CompileError,
+            Compiling => Self::Compiling,
+            Suspend | CompileSuccess { .. } => Self::CompileSuccess,
+            ExportError { .. } | CompileError { .. } => Self::CompileError,
         }
     }
 }
@@ -279,6 +279,6 @@ impl serde::Serialize for ScatterVec<Diagnostic> {
 impl<'de> serde::Deserialize<'de> for ScatterVec<Diagnostic> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let vec = EcoVec::<Diagnostic>::deserialize(deserializer)?;
-        Ok(ScatterVec(eco_vec![vec]))
+        Ok(Self(eco_vec![vec]))
     }
 }

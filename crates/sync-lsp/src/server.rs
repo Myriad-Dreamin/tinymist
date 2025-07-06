@@ -576,14 +576,14 @@ enum State<Args, S> {
 impl<Args, S> State<Args, S> {
     fn opt(&self) -> Option<&S> {
         match &self {
-            State::Ready(s) => Some(s),
+            Self::Ready(s) => Some(s),
             _ => None,
         }
     }
 
     fn opt_mut(&mut self) -> Option<&mut S> {
         match self {
-            State::Ready(s) => Some(s),
+            Self::Ready(s) => Some(s),
             _ => None,
         }
     }

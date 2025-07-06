@@ -64,7 +64,7 @@ impl<T, E: Clone, QC> QueryRef<T, E, QC> {
 
 impl<T, E> Default for QueryRef<T, E> {
     fn default() -> Self {
-        QueryRef {
+        Self {
             ctx: Mutex::new(Some(())),
             cell: OnceLock::new(),
         }

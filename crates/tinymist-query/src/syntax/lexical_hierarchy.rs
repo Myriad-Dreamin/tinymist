@@ -78,16 +78,16 @@ pub enum LexicalKind {
 }
 
 impl LexicalKind {
-    const fn label() -> LexicalKind {
-        LexicalKind::Var(LexicalVarKind::Label)
+    const fn label() -> Self {
+        Self::Var(LexicalVarKind::Label)
     }
 
-    const fn function() -> LexicalKind {
-        LexicalKind::Var(LexicalVarKind::Function)
+    const fn function() -> Self {
+        Self::Var(LexicalVarKind::Function)
     }
 
-    const fn variable() -> LexicalKind {
-        LexicalKind::Var(LexicalVarKind::Variable)
+    const fn variable() -> Self {
+        Self::Var(LexicalVarKind::Variable)
     }
 }
 
@@ -96,10 +96,10 @@ impl TryFrom<LexicalKind> for SymbolKind {
 
     fn try_from(value: LexicalKind) -> Result<Self, Self::Error> {
         match value {
-            LexicalKind::Heading(..) => Ok(SymbolKind::NAMESPACE),
-            LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
-            LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
-            LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
+            LexicalKind::Heading(..) => Ok(Self::NAMESPACE),
+            LexicalKind::Var(LexicalVarKind::Variable) => Ok(Self::VARIABLE),
+            LexicalKind::Var(LexicalVarKind::Function) => Ok(Self::FUNCTION),
+            LexicalKind::Var(LexicalVarKind::Label) => Ok(Self::CONSTANT),
             LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::CommentGroup => Err(()),
         }
     }

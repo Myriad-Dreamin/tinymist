@@ -299,7 +299,7 @@ impl CustomNode for Comment {
     }
 
     fn eq_box(&self, other: &dyn CustomNode) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Comment>() {
+        if let Some(other) = other.as_any().downcast_ref::<Self>() {
             self.0 == other.0
         } else {
             false

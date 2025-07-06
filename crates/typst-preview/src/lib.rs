@@ -231,7 +231,7 @@ impl PreviewBuilder {
     }
 
     pub async fn build<T: EditorServer>(self, conn: ControlPlaneTx, server: Arc<T>) -> Previewer {
-        let PreviewBuilder {
+        let Self {
             arguments,
             shutdown_tx,
             renderer_mailbox,

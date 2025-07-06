@@ -854,7 +854,7 @@ impl ExprsUntyped for ast::Expr<'_> {
 
 impl ExprsUntyped for SyntaxNode {
     fn exprs(&self) -> impl DoubleEndedIterator<Item = ast::Expr<'_>> {
-        self.children().filter_map(SyntaxNode::cast)
+        self.children().filter_map(Self::cast)
     }
 }
 

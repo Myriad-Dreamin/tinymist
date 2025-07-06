@@ -18,7 +18,7 @@ impl FontInfoCache {
     pub fn from_data(buffer: &[u8]) -> Self {
         let hash = hex::encode(Sha256::digest(buffer));
 
-        FontInfoCache {
+        Self {
             info: FontInfo::iter(buffer).collect(),
             conditions: vec![CacheCondition::Sha256(hash)],
         }

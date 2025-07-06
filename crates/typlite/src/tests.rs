@@ -77,15 +77,15 @@ enum ConvKind {
 impl ConvKind {
     fn for_docs(&self) -> bool {
         match self {
-            ConvKind::Md { for_docs } => *for_docs,
-            ConvKind::LaTeX => false,
+            Self::Md { for_docs } => *for_docs,
+            Self::LaTeX => false,
         }
     }
 
     fn kind(&self) -> Format {
         match self {
-            ConvKind::Md { .. } => Format::Md,
-            ConvKind::LaTeX => Format::LaTeX,
+            Self::Md { .. } => Format::Md,
+            Self::LaTeX => Format::LaTeX,
         }
     }
 }

@@ -149,14 +149,14 @@ pub struct Filesystem {
 
 impl Filesystem {
     /// Creates a new filesystem to be rooted at the given path.
-    pub fn new(path: PathBuf) -> Filesystem {
-        Filesystem { root: path }
+    pub fn new(path: PathBuf) -> Self {
+        Self { root: path }
     }
 
     /// Like `Path::join`, creates a new filesystem rooted at this filesystem
     /// joined with the given path.
-    pub fn join<T: AsRef<Path>>(&self, other: T) -> Filesystem {
-        Filesystem::new(self.root.join(other))
+    pub fn join<T: AsRef<Path>>(&self, other: T) -> Self {
+        Self::new(self.root.join(other))
     }
 
     /// Like `Path::push`, pushes a new path component onto this filesystem.

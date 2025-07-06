@@ -58,20 +58,20 @@ impl BreakpointKind {
     /// Converts the breakpoint kind to a string.
     pub fn to_str(self) -> &'static str {
         match self {
-            BreakpointKind::CallStart => "call_start",
-            BreakpointKind::CallEnd => "call_end",
-            BreakpointKind::Function => "function",
-            BreakpointKind::Break => "break",
-            BreakpointKind::Continue => "continue",
-            BreakpointKind::Return => "return",
-            BreakpointKind::BlockStart => "block_start",
-            BreakpointKind::BlockEnd => "block_end",
-            BreakpointKind::ShowStart => "show_start",
-            BreakpointKind::ShowEnd => "show_end",
-            BreakpointKind::DocStart => "doc_start",
-            BreakpointKind::DocEnd => "doc_end",
-            BreakpointKind::BeforeCompile => "before_compile",
-            BreakpointKind::AfterCompile => "after_compile",
+            Self::CallStart => "call_start",
+            Self::CallEnd => "call_end",
+            Self::Function => "function",
+            Self::Break => "break",
+            Self::Continue => "continue",
+            Self::Return => "return",
+            Self::BlockStart => "block_start",
+            Self::BlockEnd => "block_end",
+            Self::ShowStart => "show_start",
+            Self::ShowEnd => "show_end",
+            Self::DocStart => "doc_start",
+            Self::DocEnd => "doc_end",
+            Self::BeforeCompile => "before_compile",
+            Self::AfterCompile => "after_compile",
         }
     }
 }

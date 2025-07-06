@@ -24,16 +24,16 @@ pub struct EcoSnippetTextEdit {
 
 impl EcoSnippetTextEdit {
     /// Creates a new plain text edit.
-    pub fn new_plain(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
-        EcoSnippetTextEdit {
+    pub fn new_plain(range: LspRange, new_text: EcoString) -> Self {
+        Self {
             edit: EcoTextEdit::new(range, new_text),
             insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
         }
     }
 
     /// Creates a new snippet text edit.
-    pub fn new(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
-        EcoSnippetTextEdit {
+    pub fn new(range: LspRange, new_text: EcoString) -> Self {
+        Self {
             edit: EcoTextEdit::new(range, new_text),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
         }
@@ -225,7 +225,7 @@ mod url_map {
 
         impl<V: de::DeserializeOwned> Default for UrlMapVisitor<V> {
             fn default() -> Self {
-                UrlMapVisitor {
+                Self {
                     _marker: PhantomData,
                 }
             }
@@ -258,7 +258,7 @@ mod url_map {
         }
         impl<V: de::DeserializeOwned> Default for OptionUrlMapVisitor<V> {
             fn default() -> Self {
-                OptionUrlMapVisitor {
+                Self {
                     _marker: PhantomData,
                 }
             }

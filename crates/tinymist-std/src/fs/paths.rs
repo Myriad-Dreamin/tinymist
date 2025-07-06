@@ -340,7 +340,7 @@ pub struct PathAncestors<'a> {
 }
 
 impl<'a> PathAncestors<'a> {
-    fn new(path: &'a Path, stop_root_at: Option<&Path>) -> PathAncestors<'a> {
+    fn new(path: &'a Path, stop_root_at: Option<&Path>) -> Self {
         let stop_at = env::var("__CARGO_TEST_ROOT")
             .ok()
             .map(PathBuf::from)

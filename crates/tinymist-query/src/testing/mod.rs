@@ -26,7 +26,7 @@ pub struct TestSuites {
 }
 impl TestSuites {
     /// Rechecks the test suites.
-    pub fn recheck(&self, world: &dyn World) -> TestSuites {
+    pub fn recheck(&self, world: &dyn World) -> Self {
         let tests = self
             .tests
             .iter()
@@ -52,7 +52,7 @@ impl TestSuites {
             .filter_map(|source| world.source(source.id()).ok())
             .collect();
 
-        TestSuites {
+        Self {
             origin_files: self.origin_files.clone(),
             tests,
             examples,

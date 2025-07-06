@@ -34,9 +34,9 @@ impl SignatureTarget {
     /// Returns the span of the callee node.
     pub fn span(&self) -> Span {
         match self {
-            SignatureTarget::Def(_, def) => def.decl.span(),
-            SignatureTarget::SyntaxFast(_, span) | SignatureTarget::Syntax(_, span) => *span,
-            SignatureTarget::Runtime(func) | SignatureTarget::Convert(func) => func.span(),
+            Self::Def(_, def) => def.decl.span(),
+            Self::SyntaxFast(_, span) | Self::Syntax(_, span) => *span,
+            Self::Runtime(func) | Self::Convert(func) => func.span(),
         }
     }
 }

@@ -51,7 +51,7 @@ impl Initializer for SuperInit {
     /// The 'initialize' request is the first request called by the frontend
     /// to interrogate the features the debug adapter provides.
     fn initialize(self, _params: ()) -> (ServerState, AnySchedulableResponse) {
-        let SuperInit {
+        let Self {
             client,
             config,
             err,

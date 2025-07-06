@@ -145,7 +145,7 @@ impl LockFile {
             std::str::from_utf8(&data).context("tinymist.lock file is not valid utf-8")?;
 
         let mut state = if old_data.trim().is_empty() {
-            LockFile {
+            Self {
                 document: vec![],
                 task: vec![],
                 route: eco_vec![],

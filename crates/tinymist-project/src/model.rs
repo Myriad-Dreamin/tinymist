@@ -28,8 +28,8 @@ impl LockFileCompat {
     /// Returns the lock file version.
     pub fn version(&self) -> Result<&str> {
         match self {
-            LockFileCompat::Version010Beta0(..) => Ok(LOCK_VERSION),
-            LockFileCompat::Other(v) => v
+            Self::Version010Beta0(..) => Ok(LOCK_VERSION),
+            Self::Other(v) => v
                 .get("version")
                 .and_then(|v| v.as_str())
                 .context("missing version field"),
@@ -39,8 +39,8 @@ impl LockFileCompat {
     /// Migrates the lock file to the current version.
     pub fn migrate(self) -> Result<LockFile> {
         match self {
-            LockFileCompat::Version010Beta0(v) => Ok(v),
-            this @ LockFileCompat::Other(..) => {
+            Self::Version010Beta0(v) => Ok(v),
+            this @ Self::Other(..) => {
                 bail!(
                     "cannot migrate from version: {}",
                     this.version().unwrap_or("unknown version")
@@ -124,7 +124,7 @@ impl ProjectPathMaterial {
         let mut files: Vec<_> = files.into_iter().map(|p| p.as_ref().to_owned()).collect();
         files.sort();
 
-        ProjectPathMaterial {
+        Self {
             root: EcoString::default(),
             id: doc_id,
             files,

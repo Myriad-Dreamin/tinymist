@@ -26,10 +26,10 @@ pub enum DiagSeverity {
 impl fmt::Display for DiagSeverity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DiagSeverity::Error => write!(f, "error"),
-            DiagSeverity::Warning => write!(f, "warning"),
-            DiagSeverity::Information => write!(f, "information"),
-            DiagSeverity::Hint => write!(f, "hint"),
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+            Self::Information => write!(f, "information"),
+            Self::Hint => write!(f, "hint"),
         }
     }
 }
@@ -263,14 +263,14 @@ impl fmt::Display for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(e: anyhow::Error) -> Self {
-        Error::new("", e.to_string().to_error_kind(), None)
+        Self::new("", e.to_string().to_error_kind(), None)
     }
 }
 
 #[cfg(feature = "typst")]
 impl From<ecow::EcoVec<SourceDiagnostic>> for Error {
     fn from(e: ecow::EcoVec<SourceDiagnostic>) -> Self {
-        Error::new("", ErrKind::RawDiag(e), None)
+        Self::new("", ErrKind::RawDiag(e), None)
     }
 }
 
@@ -319,14 +319,14 @@ impl<T, E: std::fmt::Display> IgnoreLogging<T> for Result<T, E> {
 }
 
 impl<T> IgnoreLogging<T> for Option<T> {
-    fn log_error(self, msg: &str) -> Option<T> {
+    fn log_error(self, msg: &str) -> Self {
         self.or_else(|| {
             log::error!("{msg}");
             None
         })
     }
 
-    fn log_error_with(self, f: impl FnOnce() -> String) -> Option<T> {
+    fn log_error_with(self, f: impl FnOnce() -> String) -> Self {
         self.or_else(|| {
             log::error!("{}", f());
             None

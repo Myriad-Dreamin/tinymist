@@ -151,7 +151,7 @@ struct LexicalContext {
 
 impl Default for LexicalContext {
     fn default() -> Self {
-        LexicalContext {
+        Self {
             mode: InterpretMode::Markup,
             scopes: eco_vec![],
             last: ExprScope::Lexical(RedBlackTreeMapSync::default()),

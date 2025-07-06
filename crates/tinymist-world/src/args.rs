@@ -259,7 +259,7 @@ pub enum TaskWhen {
 impl TaskWhen {
     /// Returns `true` if the task should never be run automatically.
     pub fn is_never(&self) -> bool {
-        matches!(self, TaskWhen::Never)
+        matches!(self, Self::Never)
     }
 }
 
@@ -324,9 +324,9 @@ pub enum Feature {
 display_possible_values!(Feature);
 
 impl From<Feature> for typst::Feature {
-    fn from(f: Feature) -> typst::Feature {
+    fn from(f: Feature) -> Self {
         match f {
-            Feature::Html => typst::Feature::Html,
+            Feature::Html => Self::Html,
         }
     }
 }

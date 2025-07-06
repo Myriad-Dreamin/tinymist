@@ -131,7 +131,7 @@ impl ServerState {
     pub fn project(
         config: &Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
-        client: TypedLspClient<ServerState>,
+        client: TypedLspClient<Self>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
     ) -> ProjectState {
         let const_config = &config.const_config;
@@ -239,7 +239,7 @@ impl ProjectInsStateExt {
     pub fn compiled(
         &mut self,
         revision: &NonZeroUsize,
-        handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
+        handler: &dyn CompileHandler<LspCompilerFeat, Self>,
         compilation: &LspCompiledArtifact,
     ) {
         let rev = compilation.world().revision().get();
@@ -258,7 +258,7 @@ impl ProjectInsStateExt {
     pub fn emit_pending_reasons(
         &mut self,
         revision: &NonZeroUsize,
-        handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
+        handler: &dyn CompileHandler<LspCompilerFeat, Self>,
     ) -> bool {
         let Some(last_compilation) = self.last_compilation.as_ref() else {
             return false;

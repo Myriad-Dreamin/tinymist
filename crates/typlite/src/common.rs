@@ -155,7 +155,7 @@ pub struct CenterNode {
 
 impl CenterNode {
     pub fn new(children: Vec<Node>) -> Self {
-        CenterNode {
+        Self {
             node: Node::HtmlElement(cmark_writer::ast::HtmlElement {
                 tag: EcoString::inline("p"),
                 attributes: vec![cmark_writer::ast::HtmlAttribute {

@@ -23,26 +23,26 @@ pub enum Message {
 }
 
 impl From<Request> for Message {
-    fn from(request: Request) -> Message {
-        Message::Request(request)
+    fn from(request: Request) -> Self {
+        Self::Request(request)
     }
 }
 
 impl From<Response> for Message {
-    fn from(response: Response) -> Message {
-        Message::Response(response)
+    fn from(response: Response) -> Self {
+        Self::Response(response)
     }
 }
 
 impl From<Notification> for Message {
-    fn from(notification: Notification) -> Message {
-        Message::Notification(notification)
+    fn from(notification: Notification) -> Self {
+        Self::Notification(notification)
     }
 }
 
 impl Message {
     /// Reads a LSP message from the reader.
-    pub fn read(r: &mut impl BufRead) -> io::Result<Option<Message>> {
+    pub fn read(r: &mut impl BufRead) -> io::Result<Option<Self>> {
         let text = match read_msg_text(r)? {
             None => return Ok(None),
             Some(text) => text,
@@ -90,8 +90,8 @@ pub struct Request {
 
 impl Request {
     /// Creates a new LSP request.
-    pub fn new<P: serde::Serialize>(id: RequestId, method: String, params: P) -> Request {
-        Request {
+    pub fn new<P: serde::Serialize>(id: RequestId, method: String, params: P) -> Self {
+        Self {
             id,
             method,
             params: serde_json::to_value(params).unwrap(),
@@ -102,7 +102,7 @@ impl Request {
     pub fn extract<P: DeserializeOwned>(
         self,
         method: &str,
-    ) -> Result<(RequestId, P), ExtractError<Request>> {
+    ) -> Result<(RequestId, P), ExtractError<Self>> {
         if self.method != method {
             return Err(ExtractError::MethodMismatch(self));
         }
@@ -135,8 +135,8 @@ pub struct Response {
 
 impl Response {
     /// Creates a response with the success payload.
-    pub fn new_ok<R: serde::Serialize>(id: RequestId, result: R) -> Response {
-        Response {
+    pub fn new_ok<R: serde::Serialize>(id: RequestId, result: R) -> Self {
+        Self {
             id,
             result: Some(serde_json::to_value(result).unwrap()),
             error: None,
@@ -144,13 +144,13 @@ impl Response {
     }
 
     /// Creates a response with the failure reason.
-    pub fn new_err(id: RequestId, code: i32, message: String) -> Response {
+    pub fn new_err(id: RequestId, code: i32, message: String) -> Self {
         let error = ResponseError {
             code,
             message,
             data: None,
         };
-        Response {
+        Self {
             id,
             result: None,
             error: Some(error),
@@ -171,8 +171,8 @@ pub struct Notification {
 
 impl Notification {
     /// Creates a new notification.
-    pub fn new(method: String, params: impl serde::Serialize) -> Notification {
-        Notification {
+    pub fn new(method: String, params: impl serde::Serialize) -> Self {
+        Self {
             method,
             params: serde_json::to_value(params).unwrap(),
         }
@@ -182,7 +182,7 @@ impl Notification {
     pub fn extract<P: DeserializeOwned>(
         self,
         method: &str,
-    ) -> Result<P, ExtractError<Notification>> {
+    ) -> Result<P, ExtractError<Self>> {
         if self.method != method {
             return Err(ExtractError::MethodMismatch(self));
         }
@@ -214,20 +214,20 @@ impl TryFrom<crate::Message> for Message {
 }
 
 impl From<Request> for crate::Message {
-    fn from(request: Request) -> crate::Message {
-        crate::Message::Lsp(request.into())
+    fn from(request: Request) -> Self {
+        Self::Lsp(request.into())
     }
 }
 
 impl From<Response> for crate::Message {
-    fn from(response: Response) -> crate::Message {
-        crate::Message::Lsp(response.into())
+    fn from(response: Response) -> Self {
+        Self::Lsp(response.into())
     }
 }
 
 impl From<Notification> for crate::Message {
-    fn from(notification: Notification) -> crate::Message {
-        crate::Message::Lsp(notification.into())
+    fn from(notification: Notification) -> Self {
+        Self::Lsp(notification.into())
     }
 }
 

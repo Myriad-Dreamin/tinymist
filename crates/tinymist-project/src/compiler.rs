@@ -85,7 +85,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Runs the compiler and returns the compiled document.
-    pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> CompiledArtifact<F> {
+    pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> Self {
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
         let doc = if is_html {
@@ -94,7 +94,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             graph.shared_compile().expect("paged").map(From::from)
         };
 
-        CompiledArtifact {
+        Self {
             diag: graph.shared_diagnostics().expect("diag"),
             graph,
             doc,
@@ -246,15 +246,15 @@ pub enum Interrupt<F: CompilerFeat> {
 impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Interrupt::Compile(id) => write!(f, "Compile({id:?})"),
-            Interrupt::Settle(id) => write!(f, "Settle({id:?})"),
-            Interrupt::Compiled(artifact) => write!(f, "Compiled({:?})", artifact.id()),
-            Interrupt::ChangeTask(id, change) => {
+            Self::Compile(id) => write!(f, "Compile({id:?})"),
+            Self::Settle(id) => write!(f, "Settle({id:?})"),
+            Self::Compiled(artifact) => write!(f, "Compiled({:?})", artifact.id()),
+            Self::ChangeTask(id, change) => {
                 write!(f, "ChangeTask({id:?}, entry={:?})", change.entry.is_some())
             }
-            Interrupt::Font(..) => write!(f, "Font(..)"),
-            Interrupt::Memory(..) => write!(f, "Memory(..)"),
-            Interrupt::Fs(..) => write!(f, "Fs(..)"),
+            Self::Font(..) => write!(f, "Font(..)"),
+            Self::Memory(..) => write!(f, "Memory(..)"),
+            Self::Fs(..) => write!(f, "Fs(..)"),
         }
     }
 }
@@ -282,7 +282,7 @@ impl From<CompileReasons> for ExportSignal {
 
 impl CompileReasons {
     /// Merge two reasons.
-    pub fn see(&mut self, reason: CompileReasons) {
+    pub fn see(&mut self, reason: Self) {
         self.by_memory_events |= reason.by_memory_events;
         self.by_fs_events |= reason.by_fs_events;
         self.by_entry_update |= reason.by_entry_update;

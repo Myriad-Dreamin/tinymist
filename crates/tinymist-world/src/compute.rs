@@ -305,9 +305,9 @@ where
     type Output = Option<Warned<SourceResult<Arc<D>>>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-        let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
+        let enabled = graph.must_get::<FlagTask<Self>>()?.enabled;
 
-        Ok(enabled.then(|| CompilationTask::<D>::execute(&graph.snap.world)))
+        Ok(enabled.then(|| Self::execute(&graph.snap.world)))
     }
 }
 

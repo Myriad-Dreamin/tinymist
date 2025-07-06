@@ -20,7 +20,7 @@ impl fmt::Display for ProjectInsId {
 
 impl ProjectInsId {
     /// The primary project id.
-    pub const PRIMARY: ProjectInsId = ProjectInsId(EcoString::inline("primary"));
+    pub const PRIMARY: Self = Self(EcoString::inline("primary"));
 }
 
 /// A signal that possibly triggers an export.
@@ -40,7 +40,7 @@ pub struct ExportSignal {
 
 impl ExportSignal {
     /// Merge two signals.
-    pub fn merge(&mut self, other: ExportSignal) {
+    pub fn merge(&mut self, other: Self) {
         self.by_mem_events |= other.by_mem_events;
         self.by_fs_events |= other.by_fs_events;
         self.by_entry_update |= other.by_entry_update;

@@ -18,7 +18,7 @@ pub struct RequestId(IdRepr);
 
 impl RequestId {
     #[cfg(all(feature = "dap", feature = "server"))]
-    pub(crate) fn dap(id: RequestId) -> i64 {
+    pub(crate) fn dap(id: Self) -> i64 {
         match id.0 {
             IdRepr::I32(it) => it as i64,
             IdRepr::String(it) => panic!("unexpected string ID in DAP: {it}"),
@@ -34,14 +34,14 @@ enum IdRepr {
 }
 
 impl From<i32> for RequestId {
-    fn from(id: i32) -> RequestId {
-        RequestId(IdRepr::I32(id))
+    fn from(id: i32) -> Self {
+        Self(IdRepr::I32(id))
     }
 }
 
 impl From<String> for RequestId {
-    fn from(id: String) -> RequestId {
-        RequestId(IdRepr::String(id))
+    fn from(id: String) -> Self {
+        Self(IdRepr::String(id))
     }
 }
 
@@ -164,9 +164,9 @@ impl Message {
     pub fn write<W: std::io::Write>(self, _writer: &mut W) -> std::io::Result<()> {
         match self {
             #[cfg(feature = "lsp")]
-            Message::Lsp(msg) => msg.write(_writer),
+            Self::Lsp(msg) => msg.write(_writer),
             #[cfg(feature = "dap")]
-            Message::Dap(msg) => msg.write(_writer),
+            Self::Dap(msg) => msg.write(_writer),
         }
     }
 }

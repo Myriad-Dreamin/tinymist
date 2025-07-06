@@ -53,8 +53,8 @@ pub(crate) trait ToFunc {
 impl ToFunc for Value {
     fn to_func(&self) -> Option<Func> {
         match self {
-            Value::Func(func) => Some(func.clone()),
-            Value::Type(ty) => ty.constructor().ok(),
+            Self::Func(func) => Some(func.clone()),
+            Self::Type(ty) => ty.constructor().ok(),
             _ => None,
         }
     }

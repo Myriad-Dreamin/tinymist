@@ -65,23 +65,23 @@ impl serde::Serialize for CompletionKind {
 }
 
 impl<'de> serde::Deserialize<'de> for CompletionKind {
-    fn deserialize<D>(deserializer: D) -> Result<CompletionKind, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let kind = lsp_types::CompletionItemKind::deserialize(deserializer)?;
         Ok(match kind {
-            lsp_types::CompletionItemKind::SNIPPET => CompletionKind::Syntax,
-            lsp_types::CompletionItemKind::FUNCTION => CompletionKind::Func,
-            lsp_types::CompletionItemKind::VARIABLE => CompletionKind::Param,
-            lsp_types::CompletionItemKind::FIELD => CompletionKind::Field,
-            lsp_types::CompletionItemKind::CONSTANT => CompletionKind::Constant,
-            lsp_types::CompletionItemKind::REFERENCE => CompletionKind::Reference,
-            lsp_types::CompletionItemKind::CLASS => CompletionKind::Type,
-            lsp_types::CompletionItemKind::MODULE => CompletionKind::Module,
-            lsp_types::CompletionItemKind::FILE => CompletionKind::File,
-            lsp_types::CompletionItemKind::FOLDER => CompletionKind::Folder,
-            _ => CompletionKind::Variable,
+            lsp_types::CompletionItemKind::SNIPPET => Self::Syntax,
+            lsp_types::CompletionItemKind::FUNCTION => Self::Func,
+            lsp_types::CompletionItemKind::VARIABLE => Self::Param,
+            lsp_types::CompletionItemKind::FIELD => Self::Field,
+            lsp_types::CompletionItemKind::CONSTANT => Self::Constant,
+            lsp_types::CompletionItemKind::REFERENCE => Self::Reference,
+            lsp_types::CompletionItemKind::CLASS => Self::Type,
+            lsp_types::CompletionItemKind::MODULE => Self::Module,
+            lsp_types::CompletionItemKind::FILE => Self::File,
+            lsp_types::CompletionItemKind::FOLDER => Self::Folder,
+            _ => Self::Variable,
         })
     }
 }
@@ -173,8 +173,8 @@ pub struct EcoTextEdit {
 }
 
 impl EcoTextEdit {
-    pub fn new(range: LspRange, new_text: EcoString) -> EcoTextEdit {
-        EcoTextEdit { range, new_text }
+    pub fn new(range: LspRange, new_text: EcoString) -> Self {
+        Self { range, new_text }
     }
 }
 

@@ -91,17 +91,17 @@ impl Shell {
             let name = Path::new(&env_shell).file_stem()?.to_str()?;
 
             match name {
-                "bash" => Some(Shell::Bash),
-                "zsh" => Some(Shell::Zsh),
-                "fig" => Some(Shell::Fig),
-                "fish" => Some(Shell::Fish),
-                "elvish" => Some(Shell::Elvish),
-                "powershell" | "powershell_ise" => Some(Shell::PowerShell),
-                "nushell" => Some(Shell::Nushell),
+                "bash" => Some(Self::Bash),
+                "zsh" => Some(Self::Zsh),
+                "fig" => Some(Self::Fig),
+                "fish" => Some(Self::Fish),
+                "elvish" => Some(Self::Elvish),
+                "powershell" | "powershell_ise" => Some(Self::PowerShell),
+                "nushell" => Some(Self::Nushell),
                 _ => None,
             }
         } else if cfg!(windows) {
-            Some(Shell::PowerShell)
+            Some(Self::PowerShell)
         } else {
             None
         }
@@ -115,13 +115,13 @@ impl clap_complete::Generator for Shell {
         use clap_complete_nushell::Nushell;
 
         match self {
-            Shell::Bash => Bash.file_name(name),
-            Shell::Elvish => Elvish.file_name(name),
-            Shell::Fig => Fig.file_name(name),
-            Shell::Fish => Fish.file_name(name),
-            Shell::PowerShell => PowerShell.file_name(name),
-            Shell::Zsh => Zsh.file_name(name),
-            Shell::Nushell => Nushell.file_name(name),
+            Self::Bash => Bash.file_name(name),
+            Self::Elvish => Elvish.file_name(name),
+            Self::Fig => Fig.file_name(name),
+            Self::Fish => Fish.file_name(name),
+            Self::PowerShell => PowerShell.file_name(name),
+            Self::Zsh => Zsh.file_name(name),
+            Self::Nushell => Nushell.file_name(name),
         }
     }
 
@@ -131,13 +131,13 @@ impl clap_complete::Generator for Shell {
         use clap_complete_nushell::Nushell;
 
         match self {
-            Shell::Bash => Bash.generate(cmd, buf),
-            Shell::Elvish => Elvish.generate(cmd, buf),
-            Shell::Fig => Fig.generate(cmd, buf),
-            Shell::Fish => Fish.generate(cmd, buf),
-            Shell::PowerShell => PowerShell.generate(cmd, buf),
-            Shell::Zsh => Zsh.generate(cmd, buf),
-            Shell::Nushell => Nushell.generate(cmd, buf),
+            Self::Bash => Bash.generate(cmd, buf),
+            Self::Elvish => Elvish.generate(cmd, buf),
+            Self::Fig => Fig.generate(cmd, buf),
+            Self::Fish => Fish.generate(cmd, buf),
+            Self::PowerShell => PowerShell.generate(cmd, buf),
+            Self::Zsh => Zsh.generate(cmd, buf),
+            Self::Nushell => Nushell.generate(cmd, buf),
         }
     }
 }

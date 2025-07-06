@@ -35,9 +35,9 @@ enum AssetUrl {
 impl fmt::Display for AssetUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AssetUrl::Embedded(data) => write!(f, "data:image/svg+xml;base64,{data}"),
+            Self::Embedded(data) => write!(f, "data:image/svg+xml;base64,{data}"),
             // todo: correct relative path?
-            AssetUrl::External(path) => write!(f, "{}", path.display()),
+            Self::External(path) => write!(f, "{}", path.display()),
         }
     }
 }

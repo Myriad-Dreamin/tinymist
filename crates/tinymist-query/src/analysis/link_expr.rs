@@ -56,9 +56,9 @@ pub enum LinkTarget {
 impl LinkTarget {
     pub(crate) fn resolve(&self, ctx: &mut LocalContext) -> Option<Url> {
         match self {
-            LinkTarget::Package(..) => None,
-            LinkTarget::Url(url) => Some(url.as_ref().clone()),
-            LinkTarget::Path(id, path) => {
+            Self::Package(..) => None,
+            Self::Url(url) => Some(url.as_ref().clone()),
+            Self::Path(id, path) => {
                 // Avoid creating new ids here.
                 let root = ctx.path_for_id(id.join("/")).ok()?;
                 let path_in_workspace = id.vpath().join(Path::new(path.as_str()));

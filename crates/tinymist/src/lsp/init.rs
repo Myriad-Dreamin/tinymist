@@ -83,7 +83,7 @@ impl Initializer for SuperInit {
     type I = ();
     type S = ServerState;
     fn initialize(self, _params: ()) -> (ServerState, AnySchedulableResponse) {
-        let SuperInit {
+        let Self {
             client,
             exec_cmds,
             config,

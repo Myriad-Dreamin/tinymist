@@ -28,31 +28,31 @@ pub enum PathResolution {
 impl PathResolution {
     pub fn to_err(self) -> FileResult<PathBuf> {
         match self {
-            PathResolution::Resolved(path) => Ok(path),
-            PathResolution::Rootless(_) => Err(FileError::AccessDenied),
+            Self::Resolved(path) => Ok(path),
+            Self::Rootless(_) => Err(FileError::AccessDenied),
         }
     }
 
     pub fn as_path(&self) -> &Path {
         match self {
-            PathResolution::Resolved(path) => path.as_path(),
-            PathResolution::Rootless(path) => path.as_rooted_path(),
+            Self::Resolved(path) => path.as_path(),
+            Self::Rootless(path) => path.as_rooted_path(),
         }
     }
 
-    pub fn join(&self, path: &str) -> FileResult<PathResolution> {
+    pub fn join(&self, path: &str) -> FileResult<Self> {
         match self {
-            PathResolution::Resolved(root) => Ok(PathResolution::Resolved(root.join(path))),
-            PathResolution::Rootless(root) => {
-                Ok(PathResolution::Rootless(Cow::Owned(root.join(path))))
+            Self::Resolved(root) => Ok(Self::Resolved(root.join(path))),
+            Self::Rootless(root) => {
+                Ok(Self::Rootless(Cow::Owned(root.join(path))))
             }
         }
     }
 
-    pub fn resolve_to(&self, path: &VirtualPath) -> Option<PathResolution> {
+    pub fn resolve_to(&self, path: &VirtualPath) -> Option<Self> {
         match self {
-            PathResolution::Resolved(root) => Some(PathResolution::Resolved(path.resolve(root)?)),
-            PathResolution::Rootless(root) => Some(PathResolution::Rootless(Cow::Owned(
+            Self::Resolved(root) => Some(Self::Resolved(path.resolve(root)?)),
+            Self::Rootless(root) => Some(Self::Rootless(Cow::Owned(
                 VirtualPath::new(path.resolve(root.as_ref().as_rooted_path())?),
             ))),
         }
@@ -134,13 +134,13 @@ impl WorkspaceId {
             .clone()
     }
 
-    fn from_package_name(name: &str) -> Option<WorkspaceId> {
+    fn from_package_name(name: &str) -> Option<Self> {
         if !name.starts_with("p") {
             return None;
         }
 
         let num = name[1..].parse().ok()?;
-        Some(WorkspaceId(num))
+        Some(Self(num))
     }
 }
 
@@ -173,12 +173,12 @@ impl WorkspaceResolver {
 
     pub fn is_workspace_file(fid: FileId) -> bool {
         fid.package()
-            .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
+            .is_some_and(|p| p.namespace == Self::WORKSPACE_NS)
     }
 
     pub fn is_package_file(fid: FileId) -> bool {
         fid.package()
-            .is_some_and(|p| p.namespace != WorkspaceResolver::WORKSPACE_NS)
+            .is_some_and(|p| p.namespace != Self::WORKSPACE_NS)
     }
 
     /// Id of the given path if it exists in the `Vfs` and is not deleted.

@@ -94,7 +94,7 @@ pub trait TypliteAttrParser {
 impl TypliteAttrParser for usize {
     fn parse_attr(content: &EcoString) -> Result<Self> {
         Ok(content
-            .parse::<usize>()
+            .parse::<Self>()
             .map_err(|_| format!("cannot parse {} as usize", content))?)
     }
 }
@@ -102,7 +102,7 @@ impl TypliteAttrParser for usize {
 impl TypliteAttrParser for u32 {
     fn parse_attr(content: &EcoString) -> Result<Self> {
         Ok(content
-            .parse::<u32>()
+            .parse::<Self>()
             .map_err(|_| format!("cannot parse {} as u32", content))?)
     }
 }
@@ -110,7 +110,7 @@ impl TypliteAttrParser for u32 {
 impl TypliteAttrParser for bool {
     fn parse_attr(content: &EcoString) -> Result<Self> {
         Ok(content
-            .parse::<bool>()
+            .parse::<Self>()
             .map_err(|_| format!("cannot parse {} as bool", content))?)
     }
 }

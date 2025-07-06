@@ -476,7 +476,7 @@ pub struct TaskInputs {
 }
 
 impl<F: CompilerFeat> CompilerWorld<F> {
-    pub fn task(&self, mutant: TaskInputs) -> CompilerWorld<F> {
+    pub fn task(&self, mutant: TaskInputs) -> Self {
         // Fetch to avoid inconsistent state.
         let _ = self.today(None);
 
@@ -491,7 +491,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             false
         };
 
-        let mut world = CompilerWorld {
+        let mut world = Self {
             features: self.features.clone(),
             inputs: mutant.inputs.unwrap_or_else(|| self.inputs.clone()),
             library: library.unwrap_or_else(|| self.library.clone()),
@@ -617,7 +617,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.registry.packages()
     }
 
-    pub fn paged_task(&self) -> Cow<'_, CompilerWorld<F>> {
+    pub fn paged_task(&self) -> Cow<'_, Self> {
         let force_html = self.features.is_enabled(typst::Feature::Html);
         let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html) || force_html;
 
@@ -631,7 +631,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         Cow::Owned(world)
     }
 
-    pub fn html_task(&self) -> Cow<'_, CompilerWorld<F>> {
+    pub fn html_task(&self) -> Cow<'_, Self> {
         let enabled_html = self.library.features.is_enabled(typst::Feature::Html);
 
         if enabled_html {

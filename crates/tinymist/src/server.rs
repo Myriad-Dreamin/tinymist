@@ -98,7 +98,7 @@ pub struct ServerState {
 impl ServerState {
     /// Create a new language server.
     pub fn new(
-        client: TypedLspClient<ServerState>,
+        client: TypedLspClient<Self>,
         config: Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
@@ -171,7 +171,7 @@ impl ServerState {
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut server = ServerState::new(client.clone(), config, editor_tx);
+        let mut server = Self::new(client.clone(), config, editor_tx);
 
         if !server.config.warnings.is_empty() {
             server.show_config_warnings();
@@ -209,93 +209,93 @@ impl ServerState {
         #[cfg(feature = "preview")]
         let provider = provider
             // User commands
-            .with_command("tinymist.startDefaultPreview", State::default_preview)
-            .with_command("tinymist.scrollPreview", State::scroll_preview)
+            .with_command("tinymist.startDefaultPreview", Self::default_preview)
+            .with_command("tinymist.scrollPreview", Self::scroll_preview)
             // Internal commands
-            .with_command("tinymist.doStartPreview", State::do_start_preview)
-            .with_command("tinymist.doStartBrowsingPreview", State::browse_preview)
-            .with_command("tinymist.doKillPreview", State::kill_preview);
+            .with_command("tinymist.doStartPreview", Self::do_start_preview)
+            .with_command("tinymist.doStartBrowsingPreview", Self::browse_preview)
+            .with_command("tinymist.doKillPreview", Self::kill_preview);
 
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
-            .with_request::<Shutdown>(State::shutdown)
+            .with_request::<Shutdown>(Self::shutdown)
             // customized event
             .with_event(
                 &LspInterrupt::Compile(ProjectInsId::default()),
-                State::compile_interrupt::<T>,
+                Self::compile_interrupt::<T>,
             )
             .with_event(
                 &ServerEvent::UnpinPrimaryByPreview,
-                State::server_event::<T>,
+                Self::server_event::<T>,
             )
             // lantency sensitive
-            .with_request_::<Completion>(State::completion)
-            .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
-            .with_request_::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
-            .with_request_::<DocumentHighlightRequest>(State::document_highlight)
-            .with_request_::<DocumentSymbolRequest>(State::document_symbol)
+            .with_request_::<Completion>(Self::completion)
+            .with_request_::<SemanticTokensFullRequest>(Self::semantic_tokens_full)
+            .with_request_::<SemanticTokensFullDeltaRequest>(Self::semantic_tokens_full_delta)
+            .with_request_::<DocumentHighlightRequest>(Self::document_highlight)
+            .with_request_::<DocumentSymbolRequest>(Self::document_symbol)
             // Sync for low latency
-            .with_request_::<Formatting>(State::formatting)
-            .with_request_::<SelectionRangeRequest>(State::selection_range)
+            .with_request_::<Formatting>(Self::formatting)
+            .with_request_::<SelectionRangeRequest>(Self::selection_range)
             // latency insensitive
-            .with_request_::<InlayHintRequest>(State::inlay_hint)
-            .with_request_::<DocumentColor>(State::document_color)
-            .with_request_::<DocumentLinkRequest>(State::document_link)
-            .with_request_::<ColorPresentationRequest>(State::color_presentation)
-            .with_request_::<HoverRequest>(State::hover)
-            .with_request_::<CodeActionRequest>(State::code_action)
-            .with_request_::<CodeLensRequest>(State::code_lens)
-            .with_request_::<FoldingRangeRequest>(State::folding_range)
-            .with_request_::<SignatureHelpRequest>(State::signature_help)
-            .with_request_::<PrepareRenameRequest>(State::prepare_rename)
-            .with_request_::<Rename>(State::rename)
-            .with_request_::<GotoDefinition>(State::goto_definition)
-            .with_request_::<GotoDeclaration>(State::goto_declaration)
-            .with_request_::<References>(State::references)
-            .with_request_::<WorkspaceSymbolRequest>(State::symbol)
-            .with_request_::<OnEnter>(State::on_enter)
-            .with_request_::<WillRenameFiles>(State::will_rename_files)
+            .with_request_::<InlayHintRequest>(Self::inlay_hint)
+            .with_request_::<DocumentColor>(Self::document_color)
+            .with_request_::<DocumentLinkRequest>(Self::document_link)
+            .with_request_::<ColorPresentationRequest>(Self::color_presentation)
+            .with_request_::<HoverRequest>(Self::hover)
+            .with_request_::<CodeActionRequest>(Self::code_action)
+            .with_request_::<CodeLensRequest>(Self::code_lens)
+            .with_request_::<FoldingRangeRequest>(Self::folding_range)
+            .with_request_::<SignatureHelpRequest>(Self::signature_help)
+            .with_request_::<PrepareRenameRequest>(Self::prepare_rename)
+            .with_request_::<Rename>(Self::rename)
+            .with_request_::<GotoDefinition>(Self::goto_definition)
+            .with_request_::<GotoDeclaration>(Self::goto_declaration)
+            .with_request_::<References>(Self::references)
+            .with_request_::<WorkspaceSymbolRequest>(Self::symbol)
+            .with_request_::<OnEnter>(Self::on_enter)
+            .with_request_::<WillRenameFiles>(Self::will_rename_files)
             // notifications
-            .with_notification::<Initialized>(State::initialized)
-            .with_notification::<DidOpenTextDocument>(State::did_open)
-            .with_notification::<DidCloseTextDocument>(State::did_close)
-            .with_notification::<DidChangeTextDocument>(State::did_change)
-            .with_notification::<DidSaveTextDocument>(State::did_save)
-            .with_notification::<DidChangeConfiguration>(State::did_change_configuration)
+            .with_notification::<Initialized>(Self::initialized)
+            .with_notification::<DidOpenTextDocument>(Self::did_open)
+            .with_notification::<DidCloseTextDocument>(Self::did_close)
+            .with_notification::<DidChangeTextDocument>(Self::did_change)
+            .with_notification::<DidSaveTextDocument>(Self::did_save)
+            .with_notification::<DidChangeConfiguration>(Self::did_change_configuration)
             // commands
-            .with_command_("tinymist.exportPdf", State::export_pdf)
-            .with_command_("tinymist.exportSvg", State::export_svg)
+            .with_command_("tinymist.exportPdf", Self::export_pdf)
+            .with_command_("tinymist.exportSvg", Self::export_svg)
             // .with_command_("tinymist.exportSvgHtml", State::export_html)
-            .with_command_("tinymist.exportPng", State::export_png)
-            .with_command_("tinymist.exportText", State::export_text)
-            .with_command_("tinymist.exportHtml", State::export_html)
-            .with_command_("tinymist.exportMarkdown", State::export_markdown)
-            .with_command_("tinymist.exportTeX", State::export_tex)
-            .with_command_("tinymist.exportQuery", State::export_query)
-            .with_command("tinymist.exportAnsiHighlight", State::export_ansi_hl)
-            .with_command("tinymist.exportAst", State::export_ast)
-            .with_command("tinymist.doClearCache", State::clear_cache)
-            .with_command("tinymist.pinMain", State::pin_document)
-            .with_command("tinymist.focusMain", State::focus_document)
-            .with_command("tinymist.doInitTemplate", State::init_template)
-            .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
-            .with_command_("tinymist.interactCodeContext", State::interact_code_context)
-            .with_command("tinymist.getDocumentTrace", State::get_document_trace)
-            .with_command("tinymist.startServerProfiling", State::start_server_trace)
-            .with_command("tinymist.stopServerProfiling", State::stop_server_trace)
-            .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
-            .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labels)
-            .with_command_("tinymist.getServerInfo", State::get_server_info)
+            .with_command_("tinymist.exportPng", Self::export_png)
+            .with_command_("tinymist.exportText", Self::export_text)
+            .with_command_("tinymist.exportHtml", Self::export_html)
+            .with_command_("tinymist.exportMarkdown", Self::export_markdown)
+            .with_command_("tinymist.exportTeX", Self::export_tex)
+            .with_command_("tinymist.exportQuery", Self::export_query)
+            .with_command("tinymist.exportAnsiHighlight", Self::export_ansi_hl)
+            .with_command("tinymist.exportAst", Self::export_ast)
+            .with_command("tinymist.doClearCache", Self::clear_cache)
+            .with_command("tinymist.pinMain", Self::pin_document)
+            .with_command("tinymist.focusMain", Self::focus_document)
+            .with_command("tinymist.doInitTemplate", Self::init_template)
+            .with_command("tinymist.doGetTemplateEntry", Self::get_template_entry)
+            .with_command_("tinymist.interactCodeContext", Self::interact_code_context)
+            .with_command("tinymist.getDocumentTrace", Self::get_document_trace)
+            .with_command("tinymist.startServerProfiling", Self::start_server_trace)
+            .with_command("tinymist.stopServerProfiling", Self::stop_server_trace)
+            .with_command_("tinymist.getDocumentMetrics", Self::get_document_metrics)
+            .with_command_("tinymist.getWorkspaceLabels", Self::get_workspace_labels)
+            .with_command_("tinymist.getServerInfo", Self::get_server_info)
             // resources
-            .with_resource("/fonts", State::resource_fonts)
-            .with_resource("/symbols", State::resource_symbols)
-            .with_resource("/preview/index.html", State::resource_preview_html)
-            .with_resource("/tutorial", State::resource_tutoral)
-            .with_resource("/package/by-namespace", State::resource_package_by_ns)
-            .with_resource("/package/symbol", State::resource_package_symbols)
-            .with_resource("/package/docs", State::resource_package_docs)
-            .with_resource("/dir/package", State::resource_package_dirs)
-            .with_resource("/dir/package/local", State::resource_local_package_dir);
+            .with_resource("/fonts", Self::resource_fonts)
+            .with_resource("/symbols", Self::resource_symbols)
+            .with_resource("/preview/index.html", Self::resource_preview_html)
+            .with_resource("/tutorial", Self::resource_tutoral)
+            .with_resource("/package/by-namespace", Self::resource_package_by_ns)
+            .with_resource("/package/symbol", Self::resource_package_symbols)
+            .with_resource("/package/docs", Self::resource_package_docs)
+            .with_resource("/dir/package", Self::resource_package_dirs)
+            .with_resource("/dir/package/local", Self::resource_local_package_dir);
 
         // todo: generalize me
         provider.args.add_commands(

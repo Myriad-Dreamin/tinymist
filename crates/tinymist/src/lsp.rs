@@ -192,7 +192,7 @@ impl ServerState {
         Ok(())
     }
 
-    fn workspace_configuration_callback(this: &mut ServerState, resp: sync_ls::lsp::Response) {
+    fn workspace_configuration_callback(this: &mut Self, resp: sync_ls::lsp::Response) {
         if let Some(err) = resp.error {
             log::error!("failed to request configuration: {err:?}");
             return;

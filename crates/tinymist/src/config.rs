@@ -176,7 +176,7 @@ impl Config {
                 .into_iter()
                 .collect(),
         };
-        let mut config = Config::new(ConstConfig::from(&params), roots, font_args);
+        let mut config = Self::new(ConstConfig::from(&params), roots, font_args);
 
         // Sets locale as soon as possible
         if let Some(locale) = config.const_config.locale.as_ref() {
@@ -206,7 +206,7 @@ impl Config {
 
         // Initialize configurations
         let roots = vec![cwd];
-        let mut config = Config::new(ConstConfig::from(&params), roots, font_args);
+        let mut config = Self::new(ConstConfig::from(&params), roots, font_args);
         config.const_dap_config = ConstDapConfig::from(&params);
 
         // Sets locale as soon as possible

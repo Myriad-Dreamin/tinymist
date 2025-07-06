@@ -57,7 +57,7 @@ pub struct ControlPlaneRx {
 }
 
 impl ControlPlaneTx {
-    pub fn new(need_sync_files: bool) -> (ControlPlaneTx, ControlPlaneRx) {
+    pub fn new(need_sync_files: bool) -> (Self, ControlPlaneRx) {
         let (resp_tx, resp_rx) = mpsc::unbounded_channel();
         let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);

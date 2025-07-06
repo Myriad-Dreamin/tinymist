@@ -108,7 +108,7 @@ impl HeadingNode {
             }
         };
 
-        HeadingNode {
+        Self {
             level: element.resolve_level(StyleChain::default()),
             position,
             // 'bookmarked' set to 'auto' falls back to the value of 'outlined'.
