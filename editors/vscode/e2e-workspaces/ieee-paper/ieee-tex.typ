@@ -66,7 +66,7 @@
 
 
 
-\documentclass[conference,compsoc]{IEEEtran}
+\documentclass[conference]{IEEEtran}
 % Some/most Computer Society conferences require the compsoc mode option,
 % but others may want the standard conference format.
 %
@@ -74,9 +74,7 @@
 % manually specify the path to it like:
 % \documentclass[conference,compsoc]{../sty/IEEEtran}
 
-
-
-
+\usepackage{graphicx}
 
 % Some very useful LaTeX packages include:
 % (uncomment the ones you want to load)
@@ -499,7 +497,7 @@
   tex(if bibliography-state == none {
     "%\bibliography{IEEEabrv,../bib/paper}"
   } else {
-    "%\bibliography{IEEEabrv,"
+    "\n\bibliography{IEEEabrv,"
     bibliography-state
     "}"
   })
