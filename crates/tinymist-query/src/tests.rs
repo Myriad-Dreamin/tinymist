@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use regex::{Regex, Replacer};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
@@ -333,13 +334,13 @@ impl JsonRepr {
     }
 
     pub fn md_content(v: &str) -> Cow<'_, str> {
-        static REG: LazyLock<regex::Regex> =
-            LazyLock::new(|| regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
+        static REG: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
+        static REG2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"C:\\dummy-root"#).unwrap());
         let v = REG.replace_all(v, |_captures: &regex::Captures| {
             "data:image-hash/svg+xml;base64,redacted"
         });
-
-        v
+        REG2.replace_all_cow(v, "/dummy-root")
     }
 
     pub fn range(v: impl serde::Serialize) -> String {
@@ -360,8 +361,7 @@ impl fmt::Display for JsonRepr {
 
         let res = String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap();
         // replace Span(number) to Span(..)
-        static REG: LazyLock<regex::Regex> =
-            LazyLock::new(|| regex::Regex::new(r#"Span\((\d+)\)"#).unwrap());
+        static REG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Span\((\d+)\)"#).unwrap());
         let res = REG.replace_all(&res, "Span(..)");
         f.write_str(&res)
     }
@@ -468,5 +468,20 @@ impl fmt::Display for HashRepr<JsonRepr> {
         let res = self.0.to_string();
         let hash = Sha256::digest(res).to_vec();
         write!(f, "sha256:{}", hex::encode(hash))
+    }
+}
+
+/// Extension methods for `Regex` that operate on `Cow<str>` instead of `&str`.
+pub trait RegexCowExt {
+    /// [`Regex::replace_all`], but taking text as `Cow<str>` instead of `&str`.
+    fn replace_all_cow<'t, R: Replacer>(&self, text: Cow<'t, str>, rep: R) -> Cow<'t, str>;
+}
+
+impl RegexCowExt for Regex {
+    fn replace_all_cow<'t, R: Replacer>(&self, text: Cow<'t, str>, rep: R) -> Cow<'t, str> {
+        match self.replace_all(&text, rep) {
+            Cow::Owned(result) => Cow::Owned(result),
+            Cow::Borrowed(_) => text,
+        }
     }
 }
