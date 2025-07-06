@@ -256,7 +256,7 @@ impl DocxWriter {
             }
             // Other inline element types
             _ => {
-                println!("other inline element: {:?}", node);
+                eprintln!("other inline element: {:?}", node);
             }
         }
 

@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/hover.rs
 expression: content
-input_file: crates/tinymist-query/src/fixtures/hover/annotate_docs_error.typ
+input_file: crates/tinymist-query/src/fixtures/hover/example.typ
 ---
 Range: 12:20:12:32
 

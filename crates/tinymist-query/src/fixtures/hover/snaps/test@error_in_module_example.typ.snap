@@ -1,0 +1,64 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/error_in_module_example.typ
+---
+Range: 10:20:10:26
+
+```typc
+let my-fun(
+  note: any,
+  mode: str = "typ",
+  setting: (any) => any = Closure(..),
+) = none;
+```
+
+
+======
+
+
+Good doc
+
+```typ
+my-fun()
+```
+
+Error compiling idoc: error: unknown variable: my-f
+   ┌─ /dummy-root/s0.typ:14:1
+   │
+14 │ #my-f
+   │  ^^^^
+   │
+   = hint: if you meant to use subtraction, try adding spaces around the minus sign: \`my - f\`
+
+help: error occurred while importing this module
+  ┌─ /dummy-root/\_\_main\_\_.typ:1:8
+  │
+1 │ #import "/s0.typ": \*
+  │         ^^^^^^^^^
+
+# Positional Parameters
+
+## note
+
+```typc
+type: 
+```
+
+
+
+# Named Parameters
+
+## mode
+
+```typc
+type: "typ"
+```
+
+
+
+## setting (named)
+
+```typc
+type: (any) => any
+```

@@ -178,6 +178,93 @@ pub struct TypliteFeat {
     pub processor: Option<String>,
 }
 
+impl TypliteFeat {
+    pub fn prepare_world(
+        &self,
+        world: &LspWorld,
+        format: Format,
+    ) -> tinymist_std::Result<LspWorld> {
+        let entry = world.entry_state();
+        let main = entry.main();
+        let current = main.context("no main file in workspace")?;
+
+        if WorkspaceResolver::is_package_file(current) {
+            bail!("package file is not supported");
+        }
+
+        let wrap_main_id = current.join("__wrap_md_main.typ");
+
+        let (main_id, main_content) = match self.processor.as_ref() {
+            None => (wrap_main_id, None),
+            Some(processor) => {
+                let main_id = current.join("__md_main.typ");
+                let content = format!(
+                    r#"#import {processor:?}: article
+#article(include "__wrap_md_main.typ")"#
+                );
+
+                (main_id, Some(Bytes::from_string(content)))
+            }
+        };
+
+        let mut dict = TypstDict::new();
+        dict.insert("x-target".into(), Str("md".into()));
+        if format == Format::Text || self.remove_html {
+            dict.insert("x-remove-html".into(), Str("true".into()));
+        }
+
+        let task_inputs = TaskInputs {
+            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path())),
+            inputs: Some(Arc::new(LazyHash::new(dict))),
+        };
+
+        let mut world = world.task(task_inputs).html_task().into_owned();
+
+        let markdown_id = FileId::new(
+            Some(
+                typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0")
+                    .context_ut("failed to import markdown package")?,
+            ),
+            VirtualPath::new("lib.typ"),
+        );
+
+        world
+            .map_shadow_by_id(
+                markdown_id.join("typst.toml"),
+                Bytes::from_string(include_str!("markdown-typst.toml")),
+            )
+            .context_ut("cannot map markdown-typst.toml")?;
+        world
+            .map_shadow_by_id(
+                markdown_id,
+                Bytes::from_string(include_str!("markdown.typ")),
+            )
+            .context_ut("cannot map markdown.typ")?;
+
+        world
+            .map_shadow_by_id(
+                wrap_main_id,
+                Bytes::from_string(format!(
+                    r#"#import "@local/_markdown:0.1.0": md-doc, example; #show: md-doc
+{}"#,
+                    world
+                        .source(current)
+                        .context_ut("failed to get main file content")?
+                        .text()
+                )),
+            )
+            .context_ut("cannot map source for main file")?;
+
+        if let Some(main_content) = main_content {
+            world
+                .map_shadow_by_id(main_id, main_content)
+                .context_ut("cannot map source for main file")?;
+        }
+
+        Ok(world)
+    }
+}
+
 /// Task builder for converting a typst document to Markdown.
 pub struct Typlite {
     /// The universe to use for the conversion.
@@ -231,91 +318,22 @@ impl Typlite {
 
     /// Convert the content to a markdown document.
     pub fn convert_doc(self, format: Format) -> tinymist_std::Result<MarkdownDocument> {
-        let entry = self.world.entry_state();
-        let main = entry.main();
-        let current = main.context("no main file in workspace")?;
-        let world_origin = self.world.clone();
-        let world = self.world;
+        let world = Arc::new(self.feat.prepare_world(&self.world, format)?);
+        let feat = self.feat.clone();
+        Self::convert_doc_prepared(feat, format, world)
+    }
 
-        if WorkspaceResolver::is_package_file(current) {
-            bail!("package file is not supported");
-        }
-
-        let wrap_main_id = current.join("__wrap_md_main.typ");
-
-        let (main_id, main_content) = match self.feat.processor.as_ref() {
-            None => (wrap_main_id, None),
-            Some(processor) => {
-                let main_id = current.join("__md_main.typ");
-                let content = format!(
-                    r#"#import {processor:?}: article
-#article(include "__wrap_md_main.typ")"#
-                );
-
-                (main_id, Some(Bytes::from_string(content)))
-            }
-        };
-
-        let mut dict = TypstDict::new();
-        dict.insert("x-target".into(), Str("md".into()));
-        if format == Format::Text || self.feat.remove_html {
-            dict.insert("x-remove-html".into(), Str("true".into()));
-        }
-
-        let task_inputs = TaskInputs {
-            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path())),
-            inputs: Some(Arc::new(LazyHash::new(dict))),
-        };
-
-        let mut world = world.task(task_inputs).html_task().into_owned();
-
-        let markdown_id = FileId::new(
-            Some(
-                typst_syntax::package::PackageSpec::from_str("@local/markdown:0.1.0")
-                    .context_ut("failed to import markdown package")?,
-            ),
-            VirtualPath::new("lib.typ"),
-        );
-
-        world
-            .map_shadow_by_id(
-                markdown_id.join("typst.toml"),
-                Bytes::from_string(include_str!("markdown-typst.toml")),
-            )
-            .context_ut("cannot map markdown-typst.toml")?;
-        world
-            .map_shadow_by_id(
-                markdown_id,
-                Bytes::from_string(include_str!("markdown.typ")),
-            )
-            .context_ut("cannot map markdown.typ")?;
-
-        world
-            .map_shadow_by_id(
-                wrap_main_id,
-                Bytes::from_string(format!(
-                    r#"#import "@local/markdown:0.1.0": md-doc, example
-#show: md-doc
-{}"#,
-                    world
-                        .source(current)
-                        .context_ut("failed to get main file content")?
-                        .text()
-                )),
-            )
-            .context_ut("cannot map source for main file")?;
-
-        if let Some(main_content) = main_content {
-            world
-                .map_shadow_by_id(main_id, main_content)
-                .context_ut("cannot map source for main file")?;
-        }
-
+    /// Convert the content to a markdown document.
+    pub fn convert_doc_prepared(
+        feat: TypliteFeat,
+        format: Format,
+        world: Arc<LspWorld>,
+    ) -> tinymist_std::Result<MarkdownDocument> {
         // todo: ignoring warnings
         let base = typst::compile(&world).output?;
-        let mut feat = self.feat;
+        let mut feat = feat;
         feat.target = format;
-        Ok(MarkdownDocument::new(base, world_origin, feat))
+        Ok(MarkdownDocument::new(base, world.clone(), feat))
     }
 }
 
