@@ -337,7 +337,7 @@ impl JsonRepr {
         static REG: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
         static REG2: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r#"C:\\\\dummy-root\\\\"#).unwrap());
+            LazyLock::new(|| Regex::new(r#"C:\\\\dummy-root\\"#).unwrap());
         let v = REG.replace_all(v, |_captures: &regex::Captures| {
             "data:image-hash/svg+xml;base64,redacted"
         });
