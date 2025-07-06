@@ -117,8 +117,8 @@ impl<'a> PreviousItem<'a> {
     /// Gets the underlying [`LinkedNode`] of the item.
     pub fn node(&self) -> &'a LinkedNode<'a> {
         match self {
-            PreviousItem::Sibling(node) => node,
-            PreviousItem::Parent(node, _) => node,
+            Self::Sibling(node) => node,
+            Self::Parent(node, _) => node,
         }
     }
 }
@@ -396,15 +396,15 @@ impl DefClass<'_> {
     /// Gets the node of the def class.
     pub fn node(&self) -> &LinkedNode {
         match self {
-            DefClass::Let(node) => node,
-            DefClass::Import(node) => node,
+            Self::Let(node) => node,
+            Self::Import(node) => node,
         }
     }
 
     /// Gets the name node of the def class.
     pub fn name(&self) -> Option<LinkedNode> {
         match self {
-            DefClass::Let(node) => {
+            Self::Let(node) => {
                 let lb: ast::LetBinding<'_> = node.cast()?;
                 let names = match lb.kind() {
                     ast::LetBindingKind::Closure(name) => node.find(name.span())?,
@@ -416,7 +416,7 @@ impl DefClass<'_> {
 
                 Some(names)
             }
-            DefClass::Import(_node) => {
+            Self::Import(_node) => {
                 // let ident = node.cast::<ast::ImportItem>()?;
                 // Some(ident.span().into())
                 // todo: implement this
@@ -682,13 +682,13 @@ impl<'a> SyntaxClass<'a> {
     /// Gets the node of the syntax class.
     pub fn node(&self) -> &LinkedNode<'a> {
         match self {
-            SyntaxClass::VarAccess(cls) => cls.node(),
-            SyntaxClass::Label { node, .. }
-            | SyntaxClass::Ref { node, .. }
-            | SyntaxClass::Callee(node)
-            | SyntaxClass::ImportPath(node)
-            | SyntaxClass::IncludePath(node)
-            | SyntaxClass::Normal(_, node) => node,
+            Self::VarAccess(cls) => cls.node(),
+            Self::Label { node, .. }
+            | Self::Ref { node, .. }
+            | Self::Callee(node)
+            | Self::ImportPath(node)
+            | Self::IncludePath(node)
+            | Self::Normal(_, node) => node,
         }
     }
 
@@ -697,7 +697,7 @@ impl<'a> SyntaxClass<'a> {
         match self {
             // `<label`
             //   ^ node.offset() + 1
-            SyntaxClass::Label { node, .. } => Some(node.offset() + 1),
+            Self::Label { node, .. } => Some(node.offset() + 1),
             _ => None,
         }
     }
@@ -1145,19 +1145,19 @@ impl<'a> SyntaxContext<'a> {
     /// Gets the node of the cursor class.
     pub fn node(&self) -> Option<LinkedNode<'a>> {
         Some(match self {
-            SyntaxContext::Arg { target, .. } | SyntaxContext::Element { target, .. } => {
+            Self::Arg { target, .. } | Self::Element { target, .. } => {
                 match target {
                     ArgClass::Positional { .. } => return None,
                     ArgClass::Named(node) => node.clone(),
                 }
             }
-            SyntaxContext::VarAccess(cls) => cls.node().clone(),
-            SyntaxContext::Paren { container, .. } => container.clone(),
-            SyntaxContext::Label { node, .. }
-            | SyntaxContext::Ref { node, .. }
-            | SyntaxContext::ImportPath(node)
-            | SyntaxContext::IncludePath(node)
-            | SyntaxContext::Normal(node) => node.clone(),
+            Self::VarAccess(cls) => cls.node().clone(),
+            Self::Paren { container, .. } => container.clone(),
+            Self::Label { node, .. }
+            | Self::Ref { node, .. }
+            | Self::ImportPath(node)
+            | Self::IncludePath(node)
+            | Self::Normal(node) => node.clone(),
         })
     }
 

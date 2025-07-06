@@ -81,20 +81,20 @@ impl PathPreference {
         });
 
         match self {
-            PathPreference::Source { .. } => &SOURCE_REGSET,
-            PathPreference::Wasm => &WASM_REGSET,
-            PathPreference::Csv => &CSV_REGSET,
-            PathPreference::Image => &IMAGE_REGSET,
-            PathPreference::Json => &JSON_REGSET,
-            PathPreference::Yaml => &YAML_REGSET,
-            PathPreference::Xml => &XML_REGSET,
-            PathPreference::Toml => &TOML_REGSET,
-            PathPreference::Csl => &CSL_REGSET,
-            PathPreference::Bibliography => &BIB_REGSET,
-            PathPreference::RawTheme => &RAW_THEME_REGSET,
-            PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
-            PathPreference::Special => &ALL_SPECIAL_REGSET,
-            PathPreference::None => &ALL_REGSET,
+            Self::Source { .. } => &SOURCE_REGSET,
+            Self::Wasm => &WASM_REGSET,
+            Self::Csv => &CSV_REGSET,
+            Self::Image => &IMAGE_REGSET,
+            Self::Json => &JSON_REGSET,
+            Self::Yaml => &YAML_REGSET,
+            Self::Xml => &XML_REGSET,
+            Self::Toml => &TOML_REGSET,
+            Self::Csl => &CSL_REGSET,
+            Self::Bibliography => &BIB_REGSET,
+            Self::RawTheme => &RAW_THEME_REGSET,
+            Self::RawSyntax => &RAW_SYNTAX_REGSET,
+            Self::Special => &ALL_SPECIAL_REGSET,
+            Self::None => &ALL_REGSET,
         }
     }
 

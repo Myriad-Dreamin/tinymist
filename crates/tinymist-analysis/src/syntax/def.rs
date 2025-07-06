@@ -196,16 +196,16 @@ impl Expr {
 
     pub fn span(&self) -> Span {
         match self {
-            Expr::Decl(decl) => decl.span(),
-            Expr::Select(select) => select.span,
-            Expr::Apply(apply) => apply.span,
+            Self::Decl(decl) => decl.span(),
+            Self::Select(select) => select.span,
+            Self::Apply(apply) => apply.span,
             _ => Span::detached(),
         }
     }
 
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
-            Expr::Decl(decl) => decl.file_id(),
+            Self::Decl(decl) => decl.file_id(),
             _ => self.span().id(),
         }
     }
@@ -234,28 +234,28 @@ impl ExprScope {
 
     pub fn is_empty(&self) -> bool {
         match self {
-            ExprScope::Lexical(scope) => scope.is_empty(),
-            ExprScope::Module(module) => is_empty_scope(module.scope()),
-            ExprScope::Func(func) => func.scope().is_none_or(is_empty_scope),
-            ExprScope::Type(ty) => is_empty_scope(ty.scope()),
+            Self::Lexical(scope) => scope.is_empty(),
+            Self::Module(module) => is_empty_scope(module.scope()),
+            Self::Func(func) => func.scope().is_none_or(is_empty_scope),
+            Self::Type(ty) => is_empty_scope(ty.scope()),
         }
     }
 
     pub fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
-            ExprScope::Lexical(scope) => {
+            Self::Lexical(scope) => {
                 crate::log_debug_ct!("evaluating: {name:?} in {scope:?}");
                 (scope.get(name).cloned(), None)
             }
-            ExprScope::Module(module) => {
+            Self::Module(module) => {
                 let v = module.scope().get(name);
                 // let decl =
                 //     v.and_then(|_| Some(Decl::external(module.file_id()?,
                 // name.clone()).into()));
                 (None, v)
             }
-            ExprScope::Func(func) => (None, func.scope().unwrap().get(name)),
-            ExprScope::Type(ty) => (None, ty.scope().get(name)),
+            Self::Func(func) => (None, func.scope().unwrap().get(name)),
+            Self::Type(ty) => (None, ty.scope().get(name)),
         };
 
         // ref_expr.of = of.clone();
@@ -270,12 +270,12 @@ impl ExprScope {
 
     pub fn merge_into(&self, exports: &mut LexicalScope) {
         match self {
-            ExprScope::Lexical(scope) => {
+            Self::Lexical(scope) => {
                 for (name, expr) in scope.iter() {
                     exports.insert_mut(name.clone(), expr.clone());
                 }
             }
-            ExprScope::Module(module) => {
+            Self::Module(module) => {
                 crate::log_debug_ct!("imported: {module:?}");
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
                 for (name, _) in module.scope().iter() {
@@ -283,7 +283,7 @@ impl ExprScope {
                     exports.insert_mut(name.clone(), select_of(v.clone(), name));
                 }
             }
-            ExprScope::Func(func) => {
+            Self::Func(func) => {
                 if let Some(scope) = func.scope() {
                     let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
                     for (name, _) in scope.iter() {
@@ -292,7 +292,7 @@ impl ExprScope {
                     }
                 }
             }
-            ExprScope::Type(ty) => {
+            Self::Type(ty) => {
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Type(*ty))));
                 for (name, _) in ty.scope().iter() {
                     let name: Interned<str> = name.into();

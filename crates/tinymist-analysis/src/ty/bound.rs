@@ -73,10 +73,10 @@ impl Ty {
     /// Convert type to doc source
     pub fn as_source(&self) -> Option<DocSource> {
         match self {
-            Ty::Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
+            Self::Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
                 Some(DocSource::Builtin(ty.clone()))
             }
-            Ty::Value(ty) => match &ty.val {
+            Self::Value(ty) => match &ty.val {
                 foundations::Value::Type(..) | foundations::Value::Func(..) => {
                     Some(DocSource::Ins(ty.clone()))
                 }

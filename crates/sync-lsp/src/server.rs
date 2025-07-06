@@ -558,7 +558,7 @@ impl<A, S> ServiceState<'_, A, S> {
     /// Converts the state to an option holding the ready service.
     pub fn ready(&mut self) -> Option<&mut S> {
         match self {
-            ServiceState::Ready(s) => Some(s),
+            Self::Ready(s) => Some(s),
             _ => None,
         }
     }

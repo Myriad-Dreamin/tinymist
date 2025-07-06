@@ -29,16 +29,16 @@ impl Signature {
     /// Returns the primary signature if it is one.
     pub fn primary(&self) -> &Arc<PrimarySignature> {
         match self {
-            Signature::Primary(sig) => sig,
-            Signature::Partial(sig) => &sig.signature,
+            Self::Primary(sig) => sig,
+            Self::Partial(sig) => &sig.signature,
         }
     }
 
     /// Returns the with bindings of the signature.
     pub fn bindings(&self) -> &[ArgsInfo] {
         match self {
-            Signature::Primary(_) => &[],
-            Signature::Partial(sig) => &sig.with_stack,
+            Self::Primary(_) => &[],
+            Self::Partial(sig) => &sig.with_stack,
         }
     }
 
@@ -59,8 +59,8 @@ impl Signature {
     /// Returns the shift applied to the signature.
     pub fn param_shift(&self) -> usize {
         match self {
-            Signature::Primary(_) => 0,
-            Signature::Partial(sig) => sig
+            Self::Primary(_) => 0,
+            Self::Partial(sig) => sig
                 .with_stack
                 .iter()
                 .map(|ws| ws.items.len())
