@@ -1145,12 +1145,10 @@ impl<'a> SyntaxContext<'a> {
     /// Gets the node of the cursor class.
     pub fn node(&self) -> Option<LinkedNode<'a>> {
         Some(match self {
-            Self::Arg { target, .. } | Self::Element { target, .. } => {
-                match target {
-                    ArgClass::Positional { .. } => return None,
-                    ArgClass::Named(node) => node.clone(),
-                }
-            }
+            Self::Arg { target, .. } | Self::Element { target, .. } => match target {
+                ArgClass::Positional { .. } => return None,
+                ArgClass::Named(node) => node.clone(),
+            },
             Self::VarAccess(cls) => cls.node().clone(),
             Self::Paren { container, .. } => container.clone(),
             Self::Label { node, .. }
