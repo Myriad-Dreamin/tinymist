@@ -59,6 +59,7 @@ body:
   attributes:
     label: Server Logs
     description: |
+      For example, in Neovim, the log is oftenly stored in the `~/.local/state/nvim/lsp`.
       For example, for VSCode, get the logs in (Output Panel -> Tinymist).
       We will close a bug report that doesn't provide full logs. Please don't truncate it for us, attach it as a file if it's too long.
     value: |
@@ -69,9 +70,8 @@ body:
     required: true
 - type: textarea
   attributes:
-    label: Browser/Client Logs
+    label: Browser Logs
     description: |
-      For example, in Neovim, the log is oftenly stored in the `~/.local/state/nvim/lsp`.
       For example, in VSCode, get the logs in (Help -> Toggle Developer Tools -> Console).
       If you open preview in browser, the console log in the browser is also helpful.
       We will close a bug report that doesn't provide full logs. Please don't truncate it for us, attach it as a file if it's too long.
