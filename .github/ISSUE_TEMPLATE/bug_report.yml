@@ -71,7 +71,7 @@ body:
   attributes:
     label: Browser/Client Logs
     description: |
-      For example, in Neovim, the log is oftenly stored in the `~/.local/state/neovim/lsp`.
+      For example, in Neovim, the log is oftenly stored in the `~/.local/state/nvim/lsp`.
       For example, in VSCode, get the logs in (Help -> Toggle Developer Tools -> Console).
       If you open preview in browser, the console log in the browser is also helpful.
       We will close a bug report that doesn't provide full logs. Please don't truncate it for us, attach it as a file if it's too long.
