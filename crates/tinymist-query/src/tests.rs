@@ -336,11 +336,12 @@ impl JsonRepr {
     pub fn md_content(v: &str) -> Cow<'_, str> {
         static REG: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
-        static REG2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"C:\\dummy-root"#).unwrap());
+        static REG2: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"C:\\\\dummy-root\\"#).unwrap());
         let v = REG.replace_all(v, |_captures: &regex::Captures| {
             "data:image-hash/svg+xml;base64,redacted"
         });
-        REG2.replace_all_cow(v, "/dummy-root")
+        REG2.replace_all_cow(v, "/dummy-root/")
     }
 
     pub fn range(v: impl serde::Serialize) -> String {
