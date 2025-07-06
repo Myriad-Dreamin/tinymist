@@ -14,7 +14,7 @@ use crate::{
 
 use super::DeclExpr;
 
-pub(crate) fn compute_docstring(
+pub(crate) fn do_compute_docstring(
     ctx: &Arc<SharedContext>,
     fid: TypstFileId,
     docs: String,

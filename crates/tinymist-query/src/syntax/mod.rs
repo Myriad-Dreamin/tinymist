@@ -10,7 +10,6 @@ pub(crate) mod index;
 pub(crate) mod lexical_hierarchy;
 pub(crate) mod module;
 
-pub(crate) use docs::*;
 pub use expr::*;
 pub use index::*;
 pub use lexical_hierarchy::*;
