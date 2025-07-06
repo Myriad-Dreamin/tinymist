@@ -46,7 +46,7 @@ body:
   attributes:
     label: Editor Version
     description: |
-     For example, for VSCode, get the version in (Help -> About)
+     For example, in VSCode, get the version in (Help -> About)
   validations:
     required: true
 - type: textarea
@@ -60,8 +60,8 @@ body:
     label: Server Logs
     description: |
       For example, in Neovim, the log is oftenly stored in the `~/.local/state/nvim/lsp`.
-      For example, for VSCode, get the logs in (Output Panel -> Tinymist).
-      We will close a bug report that doesn't provide full logs. Please don't truncate it for us, attach it as a file if it's too long.
+      For example, in VSCode, get the logs in (Output Panel -> Tinymist).
+      We may close a bug report if there is no full logs. Please don't truncate it for us, attach it as a file if it's too long.
     value: |
       ```log
       Paste your logs here
@@ -74,7 +74,7 @@ body:
     description: |
       For example, in VSCode, get the logs in (Help -> Toggle Developer Tools -> Console).
       If you open preview in browser, the console log in the browser is also helpful.
-      We will close a bug report that doesn't provide full logs. Please don't truncate it for us, attach it as a file if it's too long.
+      We may close a bug report if there is no full logs. Please don't truncate it for us, attach it as a file if it's too long.
     value: |
       ```log
       Paste your logs here
