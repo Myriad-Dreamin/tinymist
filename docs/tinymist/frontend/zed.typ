@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [Zed])
+#show: book-page.with(title: [Tinymist Zed Support for Typst])
 
 See #link("https://github.com/WeetHet/typst.zed")[typst.zed];.
 

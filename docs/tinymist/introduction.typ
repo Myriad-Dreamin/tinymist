@@ -2,7 +2,13 @@
 // dist/tinymist/rs
 #import "mod.typ": *
 
-#show: book-page.with(title: "Introduction")
+#let title = if is-md-target {
+  "Tinymist"
+} else {
+  "Introduction"
+}
+
+#show: book-page.with(title: title)
 
 Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
 
@@ -62,24 +68,30 @@ See #link("https://myriad-dreamin.github.io/tinymist/")[Online Documentation].
 
 = Packaging
 
+#let channel-img(lnk, img) = if sys-is-html-target {
+  html.elem("a", attrs: (
+    href: lnk,
+    target: "_blank",
+    rel: "noopener noreferrer",
+  ))[
+    #html.elem("img", attrs: (src: img, alt: "Packaging status", style: "max-width: 100%; height: auto;"))
+  ]
+} else {
+  link(lnk)
+}
+
 Stable Channel:
 
-#link(
+#channel-img(
   "https://repology.org/project/tinymist/versions",
-  md-alter(
-    "Packaging status",
-    () => image("https://repology.org/badge/vertical-allrepos/tinymist.svg", alt: "Packaging status"),
-  ),
+  "https://repology.org/badge/vertical-allrepos/tinymist.svg",
 )
 
 Nightly Channel:
 
-#link(
+#channel-img(
   "https://repology.org/project/tinymist-nightly/versions",
-  md-alter(
-    "Packaging status",
-    () => image("https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg", alt: "Packaging status"),
-  ),
+  "https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg",
 )
 
 = Roadmap

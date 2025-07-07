@@ -16,7 +16,7 @@
   )
 
   // Inherit from gh-pages
-  show: _page-project
+  show: _page-project.with(title: title)
 
   if title != "" {
     set text(size: heading-sizes.at(1))

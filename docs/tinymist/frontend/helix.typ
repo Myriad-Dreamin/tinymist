@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [Helix])
+#show: book-page.with(title: [Tinymist Helix Support for Typst])
 
 Run and configure tinymist in helix for Typst.
 

@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [VS Cod(e,ium)])
+#show: book-page.with(title: [Tinymist Typst VS Code Extension])
 
 A VS Code or VS Codium extension for Typst. You can find the extension on:
 

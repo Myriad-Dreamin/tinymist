@@ -1,6 +1,6 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [Emacs])
+#show: book-page.with(title: [Tinymist Emacs Support for Typst])
 
 Run and configure tinymist in Emacs for Typst.
 
