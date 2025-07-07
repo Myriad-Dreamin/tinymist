@@ -157,4 +157,6 @@ const tasks = [
   },
 ];
 
-await Promise.all([...tasks.map(convert), maintainerMd()]);
+const main = async () => await Promise.all([...tasks.map(convert), maintainerMd()]);
+
+main();
