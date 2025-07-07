@@ -3,187 +3,167 @@
 
 // import { vscodeExtTranslations } from "../../../scripts/build-l10n.mjs";
 
+
+#import "mod.typ": *
+
+#import "@preview/cmarker:0.1.6": render as md
+
+#let is-vscode = state("config:is-vscode", false)
+
 #let translations = toml("/locales/tinymist-vscode.toml");
-
-// const projectRoot = path.join(import.meta.dirname, "../../..");
-
-// const packageJsonPath = path.join(projectRoot, "editors/vscode/package.json");
-// const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
 #let config = json("/editors/vscode/package.json").contributes.configuration.properties
 
-// const otherPackageJsonPath = path.join(projectRoot, "editors/vscode/package.other.json");
-// const otherPackageJson = JSON.parse(fs.readFileSync(otherPackageJsonPath, "utf8"));
-
 #let other-config = json("/editors/vscode/package.other.json").contributes.configuration.properties
 
-// const config = packageJson.contributes.configuration.properties;
-// const otherConfig = otherPackageJson.contributes.configuration.properties;
+#let html-link(dest) = if is-md-target {
+  cross-link(dest, [HTML])
+} else {
+  [HTML]
+}
 
-// const translate = (desc) => {
-//   const translations = vscodeExtTranslations["en"];
-//   desc = desc.replace(/\%(.*?)\%/g, (_, key) => {
-//     if (!translations[key]) {
-//       throw new Error(`Missing translation for ${key}`);
-//     }
-//     return translations[key];
-//   });
-//   return desc;
-// };
+#let md-link(dest) = if is-md-target {
+  [Markdown]
+} else {
+  github-link(dest, [Markdown])
+}
+
+#context if is-vscode.get() {
+  html-link("/config/vscode.typ")
+  [ | ]
+  md-link("/editor/vscode/Configuration.md")
+} else {
+  html-link("/config/neovim.typ")
+  [ | ]
+  md-link("/editor/neovim/Configuration.md")
+}
 
 #let translate(desc) = {
   desc.replace(regex("\\%(.*?)\\%"), r => {
-    // translations
-    panic("re..")
+    let item = translations
+    for p in r.captures.at(0).split(".") {
+      item = item.at(p, default: none)
+      if item == none {
+        panic(`Missing translation for` + r.captures.at(0))
+      }
+    }
+    item.en
   })
 }
 
-// Generate Configuration.md string
+#let match-region(content, region-name) = {
+  content.match(regex("// region " + region-name + "([\\s\\S]*?)// endregion " + region-name)).captures.at(0)
+}
 
-// const describeType = (typeOrTypeArray) => {
-//   if (Array.isArray(typeOrTypeArray)) {
-//     // join with , and add 'or' before the last element
-//     typeOrTypeArray = typeOrTypeArray.map(describeType);
-//     return (
-//       typeOrTypeArray.slice(0, -1).join(", ") +
-//       (typeOrTypeArray.length > 1 ? " or " : "") +
-//       typeOrTypeArray.slice(-1)
-//     );
-//   }
-//   switch (typeOrTypeArray) {
-//     case "boolean":
-//       return "`boolean`";
-//     case "string":
-//       return "`string`";
-//     case "number":
-//       return "`number`";
-//     case "array":
-//       return "`array`";
-//     case "object":
-//       return "`object`";
-//     case "null":
-//       return "`null`";
-//     default:
-//       return "`unknown`";
-//   }
-// };
+#let server-side-keys = (
+  match-region(read("/crates/tinymist/src/config.rs"), "Configuration Items")
+    .matches(regex(`"([^"]+)"`.text))
+    .map(m => {
+      "tinymist." + m.captures.at(0)
+    })
+)
 
-// const matchRegion = (content, regionName) => {
-//   const reg = new RegExp(`// region ${regionName}([\\s\\S]*?)// endregion ${regionName}`, "gm");
-//   const match = reg.exec(content);
-//   if (!match) {
-//     throw new Error(`Failed to match region ${regionName}`);
-//   }
-//   return match[1];
-// };
+#let is-server-side-config(key, is-other) = {
+  if not is-vscode.get() and key.starts-with("tinymist.preview") and not is-other {
+    return false
+  }
 
-// const serverSideKeys = (() => {
-//   const initPath = path.join(projectRoot, "crates/tinymist/src/config.rs");
-//   const initContent = fs.readFileSync(initPath, "utf8");
-//   const configItemContent = matchRegion(initContent, "Configuration Items");
-//   const strReg = /"([^"]+)"/g;
-//   const strings = [];
-//   let strMatch;
-//   while ((strMatch = strReg.exec(configItemContent)) !== null) {
-//     strings.push(strMatch[1]);
-//   }
-//   return strings.map((x) => `tinymist.${x}`);
-// })();
-// const isServerSideConfig = (key, isOther) => {
-//   if (
-//     !(
-//       serverSideKeys.includes(key) ||
-//       serverSideKeys.some((serverSideKey) => key.startsWith(`${serverSideKey}.`))
-//     )
-//   ) {
-//     return false;
-//   }
+  return server-side-keys.any(it => it == key or key.starts-with(it + "."))
+};
 
-//   if (key.startsWith("tinymist.preview") && !isOther) {
-//     return false;
-//   }
+#let config-type(t) = if type(t) == array {
+  t.join[ | ]
+} else {
+  //     default:
+  //       return "`unknown`";
+  raw(t)
+}
 
-//   return true;
-// };
-// const configMd = (editor, prefix) => {
-//   const handleOne = (config, key, isOther) => {
-//     const {
-//       description: rawDescription,
-//       markdownDescription,
-//       default: dv,
-//       type: itemType,
-//       enum: enumBase,
-//       enumDescriptions: enumBaseDescription,
-//       markdownDeprecationMessage,
-//     } = config[key];
+#let description-of(cfg) = if "markdownDescription" in cfg {
+  md(translate(cfg.markdownDescription))
+} else if "description" in cfg {
+  translate(cfg.description)
+} else {
+  ""
+}
 
-//     const description = translate(markdownDescription || rawDescription);
+#let config-shape(cfg, key) = {
+  if "anyOf" in cfg {
+    [This configuration item can be one of following types:]
+    cfg
+      .anyOf
+      .map(it => list.item[
+        #description-of(it)
+        #config-shape(it, key)
+      ])
+      .join()
+  }
 
-//     if (markdownDeprecationMessage) {
-//       return;
-//     }
+  if "type" in cfg {
+    list.item[*Type*: #config-type(cfg.type)]
+  }
 
-//     let defaultValue = dv;
-//     if (editor !== "vscode") {
-//       if (key === "tinymist.compileStatus") {
-//         defaultValue = "disable";
-//       }
+  // Enum Section
+  if cfg.at("enum", default: none) != none [
+    - *Valid Values*: #for (i, item) in cfg.enum.enumerate() [
+        - #raw(lang: "json", { "\"" + item + "\"" })#if "enumDescriptions" in cfg [
+            : #md(translate(cfg.enumDescriptions.at(i)))
+          ]
+      ]
+  ]
 
-//       if (!isServerSideConfig(key, isOther)) {
-//         return;
-//       }
-//     }
+  // Property Section
+  if cfg.at("properties", default: none) != none [
+    - *Properties*: #for (key, item) in cfg.properties.pairs() [
+        - #raw(lang: "json", { "\"" + key + "\"" }):
+          #description-of(item)
+          #if type(item) == str { list.item[*Type*: #config-type(item)] } else { config-shape(item, key) }
+      ]
+  ]
 
-//     const keyWithoutPrefix = key.replace("tinymist.", "");
-//     const name = prefix ? `tinymist.${keyWithoutPrefix}` : keyWithoutPrefix;
-//     const typeSection = itemType ? `\n- **Type**: ${describeType(itemType)}` : "";
-//     const defaultSection = defaultValue
-//       ? `\n- **Default**: \`${JSON.stringify(defaultValue)}\``
-//       : "";
-//     const enumSections = [];
-//     if (enumBase) {
-//       // zip enum values and descriptions
-//       for (let i = 0; i < enumBase.length; i++) {
-//         if (enumBaseDescription?.[i]) {
-//           enumSections.push(`  - \`${enumBase[i]}\`: ${translate(enumBaseDescription[i])}`);
-//         } else {
-//           enumSections.push(`  - \`${enumBase[i]}\``);
-//         }
-//       }
-//     }
-//     const enumSection = enumSections.length ? `\n- **Enum**:\n${enumSections.join("\n")}` : "";
+  // Default Section
+  let default = cfg.at("default", default: if key == "tinymist.compileStatus" {
+    "disable"
+  })
+  if default != none {
+    list.item[*Default*: #raw(lang: "json", json.encode(default))]
+  }
+}
 
-//     return `## \`${name}\`
+#let config-item(key, cfg, is-other) = [
+  #if "markdownDeprecationMessage" in cfg {
+    return
+  }
+  #let is-vscode = is-vscode.get()
 
-// ${description}
-// ${typeSection}${enumSection}${defaultSection}
-// `;
-//   };
+  #let prefix = is-vscode
+  #let key-without-prefix = key.replace("tinymist.", "")
+  #let key-with-prefix = "tinymist." + key-without-prefix
+  #let name = if prefix { key-with-prefix } else { key-without-prefix }
 
-//   const vscodeConfigs = Object.keys(config).map((key) => handleOne(config, key, false));
-//   const otherConfigs = Object.keys(otherConfig).map((key) => handleOne(otherConfig, key, true));
-//   return [...vscodeConfigs, ...(editor === "vscode" ? [] : otherConfigs)]
-//     .filter((x) => x)
-//     .join("\n");
-// };
+  #if not is-vscode and not is-server-side-config(key-with-prefix, is-other) {
+    return
+  }
 
-// const configMdPath = path.join(import.meta.dirname, "..", "Configuration.md");
+  #let description = description-of(cfg)
 
-// fs.writeFileSync(
-//   configMdPath,
-//   `# Tinymist Server Configuration
+  = #raw(name)
 
-// ${configMd("vscode", true)}`,
-// );
+  #description
 
-// const configMdPathNeovim = path.join(
-//   import.meta.dirname,
-//   "../../../editors/neovim/Configuration.md",
-// );
+  #config-shape(cfg, key)
+]
 
-// fs.writeFileSync(
-//   configMdPathNeovim,
-//   `# Tinymist Server Configuration
+#context {
+  let is-vscode = is-vscode.get()
 
-// ${configMd("neovim", false)}`,
-// );
+  let items = (
+    config.pairs().map(((key, cfg)) => (key, cfg, false)) + other-config.pairs().map(((key, cfg)) => (key, cfg, true))
+  )
+  items = items.sorted(key: it => it.at(0))
+
+  for (key, cfg, is-other) in items {
+    config-item(key, cfg, is-other)
+  }
+}
+

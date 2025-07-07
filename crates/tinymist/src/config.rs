@@ -34,6 +34,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "tinymist",
     "colorTheme",
     "compileStatus",
+    "lint",
     "completion",
     "development",
     "exportPdf",
@@ -314,6 +315,7 @@ impl Config {
         }
 
         assign_config!(color_theme := "colorTheme"?: Option<String>);
+        assign_config!(lint := "lint"?: LintFeat);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
