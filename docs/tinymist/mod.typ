@@ -24,8 +24,6 @@
 } else {
   raw
 }
-#let md-alter(left, right) = left
-
 #import fletcher.shapes: diamond
 
 #let fg-blue = main-color.mix(rgb("#0074d9"))

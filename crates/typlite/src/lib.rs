@@ -3,7 +3,6 @@
 pub mod attributes;
 pub mod common;
 mod error;
-pub mod library;
 pub mod parser;
 pub mod tags;
 pub mod writer;

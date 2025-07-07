@@ -1,3 +1,8 @@
+
+#import "/docs/tinymist/frontend/mod.typ": *
+
+#show: book-page.with(title: [Typlite])
+
 #show raw.where(lang: "sh"): it => [#it#metadata(it.text)<shell-script>]
 
 Converts a subset of typst to markdown.
