@@ -13,7 +13,9 @@
   summary: [
     #prefix-chapter("introduction.typ")[Introduction]
     = Editor Integration
-    #prefix-chapter("configurations.typ")[Common Configurations]
+    - #prefix-chapter("config.typ")[Configurations]
+      - #chapter("config/vscode.typ")[VS Cod(e,ium)]
+      - #chapter("config/neovim.typ")[Neovim (Other Editors)]
     - #chapter("frontend/main.typ")[Editor Frontends]
       - #chapter("frontend/vscode.typ")[VS Cod(e,ium)]
       - #chapter("frontend/neovim.typ")[Neovim]
