@@ -225,15 +225,22 @@ export class LanguageState {
               content.isTrusted = trustedCommands;
               content.supportHtml = true;
 
-              if (context.storageUri) {
-                content.baseUri = vscode.Uri.joinPath(context.storageUri, "tmp/");
-              }
+              // https://github.com/James-Yu/LaTeX-Workshop/blob/a0267e507867ae8be94b48a70d0541865fcf905f/src/preview/hover/ongraphics.ts
 
               // outline all data "data:image/svg+xml;base64," to render huge image correctly
-              content.value = content.value.replace(
-                /"data:image\/svg\+xml;base64,([^"]*)"/g,
-                (_, content: string) => hoverHandler.storeImage(content),
-              );
+              // Workaround for https://github.com/microsoft/vscode/issues/137632
+              // https://github.com/microsoft/vscode/issues/97759
+              if (vscode.env.remoteName) {
+              } else {
+                if (context.storageUri) {
+                  content.baseUri = vscode.Uri.joinPath(context.storageUri, "tmp/");
+                }
+
+                content.value = content.value.replace(
+                  /"data:image\/svg\+xml;base64,([^"]*)"/g,
+                  (_, content: string) => `"${hoverHandler.storeImage(content)}"`,
+                );
+              }
             }
           }
 
