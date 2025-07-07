@@ -39,9 +39,11 @@ const convert = async ({ input: inp, output: out }) => {
   await fs.promises.writeFile(output, outputContent.trim() + "\n");
 
   if (isCheck) {
-    const gitStatus = await exec(`git status --porcelain ${output}`, {
-      encoding: "utf-8",
-    }).trim();
+    const gitStatus = (
+      await exec(`git status --porcelain ${output}`, {
+        encoding: "utf-8",
+      })
+    ).trim();
     if (gitStatus) {
       throw new Error(
         `The file ${out} is not up to date. Please run \`node scripts/link-docs.mjs\` locally to update it.`,
