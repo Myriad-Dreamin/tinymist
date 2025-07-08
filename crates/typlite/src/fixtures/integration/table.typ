@@ -15,3 +15,14 @@
   ..range(20).map(x => [#x]),
   ..range(20).map(x => table.cell(colspan: 2)[#x]),
 )
+
+// fallback
+#table(
+  columns: 2,
+  [Header], [Row],
+  ```rust
+  Code line 1
+  Code line 2
+  ```,
+  [Regular text],
+)
