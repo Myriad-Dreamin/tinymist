@@ -31,11 +31,11 @@
 #context if is-vscode.get() {
   html-link("/config/vscode.typ")
   [ | ]
-  md-link("/editor/vscode/Configuration.md")
+  md-link("/editors/vscode/Configuration.md")
 } else {
   html-link("/config/neovim.typ")
   [ | ]
-  md-link("/editor/neovim/Configuration.md")
+  md-link("/editors/neovim/Configuration.md")
 }
 
 #let translate(desc) = {
