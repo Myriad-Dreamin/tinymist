@@ -155,6 +155,14 @@ const tasks = [
     input: "docs/tinymist/frontend/zed.typ",
     output: "editors/zed/README.md",
   },
+  {
+    input: "docs/tinymist/config/vscode.typ",
+    output: "editors/vscode/Configuration.md",
+  },
+  {
+    input: "docs/tinymist/config/neovim.typ",
+    output: "editors/neovim/Configuration.md",
+  },
 ];
 
 const main = async () => await Promise.all([...tasks.map(convert), maintainerMd()]);

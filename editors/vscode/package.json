@@ -1429,7 +1429,7 @@
     "build-web-base": "node esbuild.web.mjs",
     "build-system-base": "node esbuild.system.mjs",
     "build-base": "yarn run build-web-base && yarn run build-system-base",
-    "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs && node scripts/config-man.mjs",
+    "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs",
     "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
     "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
     "package": "npx @vscode/vsce package --yarn",
