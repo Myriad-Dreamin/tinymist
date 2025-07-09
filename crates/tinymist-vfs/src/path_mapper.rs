@@ -2,7 +2,7 @@
 //! no longer exist -- the assumption is total size of paths we ever look at is
 //! not too big.
 
-#![allow(missing_docs)]
+
 
 use core::fmt;
 use std::borrow::Cow;
