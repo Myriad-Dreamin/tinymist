@@ -10,6 +10,24 @@ It is primarily responsible for providing integrated typst language service to v
 
 ## Code Standards
 
+### Keep Good PR Title
+
+Determine a good PR prefix **only** by the PR description before work. Add a prefix to indicate what kind of release this pull request corresponds to. For reference, see https://www.conventionalcommits.org/
+
+Available types:
+ - dev
+ - feat
+ - fix
+ - docs
+ - style
+ - refactor
+ - perf
+ - test
+ - build
+ - ci
+ - chore
+ - revert
+
 ### Required Before Each Commit
 - Run `yarn fmt` to format Rust/JavaScript files
 - This will run formatters on all necessary files to maintain consistent style
@@ -17,8 +35,16 @@ It is primarily responsible for providing integrated typst language service to v
 ### Development Flow
 - Build Server: `cargo build`
 - Build VS Code Extension: `cd editors/vscode && yarn build`
-- Test Server: `cargo test --workspace -- --skip=e2e`
 - Full CI check: `cargo clippy --workspace --all-targets`
+- Test Server: `cargo test --workspace -- --skip=e2e`
+    Note that, in the envoironment where network is not available (copilot or nix actions), we should also skip following tests:
+    ```
+    completion::tests::test_pkgs
+    docs::package::tests::cetz
+    docs::package::tests::fletcher
+    docs::package::tests::tidy
+    docs::package::tests::touying
+    ```
 
 ## Repository Structure
 - `crates/`: rust crates for the server and related functionality
