@@ -2,8 +2,6 @@
 //! no longer exist -- the assumption is total size of paths we ever look at is
 //! not too big.
 
-#![allow(missing_docs)]
-
 use core::fmt;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -19,13 +17,17 @@ use typst::syntax::VirtualPath;
 
 use super::FileId;
 
+/// Represents the resolution of a path to either a physical filesystem path or a virtual path.
 #[derive(Debug)]
 pub enum PathResolution {
+    /// A path that has been resolved to a physical filesystem path.
     Resolved(PathBuf),
+    /// A path that exists without a physical root, represented as a virtual path.
     Rootless(Cow<'static, VirtualPath>),
 }
 
 impl PathResolution {
+    /// Converts the path resolution to a file result, returning an error for rootless paths.
     pub fn to_err(self) -> FileResult<PathBuf> {
         match self {
             PathResolution::Resolved(path) => Ok(path),
@@ -33,6 +35,7 @@ impl PathResolution {
         }
     }
 
+    /// Returns a reference to the path as a `Path`.
     pub fn as_path(&self) -> &Path {
         match self {
             PathResolution::Resolved(path) => path.as_path(),
@@ -40,6 +43,7 @@ impl PathResolution {
         }
     }
 
+    /// Joins the current path with a relative path string.
     pub fn join(&self, path: &str) -> FileResult<PathResolution> {
         match self {
             PathResolution::Resolved(root) => Ok(PathResolution::Resolved(root.join(path))),
@@ -49,6 +53,7 @@ impl PathResolution {
         }
     }
 
+    /// Resolves a virtual path relative to this path resolution.
     pub fn resolve_to(&self, path: &VirtualPath) -> Option<PathResolution> {
         match self {
             PathResolution::Resolved(root) => Some(PathResolution::Resolved(path.resolve(root)?)),
@@ -59,7 +64,9 @@ impl PathResolution {
     }
 }
 
+/// Trait for resolving file paths and roots for different types of files.
 pub trait RootResolver {
+    /// Resolves a file ID to its corresponding path resolution.
     fn path_for_id(&self, file_id: FileId) -> FileResult<PathResolution> {
         use WorkspaceResolution::*;
         let root = match WorkspaceResolver::resolve(file_id)? {
@@ -79,6 +86,7 @@ pub trait RootResolver {
             .ok_or_else(|| FileError::AccessDenied)
     }
 
+    /// Resolves the root path for a given file ID.
     fn resolve_root(&self, file_id: FileId) -> FileResult<Option<ImmutPath>> {
         use WorkspaceResolution::*;
         match WorkspaceResolver::resolve(file_id)? {
@@ -90,9 +98,11 @@ pub trait RootResolver {
         }
     }
 
+    /// Resolves the root path for a given package specification.
     fn resolve_package_root(&self, pkg: &PackageSpec) -> FileResult<ImmutPath>;
 }
 
+/// A unique identifier for a workspace, represented as a 16-bit integer.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct WorkspaceId(u16);
 
@@ -125,6 +135,7 @@ impl WorkspaceId {
         }
     }
 
+    /// Returns the filesystem path associated with this workspace ID.
     pub fn path(&self) -> ImmutPath {
         let interner = INTERNER.read();
         interner
@@ -152,10 +163,15 @@ static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
     })
 });
 
+/// Represents the different types of workspace resolution for a file.
 pub enum WorkspaceResolution {
+    /// A file that belongs to a workspace with a specific workspace ID.
     Workspace(WorkspaceId),
+    /// A file that is rooted in a workspace but untitled.
     UntitledRooted(WorkspaceId),
+    /// A file that has no root and exists without workspace context.
     Rootless,
+    /// A file that belongs to a package.
     Package,
 }
 
@@ -165,23 +181,27 @@ struct Interner {
     from_id: Vec<ImmutPath>,
 }
 
+/// Resolver for handling workspace-related path operations and file ID management.
 #[derive(Default)]
 pub struct WorkspaceResolver {}
 
 impl WorkspaceResolver {
+    /// Namespace identifier for workspace files.
     pub const WORKSPACE_NS: EcoString = EcoString::inline("ws");
 
+    /// Checks if a file ID represents a workspace file.
     pub fn is_workspace_file(fid: FileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace == WorkspaceResolver::WORKSPACE_NS)
     }
 
+    /// Checks if a file ID represents a package file.
     pub fn is_package_file(fid: FileId) -> bool {
         fid.package()
             .is_some_and(|p| p.namespace != WorkspaceResolver::WORKSPACE_NS)
     }
 
-    /// Id of the given path if it exists in the `Vfs` and is not deleted.
+    /// Gets or creates a workspace ID for the given root path.
     pub fn workspace_id(root: &ImmutPath) -> WorkspaceId {
         // Try to find an existing entry that we can reuse.
         //
@@ -210,7 +230,7 @@ impl WorkspaceResolver {
         FileId::new(None, path)
     }
 
-    /// Creates a file id for a rootless file.
+    /// Creates a file ID for a file with its parent directory as the root.
     pub fn file_with_parent_root(path: &Path) -> Option<FileId> {
         if !path.is_absolute() {
             return None;
@@ -221,7 +241,7 @@ impl WorkspaceResolver {
         Some(Self::workspace_file(Some(&parent), path))
     }
 
-    /// Creates a file id for a file in some workspace. The `root` is the root
+    /// Creates a file ID for a file in a workspace. The `root` is the root
     /// directory of the workspace. If `root` is `None`, the source code at the
     /// `path` will not be able to access physical files.
     pub fn workspace_file(root: Option<&ImmutPath>, path: VirtualPath) -> FileId {
@@ -229,7 +249,7 @@ impl WorkspaceResolver {
         FileId::new(workspace.as_ref().map(WorkspaceId::package), path)
     }
 
-    /// Mounts an untiled file to some workspace. The `root` is the
+    /// Mounts an untitled file to a workspace. The `root` is the
     /// root directory of the workspace. If `root` is `None`, the source
     /// code at the `path` will not be able to access physical files.
     pub fn rooted_untitled(root: Option<&ImmutPath>, path: VirtualPath) -> FileId {
@@ -237,7 +257,7 @@ impl WorkspaceResolver {
         FileId::new(workspace.as_ref().map(WorkspaceId::untitled_root), path)
     }
 
-    /// File path corresponding to the given `fid`.
+    /// Resolves a file ID to its corresponding workspace resolution.
     pub fn resolve(fid: FileId) -> FileResult<WorkspaceResolution> {
         let Some(package) = fid.package() else {
             return Ok(WorkspaceResolution::Rootless);
@@ -259,12 +279,13 @@ impl WorkspaceResolver {
         }
     }
 
-    /// File path corresponding to the given `fid`.
+    /// Creates a display wrapper for a file ID that can be formatted for output.
     pub fn display(id: Option<FileId>) -> Resolving {
         Resolving { id }
     }
 }
 
+/// A wrapper for displaying file IDs in a human-readable format.
 pub struct Resolving {
     id: Option<FileId>,
 }
