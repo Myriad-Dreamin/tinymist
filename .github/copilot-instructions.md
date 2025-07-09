@@ -10,24 +10,6 @@ It is primarily responsible for providing integrated typst language service to v
 
 ## Code Standards
 
-### Keep Good PR Title
-
-Add a prefix to indicate what kind of release this pull request corresponds to. For reference, see https://www.conventionalcommits.org/
-
-Available types:
- - dev
- - feat
- - fix
- - docs
- - style
- - refactor
- - perf
- - test
- - build
- - ci
- - chore
- - revert
-
 ### Required Before Each Commit
 - Run `yarn fmt` to format Rust/JavaScript files
 - This will run formatters on all necessary files to maintain consistent style
@@ -62,3 +44,21 @@ Available types:
 2. Maintain existing code structure and organization
 4. Write unit tests for new functionality. Use snapshot-based unit tests when possible.
 5. Document public APIs and complex logic in code comments
+
+### Keep Good PR Title
+
+Determine a good PR prefix by the PR description and commit changes. Add a prefix to indicate what kind of release this pull request corresponds to. For reference, see https://www.conventionalcommits.org/
+
+Available types:
+ - dev
+ - feat
+ - fix
+ - docs
+ - style
+ - refactor
+ - perf
+ - test
+ - build
+ - ci
+ - chore
+ - revert
