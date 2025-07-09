@@ -27,6 +27,8 @@ use crate::lsp::query::{run_query, LspClientExt};
 use crate::tool::ast::AstRepr;
 use crate::tool::package::InitTask;
 
+mod pin_focus;
+
 /// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
@@ -77,6 +79,8 @@ struct ExportSyntaxRangeOpts {
 }
 
 /// Here are implemented the handlers for each command.
+/// Some command group are placed in the sub crates:
+/// - [`pin_focus`] implements commands for pinning and focusing documents.
 impl ServerState {
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
@@ -308,35 +312,6 @@ impl ServerState {
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.project.analysis.clear_cache();
-        just_ok(JsonValue::Null)
-    }
-
-    /// Pin main file to some path.
-    pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
-
-        let update_result = self.pin_main_file(entry.clone());
-        update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
-
-        log::info!("file pinned: {entry:?}");
-        just_ok(JsonValue::Null)
-    }
-
-    /// Focus main file to some path.
-    pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
-
-        if !self.ever_manual_focusing {
-            self.ever_manual_focusing = true;
-            log::info!("first manual focusing is coming");
-        }
-
-        let ok = self.focus_main_file(entry.clone());
-        let ok = ok.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
-
-        if ok {
-            log::info!("file focused: {entry:?}");
-        }
         just_ok(JsonValue::Null)
     }
 
