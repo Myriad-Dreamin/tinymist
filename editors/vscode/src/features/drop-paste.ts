@@ -17,6 +17,16 @@ import {
 } from "./drop-paste.def";
 import { IContext } from "../context";
 
+// Type guards for paste API availability
+function hasDocumentPasteAPI(): boolean {
+  return "registerDocumentPasteEditProvider" in vscode.languages;
+}
+
+// Conditional types for compatibility
+type DocumentPasteEditProvider = any;
+type DocumentPasteEditContext = any;
+type DocumentPasteEdit = any;
+
 export function dragAndDropActivate(context: IContext) {
   context.subscriptions.push(
     vscode.languages.registerDocumentDropEditProvider(typstDocumentSelector, new DropProvider()),
@@ -24,6 +34,14 @@ export function dragAndDropActivate(context: IContext) {
 }
 
 export function copyAndPasteActivate(context: IContext) {
+  // Check if document paste API is available (VS Code 1.97+)
+  if (!hasDocumentPasteAPI()) {
+    console.warn(
+      "Tinymist: Document paste API not available, copy/paste features will be disabled",
+    );
+    return;
+  }
+
   const providedEditKinds = [typstPasteLinkEditKind, typstUriEditKind, typstImageEditKind];
 
   const sel = typstDocumentSelector;
@@ -46,12 +64,12 @@ const enum DropPasteAction {
 
 type EditClass<A extends DropPasteAction> = A extends DropPasteAction.Drop
   ? vscode.DocumentDropEdit
-  : vscode.DocumentPasteEdit;
+  : any; // Use any for DocumentPasteEdit to handle compatibility
 
 interface ResolvedEdits {
   snippet: vscode.SnippetString;
   additionalEdits: vscode.WorkspaceEdit;
-  yieldTo: vscode.DocumentDropOrPasteEditKind[];
+  yieldTo: any[]; // Use any[] for DocumentDropOrPasteEditKind compatibility
 }
 
 class DropOrPasteContext<A extends DropPasteAction> {
@@ -60,7 +78,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
 
   constructor(
     private kind: A,
-    private context: vscode.DocumentPasteEditContext | undefined,
+    private context: DocumentPasteEditContext | undefined,
     private document: vscode.TextDocument,
     private token: vscode.CancellationToken,
   ) {
@@ -71,10 +89,21 @@ class DropOrPasteContext<A extends DropPasteAction> {
     }
   }
 
-  private readonly _yieldTo = [
-    vscode.DocumentDropOrPasteEditKind.Text,
-    vscode.DocumentDropOrPasteEditKind.Empty.append("typst", "link", "image", "attachment"), // Prefer notebook attachments
-  ];
+  private readonly _yieldTo = (() => {
+    // Check if DocumentDropOrPasteEditKind is available
+    if (typeof (vscode as any).DocumentDropOrPasteEditKind !== "undefined") {
+      return [
+        (vscode as any).DocumentDropOrPasteEditKind.Text,
+        (vscode as any).DocumentDropOrPasteEditKind.Empty.append(
+          "typst",
+          "link",
+          "image",
+          "attachment",
+        ), // Prefer notebook attachments
+      ];
+    }
+    return []; // Fallback for older VS Code versions
+  })();
 
   resolved: ResolvedEdits[] = [];
 
@@ -89,10 +118,17 @@ class DropOrPasteContext<A extends DropPasteAction> {
       dropEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
       return dropEdit as EditClass<A>;
     } else {
-      const pasteEdit = new vscode.DocumentPasteEdit(edit.snippet, this.title, this.editKind);
-      pasteEdit.additionalEdit = edit.additionalEdits;
-      pasteEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
-      return pasteEdit as EditClass<A>;
+      // For paste, we need to handle the case where DocumentPasteEdit might not be available
+      const DocumentPasteEdit = (vscode as any).DocumentPasteEdit;
+      if (DocumentPasteEdit) {
+        const pasteEdit = new DocumentPasteEdit(edit.snippet, this.title, this.editKind);
+        pasteEdit.additionalEdit = edit.additionalEdits;
+        pasteEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
+        return pasteEdit as EditClass<A>;
+      } else {
+        // Fallback - this should not happen if we check hasDocumentPasteAPI() first
+        throw new Error("DocumentPasteEdit not available");
+      }
     }
   }
 
@@ -220,7 +256,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     if (
       uriList.entries.length === 1 &&
       [Schemes.http, Schemes.https].includes(uriList.entries[0].uri.scheme as Schemes) &&
-      !this.context?.only?.contains(typstUriEditKind)
+      !(this.context?.only as any)?.contains?.(typstUriEditKind)
     ) {
       const text = await dataTransfer.get(Mime.textPlain)?.asString();
       if (this.token.isCancellationRequested) {
@@ -537,16 +573,16 @@ export class DropProvider implements vscode.DocumentDropEditProvider {
   }
 }
 
-export class PasteResourceProvider implements vscode.DocumentPasteEditProvider {
+export class PasteResourceProvider implements DocumentPasteEditProvider {
   public static readonly mimeTypes = [Mime.textUriList, "files", ...typstSupportedMimes];
 
   public async provideDocumentPasteEdits(
     document: vscode.TextDocument,
     ranges: readonly vscode.Range[],
     dataTransfer: vscode.DataTransfer,
-    context: vscode.DocumentPasteEditContext,
+    context: DocumentPasteEditContext,
     token: vscode.CancellationToken,
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
+  ): Promise<DocumentPasteEdit[] | undefined> {
     const ctx = new PasteContext(DropPasteAction.Paste, context, document, token);
 
     const transferred = await ctx.transfer(ranges, dataTransfer);
@@ -559,16 +595,16 @@ export class PasteResourceProvider implements vscode.DocumentPasteEditProvider {
   }
 }
 
-export class PasteUriProvider implements vscode.DocumentPasteEditProvider {
+export class PasteUriProvider implements DocumentPasteEditProvider {
   public static readonly mimeTypes = [Mime.textPlain];
 
   public async provideDocumentPasteEdits(
     document: vscode.TextDocument,
     ranges: readonly vscode.Range[],
     dataTransfer: vscode.DataTransfer,
-    context: vscode.DocumentPasteEditContext,
+    context: DocumentPasteEditContext,
     token: vscode.CancellationToken,
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
+  ): Promise<DocumentPasteEdit[] | undefined> {
     const ctx = new PasteContext(DropPasteAction.Paste, context, document, token);
 
     const transferred = await ctx.pasteUri(ranges, dataTransfer);
