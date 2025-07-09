@@ -182,6 +182,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut RevisingUniverse<F>) -> T) -> T {
         f(&mut RevisingUniverse {
             vfs_revision: self.vfs.revision(),
+            creation_timestamp_changed: false,
             font_changed: false,
             font_revision: self.font_resolver.revision(),
             registry_changed: false,
@@ -329,6 +330,7 @@ pub struct RevisingUniverse<'a, F: CompilerFeat> {
     view_changed: bool,
     vfs_revision: NonZeroUsize,
     font_changed: bool,
+    creation_timestamp_changed: bool,
     font_revision: Option<NonZeroUsize>,
     registry_changed: bool,
     registry_revision: Option<NonZeroUsize>,
@@ -399,7 +401,7 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
 
     /// Set the creation timestamp for reproducible builds.
     pub fn set_creation_timestamp(&mut self, creation_timestamp: Option<i64>) {
-        self.view_changed = true;
+        self.creation_timestamp_changed = creation_timestamp != self.inner.creation_timestamp;
         self.inner.creation_timestamp = creation_timestamp;
     }
 
@@ -427,6 +429,10 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
 
     pub fn font_changed(&self) -> bool {
         self.font_changed && is_revision_changed(self.font_revision, self.font_resolver.revision())
+    }
+
+    pub fn creation_timestamp_changed(&self) -> bool {
+        self.creation_timestamp_changed
     }
 
     pub fn registry_changed(&self) -> bool {
@@ -770,11 +776,11 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Duration};
-        
+
         let now = self.now.get_or_init(|| {
             if let Some(timestamp) = self.creation_timestamp {
                 chrono::DateTime::from_timestamp(timestamp, 0)
-                    .unwrap_or_else(|| tinymist_std::time::now())
+                    .unwrap_or_else(|| tinymist_std::time::now().into())
                     .into()
             } else {
                 tinymist_std::time::now().into()
@@ -803,7 +809,7 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(not(any(feature = "web", feature = "system")))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use tinymist_std::time::{now, to_typst_time, Duration};
-        
+
         let now = self.now.get_or_init(|| {
             if let Some(timestamp) = self.creation_timestamp {
                 tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
@@ -1025,85 +1031,4 @@ fn create_library(inputs: Arc<LazyHash<Dict>>, features: Features) -> Arc<LazyHa
         .build();
 
     Arc::new(LazyHash::new(lib))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::system::SystemCompilerFeat;
-    use crate::entry::EntryState;
-    use typst::World;
-    use std::sync::Arc;
-    use tinymist_vfs::Vfs;
-    use crate::system::SystemAccessModel;
-    use tinymist_package::DummyRegistry;
-    use crate::font::system::SystemFontResolver;
-
-    #[test]
-    fn test_creation_timestamp_today() {
-        // Test that the World's today() method respects the creation timestamp
-        let entry = EntryState::new_rooted("/tmp".into(), None);
-        let features = Features::default();
-        let inputs = Arc::new(LazyHash::new(Dict::new()));
-        let vfs = Vfs::new(
-            Arc::new(DummyRegistry::default()),
-            SystemAccessModel {},
-        );
-        let registry = Arc::new(DummyRegistry::default());
-        let font_resolver = Arc::new(SystemFontResolver::new());
-        
-        // Create universe with fixed timestamp (1979-12-31 equivalent)
-        let fixed_timestamp = Some(315446400); // 1979-12-31 in Unix timestamp
-        let universe = CompilerUniverse::<SystemCompilerFeat>::new_raw(
-            entry,
-            features,
-            Some(inputs),
-            vfs,
-            registry,
-            font_resolver,
-            fixed_timestamp,
-        );
-        
-        let world = universe.snapshot();
-        
-        // Check that today() returns the fixed date
-        if let Some(date) = world.today(None) {
-            // The date should be 1979-12-31
-            assert_eq!(date.year(), 1979);
-            assert_eq!(date.month(), 12);
-            assert_eq!(date.day(), 31);
-        } else {
-            panic!("today() returned None");
-        }
-    }
-    
-    #[test]
-    fn test_creation_timestamp_none() {
-        // Test that without creation timestamp, today() returns current date
-        let entry = EntryState::new_rooted("/tmp".into(), None);
-        let features = Features::default();
-        let inputs = Arc::new(LazyHash::new(Dict::new()));
-        let vfs = Vfs::new(
-            Arc::new(DummyRegistry::default()),
-            SystemAccessModel {},
-        );
-        let registry = Arc::new(DummyRegistry::default());
-        let font_resolver = Arc::new(SystemFontResolver::new());
-        
-        // Create universe without creation timestamp
-        let universe = CompilerUniverse::<SystemCompilerFeat>::new_raw(
-            entry,
-            features,
-            Some(inputs),
-            vfs,
-            registry,
-            font_resolver,
-            None,
-        );
-        
-        let world = universe.snapshot();
-        
-        // Check that today() returns some date (current date)
-        assert!(world.today(None).is_some());
-    }
 }

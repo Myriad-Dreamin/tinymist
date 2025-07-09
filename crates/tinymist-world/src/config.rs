@@ -33,6 +33,10 @@ pub struct CompileOpts {
     #[serde(rename = "withEmbeddedFonts")]
     #[serde_as(as = "Vec<AsCowBytes>")]
     pub with_embedded_fonts: Vec<Cow<'static, [u8]>>,
+
+    /// Fixed creation timestamp for the world.
+    #[serde(rename = "creationTimestamp")]
+    pub creation_timestamp: Option<i64>,
 }
 
 #[serde_as]

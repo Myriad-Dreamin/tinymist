@@ -609,7 +609,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     let timestamp_changed = proj.verse.increment_revision(|verse| {
                         verse.set_creation_timestamp(creation_timestamp);
                         // Creation timestamp changes affect compilation
-                        verse.view_changed
+                        verse.creation_timestamp_changed()
                     });
                     if timestamp_changed {
                         proj.reason.see(reason_by_entry_change());

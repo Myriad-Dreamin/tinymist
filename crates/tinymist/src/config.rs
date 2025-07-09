@@ -645,12 +645,14 @@ impl Config {
         Option<bool>,
         &Vec<PathBuf>,
         Option<&CompileFontArgs>,
+        Option<i64>,
         Option<Arc<Path>>,
     ) {
         (
             self.system_fonts,
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font),
+            self.creation_timestamp(),
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )

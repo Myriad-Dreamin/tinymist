@@ -63,6 +63,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         Default::default(),
         LspUniverseBuilder::resolve_package(None, None),
         FONT_RESOLVER.clone(),
+        None,
     );
     let sources = source.split("-----");
 
