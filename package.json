@@ -14,7 +14,7 @@
     "tools/typst-preview-frontend"
   ],
   "scripts": {
-    "fmt": "cargo fmt --all && npx prettier tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
+    "fmt": "cargo fmt --all && npx prettier --write tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
     "fmt:check": "cargo fmt --check --all && prettier --check tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",

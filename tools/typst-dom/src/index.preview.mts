@@ -11,6 +11,6 @@ export class TypstPreviewDocument extends provideDoc(
     provideOutlineDoc,
     provideCanvasDoc,
     provideSvgDoc,
-    provideDebugJumpDoc
-  )
+    provideDebugJumpDoc,
+  ),
 ) {}

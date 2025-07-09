@@ -43,7 +43,7 @@ function patchChildren(prev: Element, next: Element) {
   const originView = changeViewPerspective(
     prev.children as unknown as SVGGElement[],
     targetView,
-    isGElem
+    isGElem,
   );
 
   runOriginViewInstructions(prev, originView);
@@ -76,10 +76,7 @@ interface FrozenReplacement {
   debug?: string;
 }
 
-function preReplaceNonSVGElements(
-  prev: Element,
-  next: Element
-): FrozenReplacement {
+function preReplaceNonSVGElements(prev: Element, next: Element): FrozenReplacement {
   const removedIndices: number[] = [];
   const frozenReplacement: FrozenReplacement = {
     inserts: [],
@@ -118,9 +115,9 @@ function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
   /// Retrieve the `<g>` elements from the `prev` element.
   const gElements = Array.from(prev.children).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
-    throw new Error(`invalid frozen replacement: gElements.length (${gElements.length
-      }) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ""
-      }
+    throw new Error(`invalid frozen replacement: gElements.length (${
+      gElements.length
+    }) + 1 !=== frozen.inserts.length (${frozen.inserts.length}) ${frozen.debug || ""}
   current: ${prev.outerHTML}`);
   }
 
@@ -156,10 +153,7 @@ function initOrPatchSvgHeader(svg: SVGElement) {
   }
 
   /// Create a global resource header
-  const resourceHeader = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "svg"
-  );
+  const resourceHeader = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   resourceHeader.id = "typst-svg-resources";
   // set viewbox, width, and height
   resourceHeader.setAttribute("viewBox", "0 0 0 0");
@@ -195,10 +189,7 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
         // todo: gc
         prevChild.append(...nextChild.children);
       }
-    } else if (
-      prevChild.tagName === "style" &&
-      nextChild.getAttribute("data-reuse") !== "1"
-    ) {
+    } else if (prevChild.tagName === "style" && nextChild.getAttribute("data-reuse") !== "1") {
       // console.log("replace extra style", prevChild, nextChild);
 
       // todo: gc
@@ -240,7 +231,7 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
 export function patchSvgToContainer(
   hookedElem: Element,
   patchStr: string,
-  decorateSvgElement: (elem: SVGElement) => void = () => void 0
+  decorateSvgElement: (elem: SVGElement) => void = () => void 0,
 ) {
   if (hookedElem.firstElementChild) {
     const elem = document.createElement("div");

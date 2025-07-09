@@ -21,8 +21,7 @@ import { base64Decode } from "../utils";
 // };
 
 ortEnv.wasm.numThreads = 4;
-ortEnv.wasm.wasmPaths =
-  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/";
+ortEnv.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/";
 
 type Point = [number, number];
 type Stroke = Point[];
@@ -85,7 +84,7 @@ const SYMBOL_MOCK: SymbolInformation = {
 
 const SearchBar = (
   state: State<SymbolInformation>,
-  symbolSelected: State<SelectedSymbolItem[] | undefined>
+  symbolSelected: State<SelectedSymbolItem[] | undefined>,
 ) => {
   const def = MiniSearch.getDefault("tokenize");
   const search = van.derive(() => {
@@ -233,18 +232,15 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
             startModal(
               p(
                 "The ",
-                span(
-                  { style: "font-weight: bold; text-decoration: underline" },
-                  "offline"
-                ),
+                span({ style: "font-weight: bold; text-decoration: underline" }, "offline"),
                 " handwritten stroke recognizer is powered by ",
                 a(
                   {
                     href: "https://github.com/QuarticCat/detypify",
                   },
-                  "Detypify"
+                  "Detypify",
                 ),
-                ". Draw a symbol to search for it."
+                ". Draw a symbol to search for it.",
               ),
               h4("Cannot find some symbols?"),
               p(
@@ -253,9 +249,9 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
                   {
                     href: "https://github.com/QuarticCat/detypify/blob/main/assets/supported-symbols.txt",
                   },
-                  "supported-symbols.txt"
+                  "supported-symbols.txt",
                 ),
-                "."
+                ".",
               ),
               p(
                 "❤️‍🔥: Click the ",
@@ -267,9 +263,9 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
                   {
                     href: "https://detypify.quarticcat.com/",
                   },
-                  "Detypify"
+                  "Detypify",
                 ),
-                "."
+                ".",
               ),
               p(
                 "📝: Report the missing symbol to ",
@@ -277,9 +273,9 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
                   {
                     href: "https://github.com/QuarticCat/detypify/issues/new",
                   },
-                  "GitHub Issues"
+                  "GitHub Issues",
                 ),
-                "."
+                ".",
               ),
               h4("Like it?"),
               p(
@@ -288,16 +284,16 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
                   {
                     href: "https://github.com/QuarticCat/detypify",
                   },
-                  "Detypify"
+                  "Detypify",
                 ),
-                "!"
-              )
+                "!",
+              ),
             );
           },
         },
-        HelpIcon()
+        HelpIcon(),
       ),
-      srcCanvas
+      srcCanvas,
     ),
     button(
       {
@@ -305,8 +301,8 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
         title: "clear",
         onclick: drawClear,
       },
-      "Clear"
-    )
+      "Clear",
+    ),
   );
 };
 
@@ -441,16 +437,14 @@ const CATEGORY_INFO: SymbolCategory[] = [
   },
 ];
 // generate map from category value to category name
-const categoryIndex = new Map(
-  CATEGORY_INFO.map((cat) => [cat.value, cat.name.toLowerCase()])
-);
+const categoryIndex = new Map(CATEGORY_INFO.map((cat) => [cat.value, cat.name.toLowerCase()]));
 
 export const SymbolPicker = () => {
   const symbolInformationData = `:[[preview:SymbolInformation]]:`;
   const symInfo = van.state<SymbolInformation>(
     symbolInformationData.startsWith(":")
       ? SYMBOL_MOCK
-      : JSON.parse(base64Decode(symbolInformationData))
+      : JSON.parse(base64Decode(symbolInformationData)),
   );
   console.log("symbolInformation", symInfo);
   const detypifyPromise = Detypify.create();
@@ -473,7 +467,7 @@ export const SymbolPicker = () => {
       () =>
         `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="0" height="0" viewBox="0 0 0 0" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" style="opacity: 0; position: absolute">
   ${symInfo.val.glyphDefs || ""}
-  </svg>`
+  </svg>`,
     ),
   });
 
@@ -494,10 +488,7 @@ export const SymbolPicker = () => {
         };
 
         const bboxXWidth = diff(primaryGlyph.xMin, primaryGlyph.xMax);
-        let xWidth = Math.max(
-          bboxXWidth,
-          primaryGlyph.xAdvance || fontSelected.unitsPerEm
-        );
+        let xWidth = Math.max(bboxXWidth, primaryGlyph.xAdvance || fontSelected.unitsPerEm);
 
         let yReal = diff(primaryGlyph.yMin, primaryGlyph.yMax);
         let yGlobal = primaryGlyph.yAdvance || fontSelected.unitsPerEm;
@@ -527,7 +518,7 @@ export const SymbolPicker = () => {
         // console.log(sym.typstCode, div({ innerHTML: imageData }));
         maskInfo.setAttribute(
           "style",
-          `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`
+          `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`,
         );
       }, 1);
     }
@@ -557,7 +548,7 @@ export const SymbolPicker = () => {
           });
         },
       },
-      maskInfo
+      maskInfo,
     );
   };
 
@@ -566,8 +557,8 @@ export const SymbolPicker = () => {
       div({ style: "font-size: 14px; margin: 8px 0" }, cat.name),
       div(
         { class: "flex-row", style: "flex-wrap: wrap; gap: 5px; width: 100%" },
-        ...(cat.symbols || []).map((sym) => sym.elem)
-      )
+        ...(cat.symbols || []).map((sym) => sym.elem),
+      ),
     );
   };
 
@@ -580,25 +571,21 @@ export const SymbolPicker = () => {
         value,
         elem: SymbolCell(value),
       };
-    })
+    }),
   );
-  const filteredPickers = van.state<SelectedSymbolItem[] | undefined>(
-    undefined
-  );
+  const filteredPickers = van.state<SelectedSymbolItem[] | undefined>(undefined);
 
   function pickSymbolsBySearch(
     pickers: { key: string; value: SymbolItem; elem: Element }[],
-    filteredPickers: SelectedSymbolItem[] | undefined
+    filteredPickers: SelectedSymbolItem[] | undefined,
   ) {
     if (!filteredPickers) return pickers;
-    return pickers.filter((picker) =>
-      filteredPickers.some((f) => f.typstCode === picker.key)
-    );
+    return pickers.filter((picker) => filteredPickers.some((f) => f.typstCode === picker.key));
   }
 
   function pickSymbolsByDrawCandidates(
     pickers: { key: string; value: SymbolItem; elem: Element }[],
-    drawCandidates: DetypifySymbol[] | undefined
+    drawCandidates: DetypifySymbol[] | undefined,
   ) {
     if (drawCandidates === undefined) return pickers;
     if (!drawCandidates.length) return [];
@@ -623,7 +610,7 @@ export const SymbolPicker = () => {
         style: "flex: 0 0 auto; gap: 5px",
       },
       SearchBar(symInfo, filteredPickers),
-      CanvasPanel(strokes)
+      CanvasPanel(strokes),
     ),
     div({ style: "flex: 1;" }, (_dom?: Element) =>
       div(
@@ -631,27 +618,23 @@ export const SymbolPicker = () => {
           CATEGORY_INFO,
           pickSymbolsBySearch(
             pickSymbolsByDrawCandidates(pickers.val, drawCandidates.val),
-            filteredPickers.val
-          )
+            filteredPickers.val,
+          ),
         )
           .filter((cat) => cat.symbols?.length)
-          .map((info) => CategoryPicker(info))
-      )
-    )
+          .map((info) => CategoryPicker(info)),
+      ),
+    ),
   );
 };
 
 function categorize(
   catsRaw: SymbolCategory[],
-  symInfo: InstantiatedSymbolItem[]
+  symInfo: InstantiatedSymbolItem[],
 ): InstantiatedSymbolCategory[] {
-  let cats: InstantiatedSymbolCategory[] = [
-    ...catsRaw.map((cat) => ({ ...cat })),
-  ];
+  let cats: InstantiatedSymbolCategory[] = [...catsRaw.map((cat) => ({ ...cat }))];
   // let misc
-  let misc: InstantiatedSymbolCategory = cats.find(
-    (cat) => cat.name === "Miscellaneous"
-  )!;
+  let misc: InstantiatedSymbolCategory = cats.find((cat) => cat.name === "Miscellaneous")!;
   // misc.symbols = symInfo.val.symbols;
   for (let sym of symInfo) {
     const { key, value } = sym;
