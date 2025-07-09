@@ -8,6 +8,7 @@ target/**
 dist/**
 icons/
 node_modules/
+editors/vscode/test-dist/
 editors/vscode/out/
 editors/vscode/.vscode-test/**
 *.toml

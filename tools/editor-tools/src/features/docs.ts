@@ -40,8 +40,8 @@ export const Docs = () => {
         const v = parsedDocs.val;
         // console.log("updated", v);
         return div(MakeDoc(v));
-      }
-    )
+      },
+    ),
   );
 };
 
@@ -89,9 +89,7 @@ async function recoverDocsStructure(content: string) {
   let match;
   let lastIndex = 0;
   while ((match = reg.exec(content))) {
-    tokenPromises.push(
-      Promise.resolve([TokenKind.Text, content.slice(lastIndex, match.index)])
-    );
+    tokenPromises.push(Promise.resolve([TokenKind.Text, content.slice(lastIndex, match.index)]));
     tokenPromises.push(identifyCommentToken(match[1]));
     lastIndex = reg.lastIndex;
   }
@@ -157,8 +155,7 @@ async function recoverDocsStructure(content: string) {
         };
         if (sym) {
           current.id = `${sym.id}-param-${token[1]}`;
-          const renderedParams = (sym.data.renderedParams =
-            sym.data.renderedParams || {});
+          const renderedParams = (sym.data.renderedParams = sym.data.renderedParams || {});
           renderedParams[current.id] = current;
         }
         break;
@@ -240,19 +237,11 @@ async function identifyCommentToken(comment: string) {
     case "end:errors":
       return [TokenKind.ErrorEnd, cs[1]];
     case "begin:module":
-      return [
-        TokenKind.ModuleStart,
-        cs[1],
-        JSON.parse(await base64ToUtf8(cs[2])),
-      ];
+      return [TokenKind.ModuleStart, cs[1], JSON.parse(await base64ToUtf8(cs[2]))];
     case "end:module":
       return [TokenKind.ModuleEnd, cs[1]];
     case "begin:symbol":
-      return [
-        TokenKind.SymbolStart,
-        cs[1],
-        JSON.parse(await base64ToUtf8(cs[2])),
-      ];
+      return [TokenKind.SymbolStart, cs[1], JSON.parse(await base64ToUtf8(cs[2]))];
     case "end:symbol":
       return [TokenKind.SymbolEnd, cs[1]];
     case "begin:sig":
@@ -312,7 +301,7 @@ function MakeDoc(root: DocElement) {
           (e) =>
             e.namespace === child.data.namespace &&
             e.name === child.data.name &&
-            e.version === child.data.version
+            e.version === child.data.version,
         );
         return;
       }
@@ -494,9 +483,9 @@ function MakeDoc(root: DocElement) {
             style: "text-decoration: underline",
             title: `It is inaccessible by paths`,
           },
-          "Module"
+          "Module",
         ),
-        code(" ", knownFiles[fileLoc]?.path || v.id)
+        code(" ", knownFiles[fileLoc]?.path || v.id),
       );
     } else {
       title.push(span(`Module: ${v.id}`));
@@ -505,7 +494,7 @@ function MakeDoc(root: DocElement) {
     return div(
       { class: "tinymist-module" },
       h1({ id: v.id }, ...(fid ? [span({ id: fid }, ...title)] : title)),
-      ModuleBody(v)
+      ModuleBody(v),
     );
   }
 
@@ -514,19 +503,14 @@ function MakeDoc(root: DocElement) {
     return div(
       h1(`@${v.data.namespace}/${v.data.name}:${v.data.version}`),
       p(
-        span(
-          "This documentation is generated locally. Please submit issues to "
-        ),
-        a(
-          { href: "https://github.com/Myriad-Dreamin/tinymist/issues" },
-          "tinymist"
-        ),
+        span("This documentation is generated locally. Please submit issues to "),
+        a({ href: "https://github.com/Myriad-Dreamin/tinymist/issues" }, "tinymist"),
         span(" if you see "),
         strong(i("incorrect")),
-        span(" information in it.")
+        span(" information in it."),
       ),
       // ModuleBody(v)
-      ...v.children.map(Item)
+      ...v.children.map(Item),
     );
   }
 
@@ -546,16 +530,16 @@ function MakeDoc(root: DocElement) {
                 style: "text-decoration: underline",
                 title: `In external package @${extPkg.namespace}/${extPkg.name}:${extPkg.version}`,
               },
-              "external"
+              "external",
             )
           : span(
               {
                 style: "text-decoration: underline",
                 title: `In local package @${extPkg.namespace}/${extPkg.name}:${extPkg.version}`,
               },
-              "external"
+              "external",
             ),
-        code(" ", v.data.name)
+        code(" ", v.data.name),
       );
     } else {
       const file = knownFiles[fileLoc?.[0]];
@@ -567,9 +551,9 @@ function MakeDoc(root: DocElement) {
                 style: "text-decoration: underline",
                 title: `This module is inaccessible by paths`,
               },
-              "internal"
+              "internal",
             ),
-            code(" ")
+            code(" "),
           )
         : code();
 
@@ -579,8 +563,8 @@ function MakeDoc(root: DocElement) {
           {
             href: `#${fid}`,
           },
-          v.data.name
-        )
+          v.data.name,
+        ),
       );
     }
 
@@ -598,8 +582,8 @@ function MakeDoc(root: DocElement) {
           //   <span class="sr-only">View Source</span>
           // </a>
         },
-        h3({ class: "doc-symbol-name" }, body)
-      )
+        h3({ class: "doc-symbol-name" }, body),
+      ),
     );
   }
 
@@ -618,7 +602,7 @@ function MakeDoc(root: DocElement) {
       {
         id: v.id,
       },
-      code(v.data.name)
+      code(v.data.name),
     );
     let funcTitle = [...is_external, name];
     if (sig) {
@@ -652,10 +636,10 @@ function MakeDoc(root: DocElement) {
         {
           class: `detail-header doc-symbol-${v.data.kind}`,
         },
-        h3({ class: "doc-symbol-name" }, code(...funcTitle))
+        h3({ class: "doc-symbol-name" }, code(...funcTitle)),
       ),
       ...SigPreview(v),
-      ...(v.data.is_external ? ShortItemDoc(v) : [ItemDoc(v), ...SigDocs(v)])
+      ...(v.data.is_external ? ShortItemDoc(v) : [ItemDoc(v), ...SigDocs(v)]),
     );
   }
 
@@ -728,10 +712,10 @@ function MakeDoc(root: DocElement) {
               {
                 class: "doc-param-title",
               },
-              strong(paramTitle)
-            )
-          )
-        )
+              strong(paramTitle),
+            ),
+          ),
+        ),
       );
     }
 
@@ -751,7 +735,7 @@ function MakeDoc(root: DocElement) {
           {
             id: `param-${v.id}-${param.name}`,
           },
-          param.name
+          param.name,
         ),
       ];
       if (param.cano_type) {
@@ -782,13 +766,13 @@ function MakeDoc(root: DocElement) {
             {
               class: "doc-param-title",
             },
-            strong(code(paramTitle))
+            strong(code(paramTitle)),
           ),
           div({
             style: "margin-left: 0.62em",
             innerHTML: docsAll ? docsAll : "<p>-</p>",
-          })
-        )
+          }),
+        ),
       );
     }
 
@@ -826,19 +810,13 @@ function MakeDoc(root: DocElement) {
               href: v.data.external_link,
               title: "this symbol is re-exported from other modules",
             },
-            kwHl("external")
+            kwHl("external"),
           ),
           code(" "),
         ]
       : [];
 
-    const sigTitle = [
-      ...is_external,
-      kwHl("let"),
-      code(" "),
-      code(fnHl(v.data.name)),
-      code("("),
-    ];
+    const sigTitle = [...is_external, kwHl("let"), code(" "), code(fnHl(v.data.name)), code("(")];
     for (let i = 0; i < paramsAll.length; i++) {
       if (i > 0) {
         sigTitle.push(code(", "));
@@ -856,8 +834,8 @@ function MakeDoc(root: DocElement) {
           {
             href: `#param-${v.id}-${paramsAll[i].param.name}`,
           },
-          ...paramTitle
-        )
+          ...paramTitle,
+        ),
       );
     }
     sigTitle.push(code(")"));
@@ -877,9 +855,9 @@ function MakeDoc(root: DocElement) {
           {
             style: "margin: 0 1em",
           },
-          code(...sigTitle)
-        )
-      )
+          code(...sigTitle),
+        ),
+      ),
     );
 
     return res;
@@ -896,26 +874,23 @@ function MakeDoc(root: DocElement) {
         },
         h3(
           { class: "doc-symbol-name" },
-          code(`${v.data.name}`)
+          code(`${v.data.name}`),
           // code(
           //   {
           //     style: "float: right; line-height: 1em",
           //   },
           //   `${v.data.kind}`
           // )
-        )
+        ),
       ),
-      ItemDoc(v)
+      ItemDoc(v),
     );
   }
 
   return Item(root);
 }
 
-function sigTypeHighlighted(
-  inferred: [string, string] | undefined,
-  target: ChildDom[]
-) {
+function sigTypeHighlighted(inferred: [string, string] | undefined, target: ChildDom[]) {
   // todo: determine whether it is inferred
   // if (types) {
   //   typeHighlighted(types, target);
@@ -925,24 +900,20 @@ function sigTypeHighlighted(
     typeHighlighted(inferred[0], rendered, "|");
     const infer = span(
       { class: "code-kw type-inferred", title: "inferred by type checker" },
-      "infer"
+      "infer",
     );
     target.push(
       code(
         { class: "type-inferred" },
         infer,
         code(" "),
-        span({ class: "type-inferred-as", title: inferred[1] }, ...rendered)
-      )
+        span({ class: "type-inferred-as", title: inferred[1] }, ...rendered),
+      ),
     );
   }
 }
 
-function typeHighlighted(
-  types: string,
-  target: ChildDom[],
-  by: RegExp | string = /[|,]/g
-) {
+function typeHighlighted(types: string, target: ChildDom[], by: RegExp | string = /[|,]/g) {
   const type = types.split(by);
   for (let i = 0; i < type.length; i++) {
     if (i > 0) {

@@ -22,8 +22,8 @@ export const Diagnostics = () => {
         `: error occurred in this call of function \`f\``,
         br(),
         a({ href: "javascript:void(0)" }, `test.typ(6, 2)`),
-        `: error occurred in this call of function \`g\``
-      )
+        `: error occurred in this call of function \`g\``,
+      ),
     ),
     div(
       { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
@@ -44,7 +44,7 @@ export const Diagnostics = () => {
           },
           `#let f(x, y)  = `,
           span({ style: "text-decoration: underline" }, `x + y`),
-          `;`
+          `;`,
         ),
         br(),
         "where ",
@@ -61,7 +61,7 @@ export const Diagnostics = () => {
         "2nd",
         " function parameter of ",
         code(a({ href: "javascript:void(0)" }, `f`)),
-        "."
+        ".",
       ),
       div(
         {
@@ -82,7 +82,7 @@ export const Diagnostics = () => {
           },
           `#let g(x, y, z) = `,
           span({ style: "text-decoration: underline" }, `f(x, y)`),
-          ` + z;`
+          ` + z;`,
         ),
         br(),
         "where ",
@@ -99,7 +99,7 @@ export const Diagnostics = () => {
         "2nd",
         " function parameter of ",
         code(a({ href: "javascript:void(0)" }, `g`)),
-        "."
+        ".",
       ),
       div(
         {
@@ -120,9 +120,9 @@ export const Diagnostics = () => {
           },
           `#`,
           span({ style: "text-decoration: underline" }, `g(1, left, red)`),
-          `;`
-        )
-      )
-    )
+          `;`,
+        ),
+      ),
+    ),
   );
 };

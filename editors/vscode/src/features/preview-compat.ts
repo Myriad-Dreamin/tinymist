@@ -681,4 +681,4 @@ export const revealDocumentCompat = async (args: any) => {
 
 export const ejectPreviewPanelCompat = async () => {
   vscode.window.showWarningMessage("Eject is not supported in compat mode");
-}
+};

@@ -15,17 +15,13 @@ export const FontView = () => {
 
   const FontResourcesData = `:[[preview:FontInformation]]:`;
   const fontResources = van.state<FontResources>(
-    FontResourcesData.startsWith(":")
-      ? DOC_MOCK
-      : JSON.parse(base64Decode(FontResourcesData))
+    FontResourcesData.startsWith(":") ? DOC_MOCK : JSON.parse(base64Decode(FontResourcesData)),
   );
   console.log("fontResources", fontResources);
 
   const StyleAtCursorData = `:[[preview:StyleAtCursor]]:`;
   const lastStylesAtCursor = van.state<any>(
-    StyleAtCursorData.startsWith(":")
-      ? undefined
-      : JSON.parse(base64Decode(StyleAtCursorData))
+    StyleAtCursorData.startsWith(":") ? undefined : JSON.parse(base64Decode(StyleAtCursorData)),
   );
   console.log("styleAtCursorBase", lastStylesAtCursor);
   van.derive(() => {
@@ -72,12 +68,11 @@ export const FontView = () => {
     icon: ChildDom,
     title: string,
     onclick: (this: HTMLDivElement) => void,
-    opts?: PropsWithKnownKeys<HTMLButtonElement> & { active?: State<boolean> }
+    opts?: PropsWithKnownKeys<HTMLButtonElement> & { active?: State<boolean> },
   ) => {
     const classProp = opts?.active
       ? van.derive(
-          () =>
-            `tinymist-button tinymist-font-action${opts?.active?.val ? " activated" : ""}`
+          () => `tinymist-button tinymist-font-action${opts?.active?.val ? " activated" : ""}`,
         )
       : "tinymist-button tinymist-font-action";
 
@@ -89,7 +84,7 @@ export const FontView = () => {
         title,
         onclick,
       },
-      icon
+      icon,
     );
   };
 
@@ -106,17 +101,15 @@ export const FontView = () => {
 
     const machineTitle = `Weight ${font.weight || 400}, Stretch ${font.stretch || 1000}, at `;
     const baseName = code(
-      font.style === "normal" || !font.style
-        ? ""
-        : `${humanStyle(font.style)}, `,
+      font.style === "normal" || !font.style ? "" : `${humanStyle(font.style)}, `,
       (_dom?: Element) => {
         return span(
           humanWeight(font.weight, showNumberOpt.val),
           showNumber.val ? ", " : " ",
-          humanStretch(font.stretch, showNumberOpt.val)
+          humanStretch(font.stretch, showNumberOpt.val),
         );
       },
-      ` (${fileName})`
+      ` (${fileName})`,
     );
 
     let variantName;
@@ -127,8 +120,7 @@ export const FontView = () => {
         title = machineTitle + w.path;
         variantName = a(
           {
-            style:
-              "font-size: 1.2em; text-decoration: underline; cursor: pointer;",
+            style: "font-size: 1.2em; text-decoration: underline; cursor: pointer;",
             title,
             onclick() {
               if (w.kind === "fs") {
@@ -136,7 +128,7 @@ export const FontView = () => {
               }
             },
           },
-          baseName
+          baseName,
         );
       } else {
         title = machineTitle + `Embedded: ${w.name}`;
@@ -145,7 +137,7 @@ export const FontView = () => {
             style: "font-size: 1.2em",
             title,
           },
-          baseName
+          baseName,
         );
       }
     } else {
@@ -184,56 +176,44 @@ export const FontView = () => {
         div(
           { style: "margin: 1.2em; margin-left: 0.5em" },
           div(
-            FontAction(
-              "Copy",
-              "Copy to clipboard",
-              function (this: HTMLDivElement) {
-                activeMe(this);
-                copyToClipboard(`"${family.name || ""}"`);
-              }
-            ),
+            FontAction("Copy", "Copy to clipboard", function (this: HTMLDivElement) {
+              activeMe(this);
+              copyToClipboard(`"${family.name || ""}"`);
+            }),
             " | ",
-            FontAction(
-              "Paste string",
-              "Paste as String",
-              function (this: HTMLDivElement) {
-                activeMe(this);
-                const rest = name;
-                const markup = `#${rest}`;
-                requestTextEdit({
-                  newText: {
-                    kind: "by-mode",
-                    markup,
-                    rest,
-                  },
-                });
-              }
-            ),
+            FontAction("Paste string", "Paste as String", function (this: HTMLDivElement) {
+              activeMe(this);
+              const rest = name;
+              const markup = `#${rest}`;
+              requestTextEdit({
+                newText: {
+                  kind: "by-mode",
+                  markup,
+                  rest,
+                },
+              });
+            }),
             " ",
-            FontAction(
-              "#set",
-              "Paste as Set Font Rule",
-              function (this: HTMLDivElement) {
-                activeMe(this);
-                const rest = name;
-                const markup = `#set text(font: ${rest})`;
-                requestTextEdit({
-                  newText: {
-                    kind: "by-mode",
-                    markup,
-                    rest,
-                  },
-                });
-              }
-            )
+            FontAction("#set", "Paste as Set Font Rule", function (this: HTMLDivElement) {
+              activeMe(this);
+              const rest = name;
+              const markup = `#set text(font: ${rest})`;
+              requestTextEdit({
+                newText: {
+                  kind: "by-mode",
+                  markup,
+                  rest,
+                },
+              });
+            }),
           ),
           span({ style: "font-size: 1.2em" }, family.name),
           ".",
           br(),
           code("Variant"),
           ": ",
-          family.infos.map(FontSlot)
-        )
+          family.infos.map(FontSlot),
+        ),
     );
   };
 
@@ -245,7 +225,7 @@ export const FontView = () => {
       code(fontAtCursor),
       br(),
       "Checked at ",
-      code(fontPosition)
+      code(fontPosition),
     );
   };
 
@@ -257,8 +237,7 @@ export const FontView = () => {
       div(
         {
           class: "flex-col",
-          style:
-            "justify-content: center; align-items: center; gap: 10px; width: 100%;",
+          style: "justify-content: center; align-items: center; gap: 10px; width: 100%;",
         },
         div(
           {
@@ -270,24 +249,22 @@ export const FontView = () => {
             () => {
               showNumber.val = !showNumber.val;
             },
-            { active: showNumber }
-          )
+            { active: showNumber },
+          ),
         ),
         div(
           {
             class: `tinymist-card`,
             style: "flex: 1; width: 100%; padding: 10px; display: none",
           },
-          (_dom?: Element) => SelectingSlot()
+          (_dom?: Element) => SelectingSlot(),
         ),
-        ...fontResources.val.families.map(FontFamilySlot)
-      )
+        ...fontResources.val.families.map(FontFamilySlot),
+      ),
   );
 };
 
-export type fontLocation = FontSource extends { kind: infer Kind }
-  ? Kind
-  : never;
+export type fontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
 
 interface FontInfo {
   name: string;

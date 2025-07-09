@@ -15,8 +15,4 @@ export const base64Decode = (encoded: string) =>
  * @returns Base64 encoded string
  */
 export const base64Encode = (utf8Str: string) =>
-  btoa(
-    Array.from(utf82bytes.encode(utf8Str), (c) => String.fromCharCode(c)).join(
-      ""
-    )
-  );
+  btoa(Array.from(utf82bytes.encode(utf8Str), (c) => String.fromCharCode(c)).join(""));

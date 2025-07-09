@@ -21,5 +21,5 @@ import { TypstDocumentContext, composeDoc, provideDoc } from "./typst-doc.mjs";
  * ) {}
  */
 export class TypstDocument extends provideDoc(
-  composeDoc(TypstDocumentContext, provideCanvasDoc, provideSvgDoc)
+  composeDoc(TypstDocumentContext, provideCanvasDoc, provideSvgDoc),
 ) {}
