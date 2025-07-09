@@ -64,6 +64,8 @@ pub struct CompilerUniverse<F: CompilerFeat> {
 
     /// The current revision of the universe.
     pub revision: NonZeroUsize,
+    /// The creation timestamp for reproducible builds.
+    pub creation_timestamp: Option<i64>,
 }
 
 /// Creates, snapshots, and manages the compiler universe.
@@ -81,6 +83,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         vfs: Vfs<F::AccessModel>,
         package_registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
+        creation_timestamp: Option<i64>,
     ) -> Self {
         Self {
             entry,
@@ -92,6 +95,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             font_resolver,
             registry: package_registry,
             vfs,
+            creation_timestamp,
         }
     }
 
@@ -168,6 +172,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
                 slots: Default::default(),
             },
             now: OnceLock::new(),
+            creation_timestamp: self.creation_timestamp,
         };
 
         mutant.map(|m| w.task(m)).unwrap_or(w)
@@ -392,6 +397,12 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         self.inner.inputs = inputs;
     }
 
+    /// Set the creation timestamp for reproducible builds.
+    pub fn set_creation_timestamp(&mut self, creation_timestamp: Option<i64>) {
+        self.view_changed = true;
+        self.inner.creation_timestamp = creation_timestamp;
+    }
+
     pub fn set_entry_file(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         self.view_changed = true;
         self.inner.set_entry_file_(entry_file)
@@ -461,6 +472,8 @@ pub struct CompilerWorld<F: CompilerFeat> {
     /// The current datetime if requested. This is stored here to ensure it is
     /// always the same within one compilation. Reset between compilations.
     now: OnceLock<NowStorage>,
+    /// The creation timestamp for reproducible builds.
+    creation_timestamp: Option<i64>,
 }
 
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
@@ -502,6 +515,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             revision: self.revision,
             source_db: self.source_db.clone(),
             now: self.now.clone(),
+            creation_timestamp: self.creation_timestamp,
         };
 
         if root_changed {
@@ -756,8 +770,16 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Duration};
-        // todo: typst respects creation_timestamp, but we don't...
-        let now = self.now.get_or_init(|| tinymist_std::time::now().into());
+        
+        let now = self.now.get_or_init(|| {
+            if let Some(timestamp) = self.creation_timestamp {
+                chrono::DateTime::from_timestamp(timestamp, 0)
+                    .unwrap_or_else(|| tinymist_std::time::now())
+                    .into()
+            } else {
+                tinymist_std::time::now().into()
+            }
+        });
 
         let naive = match offset {
             None => now.naive_local(),
@@ -781,8 +803,16 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(not(any(feature = "web", feature = "system")))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use tinymist_std::time::{now, to_typst_time, Duration};
-        // todo: typst respects creation_timestamp, but we don't...
-        let now = self.now.get_or_init(|| now().into());
+        
+        let now = self.now.get_or_init(|| {
+            if let Some(timestamp) = self.creation_timestamp {
+                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
+                    .unwrap_or_else(|_| now().into())
+                    .into()
+            } else {
+                now().into()
+            }
+        });
 
         let now = offset
             .and_then(|offset| {
@@ -995,4 +1025,85 @@ fn create_library(inputs: Arc<LazyHash<Dict>>, features: Features) -> Arc<LazyHa
         .build();
 
     Arc::new(LazyHash::new(lib))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::system::SystemCompilerFeat;
+    use crate::entry::EntryState;
+    use typst::World;
+    use std::sync::Arc;
+    use tinymist_vfs::Vfs;
+    use crate::system::SystemAccessModel;
+    use tinymist_package::DummyRegistry;
+    use crate::font::system::SystemFontResolver;
+
+    #[test]
+    fn test_creation_timestamp_today() {
+        // Test that the World's today() method respects the creation timestamp
+        let entry = EntryState::new_rooted("/tmp".into(), None);
+        let features = Features::default();
+        let inputs = Arc::new(LazyHash::new(Dict::new()));
+        let vfs = Vfs::new(
+            Arc::new(DummyRegistry::default()),
+            SystemAccessModel {},
+        );
+        let registry = Arc::new(DummyRegistry::default());
+        let font_resolver = Arc::new(SystemFontResolver::new());
+        
+        // Create universe with fixed timestamp (1979-12-31 equivalent)
+        let fixed_timestamp = Some(315446400); // 1979-12-31 in Unix timestamp
+        let universe = CompilerUniverse::<SystemCompilerFeat>::new_raw(
+            entry,
+            features,
+            Some(inputs),
+            vfs,
+            registry,
+            font_resolver,
+            fixed_timestamp,
+        );
+        
+        let world = universe.snapshot();
+        
+        // Check that today() returns the fixed date
+        if let Some(date) = world.today(None) {
+            // The date should be 1979-12-31
+            assert_eq!(date.year(), 1979);
+            assert_eq!(date.month(), 12);
+            assert_eq!(date.day(), 31);
+        } else {
+            panic!("today() returned None");
+        }
+    }
+    
+    #[test]
+    fn test_creation_timestamp_none() {
+        // Test that without creation timestamp, today() returns current date
+        let entry = EntryState::new_rooted("/tmp".into(), None);
+        let features = Features::default();
+        let inputs = Arc::new(LazyHash::new(Dict::new()));
+        let vfs = Vfs::new(
+            Arc::new(DummyRegistry::default()),
+            SystemAccessModel {},
+        );
+        let registry = Arc::new(DummyRegistry::default());
+        let font_resolver = Arc::new(SystemFontResolver::new());
+        
+        // Create universe without creation timestamp
+        let universe = CompilerUniverse::<SystemCompilerFeat>::new_raw(
+            entry,
+            features,
+            Some(inputs),
+            vfs,
+            registry,
+            font_resolver,
+            None,
+        );
+        
+        let world = universe.snapshot();
+        
+        // Check that today() returns some date (current date)
+        assert!(world.today(None).is_some());
+    }
 }

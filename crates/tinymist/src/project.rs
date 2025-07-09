@@ -191,8 +191,16 @@ impl ServerState {
 
         let fonts = config.fonts();
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
-        let verse =
-            LspUniverseBuilder::build(entry, export_target, features, inputs, packages, fonts);
+        let creation_timestamp = config.creation_timestamp();
+        let verse = LspUniverseBuilder::build(
+            entry,
+            export_target,
+            features,
+            inputs,
+            packages,
+            fonts,
+            creation_timestamp,
+        );
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
