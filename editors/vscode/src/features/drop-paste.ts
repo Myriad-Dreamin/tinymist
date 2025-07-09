@@ -27,13 +27,15 @@ type DocumentPasteEditProvider = any;
 type DocumentPasteEditContext = any;
 type DocumentPasteEdit = any;
 
-export function dragAndDropActivate(context: IContext) {
+type SubscriptionContext = Pick<IContext, "subscriptions">;
+
+export function dragAndDropActivate(context: SubscriptionContext) {
   context.subscriptions.push(
     vscode.languages.registerDocumentDropEditProvider(typstDocumentSelector, new DropProvider()),
   );
 }
 
-export function copyAndPasteActivate(context: IContext) {
+export function copyAndPasteActivate(context: SubscriptionContext) {
   // Check if document paste API is available (VS Code 1.97+)
   if (!hasDocumentPasteAPI()) {
     console.warn(
