@@ -237,6 +237,8 @@ pub enum Interrupt<F: CompilerFeat> {
     ChangeTask(ProjectInsId, TaskInputs),
     /// Font changes.
     Font(Arc<F::FontResolver>),
+    /// Creation timestamp changes.
+    CreationTimestamp(Option<i64>),
     /// Memory file changes.
     Memory(MemoryEvent),
     /// File system event.
@@ -253,6 +255,7 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
                 write!(f, "ChangeTask({id:?}, entry={:?})", change.entry.is_some())
             }
             Interrupt::Font(..) => write!(f, "Font(..)"),
+            Interrupt::CreationTimestamp(ts) => write!(f, "CreationTimestamp({ts:?})"),
             Interrupt::Memory(..) => write!(f, "Memory(..)"),
             Interrupt::Fs(..) => write!(f, "Fs(..)"),
         }
@@ -482,6 +485,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             self.primary.verse.vfs().fork(),
             self.primary.verse.registry.clone(),
             self.primary.verse.font_resolver.clone(),
+            self.primary.verse.creation_timestamp,
         );
 
         let mut proj =
@@ -596,6 +600,18 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     });
                     if font_changed {
                         // todo: reason_by_font_change
+                        proj.reason.see(reason_by_entry_change());
+                    }
+                });
+            }
+            Interrupt::CreationTimestamp(creation_timestamp) => {
+                self.projects().for_each(|proj| {
+                    let timestamp_changed = proj.verse.increment_revision(|verse| {
+                        verse.set_creation_timestamp(creation_timestamp);
+                        // Creation timestamp changes affect compilation
+                        verse.creation_timestamp_changed()
+                    });
+                    if timestamp_changed {
                         proj.reason.see(reason_by_entry_change());
                     }
                 });

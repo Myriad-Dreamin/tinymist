@@ -43,6 +43,7 @@ impl TypstSystemUniverse {
         let registry: Arc<HttpRegistry> = Arc::default();
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
         let inputs = std::mem::take(&mut opts.inputs);
+        let timestamp = opts.creation_timestamp;
 
         // todo: enable html
         Ok(Self::new_raw(
@@ -52,6 +53,7 @@ impl TypstSystemUniverse {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             Arc::new(Self::resolve_fonts(opts)?),
+            timestamp,
         ))
     }
 
@@ -86,6 +88,7 @@ impl SystemUniverseBuilder {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             font_resolver,
+            None, // creation_timestamp - not used in this context
         )
     }
 

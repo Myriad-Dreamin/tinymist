@@ -64,6 +64,8 @@ pub struct CompilerUniverse<F: CompilerFeat> {
 
     /// The current revision of the universe.
     pub revision: NonZeroUsize,
+    /// The creation timestamp for reproducible builds.
+    pub creation_timestamp: Option<i64>,
 }
 
 /// Creates, snapshots, and manages the compiler universe.
@@ -81,6 +83,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         vfs: Vfs<F::AccessModel>,
         package_registry: Arc<F::Registry>,
         font_resolver: Arc<F::FontResolver>,
+        creation_timestamp: Option<i64>,
     ) -> Self {
         Self {
             entry,
@@ -92,6 +95,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             font_resolver,
             registry: package_registry,
             vfs,
+            creation_timestamp,
         }
     }
 
@@ -168,6 +172,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
                 slots: Default::default(),
             },
             now: OnceLock::new(),
+            creation_timestamp: self.creation_timestamp,
         };
 
         mutant.map(|m| w.task(m)).unwrap_or(w)
@@ -177,6 +182,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
     pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut RevisingUniverse<F>) -> T) -> T {
         f(&mut RevisingUniverse {
             vfs_revision: self.vfs.revision(),
+            creation_timestamp_changed: false,
             font_changed: false,
             font_revision: self.font_resolver.revision(),
             registry_changed: false,
@@ -324,6 +330,7 @@ pub struct RevisingUniverse<'a, F: CompilerFeat> {
     view_changed: bool,
     vfs_revision: NonZeroUsize,
     font_changed: bool,
+    creation_timestamp_changed: bool,
     font_revision: Option<NonZeroUsize>,
     registry_changed: bool,
     registry_revision: Option<NonZeroUsize>,
@@ -392,6 +399,12 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         self.inner.inputs = inputs;
     }
 
+    /// Set the creation timestamp for reproducible builds.
+    pub fn set_creation_timestamp(&mut self, creation_timestamp: Option<i64>) {
+        self.creation_timestamp_changed = creation_timestamp != self.inner.creation_timestamp;
+        self.inner.creation_timestamp = creation_timestamp;
+    }
+
     pub fn set_entry_file(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         self.view_changed = true;
         self.inner.set_entry_file_(entry_file)
@@ -416,6 +429,10 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
 
     pub fn font_changed(&self) -> bool {
         self.font_changed && is_revision_changed(self.font_revision, self.font_resolver.revision())
+    }
+
+    pub fn creation_timestamp_changed(&self) -> bool {
+        self.creation_timestamp_changed
     }
 
     pub fn registry_changed(&self) -> bool {
@@ -461,6 +478,8 @@ pub struct CompilerWorld<F: CompilerFeat> {
     /// The current datetime if requested. This is stored here to ensure it is
     /// always the same within one compilation. Reset between compilations.
     now: OnceLock<NowStorage>,
+    /// The creation timestamp for reproducible builds.
+    creation_timestamp: Option<i64>,
 }
 
 impl<F: CompilerFeat> Clone for CompilerWorld<F> {
@@ -502,6 +521,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
             revision: self.revision,
             source_db: self.source_db.clone(),
             now: self.now.clone(),
+            creation_timestamp: self.creation_timestamp,
         };
 
         if root_changed {
@@ -756,8 +776,16 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use chrono::{Datelike, Duration};
-        // todo: typst respects creation_timestamp, but we don't...
-        let now = self.now.get_or_init(|| tinymist_std::time::now().into());
+
+        let now = self.now.get_or_init(|| {
+            if let Some(timestamp) = self.creation_timestamp {
+                chrono::DateTime::from_timestamp(timestamp, 0)
+                    .unwrap_or_else(|| tinymist_std::time::now().into())
+                    .into()
+            } else {
+                tinymist_std::time::now().into()
+            }
+        });
 
         let naive = match offset {
             None => now.naive_local(),
@@ -781,8 +809,16 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     #[cfg(not(any(feature = "web", feature = "system")))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
         use tinymist_std::time::{now, to_typst_time, Duration};
-        // todo: typst respects creation_timestamp, but we don't...
-        let now = self.now.get_or_init(|| now().into());
+
+        let now = self.now.get_or_init(|| {
+            if let Some(timestamp) = self.creation_timestamp {
+                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
+                    .unwrap_or_else(|_| now().into())
+                    .into()
+            } else {
+                now().into()
+            }
+        });
 
         let now = offset
             .and_then(|offset| {
