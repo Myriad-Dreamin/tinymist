@@ -76,6 +76,7 @@ impl WorldProvider for CompileOnceArgs {
             inputs,
             packages,
             fonts,
+            self.creation_timestamp,
         ))
     }
 
@@ -168,6 +169,7 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             Arc::new(LazyHash::new(inputs)),
             packages,
             Arc::new(fonts),
+            None, // creation_timestamp - not available in project file context
         ))
     }
 
@@ -215,6 +217,7 @@ impl LspUniverseBuilder {
         inputs: ImmutDict,
         package_registry: HttpRegistry,
         font_resolver: Arc<FontResolverImpl>,
+        creation_timestamp: Option<i64>,
     ) -> LspUniverse {
         let package_registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
@@ -233,6 +236,7 @@ impl LspUniverseBuilder {
             Vfs::new(resolver, SystemAccessModel {}),
             package_registry,
             font_resolver,
+            creation_timestamp,
         )
     }
 

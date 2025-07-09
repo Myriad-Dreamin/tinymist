@@ -52,6 +52,7 @@ impl TypstSystemUniverse {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             Arc::new(Self::resolve_fonts(opts)?),
+            opts.creation_timestamp,
         ))
     }
 
@@ -86,6 +87,7 @@ impl SystemUniverseBuilder {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             font_resolver,
+            None, // creation_timestamp - not used in this context
         )
     }
 

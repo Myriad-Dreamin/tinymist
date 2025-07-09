@@ -46,6 +46,7 @@ impl TypstBrowserUniverse {
             vfs,
             registry,
             Arc::new(font_resolver),
+            None, // creation_timestamp - not used in browser context
         )
     }
 }
