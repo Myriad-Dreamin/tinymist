@@ -5,9 +5,11 @@
 assets/**
 src/**
 target/**
+dist/**
 icons/
 node_modules/
-editiors/vscode/out/
+editors/vscode/out/
+editors/vscode/.vscode-test/**
 *.toml
 *.txt
 *.lock
