@@ -17,8 +17,18 @@ It is primarily responsible for providing integrated typst language service to v
 ### Development Flow
 - Build Server: `cargo build`
 - Build VS Code Extension: `cd editors/vscode && yarn build`
-- Test Server: `cargo test --workspace -- --skip=e2e`
 - Full CI check: `cargo clippy --workspace --all-targets`
+- Test Server: `cargo test --workspace -- --skip=e2e`
+    Note that, in the envoironment where network is not available (copilot or nix actions), we should also skip following tests:
+    ```
+    completion::tests::test_pkgs
+    docs::package::tests::cetz
+    docs::package::tests::fletcher
+    docs::package::tests::tidy
+    docs::package::tests::touying
+    ```
+
+
 
 ## Repository Structure
 - `crates/`: rust crates for the server and related functionality
