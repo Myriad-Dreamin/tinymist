@@ -10,6 +10,24 @@ It is primarily responsible for providing integrated typst language service to v
 
 ## Code Standards
 
+### Keep Good PR Title
+
+Add a prefix to indicate what kind of release this pull request corresponds to. For reference, see https://www.conventionalcommits.org/
+
+Available types:
+ - dev
+ - feat
+ - fix
+ - docs
+ - style
+ - refactor
+ - perf
+ - test
+ - build
+ - ci
+ - chore
+ - revert
+
 ### Required Before Each Commit
 - Run `yarn fmt` to format Rust/JavaScript files
 - This will run formatters on all necessary files to maintain consistent style
@@ -27,8 +45,6 @@ It is primarily responsible for providing integrated typst language service to v
     docs::package::tests::tidy
     docs::package::tests::touying
     ```
-
-
 
 ## Repository Structure
 - `crates/`: rust crates for the server and related functionality
