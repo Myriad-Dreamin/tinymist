@@ -6,6 +6,61 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## v0.13.16 - [2025-07-13]
+
+### Editor
+
+* (Fix) Skipping exports on entry change and first filesystem sync in https://github.com/Myriad-Dreamin/tinymist/pull/1854
+* (Fix) Reading `formatterProseWrap` at server side by @andreaswilli in https://github.com/Myriad-Dreamin/tinymist/pull/1856
+* (Fix) Displaying SVG embedded in docs on hovering in VS Code Remote in https://github.com/Myriad-Dreamin/tinymist/pull/1878
+* (Test) Ensuring pdf export `onType` to work in https://github.com/Myriad-Dreamin/tinymist/pull/1865
+* Adding a neovim plugin as the canonical lsp client implementation in https://github.com/Myriad-Dreamin/tinymist/pull/1842 and https://github.com/Myriad-Dreamin/tinymist/pull/1851 and https://github.com/Myriad-Dreamin/tinymist/pull/1857
+* Added VS Code alpine-arm64 support in https://github.com/Myriad-Dreamin/tinymist/pull/1837
+
+### Compiler
+
+* Respecting `SOURCE_DATE_EPOCH` when compiling docs in https://github.com/Myriad-Dreamin/tinymist/pull/1631
+
+### Export
+
+* Skipping exporting style elements in HTML nodes by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1849
+
+### Completion
+
+* (Fix) Completing `func.where` and `func.with` after dot in https://github.com/Myriad-Dreamin/tinymist/pull/1871
+
+### Code Analysis
+
+* (Fix) truncating value repr with 10MB limit in https://github.com/Myriad-Dreamin/tinymist/pull/1850
+
+### Docstring
+
+* (Perf) Added cache for docstrings in https://github.com/Myriad-Dreamin/tinymist/pull/1877
+* Pretty printing errors in docstrings in https://github.com/Myriad-Dreamin/tinymist/pull/1876
+
+### Preview
+
+* (Fix) Restoring bidirectional jump functionality in slide mode in https://github.com/Myriad-Dreamin/tinymist/pull/1873
+* Automatically hiding presentation toolbar when not hovered by @Copilot and @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1887
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Stopping atomic expressions before backslash in https://github.com/Myriad-Dreamin/tinymist/pull/1835
+
+### Misc
+
+* (Fix) Upgraded builder for windows binaries in https://github.com/Myriad-Dreamin/tinymist/pull/1794
+* (Fix) Added minor fixes in the IEEE template in https://github.com/Myriad-Dreamin/tinymist/pull/1875
+* (Fix) Eliminating default-features warning in cargo.toml by @Copilot and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1895
+* Maintained docs in https://github.com/Myriad-Dreamin/tinymist/pull/1841, https://github.com/Myriad-Dreamin/tinymist/pull/1838, and https://github.com/Myriad-Dreamin/tinymist/pull/1864
+* Added copilot instructions in https://github.com/Myriad-Dreamin/tinymist/pull/1890 and https://github.com/Myriad-Dreamin/tinymist/pull/1896
+* Added docs for `crates/tinymist-vfs/src/path_mapper.rs` by @Copilot and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1892
+* Added flake.nix in https://github.com/Myriad-Dreamin/tinymist/pull/1843
+* Removed debug symbol links in https://github.com/Myriad-Dreamin/tinymist/pull/1836
+* Generating typlite, config reference markdown files in https://github.com/Myriad-Dreamin/tinymist/pull/1868, https://github.com/Myriad-Dreamin/tinymist/pull/1881, https://github.com/Myriad-Dreamin/tinymist/pull/1885, and https://github.com/Myriad-Dreamin/tinymist/pull/1886
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.14...v0.13.16
+
 ## v0.13.14 - [2025-06-08]
 
 With new approach to converting typst to other markup, we provide unofficial support to export [LaTeX](https://github.com/Myriad-Dreamin/tinymist/pull/1718), [DocX](https://github.com/Myriad-Dreamin/tinymist/pull/1727), and [Plain Text](https://github.com/Myriad-Dreamin/tinymist/pull/1731), with full power of typst scripting.
