@@ -17,6 +17,8 @@ jobs:
       image: rust:alpine
       volumes:
         - /usr/local/cargo/registry:/usr/local/cargo/registry
+        - /opt:/opt:rw,rshared
+        - /opt:/__e/node20:ro,rshared
     strategy:
       matrix:
         include:
@@ -35,6 +37,14 @@ jobs:
       isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
     steps:
+      - name: Allow Linux musl containers on ARM64 runners
+        if: matrix.runner == 'ubuntu-24.04-arm'
+        run: |
+          sed -i "/^ID=/s/alpine/NotpineForGHA/" /etc/os-release
+          apk add nodejs --update-cache
+          mkdir /opt/bin
+          ln -s /usr/bin/node /opt/bin/node
+
       - name: Install dependencies
         # bash is required by setup-rust-toolchain
         run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils bash
