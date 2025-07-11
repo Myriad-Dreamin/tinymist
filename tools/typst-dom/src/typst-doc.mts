@@ -1,4 +1,4 @@
-import type { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+import type { RenderSession, TypstWorker } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 
 export interface ContainerDOMState {
@@ -29,6 +29,7 @@ export enum PreviewMode {
 export interface Options {
   hookedElem: HTMLElement;
   kModule: RenderSession;
+  kWorker: TypstWorker;
   renderMode?: RenderMode;
   previewMode?: PreviewMode;
   isContentPreview?: boolean;
@@ -47,6 +48,7 @@ interface TypstDocumentFacade {
 export class TypstDocumentContext<O = any> {
   public hookedElem: HTMLElement;
   public kModule: RenderSession;
+  public kWorker: TypstWorker;
   public opts: O;
   modes: [string, TypstDocumentFacade][] = [];
 
@@ -55,7 +57,7 @@ export class TypstDocumentContext<O = any> {
   /// enable partial rendering
   partialRendering: boolean = true;
   /// underlying renderer
-  renderMode: RenderMode = "svg";
+  renderMode: RenderMode = "canvas";
   r: TypstDocumentFacade = undefined!;
   /// preview mode
   previewMode: PreviewMode = PreviewMode.Doc;
@@ -127,6 +129,7 @@ export class TypstDocumentContext<O = any> {
   constructor(opts: Options & O) {
     this.hookedElem = opts.hookedElem;
     this.kModule = opts.kModule;
+    this.kWorker = opts.kWorker;
     this.opts = opts || {};
 
     /// Apply configuration
@@ -164,11 +167,14 @@ export class TypstDocumentContext<O = any> {
       this.hookedElem.parentElement?.classList.add("hide-scrollbar-y");
     }
 
+    console.log("use renderMode", this.renderMode);
+
     this.installRescaleHandler();
   }
 
   reset() {
-    this.kModule.reset();
+    // todo: reset
+    // this.kWorker.reset();
     this.moduleInitialized = false;
   }
 
@@ -365,10 +371,7 @@ export class TypstDocumentContext<O = any> {
         if (eventName === "new") {
           this.reset();
         }
-        this.kModule.manipulateData({
-          action: "merge",
-          data: svgUpdateEvent[1] as unknown as Uint8Array,
-        });
+        this.kWorker.manipulateData("merge", svgUpdateEvent[1] as unknown as Uint8Array);
 
         this.moduleInitialized = true;
         return true;
