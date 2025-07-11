@@ -6,6 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
+## Unreleased
+
+* Bumped typstyle to v0.13.14 by @Enter-tainer. See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.14%20-%20[2025-07-11]>
+
 ## v0.13.16 - [2025-07-13]
 
 ### Editor

@@ -2686,14 +2686,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "pretty"
-version = "0.12.4"
+name = "prettyless"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac98773b7109bc75f475ab5a134c9b64b87e59d776d31098d8f346922396a477"
+checksum = "d03ccf1cbd64d88883e4d9363b8ba202cdce66b7bec175233c8b157e772b1165"
 dependencies = [
  "arrayvec 0.5.2",
  "typed-arena",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.1",
 ]
 
 [[package]]
@@ -5184,18 +5184,18 @@ dependencies = [
 
 [[package]]
 name = "typstyle-core"
-version = "0.13.11"
+version = "0.13.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75530bc7a041e4e3817e7c50dbbc8a9d35c4af09b773a903f4b0dbae2bdc8f1"
+checksum = "a731776328e7f494ab9db9b15152530b5833537666978f12fa0b8d6020a1dfc1"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
- "pretty",
+ "prettyless",
  "rustc-hash 2.1.1",
  "smallvec",
  "thiserror 2.0.12",
  "typst-syntax",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.1",
 ]
 
 [[package]]
@@ -5626,7 +5626,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
