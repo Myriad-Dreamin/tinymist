@@ -1,0 +1,28 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/jsx.typ
+---
+Range: 4:20:4:27
+
+```typc
+let Counter(
+  initialCounter: any = 0,
+);
+```
+
+
+======
+
+
+
+
+# Named Parameters
+
+## initialCounter
+
+```typc
+type: 
+```
+
+Default value: 0

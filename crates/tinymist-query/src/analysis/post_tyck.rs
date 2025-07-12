@@ -222,12 +222,12 @@ impl<'a> PostTypeChecker<'a> {
                 target,
                 is_set,
             } => {
-                let callee = self.check_or(callee, context_ty)?;
+                let callee_ty = self.check_or(callee, context_ty)?;
                 crate::log_debug_ct!(
-                    "post check call target: ({callee:?})::{target:?} is_set: {is_set}"
+                    "post check call target: ({callee_ty:?})::{target:?} is_set: {is_set}"
                 );
 
-                let sig = self.ctx.sig_of_type(self.info, callee)?;
+                let sig = self.ctx.sig_of_type_or_dyn(self.info, callee_ty, callee)?;
                 crate::log_debug_ct!("post check call sig: {target:?} {sig:?}");
                 let mut resp = SignatureReceiver::default();
 

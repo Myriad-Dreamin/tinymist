@@ -861,12 +861,55 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
-    pub(crate) fn type_of_span(self: &Arc<Self>, span: Span) -> Option<Ty> {
-        self.type_of_span_(&self.source_by_id(span.id()?).ok()?, span)
+    pub(crate) fn def_of_syntax_or_dyn(
+        self: &Arc<Self>,
+        source: &Source,
+        doc: Option<&TypstDocument>,
+        syntax: SyntaxClass,
+    ) -> Option<Definition> {
+        let def = self.def_of_syntax(source, doc, syntax.clone());
+        match def.as_ref().map(|d| d.decl.kind()) {
+            // todo: DefKind::Function
+            Some(DefKind::Reference | DefKind::Module | DefKind::Function) => return def,
+            Some(DefKind::Struct | DefKind::Constant | DefKind::Variable) | None => {
+                let know_ty_well = def
+                    .as_ref()
+                    .and_then(|d| self.simplified_type_of_span(d.decl.span()))
+                    .filter(|ty| !matches!(ty, Ty::Any))
+                    .is_some();
+                if !know_ty_well {
+                    let def_ref = def.as_ref();
+                    let def_name = || Some(def_ref?.name().clone());
+                    let dyn_def = self
+                        .analyze_expr(syntax.node())
+                        .iter()
+                        .find_map(|(value, _)| Definition::from_value(value.clone(), def_name));
+                    return dyn_def.or(def);
+                }
+            }
+        }
+        def
     }
 
-    pub(crate) fn type_of_span_(self: &Arc<Self>, source: &Source, span: Span) -> Option<Ty> {
-        self.type_check(source).type_of_span(span)
+    pub(crate) fn simplified_type_of_span(self: &Arc<Self>, span: Span) -> Option<Ty> {
+        let source = self.source_by_id(span.id()?).ok()?;
+        let (ti, ty) = self.type_of_span_(&source, span)?;
+        Some(ti.simplify(ty, false))
+    }
+
+    pub(crate) fn type_of_span(self: &Arc<Self>, span: Span) -> Option<Ty> {
+        let source = self.source_by_id(span.id()?).ok()?;
+        Some(self.type_of_span_(&source, span)?.1)
+    }
+
+    pub(crate) fn type_of_span_(
+        self: &Arc<Self>,
+        source: &Source,
+        span: Span,
+    ) -> Option<(Arc<TypeInfo>, Ty)> {
+        let ti = self.type_check(source);
+        let ty = ti.type_of_span(span)?;
+        Some((ti, ty))
     }
 
     pub(crate) fn post_type_of_node(self: &Arc<Self>, node: LinkedNode) -> Option<Ty> {
@@ -887,6 +930,24 @@ impl SharedContext {
 
     pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeInfo, ty: Ty) -> Option<Signature> {
         super::sig_of_type(self, ti, ty)
+    }
+
+    pub(crate) fn sig_of_type_or_dyn(
+        self: &Arc<Self>,
+        ti: &TypeInfo,
+        callee_ty: Ty,
+        callee: &SyntaxNode,
+    ) -> Option<Signature> {
+        self.sig_of_type(ti, callee_ty).or_else(|| {
+            self.analyze_expr(callee).iter().find_map(|(value, _)| {
+                let Value::Func(callee) = value else {
+                    return None;
+                };
+
+                // Converts with cache
+                analyze_signature(self, SignatureTarget::Convert(callee.clone()))
+            })
+        })
     }
 
     /// Try to find imported target from the current source file.
