@@ -7,22 +7,22 @@ Range: 4:20:4:27
 
 ```typc
 let Counter(
-  initialCounter: any = 0,
-);
+  initialCounter: int = 0,
+) = content | none;
 ```
 
 
 ======
 
 
-
+Creates a counter component.
 
 # Named Parameters
 
 ## initialCounter
 
 ```typc
-type: 
+type: 0 | int
 ```
 
-Default value: 0
+The initial value for the counter.

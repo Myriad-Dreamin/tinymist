@@ -10,6 +10,7 @@ use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
 use tinymist_lint::LintInfo;
@@ -871,24 +872,37 @@ impl SharedContext {
         match def.as_ref().map(|d| d.decl.kind()) {
             // todo: DefKind::Function
             Some(DefKind::Reference | DefKind::Module | DefKind::Function) => return def,
-            Some(DefKind::Struct | DefKind::Constant | DefKind::Variable) | None => {
-                let know_ty_well = def
-                    .as_ref()
-                    .and_then(|d| self.simplified_type_of_span(d.decl.span()))
-                    .filter(|ty| !matches!(ty, Ty::Any))
-                    .is_some();
-                if !know_ty_well {
-                    let def_ref = def.as_ref();
-                    let def_name = || Some(def_ref?.name().clone());
-                    let dyn_def = self
-                        .analyze_expr(syntax.node())
-                        .iter()
-                        .find_map(|(value, _)| Definition::from_value(value.clone(), def_name));
-                    return dyn_def.or(def);
-                }
-            }
+            Some(DefKind::Struct | DefKind::Constant | DefKind::Variable) | None => {}
         }
-        def
+
+        // Checks that we resolved a high-equality definition.
+        let know_ty_well = def
+            .as_ref()
+            .and_then(|d| self.simplified_type_of_span(d.decl.span()))
+            .filter(|ty| !matches!(ty, Ty::Any))
+            .is_some();
+        if know_ty_well {
+            return def;
+        }
+
+        let def_ref = def.as_ref();
+        let def_name = || Some(def_ref?.name().clone());
+        let dyn_def = self
+            .analyze_expr(syntax.node())
+            .iter()
+            .find_map(|(value, _)| {
+                let def = Definition::from_value(value.clone(), def_name)?;
+                None.or_else(|| {
+                    let source = self.source_by_id(def.decl.file_id()?).ok()?;
+                    let node = LinkedNode::new(source.root()).find(def.decl.span())?;
+                    let def_at_the_span = classify_def_loosely(node)?;
+                    self.def_of_span(&source, doc, def_at_the_span.name()?.span())
+                })
+                .or(Some(def))
+            });
+
+        // Uses the dynamic definition or the fallback definition.
+        dyn_def.or(def)
     }
 
     pub(crate) fn simplified_type_of_span(self: &Arc<Self>, span: Span) -> Option<Ty> {
@@ -945,7 +959,7 @@ impl SharedContext {
                 };
 
                 // Converts with cache
-                analyze_signature(self, SignatureTarget::Convert(callee.clone()))
+                analyze_signature(self, SignatureTarget::Runtime(callee.clone()))
             })
         })
     }

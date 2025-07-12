@@ -15,6 +15,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_jsx_import.typ
     },
     "kind": 5,
     "label": "initialCounter",
+    "labelDetails": {
+     "description": "0 | int"
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "initialCounter: ${1:}",
