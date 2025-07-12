@@ -6,6 +6,12 @@
 /// -> content
 #let Counter(initialCounter: 0) = none
 
+#let modules = (
+  "$components/Counter.astro": (
+    Counter: Counter,
+  ),
+)
+
 -----
 /// path: jsx-runtime.typ
 
@@ -13,15 +19,14 @@
 
 #import typing-path as typings
 
-#let require = (it, hint: none) => (
-  Counter: typings.Counter,
-)
+#let require = (it, hint: none) => typings.modules.at(it)
 
 -----
 /// contains: initialCounter
 #import "jsx-runtime.typ": require
 
-#let (Counter,) = require("$components/Counter.astro");
+#let (Counter: Counter) = require("$components/Counter.astro");
 
-#(/* ident after */ Counter)
-#Counter(/* range 0..1 */)
+#Counter(
+  /* range 0..1 */
+)
