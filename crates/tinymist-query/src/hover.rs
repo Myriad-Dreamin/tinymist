@@ -120,7 +120,7 @@ impl HoverWorker<'_> {
         let syntax = classify_syntax(leaf.clone(), self.cursor)?;
         let def = self
             .ctx
-            .def_of_syntax(&self.source, self.doc.as_ref(), syntax.clone())?;
+            .def_of_syntax_or_dyn(&self.source, self.doc.as_ref(), syntax.clone())?;
 
         use Decl::*;
         match def.decl.as_ref() {

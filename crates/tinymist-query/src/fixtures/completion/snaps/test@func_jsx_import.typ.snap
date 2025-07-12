@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (142..143)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/func_jsx_import.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 5,
+    "label": "initialCounter",
+    "labelDetails": {
+     "description": "0 | int"
+    },
+    "sortText": "000",
+    "textEdit": {
+     "newText": "initialCounter: ${1:}",
+     "range": {
+      "end": {
+       "character": 2,
+       "line": 6
+      },
+      "start": {
+       "character": 2,
+       "line": 6
+      }
+     }
+    }
+   }
+  ]
+ }
+]

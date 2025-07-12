@@ -52,6 +52,10 @@ impl Definition {
     pub(crate) fn value(&self) -> Option<Value> {
         self.term.as_ref()?.value()
     }
+
+    pub(crate) fn from_value(value: Value, name: impl FnOnce() -> Option<StrRef>) -> Option<Self> {
+        value_to_def(value, name)
+    }
 }
 
 trait HasNameRange {
@@ -336,7 +340,7 @@ static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     Some(func)
 });
 
-fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> Option<Definition> {
+fn value_to_def(value: Value, name: impl FnOnce() -> Option<StrRef>) -> Option<Definition> {
     let val = Ty::Value(InsTy::new(value.clone()));
     Some(match value {
         Value::Func(func) => {
