@@ -32,7 +32,7 @@ impl StatefulRequest for GotoDefinitionRequest {
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
 
-        let def = ctx.def_of_syntax(&source, doc, syntax)?;
+        let def = ctx.def_of_syntax_or_dyn(&source, doc, syntax)?;
 
         let fid = def.file_id()?;
         let name_range = def.name_range(ctx.shared()).unwrap_or_default();
