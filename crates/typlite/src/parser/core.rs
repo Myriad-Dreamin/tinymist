@@ -253,7 +253,7 @@ impl HtmlToAstParser {
                     self.convert_element(element)?;
                 }
                 HtmlNode::Frame(frame) => {
-                    let res = self.convert_frame(frame);
+                    let res = self.convert_frame(&frame.inner);
                     self.inline_buffer.push(res);
                 }
                 HtmlNode::Tag(..) => {}

@@ -76,7 +76,7 @@ impl HtmlToAstParser {
             });
         };
 
-        let svg = typst_svg::svg_frame(frame);
+        let svg = typst_svg::svg_frame(&frame.inner);
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {

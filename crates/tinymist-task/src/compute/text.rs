@@ -69,7 +69,7 @@ impl FullTextDigest<'_> {
             Tag(_) => Ok(()),
             Element(elem) => Self::export_element(f, elem),
             Text(t, _) => f.write_str(t.as_str()),
-            Frame(frame) => Self::export_frame(f, frame),
+            Frame(frame) => Self::export_frame(f, &frame.inner),
         }
     }
 }
