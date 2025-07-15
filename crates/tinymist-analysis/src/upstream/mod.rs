@@ -495,7 +495,7 @@ mod tests {
         let mut values = ROUTE_MAPS.values().map(access).collect::<Vec<_>>();
         values.sort();
 
-        insta::assert_snapshot!(values.as_slice().join("\n"), @r###"
+        insta::assert_snapshot!(values.as_slice().join("\n"), @r"
         https://typst.app/docs/reference/data-loading/cbor/
         https://typst.app/docs/reference/data-loading/cbor/#definitions-decode
         https://typst.app/docs/reference/data-loading/cbor/#definitions-encode
@@ -673,6 +673,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/str/#definitions-len
         https://typst.app/docs/reference/foundations/str/#definitions-match
         https://typst.app/docs/reference/foundations/str/#definitions-matches
+        https://typst.app/docs/reference/foundations/str/#definitions-normalize
         https://typst.app/docs/reference/foundations/str/#definitions-position
         https://typst.app/docs/reference/foundations/str/#definitions-replace
         https://typst.app/docs/reference/foundations/str/#definitions-rev
@@ -719,8 +720,11 @@ mod tests {
         https://typst.app/docs/reference/layout/direction/
         https://typst.app/docs/reference/layout/direction/#definitions-axis
         https://typst.app/docs/reference/layout/direction/#definitions-end
+        https://typst.app/docs/reference/layout/direction/#definitions-from
         https://typst.app/docs/reference/layout/direction/#definitions-inv
+        https://typst.app/docs/reference/layout/direction/#definitions-sign
         https://typst.app/docs/reference/layout/direction/#definitions-start
+        https://typst.app/docs/reference/layout/direction/#definitions-to
         https://typst.app/docs/reference/layout/fraction/
         https://typst.app/docs/reference/layout/grid/
         https://typst.app/docs/reference/layout/grid/#definitions-cell
@@ -772,6 +776,7 @@ mod tests {
         https://typst.app/docs/reference/math/primes/
         https://typst.app/docs/reference/math/roots/#functions-root
         https://typst.app/docs/reference/math/roots/#functions-sqrt
+        https://typst.app/docs/reference/math/scr/
         https://typst.app/docs/reference/math/sizes/#functions-display
         https://typst.app/docs/reference/math/sizes/#functions-inline
         https://typst.app/docs/reference/math/sizes/#functions-script
@@ -905,6 +910,6 @@ mod tests {
         https://typst.app/docs/reference/visualize/rect/
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
-        "###);
+        ");
     }
 }
