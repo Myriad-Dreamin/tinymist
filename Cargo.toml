@@ -187,15 +187,15 @@ insta = { version = "1.39", features = ["glob"] }
 # Our Own Crates
 tinymist-assets = { version = "=0.13.14" }
 
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.12" }
-tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.12" }
-tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.12" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.12", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.12", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.12", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.12" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.12" }
-typst-shim = { path = "./crates/typst-shim", version = "0.13.12" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.15-rc1" }
+tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.15-rc1" }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.15-rc1" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.15-rc1", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.15-rc1", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.15-rc1", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.15-rc1" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.15-rc1" }
+typst-shim = { path = "./crates/typst-shim", version = "0.13.15-rc1" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
@@ -275,18 +275,18 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
 
-typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", tag = "tinymist-nightly-v0.13.15" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
 
 # These patches use local `typst` for development.
