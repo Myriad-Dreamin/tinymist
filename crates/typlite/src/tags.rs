@@ -2,7 +2,7 @@
 
 /// Tag definitions specific to markdown conversion
 pub mod md_tag {
-    use typst::html::HtmlTag;
+    use typst_html::HtmlTag;
 
     macro_rules! tags {
         ($($tag:ident -> $name:ident)*) => {

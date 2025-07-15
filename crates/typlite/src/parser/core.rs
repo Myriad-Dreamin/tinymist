@@ -6,7 +6,7 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use cmark_writer::{CommonMarkWriter, WriteResult};
 use ecow::EcoString;
 use tinymist_project::LspWorld;
-use typst::html::{tag, HtmlElement, HtmlNode};
+use typst_html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{md_attr, AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};

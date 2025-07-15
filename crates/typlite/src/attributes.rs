@@ -2,13 +2,13 @@
 
 use ecow::EcoString;
 use tinymist_derive::TypliteAttr;
-use typst::html::HtmlAttrs;
+use typst_html::HtmlAttrs;
 
 use crate::Result;
 
 /// Tag attributes defined for HTML elements.
 pub mod md_attr {
-    use typst::html::HtmlAttr;
+    use typst_html::HtmlAttr;
 
     macro_rules! attrs {
         ($($attr:ident -> $name:ident)*) => {
