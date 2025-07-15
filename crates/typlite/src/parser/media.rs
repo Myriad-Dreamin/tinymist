@@ -11,12 +11,11 @@ use tinymist_project::system::print_diagnostics_to_string;
 use tinymist_project::{base::ShadowApi, EntryReader, TaskInputs, MEMORY_MAIN_ENTRY};
 use typst::{
     foundations::{Bytes, Dict, IntoValue},
-    html::{HtmlElement, HtmlNode},
     layout::{Abs, Frame},
     utils::LazyHash,
     World,
 };
-
+use typst_html::{HtmlElement, HtmlNode};
 use crate::{
     attributes::{md_attr, IdocAttr, TypliteAttrsParser},
     common::ExternalFrameNode,
