@@ -76,7 +76,7 @@ impl FullTextDigest<'_> {
                 }
             }
             Text(t, _) => f.write_str(t.as_str()),
-            Frame(frame) => Self::export_frame(f, frame),
+            Frame(frame) => Self::export_frame(f, &frame.inner),
         }
     }
 }
