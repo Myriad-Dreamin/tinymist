@@ -156,7 +156,7 @@ typst-eval = "0.14.0"
 typst-assets = { git = "https://github.com/typst/typst-assets", rev = "edf0d64" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.11", default-features = false }
+typstyle-core = { version = "=0.13.14", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -287,7 +287,7 @@ typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", tag = "tinymist-nightly-v0.13.15" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", tag = "tinymist-nightly-v0.13.15" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.13.15" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
@@ -300,9 +300,9 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nigh
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.13.15" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.13.15" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", tag = "tinymist-nightly-v0.13.15" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
