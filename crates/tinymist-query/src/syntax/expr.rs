@@ -41,7 +41,7 @@ pub(crate) fn expr_of(
     route.insert(source.id(), None);
 
     let cache_hit = prev.and_then(|prev| {
-        if prev.source.len_bytes() != source.len_bytes()
+        if prev.source.lines().len_bytes() != source.lines().len_bytes()
             || hash128(&prev.source) != hash128(&source)
         {
             return None;
