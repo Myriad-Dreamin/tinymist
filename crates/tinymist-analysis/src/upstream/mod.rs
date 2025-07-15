@@ -12,7 +12,7 @@ use typst::{
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
-    Category, Library, World,
+    Category, Library, LibraryExt, World,
 };
 
 mod tooltip;

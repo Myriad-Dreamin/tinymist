@@ -17,7 +17,7 @@ use typst::{
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Features, Library, World, WorldExt,
+    Features, Library, LibraryExt, World,
 };
 
 use crate::{
