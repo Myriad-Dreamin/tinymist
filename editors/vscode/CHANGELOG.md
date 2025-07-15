@@ -11,7 +11,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ## v0.13.16 - [2025-07-19]
 
 * Bumped typstyle to v0.13.16 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1902 and https://github.com/Myriad-Dreamin/tinymist/pull/1915
- * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.16%20-%20[2025-07-19]>
+    * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.16%20-%20[2025-07-19]>
 
 ### Editor
 
@@ -36,8 +36,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Code Analysis
 
-* (Fix) truncating value repr with 10MB limit in https://github.com/Myriad-Dreamin/tinymist/pull/1850
-* feat: resolve definitions with dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/1904
+* (Fix) Truncating value repr with 10MB limit in https://github.com/Myriad-Dreamin/tinymist/pull/1850
+* Resolving definitions with dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/1904
 
 ### Docstring
 
