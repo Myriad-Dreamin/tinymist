@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::analyze_expr;
 use tinymist_world::ShadowApi;
-use typst::foundations::{Bytes, IntoValue, StyleChain};
+use typst::{foundations::{Bytes, IntoValue, StyleChain}, text::TextElem};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
@@ -157,9 +157,7 @@ impl InteractCodeContextRequest {
     fn style_at(cursor_style: StyleChain, style: &str) -> Option<JsonValue> {
         match style {
             "text.font" => {
-                let font = typst::text::TextElem::font_in(cursor_style)
-                    .clone()
-                    .into_value();
+                let font = cursor_style.get_ref(TextElem::font).clone().into_value();
                 serde_json::to_value(font).ok()
             }
             _ => None,
