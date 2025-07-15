@@ -6,20 +6,6 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
 };
 
-use ecow::EcoVec;
-use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{
-    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
-};
-use typst::{
-    diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
-    foundations::{Bytes, Datetime, Dict},
-    syntax::{Source, Span, VirtualPath},
-    text::{Font, FontBook},
-    utils::LazyHash,
-    Features, Library, World, WorldExt,
-};
-
 use crate::{
     package::{PackageRegistry, PackageSpec},
     source::SourceDb,
@@ -31,6 +17,19 @@ use crate::{
         SemanticTokensLegend,
     },
     WorldComputeGraph,
+};
+use ecow::EcoVec;
+use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist_vfs::{
+    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
+};
+use typst::{
+    diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
+    foundations::{Bytes, Datetime, Dict},
+    syntax::{Source, Span, VirtualPath},
+    text::{Font, FontBook},
+    utils::LazyHash,
+    Features, Library, LibraryExt, World, WorldExt,
 };
 // use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};

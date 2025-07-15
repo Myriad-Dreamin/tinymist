@@ -3,8 +3,8 @@
 use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
 use ecow::EcoString;
-use typst_html::{tag, HtmlElement, HtmlNode};
 use typst::utils::PicoStr;
+use typst_html::{tag, HtmlElement, HtmlNode};
 
 use crate::common::InlineNode;
 use crate::tags::md_tag;

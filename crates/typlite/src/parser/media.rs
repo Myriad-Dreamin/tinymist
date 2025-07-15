@@ -4,6 +4,11 @@ use core::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
+use crate::{
+    attributes::{md_attr, IdocAttr, TypliteAttrsParser},
+    common::ExternalFrameNode,
+    ColorTheme,
+};
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{eco_format, EcoString};
@@ -16,11 +21,6 @@ use typst::{
     World,
 };
 use typst_html::{HtmlElement, HtmlNode};
-use crate::{
-    attributes::{md_attr, IdocAttr, TypliteAttrsParser},
-    common::ExternalFrameNode,
-    ColorTheme,
-};
 
 use super::core::HtmlToAstParser;
 
