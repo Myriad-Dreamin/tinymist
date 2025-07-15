@@ -17,7 +17,7 @@ use typst::{
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
-    Features, Library, World,
+    Features, Library, World, WorldExt,
 };
 
 use crate::{
@@ -32,6 +32,7 @@ use crate::{
     },
     WorldComputeGraph,
 };
+
 // use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
 use crate::{font::FontResolver, CompilerFeat, ShadowApi, WorldDeps};
