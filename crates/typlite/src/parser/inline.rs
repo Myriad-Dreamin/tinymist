@@ -1,7 +1,7 @@
 //! Inline element processing module, handles text and inline style elements
 
 use cmark_writer::ast::Node;
-use typst::html::HtmlElement;
+use typst_html::HtmlElement;
 
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
 use crate::common::{CenterNode, FigureNode, HighlightNode};

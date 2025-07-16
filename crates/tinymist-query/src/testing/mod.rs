@@ -144,7 +144,9 @@ struct UserTestConfig {
 
 fn extract_test_configuration(doc: &TypstDocument) -> Result<TestConfig> {
     let selector = Label::new(PicoStr::intern("test-config"));
-    let metadata = doc.introspector().query(&Selector::Label(selector));
+    let metadata = doc
+        .introspector()
+        .query(&Selector::Label(selector.unwrap()));
     if metadata.len() > 1 {
         // todo: attach source locations.
         bail!("multiple test configurations found");

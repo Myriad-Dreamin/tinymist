@@ -248,11 +248,11 @@ impl RenameFileWorker<'_> {
         let import_node = root.find(span).and_then(first_ancestor_expr)?;
         let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
             match import_node.cast::<ast::Expr>()? {
-                ast::Expr::Import(import) => Some((
+                ast::Expr::ModuleImport(import) => Some((
                     import.source(),
                     import.new_name().is_none() && import.imports().is_none(),
                 )),
-                ast::Expr::Include(include) => Some((include.source(), false)),
+                ast::Expr::ModuleInclude(include) => Some((include.source(), false)),
                 _ => None,
             }
         })?;

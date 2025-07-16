@@ -43,14 +43,14 @@ pub fn to_typst_position(
     lsp_position_encoding: PositionEncoding,
     typst_source: &Source,
 ) -> Option<usize> {
-    let lines = typst_source.len_lines() as u32;
+    let lines = typst_source.lines().len_lines() as u32;
 
     'bound_checking: {
         let should_warning = match lsp_position.line.cmp(&lines) {
             Ordering::Greater => true,
             Ordering::Equal => lsp_position.character > 0,
             Ordering::Less if lsp_position.line + 1 == lines => {
-                let last_line_offset = typst_source.line_to_byte(lines as usize - 1)?;
+                let last_line_offset = typst_source.lines().line_to_byte(lines as usize - 1)?;
                 let last_line_chars = &typst_source.text()[last_line_offset..];
                 let len = match lsp_position_encoding {
                     PositionEncoding::Utf8 => last_line_chars.len(),
@@ -71,18 +71,20 @@ pub fn to_typst_position(
         if should_warning {
             log::warn!(
                     "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
-                    lsp_position, typst_source.len_lines(), typst_source.line_to_range(typst_source.len_lines() - 1),
+                    lsp_position, typst_source.lines().len_lines(), typst_source.lines().line_to_range(typst_source.lines().len_lines() - 1),
                 );
         }
 
-        return Some(typst_source.len_bytes());
+        return Some(typst_source.lines().len_bytes());
     }
 
     match lsp_position_encoding {
         PositionEncoding::Utf8 => {
             let line_index = lsp_position.line as usize;
             let column_index = lsp_position.character as usize;
-            typst_source.line_column_to_byte(line_index, column_index)
+            typst_source
+                .lines()
+                .line_column_to_byte(line_index, column_index)
         }
         PositionEncoding::Utf16 => {
             // We have a line number and a UTF-16 offset into that line. We want a byte
@@ -106,11 +108,11 @@ pub fn to_typst_position(
             let line_index = lsp_position.line as usize;
             let utf16_offset_in_line = lsp_position.character as usize;
 
-            let byte_line_offset = typst_source.line_to_byte(line_index)?;
-            let utf16_line_offset = typst_source.byte_to_utf16(byte_line_offset)?;
+            let byte_line_offset = typst_source.lines().line_to_byte(line_index)?;
+            let utf16_line_offset = typst_source.lines().byte_to_utf16(byte_line_offset)?;
             let utf16_offset = utf16_line_offset + utf16_offset_in_line;
 
-            typst_source.utf16_to_byte(utf16_offset)
+            typst_source.lines().utf16_to_byte(utf16_offset)
         }
     }
 }
@@ -121,12 +123,12 @@ pub fn to_lsp_position(
     lsp_position_encoding: PositionEncoding,
     typst_source: &Source,
 ) -> LspPosition {
-    if typst_offset > typst_source.len_bytes() {
-        return LspPosition::new(typst_source.len_lines() as u32, 0);
+    if typst_offset > typst_source.lines().len_bytes() {
+        return LspPosition::new(typst_source.lines().len_lines() as u32, 0);
     }
 
-    let line_index = typst_source.byte_to_line(typst_offset).unwrap();
-    let column_index = typst_source.byte_to_column(typst_offset).unwrap();
+    let line_index = typst_source.lines().byte_to_line(typst_offset).unwrap();
+    let column_index = typst_source.lines().byte_to_column(typst_offset).unwrap();
 
     let lsp_line = line_index as u32;
     let lsp_column = match lsp_position_encoding {
@@ -139,10 +141,13 @@ pub fn to_lsp_position(
             // we   need here. Submit a PR to `typst` to add it, then update
             // this if/when merged.
 
-            let utf16_offset = typst_source.byte_to_utf16(typst_offset).unwrap();
+            let utf16_offset = typst_source.lines().byte_to_utf16(typst_offset).unwrap();
 
-            let byte_line_offset = typst_source.line_to_byte(line_index).unwrap();
-            let utf16_line_offset = typst_source.byte_to_utf16(byte_line_offset).unwrap();
+            let byte_line_offset = typst_source.lines().line_to_byte(line_index).unwrap();
+            let utf16_line_offset = typst_source
+                .lines()
+                .byte_to_utf16(byte_line_offset)
+                .unwrap();
 
             let utf16_column_offset = utf16_offset - utf16_line_offset;
             utf16_column_offset as u32
@@ -231,7 +236,7 @@ mod test {
             },
         };
         let res = to_typst_range(rng, PositionEncoding::Utf16, &source).unwrap();
-        assert_eq!(res, 19..source.len_bytes());
+        assert_eq!(res, 19..source.lines().len_bytes());
         // EOF
         let rng = LspRange {
             start: LspPosition {
@@ -244,7 +249,7 @@ mod test {
             },
         };
         let res = to_typst_range(rng, PositionEncoding::Utf16, &source).unwrap();
-        assert_eq!(res, source.len_bytes()..source.len_bytes());
+        assert_eq!(res, source.lines().len_bytes()..source.lines().len_bytes());
 
         for line in 0..=5 {
             for character in 0..2 {
@@ -262,7 +267,7 @@ mod test {
     fn overflow_offset_to_position() {
         let source = Source::detached("test");
 
-        let offset = source.len_bytes();
+        let offset = source.lines().len_bytes();
         let position = to_lsp_position(offset, PositionEncoding::Utf16, &source);
         assert_eq!(
             position,
@@ -272,7 +277,7 @@ mod test {
             }
         );
 
-        let offset = source.len_bytes() + 1;
+        let offset = source.lines().len_bytes() + 1;
         let position = to_lsp_position(offset, PositionEncoding::Utf16, &source);
         assert_eq!(
             position,

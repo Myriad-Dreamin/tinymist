@@ -52,15 +52,15 @@ impl InstrumentWorker {
     fn visit_node(&mut self, node: &SyntaxNode) {
         if let Some(expr) = node.cast::<ast::Expr>() {
             match expr {
-                ast::Expr::Code(..) => {
+                ast::Expr::CodeBlock(..) => {
                     self.instrument_block(node);
                     return;
                 }
-                ast::Expr::While(while_expr) => {
+                ast::Expr::WhileLoop(while_expr) => {
                     self.instrument_block_child(node, while_expr.body().span(), Span::detached());
                     return;
                 }
-                ast::Expr::For(for_expr) => {
+                ast::Expr::ForLoop(for_expr) => {
                     self.instrument_block_child(node, for_expr.body().span(), Span::detached());
                     return;
                 }
@@ -76,7 +76,7 @@ impl InstrumentWorker {
                     self.instrument_block_child(node, closure.body().span(), Span::detached());
                     return;
                 }
-                ast::Expr::Show(show_rule) => {
+                ast::Expr::ShowRule(show_rule) => {
                     let transform = show_rule.transform().to_untyped().span();
 
                     for child in node.children() {
@@ -102,9 +102,9 @@ impl InstrumentWorker {
                 | ast::Expr::Label(..)
                 | ast::Expr::Ref(..)
                 | ast::Expr::Heading(..)
-                | ast::Expr::List(..)
-                | ast::Expr::Enum(..)
-                | ast::Expr::Term(..)
+                | ast::Expr::ListItem(..)
+                | ast::Expr::EnumItem(..)
+                | ast::Expr::TermItem(..)
                 | ast::Expr::Equation(..)
                 | ast::Expr::Math(..)
                 | ast::Expr::MathText(..)
@@ -124,7 +124,7 @@ impl InstrumentWorker {
                 | ast::Expr::Float(..)
                 | ast::Expr::Numeric(..)
                 | ast::Expr::Str(..)
-                | ast::Expr::Content(..)
+                | ast::Expr::ContentBlock(..)
                 | ast::Expr::Parenthesized(..)
                 | ast::Expr::Array(..)
                 | ast::Expr::Dict(..)
@@ -132,15 +132,15 @@ impl InstrumentWorker {
                 | ast::Expr::Binary(..)
                 | ast::Expr::FieldAccess(..)
                 | ast::Expr::FuncCall(..)
-                | ast::Expr::Let(..)
-                | ast::Expr::DestructAssign(..)
-                | ast::Expr::Set(..)
+                | ast::Expr::LetBinding(..)
+                | ast::Expr::DestructAssignment(..)
+                | ast::Expr::SetRule(..)
                 | ast::Expr::Contextual(..)
-                | ast::Expr::Import(..)
-                | ast::Expr::Include(..)
-                | ast::Expr::Break(..)
-                | ast::Expr::Continue(..)
-                | ast::Expr::Return(..) => {}
+                | ast::Expr::ModuleImport(..)
+                | ast::Expr::ModuleInclude(..)
+                | ast::Expr::LoopBreak(..)
+                | ast::Expr::LoopContinue(..)
+                | ast::Expr::FuncReturn(..) => {}
             }
         }
 

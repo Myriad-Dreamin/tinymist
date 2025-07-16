@@ -414,8 +414,8 @@ impl Tokenizer {
                 PositionEncoding::Utf8 => t - s,
                 PositionEncoding::Utf16 => {
                     // todo: whether it is safe to unwrap
-                    let utf16_start = self.source.byte_to_utf16(s).unwrap();
-                    let utf16_end = self.source.byte_to_utf16(t).unwrap();
+                    let utf16_start = self.source.lines().byte_to_utf16(s).unwrap();
+                    let utf16_end = self.source.lines().byte_to_utf16(t).unwrap();
                     utf16_end - utf16_start
                 }
             }
@@ -431,12 +431,14 @@ impl Tokenizer {
             });
             self.curr_pos = position;
         } else {
-            let final_line = self
-                .source
-                .byte_to_line(utf8_end)
-                .unwrap_or_else(|| self.source.len_lines()) as u32;
+            let final_line =
+                self.source
+                    .lines()
+                    .byte_to_line(utf8_end)
+                    .unwrap_or_else(|| self.source.lines().len_lines()) as u32;
             let next_offset = self
                 .source
+                .lines()
                 .line_to_byte((self.curr_pos.line + 1) as usize)
                 .unwrap_or(source_len);
             let inline_length = encode_length(utf8_start, utf8_end.min(next_offset)) as u32;
@@ -461,6 +463,7 @@ impl Tokenizer {
                     utf8_end
                 } else {
                     self.source
+                        .lines()
                         .line_to_byte((line + 1) as usize)
                         .unwrap_or(source_len)
                 };

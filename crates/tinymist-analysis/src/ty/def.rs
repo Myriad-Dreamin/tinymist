@@ -5,6 +5,8 @@
 use core::fmt;
 use std::{
     hash::{Hash, Hasher},
+    panic,
+    panic::AssertUnwindSafe,
     sync::{Arc, OnceLock},
 };
 
@@ -90,47 +92,54 @@ pub enum Ty {
 
 impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Ty::Any => f.write_str("Any"),
-            Ty::Builtin(ty) => write!(f, "{ty:?}"),
-            Ty::Args(args) => write!(f, "&({args:?})"),
-            Ty::Func(func) => write!(f, "{func:?}"),
-            Ty::Pattern(pat) => write!(f, "{pat:?}"),
-            Ty::Dict(record) => write!(f, "{record:?}"),
-            Ty::Array(arr) => write!(f, "Array<{arr:?}>"),
-            Ty::Tuple(elems) => {
-                f.write_str("(")?;
-                for t in elems.iter() {
-                    write!(f, "{t:?}, ")?;
+        let result = panic::catch_unwind(AssertUnwindSafe(|| -> fmt::Result {
+            match self {
+                Ty::Any => f.write_str("Any"),
+                Ty::Builtin(ty) => write!(f, "{ty:?}"),
+                Ty::Args(args) => write!(f, "&({args:?})"),
+                Ty::Func(func) => write!(f, "{func:?}"),
+                Ty::Pattern(pat) => write!(f, "{pat:?}"),
+                Ty::Dict(record) => write!(f, "{record:?}"),
+                Ty::Array(arr) => write!(f, "Array<{arr:?}>"),
+                Ty::Tuple(elems) => {
+                    f.write_str("(")?;
+                    for t in elems.iter() {
+                        write!(f, "{t:?}, ")?;
+                    }
+                    f.write_str(")")
                 }
-                f.write_str(")")
-            }
-            Ty::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
-            Ty::Select(sel) => write!(f, "{sel:?}"),
-            Ty::Union(types) => {
-                f.write_str("(")?;
-                if let Some((first, u)) = types.split_first() {
-                    write!(f, "{first:?}")?;
-                    for u in u {
-                        write!(f, " | {u:?}")?;
+                Ty::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
+                Ty::Select(sel) => write!(f, "{sel:?}"),
+                Ty::Union(types) => {
+                    f.write_str("(")?;
+                    if let Some((first, u)) = types.split_first() {
+                        write!(f, "{first:?}")?;
+                        for u in u {
+                            write!(f, " | {u:?}")?;
+                        }
+                    }
+                    f.write_str(")")
+                }
+                Ty::Let(bounds) => write!(f, "({bounds:?})"),
+                Ty::Param(param) => write!(f, "{:?}: {:?}", param.name, param.ty),
+                Ty::Var(var) => var.fmt(f),
+                Ty::Unary(unary) => write!(f, "{unary:?}"),
+                Ty::Binary(binary) => write!(f, "{binary:?}"),
+                Ty::If(if_expr) => write!(f, "{if_expr:?}"),
+                Ty::Value(ins_ty) => write!(f, "{:?}", ins_ty.val),
+                Ty::Boolean(truthiness) => {
+                    if let Some(truthiness) = truthiness {
+                        write!(f, "{truthiness}")
+                    } else {
+                        f.write_str("Boolean")
                     }
                 }
-                f.write_str(")")
             }
-            Ty::Let(bounds) => write!(f, "({bounds:?})"),
-            Ty::Param(param) => write!(f, "{:?}: {:?}", param.name, param.ty),
-            Ty::Var(var) => var.fmt(f),
-            Ty::Unary(unary) => write!(f, "{unary:?}"),
-            Ty::Binary(binary) => write!(f, "{binary:?}"),
-            Ty::If(if_expr) => write!(f, "{if_expr:?}"),
-            Ty::Value(ins_ty) => write!(f, "{:?}", ins_ty.val),
-            Ty::Boolean(truthiness) => {
-                if let Some(truthiness) = truthiness {
-                    write!(f, "{truthiness}")
-                } else {
-                    f.write_str("Boolean")
-                }
-            }
+        }));
+
+        match result {
+            Ok(fmt_result) => fmt_result,
+            Err(_) => f.write_str("Any"),
         }
     }
 }

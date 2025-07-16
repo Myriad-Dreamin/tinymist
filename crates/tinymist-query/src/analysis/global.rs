@@ -1315,7 +1315,11 @@ fn analyze_bib(
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`
-    let csl_style = bib_elem.style(StyleChain::default()).derived;
+    let csl_style = bib_elem
+        .style
+        .get_ref(StyleChain::default())
+        .derived
+        .clone();
 
     let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
         return None;
