@@ -6,7 +6,7 @@ use ecow::EcoString;
 use typst::html::{tag, HtmlElement, HtmlNode};
 use typst::utils::PicoStr;
 
-use crate::common::InlineNode;
+use crate::common::{InlineNode, MixedContentNode};
 use crate::tags::md_tag;
 use crate::Result;
 
@@ -184,7 +184,17 @@ impl TableParser {
         match content.len() {
             0 => Node::Text(EcoString::new()),
             1 => content.into_iter().next().unwrap(),
-            _ => Node::Custom(Box::new(InlineNode { content })),
+            _ => {
+                let block_nodes: Vec<_> = content.iter().filter(|node| node.is_block()).collect();
+
+                if block_nodes.len() == 1 && content.len() == 1 {
+                    block_nodes[0].clone()
+                } else if !block_nodes.is_empty() {
+                    Node::Custom(Box::new(MixedContentNode { content }))
+                } else {
+                    Node::Custom(Box::new(InlineNode { content }))
+                }
+            }
         }
     }
 
