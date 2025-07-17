@@ -12,7 +12,8 @@ use tinymist_world::{args::*, WorldComputeGraph};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
 };
-use typst::foundations::{Dict, Str, Value};
+use typst::diag::FileResult;
+use typst::foundations::{Bytes, Dict, Str, Value};
 use typst::utils::LazyHash;
 use typst::Features;
 
@@ -30,7 +31,7 @@ impl CompilerFeat for LspCompilerFeat {
     /// Uses [`FontResolverImpl`] directly.
     type FontResolver = FontResolverImpl;
     /// It accesses a physical file system.
-    type AccessModel = SystemAccessModel;
+    type AccessModel = DynAccessModel;
     /// It performs native HTTP requests for fetching package data.
     type Registry = HttpRegistry;
 }
@@ -77,6 +78,7 @@ impl WorldProvider for CompileOnceArgs {
             packages,
             fonts,
             self.creation_timestamp,
+            DynAccessModel(Arc::new(SystemAccessModel {})),
         ))
     }
 
@@ -170,6 +172,7 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             packages,
             Arc::new(fonts),
             None, // creation_timestamp - not available in project file context
+            DynAccessModel(Arc::new(SystemAccessModel {})),
         ))
     }
 
@@ -210,6 +213,7 @@ pub struct LspUniverseBuilder;
 impl LspUniverseBuilder {
     /// Create [`LspUniverse`] with the given options.
     /// See [`LspCompilerFeat`] for instantiation details.
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         entry: EntryState,
         export_target: ExportTarget,
@@ -218,6 +222,7 @@ impl LspUniverseBuilder {
         package_registry: HttpRegistry,
         font_resolver: Arc<FontResolverImpl>,
         creation_timestamp: Option<i64>,
+        am: DynAccessModel,
     ) -> LspUniverse {
         let package_registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
@@ -233,7 +238,7 @@ impl LspUniverseBuilder {
             entry,
             features,
             Some(inputs),
-            Vfs::new(resolver, SystemAccessModel {}),
+            Vfs::new(resolver, am),
             package_registry,
             font_resolver,
             creation_timestamp,
@@ -273,4 +278,38 @@ impl LspUniverseBuilder {
             args.and_then(|args| Some(args.package_cache_path.clone()?.into())),
         )
     }
+}
+
+/// Access model for LSP universe and worlds.
+pub trait LspAccessModel: Send + Sync {
+    /// Returns the content of a file entry.
+    fn content(&self, src: &Path) -> FileResult<Bytes>;
+}
+
+impl<T> LspAccessModel for T
+where
+    T: tinymist_world::vfs::PathAccessModel + Send + Sync + 'static,
+{
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        self.content(src)
+    }
+}
+
+/// Access model for LSP universe and worlds.
+#[derive(Clone)]
+pub struct DynAccessModel(pub Arc<dyn LspAccessModel>);
+
+impl DynAccessModel {
+    /// Create a new dynamic access model from the given access model.
+    pub fn new(access_model: Arc<dyn LspAccessModel>) -> Self {
+        Self(access_model)
+    }
+}
+
+impl tinymist_world::vfs::PathAccessModel for DynAccessModel {
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        self.0.content(src)
+    }
+
+    fn reset(&mut self) {}
 }

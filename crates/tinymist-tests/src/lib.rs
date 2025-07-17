@@ -6,8 +6,8 @@ use std::{
 };
 
 use tinymist_project::{
-    base::ShadowApi, font::FontResolverImpl, CompileFontArgs, EntryManager, EntryState,
-    ExportTarget, LspUniverse, LspUniverseBuilder,
+    base::ShadowApi, font::FontResolverImpl, vfs::system::SystemAccessModel, CompileFontArgs,
+    DynAccessModel, EntryManager, EntryState, ExportTarget, LspUniverse, LspUniverseBuilder,
 };
 use typst::{foundations::Bytes, syntax::VirtualPath};
 
@@ -64,6 +64,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         LspUniverseBuilder::resolve_package(None, None),
         FONT_RESOLVER.clone(),
         None,
+        DynAccessModel(Arc::new(SystemAccessModel {})),
     );
     let sources = source.split("-----");
 
