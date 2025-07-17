@@ -8,9 +8,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## Unreleased
 
-* Bumped typstyle to v0.13.14 by @Enter-tainer. See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.14%20-%20[2025-07-11]>
+## v0.13.16 - [2025-07-19]
 
-## v0.13.16 - [2025-07-13]
+* Bumped typstyle to v0.13.14 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1902.
+ * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.14%20-%20[2025-07-11]>
 
 ### Editor
 
@@ -19,7 +20,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Fix) Displaying SVG embedded in docs on hovering in VS Code Remote in https://github.com/Myriad-Dreamin/tinymist/pull/1878
 * (Test) Ensuring pdf export `onType` to work in https://github.com/Myriad-Dreamin/tinymist/pull/1865
 * Adding a neovim plugin as the canonical lsp client implementation in https://github.com/Myriad-Dreamin/tinymist/pull/1842 and https://github.com/Myriad-Dreamin/tinymist/pull/1851 and https://github.com/Myriad-Dreamin/tinymist/pull/1857
-* Added VS Code alpine-arm64 support in https://github.com/Myriad-Dreamin/tinymist/pull/1837
+* Added VS Code alpine-arm64 support in https://github.com/Myriad-Dreamin/tinymist/pull/1837 and https://github.com/Myriad-Dreamin/tinymist/pull/1901
 
 ### Compiler
 
@@ -36,6 +37,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Code Analysis
 
 * (Fix) truncating value repr with 10MB limit in https://github.com/Myriad-Dreamin/tinymist/pull/1850
+* feat: resolve definitions with dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/1904
 
 ### Docstring
 
