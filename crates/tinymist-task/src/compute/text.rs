@@ -1,5 +1,6 @@
 use core::fmt;
 use std::sync::Arc;
+use typst_html::HtmlNode::*;
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;
@@ -56,20 +57,19 @@ impl FullTextDigest<'_> {
         }
     }
 
-    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst::html::HtmlElement) -> fmt::Result {
+    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst_html::HtmlElement) -> fmt::Result {
         for child in elem.children.iter() {
             Self::export_html_node(f, child)?;
         }
         Ok(())
     }
 
-    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst::html::HtmlNode) -> fmt::Result {
-        use typst::html::HtmlNode::*;
+    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst_html::HtmlNode) -> fmt::Result {
         match node {
             Tag(_) => Ok(()),
             Element(elem) => Self::export_element(f, elem),
             Text(t, _) => f.write_str(t.as_str()),
-            Frame(frame) => Self::export_frame(f, frame),
+            Frame(frame) => Self::export_frame(f, &frame.inner),
         }
     }
 }
