@@ -156,7 +156,7 @@ typst-eval = "0.13.1"
 typst-assets = "0.13.1"
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.14", default-features = false }
+typstyle-core = { version = "=0.13.16", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.12"

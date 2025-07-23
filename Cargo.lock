@@ -167,12 +167,6 @@ checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
 
 [[package]]
 name = "arrayvec"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
-
-[[package]]
-name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
@@ -2132,7 +2126,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1077d333efea6170d9ccb96d3c3026f300ca0773da4938cc4c811daa6df68b0c"
 dependencies = [
- "arrayvec 0.7.6",
+ "arrayvec",
  "smallvec",
 ]
 
@@ -2687,11 +2681,10 @@ dependencies = [
 
 [[package]]
 name = "prettyless"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03ccf1cbd64d88883e4d9363b8ba202cdce66b7bec175233c8b157e772b1165"
+checksum = "749d63085aa461d80b3233e48781bf9e9dca8147fbc98f577e0697c6827dc418"
 dependencies = [
- "arrayvec 0.5.2",
  "typed-arena",
  "unicode-width 0.2.1",
 ]
@@ -3263,7 +3256,7 @@ version = "1.37.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b203a6425500a03e0919c42d3c47caca51e79f1132046626d2c8871c5092035d"
 dependencies = [
- "arrayvec 0.7.6",
+ "arrayvec",
  "num-traits",
 ]
 
@@ -4030,7 +4023,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83d13394d44dae3207b52a326c0c85a8bf87f1541f23b0d143811088497b09ab"
 dependencies = [
  "arrayref",
- "arrayvec 0.7.6",
+ "arrayvec",
  "bytemuck",
  "cfg-if",
  "log",
@@ -5037,7 +5030,7 @@ name = "typst-pdf"
 version = "0.13.1"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist%2Fv0.13.10#946ea31fb554bcf62e3215f64ddda87d70b026af"
 dependencies = [
- "arrayvec 0.7.6",
+ "arrayvec",
  "base64",
  "bytemuck",
  "comemo",
@@ -5064,7 +5057,7 @@ name = "typst-realize"
 version = "0.13.1"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist%2Fv0.13.10#946ea31fb554bcf62e3215f64ddda87d70b026af"
 dependencies = [
- "arrayvec 0.7.6",
+ "arrayvec",
  "bumpalo",
  "comemo",
  "ecow",
@@ -5180,9 +5173,9 @@ dependencies = [
 
 [[package]]
 name = "typstyle-core"
-version = "0.13.14"
+version = "0.13.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a731776328e7f494ab9db9b15152530b5833537666978f12fa0b8d6020a1dfc1"
+checksum = "3ad75e439d474e9dd4e08619e3081b3f6f9c9859cb17108695bf019f9848f1a3"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
@@ -5517,7 +5510,7 @@ version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a19af97fcb96045dd1d6b4d23e2b4abdbbe81723dbc5c9f016eb52145b320063"
 dependencies = [
- "arrayvec 0.7.6",
+ "arrayvec",
  "multi-stash",
  "smallvec",
  "spin",
