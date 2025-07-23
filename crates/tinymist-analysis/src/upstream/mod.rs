@@ -322,7 +322,15 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
                         crate::log_debug_ct!("type: {t:?} -> {cat:?}");
 
                         let route = format_route(parent_name.as_deref(), &name, &cat);
-                        map.insert(CatKey::Type(*t), route);
+
+                        // Some types are defined multiple times, and the first one should take precedence.
+                        //
+                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep `pattern` remains as a deprecated alias.
+                        // Therefore, `Tiling` is first defined as `tiling`, then defined as `pattern` with deprecation again.
+                        // https://typst.app/docs/changelog/0.13.0/#visualization
+                        // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L34
+                        // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L47-L49
+                        map.entry(CatKey::Type(*t)).or_insert(route);
                     }
                     scope_to_finds.push((t.scope(), Some(name), cat));
                 }
@@ -899,12 +907,12 @@ mod tests {
         https://typst.app/docs/reference/visualize/image/#definitions-decode
         https://typst.app/docs/reference/visualize/line/
         https://typst.app/docs/reference/visualize/path/
-        https://typst.app/docs/reference/visualize/pattern/
         https://typst.app/docs/reference/visualize/polygon/
         https://typst.app/docs/reference/visualize/polygon/#definitions-regular
         https://typst.app/docs/reference/visualize/rect/
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
+        https://typst.app/docs/reference/visualize/tiling/
         "###);
     }
 }
