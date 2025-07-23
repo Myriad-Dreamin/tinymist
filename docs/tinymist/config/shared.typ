@@ -1,14 +1,10 @@
-// import * as fs from "fs";
-// import * as path from "path";
-
-// import { vscodeExtTranslations } from "../../../scripts/build-l10n.mjs";
-
 
 #import "mod.typ": *
 
 #import "@preview/cmarker:0.1.6": render as md
 
 #let is-vscode = state("config:is-vscode", false)
+#let show-switch = state("config:show-switch", true)
 
 #let translations = toml("/locales/tinymist-vscode.toml");
 
@@ -28,14 +24,16 @@
   github-link(dest, [Markdown])
 }
 
-#context if is-vscode.get() {
-  html-link("/config/vscode.typ")
-  [ | ]
-  md-link("/editors/vscode/Configuration.md")
-} else {
-  html-link("/config/neovim.typ")
-  [ | ]
-  md-link("/editors/neovim/Configuration.md")
+#context if show-switch.get() {
+  if is-vscode.get() {
+    html-link("/config/vscode.typ")
+    [ | ]
+    md-link("/editors/vscode/Configuration.md")
+  } else {
+    html-link("/config/neovim.typ")
+    [ | ]
+    md-link("/editors/neovim/Configuration.md")
+  }
 }
 
 #let translate(desc) = {

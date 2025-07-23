@@ -63,6 +63,7 @@
   - You can also perform some contextual actions in the editor, such as _Drag and Drop_ a file to the editor, or `Right Click` in the editor to see the _Context Menu_.
   - There are tools in the _Tool View_ that you can use to automate typst tasks.
   - You can interacts with the _Tinymist LSP_ under the state model _Entry File_, _Focus State_, _Pin State_, and _Preview State_.
+  - You can configure the extension and the language server by the _Typst-Specific VS Code Configurations_.
 
   = Tinymist Views
 
@@ -157,6 +158,6 @@
 
 #context {
   let is-vscode = is-vscode.get()
-  vscode-spec
+  if is-vscode { vscode-spec } else [ Todo ]
 }
 

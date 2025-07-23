@@ -25,6 +25,8 @@ There are following user interfaces for Tinymist:
   , [_Pin State_](#pin-state)
   , and [_Preview State_](#preview-state)
   .
+- You can configure the extension and the language server by the [_Typst-Specific VS Code Configurations_](#typst-specific-vs-code-configurations)
+  .
 
 ## Tinymist Views
 
@@ -147,3 +149,392 @@ The [_Profiling_](#profiling)
 The [_Profiling Server_](#profiling-server)
  tool allows you to profile the language server. When you click the `Profiling Server` button in the tool view, the server will start profiling and you can see the profiling results in the [_Profiling_](#profiling)
  tool. You can stop profiling by clicking the `Stop Profiling` button.
+
+## Typst-Specific VS Code Configurations
+
+## `tinymist.compileStatus`
+
+In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don’t have a such feature, it is disabled by default at the language server label.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"`
+  - `"disable"`
+- **Default**: `"enable"`
+
+## `tinymist.completion.postfix`
+
+Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcs`
+
+Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsLeft`
+
+Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsRight`
+
+Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.symbol`
+
+Whether to make symbol completion stepless. For example, `$ar|$` will be completed to `$arrow.r$`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"step"` : Complete symbols step by step
+  - `"stepless"` : Complete symbols steplessly
+- **Default**: `"step"`
+
+## `tinymist.completion.triggerOnSnippetPlaceholders`
+
+Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn’t support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+## `tinymist.configureDefaultWordSeparator`
+
+Whether to configure default word separators on startup
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Override the default word separators on startup
+  - `"disable"` : Do not override the default word separators on startup
+- **Default**: `"disable"`
+
+## `tinymist.copyAndPaste`
+
+Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Enable copy-and-paste.
+  - `"disable"` : Disable copy-and-paste.
+- **Default**: `"enable"`
+
+## `tinymist.dragAndDrop`
+
+Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Enable drag-and-drop.
+  - `"disable"` : Disable drag-and-drop.
+- **Default**: `"enable"`
+
+## `tinymist.exportPdf`
+
+The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"never"` : Never export PDFs, you will manually run typst.
+  - `"onSave"` : Export PDFs when you save a file.
+  - `"onType"` : Export PDFs as you type in a file.
+  - `"onDocumentHasTitle"` : (Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
+- **Default**: `"never"`
+
+## `tinymist.exportTarget`
+
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"paged"` : The current export target is for PDF, PNG, and SVG export.
+  - `"html"` : The current export target is for HTML export.
+- **Default**: `"paged"`
+
+## `tinymist.fontPaths`
+
+A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` \> Configuration `tinymist.typstExtraArgs.fontPaths` \> LSP’s CLI Argument `--font-path` \> The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`.
+
+- **Type**: array | null
+
+## `tinymist.formatterIndentSize`
+
+Sets the indent size (using space) for the formatter.
+
+- **Type**: `number`
+- **Default**: `2`
+
+## `tinymist.formatterMode`
+
+The extension can format Typst files using typstfmt or typstyle.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"disable"` : Formatter is not activated.
+  - `"typstyle"` : Use typstyle formatter.
+  - `"typstfmt"` : Use typstfmt formatter.
+- **Default**: `"typstyle"`
+
+## `tinymist.formatterPrintWidth`
+
+Sets the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of _Print Width_](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter’s specific configurations.
+
+- **Type**: `number`
+- **Default**: `120`
+
+## `tinymist.formatterProseWrap`
+
+Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces.
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+## `tinymist.lint.enabled`
+
+Enable or disable lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+## `tinymist.lint.when`
+
+Configure when to perform lint checks. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"onSave"` : Perform lint checks on save
+  - `"onType"` : Perform lint checks on type
+- **Default**: `"onSave"`
+
+## `tinymist.onEnterEvent`
+
+Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.outputPath`
+
+The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.
+
+- **Type**: `string`
+- **Default**: `""`
+
+## `tinymist.preview.background.args`
+
+The arguments that the background preview server used for. It is only used when \`tinymist.preview.background\` is enabled. Check \`tinymist preview\` to see the allowed arguments.
+
+- **Type**: `array`
+- **Properties**:
+  - `"type"`: 
+    - **Type**: `string`
+- **Default**: `[
+    "--data-plane-host=127.0.0.1:23635",
+    "--invert-colors=auto"
+  ]`
+
+## `tinymist.preview.background.enabled`
+
+This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server listens a specific tcp port in the background. You can discover the background previewers in the preview panel.
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+## `tinymist.preview.browsing.args`
+
+The arguments used by \`tinymist.startDefaultPreview\` command. Check \`tinymist preview\` to see the allowed arguments.
+
+- **Type**: `array`
+- **Properties**:
+  - `"type"`: 
+    - **Type**: `string`
+- **Default**: `[
+    "--data-plane-host=127.0.0.1:0",
+    "--invert-colors=auto",
+    "--open"
+  ]`
+
+## `tinymist.preview.cursorIndicator`
+
+(Experimental) Show typst cursor indicator in preview.
+
+- **Type**: `boolean`
+- **Default**: `false`
+
+## `tinymist.preview.invertColors`
+
+Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format.
+
+This configuration item can be one of following types:
+
+- Invert colors of the preview.
+  - **Type**: `string`
+  - **Valid Values**:
+    - `"never"` : Never
+    - `"auto"` : Inferring from the browser settings
+    - `"always"` : Always
+  - **Default**: `"never"`
+- Invert colors of the preview in a more fine-grained way.
+  - **Type**: `object`
+  - **Properties**:
+    - `"rest"`: Invert colors of the rest of the elements.
+      - **Type**: `string`
+      - **Valid Values**:
+        - `"never"` : Never
+        - `"auto"` : Inferring from the browser settings
+        - `"always"` : Always
+      - **Default**: `"never"`
+    - `"image"`: Invert colors of the images.
+      - **Type**: `string`
+      - **Valid Values**:
+        - `"never"` : Never
+        - `"auto"` : Inferring from the browser settings
+        - `"always"` : Always
+      - **Default**: `"never"`
+  - **Default**: `{}`
+
+## `tinymist.preview.partialRendering`
+
+Only render visible part of the document. This can improve performance but still being experimental.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.preview.refresh`
+
+Refresh preview when the document is saved or when the document is changed
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"onSave"` : Refresh preview on save
+  - `"onType"` : Refresh preview on type
+- **Default**: `"onType"`
+
+## `tinymist.preview.scrollSync`
+
+Configure scroll sync mode.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"never"` : Disable automatic scroll sync
+  - `"onSelectionChangeByMouse"` : Scroll preview to current cursor position when selection changes by mouse
+  - `"onSelectionChange"` : Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)
+- **Default**: `"onSelectionChangeByMouse"`
+
+## `tinymist.previewFeature`
+
+Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Enable preview features.
+  - `"disable"` : Disable preview features.
+- **Default**: `"enable"`
+
+## `tinymist.projectResolution`
+
+This configuration specifies the way to resolved projects.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"singleFile"` : Manage typst documents like what we did in Markdown. Each single file is an individual document and no project resolution is needed.
+  - `"lockDatabase"` : Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file.
+- **Default**: `"singleFile"`
+
+## `tinymist.renderDocs`
+
+(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem’s temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn’t support/handle image previewing in docs.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Enable render docs.
+  - `"disable"` : Disable render docs.
+- **Default**: `"enable"`
+
+## `tinymist.rootPath`
+
+Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for Neovim users, if it complains root not found, you must set `require("lspconfig")["tinymist"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528).
+
+- **Type**: string | null
+
+## `tinymist.semanticTokens`
+
+Enable or disable semantic tokens (LSP syntax highlighting)
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"enable"` : Use semantic tokens for syntax highlighting
+  - `"disable"` : Do not use semantic tokens for syntax highlighting
+- **Default**: `"enable"`
+
+## `tinymist.serverPath`
+
+The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable. The string “tinymist” means look up Tinymist in PATH.
+
+- **Type**: string | null
+
+## `tinymist.showExportFileIn`
+
+Configures way of opening exported files, e.g. inside of editor tabs or using system application.
+
+This configuration item can be one of following types:
+
+- Configures way of opening exported files, e.g. inside of editor tabs or using system application.
+  - **Type**: `string`
+  - **Valid Values**:
+    - `"editorTab"` : Show the exported files in editor tabs.
+    - `"systemDefault"` : Show the exported files by system default application.
+  - **Default**: `"editorTab"`
+
+## `tinymist.statusBarFormat`
+
+Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:
+
+- `{compileStatusIcon}`: Icon indicating the compile status
+- `{wordCount}`: Number of words in the document
+- `{fileName}`: Name of the file being compiled
+
+Note: The status bar will be hidden if the format string is empty.
+
+- **Type**: `string`
+- **Default**: `"{compileStatusIcon} {wordCount} [{fileName}]"`
+
+## `tinymist.systemFonts`
+
+A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.trace.server`
+
+Traces the communication between VS Code and the language server.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"off"`
+  - `"messages"`
+  - `"verbose"`
+- **Default**: `"off"`
+
+## `tinymist.typingContinueCommentsOnNewline`
+
+Whether to prefix newlines after comments with the corresponding comment prefix.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.typstExtraArgs`
+
+You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.
+
+- **Type**: `array`
+- **Default**: `[]`
