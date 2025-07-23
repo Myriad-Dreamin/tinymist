@@ -6,18 +6,14 @@ Normally, you should always create release candidates to avoid failures in the r
 - At most 9 release candidates can be created for a version. This is because semver compares the version number as a string, and `rc9` is greater than `rc10` in sense of string comparison.
 - You must publish the release soon after a good release candidate is created, otherwise CI may fail tomorrow.
 
+The steps to release are list as following:
+- Determining a Git Tag.
+- Checking before Releases.
+- Making a Release PR.
+- Tagging the Release Locally.
+- Generating the GitHub Release's Body (Content).
+
 #set heading(numbering: numbly("Step {1}~"))
-
-= Checking the `Cargo.toml` and the `Cargo.lock`
-
-A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This will cause the `Cargo.lock` file to be unstable and the build to fail. Use the `git` with `tag` dependencies instead.
-
-= Checking publish tokens
-
-Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
-
-- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the #link("https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows")[Azure DevOps -- Use personal access tokens.]
-- Renew the `OPENVSX_ACCESS_TOKEN` at the #link("https://open-vsx.org/user-settings/tokens")[Open VSX Registry -- Access Tokens.]
 
 = Determining a Git Tag
 
@@ -27,7 +23,30 @@ If you are releasing a nightly version, please set the prerelease flag to true. 
 
 #include "versioning.typ"
 
-= Updating Version String to Release
+= Checking before Releases
+
+== Checking the `Cargo.toml` and the `Cargo.lock`
+
+A `git` with `branch` dependency is forbidden in the `Cargo.toml` file. This will cause the `Cargo.lock` file to be unstable and the build to fail. Use the `git` with `tag` dependencies instead.
+
+== Checking publish tokens
+
+Please check the deadline of the publish tokens stored in the GitHub secrets. If the tokens are expired, please renew them before release.
+
+- Renew the `VSCODE_MARKETPLACE_TOKEN` according to the #link("https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows")[Azure DevOps -- Use personal access tokens.]
+- Renew the `OPENVSX_ACCESS_TOKEN` at the #link("https://open-vsx.org/user-settings/tokens")[Open VSX Registry -- Access Tokens.]
+
+= Making a Release PR
+
+You should perform following steps to make a release PR:
+- Create a PR with name in format of `build: bump version to {version}`.
+- Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI.
+- Update the Changelog.1
+- Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate.
+- Update `tinymist-assets` version in the `Cargo.toml` file.
+- Wait for the CI to pass, and then merge the PR.
+
+== Updating Version String in Codebase
 
 - The `tinymist-assets` package
   - package.json should be the version.
@@ -40,21 +59,13 @@ If you are releasing a nightly version, please set the prerelease flag to true. 
 
 You can `grep` the version number in the repository to check if all the components are updated. Some CI script will also assert failing to help you catch the issue.
 
-= Publishing the tinymist-assets crate
-
-Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
-
-= Updating the Changelog
+== Updating the Changelog
 
 All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
 
-= Generating the GitHub Release's Body (Content)
+== Publishing the tinymist-assets crate
 
-Run the `tinymist::announce` CI to generate announcement body of the GitHub release. It first includes the changelog read from the `CHANGELOG.md` file, then attaches the download script and available download links.
-
-= Dry running the CI
-
-Dry running the `ci.yml` if you feel necessary.
+Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
 
 = Tagging the Release
 
@@ -66,3 +77,7 @@ $ git push --tag
 ```
 
 This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.
+
+= Generating the GitHub Release's Body (Content)
+
+After tagging the Release, run the `tinymist::announce` CI to generate announcement body of the GitHub release. It first includes the changelog read from the `CHANGELOG.md` file, then attaches the download script and available download links.
