@@ -4218,7 +4218,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -4226,7 +4226,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4254,7 +4254,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "base64",
  "comemo",
@@ -4305,7 +4305,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "anyhow",
  "base64",
@@ -4437,7 +4437,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4483,7 +4483,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "comemo",
  "ecow",
@@ -4501,7 +4501,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5088,7 +5088,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 dependencies = [
  "cfg-if",
  "comemo",
