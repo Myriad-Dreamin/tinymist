@@ -128,6 +128,14 @@ const tasks = [
     output: "docs/release-instruction.md",
   },
   {
+    input: "docs/tinymist/software-spec/vscode.typ",
+    output: "docs/for-llm/vscode-ui.md",
+  },
+  {
+    input: "docs/tinymist/software-spec/neovim.typ",
+    output: "docs/for-llm/neovim-ui.md",
+  },
+  {
     input: "docs/tinymist/crates/typlite.typ",
     output: "crates/typlite/README.md",
   },
