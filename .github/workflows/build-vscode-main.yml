@@ -1,4 +1,3 @@
-
 name: tinymist::build::vscode::main
 on:
   workflow_call:
