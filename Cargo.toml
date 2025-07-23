@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.16-rc1"
+version = "0.13.16-rc2"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -137,11 +137,11 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.6.1-rc1", default-features = false, features = [
+reflexo = { version = "=0.6.1-rc2", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.6.1-rc1", default-features = false }
-reflexo-vec2svg = { version = "=0.6.1-rc1" }
+reflexo-typst = { version = "=0.6.1-rc2", default-features = false }
+reflexo-vec2svg = { version = "=0.6.1-rc2" }
 
 typst = "0.13.1"
 typst-html = "0.13.1"
@@ -185,30 +185,30 @@ insta = { version = "1.39", features = ["glob"] }
 
 
 # Our Own Crates
-tinymist-assets = { version = "=0.13.16-rc1" }
+tinymist-assets = { version = "=0.13.16-rc2" }
 
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.16-rc1" }
-tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.16-rc1" }
-tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.16-rc1" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.16-rc1", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.16-rc1", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.16-rc1", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.16-rc1" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.16-rc1" }
-typst-shim = { path = "./crates/typst-shim", version = "0.13.16-rc1" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.16-rc2" }
+tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.16-rc2" }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.16-rc2" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.16-rc2", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.16-rc2", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.16-rc2", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.16-rc2" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.16-rc2" }
+typst-shim = { path = "./crates/typst-shim", version = "0.13.16-rc2" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.13.16-rc1" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.16-rc1" }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.16-rc1" }
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.16-rc1", default-features = false }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.16-rc1" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.16-rc1" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.16-rc1" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.16-rc1" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.13.16-rc1" }
-typlite = { path = "./crates/typlite", version = "0.13.16-rc1", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.13.16-rc2" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.16-rc2" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.16-rc2" }
+tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.16-rc2", default-features = false }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.16-rc2" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.16-rc2" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.16-rc2" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.16-rc2" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.13.16-rc2" }
+typlite = { path = "./crates/typlite", version = "0.13.16-rc2", default-features = false }
 
 [profile.dev.package.insta]
 opt-level = 3
@@ -297,9 +297,9 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinym
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "721308ad79ee5c529a65da17239a58dca7b5453c" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
