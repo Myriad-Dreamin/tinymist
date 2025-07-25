@@ -14,10 +14,21 @@ export function setupDrag() {
     };
     moved = true;
   };
+  const goodDrag = (element: HTMLElement | null): element is HTMLElement => {
+    if (!element) return false;
+    // is not child of id=typst-container-top
+    while (element) {
+      if (element.id === "typst-container-top") {
+        return false;
+      }
+      element = element.parentElement;
+    }
+    return true;
+  };
   const mouseUpHandler = function () {
     document.removeEventListener("mousemove", mouseMoveHandler);
     document.removeEventListener("mouseup", mouseUpHandler);
-    if (!containerElement) return;
+    if (!goodDrag(containerElement)) return;
     if (!moved) {
       document.getSelection()?.removeAllRanges();
     }
@@ -29,7 +40,7 @@ export function setupDrag() {
       x: e.clientX,
       y: e.clientY,
     };
-    if (!containerElement) return;
+    if (!goodDrag(containerElement)) return;
     const elementUnderMouse = e.target as HTMLElement | null;
     if (elementUnderMouse !== null && elementUnderMouse.classList.contains("tsel")) {
       return;

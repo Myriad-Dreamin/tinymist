@@ -75,6 +75,7 @@
 }
 
 #typst-container.mode-slide #typst-container-top {
+    height: 35px;
     position: absolute;
     opacity: 0;
     transition: opacity 0.3s ease;
