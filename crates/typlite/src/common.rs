@@ -7,7 +7,6 @@ use cmark_writer::HtmlAttribute;
 use cmark_writer::HtmlElement;
 use cmark_writer::HtmlWriteResult;
 use cmark_writer::HtmlWriter;
-use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
 use cmark_writer::WriterOptions;
 use ecow::eco_format;
@@ -178,14 +177,7 @@ impl CenterNode {
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        let mut temp_writer = HtmlWriter::with_options(HtmlWriterOptions {
-            strict: false,
-            ..Default::default()
-        });
-        temp_writer.write_node(&self.node)?;
-        let content = temp_writer.into_string();
-        writer.write_str(&content)?;
-        Ok(())
+        writer.write_node(&self.node)
     }
 }
 
@@ -258,6 +250,29 @@ impl AlertNode {
         tmp_writer.write(&quote)?;
         content += tmp_writer.into_string();
         writer.write_str(&content)?;
+        Ok(())
+    }
+}
+
+/// Mixed content node for table cells that may contain both inline and block elements
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = true)]
+pub struct MixedContentNode {
+    pub content: Vec<Node>,
+}
+
+impl MixedContentNode {
+    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+        for node in &self.content {
+            writer.write(node)?;
+        }
+        Ok(())
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        for node in &self.content {
+            writer.write_node(node)?;
+        }
         Ok(())
     }
 }
