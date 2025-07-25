@@ -10,7 +10,7 @@
 
 #show: book-page.with(title: title)
 
-Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
+Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it #ruby[微][wēi][霭][ǎi] in Chinese.
 
 It contains:
 - an analyzing library for Typst, see #github-link("/crates/tinymist-query/")[tinymist-query].
