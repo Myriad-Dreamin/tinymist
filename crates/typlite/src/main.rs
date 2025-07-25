@@ -47,6 +47,10 @@ pub struct CompileArgs {
     /// ```
     #[clap(long = "processor", default_value = None, value_name = "PACKAGE_SPEC")]
     pub processor: Option<String>,
+
+    /// Enable debug mode to output intermediate parsing results
+    #[clap(long)]
+    pub debug: bool,
 }
 
 fn main() -> Result<()> {
@@ -89,6 +93,7 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
         .with_feature(TypliteFeat {
             assets_path: args.assets_path,
             processor: args.processor,
+            debug: args.debug,
             ..Default::default()
         })
         .convert_doc(output_format)?;

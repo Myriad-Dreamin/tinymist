@@ -78,6 +78,9 @@ impl MarkdownDocument {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone(), &self.world);
+        if self.feat.debug {
+            eprintln!("[DEBUG] Starting parsing with debug mode enabled");
+        }
         parser.parse(&self.base.root).context_ut("failed to parse")
     }
 
@@ -157,6 +160,8 @@ pub struct TypliteFeat {
     /// Import context for code examples (e.g., "#import \"/path/to/file.typ\":
     /// *")
     pub import_context: Option<String>,
+    /// Enable debug mode to output intermediate parsing results
+    pub debug: bool,
     /// Specifies the package to process markup.
     ///
     /// ## `article` function
