@@ -67,6 +67,15 @@ export async function getTests(ctx: Context) {
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     });
 
+    suite.addTest("tinymist.showSummary works well", async () => {
+      await ctx.openDocument(vscode.Uri.joinPath(workspaceUri, "preview-skyzh-cv.typ"));
+
+      await vscode.commands.executeCommand("tinymist.showSummary");
+
+      // close the editor
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    });
+
     suite.addTest("restart server", async () => {
       const _mainTyp = await ctx.openDocument(
         vscode.Uri.joinPath(workspaceUri, "completion-base.typ"),
