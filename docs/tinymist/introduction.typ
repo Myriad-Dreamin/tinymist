@@ -10,7 +10,24 @@
 
 #show: book-page.with(title: title)
 
-Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
+#let ruby(..pairs) = {
+  let ks = ()
+  let vs = ()
+  for (k, v) in pairs.pos().chunks(2) {
+    if sys-is-html-target {
+      html.elem("ruby")[#k#html.elem("rt", v)]
+    } else {
+      ks.push(k)
+      vs.push(v)
+    }
+  }
+
+  if ks.len() != 0 [
+    "#ks.join("")" [#vs.join(" ")]
+  ]
+}
+
+Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it #ruby[微][wēi][霭][ǎi] in Chinese.
 
 It contains:
 - an analyzing library for Typst, see #github-link("/crates/tinymist-query/")[tinymist-query].
