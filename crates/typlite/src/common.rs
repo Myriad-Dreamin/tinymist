@@ -215,7 +215,7 @@ impl InlineNode {
 
 /// Verbatim node for raw text output
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node(block = true, html_impl = false)]
+#[custom_node(block = false, html_impl = false)]
 pub struct VerbatimNode {
     /// The content to directly output
     pub content: EcoString,
