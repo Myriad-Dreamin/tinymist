@@ -71,10 +71,17 @@
   width: 100%;
   height: 100%;
   flex: 1;
-  max-height: calc(100vh - 35px);
+  max-height: 100vh;
 }
 
 #typst-container.mode-slide #typst-container-top {
-  flex: 0 0 35px;
-  display: flex;
+    position: absolute;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+#typst-container.mode-slide #typst-container-top:hover {
+    opacity: 1;
+    pointer-events: auto;
 }
