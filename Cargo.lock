@@ -355,9 +355,9 @@ dependencies = [
 
 [[package]]
 name = "bytemuck_derive"
-version = "1.9.3"
+version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ecc273b49b3205b83d648f0690daa588925572cc5063745bfe547fe7ec8e1a1"
+checksum = "441473f2b4b0459a68628c744bc61d23e730fb00128b841d30fa4bb3972257e4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -422,9 +422,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.2.29"
+version = "1.2.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c1599538de2394445747c8cf7935946e3cc27e9625f889d979bfb2aaf569362"
+checksum = "deec109607ca693028562ed836a5f1c4b8bd77755c4e132fc5ce11b0b6211ae7"
 dependencies = [
  "shlex",
 ]
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "base64",
@@ -1187,6 +1187,15 @@ checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "euclid"
+version = "0.22.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad9cdb4b747e485a12abb0e6566612956c7a1bafa3bdb8d682c5b6d403589e48"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -1724,9 +1733,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66d5bd4c6f02bf0542fad85d626775bab9258cf795a4256dcaf3161114d1df"
+checksum = "8d9b05277c7e8da2c93a568989bb6207bef0112e8d17df7a6eda4a3cf143bc5e"
 dependencies = [
  "base64",
  "bytes",
@@ -1740,7 +1749,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2",
+ "socket2 0.6.0",
  "tokio",
  "tower-service",
  "tracing",
@@ -2149,9 +2158,9 @@ dependencies = [
 
 [[package]]
 name = "io-uring"
-version = "0.7.8"
+version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b86e202f00093dcba4275d4636b93ef9dd75d025ae560d2521b45ea28ab49013"
+checksum = "d93587f37623a1a17d94ef2bc9ada592f5465fe7732084ab7beefabe5c77c0c4"
 dependencies = [
  "bitflags 2.9.1",
  "cfg-if",
@@ -2350,11 +2359,12 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.11.2"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1077d333efea6170d9ccb96d3c3026f300ca0773da4938cc4c811daa6df68b0c"
+checksum = "c62026ae44756f8a599ba21140f350303d4f08dcdcc71b5ad9c9bb8128c13c62"
 dependencies = [
  "arrayvec 0.7.6",
+ "euclid",
  "smallvec",
 ]
 
@@ -2384,9 +2394,9 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libredox"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1580801010e535496706ba011c15f8532df6b42297d2e471fec38ceadd8c0638"
+checksum = "4488594b9328dee448adb906d8b126d9b7deb7cf5c22161ee591610bb1be83c0"
 dependencies = [
  "bitflags 2.9.1",
  "libc",
@@ -2897,9 +2907,9 @@ dependencies = [
 
 [[package]]
 name = "postcard"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c1de96e20f51df24ca73cafcc4690e044854d803259db27a00a461cb3b9d17a"
+checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
 dependencies = [
  "cobs",
  "embedded-io 0.4.0",
@@ -3038,7 +3048,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash 2.1.1",
  "rustls",
- "socket2",
+ "socket2 0.5.10",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
@@ -3054,7 +3064,7 @@ dependencies = [
  "bytes",
  "getrandom 0.3.3",
  "lru-slab",
- "rand 0.9.1",
+ "rand 0.9.2",
  "ring",
  "rustc-hash 2.1.1",
  "rustls",
@@ -3075,7 +3085,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.59.0",
 ]
@@ -3114,9 +3124,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
+checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
@@ -3192,9 +3202,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.13"
+version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d04b7d0ee6b4a0207a0a7adb104d23ecb0b47d6beae7152d0fa34b692b29fd6"
+checksum = "7e8af0dde094006011e6a740d4879319439489813bd0bcdc7d821beaeeff48ec"
 dependencies = [
  "bitflags 2.9.1",
 ]
@@ -3775,9 +3785,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.140"
+version = "1.0.141"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
+checksum = "30b9eff21ebe718216c6ec64e1d9ac57087aad11efc64e32002bce4a0d4c03d3"
 dependencies = [
  "itoa",
  "memchr",
@@ -3974,6 +3984,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket2"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
+dependencies = [
+ "libc",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4094,7 +4114,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4223,7 +4243,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "insta",
  "lsp-types",
@@ -4346,7 +4366,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4420,7 +4440,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "comemo",
  "dashmap",
@@ -4459,11 +4479,11 @@ checksum = "053414ba8d0129f161bb4f4fd79beac72ddfa9f54d7d03a17b0c608edc473a67"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "divan",
  "tinymist",
@@ -4471,7 +4491,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-core"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4483,7 +4503,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "base64",
  "comemo",
@@ -4502,7 +4522,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "base64",
  "comemo",
@@ -4520,7 +4540,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -4528,7 +4548,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4542,7 +4562,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "comemo",
  "insta",
@@ -4556,7 +4576,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "base64",
  "comemo",
@@ -4583,7 +4603,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "clap",
  "comemo",
@@ -4607,7 +4627,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4635,7 +4655,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "base64",
@@ -4689,7 +4709,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "base64",
  "log",
@@ -4702,7 +4722,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "base64",
@@ -4740,7 +4760,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -4773,7 +4793,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "comemo",
  "insta",
@@ -4786,7 +4806,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "comemo",
  "ecow",
@@ -4804,7 +4824,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4901,7 +4921,7 @@ dependencies = [
  "pin-project-lite",
  "signal-hook-registry",
  "slab",
- "socket2",
+ "socket2 0.5.10",
  "tokio-macros",
  "windows-sys 0.52.0",
 ]
@@ -5143,7 +5163,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "base64",
  "clap",
@@ -5403,7 +5423,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.13.15-rc1"
+version = "0.13.15-rc2"
 dependencies = [
  "cfg-if",
  "comemo",
@@ -5977,9 +5997,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8782dd5a41a24eed3a4f40b606249b3e236ca61adf1f25ea4d45c73de122b502"
+checksum = "7e8983c3ab33d6fb807cfcdad2491c4ea8cbc8ed839181c7dfd9c67c83e261b2"
 dependencies = [
  "rustls-pki-types",
 ]

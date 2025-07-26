@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## v0.13.15 - [2025-07-16]
+## v0.13.15 - [2025-07-26]
 
 Nightly Release at [fix: vesrion in package.json files are wrong (#1834)](https://github.com/Myriad-Dreamin/tinymist/commit/96510385a13e2005af533ddc1222044704131f6f), using [ParaN3xus/typst tinymist-nightly-v0.13.15](https://github.com/ParaN3xus/typst/tree/tinymist-nightly-v0.13.15/), a.k.a. [typst/typst Rephrase docs for truncation of float/decimal to integer (typst/typst#6543)](https://github.com/typst/typst/commit/f51cb4b03e9712b8eb404f8184a17ee4a63aaab2).
 
