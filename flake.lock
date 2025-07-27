@@ -309,11 +309,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "path": "././././././././contrib/nix/dev",
+        "path": "contrib/nix/dev",
         "type": "path"
       },
       "original": {
-        "path": "././././././././contrib/nix/dev",
+        "path": "contrib/nix/dev",
         "type": "path"
       },
       "parent": []
@@ -325,11 +325,11 @@
         "nixvim": "nixvim"
       },
       "locked": {
-        "path": "editors/nixvim",
+        "path": "editors/neovim/samples/nixvim",
         "type": "path"
       },
       "original": {
-        "path": "editors/nixvim",
+        "path": "editors/neovim/samples/nixvim",
         "type": "path"
       },
       "parent": []
