@@ -298,12 +298,15 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nigh
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
+# These patches use local `typstyle-core` for development.
+# typstyle-core = { path = "../typstyle/crates/typstyle-core" }
+
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+# reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+# reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+# reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
