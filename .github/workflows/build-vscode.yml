@@ -1,6 +1,11 @@
 name: tinymist::build::vscode
 on:
   workflow_call:
+    inputs:
+      plan:
+        description: 'A description of the plan input'
+        required: true # or false, depending on whether the input is mandatory
+        type: string # or other appropriate type like boolean, number, etc.
     secrets:
       VSCODE_MARKETPLACE_TOKEN:
         required: true

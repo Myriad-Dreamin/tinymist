@@ -8,23 +8,9 @@ Normally, you should always create release candidates to avoid failures in the r
 
 The steps to release are list as following:
 
-- Determining a Git Tag.
-- Checking before Releases.
-- Making a Release PR.
-- Tagging the Release Locally.
-- Generating the GitHub Release's Body (Content).
-
-## Determining a Git Tag
-
-Create a draft release on GitHub with the generated announcement.
-
-If you are releasing a nightly version, please set the prerelease flag to true. Otherwise, if you are releasing a regular version, please set the prerelease flag to false. Some package registries relies on this flag to determine whether to update their stable channel.
-
-Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
-
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/images/release-instruction/frame_0.svg" /><img src="docs/assets/images/release-instruction/frame_1.svg" alt="typst-frame" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
-- If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
-- Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
+- Checking before releases.
+- Making a release PR.
+- Tagging and pushing current revision to release
 
 ## Checking before Releases
 
@@ -41,27 +27,21 @@ Please check the deadline of the publish tokens stored in the GitHub secrets. If
 
 ## Making a Release PR
 
-You should perform following steps to make a release PR:
+You should perform following steps to make a release PR with name in format of `build: bump version to {version}`:
 
-- Create a PR with name in format of `build: bump version to {version}`.
-- Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI.
-- Update the Changelog.1
-- Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate.
-- Update `tinymist-assets` version in the `Cargo.toml` file.
-- Wait for the CI to pass, and then merge the PR.
+### Determining the Version Number
+
+Before release, you should determine the version number to release.
+
+Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
+
+- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/images/release-instruction/frame_0.svg" /><img src="docs/assets/images/release-instruction/frame_1.svg" alt="typst-frame" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+- If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
+- Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 
 ### Updating Version String in Codebase
 
-- The `tinymist-assets` package
-  - package.json should be the version.
-- The VSCode Extension
-  - package.json should be the version.
-- The Language Server Binaries
-  - Cargo.toml should be the version.
-- The `tinymist-web` NPM package
-  - package.json should be the version.
-
-You can `grep` the version number in the repository to check if all the components are updated. Some CI script will also assert failing to help you catch the issue.
+Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI. You can `grep` the version number in the repository to check if all the version numbers in the `Cargo.toml` and `package.json` files are updated. Some CI script will also assert failing to help you catch the issue.
 
 ### Updating the Changelog
 
@@ -69,9 +49,11 @@ All released version must be documented in the changelog. The changelog is locat
 
 ### Publishing the tinymist-assets crate
 
-Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
+Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate. Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
 
-## Tagging the Release
+After publish, you should update `tinymist-assets` version in the `Cargo.toml` file.
+
+## Tagging and Pushing Current Revision to Release
 
 Push a tag to the repository with the version number. For example, if you are releasing version `0.12.19`, you should run the following command:
 
@@ -81,7 +63,3 @@ $ git push --tag
 ```
 
 This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.
-
-## Generating the GitHub Release's Body (Content)
-
-After tagging the Release, run the `tinymist::announce` CI to generate announcement body of the GitHub release. It first includes the changelog read from the `CHANGELOG.md` file, then attaches the download script and available download links.
