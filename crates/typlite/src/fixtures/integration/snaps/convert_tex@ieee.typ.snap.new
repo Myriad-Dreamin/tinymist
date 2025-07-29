@@ -1,0 +1,7 @@
+---
+source: crates/typlite/src/tests.rs
+assertion_line: 25
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/ieee.typ
+---
+failed to convert to markdown: [SourceDiagnostic { severity: Error, span: Span(852819015454036), message: "expected string, found location", trace: [Call(Some("md-link")), Show("link")], hints: [] }]
