@@ -28,33 +28,17 @@ Please check the deadline of the publish tokens stored in the GitHub secrets. If
 
 = Making a Release PR
 
-You should perform following steps to make a release PR:
-- determine the version number to release.
-- Create a PR with name in format of `build: bump version to {version}`.
-- Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI.
-- Update the Changelog.1
-- Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate.
-- Update `tinymist-assets` version in the `Cargo.toml` file.
-- Wait for the CI to pass, and then merge the PR.
+You should perform following steps to make a release PR  with name in format of `build: bump version to {version}`:
 
 == Determining the Version Number
 
-If you are releasing a nightly version, please set the prerelease flag to true. Otherwise, if you are releasing a regular version, please set the prerelease flag to false. Some package registries relies on this flag to determine whether to update their stable channel.
+Before release, you should determine the version number to release.
 
 #include "versioning.typ"
 
 == Updating Version String in Codebase
 
-- The `tinymist-assets` package
-  - package.json should be the version.
-- The VSCode Extension
-  - package.json should be the version.
-- The Language Server Binaries
-  - Cargo.toml should be the version.
-- The `tinymist-web` NPM package
-  - package.json should be the version.
-
-You can `grep` the version number in the repository to check if all the components are updated. Some CI script will also assert failing to help you catch the issue.
+Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI. You can `grep` the version number in the repository to check if all the version numbers in the `Cargo.toml` and `package.json` files are updated. Some CI script will also assert failing to help you catch the issue.
 
 == Updating the Changelog
 
@@ -62,7 +46,9 @@ All released version must be documented in the changelog. The changelog is locat
 
 == Publishing the tinymist-assets crate
 
-Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
+Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate. Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
+
+After publish, you should update `tinymist-assets` version in the `Cargo.toml` file.
 
 = Tagging and Pushing Current Revision to Release
 
