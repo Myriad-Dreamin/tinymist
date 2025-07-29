@@ -118,6 +118,7 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/announce.yml
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
     secrets: inherit
     with:
       tag: ${{ needs.prepare-build.outputs.tag }}
