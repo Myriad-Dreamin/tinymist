@@ -106,18 +106,20 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - id: tag # get the tag after the `refs/tags/` prefix
+      - id: tag # get the tag from package.json
         run:
-          echo "tag=${{ github.ref }}" | sed 's/refs\/tags\///' >> "$GITHUB_OUTPUT"
+          echo "tag=$(jq -r '.version' package.json)" >> $GITHUB_OUTPUT
+      - name: Show tag
+        run: echo "Tag is ${{ steps.tag.outputs.tag }}"
   
-  # announce:
-  #   needs: [prepare-build]
-  #   permissions:
-  #     contents: write
-  #   uses: ./.github/workflows/announce.yml
-  #   if: ${{ startsWith(github.ref, 'refs/tags/') }}
-  #   with:
-  #     tag: ${{ needs.prepare-build.outputs.tag }}
+  announce:
+    needs: [prepare-build]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/announce.yml
+    secrets: inherit
+    with:
+      tag: ${{ needs.prepare-build.outputs.tag }}
 
   build:
     needs: [prepare-build] # , announce
