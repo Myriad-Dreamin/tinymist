@@ -23,13 +23,16 @@ impl ProjectInsId {
     pub const PRIMARY: ProjectInsId = ProjectInsId(EcoString::inline("primary"));
 }
 
-/// A signal that possibly triggers an export.
+#[deprecated(note = "Use `CompileSignal` directly.")]
+pub type ExportSignal = CompileSignal;
+
+/// A signal that possibly triggers an compile (export).
 ///
-/// Whether to export depends on the current state of the document and the user
-/// settings.
+/// Whether to compile (export) depends on the current state of the document and
+/// the user settings.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExportSignal {
+pub struct CompileSignal {
     /// Whether the revision is annotated by memory events.
     pub by_mem_events: bool,
     /// Whether the revision is annotated by file system events.
@@ -38,12 +41,26 @@ pub struct ExportSignal {
     pub by_entry_update: bool,
 }
 
-impl ExportSignal {
+impl CompileSignal {
     /// Merge two signals.
-    pub fn merge(&mut self, other: ExportSignal) {
+    pub fn merge(&mut self, other: CompileSignal) {
         self.by_mem_events |= other.by_mem_events;
         self.by_fs_events |= other.by_fs_events;
         self.by_entry_update |= other.by_entry_update;
+    }
+
+    /// Whether there is any reason to compile (export).
+    pub fn any(&self) -> bool {
+        self.by_mem_events || self.by_fs_events || self.by_entry_update
+    }
+
+    /// Exclude some signals.
+    pub fn exclude(&self, excluded: Self) -> Self {
+        Self {
+            by_mem_events: self.by_mem_events && !excluded.by_mem_events,
+            by_fs_events: self.by_fs_events && !excluded.by_fs_events,
+            by_entry_update: self.by_entry_update && !excluded.by_entry_update,
+        }
     }
 
     pub fn should_run_task_dyn(
@@ -82,7 +99,7 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     /// The project id.
     pub id: ProjectInsId,
     /// The export signal for the document.
-    pub signal: ExportSignal,
+    pub signal: CompileSignal,
     /// Using world
     pub world: CompilerWorld<F>,
     /// The last successfully compiled document.
@@ -94,7 +111,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub fn from_world(world: CompilerWorld<F>) -> Self {
         Self {
             id: ProjectInsId("primary".into()),
-            signal: ExportSignal::default(),
+            signal: CompileSignal::default(),
             world,
             success_doc: None,
         }
