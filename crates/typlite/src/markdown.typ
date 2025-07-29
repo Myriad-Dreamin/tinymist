@@ -45,13 +45,16 @@
   attrs: (dest: dest),
   body,
 )
-#let md-ref(body) = html.elem(
-  "span",
+#let md-ref(body) = {
+  show link: it => it.body
   html.elem(
-    "m1ref",
-    body,
-  ),
-)
+    "span",
+    html.elem(
+      "m1ref",
+      body,
+    ),
+  )
+}
 #let md-heading(level: int, body) = html.elem(
   "m1heading",
   attrs: (level: str(level)),
