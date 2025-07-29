@@ -8,7 +8,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## Unreleased
 
-## v0.13.16 - [2025-07-19]
+## v0.13.16 - [2025-07-29]
 
 * Bumped typstyle to v0.13.16 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1902 and https://github.com/Myriad-Dreamin/tinymist/pull/1915
     * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.16%20-%20[2025-07-19]>
@@ -37,6 +37,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Code Analysis
 
 * (Fix) Truncating value repr with 10MB limit in https://github.com/Myriad-Dreamin/tinymist/pull/1850
+* (Fix) Updated the docs link from `pattern` to `tiling` by @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/1906
 * Resolving definitions with dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/1904
 
 ### Docstring
@@ -64,6 +65,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Added flake.nix in https://github.com/Myriad-Dreamin/tinymist/pull/1843
 * Removed debug symbol links in https://github.com/Myriad-Dreamin/tinymist/pull/1836
 * Generating typlite, config reference markdown files in https://github.com/Myriad-Dreamin/tinymist/pull/1868, https://github.com/Myriad-Dreamin/tinymist/pull/1881, https://github.com/Myriad-Dreamin/tinymist/pull/1885, and https://github.com/Myriad-Dreamin/tinymist/pull/1886
+* Added software specification for LLM in https://github.com/Myriad-Dreamin/tinymist/pull/1917 and https://github.com/Myriad-Dreamin/tinymist/pull/1918
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.14...v0.13.16
 

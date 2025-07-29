@@ -1,6 +1,11 @@
 name: tinymist::build::vscode
 on:
   workflow_call:
+    secrets:
+      VSCODE_MARKETPLACE_TOKEN:
+        required: true
+      OPENVSX_ACCESS_TOKEN:
+        required: true
 
 env:
   RUSTFLAGS: '-Dwarnings'

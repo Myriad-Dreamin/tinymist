@@ -70,3 +70,26 @@
 }
 
 #let note-box = pro-tip
+
+/// A ruby is a text with a ruby annotation.
+///
+/// Example:
+/// ```typ
+/// #ruby[汉][hàn][字][zì].
+/// ```
+#let ruby(..pairs) = {
+  let ks = ()
+  let vs = ()
+  for (k, v) in pairs.pos().chunks(2) {
+    if sys-is-html-target {
+      html.elem("ruby")[#k#html.elem("rt", v)]
+    } else {
+      ks.push(k)
+      vs.push(v)
+    }
+  }
+
+  if ks.len() != 0 [
+    "#ks.join("")" [#vs.join(" ")]
+  ]
+}
