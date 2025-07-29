@@ -23,4 +23,7 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/publish-vscode.yml
+    with:
+      VSCODE_MARKETPLACE_TOKEN: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+      OPENVSX_ACCESS_TOKEN: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
  

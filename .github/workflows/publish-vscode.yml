@@ -1,6 +1,11 @@
 name: tinymist::vscode::pubish
 on:
   workflow_call:
+    secrets:
+      VSCODE_MARKETPLACE_TOKEN:
+        required: true
+      OPENVSX_ACCESS_TOKEN:
+        required: true
 
 env:
   RUSTFLAGS: '-Dwarnings'
@@ -52,9 +57,11 @@ jobs:
         run: yarn install
       - name: Deploy to VS Code Marketplace (Nightly)
         if: fromJson(env.isNightly)
-        run: npx @vscode/vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} --skip-duplicate --pre-release --packagePath $(find . -type f -iname 'tinymist-*.vsix')
+        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
       - name: Deploy to OpenVSX (Nightly)
         if: fromJson(env.isNightly)
-        run: npx ovsx publish --skip-duplicate --pre-release --packagePath $(find . -type f -iname 'tinymist-*.vsix')
+        run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
