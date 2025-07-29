@@ -483,7 +483,7 @@ mod tests {
 
     use super::*;
     use crate::export::ProjectCompilation;
-    use crate::project::{CompileOnceArgs, ExportSignal};
+    use crate::project::{CompileOnceArgs, CompileSignal};
     use crate::world::base::{CompileSnapshot, WorldComputeGraph};
 
     #[test]
@@ -542,7 +542,7 @@ mod tests {
 
         let mut snap = CompileSnapshot::from_world(verse.snapshot());
 
-        snap.signal = ExportSignal {
+        snap.signal = CompileSignal {
             by_entry_update: true,
             by_fs_events: false,
             by_mem_events: false,

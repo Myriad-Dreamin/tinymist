@@ -235,8 +235,8 @@ impl ServerState {
 #[derive(Default)]
 pub struct ProjectInsStateExt {
     pub notified_revision: usize,
-    pub pending_reasons: CompileReasons,
-    pub emitted_reasons: CompileReasons,
+    pub pending_reasons: CompileSignal,
+    pub emitted_reasons: CompileSignal,
     pub is_compiling: bool,
     pub last_compilation: Option<LspCompiledArtifact>,
 }
@@ -274,6 +274,7 @@ impl ProjectInsStateExt {
 
         let last_rev = last_compilation.world().revision();
         if last_rev != *revision {
+            log::info!("skipping emit pending reasons for {revision:?} != {last_rev:?}");
             return false;
         }
 
@@ -281,11 +282,11 @@ impl ProjectInsStateExt {
         if !pending_reasons.any() {
             return false;
         }
-        self.emitted_reasons.see(self.pending_reasons);
-        let last_compilation = last_compilation.clone().with_signal(pending_reasons.into());
+        self.emitted_reasons.merge(self.pending_reasons);
+        let last_compilation = last_compilation.clone().with_signal(pending_reasons);
 
         handler.notify_compile(&last_compilation);
-        self.pending_reasons = CompileReasons::default();
+        self.pending_reasons = CompileSignal::default();
 
         true
     }
@@ -409,7 +410,7 @@ pub struct CompileHandlerImpl {
     pub(crate) client: Arc<dyn ProjectClient>,
 
     pub(crate) status_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
-    pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
+    pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, (usize, CompileSignal)>>,
 }
 
 pub(crate) trait ProjectClient: Send + Sync + 'static {
@@ -520,8 +521,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
             let reason = s.reason;
 
-            const VFS_SUB: CompileReasons = CompileReasons {
-                by_memory_events: true,
+            const VFS_SUB: CompileSignal = CompileSignal {
+                by_mem_events: true,
                 by_fs_events: true,
                 by_entry_update: false,
             };
@@ -540,8 +541,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                     s.verse.vfs().is_clean_compile(last_rev.get(), &deps)
                 }
             {
-                s.ext.pending_reasons.see(reason);
-                s.reason = CompileReasons::default();
+                s.ext.pending_reasons.merge(reason);
+                s.reason = CompileSignal::default();
 
                 let pending_reasons = s.ext.pending_reasons.exclude(s.ext.emitted_reasons);
                 let emitted = s
@@ -559,7 +560,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 continue;
             }
 
-            s.ext.pending_reasons = CompileReasons::default();
+            s.ext.pending_reasons = CompileSignal::default();
             s.ext.emitted_reasons = reason;
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
@@ -611,7 +612,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         let dv = ProjVersion {
             id: id.clone(),
-            revision: last_rev,
+            revision: last_rev.0,
         };
 
         // todo: race condition with notify_compile?
@@ -622,8 +623,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     fn notify_compile(&self, art: &LspCompiledArtifact) {
         {
             let mut n_revs = self.notified_revision.lock();
-            let n_rev = n_revs.entry(art.id().clone()).or_default();
-            if *n_rev >= art.world().revision().get() {
+            let (n_rev, n_signal) = n_revs.entry(art.id().clone()).or_default();
+            if *n_rev >= art.world().revision().get() && !n_signal.exclude(art.snap.signal).any() {
                 log::info!(
                     "Project: already notified for revision {} <= {n_rev}",
                     art.world().revision(),
@@ -631,6 +632,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 return;
             }
             *n_rev = art.world().revision().get();
+            n_signal.merge(art.snap.signal);
         }
 
         // Prints the diagnostics when we are running the compilation in standalone
@@ -667,7 +669,7 @@ pub(crate) struct DevExportEvent {
     pub id: String,
     pub when: TaskWhen,
     pub need_export: bool,
-    pub signal: ExportSignal,
+    pub signal: CompileSignal,
     pub path: Option<String>,
 }
 

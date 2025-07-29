@@ -14,8 +14,8 @@ use tinymist_world::vfs::notify::{
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
-    CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader, EntryState,
-    ExportSignal, FlagTask, HtmlCompilationTask, PagedCompilationTask, ProjectInsId, TaskInputs,
+    CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader,
+    EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask, ProjectInsId, TaskInputs,
     WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
@@ -123,7 +123,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Sets the signal.
-    pub fn with_signal(mut self, signal: ExportSignal) -> Self {
+    pub fn with_signal(mut self, signal: CompileSignal) -> Self {
         let mut snap = self.snap.clone();
         snap.signal = signal;
 
@@ -262,72 +262,28 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
     }
 }
 
-/// An accumulated compile reason stored in the project state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct CompileReasons {
-    /// The snapshot is taken by the memory editing events.
-    pub by_memory_events: bool,
-    /// The snapshot is taken by the file system events.
-    pub by_fs_events: bool,
-    /// The snapshot is taken by the entry change.
-    pub by_entry_update: bool,
+fn no_reason() -> CompileSignal {
+    CompileSignal::default()
 }
 
-impl From<CompileReasons> for ExportSignal {
-    fn from(value: CompileReasons) -> Self {
-        Self {
-            by_mem_events: value.by_memory_events,
-            by_fs_events: value.by_fs_events,
-            by_entry_update: value.by_entry_update,
-        }
+fn reason_by_mem() -> CompileSignal {
+    CompileSignal {
+        by_mem_events: true,
+        ..CompileSignal::default()
     }
 }
 
-impl CompileReasons {
-    /// Merge two reasons.
-    pub fn see(&mut self, reason: CompileReasons) {
-        self.by_memory_events |= reason.by_memory_events;
-        self.by_fs_events |= reason.by_fs_events;
-        self.by_entry_update |= reason.by_entry_update;
-    }
-
-    /// Whether there is any reason to compile.
-    pub fn any(&self) -> bool {
-        self.by_memory_events || self.by_fs_events || self.by_entry_update
-    }
-
-    /// Exclude some reasons.
-    pub fn exclude(&self, excluded: Self) -> Self {
-        Self {
-            by_memory_events: self.by_memory_events && !excluded.by_memory_events,
-            by_fs_events: self.by_fs_events && !excluded.by_fs_events,
-            by_entry_update: self.by_entry_update && !excluded.by_entry_update,
-        }
-    }
-}
-
-fn no_reason() -> CompileReasons {
-    CompileReasons::default()
-}
-
-fn reason_by_mem() -> CompileReasons {
-    CompileReasons {
-        by_memory_events: true,
-        ..CompileReasons::default()
-    }
-}
-
-fn reason_by_fs() -> CompileReasons {
-    CompileReasons {
+fn reason_by_fs() -> CompileSignal {
+    CompileSignal {
         by_fs_events: true,
-        ..CompileReasons::default()
+        ..CompileSignal::default()
     }
 }
 
-fn reason_by_entry_change() -> CompileReasons {
-    CompileReasons {
+fn reason_by_entry_change() -> CompileSignal {
+    CompileSignal {
         by_entry_update: true,
-        ..CompileReasons::default()
+        ..CompileSignal::default()
     }
 }
 
@@ -490,7 +446,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
         let mut proj =
             Self::create_project(id.clone(), verse, self.export_target, self.handler.clone());
-        proj.reason.see(reason_by_entry_change());
+        proj.reason.merge(reason_by_entry_change());
 
         self.remove_dedicates(&id);
         self.dedicates.push(proj);
@@ -534,7 +490,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     verse.flush();
                 });
 
-                proj.reason.see(reason_by_entry_change());
+                proj.reason.merge(reason_by_entry_change());
             }
             Interrupt::Compiled(artifact) => {
                 let proj =
@@ -589,7 +545,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     proj.latest_success_doc = None;
                 }
 
-                proj.reason.see(reason_by_entry_change());
+                proj.reason.merge(reason_by_entry_change());
             }
 
             Interrupt::Font(fonts) => {
@@ -600,7 +556,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                     });
                     if font_changed {
                         // todo: reason_by_font_change
-                        proj.reason.see(reason_by_entry_change());
+                        proj.reason.merge(reason_by_entry_change());
                     }
                 });
             }
@@ -612,7 +568,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         verse.creation_timestamp_changed()
                     });
                     if timestamp_changed {
-                        proj.reason.see(reason_by_entry_change());
+                        proj.reason.merge(reason_by_entry_change());
                     }
                 });
             }
@@ -648,7 +604,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                             verse.vfs_changed()
                         });
                         if vfs_changed {
-                            proj.reason.see(reason_by_mem());
+                            proj.reason.merge(reason_by_mem());
                         }
                         log::debug!("memory update: vfs after {:#?}", proj.verse.vfs().display());
                     }
@@ -673,32 +629,29 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
 
                 // Apply file system changes.
                 let dirty_tick = &mut self.dirty_shadow_logical_tick;
-                let (changes, watched, event) = event.split_with_is_sync();
+                let (changes, is_sync, event) = event.split_with_is_sync();
                 let changes = std::iter::repeat_n(changes, 1 + self.dedicates.len());
                 let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
 
                 for (proj, changes) in proj.zip(changes) {
-                    let vfs_changed = proj.verse.increment_revision(|verse| {
+                    proj.verse.increment_revision(|verse| {
+                        let mut vfs = verse.vfs();
+
+                        // Handle delayed upstream update event before applying file system
+                        // changes
+                        if Self::apply_delayed_memory_changes(&mut vfs, dirty_tick, &event)
+                            .is_none()
                         {
-                            let mut vfs = verse.vfs();
+                            log::warn!("ProjectCompiler: unknown upstream update event");
 
-                            // Handle delayed upstream update event before applying file system
-                            // changes
-                            if Self::apply_delayed_memory_changes(&mut vfs, dirty_tick, &event)
-                                .is_none()
-                            {
-                                log::warn!("ProjectCompiler: unknown upstream update event");
-
-                                // Actual a delayed memory event.
-                                proj.reason.see(reason_by_mem());
-                            }
-                            vfs.notify_fs_changes(changes);
+                            // Actual a delayed memory event.
+                            proj.reason.merge(reason_by_mem());
                         }
-                        verse.vfs_changed()
+                        vfs.notify_fs_changes(changes);
                     });
 
-                    if vfs_changed && (!self.ignore_first_sync || !watched) {
-                        proj.reason.see(reason_by_fs());
+                    if !self.ignore_first_sync || !is_sync {
+                        proj.reason.merge(reason_by_fs());
                     }
                 }
             }
@@ -758,7 +711,7 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     /// Specifies the current export target.
     pub export_target: ExportTarget,
     /// The reason to compile.
-    pub reason: CompileReasons,
+    pub reason: CompileSignal,
     /// The latest compute graph (snapshot).
     snapshot: Option<Arc<WorldComputeGraph<F>>>,
     /// The latest compilation.
@@ -792,11 +745,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let snap = CompileSnapshot {
             id: self.id.clone(),
             world,
-            signal: ExportSignal {
-                by_entry_update: self.reason.by_entry_update,
-                by_mem_events: self.reason.by_memory_events,
-                by_fs_events: self.reason.by_fs_events,
-            },
+            signal: self.reason,
             success_doc: self.latest_success_doc.clone(),
         };
         WorldComputeGraph::new(snap)
