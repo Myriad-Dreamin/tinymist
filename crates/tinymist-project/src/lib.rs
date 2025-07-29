@@ -28,7 +28,7 @@ pub use watch::*;
 #[cfg(feature = "system")]
 pub use world::*;
 
-pub use tinymist_world::{CompileSnapshot, CompileSignal, ProjectInsId};
+pub use tinymist_world::{CompileSignal, CompileSnapshot, ProjectInsId};
 
 /// The default project route priority assigned to user actions.
 pub const PROJECT_ROUTE_USER_ACTION_PRIORITY: u32 = 256;
