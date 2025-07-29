@@ -8,7 +8,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## Unreleased
 
-## v0.13.16 - [2025-07-19]
+## v0.13.16 - [2025-07-29]
 
 * Bumped typstyle to v0.13.16 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1902 and https://github.com/Myriad-Dreamin/tinymist/pull/1915
     * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.16%20-%20[2025-07-19]>
