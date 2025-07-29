@@ -1,0 +1,59 @@
+name: tinymist::check-e2e
+on:
+  workflow_call:
+
+env:
+  RUSTFLAGS: '-Dwarnings'
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+  CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+
+jobs:
+  checks-e2e:
+    strategy:
+      matrix:
+        include:
+          - os: windows-2022
+            rust-target: x86_64-pc-windows-msvc
+            platform: win32
+            arch: x64
+          - os: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+            platform: win32
+            arch: x64
+          - os: ubuntu-22.04
+            rust-target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+          - os: ubuntu-latest
+            rust-target: x86_64-unknown-linux-gnu
+            platform: linux
+            arch: x64
+          - os: macos-latest
+            rust-target: aarch64-apple-darwin
+            platform: darwin
+            arch: arm64
+    name: E2E Tests (${{ matrix.platform }}-${{ matrix.arch }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tinymist binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts-build-local-${{ matrix.rust-target }}
+          path: editors/vscode/out
+      - name: Unzip tinymist binary artifact (Windows)
+        run: 7z x -y -oeditors/vscode/out editors/vscode/out/tinymist-${{ matrix.rust-target }}.zip
+        if: matrix.platform == 'win32'
+      - name: Unzip tinymist binary artifact (Linux)
+        run: |
+          tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
+          mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
+        if: matrix.platform != 'win32'
+      - name: Test Tinymist (E2E)
+        run: cargo test -p tests -- e2e
+      - name: Upload Tinymist E2E Test Snapshot 
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-snapshot-${{ matrix.rust-target }}-${{ matrix.os }}
+          path: target/e2e
