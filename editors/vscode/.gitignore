@@ -1,4 +1,3 @@
-tinymist-*.vsix
 *.log
 test-dist
 .vscode-test

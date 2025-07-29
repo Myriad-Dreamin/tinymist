@@ -36,9 +36,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
-      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
-    if: success() && startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'rc')
+      isRelease: 'false'
+      isNightly: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,23 +50,13 @@ jobs:
           cache: 'yarn'
       - name: Install deps
         run: yarn install
-      - name: Deploy to VS Code Marketplace
-        if: fromJson(env.isRelease)
-        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
-        env:
-          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
-      - name: Deploy to OpenVSX
-        if: fromJson(env.isRelease)
-        run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
-        env:
-          OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
       - name: Deploy to VS Code Marketplace (Nightly)
         if: fromJson(env.isNightly)
-        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
+        run: npx @vscode/vsce publish -p ${{ secrets.VSCODE_MARKETPLACE_TOKEN }} --skip-duplicate --pre-release --packagePath $(find . -type f -iname 'tinymist-*.vsix')
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
       - name: Deploy to OpenVSX (Nightly)
         if: fromJson(env.isNightly)
-        run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
+        run: npx ovsx publish --skip-duplicate --pre-release --packagePath $(find . -type f -iname 'tinymist-*.vsix')
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
