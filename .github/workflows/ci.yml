@@ -20,7 +20,6 @@ env:
 
 jobs:
   publish-vscode:
-    needs: [build-vscode, build-vscode-others] # , announce
     permissions:
       contents: write
     uses: ./.github/workflows/publish-vscode.yml
