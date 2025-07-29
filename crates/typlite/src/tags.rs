@@ -19,8 +19,6 @@ pub mod md_tag {
         image -> m1image
         strong -> m1strong
         emph -> m1emph
-        highlight -> m1highlight
-        strike -> m1strike
         raw -> m1raw
         verbatim -> m1verbatim
         label -> m1label
