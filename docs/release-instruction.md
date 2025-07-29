@@ -63,7 +63,3 @@ $ git push --tag
 ```
 
 This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.
-
-## APPENDIX: Manually generating the GitHub Release's Body (Content)
-
-The `tinymist::announce` is run in CI automatically. You could manually run it to generate announcement body of the GitHub release. It first includes the changelog read from the `CHANGELOG.md` file, then attaches the download script and available download links.
