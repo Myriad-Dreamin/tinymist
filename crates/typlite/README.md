@@ -8,13 +8,13 @@ Converts a subset of typst to markdown.
 ### Install prebuilt binaries via shell script
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/tinymist/releases/download/v0.13.16-rc2/typlite-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/tinymist/releases/download/v0.13.16/typlite-installer.sh | sh
 ```
 
 ### Install prebuilt binaries via powershell script
 
 ```ps1
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/Myriad-Dreamin/tinymist/releases/download/v0.13.16-rc2/typlite-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/Myriad-Dreamin/tinymist/releases/download/v0.13.16/typlite-installer.ps1 | iex"
 ```
 
 ## Usage
