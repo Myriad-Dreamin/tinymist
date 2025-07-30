@@ -13,6 +13,7 @@ use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
+use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -107,6 +108,8 @@ pub struct Config {
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
+    /// Computed fonts based on configuration.
+    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
 
@@ -656,6 +659,22 @@ impl Config {
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )
+    }
+
+    pub(crate) fn access_model(&self) -> DynAccessModel {
+        #[cfg(not(target_arch = "wasm32"))]
+        use reflexo_typst::vfs::system::SystemAccessModel as PhysicalAccessModel;
+        #[cfg(target_arch = "wasm32")]
+        use reflexo_typst::vfs::system::SystemAccessModel as PhysicalAccessModel;
+
+        // todo: impl an access model delegation to vscode's ssh-fs
+        let access_model = || {
+            let opts = self.font_opts();
+
+            log::info!("creating AccessModel with {opts:?}");
+            Derived(Arc::new(PhysicalAccessModel {}) as Arc<dyn LspAccessModel>)
+        };
+        DynAccessModel(self.access_model.get_or_init(access_model).0.clone())
     }
 }
 

@@ -222,7 +222,7 @@ impl LspUniverseBuilder {
         package_registry: HttpRegistry,
         font_resolver: Arc<FontResolverImpl>,
         creation_timestamp: Option<i64>,
-        am: DynAccessModel,
+        access_model: DynAccessModel,
     ) -> LspUniverse {
         let package_registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
@@ -238,7 +238,7 @@ impl LspUniverseBuilder {
             entry,
             features,
             Some(inputs),
-            Vfs::new(resolver, am),
+            Vfs::new(resolver, access_model),
             package_registry,
             font_resolver,
             creation_timestamp,
