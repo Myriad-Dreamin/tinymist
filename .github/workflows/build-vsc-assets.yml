@@ -54,7 +54,6 @@ jobs:
       # todo: this is a bug
       - name: Install PDF Documentation
         run: |
-          mv docs/tinymist/ebook.pdf tinymist-docs.pdf
           mkdir -p editors/vscode/out/ contrib/html/editors/vscode/out/
           cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
           cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
