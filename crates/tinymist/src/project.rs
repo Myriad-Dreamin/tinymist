@@ -19,6 +19,7 @@
 
 #![allow(missing_docs)]
 
+use reflexo_typst::vfs::system::SystemAccessModel;
 use reflexo_typst::{diag::print_diagnostics, TypstDocument};
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -200,6 +201,8 @@ impl ServerState {
             packages,
             fonts,
             creation_timestamp,
+            // todo: impl an access model delegation to vscode's ssh-fs
+            DynAccessModel(Arc::new(SystemAccessModel {})),
         );
 
         // todo: unify filesystem watcher
