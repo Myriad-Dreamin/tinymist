@@ -75,6 +75,7 @@ pub(crate) struct FnCompletionFeat {
     pub next_arg_is_content: bool,
     pub is_element: bool,
     pub has_static_member: bool,
+    pub is_type: bool,
 }
 
 impl FnCompletionFeat {
@@ -84,6 +85,15 @@ impl FnCompletionFeat {
         }
 
         self
+    }
+
+    /// Whether this function is preferred to be used as a scope (accessed with
+    /// dots).
+    ///
+    /// If it is a function, we think of it is preferred to be called
+    /// directly.
+    pub fn prefer_to_be_scope(&self) -> bool {
+        self.has_static_member && (self.is_element || self.is_type)
     }
 
     pub fn min_pos(&self) -> usize {
@@ -162,6 +172,7 @@ impl FnCompletionFeat {
                     self.check_sig(&sig, pos);
                 }
                 BuiltinTy::Type(ty) => {
+                    self.is_type = true;
                     self.has_static_member = has_static_member(ty);
                     let func = ty.constructor().ok();
                     if let Some(func) = func {
@@ -169,7 +180,9 @@ impl FnCompletionFeat {
                         self.check_sig(&sig, pos);
                     }
                 }
-                BuiltinTy::TypeType(..) => {}
+                BuiltinTy::TypeType(..) => {
+                    self.is_type = true;
+                }
                 BuiltinTy::Clause
                 | BuiltinTy::Undef
                 | BuiltinTy::Content(..)

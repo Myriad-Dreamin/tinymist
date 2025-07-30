@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/arg_content4.typ
     "labelDetails": {
      "description": "alignment"
     },
-    "sortText": "027",
+    "sortText": "025",
     "textEdit": {
      "newText": "center",
      "range": {

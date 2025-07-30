@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_self4.typ
     "labelDetails": {
      "description": "module(base)"
     },
-    "sortText": "015",
+    "sortText": "014",
     "textEdit": {
      "newText": "baz",
      "range": {

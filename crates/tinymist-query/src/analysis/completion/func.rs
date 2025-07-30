@@ -57,7 +57,7 @@ impl CompletionPair<'_, '_, '_> {
                 || (matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector)
                     && fn_feat.is_element);
 
-            if !only_parens && fn_feat.has_static_member {
+            if !only_parens && fn_feat.prefer_to_be_scope() {
                 self.push_completion(Completion {
                     label: name.clone(),
                     ..base.clone()
@@ -99,7 +99,7 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         fn paren_label(name: &EcoString, fn_feat: &FnCompletionFeat) -> EcoString {
-            if fn_feat.has_static_member {
+            if fn_feat.prefer_to_be_scope() {
                 eco_format!("{name}.paren")
             } else {
                 name.clone()

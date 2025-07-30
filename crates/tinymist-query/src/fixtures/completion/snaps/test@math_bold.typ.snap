@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_bold.typ
     "labelDetails": {
      "description": "(content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box"
     },
-    "sortText": "018",
+    "sortText": "017",
     "textEdit": {
      "newText": "box(${1:})",
      "range": {
@@ -43,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_bold.typ
     "labelDetails": {
      "description": "(content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box"
     },
-    "sortText": "019",
+    "sortText": "018",
     "textEdit": {
      "newText": "box[${1:}]",
      "range": {

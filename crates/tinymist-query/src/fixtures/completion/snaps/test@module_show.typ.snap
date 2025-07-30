@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/module_show.typ
     "labelDetails": {
      "description": "module(\"global\")"
     },
-    "sortText": "291",
+    "sortText": "286",
     "textEdit": {
      "newText": "std",
      "range": {
