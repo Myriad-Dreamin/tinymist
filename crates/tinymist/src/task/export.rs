@@ -10,6 +10,7 @@ use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
 use tinymist_project::LspWorld;
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
+use tinymist_std::path::PathClean;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{get_page_selection, ExportMarkdownTask, ExportTarget, PdfExport, TextExport};
 use tokio::sync::mpsc;
@@ -177,6 +178,12 @@ impl ExportTask {
         let output = config.output.clone().unwrap_or_default();
         let Some(write_to) = output.substitute(&entry) else {
             return Ok(None);
+        };
+        let write_to = if write_to.is_relative() {
+            let cwd = std::env::current_dir().context("failed to get current directory")?;
+            cwd.join(write_to).clean()
+        } else {
+            write_to.to_path_buf()
         };
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
