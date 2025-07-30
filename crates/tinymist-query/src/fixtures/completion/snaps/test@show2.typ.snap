@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "165",
+    "sortText": "179",
     "textEdit": {
      "newText": "raw: ${1:}",
      "range": {
@@ -43,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "166",
+    "sortText": "180",
     "textEdit": {
      "newText": "raw.where(${1:}): ${2:}",
      "range": {
@@ -68,7 +68,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
     "labelDetails": {
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
-    "sortText": "167",
+    "sortText": "181",
     "textEdit": {
      "newText": "read(${1:}): ${2:}",
      "range": {
@@ -89,7 +89,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
     "labelDetails": {
      "description": "rgb(\"#ff4136\")"
     },
-    "sortText": "170",
+    "sortText": "184",
     "textEdit": {
      "newText": "red: ${1:}",
      "range": {
@@ -111,7 +111,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
     },
     "kind": 15,
     "label": "regex selector",
-    "sortText": "174",
+    "sortText": "188",
     "textEdit": {
      "newText": "regex(\"${1:regex}\"): ${2:}",
      "range": {

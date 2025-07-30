@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/module_show_calc.typ
     "labelDetails": {
      "description": "module(\"calc\")"
     },
-    "sortText": "027",
+    "sortText": "031",
     "textEdit": {
      "newText": "calc",
      "range": {

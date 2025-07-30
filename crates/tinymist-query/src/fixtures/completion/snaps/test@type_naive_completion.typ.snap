@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/type_naive_completion.
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "032",
+    "sortText": "037",
     "textEdit": {
      "newText": "content",
      "range": {

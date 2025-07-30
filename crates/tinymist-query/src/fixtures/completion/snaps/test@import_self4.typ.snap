@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on c( (88..90)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/import_self4.typ
-snapshot_kind: text
 ---
 [
  {
@@ -15,7 +14,7 @@ snapshot_kind: text
     "labelDetails": {
      "description": "module(base)"
     },
-    "sortText": "012",
+    "sortText": "015",
     "textEdit": {
      "newText": "baz",
      "range": {

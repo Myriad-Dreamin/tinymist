@@ -18,9 +18,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/set_in_show.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "053",
+    "sortText": "064",
     "textEdit": {
-     "newText": "raw(${1:})",
+     "newText": "raw",
      "range": {
       "end": {
        "character": 6,

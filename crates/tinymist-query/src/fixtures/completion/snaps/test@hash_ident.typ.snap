@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/hash_ident.typ
     "labelDetails": {
      "description": "(to: \"even\" | \"odd\" | none, weak: bool) => pagebreak"
     },
-    "sortText": "127",
+    "sortText": "148",
     "textEdit": {
      "newText": "pagebreak()${1:}",
      "range": {

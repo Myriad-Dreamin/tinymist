@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (25..26)
+description: Completion on / (38..39)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/func_module.typ
 ---
@@ -18,7 +18,32 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module.typ
     "labelDetails": {
      "description": "(align: alignment | array | auto | function, column-gutter: array | auto | length | type, columns: array | auto | length | type, fill: color, gutter: array | auto | length | type, inset: inset, row-gutter: array | auto | length | type, rows: array | auto | length | type, stroke: stroke, ..: content) => table"
     },
-    "sortText": "191",
+    "sortText": "220",
+    "textEdit": {
+     "newText": "table",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "table.paren",
+    "labelDetails": {
+     "description": "(align: alignment | array | auto | function, column-gutter: array | auto | length | type, columns: array | auto | length | type, fill: color, gutter: array | auto | length | type, inset: inset, row-gutter: array | auto | length | type, rows: array | auto | length | type, stroke: stroke, ..: content) => table"
+    },
+    "sortText": "221",
     "textEdit": {
      "newText": "table(${1:})",
      "range": {
