@@ -5,6 +5,7 @@
 !out/tinymist-docs.pdf
 !out/extension.js
 !out/extension.web.js
+!out/tinymist_core_bg.wasm
 !out/tinymist
 !out/tinymist.exe
 !out/typst.tmLanguage.json

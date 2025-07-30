@@ -16,6 +16,7 @@
 		{
 			"label": "VS Code Extension Prelaunch [Web]",
 			"dependsOn": [
+				"Build and Copy Web LSP Binary [Wasm]",
 				"Compile VS Code Extension [Web]",
 			],
 			"dependsOrder": "sequence",
@@ -88,6 +89,13 @@
 			"problemMatcher": [
 				"$rustc"
 			],
+			"group": "build"
+		},
+		{
+			"label": "Build and Copy Web LSP Binary [Wasm]",
+			"type": "npm",
+			"script": "build:web",
+			"path": ".",
 			"group": "build"
 		},
 		{

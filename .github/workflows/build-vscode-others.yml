@@ -154,8 +154,8 @@ jobs:
           yarn run compile:web
         working-directory: ./editors/vscode
       - name: Build tinymist library
-        run: yarn build
-        working-directory: ./crates/tinymist-core
+        run: yarn build:web
+        working-directory: .
       - name: Pack tinymist npm library
         run: |
           npm pack > package-name
