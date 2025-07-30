@@ -13,5 +13,6 @@ sync-ls = { workspace = true, features = ["lsp"] }
 lsp-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tinymist-std.workspace = true
+tinymist-std = { workspace = true, features = ["system"] }
 insta.workspace = true
+insta-cmd.workspace = true
