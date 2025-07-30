@@ -13,6 +13,7 @@ use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
+use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -67,6 +68,8 @@ pub struct Config {
     /// Constant DAP-specific configuration during session.
     pub const_dap_config: ConstDapConfig,
 
+    /// Whether to delegate file system accesses to the client.
+    pub delegate_fs_requests: bool,
     /// Whether to send show document requests with customized notification.
     pub customized_show_document: bool,
     /// Whether the configuration can have a default entry path.
@@ -107,6 +110,8 @@ pub struct Config {
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
+    /// Computed fonts based on configuration.
+    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
 
@@ -333,6 +338,7 @@ impl Config {
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
+        assign_config!(delegate_fs_requests := "delegateFsRequests"?: bool);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(development := "development"?: bool);
@@ -656,6 +662,46 @@ impl Config {
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn create_physical_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        self.create_delegate_access_model(client)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn create_physical_access_model(
+        &self,
+        _client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        use reflexo_typst::vfs::system::SystemAccessModel;
+        Arc::new(SystemAccessModel {})
+    }
+
+    fn create_delegate_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        let client = client.clone();
+        Arc::new(crate::input::ClientAccessModel::new(client))
+    }
+
+    pub(crate) fn access_model(&self, client: &TypedLspClient<ServerState>) -> DynAccessModel {
+        let access_model = || {
+            log::info!(
+                "creating AccessModel with delegation={:?}",
+                self.delegate_fs_requests
+            );
+            if self.delegate_fs_requests {
+                Derived(self.create_delegate_access_model(client))
+            } else {
+                Derived(self.create_physical_access_model(client))
+            }
+        };
+        DynAccessModel(self.access_model.get_or_init(access_model).0.clone())
     }
 }
 

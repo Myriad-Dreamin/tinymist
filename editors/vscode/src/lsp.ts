@@ -15,7 +15,13 @@ import type {
 import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
-import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from "./util";
+import {
+  base64Encode,
+  bytesBase64Encode,
+  DisposeList,
+  getSensibleTextEditorColumn,
+  typstDocumentSelector,
+} from "./util";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
@@ -307,6 +313,16 @@ export class LanguageState {
       throw new Error("Language client is not set");
     }
 
+    client.onRequest("tinymist/fs/content", (params: FsReadRequest) => {
+      const fsUrl = vscode.Uri.file(params.path);
+      return vscode.workspace.fs.readFile(fsUrl).then(
+        (data) => ({ content: bytesBase64Encode(data) }),
+        (err) => {
+          console.error("Failed to read file", params, err);
+          throw err;
+        },
+      );
+    });
     client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
@@ -660,4 +676,8 @@ function isCodeActionWithoutEditsAndCommands(value: any): boolean {
     candidate.edit === void 0 &&
     candidate.command === void 0
   );
+}
+
+interface FsReadRequest {
+  path: string;
 }
