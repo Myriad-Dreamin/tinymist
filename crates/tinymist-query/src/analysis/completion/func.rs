@@ -56,8 +56,9 @@ impl CompletionPair<'_, '_, '_> {
             let only_parens = !parens
                 || (matches!(self.cursor.surrounding_syntax, SurroundingSyntax::Selector)
                     && fn_feat.is_element);
+            let is_set = matches!(self.cursor.surrounding_syntax, SurroundingSyntax::SetRule);
 
-            if !only_parens && fn_feat.prefer_to_be_scope() {
+            if !only_parens && fn_feat.prefer_to_be_scope(is_set) {
                 self.push_completion(Completion {
                     label: name.clone(),
                     ..base.clone()
@@ -72,7 +73,7 @@ impl CompletionPair<'_, '_, '_> {
             } else if (fn_feat.min_pos() < 1 || fn_feat.has_only_self()) && !fn_feat.has_rest {
                 self.push_completion(Completion {
                     apply: Some(eco_format!("{}()${{}}", name)),
-                    label: paren_label(&name, &fn_feat),
+                    label: paren_label(&name, &fn_feat, is_set),
                     command: None,
                     ..base
                 });
@@ -85,7 +86,7 @@ impl CompletionPair<'_, '_, '_> {
                     );
                 self.push_completion(Completion {
                     apply: Some(eco_format!("{name}(${{}})")),
-                    label: paren_label(&name, &fn_feat),
+                    label: paren_label(&name, &fn_feat, is_set),
                     ..base.clone()
                 });
                 if !scope_reject_content && accept_content_arg {
@@ -98,8 +99,8 @@ impl CompletionPair<'_, '_, '_> {
             }
         }
 
-        fn paren_label(name: &EcoString, fn_feat: &FnCompletionFeat) -> EcoString {
-            if fn_feat.prefer_to_be_scope() {
+        fn paren_label(name: &EcoString, fn_feat: &FnCompletionFeat, is_set: bool) -> EcoString {
+            if fn_feat.prefer_to_be_scope(is_set) {
                 eco_format!("{name}.paren")
             } else {
                 name.clone()

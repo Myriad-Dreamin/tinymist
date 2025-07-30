@@ -92,8 +92,8 @@ impl FnCompletionFeat {
     ///
     /// If it is a function, we think of it is preferred to be called
     /// directly.
-    pub fn prefer_to_be_scope(&self) -> bool {
-        self.has_static_member && (self.is_element || self.is_type)
+    pub fn prefer_to_be_scope(&self, is_set: bool) -> bool {
+        !is_set && (self.has_static_member && (self.is_element || self.is_type))
     }
 
     pub fn min_pos(&self) -> usize {

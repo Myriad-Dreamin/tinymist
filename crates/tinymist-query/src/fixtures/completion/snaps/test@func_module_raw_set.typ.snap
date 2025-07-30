@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (92..93)
+description: Completion on / (49..50)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/set.typ
+input_file: crates/tinymist-query/src/fixtures/completion/func_module_raw_set.typ
 ---
 [
  {
@@ -24,11 +24,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/set.typ
      "range": {
       "end": {
        "character": 6,
-       "line": 1
+       "line": 2
       },
       "start": {
        "character": 5,
-       "line": 1
+       "line": 2
       }
      }
     }
