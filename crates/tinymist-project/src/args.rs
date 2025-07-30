@@ -207,7 +207,7 @@ impl TaskCompileArgs {
 
         let export = ExportTask {
             when,
-            output: None,
+            output: self.output.as_deref().map(PathPattern::new),
             transform: transforms,
         };
 
