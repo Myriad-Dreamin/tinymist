@@ -10,7 +10,7 @@ use sync_ls::{lsp, RequestId};
 use crate::artifact::{cli, GIT_ROOT};
 
 #[test]
-fn lsp() {
+fn test_lsp() {
     std::env::set_var("RUST_BACKTRACE", "full");
     let root = GIT_ROOT.join("target/e2e/tinymist");
 

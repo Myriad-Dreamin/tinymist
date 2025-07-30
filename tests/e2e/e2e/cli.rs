@@ -3,7 +3,7 @@ use tinymist_std::path::PathClean;
 use crate::artifact::{cli, GIT_ROOT};
 
 #[test]
-fn cli_compile() {
+fn test_compile() {
     const INPUT_REL: &str = "tests/workspaces/individuals/tiny.typ";
 
     std::env::set_var("RUST_BACKTRACE", "full");
