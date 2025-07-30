@@ -42,6 +42,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.supportHtmlInMarkdown = true;
   config.supportExtendedCodeAction = true;
   config.customizedShowDocument = true;
+  config.delegateFsRequests = false; // todo: detect live sharing.
   // Sets shared features
   extensionState.features.preview = !isWeb && config.previewFeature === "enable";
   extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";

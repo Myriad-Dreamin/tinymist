@@ -11,6 +11,9 @@ use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;
 use crate::*;
 
+mod client;
+pub use client::ClientAccessModel;
+
 /// In memory source file management.
 impl ServerState {
     /// Updates a set of source files.

@@ -68,6 +68,8 @@ pub struct Config {
     /// Constant DAP-specific configuration during session.
     pub const_dap_config: ConstDapConfig,
 
+    /// Whether to delegate file system accesses to the client.
+    pub delegate_fs_requests: bool,
     /// Whether to send show document requests with customized notification.
     pub customized_show_document: bool,
     /// Whether the configuration can have a default entry path.
@@ -336,6 +338,7 @@ impl Config {
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
+        assign_config!(delegate_fs_requests := "delegateFsRequests"?: bool);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(development := "development"?: bool);
@@ -661,18 +664,42 @@ impl Config {
         )
     }
 
-    pub(crate) fn access_model(&self) -> DynAccessModel {
-        #[cfg(not(target_arch = "wasm32"))]
-        use reflexo_typst::vfs::system::SystemAccessModel as PhysicalAccessModel;
-        #[cfg(target_arch = "wasm32")]
-        use reflexo_typst::vfs::system::SystemAccessModel as PhysicalAccessModel;
+    #[cfg(target_arch = "wasm32")]
+    fn create_physical_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        self.create_delegate_access_model(client)
+    }
 
-        // todo: impl an access model delegation to vscode's ssh-fs
+    #[cfg(not(target_arch = "wasm32"))]
+    fn create_physical_access_model(
+        &self,
+        _client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        use reflexo_typst::vfs::system::SystemAccessModel;
+        Arc::new(SystemAccessModel {})
+    }
+
+    fn create_delegate_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        let client = client.clone();
+        Arc::new(crate::input::ClientAccessModel::new(client))
+    }
+
+    pub(crate) fn access_model(&self, client: &TypedLspClient<ServerState>) -> DynAccessModel {
         let access_model = || {
-            let opts = self.font_opts();
-
-            log::info!("creating AccessModel with {opts:?}");
-            Derived(Arc::new(PhysicalAccessModel {}) as Arc<dyn LspAccessModel>)
+            log::info!(
+                "creating AccessModel with delegation={:?}",
+                self.delegate_fs_requests
+            );
+            if self.delegate_fs_requests {
+                Derived(self.create_delegate_access_model(client))
+            } else {
+                Derived(self.create_physical_access_model(client))
+            }
         };
         DynAccessModel(self.access_model.get_or_init(access_model).0.clone())
     }

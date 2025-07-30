@@ -31,12 +31,19 @@ export const base64Decode = (encoded: string) =>
   bytes2utf8.decode(Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0)));
 
 /**
+ * bytes to Base64
+ * @param utf8Str bytes
+ * @returns Base64 encoded string
+ */
+export const bytesBase64Encode = (bytes: Uint8Array) =>
+  btoa(Array.from(bytes, (c) => String.fromCharCode(c)).join(""));
+
+/**
  * UTF-8 to Base64
  * @param utf8Str UTF-8 string
  * @returns Base64 encoded string
  */
-export const base64Encode = (utf8Str: string) =>
-  btoa(Array.from(utf82bytes.encode(utf8Str), (c) => String.fromCharCode(c)).join(""));
+export const base64Encode = (utf8Str: string) => bytesBase64Encode(utf82bytes.encode(utf8Str));
 
 export function translateExternalURL(urlStr: string): string {
   if (isGitpod()) {
