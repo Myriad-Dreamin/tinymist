@@ -4,19 +4,13 @@ import { resolve } from "path";
 import * as vscode from "vscode";
 import * as lc from "vscode-languageclient";
 import * as Is from "vscode-languageclient/lib/common/utils/is";
-import { ExtensionMode } from "vscode";
-import type {
-  LanguageClient,
-  SymbolInformation,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import type { SymbolInformation, LanguageClientOptions } from "vscode-languageclient/node";
+import type { BaseLanguageClient as LanguageClient } from "vscode-languageclient";
 
 import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import {
-  base64Encode,
   bytesBase64Encode,
   DisposeList,
   getSensibleTextEditorColumn,
@@ -26,6 +20,7 @@ import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
 import { wordPattern } from "./language";
+import type { createSystemLanguageClient } from "./lsp.system";
 
 interface ResourceRoutes {
   "/fonts": any;
@@ -97,7 +92,7 @@ interface JumpInfo {
 }
 
 export class LanguageState {
-  static Client: typeof LanguageClient = undefined!;
+  static Client: typeof createSystemLanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
 
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
@@ -171,29 +166,8 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: TinymistConfig) {
+  async initClient(config: TinymistConfig) {
     const context = this.context;
-    const isProdMode = context.extensionMode === ExtensionMode.Production;
-
-    /// The `--mirror` flag is only used in development/test mode for testing
-    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
-    /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
-    /// production mode because we don't put the debug information in the binary.
-    ///
-    /// Note: Developers can still download the debug information from the GitHub Releases and enable the backtrace
-    /// manually by themselves.
-    const RUST_BACKTRACE = isProdMode ? "1" : "full";
-
-    const run = {
-      command: config.probedServerPath,
-      args: ["lsp", ...mirrorFlag],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
-    };
-    // console.log("use arguments", run);
-    const serverOptions: ServerOptions = {
-      run,
-      debug: run,
-    };
 
     const trustedCommands = {
       enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
@@ -296,12 +270,8 @@ export class LanguageState {
       },
     };
 
-    const client = (this.client = new LanguageState.Client(
-      "tinymist",
-      "Tinymist Typst Language Server",
-      serverOptions,
-      clientOptions,
-    ));
+    const client = (this.client = await LanguageState.Client(context, config, clientOptions));
+    console.log("this.client", !!this.client);
 
     this.clientPromiseResolve(client);
     return client;
@@ -309,6 +279,7 @@ export class LanguageState {
 
   async startClient(): Promise<void> {
     const client = this.client;
+    console.log("this.client", !!this.client);
     if (!client) {
       throw new Error("Language client is not set");
     }
@@ -327,7 +298,9 @@ export class LanguageState {
       wordCountItemProcess(params);
     });
 
-    this.registerPreviewNotifications(client);
+    if (extensionState.features.preview) {
+      this.registerPreviewNotifications(client);
+    }
 
     await client.start();
 
