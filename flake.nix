@@ -20,6 +20,8 @@
         devShells = {
           # nix develop
           default = tinymist-dev.devShells.${system}.default;
+          # nix develop #neovim
+          neovim = tinymist-dev.devShells.${system}.neovim;
           # nix develop .#unstable
           unstable = tinymist-unstable.devShells.${system}.default;
           # nix develop .#nixvim

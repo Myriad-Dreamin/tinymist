@@ -2,13 +2,24 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    rust-manifest = {
+      url = "https://static.rust-lang.org/dist/channel-rust-1.85.1.toml";
+      flake = false;
+    };
   };
 
-  outputs = inputs @ { self, flake-parts, nixpkgs, }:
+  outputs = inputs @ { self, flake-parts, nixpkgs, fenix, rust-manifest, }:
     flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = ["x86_64-linux"];
-      perSystem = {config, lib, pkgs, ...}: 
-      let tinymist = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+      systems = [ "x86_64-linux" ];
+    
+      perSystem = {config, lib, pkgs, system, ...}: 
+      let
+        rust-toolchain = (fenix.packages.${system}.fromManifestFile rust-manifest).defaultToolchain;
+        tinymist = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
           pname = "tinymist";
           # Please update the corresponding vscode extension when updating
           # this derivation.
@@ -82,6 +93,18 @@
       in {
         # export the project devshell as the default devshell
         devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            rust-analyzer
+            nodejs_24
+            (yarn.override { nodejs = nodejs_24; })
+          ];
+
+          shellHook = ''
+            echo "Docs: docs/tinymist/nix.typ."
+          '';
+        };
+        # Developing neovim integration requires a fresh tinymist binary
+        devShells.neovim = pkgs.mkShell {
           buildInputs = [
             tinymist
           ];
