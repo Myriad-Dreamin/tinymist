@@ -149,64 +149,67 @@ export const Summary = () => {
     return res;
   };
 
+  const fontStats = div(
+    { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
+    div(
+      { style: "position: relative; width: 100%; height: 0px" },
+      button(
+        {
+          class: "btn",
+          style: "position: absolute; top: 0px; right: 0px",
+          onclick: () => {
+            startModal(
+              div(
+                {
+                  style: "height: calc(100% - 20px); box-sizing: border-box; padding-top: 4px",
+                },
+                fontsExportPanel({
+                  fonts: docMetrics.val.fontInfo,
+                  sources: docMetrics.val.spanInfo.sources,
+                }),
+              ),
+            );
+          },
+        },
+        CopyIcon(),
+      ),
+    ),
+    div(van.derive(() => `This document uses ${docMetrics.val.fontInfo.length} fonts.`)),
+    (_dom?: Element) =>
+      div(
+        ...docMetrics.val.fontInfo
+          .sort((x, y) => {
+            if (x.usesScale === undefined || y.usesScale === undefined) {
+              if (x.usesScale === undefined) {
+                return 1;
+              }
+              if (y.usesScale === undefined) {
+                return -1;
+              }
+
+              return x.name.localeCompare(y.name);
+            }
+            if (x.usesScale !== y.usesScale) {
+              return y.usesScale - x.usesScale;
+            }
+            return x.name.localeCompare(y.name);
+          })
+          .map(FontSlot),
+      ),
+  );
+
   return div(
     {
       class: "flex-col",
       style: "justify-content: center; align-items: center; gap: 10px;",
     },
+    fontStats,
     div(
       { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(van.derive(() => `This document is compiled with following arguments.`)),
       div({ style: "margin: 1.2em; margin-left: 0.5em" }, ...ArgSlots()),
     ),
-    div(
-      { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
-      div(
-        { style: "position: relative; width: 100%; height: 0px" },
-        button(
-          {
-            class: "btn",
-            style: "position: absolute; top: 0px; right: 0px",
-            onclick: () => {
-              startModal(
-                div(
-                  {
-                    style: "height: calc(100% - 20px); box-sizing: border-box; padding-top: 4px",
-                  },
-                  fontsExportPanel({
-                    fonts: docMetrics.val.fontInfo,
-                    sources: docMetrics.val.spanInfo.sources,
-                  }),
-                ),
-              );
-            },
-          },
-          CopyIcon(),
-        ),
-      ),
-      div(van.derive(() => `This document uses ${docMetrics.val.fontInfo.length} fonts.`)),
-      (_dom?: Element) =>
-        div(
-          ...docMetrics.val.fontInfo
-            .sort((x, y) => {
-              if (x.usesScale === undefined || y.usesScale === undefined) {
-                if (x.usesScale === undefined) {
-                  return 1;
-                }
-                if (y.usesScale === undefined) {
-                  return -1;
-                }
-
-                return x.name.localeCompare(y.name);
-              }
-              if (x.usesScale !== y.usesScale) {
-                return y.usesScale - x.usesScale;
-              }
-              return x.name.localeCompare(y.name);
-            })
-            .map(FontSlot),
-        ),
-    ),
+    fontStats,
     div(
       {
         class: `card hidden`,
