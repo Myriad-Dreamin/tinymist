@@ -23,6 +23,73 @@
           "properties": {
             "type": "string"
           }
+        },
+        "tinymist.preview.refresh": {
+          "title": "%extension.tinymist.config.tinymist.preview.refresh.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.refresh.desc%",
+          "type": "string",
+          "enum": ["onSave", "onType"],
+          "default": "onType",
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onSave%",
+            "%extension.tinymist.config.tinymist.preview.refresh.string.enum.onType%"
+          ]
+        },
+        "tinymist.preview.partialRendering": {
+          "title": "%extension.tinymist.config.tinymist.preview.partialRendering.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.partialRendering.desc%",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.preview.invertColors": {
+          "title": "%extension.tinymist.config.tinymist.preview.invertColors.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.desc%",
+          "anyOf": [
+            {
+              "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.title%",
+              "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.desc%",
+              "type": "string",
+              "enum": ["never", "auto", "always"],
+              "default": "never",
+              "enumDescriptions": [
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.never%",
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.auto%",
+                "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.always%"
+              ]
+            },
+            {
+              "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.title%",
+              "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.desc%",
+              "type": "object",
+              "default": {},
+              "properties": {
+                "rest": {
+                  "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.title%",
+                  "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.desc%",
+                  "type": "string",
+                  "enum": ["never", "auto", "always"],
+                  "default": "never",
+                  "enumDescriptions": [
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.never%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.auto%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.enum.always%"
+                  ]
+                },
+                "image": {
+                  "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.title%",
+                  "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.desc%",
+                  "type": "string",
+                  "enum": ["never", "auto", "always"],
+                  "default": "never",
+                  "enumDescriptions": [
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.never%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.auto%",
+                    "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.image.string.enum.always%"
+                  ]
+                }
+              }
+            }
+          ]
         }
       }
     }

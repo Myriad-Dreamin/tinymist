@@ -178,6 +178,55 @@ The arguments used by \`tinymist.startDefaultPreview\` command. Check \`tinymist
     "--open"
   ]`
 
+## `preview.invertColors`
+
+Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format.
+
+This configuration item can be one of following types:
+
+- Invert colors of the preview.
+  - **Type**: `string`
+  - **Valid Values**:
+    - `"never"` : Never
+    - `"auto"` : Inferring from the browser settings
+    - `"always"` : Always
+  - **Default**: `"never"`
+- Invert colors of the preview in a more fine-grained way.
+  - **Type**: `object`
+  - **Properties**:
+    - `"rest"`: Invert colors of the rest of the elements.
+      - **Type**: `string`
+      - **Valid Values**:
+        - `"never"` : Never
+        - `"auto"` : Inferring from the browser settings
+        - `"always"` : Always
+      - **Default**: `"never"`
+    - `"image"`: Invert colors of the images.
+      - **Type**: `string`
+      - **Valid Values**:
+        - `"never"` : Never
+        - `"auto"` : Inferring from the browser settings
+        - `"always"` : Always
+      - **Default**: `"never"`
+  - **Default**: `{}`
+
+## `preview.partialRendering`
+
+Only render visible part of the document. This can improve performance but still being experimental.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `preview.refresh`
+
+Refresh preview when the document is saved or when the document is changed
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"onSave"` : Refresh preview on save
+  - `"onType"` : Refresh preview on type
+- **Default**: `"onType"`
+
 ## `projectResolution`
 
 This configuration specifies the way to resolved projects.
