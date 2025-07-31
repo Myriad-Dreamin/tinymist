@@ -1174,8 +1174,6 @@ mod tests {
         assert!(!font_opts.ignore_system_fonts);
     }
 
-    // "preview":{"refresh":"onType"}
-
     #[test]
     fn test_preview_opts() {
         fn opts(update: Option<&JsonValue>) -> PreviewFeat {
