@@ -1206,14 +1206,6 @@ mod tests {
             }
         })));
         assert_eq!(preview.refresh, Some(TaskWhen::OnSave));
-
-        panic!("preview opts from editors/vscode/src/features/preview-compat.ts should be implemented at server side");
-        //   const refreshStyle =
-        //     vscode.workspace.getConfiguration().get<string>("typst-preview.
-        // refresh") || "onSave";   const scrollSyncMode =
-        //     ScrollSyncModeEnum[
-        //       vscode.workspace.getConfiguration().get<ScrollSyncMode>("
-        // typst-preview.scrollSync") || "never"     ];
     }
 
     #[test]
