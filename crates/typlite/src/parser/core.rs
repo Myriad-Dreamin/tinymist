@@ -38,8 +38,51 @@ impl HtmlToAstParser {
         }
     }
 
+    pub(crate) fn debug_print(&self, message: &str) {
+        if self.feat.debug {
+            eprintln!("[DEBUG] {}", message);
+        }
+    }
+
+    fn debug_print_element(&self, element: &HtmlElement, stage: &str) {
+        if self.feat.debug {
+            let tag_name = element.tag.resolve();
+            let attrs = element
+                .attrs
+                .0
+                .iter()
+                .map(|(k, v)| format!("{}={:?}", k.resolve(), v))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let attrs_str = if attrs.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", attrs)
+            };
+            eprintln!(
+                "[DEBUG] {} <{}{}> (children: {})",
+                stage,
+                tag_name,
+                attrs_str,
+                element.children.len()
+            );
+        }
+    }
+
+    fn debug_print_ast_state(&self, stage: &str) {
+        if self.feat.debug {
+            eprintln!(
+                "[DEBUG] {} - blocks: {}, inline_buffer: {}",
+                stage,
+                self.blocks.len(),
+                self.inline_buffer.len()
+            );
+        }
+    }
+
     pub fn convert_element(&mut self, element: &HtmlElement) -> Result<()> {
-        match element.tag {
+        self.debug_print_element(element, "Processing element");
+        let result = match element.tag {
             tag::head => Ok(()),
 
             tag::html | tag::body | md_tag::doc => {
@@ -203,7 +246,9 @@ impl HtmlToAstParser {
                 }
                 Ok(())
             }
-        }
+        };
+        self.debug_print_ast_state(&format!("After processing {}", element.tag.resolve()));
+        result
     }
 
     /// Create a CommonMark HTML element from the given HTML element    
@@ -244,19 +289,29 @@ impl HtmlToAstParser {
     }
 
     pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
-        for child in &element.children {
+        self.debug_print(&format!("Converting {} children", element.children.len()));
+        for (i, child) in element.children.iter().enumerate() {
             match child {
                 HtmlNode::Text(text, _) => {
+                    self.debug_print(&format!("  Child {}: Text({:?})", i, text.as_str()));
                     self.inline_buffer.push(Node::Text(text.clone()));
                 }
                 HtmlNode::Element(element) => {
+                    self.debug_print(&format!(
+                        "  Child {}: Element({})",
+                        i,
+                        element.tag.resolve()
+                    ));
                     self.convert_element(element)?;
                 }
                 HtmlNode::Frame(frame) => {
+                    self.debug_print(&format!("  Child {}: Frame", i));
                     let res = self.convert_frame(frame);
                     self.inline_buffer.push(res);
                 }
-                HtmlNode::Tag(..) => {}
+                HtmlNode::Tag(..) => {
+                    self.debug_print(&format!("  Child {}: Tag (skipped)", i));
+                }
             }
         }
         Ok(())
@@ -379,11 +434,25 @@ impl HtmlToAstParser {
     }
 
     pub fn parse(mut self, root: &HtmlElement) -> Result<Node> {
+        self.debug_print("Starting HTML to AST parsing");
+        self.debug_print_element(root, "Root element");
+
         self.blocks.clear();
         self.inline_buffer.clear();
 
         self.convert_element(root)?;
         self.flush_inline_buffer();
+
+        self.debug_print(&format!(
+            "Parsing complete. Final document has {} blocks",
+            self.blocks.len()
+        ));
+        if self.feat.debug {
+            self.debug_print("Final AST structure:");
+            for (i, block) in self.blocks.iter().enumerate() {
+                eprintln!("[DEBUG]   Block {}: {:?}", i, std::mem::discriminant(block));
+            }
+        }
 
         Ok(Node::Document(self.blocks))
     }
