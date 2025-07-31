@@ -398,14 +398,14 @@ impl ProjectPreviewState {
     }
 }
 
-struct PostCompileHooks {
+struct CompileHooks {
     pub(crate) export: ExportHook,
     pub(crate) preview: PreviewHook,
     pub(crate) diag: DiagHook,
     pub(crate) word_count: WordCountHook,
 }
 
-impl PostCompileHooks {
+impl CompileHooks {
     pub fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
         self.export.needs_comile(snap)
             || self.preview.needs_comile(snap)
