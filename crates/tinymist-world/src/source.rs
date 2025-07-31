@@ -48,8 +48,8 @@ impl SourceDb {
         w += self
             .slots
             .lock()
-            .iter()
-            .map(|(_, slot)| {
+            .values()
+            .map(|slot| {
                 slot.source
                     .get_uninitialized()
                     .and_then(|e| e.as_ref().ok())

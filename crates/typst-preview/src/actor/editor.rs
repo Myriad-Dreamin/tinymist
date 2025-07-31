@@ -176,7 +176,7 @@ impl<T: EditorServer> EditorActor<T> {
         loop {
             tokio::select! {
                 Some(msg) = self.mailbox.recv() => {
-                    log::trace!("EditorActor: received message from mailbox: {:?}", msg);
+                    log::trace!("EditorActor: received message from mailbox: {msg:?}");
                    let sent = match msg {
                         EditorActorRequest::Shutdown => {
                             log::info!("EditorActor: received exit message");
@@ -206,19 +206,19 @@ impl<T: EditorServer> EditorActor<T> {
                 Some(msg) = self.editor_conn.next() => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
-                            log::debug!("EditorActor: received message from editor: {:?}", cursor_info);
+                            log::debug!("EditorActor: received message from editor: {cursor_info:?}");
                             self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::ResolveSourceLoc(jump_info) => {
-                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {jump_info:?}");
                             self.renderer_sender.send(RenderActorRequest::ResolveSourceLoc(jump_info)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::PanelScrollByPosition(jump_info) => {
-                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {jump_info:?}");
                             self.webview_sender.send(WebviewActorRequest::ViewportPosition(jump_info.position)).log_error("EditorActor");
                         }
                         ControlPlaneMessage::DocToSrcJumpResolve(jump_info) => {
-                            log::debug!("EditorActor: received message from editor: {:?}", jump_info);
+                            log::debug!("EditorActor: received message from editor: {jump_info:?}");
 
                             self.source_scroll_by_span(jump_info.span)
                                 .await;
@@ -268,7 +268,7 @@ impl<T: EditorServer> EditorActor<T> {
             match self.span_interner.span_by_str(&span).await {
                 InternQuery::Ok(s) => s,
                 InternQuery::UseAfterFree => {
-                    log::warn!("EditorActor: out of date span id: {}", span);
+                    log::warn!("EditorActor: out of date span id: {span}");
                     return;
                 }
             }
