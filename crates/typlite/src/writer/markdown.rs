@@ -28,7 +28,7 @@ impl FormatWriter for MarkdownWriter {
         });
         writer
             .write(document)
-            .map_err(|e| format!("failed to write document: {}", e))?;
+            .map_err(|e| format!("failed to write document: {e}"))?;
         output.push_str(&writer.into_string());
         Ok(())
     }

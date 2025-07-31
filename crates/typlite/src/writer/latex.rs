@@ -53,7 +53,7 @@ impl LaTeXWriter {
                 heading_type: _,
             } => {
                 if *level > 4 {
-                    return Err(format!("heading level {} is not supported in LaTeX", level).into());
+                    return Err(format!("heading level {level} is not supported in LaTeX").into());
                 }
 
                 output.push('\\');
@@ -62,7 +62,7 @@ impl LaTeXWriter {
                     2 => output.push_str("section{"),
                     3 => output.push_str("subsection{"),
                     4 => output.push_str("subsubsection{"),
-                    _ => return Err(format!("Heading level {} is not supported", level).into()),
+                    _ => return Err(format!("Heading level {level} is not supported").into()),
                 }
 
                 self.write_inline_nodes(content, output)?;
