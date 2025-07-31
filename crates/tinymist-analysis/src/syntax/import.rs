@@ -49,8 +49,8 @@ pub fn find_source_by_expr(
 /// Casts node to a single include expression.
 pub fn cast_include_expr<'a>(name: &str, node: ast::Expr<'a>) -> Option<ast::Expr<'a>> {
     match node {
-        ast::Expr::Include(inc) => Some(inc.source()),
-        ast::Expr::Code(code) => {
+        ast::Expr::ModuleInclude(inc) => Some(inc.source()),
+        ast::Expr::CodeBlock(code) => {
             let exprs = code.body();
             if exprs.exprs().count() != 1 {
                 eprintln!("example function must have a single inclusion: {name}");

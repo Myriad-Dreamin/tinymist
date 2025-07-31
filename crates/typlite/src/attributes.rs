@@ -2,13 +2,13 @@
 
 use ecow::EcoString;
 use tinymist_derive::TypliteAttr;
-use typst::html::HtmlAttrs;
+use typst_html::HtmlAttrs;
 
 use crate::Result;
 
 /// Tag attributes defined for HTML elements.
 pub mod md_attr {
-    use typst::html::HtmlAttr;
+    use typst_html::HtmlAttr;
 
     macro_rules! attrs {
         ($($attr:ident -> $name:ident)*) => {
@@ -32,6 +32,7 @@ pub mod md_attr {
         value -> value
         caption -> caption
         class -> class
+        id -> id
     }
 }
 
@@ -43,17 +44,20 @@ pub struct IdocAttr {
 
 #[derive(TypliteAttr, Default)]
 pub struct HeadingAttr {
+    pub id: EcoString,
     pub level: usize,
 }
 
 #[derive(TypliteAttr, Default)]
 pub struct ImageAttr {
+    pub id: EcoString,
     pub src: EcoString,
     pub alt: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
 pub struct FigureAttr {
+    pub id: EcoString,
     pub caption: EcoString,
 }
 
@@ -64,6 +68,7 @@ pub struct LinkAttr {
 
 #[derive(TypliteAttr, Default)]
 pub struct RawAttr {
+    pub id: EcoString,
     pub lang: EcoString,
     pub block: bool,
     pub text: EcoString,
