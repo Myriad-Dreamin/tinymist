@@ -118,8 +118,9 @@ impl tinymist_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor =
-            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
+        let cursor = source
+            .lines()
+            .line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
@@ -167,7 +168,7 @@ impl tinymist_preview::CompileView for PreviewCompileView {
         let Some(source) = world.source(source_id).ok() else {
             return vec![];
         };
-        let Some(cursor) = source.line_column_to_byte(line, column) else {
+        let Some(cursor) = source.lines().line_column_to_byte(line, column) else {
             return vec![];
         };
 
@@ -176,8 +177,11 @@ impl tinymist_preview::CompileView for PreviewCompileView {
 
     fn resolve_span(&self, span: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
         let world = self.art.world();
-        let resolve_off =
-            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
+        let resolve_off = |src: &Source, off: usize| {
+            src.lines()
+                .byte_to_line(off)
+                .zip(src.lines().byte_to_column(off))
+        };
 
         let source = world.source(span.id()?).ok()?;
         let mut range = source.find(span)?.range();

@@ -8,7 +8,7 @@ impl CompletionPair<'_, '_, '_> {
         // "#import "path.typ":|"
         if matches!(self.cursor.leaf.kind(), SyntaxKind::Colon)
             && let Some(parent) = self.cursor.leaf.clone().parent()
-            && let Some(ast::Expr::Import(import)) = parent.get().cast()
+            && let Some(ast::Expr::ModuleImport(import)) = parent.get().cast()
             && !matches!(import.imports(), Some(ast::Imports::Wildcard))
             && let Some(source) = parent.children().find(|child| child.is::<ast::Expr>())
         {
@@ -31,7 +31,7 @@ impl CompletionPair<'_, '_, '_> {
         // "#import "path.typ": a, b, |".
 
         if let Some(prev) = self.cursor.leaf.prev_sibling()
-            && let Some(ast::Expr::Import(import)) = prev.get().cast()
+            && let Some(ast::Expr::ModuleImport(import)) = prev.get().cast()
             && !self.cursor.text[prev.offset()..self.cursor.cursor].contains('\n')
             && let Some(ast::Imports::Items(items)) = import.imports()
             && let Some(source) = prev.children().find(|child| child.is::<ast::Expr>())
@@ -47,7 +47,7 @@ impl CompletionPair<'_, '_, '_> {
             && let Some(parent) = self.cursor.leaf.clone().parent()
             && parent.kind() == SyntaxKind::ImportItems
             && let Some(grand) = parent.parent()
-            && let Some(ast::Expr::Import(import)) = grand.get().cast()
+            && let Some(ast::Expr::ModuleImport(import)) = grand.get().cast()
             && let Some(ast::Imports::Items(items)) = import.imports()
             && let Some(source) = grand.children().find(|child| child.is::<ast::Expr>())
         {
@@ -64,7 +64,7 @@ impl CompletionPair<'_, '_, '_> {
             && let Some(parent) = path_ctx.parent()
             && parent.kind() == SyntaxKind::ImportItems
             && let Some(grand) = parent.parent()
-            && let Some(ast::Expr::Import(import)) = grand.get().cast()
+            && let Some(ast::Expr::ModuleImport(import)) = grand.get().cast()
             && let Some(ast::Imports::Items(items)) = import.imports()
             && let Some(source) = grand.children().find(|child| child.is::<ast::Expr>())
         {

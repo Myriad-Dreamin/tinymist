@@ -4,6 +4,11 @@ use core::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
+use crate::{
+    ColorTheme,
+    attributes::{IdocAttr, TypliteAttrsParser, md_attr},
+    common::ExternalFrameNode,
+};
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{EcoString, eco_format};
@@ -13,10 +18,10 @@ use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowA
 use typst::{
     World,
     foundations::{Bytes, Dict, IntoValue},
-    html::{HtmlElement, HtmlNode},
     layout::{Abs, Frame},
     utils::LazyHash,
 };
+use typst_html::{HtmlElement, HtmlNode};
 
 use crate::{
     ColorTheme,
@@ -79,7 +84,7 @@ impl HtmlToAstParser {
             });
         };
 
-        let svg = typst_svg::svg_frame(frame);
+        let svg = typst_svg::svg_frame(&frame.inner);
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {

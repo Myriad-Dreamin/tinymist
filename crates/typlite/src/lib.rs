@@ -26,7 +26,7 @@ use typst::World;
 use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
-use typst::html::HtmlDocument;
+use typst_html::HtmlDocument;
 use typst_syntax::Span;
 use typst_syntax::VirtualPath;
 

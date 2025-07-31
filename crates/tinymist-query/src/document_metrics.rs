@@ -209,8 +209,8 @@ impl DocumentMetricsWorker<'_> {
         let range = source.range(span)?;
         let byte_index = range.start + usize::from(span_offset);
         let byte_index = byte_index.min(range.end - 1);
-        let line = source.byte_to_line(byte_index)?;
-        let column = source.byte_to_column(byte_index)?;
+        let line = source.lines().byte_to_line(byte_index)?;
+        let column = source.lines().byte_to_column(byte_index)?;
 
         let filepath = self.ctx.path_for_id(file_id).ok()?;
         let filepath_str = filepath.as_path().display().to_string();
