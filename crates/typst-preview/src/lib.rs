@@ -1,19 +1,18 @@
 mod actor;
-mod args;
 mod debug_loc;
 mod outline;
 
-pub use actor::editor::{
+pub use crate::actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
     PanelScrollByPositionRequest,
 };
-pub use args::*;
-pub use outline::Outline;
+pub use crate::outline::Outline;
 
-use std::sync::OnceLock;
-use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
+use std::sync::{Arc, OnceLock};
+use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
 use futures::sink::SinkExt;
+use reflexo_typst::args::TaskWhen;
 use reflexo_typst::debug_loc::{DocumentPosition, SourceSpanOffset};
 use reflexo_typst::Error;
 use serde::{Deserialize, Serialize};
@@ -22,15 +21,36 @@ use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
-use actor::editor::{EditorActor, EditorActorRequest};
-use actor::render::RenderActorRequest;
-use actor::webview::WebviewActorRequest;
-use debug_loc::SpanInterner;
+use crate::actor::editor::{EditorActor, EditorActorRequest};
+use crate::actor::render::RenderActorRequest;
+use crate::actor::webview::WebviewActorRequest;
+use crate::debug_loc::SpanInterner;
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-type WsError = Error;
-type Message = WsMessage;
+// enum Preview Mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+pub enum PreviewMode {
+    /// Preview mode for regular document
+    #[cfg_attr(feature = "clap", clap(name = "document"))]
+    Document,
+
+    /// Preview mode for slide
+    #[cfg_attr(feature = "clap", clap(name = "slide"))]
+    Slide,
+}
+
+/// The configurations about the preview.
+#[derive(Debug, Clone, Default)]
+pub struct PreviewConfig {
+    /// Whether to enable partial rendering.
+    pub enable_partial_rendering: bool,
+    /// The refresh style of the preview.
+    pub refresh_style: TaskWhen,
+    /// The invert colors setting for the preview.
+    pub invert_colors: String,
+}
 
 /// Get the HTML for the frontend by a given preview mode and server to connect
 pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
@@ -47,11 +67,11 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
 
 /// Shortcut to create a previewer.
 pub async fn preview(
-    arguments: PreviewArgs,
+    config: PreviewConfig,
     conn: ControlPlaneTx,
     server: Arc<impl EditorServer>,
 ) -> Previewer {
-    PreviewBuilder::new(arguments).build(conn, server).await
+    PreviewBuilder::new(config).build(conn, server).await
 }
 
 pub struct Previewer {
@@ -77,8 +97,8 @@ impl Previewer {
 
     /// Listen streams that accepting data plane messages.
     pub fn start_data_plane<
-        C: futures::Sink<WsMessage, Error = WsError>
-            + futures::Stream<Item = Result<WsMessage, WsError>>
+        C: futures::Sink<WsMessage, Error = reflexo_typst::Error>
+            + futures::Stream<Item = Result<WsMessage, reflexo_typst::Error>>
             + Send
             + 'static,
         S: 'static,
@@ -190,7 +210,7 @@ type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
 type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
 pub struct PreviewBuilder {
-    arguments: PreviewArgs,
+    config: PreviewConfig,
     shutdown_tx: Option<mpsc::Sender<()>>,
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
@@ -201,9 +221,9 @@ pub struct PreviewBuilder {
 }
 
 impl PreviewBuilder {
-    pub fn new(arguments: PreviewArgs) -> Self {
+    pub fn new(config: PreviewConfig) -> Self {
         Self {
-            arguments,
+            config,
             shutdown_tx: None,
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
@@ -218,11 +238,11 @@ impl PreviewBuilder {
         self
     }
 
-    pub fn compile_watcher(&self) -> &Arc<CompileWatcher> {
+    pub fn compile_watcher(&self, task_id: String) -> &Arc<CompileWatcher> {
         self.compile_watcher.get_or_init(|| {
             Arc::new(CompileWatcher {
-                task_id: self.arguments.task_id.clone(),
-                refresh_style: self.arguments.refresh_style,
+                task_id,
+                when: self.config.refresh_style.clone(),
                 doc_sender: self.doc_sender.clone(),
                 editor_tx: self.editor_conn.0.clone(),
                 render_tx: self.renderer_mailbox.0.clone(),
@@ -232,7 +252,7 @@ impl PreviewBuilder {
 
     pub async fn build<T: EditorServer>(self, conn: ControlPlaneTx, server: Arc<T>) -> Previewer {
         let PreviewBuilder {
-            arguments,
+            config,
             shutdown_tx,
             renderer_mailbox,
             editor_conn: (editor_tx, editor_rx),
@@ -262,9 +282,9 @@ impl PreviewBuilder {
             span_interner: span_interner.clone(),
             webview_tx: webview_tx.clone(),
             editor_tx: editor_tx.clone(),
-            invert_colors: arguments.invert_colors.clone(),
+            invert_colors: config.invert_colors,
             renderer_tx: renderer_mailbox.0.clone(),
-            enable_partial_rendering: arguments.enable_partial_rendering,
+            enable_partial_rendering: config.enable_partial_rendering,
             doc_sender,
         };
 
@@ -392,7 +412,7 @@ pub trait CompileView: Send + Sync {
 
 pub struct CompileWatcher {
     task_id: String,
-    refresh_style: RefreshStyle,
+    when: TaskWhen,
     doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -411,14 +431,14 @@ impl CompileWatcher {
 
     pub fn notify_compile(&self, view: Arc<dyn CompileView>) {
         log::info!(
-            "Preview({:?}): received notification: signal({:?}, {:?}), refresh style {:?}",
+            "Preview({:?}): received notification: signal({:?}, {:?}), when {:?}",
             self.task_id,
             view.is_by_entry_update(),
             view.is_on_saved(),
-            self.refresh_style
+            self.when
         );
         if !view.is_by_entry_update()
-            && (self.refresh_style == RefreshStyle::OnSave && !view.is_on_saved())
+            && (matches!(self.when, TaskWhen::OnSave) && !view.is_on_saved())
         {
             return;
         }
@@ -453,4 +473,93 @@ struct DataPlane {
     invert_colors: String,
     renderer_tx: broadcast::Sender<RenderActorRequest>,
     doc_sender: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
+}
+
+/// The invert colors for the preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreviewInvertColors {
+    /// Inverts all elements.
+    Enum(PreviewInvertColor),
+    /// Inverts colors per element kinds.
+    Object(PreviewInvertColorObject),
+}
+
+impl Default for PreviewInvertColors {
+    fn default() -> Self {
+        PreviewInvertColors::Enum(PreviewInvertColor::Never)
+    }
+}
+
+impl serde::Serialize for PreviewInvertColors {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            PreviewInvertColors::Enum(color) => color.serialize(serializer),
+            PreviewInvertColors::Object(obj) => obj.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PreviewInvertColors {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = PreviewInvertColors;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string or an object with image and rest fields")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(PreviewInvertColors::Enum(Deserialize::deserialize(
+                    serde::de::value::StrDeserializer::new(v),
+                )?))
+            }
+
+            fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+            where
+                M: serde::de::MapAccess<'de>,
+            {
+                Ok(PreviewInvertColors::Object(Deserialize::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
+}
+
+/// The ways of inverting colors in the preview.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PreviewInvertColor {
+    /// Never inverts colors.
+    #[default]
+    Never,
+    /// Inverts colors automatically based on the color theme.
+    Auto,
+    /// Always inverts colors.
+    Always,
+}
+
+/// The invert colors for the preview, which can be applied to images and other
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewInvertColorObject {
+    /// The invert color mode about images.
+    #[serde(default)]
+    pub image: PreviewInvertColor,
+    /// The invert color mode about rest elements.
+    #[serde(default)]
+    pub rest: PreviewInvertColor,
 }

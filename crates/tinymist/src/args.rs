@@ -32,7 +32,7 @@ pub enum Commands {
     TraceLsp(TraceLspArgs),
     /// Runs preview server
     #[cfg(feature = "preview")]
-    Preview(tinymist::tool::preview::PreviewCliArgs),
+    Preview(tinymist::tool::preview::PreviewArgs),
 
     /// Execute a document and collect coverage
     #[clap(hide(true))] // still in development

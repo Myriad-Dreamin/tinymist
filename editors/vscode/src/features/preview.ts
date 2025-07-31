@@ -408,12 +408,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   const taskId = Math.random().toString(36).substring(7);
   const filePath = bindDocument.uri.fsPath;
 
-  // todo: move me to the server side.
-  const refreshStyle = getPreviewConfCompat<string>("refresh") || "onSave";
-  const scrollSyncMode =
-    ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
-  const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
-
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
 
@@ -471,24 +465,18 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
   async function invokeLspCommand() {
     let prevSelection: EditorSelection | undefined = undefined;
+    const scrollSyncMode =
+      ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
+    const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
 
     console.log(`Preview Command ${filePath}`);
-    const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
-      ? ["--partial-rendering"]
-      : [];
-    const ivArgs = getPreviewConfCompat("invertColors");
-    const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
 
     const previewArgs = [
       "--task-id",
       taskId,
-      "--refresh-style",
-      refreshStyle,
       ...dataPlaneHostArgs,
-      ...partialRenderingArgs,
-      ...invertColorsArgs,
       ...previewInSlideModeArgs,
       ...(isNotPrimary ? ["--not-primary"] : []),
       filePath,

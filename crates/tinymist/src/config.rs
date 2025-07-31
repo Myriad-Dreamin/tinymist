@@ -13,6 +13,7 @@ use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
+use tinymist_preview::{PreviewConfig, PreviewInvertColors};
 use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
@@ -508,6 +509,16 @@ impl Config {
         }
     }
 
+    /// Gets the preview configuration.
+    pub fn preview(&self) -> PreviewConfig {
+        PreviewConfig {
+            enable_partial_rendering: self.preview.partial_rendering,
+            refresh_style: self.preview.refresh.clone().unwrap_or(TaskWhen::OnType),
+            invert_colors: serde_json::to_string(&self.preview.invert_colors)
+                .unwrap_or_else(|_| "never".to_string()),
+        }
+    }
+
     /// Gets the export task configuration.
     pub(crate) fn export_task(&self) -> ExportTask {
         ExportTask {
@@ -858,6 +869,11 @@ pub struct PreviewFeat {
     pub background: BackgroundPreviewOpts,
     /// When to refresh the preview.
     pub refresh: Option<TaskWhen>,
+    /// Whether to enable partial rendering.
+    pub partial_rendering: bool,
+    /// Invert colors for the preview.
+    #[serde(default)]
+    pub invert_colors: PreviewInvertColors,
 }
 
 /// The lint features.
@@ -943,6 +959,7 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
 mod tests {
     use super::*;
     use serde_json::json;
+    use tinymist_preview::{PreviewInvertColor, PreviewInvertColorObject};
 
     fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
         temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
@@ -1350,5 +1367,55 @@ mod tests {
                 .is_some_and(|args| args.package.package_cache_path == Some(pkg_path.into()));
             assert!(applied_cache_path);
         });
+    }
+
+    #[test]
+    fn test_invert_colors_validation() {
+        fn test(s: &str) -> anyhow::Result<PreviewInvertColors> {
+            Ok(serde_json::from_str(s)?)
+        }
+
+        assert_eq!(
+            test(r#""never""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Never)
+        );
+        assert_eq!(
+            test(r#""auto""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Auto)
+        );
+        assert_eq!(
+            test(r#""always""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Always)
+        );
+        assert!(test(r#""e""#).is_err());
+
+        assert_eq!(
+            test(r#"{"rest": "never"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{"image": "always"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Always,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{"unknown": "ovo"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
     }
 }
