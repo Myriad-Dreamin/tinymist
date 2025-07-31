@@ -10,10 +10,10 @@ use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
 use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::World;
 use typst::diag::{SourceResult, StrResult};
+use typst::engine::Sink;
 use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
 use typst::layout::Abs;
-use typst::routines::EvalMode;
-use typst::syntax::{Span, SyntaxNode, ast};
+use typst::syntax::{Span, SyntaxMode, SyntaxNode, ast};
 use typst::visualize::Color;
 use typst_eval::eval_string;
 
@@ -177,9 +177,10 @@ impl DocumentQuery {
         let selector = eval_string(
             &typst::ROUTINES,
             world.track(),
+            Sink::new().track_mut(),
             selector,
             Span::detached(),
-            EvalMode::Code,
+            SyntaxMode::Code,
             Scope::default(),
         )
         .map_err(|errors| {

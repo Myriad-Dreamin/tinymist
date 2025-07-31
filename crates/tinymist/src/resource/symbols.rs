@@ -1191,9 +1191,10 @@ fn populate(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (modifier_name, ch) in sym.variants() {
-        let mut name =
-            String::with_capacity(mod_name.len() + sym_name.len() + modifier_name.len() + 2);
+    for (modifier_name, ch, _) in sym.variants() {
+        let mut name = String::with_capacity(
+            mod_name.len() + sym_name.len() + modifier_name.as_str().len() + 2,
+        );
 
         name.push_str(mod_name);
         name.push('.');
@@ -1201,7 +1202,7 @@ fn populate(
 
         if !modifier_name.is_empty() {
             name.push('.');
-            name.push_str(modifier_name);
+            name.push_str(modifier_name.as_str());
         }
 
         let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);

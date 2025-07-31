@@ -2,7 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/figure_image_alt.typ
-snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -10,7 +9,7 @@ snapshot_kind: text
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1figure caption=""><m1image src="./fig.svg" alt="Content"></m1image></m1figure></m1document></body>
+  <body><m1document><m1figure caption><m1image src="./fig.svg" alt="Content"></m1image></m1figure></m1document></body>
 </html>
 
 =====

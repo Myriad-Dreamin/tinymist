@@ -23,7 +23,7 @@ use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
 use typst::World;
 use typst::foundations::Bytes;
-use typst::html::HtmlDocument;
+use typst_html::HtmlDocument;
 use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;
