@@ -398,6 +398,89 @@ impl ProjectPreviewState {
     }
 }
 
+struct PostCompileHooks {
+    pub(crate) export: ExportHook,
+    pub(crate) preview: PreviewHook,
+    pub(crate) diag: DiagHook,
+    pub(crate) word_count: WordCountHook,
+}
+
+impl PostCompileHooks {
+    pub fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
+        self.export.needs_comile(snap)
+            || self.preview.needs_comile(snap)
+            || self.diag.needs_comile(snap)
+            || self.word_count.needs_comile(snap)
+    }
+}
+
+struct ExportHook {
+    pub(crate) task: crate::task::ExportTask,
+}
+
+impl ExportHook {
+    fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
+        let s = snap.signal;
+
+        let config = self.task.factory.task();
+        let when = config.task.when().unwrap_or(&TaskWhen::Never);
+        needs_compile(snap, when)
+    }
+}
+
+struct PreviewHook {
+    #[cfg(feature = "preview")]
+    pub(crate) preview: ProjectPreviewState,
+    pub(crate) when: TaskWhen,
+}
+
+impl PreviewHook {
+    fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
+        needs_compile(snap, &self.when)
+    }
+}
+
+struct DiagHook {
+    pub(crate) editor_tx: EditorSender,
+    /// When to trigger the diag.
+    pub(crate) when: TaskWhen,
+    /// When to trigger the lint.
+    pub(crate) lint: TaskWhen,
+}
+
+impl DiagHook {
+    fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
+        needs_compile(snap, &self.when) || needs_compile(snap, &self.lint)
+    }
+}
+
+struct WordCountHook {
+    count_words: bool,
+}
+
+impl WordCountHook {
+    fn needs_comile(&self, snap: &LspCompileSnapshot) -> bool {
+        let when = if self.count_words {
+            &TaskWhen::OnSave
+        } else {
+            &TaskWhen::Never
+        };
+        needs_compile(snap, when)
+    }
+}
+
+fn needs_compile(snap: &LspCompileSnapshot, when: &TaskWhen) -> bool {
+    let s = snap.signal;
+    match when {
+        TaskWhen::Never => false,
+        TaskWhen::Script => s.by_entry_update,
+        TaskWhen::OnType => s.by_mem_events,
+        TaskWhen::OnSave => s.by_fs_events,
+        // todo: respect doc
+        TaskWhen::OnDocumentHasTitle => s.by_fs_events, // && doc.info().title.is_some(),
+    }
+}
+
 pub struct CompileHandlerImpl {
     pub(crate) analysis: Arc<Analysis>,
 
