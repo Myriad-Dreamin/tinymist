@@ -868,8 +868,10 @@ pub struct PreviewFeat {
     #[serde(default)]
     pub background: BackgroundPreviewOpts,
     /// When to refresh the preview.
+    #[serde(default)]
     pub refresh: Option<TaskWhen>,
     /// Whether to enable partial rendering.
+    #[serde(default)]
     pub partial_rendering: bool,
     /// Invert colors for the preview.
     #[serde(default)]
