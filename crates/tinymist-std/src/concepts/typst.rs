@@ -16,7 +16,7 @@ pub(crate) mod well_known {
 
     pub use typst::layout::PagedDocument as TypstPagedDocument;
 
-    pub use typst::html::HtmlDocument as TypstHtmlDocument;
+    pub use typst_html::HtmlDocument as TypstHtmlDocument;
 
     pub use typst::text::Font as TypstFont;
 

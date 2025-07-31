@@ -34,7 +34,7 @@ impl DocxImageProcessor {
         // Parse SVG
         let rtree = match resvg::usvg::Tree::from_str(svg_str, &opt) {
             Ok(tree) => tree,
-            Err(e) => return Err(format!("SVG parsing error: {:?}", e).into()),
+            Err(e) => return Err(format!("SVG parsing error: {e:?}").into()),
         };
 
         let size = rtree.size().to_int_size();
@@ -57,7 +57,7 @@ impl DocxImageProcessor {
         // Encode as PNG
         pixmap
             .encode_png()
-            .map_err(|e| format!("PNG encoding error: {:?}", e).into())
+            .map_err(|e| format!("PNG encoding error: {e:?}").into())
     }
 
     /// Process image data and add to document

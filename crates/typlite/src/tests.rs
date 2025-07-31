@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
 use regex::Regex;
-use typst::html::{HtmlNode, HtmlTag};
+use typst_html::{HtmlNode, HtmlTag};
 use typst_syntax::Span;
 
 use super::*;
@@ -46,7 +46,7 @@ fn test_docx_generation() {
         let docx_data = match converter.to_docx() {
             Ok(data) => data,
             Err(err) => {
-                panic!("Failed to generate DOCX: {}", err);
+                panic!("Failed to generate DOCX: {err}");
             }
         };
 

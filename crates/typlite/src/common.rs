@@ -129,7 +129,7 @@ impl HighlightNode {
             temp_writer.write(node)?;
         }
         let content = temp_writer.into_string();
-        writer.write_str(&format!("=={}==", content))?;
+        writer.write_str(&format!("=={content}=="))?;
         Ok(())
     }
 

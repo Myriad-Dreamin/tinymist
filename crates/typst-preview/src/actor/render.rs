@@ -348,7 +348,7 @@ impl OutlineRenderActor {
             log::debug!("OutlineRenderActor: waiting for message");
             match self.signal.recv().await {
                 Ok(msg) => {
-                    log::debug!("OutlineRenderActor: received message: {:?}", msg);
+                    log::debug!("OutlineRenderActor: received message: {msg:?}");
                 }
                 Err(broadcast::error::RecvError::Closed) => {
                     log::info!("OutlineRenderActor: no more messages");
