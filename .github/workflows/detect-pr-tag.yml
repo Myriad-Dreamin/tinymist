@@ -1,0 +1,62 @@
+name: tinymist::detect_pr_tag
+
+on:
+  pull_request:
+    types: [opened, edited]
+    branches: 
+      - main
+
+jobs:
+  detect-tag:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check tag in PR body
+      id: check-tag
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const prBody = context.payload.pull_request.body || '';
+          console.log('PR Body:', prBody);
+          
+          const tagRegex = /\+Tags\s+(v\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/;
+          const match = prBody.match(tagRegex);
+          
+          if (match) {
+              const tagVersion = match[1];
+              console.log('Found tag:', tagVersion);
+              
+              core.setOutput('tag_found', 'true');
+              core.setOutput('tag_version', tagVersion);
+          } else {
+              console.log('No tag found in PR description');
+              core.setOutput('tag_found', 'false');
+          }
+
+    - name: Comment on PR
+      if: steps.check-tag.outputs.tag_found == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const tagVersion = '${{ steps.check-tag.outputs.tag_version }}';
+          const comment = `**Tag Detection Notice**
+          
+          This PR contains a tag directive: \`+Tags ${tagVersion}\`
+          
+          If this PR is merged, it will automatically create tag \`${tagVersion}\` on the main branch.
+          
+          Please ensure before merging:
+          - [ ] **Cargo.toml & Cargo.lock**: No \`git\` dependencies with \`branch\`, use \`tag\` or \`rev\` dependencies instead
+          - [ ] **Publish tokens**: Both \`VSCODE_MARKETPLACE_TOKEN\` and \`OPENVSX_ACCESS_TOKEN\` are valid and not expired
+          - [ ] **Version updates**: All version numbers in \`Cargo.toml\`, \`package.json\` and other files have been updated consistently
+          - [ ] **Changelog**: \`editors/vscode/CHANGELOG.md\` has been updated with correct format
+          - [ ] **tinymist-assets**: If needed, the crate has been published and version updated in \`Cargo.toml\`
+          `
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
