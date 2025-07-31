@@ -6,20 +6,6 @@ use std::{
     sync::{Arc, LazyLock, OnceLock},
 };
 
-use ecow::EcoVec;
-use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{
-    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
-};
-use typst::{
-    diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
-    foundations::{Bytes, Datetime, Dict},
-    syntax::{Source, Span, VirtualPath},
-    text::{Font, FontBook},
-    utils::LazyHash,
-    Features, Library, World, WorldExt,
-};
-
 use crate::{
     package::{PackageRegistry, PackageSpec},
     source::SourceDb,
@@ -31,6 +17,19 @@ use crate::{
         SemanticTokensLegend,
     },
     WorldComputeGraph,
+};
+use ecow::EcoVec;
+use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist_vfs::{
+    FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
+};
+use typst::{
+    diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
+    foundations::{Bytes, Datetime, Dict},
+    syntax::{Source, Span, VirtualPath},
+    text::{Font, FontBook},
+    utils::LazyHash,
+    Features, Library, LibraryExt, World, WorldExt,
 };
 // use crate::source::{SharedState, SourceCache, SourceDb};
 use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
@@ -949,18 +948,19 @@ impl<'a> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a> {
     fn line_index(&'a self, id: FileId, given: usize) -> CodespanResult<usize> {
         let source = self.world.lookup(id);
         source
+            .lines()
             .byte_to_line(given)
             .ok_or_else(|| CodespanError::IndexTooLarge {
                 given,
-                max: source.len_bytes(),
+                max: source.lines().len_bytes(),
             })
     }
 
     /// See [`codespan_reporting::files::Files::column_number`].
     fn column_number(&'a self, id: FileId, _: usize, given: usize) -> CodespanResult<usize> {
         let source = self.world.lookup(id);
-        source.byte_to_column(given).ok_or_else(|| {
-            let max = source.len_bytes();
+        source.lines().byte_to_column(given).ok_or_else(|| {
+            let max = source.lines().len_bytes();
             if given <= max {
                 CodespanError::InvalidCharBoundary { given }
             } else {
@@ -974,10 +974,11 @@ impl<'a> codespan_reporting::files::Files<'a> for CodeSpanReportWorld<'a> {
         match self.world.source(id).ok() {
             Some(source) => {
                 source
+                    .lines()
                     .line_to_range(given)
                     .ok_or_else(|| CodespanError::LineTooLarge {
                         given,
-                        max: source.len_lines(),
+                        max: source.lines().len_lines(),
                     })
             }
             None => Ok(0..0),

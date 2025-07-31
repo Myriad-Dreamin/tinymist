@@ -149,8 +149,8 @@ impl<'w> Linter<'w> {
             let mut first = true;
             for set in block.iter() {
                 let msg = match set {
-                    ast::Expr::Set(..) => "This set statement doesn't take effect.",
-                    ast::Expr::Show(..) => "This show statement doesn't take effect.",
+                    ast::Expr::SetRule(..) => "This set statement doesn't take effect.",
+                    ast::Expr::ShowRule(..) => "This show statement doesn't take effect.",
                     _ => continue,
                 };
                 let mut warning = SourceDiagnostic::warning(set.span(), msg);
@@ -173,7 +173,7 @@ impl<'w> Linter<'w> {
         for it in block.iter() {
             if is_show_set(it) {
                 has_set = true;
-            } else if matches!(it, ast::Expr::Break(..) | ast::Expr::Continue(..)) {
+            } else if matches!(it, ast::Expr::LoopBreak(..) | ast::Expr::LoopContinue(..)) {
                 return has_set;
             } else if !it.to_untyped().kind().is_trivia() {
                 return false;
@@ -536,7 +536,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
-        self.value(ast::Expr::Include(expr));
+        self.value(ast::Expr::ModuleInclude(expr));
         Some(())
     }
 
@@ -591,7 +591,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 ),
             );
             let diag = match expr {
-                ast::Expr::Show(..) | ast::Expr::Set(..) => diag,
+                ast::Expr::ShowRule(..) | ast::Expr::SetRule(..) => diag,
                 expr if expr.hash() => diag.with_hint(eco_format!(
                     "consider ignoring the value explicitly using underscore: `let _ = {}`",
                     expr.to_untyped().clone().into_text()
@@ -599,7 +599,8 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 _ => diag,
             };
             self.linter.diag.push(diag);
-        } else if ri.return_none && matches!(expr, ast::Expr::Show(..) | ast::Expr::Set(..)) {
+        } else if ri.return_none && matches!(expr, ast::Expr::ShowRule(..) | ast::Expr::SetRule(..))
+        {
             ri.warned = true;
             let diag = SourceDiagnostic::warning(
                 expr.span(),
@@ -615,12 +616,12 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
-        self.value(ast::Expr::Show(expr));
+        self.value(ast::Expr::ShowRule(expr));
         Some(())
     }
 
     fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
-        self.value(ast::Expr::Set(expr));
+        self.value(ast::Expr::SetRule(expr));
         Some(())
     }
 
@@ -654,8 +655,8 @@ trait DataFlowVisitor {
     fn expr(&mut self, expr: ast::Expr) -> Option<()> {
         match expr {
             ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
-            ast::Expr::Code(expr) => self.block(expr.body().exprs()),
-            ast::Expr::Content(expr) => self.block(expr.body().exprs()),
+            ast::Expr::CodeBlock(expr) => self.block(expr.body().exprs()),
+            ast::Expr::ContentBlock(expr) => self.block(expr.body().exprs()),
             ast::Expr::Math(expr) => self.exprs(expr.exprs()),
 
             ast::Expr::Text(..) => self.value(expr),
@@ -686,9 +687,9 @@ trait DataFlowVisitor {
             ast::Expr::Strong(content) => self.exprs(content.body().exprs()),
             ast::Expr::Emph(content) => self.exprs(content.body().exprs()),
             ast::Expr::Heading(content) => self.exprs(content.body().exprs()),
-            ast::Expr::List(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Enum(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Term(content) => {
+            ast::Expr::ListItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::EnumItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::TermItem(content) => {
                 self.exprs(content.term().exprs().chain(content.description().exprs()))
             }
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
@@ -704,19 +705,19 @@ trait DataFlowVisitor {
             ast::Expr::FieldAccess(expr) => self.field_access(expr),
             ast::Expr::FuncCall(expr) => self.func_call(expr),
             ast::Expr::Closure(expr) => self.closure(expr),
-            ast::Expr::Let(expr) => self.let_binding(expr),
-            ast::Expr::DestructAssign(expr) => self.destruct_assign(expr),
-            ast::Expr::Set(expr) => self.set(expr),
-            ast::Expr::Show(expr) => self.show(expr),
+            ast::Expr::LetBinding(expr) => self.let_binding(expr),
+            ast::Expr::DestructAssignment(expr) => self.destruct_assign(expr),
+            ast::Expr::SetRule(expr) => self.set(expr),
+            ast::Expr::ShowRule(expr) => self.show(expr),
             ast::Expr::Contextual(expr) => self.contextual(expr),
             ast::Expr::Conditional(expr) => self.conditional(expr),
-            ast::Expr::While(expr) => self.while_loop(expr),
-            ast::Expr::For(expr) => self.for_loop(expr),
-            ast::Expr::Import(expr) => self.import(expr),
-            ast::Expr::Include(expr) => self.include(expr),
-            ast::Expr::Break(expr) => self.loop_break(expr),
-            ast::Expr::Continue(expr) => self.loop_continue(expr),
-            ast::Expr::Return(expr) => self.func_return(expr),
+            ast::Expr::WhileLoop(expr) => self.while_loop(expr),
+            ast::Expr::ForLoop(expr) => self.for_loop(expr),
+            ast::Expr::ModuleImport(expr) => self.import(expr),
+            ast::Expr::ModuleInclude(expr) => self.include(expr),
+            ast::Expr::LoopBreak(expr) => self.loop_break(expr),
+            ast::Expr::LoopContinue(expr) => self.loop_continue(expr),
+            ast::Expr::FuncReturn(expr) => self.func_return(expr),
         }
     }
 
@@ -893,8 +894,8 @@ enum Block<'a> {
 impl<'a> Block<'a> {
     fn from(expr: ast::Expr<'a>) -> Option<Self> {
         Some(match expr {
-            ast::Expr::Code(block) => Block::Code(block.body()),
-            ast::Expr::Content(block) => Block::Markup(block.body()),
+            ast::Expr::CodeBlock(block) => Block::Code(block.body()),
+            ast::Expr::ContentBlock(block) => Block::Markup(block.body()),
             _ => return None,
         })
     }
@@ -944,7 +945,7 @@ impl BuggyBlockLoc<'_> {
     fn hint(&self, show_set: ast::Expr<'_>) -> EcoString {
         match self {
             BuggyBlockLoc::Show(show_parent) => {
-                if let ast::Expr::Show(show) = show_set {
+                if let ast::Expr::ShowRule(show) = show_set {
                     eco_format!(
                         "consider changing parent to `show {}: it => {{ {}; it }}`",
                         match show_parent.selector() {
@@ -970,7 +971,7 @@ impl BuggyBlockLoc<'_> {
                 } else {
                     "not "
                 };
-                if let ast::Expr::Show(show) = show_set {
+                if let ast::Expr::ShowRule(show) = show_set {
                     eco_format!(
                         "consider changing parent to `show {}: if {neg}({}) {{ .. }}`",
                         match show.selector() {
@@ -1014,7 +1015,7 @@ enum ExprContext {
 }
 
 fn is_show_set(it: ast::Expr) -> bool {
-    matches!(it, ast::Expr::Set(..) | ast::Expr::Show(..))
+    matches!(it, ast::Expr::SetRule(..) | ast::Expr::ShowRule(..))
 }
 
 fn is_compare_op(op: ast::BinOp) -> bool {

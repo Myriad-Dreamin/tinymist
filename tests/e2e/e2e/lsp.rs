@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:7e4a9cdceda2bf7409ec907108d0f927");
+        insta::assert_snapshot!(hash, @"siphash128_13:1aa2e6cae480307559aadb11636169ca");
     }
 
     {
@@ -33,14 +33,14 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:b18199e96fd07287ead7caa2b33f777");
+        insta::assert_snapshot!(hash, @"siphash128_13:3b9d66e76f15674d5a94cd66f7bff2e8");
     }
 }
 
 fn handle_io<T>(res: io::Result<T>) -> T {
     match res {
         Ok(status) => status,
-        Err(err) => panic!("Error: {}", err),
+        Err(err) => panic!("Error: {err}"),
     }
 }
 
@@ -112,7 +112,7 @@ impl ReplayBuilder {
 
 fn fixture(o: &str, f: impl FnOnce(&mut Value)) -> Value {
     // tests/fixtures/o.json
-    let content = std::fs::read_to_string(format!("tests/fixtures/{}.json", o)).unwrap();
+    let content = std::fs::read_to_string(format!("tests/fixtures/{o}.json")).unwrap();
     let mut req = serde_json::from_str(&content).unwrap();
     f(&mut req);
     req
@@ -358,7 +358,7 @@ fn replay_log(root: &Path) -> String {
     let hash = tinymist_std::hash::hash128(&c);
     std::fs::write(root.join("result_sorted.json"), c).unwrap();
 
-    format!("siphash128_13:{:x}", hash)
+    format!("siphash128_13:{hash:x}")
 }
 
 fn sort_and_redact_value(v: Value) -> Value {

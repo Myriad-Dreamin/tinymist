@@ -6,7 +6,7 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use cmark_writer::{CommonMarkWriter, WriteResult};
 use ecow::EcoString;
 use tinymist_project::LspWorld;
-use typst::html::{tag, HtmlElement, HtmlNode};
+use typst_html::{tag, HtmlElement, HtmlNode};
 
 use crate::attributes::{md_attr, AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
@@ -54,6 +54,8 @@ impl HtmlToAstParser {
 
             tag::strong | md_tag::strong => self.convert_strong(element),
             tag::em | md_tag::emph => self.convert_emphasis(element),
+            tag::mark => self.convert_highlight(element),
+            tag::s => self.convert_strikethrough(element),
 
             tag::br => {
                 self.inline_buffer.push(Node::HardBreak);
@@ -118,8 +120,6 @@ impl HtmlToAstParser {
             }
 
             md_tag::figure => self.convert_figure(element),
-            md_tag::highlight => self.convert_highlight(element),
-            md_tag::strike => self.convert_strikethrough(element),
             md_tag::link => self.convert_link(element),
             md_tag::image => self.convert_image(element),
 
@@ -253,7 +253,7 @@ impl HtmlToAstParser {
                     self.convert_element(element)?;
                 }
                 HtmlNode::Frame(frame) => {
-                    let res = self.convert_frame(frame);
+                    let res = self.convert_frame(&frame.inner);
                     self.inline_buffer.push(res);
                 }
                 HtmlNode::Tag(..) => {}
