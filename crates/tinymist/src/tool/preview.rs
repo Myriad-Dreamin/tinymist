@@ -64,20 +64,16 @@ impl From<RefreshStyle> for TaskWhen {
     }
 }
 
-/// CLI Arguments for the preview tool.
+/// Specia Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewArgs {
-    /// Compile arguments
-    #[clap(flatten)]
-    pub compile: CompileOnceArgs,
-
     /// Preview mode
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
     /// Only render visible part of the document. This can improve performance
     /// but still being experimental.
-    #[cfg_attr(feature = "clap", clap(long = "partial-rendering"))]
+    #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: Option<bool>,
 
     /// Invert colors of the preview (useful for dark themes without cost).
@@ -109,6 +105,41 @@ pub struct PreviewArgs {
     #[clap(long)]
     pub invert_colors: Option<String>,
 
+    /// Used by lsp for controlling the preview refresh style.
+    #[clap(long, hide(true))]
+    pub refresh_style: Option<RefreshStyle>,
+}
+
+impl PreviewArgs {
+    /// Get the configuration for the preview.
+    pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
+        PreviewConfig {
+            enable_partial_rendering: self
+                .enable_partial_rendering
+                .unwrap_or(config.enable_partial_rendering),
+            refresh_style: self
+                .refresh_style
+                .map(From::from)
+                .unwrap_or_else(|| config.refresh_style.clone()),
+            invert_colors: match &self.invert_colors {
+                Some(s) => s.clone(),
+                None => config.invert_colors.clone(),
+            },
+        }
+    }
+}
+
+/// CLI Arguments for the preview tool.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PreviewCliArgs {
+    /// Preview arguments
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Compile arguments
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
     /// Used by lsp for identifying the task.
     #[clap(
         long = "task-id",
@@ -117,10 +148,6 @@ pub struct PreviewArgs {
         hide(true)
     )]
     pub task_id: String,
-
-    /// Used by lsp for controlling the preview refresh style.
-    #[clap(long, hide(true))]
-    pub refresh_style: Option<RefreshStyle>,
 
     /// Data plane server will bind to this address. Note: if it equals to
     /// `static_file_host`, same address will be used.
@@ -166,27 +193,10 @@ pub struct PreviewArgs {
     pub no_open: bool,
 }
 
-impl PreviewArgs {
+impl PreviewCliArgs {
     /// Whether to open the preview in the browser after compilation.
     pub fn open_in_browser(&self, default: bool) -> bool {
         !self.no_open && (self.open || default)
-    }
-
-    /// Get the configuration for the preview.
-    pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
-        PreviewConfig {
-            enable_partial_rendering: self
-                .enable_partial_rendering
-                .unwrap_or(config.enable_partial_rendering),
-            refresh_style: self
-                .refresh_style
-                .map(From::from)
-                .unwrap_or_else(|| config.refresh_style.clone()),
-            invert_colors: match &self.invert_colors {
-                Some(s) => s.clone(),
-                None => config.invert_colors.clone(),
-            },
-        }
     }
 }
 
@@ -246,9 +256,9 @@ impl ServerState {
             .into_iter()
             .chain(cli_args.iter().map(|e| e.as_str()));
         let cli_args =
-            PreviewArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
         // default configs
-        let config = cli_args.config(&self.config.preview());
+        let config = cli_args.preview.config(&self.config.preview());
 
         // todo: preview specific arguments are not used
         let entry = cli_args.compile.input.as_ref();
@@ -380,7 +390,7 @@ impl PreviewState {
     /// Start a preview on a given compiler.
     pub fn start(
         &self,
-        args: PreviewArgs,
+        args: PreviewCliArgs,
         previewer: PreviewBuilder,
         // compile_handler: Arc<CompileHandler>,
         project_id: ProjectInsId,
@@ -466,7 +476,7 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
@@ -537,11 +547,11 @@ impl PreviewState {
 }
 
 /// Entry point of the preview tool.
-pub async fn preview_main(args: PreviewArgs) -> Result<()> {
+pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
     let handle = tokio::runtime::Handle::current();
 
-    let config = args.config(&PreviewConfig::default());
+    let config = args.preview.config(&PreviewConfig::default());
     let open_in_browser = args.open_in_browser(true);
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
@@ -656,7 +666,7 @@ pub async fn preview_main(args: PreviewArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
