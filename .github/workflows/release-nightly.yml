@@ -1,0 +1,343 @@
+name: Nightly Release
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'nightly'
+        type: choice
+        options:
+          - nightly
+          - canary
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: nightly
+        token: ${{ secrets.NIGHTLY_REPO_TOKEN }}
+        fetch-depth: 0
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'yarn'
+    - name: Install deps
+      run: yarn install
+
+    - name: Setup Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq --no-install-recommends
+
+    - name: Determine release type
+      id: release_type
+      run: |
+        if [[ "${{ github.event_name }}" == "schedule" ]]; then
+          if [[ "${{ github.event.schedule }}" == "0 0 * * *" ]]; then
+            echo "release_type=nightly" >> $GITHUB_ENV
+          else
+            echo "release_type=canary" >> $GITHUB_ENV
+          fi
+        else
+          echo "release_type=${{ github.event.inputs.release_type }}" >> $GITHUB_ENV
+        fi
+
+    - name: Check for updates
+      id: check_updates
+      run: |
+        echo "Checking for updates in dependency repositories..."
+        
+        # Get current revs using script
+        eval "$(node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . get-current-revs)"
+        
+        # Get latest revs
+        latest_typst_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly-content-hint" | jq -r '.sha')
+        latest_reflexo_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst.ts/commits/nightly" | jq -r '.sha')
+        latest_typstyle_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typstyle/commits/nightly" | jq -r '.sha')
+        latest_typst_ansi_hl_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst-ansi-hl/commits/nightly" | jq -r '.sha')
+        
+        echo "Current revs: typst=$current_typst_rev, typst.ts=$current_reflexo_rev, typstyle=$current_typstyle_rev, hl=$current_typst_ansi_hl_rev"
+        echo "Latest revs: typst=$latest_typst_rev, typst.ts=$latest_reflexo_rev, typstyle=$latest_typstyle_rev, hl=$latest_typst_ansi_hl_rev"
+        
+        # Check for updates
+        need_update=false
+        if [[ "$current_typst_rev" != "$latest_typst_rev" ]] || [[ -z "$current_typst_rev" ]]; then
+          echo "Typst needs update"
+          need_update=true
+        fi
+        if [[ "$current_reflexo_rev" != "$latest_reflexo_rev" ]] || [[ -z "$current_reflexo_rev" ]]; then
+          echo "Typst.ts needs update"
+          need_update=true
+        fi
+        if [[ "$current_typstyle_rev" != "$latest_typstyle_rev" ]] || [[ -z "$current_typstyle_rev" ]]; then
+          echo "Typstyle needs update"
+          need_update=true
+        fi
+        if [[ "$current_typst_ansi_hl_rev" != "$latest_typst_ansi_hl_rev" ]] || [[ -z "$current_typst_ansi_hl_rev" ]]; then
+          echo "Typst-ansi-hl needs update"
+          need_update=true
+        fi
+        
+        current_version=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+        echo "current_version=$current_version" >> $GITHUB_ENV
+
+        # Updates can only be performed when releasing an RC. 
+        # When an RC has been released and there are no subsequent updates, 
+        # this indicates that the RC release was successful. Only at this 
+        # point will the nightly release be published.
+
+        need_release=false
+        if [ "$release_type" = "nightly" ]; then
+            if [ "$need_update" = "false" ] && echo "$current_version" | grep -q -- '-rc[0-9]\+$'; then
+                echo "RC version detected with no updates needed, nightly release condition met"
+                need_release=true
+            else
+                echo "Nightly release condition not met (requires stable RC version)"
+            fi
+        elif [ "$release_type" = "canary" ]; then
+            if [ "$need_update" = "true" ]; then
+                echo "Code updates detected, canary release condition met"
+                need_release=true
+            else
+                echo "No code updates, skipping canary release"
+            fi
+        fi
+        
+        echo "Final decision: need_release=$need_release"
+        
+        echo "need_release=$need_release" >> $GITHUB_OUTPUT
+        echo "latest_typst_rev=$latest_typst_rev" >> $GITHUB_ENV
+
+    - name: Calculate new version
+      id: version
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        echo "Current version: $current_version"
+        echo "Release type: $release_type"
+        
+        new_version=$(node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . calculate-version "$current_version" "$release_type")
+        
+        echo "New version: $new_version"
+        echo "new_version=$new_version" >> $GITHUB_ENV
+
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Get typst information
+      id: typst_info
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        # Clone typst repository
+        git clone --depth 50 --single-branch --branch nightly-content-hint \
+            --filter=blob:limit=1k https://github.com/ParaN3xus/typst.git /tmp/typst
+        cd /tmp/typst
+        git checkout nightly-content-hint
+        
+        # Get version
+        typst_version=$(grep '^version = ' Cargo.toml | head -1 | cut -d'"' -f2)
+ 
+        typst_assets_rev=$(grep 'typst-assets.*git' Cargo.toml | grep 'rev = ' | cut -d'"' -f4)
+        
+        echo "typst_version=$typst_version" >> $GITHUB_ENV
+        echo "typst_assets_rev=$typst_assets_rev" >> $GITHUB_ENV
+        
+        # Get base commit
+        git remote add upstream https://github.com/typst/typst.git && git fetch upstream main --prune
+        typst_base_commit=$(git merge-base HEAD upstream/main 2>/dev/null)
+        typst_base_msg=$(git --no-pager log --format="%s" -1 $base_sha)
+        echo "typst_base_commit=$typst_base_commit" >> $GITHUB_ENV
+        echo "typst_base_msg=$typst_base_msg" >> $GITHUB_ENV
+
+    - name: Update typst dependencies in tinymist
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
+          "$typst_version" \
+          "$typst_assets_rev"
+        
+        revs_json=$(cat <<EOF
+        {
+          "typst": "${latest_typst_rev}"
+        }
+        EOF
+        )
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
+
+    - name: Update world crates version
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
+        
+        cargo update -p tinymist-derive -p tinymist-l10n -p tinymist-package -p tinymist-std -p tinymist-vfs -p tinymist-world -p tinymist-project -p tinymist-task -p typst-shim
+        git add -A
+        git commit -m "build: bump world crates to $new_version"
+        git push origin nightly
+        
+        world_commit=$(git rev-parse HEAD)
+        echo "world_commit=$world_commit" >> $GITHUB_ENV
+
+    - name: Update typst.ts
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        # Clone typst.ts
+        git clone https://${{ secrets.NIGHTLY_REPO_TOKEN }}@github.com/ParaN3xus/typst.ts.git /tmp/typst.ts
+        cd /tmp/typst.ts
+        git checkout nightly
+        
+        new_version="$new_version"
+        
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+
+        # Update typst dependencies
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
+          "$typst_version" \
+          "$typst_assets_rev"
+
+        # Update patches
+        revs_json=$(cat <<EOF
+        {
+          "tinymist": "${world_commit}",
+          "typst": "${latest_typst_rev}"
+        }
+        EOF
+        )
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
+        
+        cargo update
+        git add -A
+        git commit -m "build: update tinymist and typst"
+        git push origin nightly
+        
+        reflexo_commit=$(git rev-parse HEAD)
+        echo "reflexo_commit=$reflexo_commit" >> $GITHUB_ENV
+
+    - name: Update typstyle
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        # Clone typstyle
+        git clone https://${{ secrets.NIGHTLY_REPO_TOKEN }}@github.com/ParaN3xus/typstyle.git /tmp/typstyle
+        cd /tmp/typstyle
+        git checkout nightly
+        
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
+          "$typst_version" \
+          "$typst_assets_rev"
+          
+        # Update patches
+        revs_json=$(cat <<EOF
+        {
+          "tinymist": "${world_commit}",
+          "typst": "${latest_typst_rev}"
+        }
+        EOF
+        )
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
+        
+        cargo update
+        git add -A
+        git commit -m "build: update tinymist to ${new_version}"
+        git push origin nightly
+        
+        typstyle_commit=$(git rev-parse HEAD)
+        echo "typstyle_commit=$typstyle_commit" >> $GITHUB_ENV
+
+    - name: Update typst-ansi-hl
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        # Clone typst-ansi-hl
+        git clone https://${{ secrets.NIGHTLY_REPO_TOKEN }}@github.com/ParaN3xus/typst-ansi-hl.git /tmp/typst-ansi-hl
+        cd /tmp/typst-ansi-hl
+        git checkout nightly
+        
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
+          "$typst_version" \
+          "$typst_assets_rev"
+          
+        # Update patches
+        revs_json=$(cat <<EOF
+        {
+          "typst": "${latest_typst_rev}"
+        }
+        EOF
+        )
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
+        
+        cargo update
+        git add -A
+        git commit -m "build: update typst-syntax" || true
+        git push origin nightly
+        
+        hl_commit=$(git rev-parse HEAD)
+        echo "hl_commit=$hl_commit" >> $GITHUB_ENV
+
+    - name: Update tinymist patches and versions
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        # Update patch revisions using script
+        revs_json=$(cat <<EOF
+        {
+          "reflexo": "${reflexo_commit}",
+          "typst-ansi-hl": "${hl_commit}",
+          "typstyle": "${typstyle_commit}"
+        }
+        EOF
+        )
+        
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
+        
+        # Update main version
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-main-version "$new_version"
+
+    - name: Update version files
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-version-files "$new_version"
+
+    - name: Generate changelog
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        tinymist_base_commit=$(git merge-base HEAD origin/main)
+        tinymist_base_msg=$(git --no-pager log --format="%s" -1 $base_sha)
+        
+        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . generate-changelog \
+          "$new_version" \
+          "$tinymist_base_commit" \
+          "$tinymist_base_msg" \
+          "$latest_typst_rev" \
+          "$typst_base_commit" \
+          "$typst_base_msg"
+
+    - name: Final commit and tag
+      if: steps.check_updates.outputs.need_release == 'true'
+      run: |
+        new_version="$new_version"
+        
+        cargo update
+        git add -A
+        git commit -m "build: bump version to ${new_version}"
+        
+        git tag "v${new_version}"
+        git push origin nightly
+        git push origin "v${new_version}"
+        
+        echo "Successfully released tinymist ${new_version}!"
+
+    - name: No updates needed
+      if: steps.check_updates.outputs.need_release != 'true'
+      run: |
+        echo "No updates needed. All dependencies are up to date."
