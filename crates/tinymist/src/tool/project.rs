@@ -79,10 +79,6 @@ pub struct TaskPreviewArgs {
     /// Preview arguments
     #[clap(flatten)]
     pub preview: PreviewArgs,
-
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
 }
 
 #[cfg(feature = "preview")]
