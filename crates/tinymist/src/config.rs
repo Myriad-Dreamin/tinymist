@@ -1417,5 +1417,6 @@ mod tests {
                 rest: PreviewInvertColor::Never,
             })
         );
+        assert!(test(r#"{"image": "e"}"#).is_err());
     }
 }
