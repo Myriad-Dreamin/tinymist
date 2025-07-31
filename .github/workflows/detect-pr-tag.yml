@@ -19,7 +19,7 @@ jobs:
           const prBody = context.payload.pull_request.body || '';
           console.log('PR Body:', prBody);
           
-          const tagRegex = /\+Tags\s+(v\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/;
+          const tagRegex = /\+tag\s+(v\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/;
           const match = prBody.match(tagRegex);
           
           if (match) {
@@ -42,7 +42,7 @@ jobs:
           const tagVersion = '${{ steps.check-tag.outputs.tag_version }}';
           const comment = `**Tag Detection Notice**
           
-          This PR contains a tag directive: \`+Tags ${tagVersion}\`
+          This PR contains a tag directive: \`+tag ${tagVersion}\`
           
           If this PR is merged, it will automatically create tag \`${tagVersion}\` on the main branch.
           
