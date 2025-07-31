@@ -1339,6 +1339,32 @@ mod tests {
     }
 
     #[test]
+    fn test_default_preview_config() {
+        let config = Config::default().preview();
+        assert!(!config.enable_partial_rendering);
+        assert_eq!(config.refresh_style, TaskWhen::OnType);
+        assert_eq!(config.invert_colors, "\"never\"");
+    }
+
+    #[test]
+    fn test_preview_config() {
+        let config = Config {
+            preview: PreviewFeat {
+                partial_rendering: true,
+                refresh: Some(TaskWhen::OnSave),
+                invert_colors: PreviewInvertColors::Enum(PreviewInvertColor::Auto),
+                ..PreviewFeat::default()
+            },
+            ..Config::default()
+        }
+        .preview();
+
+        assert!(config.enable_partial_rendering);
+        assert_eq!(config.refresh_style, TaskWhen::OnSave);
+        assert_eq!(config.invert_colors, "\"auto\"");
+    }
+
+    #[test]
     fn test_default_lsp_config_initialize() {
         let (_conf, err) =
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
