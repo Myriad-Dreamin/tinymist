@@ -22,7 +22,7 @@ web = [
     "js-sys",
     "console_error_panic_hook",
     "no-content-hint",
-    "tinymist-world/web",
+    "tinymist-project/web",
     "reflexo-typst/web",
 ]
 
@@ -31,7 +31,8 @@ no-content-hint = ["reflexo-typst/no-content-hint"]
 [dependencies]
 wasm-bindgen = { version = "0.2.100", optional = true }
 js-sys = { version = "0.3.77", optional = true }
-tinymist-world.workspace = true
+tinymist-project.workspace = true
+tinymist-query.workspace = true
 reflexo-typst.workspace = true
 
 console_error_panic_hook = { version = "0.1.2", optional = true }

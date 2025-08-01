@@ -4203,7 +4203,8 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "reflexo-typst",
- "tinymist-world",
+ "tinymist-project",
+ "tinymist-query",
  "vergen",
  "wasm-bindgen",
 ]
