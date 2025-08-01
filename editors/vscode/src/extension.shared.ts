@@ -105,6 +105,9 @@ export async function tinymistActivate(
 
   configureEditorAndLanguage(context, trait);
 
+  // todo: a better model is `focusing.transfer(newClient)`, since the old request must not be cancelled and must
+  // be sent to the new client.
+  extensionState.mut.focusing.reset();
   // Initializes language client
   if (extensionState.features.lsp) {
     const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
