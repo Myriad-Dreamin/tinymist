@@ -91,8 +91,12 @@ pub(crate) fn prepare_renaming(
             let name = path.get().to_string();
             Some((name, None))
         }
-        // todo: label renaming, bibkey renaming
-        BibEntry(..) | Label(..) | ContentRef(..) => None,
+        // todo: bibkey renaming
+        BibEntry(..) => None,
+        Label(..) | ContentRef(..) => {
+            // todo: label renaming
+            None
+        }
         ImportAlias(..) | Constant(..) | IdentRef(..) | Import(..) | StrName(..) | Spread(..) => {
             None
         }
