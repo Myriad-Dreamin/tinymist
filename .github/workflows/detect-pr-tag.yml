@@ -19,7 +19,7 @@ jobs:
           const prBody = context.payload.pull_request.body || '';
           console.log('PR Body:', prBody);
           
-          const tagRegex = /\+tag\s+(v\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/;
+          const tagRegex = /^\+tag\s+(v\d+\.\d+\.\d+(?:-[a-zA-Z0-9]+)?)/m;
           const match = prBody.match(tagRegex);
           
           if (match) {
