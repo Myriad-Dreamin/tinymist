@@ -18,12 +18,14 @@ on:
 jobs:
   check-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         ref: nightly
-        token: ${{ secrets.NIGHTLY_REPO_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
 
     - name: Install Node.js
@@ -36,8 +38,8 @@ jobs:
 
     - name: Setup Git
       run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
     - name: Install system dependencies
       run: |
