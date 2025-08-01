@@ -18,12 +18,14 @@ on:
 jobs:
   check-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         ref: nightly
-        token: ${{ secrets.NIGHTLY_REPO_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
 
     - name: Install Node.js
