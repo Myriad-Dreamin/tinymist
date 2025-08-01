@@ -1189,7 +1189,7 @@ mod tests {
             "preview": {
             }
         })));
-        assert_eq!(preview.refresh, Some(TaskWhen::OnType));
+        assert_eq!(preview.refresh, None);
 
         let preview = opts(Some(&json!({
             "preview": {
