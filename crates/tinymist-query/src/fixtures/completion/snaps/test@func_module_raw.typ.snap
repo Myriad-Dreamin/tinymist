@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on t (63..64)
+description: Completion on / (45..46)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
+input_file: crates/tinymist-query/src/fixtures/completion/func_module_raw.typ
 ---
 [
  {
@@ -14,20 +14,20 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
      "title": ""
     },
     "kind": 3,
-    "label": "strong",
+    "label": "raw",
     "labelDetails": {
-     "description": "(content, delta: int) => strong"
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "207",
+    "sortText": "165",
     "textEdit": {
-     "newText": "strong(${1:})",
+     "newText": "raw",
      "range": {
       "end": {
-       "character": 26,
+       "character": 2,
        "line": 2
       },
       "start": {
-       "character": 24,
+       "character": 1,
        "line": 2
       }
      }
@@ -39,20 +39,20 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
      "title": ""
     },
     "kind": 3,
-    "label": "strong.bracket",
+    "label": "raw.paren",
     "labelDetails": {
-     "description": "(content, delta: int) => strong"
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "208",
+    "sortText": "166",
     "textEdit": {
-     "newText": "strong[${1:}]",
+     "newText": "raw(${1:})",
      "range": {
       "end": {
-       "character": 26,
+       "character": 2,
        "line": 2
       },
       "start": {
-       "character": 24,
+       "character": 1,
        "line": 2
       }
      }
