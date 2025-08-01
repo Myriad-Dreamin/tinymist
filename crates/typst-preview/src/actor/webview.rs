@@ -3,12 +3,11 @@ use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{broadcast, mpsc};
 
+use super::{editor::EditorActorRequest, render::RenderActorRequest};
 use crate::{
     actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
-    Message, WsError,
+    WsMessage,
 };
-
-use super::{editor::EditorActorRequest, render::RenderActorRequest};
 
 // pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
@@ -37,10 +36,7 @@ fn positions_req(event: &'static str, positions: Vec<DocumentPosition>) -> Strin
             .join(",")
 }
 
-pub struct WebviewActor<
-    'a,
-    C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
-> {
+pub struct WebviewActor<'a, C> {
     webview_websocket_conn: std::pin::Pin<&'a mut C>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
@@ -57,10 +53,10 @@ pub struct Channels {
     ),
 }
 
-impl<
-        'a,
-        C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
-    > WebviewActor<'a, C>
+impl<'a, C> WebviewActor<'a, C>
+where
+    C: futures::Sink<WsMessage, Error = reflexo_typst::Error>
+        + futures::Stream<Item = Result<WsMessage, reflexo_typst::Error>>,
 {
     pub fn set_up_channels() -> Channels {
         Channels {
@@ -93,12 +89,12 @@ impl<
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let msg = positions_req("jump", jump_info);
-                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
                               .await.log_error("WebViewActor");
                         }
                         WebviewActorRequest::ViewportPosition(jump_info) => {
                             let msg = position_req("viewport", jump_info);
-                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
                               .await.log_error("WebViewActor");
                         }
                         // WebviewActorRequest::CursorPosition(jump_info) => {
@@ -108,7 +104,7 @@ impl<
                         WebviewActorRequest::CursorPaths(jump_info) => {
                             let json = serde_json::to_string(&jump_info).unwrap();
                             let msg = format!("cursor-paths,{json}");
-                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
                               .await.log_error("WebViewActor");
                         }
                     }
@@ -116,7 +112,7 @@ impl<
                 Some(svg) = self.svg_receiver.recv() => {
                     log::trace!("WebviewActor: received svg from renderer");
                     let _scope = typst_timing::TimingScope::new("webview_actor_send_svg");
-                    self.webview_websocket_conn.send(Message::Binary(svg))
+                    self.webview_websocket_conn.send(WsMessage::Binary(svg))
                     .await.log_error("WebViewActor");
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {
@@ -125,9 +121,9 @@ impl<
                         log::info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
-                    let Message::Text(msg) = msg else {
+                    let WsMessage::Text(msg) = msg else {
                         log::info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
+                        let _ = self.webview_websocket_conn.send(WsMessage::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
                         .await;
                         break;
                     };
@@ -164,7 +160,7 @@ impl<
                             self.render_sender.send(RenderActorRequest::WebviewResolveFrameLoc(path)).log_error("WebViewActor");
                         };
                     } else {
-                        let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {msg}"))).await;
+                        let err = self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {msg}"))).await;
                         log::info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }

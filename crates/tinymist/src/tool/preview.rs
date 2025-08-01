@@ -8,7 +8,7 @@ mod http;
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
 use lsp_types::notification::Notification;
@@ -20,7 +20,7 @@ use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
+    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
 };
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
@@ -42,6 +42,93 @@ pub enum PreviewKind {
     Background,
 }
 
+/// The refresh style for the preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
+pub enum RefreshStyle {
+    /// Refresh preview on save
+    #[cfg_attr(feature = "clap", clap(name = "onSave"))]
+    OnSave,
+
+    /// Refresh preview on type
+    #[cfg_attr(feature = "clap", clap(name = "onType"))]
+    #[default]
+    OnType,
+}
+
+impl From<RefreshStyle> for TaskWhen {
+    fn from(style: RefreshStyle) -> Self {
+        match style {
+            RefreshStyle::OnSave => TaskWhen::OnSave,
+            RefreshStyle::OnType => TaskWhen::OnType,
+        }
+    }
+}
+
+/// Specia Arguments for the preview tool.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PreviewArgs {
+    /// Preview mode
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
+    pub preview_mode: PreviewMode,
+
+    /// Only render visible part of the document. This can improve performance
+    /// but still being experimental.
+    #[clap(long = "partial-rendering")]
+    pub enable_partial_rendering: Option<bool>,
+
+    /// Invert colors of the preview (useful for dark themes without cost).
+    /// Please note you could see the origin colors when you hover elements in
+    /// the preview.
+    ///
+    /// It is also possible to specify strategy to each element kind by an
+    /// object map in JSON format.
+    ///
+    /// Possible element kinds:
+    /// - `image`: Images in the preview.
+    /// - `rest`: Rest elements in the preview.
+    ///
+    /// By default, the preview will never invert colors.
+    ///
+    /// ## Example
+    ///
+    /// By string:
+    ///
+    /// ```shell
+    /// --invert-colors=auto
+    /// ```
+    ///
+    /// By element:
+    ///
+    /// ```shell
+    /// --invert-colors='{"rest": "always", "image": "never"}'
+    /// ```
+    #[clap(long)]
+    pub invert_colors: Option<String>,
+
+    /// Used by lsp for controlling the preview refresh style.
+    #[clap(long, hide(true))]
+    pub refresh_style: Option<RefreshStyle>,
+}
+
+impl PreviewArgs {
+    /// Get the configuration for the preview.
+    pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
+        PreviewConfig {
+            enable_partial_rendering: self
+                .enable_partial_rendering
+                .unwrap_or(config.enable_partial_rendering),
+            refresh_style: self
+                .refresh_style
+                .map(From::from)
+                .unwrap_or_else(|| config.refresh_style.clone()),
+            invert_colors: match &self.invert_colors {
+                Some(s) => s.clone(),
+                None => config.invert_colors.clone(),
+            },
+        }
+    }
+}
+
 /// CLI Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
@@ -53,9 +140,14 @@ pub struct PreviewCliArgs {
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
-    /// Preview mode
-    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
-    pub preview_mode: PreviewMode,
+    /// Used by lsp for identifying the task.
+    #[clap(
+        long = "task-id",
+        default_value = "default_preview",
+        value_name = "TASK_ID",
+        hide(true)
+    )]
+    pub task_id: String,
 
     /// Data plane server will bind to this address. Note: if it equals to
     /// `static_file_host`, same address will be used.
@@ -165,6 +257,8 @@ impl ServerState {
             .chain(cli_args.iter().map(|e| e.as_str()));
         let cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+        // default configs
+        let config = cli_args.preview.config(&self.config.preview());
 
         // todo: preview specific arguments are not used
         let entry = cli_args.compile.input.as_ref();
@@ -180,7 +274,7 @@ impl ServerState {
             })
             .transpose()?;
 
-        let task_id = cli_args.preview.task_id.clone();
+        let task_id = cli_args.task_id.clone();
         if task_id == "primary" {
             return Err(invalid_params("task id 'primary' is reserved"));
         }
@@ -191,8 +285,8 @@ impl ServerState {
             ));
         }
 
-        let previewer = tinymist_preview::PreviewBuilder::new(cli_args.preview.clone());
-        let watcher = previewer.compile_watcher();
+        let previewer = tinymist_preview::PreviewBuilder::new(config);
+        let watcher = previewer.compile_watcher(task_id.clone());
 
         let primary = &mut self.project.compiler.primary;
         // todo: recover pin status reliably
@@ -308,7 +402,7 @@ impl PreviewState {
             client: Box::new(self.client.clone().to_untyped()),
         });
 
-        let task_id = args.preview.task_id.clone();
+        let task_id = args.task_id.clone();
         let open_in_browser = args.open_in_browser(false);
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
@@ -382,7 +476,7 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
@@ -457,6 +551,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     log::info!("Arguments: {args:#?}");
     let handle = tokio::runtime::Handle::current();
 
+    let config = args.preview.config(&PreviewConfig::default());
     let open_in_browser = args.open_in_browser(true);
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
@@ -468,7 +563,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     exit_on_ctrl_c();
 
     let verse = args.compile.resolve()?;
-    let previewer = PreviewBuilder::new(args.preview);
+    let previewer = PreviewBuilder::new(config);
 
     let (service, handle) = {
         let preview_state = ProjectPreviewState::default();
@@ -490,7 +585,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         let id = service.compiler.primary.id.clone();
-        let registered = preview_state.register(&id, previewer.compile_watcher());
+        let registered = preview_state.register(&id, previewer.compile_watcher(args.task_id));
         if !registered {
             tinymist_std::bail!("failed to register preview");
         }
@@ -571,7 +666,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");

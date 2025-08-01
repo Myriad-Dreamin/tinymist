@@ -156,7 +156,8 @@
   let is-vscode = is-vscode.get()
 
   let items = (
-    config.pairs().map(((key, cfg)) => (key, cfg, false)) + other-config.pairs().map(((key, cfg)) => (key, cfg, true))
+    config.pairs().filter(((k, _)) => k not in other-config).map(((key, cfg)) => (key, cfg, false))
+      + other-config.pairs().map(((key, cfg)) => (key, cfg, true))
   )
   items = items.sorted(key: it => it.at(0))
 
