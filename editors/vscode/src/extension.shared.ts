@@ -84,6 +84,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
 
 interface TinymistTrait {
   activateTable(): FeatureEntry[];
+  createLanguageClient: any;
   config: TinymistConfig;
 }
 

@@ -2,13 +2,14 @@ import { ExtensionContext, window } from "vscode";
 import { loadTinymistConfig } from "./config";
 import { tinymistActivate, tinymistDeactivate } from "./extension.shared";
 import { extensionState } from "./state";
+import { createBrowserLanguageClient } from "./lsp.web";
 
 const webActivateTable = () => [];
 
 export async function activate(context: ExtensionContext): Promise<void> {
   extensionState.features = {
     web: true,
-    lsp: false,
+    lsp: true,
     export: false,
     task: false,
     wordSeparator: true,
@@ -29,6 +30,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   try {
     return await tinymistActivate(context, {
       activateTable: webActivateTable,
+      createLanguageClient: createBrowserLanguageClient,
       config: loadTinymistConfig(),
     });
   } catch (e) {

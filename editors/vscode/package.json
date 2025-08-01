@@ -1426,7 +1426,7 @@
     "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
     "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
     "build:l10n": "cd ../../ && yarn build:l10n",
-    "build-web-base": "node esbuild.web.mjs",
+    "build-web-base": "node esbuild.web.mjs && node esbuild.web-server.mjs",
     "build-system-base": "node esbuild.system.mjs",
     "build-base": "yarn run build-web-base && yarn run build-system-base",
     "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs",
@@ -1446,6 +1446,7 @@
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
     "vscode-languageclient": "^9.0.0",
+    "tinymist-web": "link:../../crates/tinymist-core",
     "ws": "^8.13.0"
   },
   "devDependencies": {
