@@ -160,7 +160,7 @@ jobs:
         # Get base commit
         git remote add upstream https://github.com/typst/typst.git && git fetch upstream main --prune
         typst_base_commit=$(git merge-base HEAD upstream/main 2>/dev/null)
-        typst_base_msg=$(git --no-pager log --format="%s" -1 $base_sha)
+        typst_base_msg=$(git --no-pager log --format="%s" -1 $typst_base_commit)
         echo "typst_base_commit=$typst_base_commit" >> $GITHUB_ENV
         echo "typst_base_msg=$typst_base_msg" >> $GITHUB_ENV
 
@@ -314,7 +314,7 @@ jobs:
       if: steps.check_updates.outputs.need_release == 'true'
       run: |
         tinymist_base_commit=$(git merge-base HEAD origin/main)
-        tinymist_base_msg=$(git --no-pager log --format="%s" -1 $base_sha)
+        tinymist_base_msg=$(git --no-pager log --format="%s" -1 $tinymist_base_commit)
         
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . generate-changelog \
           "$new_version" \
