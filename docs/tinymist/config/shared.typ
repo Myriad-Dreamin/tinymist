@@ -12,27 +12,11 @@
 
 #let other-config = json("/editors/vscode/package.other.json").contributes.configuration.properties
 
-#let html-link(dest) = if is-md-target {
-  cross-link(dest, [HTML])
-} else {
-  [HTML]
-}
-
-#let md-link(dest) = if is-md-target {
-  [Markdown]
-} else {
-  github-link(dest, [Markdown])
-}
-
 #context if show-switch.get() {
   if is-vscode.get() {
-    html-link("/config/vscode.typ")
-    [ | ]
-    md-link("/editors/vscode/Configuration.md")
+    switch-link("/config/vscode.typ", "/editors/vscode/Configuration.md")
   } else {
-    html-link("/config/neovim.typ")
-    [ | ]
-    md-link("/editors/neovim/Configuration.md")
+    switch-link("/config/neovim.typ", "/editors/neovim/Configuration.md")
   }
 }
 
