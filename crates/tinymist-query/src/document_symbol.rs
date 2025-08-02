@@ -1,5 +1,3 @@
-use lsp_types::SymbolKind;
-
 use crate::{
     prelude::*,
     syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
@@ -46,14 +44,14 @@ fn symbols_in_hierarchy(
 ) -> Vec<DocumentSymbol> {
     hierarchy
         .iter()
-        .filter(|hierarchy| TryInto::<SymbolKind>::try_into(hierarchy.info.kind.clone()).is_ok())
+        .filter(|hierarchy| hierarchy.info.kind.is_valid_lsp_symbol())
         .map(|hierarchy| {
             let range = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
                 name: hierarchy.info.name.to_string(),
                 detail: None,
-                kind: hierarchy.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().into(),
                 tags: None,
                 deprecated: None,
                 range,

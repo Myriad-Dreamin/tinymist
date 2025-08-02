@@ -89,18 +89,21 @@ impl LexicalKind {
     const fn variable() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Variable)
     }
+
+    pub fn is_valid_lsp_symbol(&self) -> bool {
+        !matches!(self, LexicalKind::Block | LexicalKind::CommentGroup)
+    }
 }
 
-impl TryFrom<LexicalKind> for SymbolKind {
-    type Error = ();
-
-    fn try_from(value: LexicalKind) -> Result<Self, Self::Error> {
+impl From<LexicalKind> for SymbolKind {
+    fn from(value: LexicalKind) -> Self {
+        use LexicalVarKind::*;
         match value {
-            LexicalKind::Heading(..) => Ok(SymbolKind::NAMESPACE),
-            LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
-            LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
-            LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..) | LexicalKind::Block | LexicalKind::CommentGroup => Err(()),
+            LexicalKind::Heading(..) => SymbolKind::NAMESPACE,
+            LexicalKind::Var(ValRef | Variable) => SymbolKind::VARIABLE,
+            LexicalKind::Var(Function) => SymbolKind::FUNCTION,
+            LexicalKind::Var(LabelRef | Label | BibKey) => SymbolKind::CONSTANT,
+            LexicalKind::Block | LexicalKind::CommentGroup => SymbolKind::CONSTANT,
         }
     }
 }

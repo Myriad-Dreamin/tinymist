@@ -32,8 +32,6 @@ impl SemanticRequest for SymbolRequest {
     type Response = Vec<SymbolInformation>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        // todo: let typst.ts expose source
-
         let mut symbols = vec![];
 
         for id in ctx.depended_files() {
@@ -75,6 +73,7 @@ fn filter_document_symbols(
                 .into_iter()
                 .chain(hierarchy.children.as_deref().into_iter().flatten())
         })
+        .filter(|hierarchy| hierarchy.info.kind.is_valid_lsp_symbol())
         .flat_map(|hierarchy| {
             if query_string.is_some_and(|s| !hierarchy.info.name.contains(s)) {
                 return None;
@@ -84,7 +83,7 @@ fn filter_document_symbols(
 
             Some(SymbolInformation {
                 name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().into(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {

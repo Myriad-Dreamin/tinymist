@@ -64,7 +64,7 @@ fn filter_document_labels(
 
             Some(SymbolInformation {
                 name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().into(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {
