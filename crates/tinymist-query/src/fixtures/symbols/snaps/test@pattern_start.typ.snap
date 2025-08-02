@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/symbol.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/symbols/with_comment.typ
+input_file: crates/tinymist-query/src/fixtures/symbols/pattern_start.typ
 ---
 [
  {

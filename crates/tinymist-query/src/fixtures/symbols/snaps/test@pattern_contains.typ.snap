@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/symbol.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/symbols/pattern_contains.typ
+---
+[
+ {
+  "kind": 13,
+  "name": "analysis"
+ },
+ {
+  "kind": 13,
+  "name": "banana"
+ }
+]
