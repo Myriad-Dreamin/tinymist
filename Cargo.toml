@@ -152,7 +152,7 @@ typst-render = "0.14.0"
 typst-pdf = "0.14.0"
 typst-syntax = "0.14.0"
 typst-eval = "0.14.0"
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "edf0d64" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "fbf00f9" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
 typstyle-core = { version = "=0.13.16", default-features = false }
@@ -187,15 +187,15 @@ insta-cmd = "0.6.0"
 # Our Own Crates
 tinymist-assets = { version = "=0.13.16" }
 
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.17-rc1" }
-tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.17-rc1" }
-tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.17-rc1" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.17-rc1", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.17-rc1", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.17-rc1", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.17-rc1" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.17-rc1" }
-typst-shim = { path = "./crates/typst-shim", version = "0.13.17-rc1" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.13.17-rc2" }
+tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.13.17-rc2" }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.13.17-rc2" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.13.17-rc2", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.13.17-rc2", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.13.17-rc2", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.13.17-rc2" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.13.17-rc2" }
+typst-shim = { path = "./crates/typst-shim", version = "0.13.17-rc2" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
@@ -264,17 +264,6 @@ ignore-hidden = false
 extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
-
-# This patch is used to bundle a locally built frontend (HTML) of `typst-preview`.
-# The shortcoming is that you cannot install tinymist from git source then, i.e. `cargo install --git ..`, with this patch.
-# However, it is not suggested to install it in that way. The suggested ways are:
-# - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
-# - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
-# tinymist-assets = { path = "./crates/tinymist-assets/" }
-
-# These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
-#
-# A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
 typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
 typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
