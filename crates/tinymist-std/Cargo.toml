@@ -1,8 +1,7 @@
 [package]
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
-# group: world
-version = "0.13.16"
+version = "0.13.17-rc1"
 authors.workspace = true
 license.workspace = true
 edition = "2024"
