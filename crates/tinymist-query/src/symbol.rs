@@ -95,3 +95,30 @@ fn filter_document_symbols(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::find_module_level_docs;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("symbols", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let mut properties = get_test_properties(&docs);
+            // need to compile the doc to get the dependencies
+            properties.insert("compile", "true");
+            let _doc = compile_doc_for_test(ctx, &properties);
+
+            let request = SymbolRequest {
+                pattern: properties.get("pattern").copied().map(str::to_owned),
+            };
+
+            let result = request.request(ctx);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}
