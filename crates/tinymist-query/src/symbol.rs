@@ -32,31 +32,32 @@ impl SemanticRequest for SymbolRequest {
     type Response = Vec<SymbolInformation>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        // todo: let typst.ts expose source
+        // let mut symbols = vec![];
 
-        let mut symbols = vec![];
+        // for id in ctx.depended_files() {
+        //     let Ok(source) = ctx.source_by_id(id) else {
+        //         continue;
+        //     };
+        //     let uri = ctx.uri_for_id(id).unwrap();
+        //     let res = get_lexical_hierarchy(&source,
+        // LexicalScopeKind::Symbol).map(|symbols| {
+        //         filter_document_symbols(
+        //             &symbols,
+        //             self.pattern.as_deref(),
+        //             &source,
+        //             &uri,
+        //             ctx.position_encoding(),
+        //         )
+        //     });
 
-        for id in ctx.depended_files() {
-            let Ok(source) = ctx.source_by_id(id) else {
-                continue;
-            };
-            let uri = ctx.uri_for_id(id).unwrap();
-            let res = get_lexical_hierarchy(&source, LexicalScopeKind::Symbol).map(|symbols| {
-                filter_document_symbols(
-                    &symbols,
-                    self.pattern.as_deref(),
-                    &source,
-                    &uri,
-                    ctx.position_encoding(),
-                )
-            });
+        //     if let Some(mut res) = res {
+        //         symbols.append(&mut res)
+        //     }
+        // }
 
-            if let Some(mut res) = res {
-                symbols.append(&mut res)
-            }
-        }
+        // Some(symbols)
 
-        Some(symbols)
+        todo!()
     }
 }
 
