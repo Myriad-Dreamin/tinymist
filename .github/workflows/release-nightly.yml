@@ -184,7 +184,7 @@ jobs:
       run: |
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
         
-        cargo update -p tinymist-derive -p tinymist-l10n -p tinymist-package -p tinymist-std -p tinymist-vfs -p tinymist-world -p tinymist-project -p tinymist-task -p typst-shim
+        cargo update
         git add -A
         git commit -m "build: bump world crates to $new_version"
         git push origin nightly
