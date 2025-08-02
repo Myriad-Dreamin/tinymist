@@ -8,6 +8,7 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 - Stable and pre-release versions available at #link("https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist")[Visual Studio Marketplace] and #link("https://open-vsx.org/extension/myriad-dreamin/tinymist")[Open VSX].
 - The artifacts built per commits at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].
+- The artifacts built per release at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases].
 
 = Features
 <features>

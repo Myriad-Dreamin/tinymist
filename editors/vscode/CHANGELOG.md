@@ -6,7 +6,35 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 The changelog lines unspecified with authors are all written by the @Myriad-Dreamin.
 
-## Unreleased
+- [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
+- [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
+
+## v0.13.18 - [2025-08-03]
+
+### Compiler
+
+* (Fix) Emitting `onSaved` signal to exporter when vfs is clean in https://github.com/Myriad-Dreamin/tinymist/pull/1939
+  * Previously, this broke PDF export when `exportPdf=onSave`.
+* (Fix) Correctly handled relative user-specified output paths in compile command by @moeleak and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1941 and https://github.com/Myriad-Dreamin/tinymist/pull/1942
+
+### Symbols
+
+* (Fix) Made symbol queries infallible in https://github.com/Myriad-Dreamin/tinymist/pull/1964
+
+### Typlite
+
+* (Fix) Updated VerbatimNode attribute to inline by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/1926
+
+### Preview
+
+* (Fix) Removed some compatiblility to preview configuration and fix `tinymist.preview.refresh` in https://github.com/Myriad-Dreamin/tinymist/pull/1807
+
+### Misc
+
+* Added Rust and Yarn to nix devShell in https://github.com/Myriad-Dreamin/tinymist/pull/1953
+* Automatically triggering [nightly releases](https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#versioning-and-release-cycle) by @ParaN3xus and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1951, https://github.com/Myriad-Dreamin/tinymist/pull/1955, https://github.com/Myriad-Dreamin/tinymist/pull/1959, https://github.com/Myriad-Dreamin/tinymist/pull/1961, https://github.com/Myriad-Dreamin/tinymist/pull/1962, and https://github.com/Myriad-Dreamin/tinymist/pull/1965
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.16...v0.13.18
 
 ## v0.13.16 - [2025-07-29]
 
