@@ -117,7 +117,15 @@ mod tests {
                 pattern: properties.get("pattern").copied().map(str::to_owned),
             };
 
-            let result = request.request(ctx);
+            let mut result = request.request(ctx);
+            if let Some(result) = &mut result {
+                // Sort the symbols by name for consistent output
+                result.sort_by(|x, y| {
+                    x.name
+                        .cmp(&y.name)
+                        .then_with(|| x.location.uri.cmp(&y.location.uri))
+                });
+            }
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

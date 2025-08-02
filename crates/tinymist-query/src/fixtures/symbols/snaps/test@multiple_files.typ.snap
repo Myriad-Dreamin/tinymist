@@ -5,11 +5,11 @@ input_file: crates/tinymist-query/src/fixtures/symbols/multiple_files.typ
 ---
 [
  {
-  "kind": 12,
-  "name": "y"
- },
- {
   "kind": 13,
   "name": "x"
+ },
+ {
+  "kind": 12,
+  "name": "y"
  }
 ]
