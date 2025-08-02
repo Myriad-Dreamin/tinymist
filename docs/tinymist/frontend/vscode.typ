@@ -15,7 +15,7 @@ See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Featur
 
 = LLM-Assisted Documentation
 
-You could get a LLM-friendly documentation at #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm")[docs/for-llm].
+The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm/vscode-ui.md")[Software Specification] contains user interface provided by this extension, You could find solutions by text search in the docs or ask LLMs with plugging the docs.
 
 = Configuration Reference
 
