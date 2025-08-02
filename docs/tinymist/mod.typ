@@ -93,3 +93,25 @@
     "#ks.join("")" [#vs.join(" ")]
   ]
 }
+
+
+/// A link to a html docs based on the target type.
+#let html-link(dest) = if is-md-target {
+  cross-link(dest, [HTML])
+} else {
+  [HTML]
+}
+
+/// A link to a markdown docs based on the target type.
+#let md-link(dest) = if is-md-target {
+  [Markdown]
+} else {
+  github-link(dest, [Markdown])
+}
+
+/// A link switches between HTML and Markdown links based on the target type.
+#let switch-link(html, md) = if is-md-target {
+  html-link(html)
+  [ | ]
+  md-link(md)
+}

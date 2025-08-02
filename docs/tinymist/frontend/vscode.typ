@@ -2,15 +2,24 @@
 
 #show: book-page.with(title: [Tinymist Typst VS Code Extension])
 
+#switch-link("/frontend/vscode.typ", "/editors/vscode/Configuration.md")
+
 A VS Code or VS Codium extension for Typst. You can find the extension on:
 
-- Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions];.
-- Stable versions available at #link("https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist")[Visual Studio Marketplace];.
-- Stable versions available at #link("https://open-vsx.org/extension/myriad-dreamin/tinymist")[Open VSX];.
+- Stable and pre-release versions available at #link("https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist")[Visual Studio Marketplace] and #link("https://open-vsx.org/extension/myriad-dreamin/tinymist")[Open VSX].
+- The artifacts built per commits at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].
 
 = Features
 <features>
 See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Features] for a list of features.
+
+= LLM-Assisted Documentation
+
+You could get a LLM-friendly documentation at #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm")[docs/for-llm].
+
+= Configuration Reference
+
+#cross-link("/config/vscode.typ", [Configuration Reference]).
 
 = Usage Tips
 <usage-tips>
@@ -28,8 +37,8 @@ To initialize a Typst project:
 <configuring-lsp-enhanced-formatters>
 + Open settings.
 + Search for "Tinymist Formatter" and modify the value.
-  - Use `"formatterMode": "typstyle"` for #link("https://github.com/Enter-tainer/typstyle")[typstyle];.
-  - Use `"formatterMode": "typstfmt"` for #link("https://github.com/astrale-sharp/typstfmt")[typstfmt];.
+  - Use `"formatterMode": "typstyle"` for #link("https://github.com/Enter-tainer/typstyle")[typstyle].
+  - Use `"formatterMode": "typstfmt"` for #link("https://github.com/astrale-sharp/typstfmt")[typstfmt].
 
 Tips: to enable formatting on save, you should add extra settings for typst language:
 
@@ -104,7 +113,7 @@ In short, there is a `sys.inputs` item added to the compiler when your document 
 #let preview-theme = preview-args.at("theme", default: "light")
 ```
 
-For details, please check #link("https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-sys.inputs")[Preview’s sys.inputs];.
+For details, please check #link("https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-sys.inputs")[Preview’s sys.inputs].
 
 == Configuring path to search fonts
 <configuring-path-to-search-fonts>
@@ -171,7 +180,7 @@ You can export your documents to various other formats by lsp as well.
 Currently, the following formats are supported:
 - Official svg, png, and pdf.
 - Unofficial html, md (typlite), and txt
-- Query Results (into json, yaml, or txt), and pdfpc (by `typst query --selector <pdfpc-file>`, for #link("https://touying-typ.github.io/touying/")[Touying];)
+- Query Results (into json, yaml, or txt), and pdfpc (by `typst query --selector <pdfpc-file>`, for #link("https://touying-typ.github.io/touying/")[Touying])
 
 See
 #link("https://myriad-dreamin.github.io/tinymist/feature/export.html")[Docs: Exporting Documents]
@@ -201,7 +210,7 @@ Supported arguments:
 - `--input`: Add a string key-value pair visible through `sys.inputs`.
 - `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
 - `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
-- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX timestamp];.
+- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX timestamp].
 - `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
 *Note:* Fix entry to `main.typ` may help multiple-file projects
@@ -212,4 +221,4 @@ by other settings.
 
 = Contributing
 <contributing>
-You can submit issues or make PRs to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub];.
+You can submit issues or make PRs to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub].
