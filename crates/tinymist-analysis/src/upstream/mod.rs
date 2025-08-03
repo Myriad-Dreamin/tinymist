@@ -786,7 +786,6 @@ mod tests {
         https://typst.app/docs/reference/math/primes/
         https://typst.app/docs/reference/math/roots/#functions-root
         https://typst.app/docs/reference/math/roots/#functions-sqrt
-        https://typst.app/docs/reference/math/scr/
         https://typst.app/docs/reference/math/sizes/#functions-display
         https://typst.app/docs/reference/math/sizes/#functions-inline
         https://typst.app/docs/reference/math/sizes/#functions-script
@@ -811,6 +810,7 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-frak
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
+        https://typst.app/docs/reference/math/variants/#functions-scr
         https://typst.app/docs/reference/math/variants/#functions-serif
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
