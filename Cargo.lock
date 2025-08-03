@@ -834,8 +834,8 @@ dependencies = [
  "criterion",
  "ecow",
  "insta",
- "tinymist-project 0.13.16",
- "tinymist-std 0.13.16",
+ "tinymist-project 0.13.17",
+ "tinymist-std 0.13.17",
  "typst 0.14.0",
  "typst-syntax 0.14.0",
 ]
@@ -4565,7 +4565,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sync-ls",
- "tinymist-std 0.13.16",
+ "tinymist-std 0.13.17",
 ]
 
 [[package]]
@@ -4726,13 +4726,13 @@ dependencies = [
  "tinymist-assets 0.13.22",
  "tinymist-core",
  "tinymist-debug",
- "tinymist-l10n 0.13.16",
+ "tinymist-l10n 0.13.17",
  "tinymist-preview",
- "tinymist-project 0.13.16",
+ "tinymist-project 0.13.17",
  "tinymist-query",
  "tinymist-render",
- "tinymist-std 0.13.16",
- "tinymist-task 0.13.16",
+ "tinymist-std 0.13.17",
+ "tinymist-task 0.13.17",
  "tokio",
  "tokio-util",
  "toml",
@@ -4743,7 +4743,7 @@ dependencies = [
  "typst-html 0.14.0",
  "typst-pdf 0.14.0",
  "typst-render 0.14.0",
- "typst-shim 0.13.16",
+ "typst-shim 0.13.17",
  "typst-svg 0.14.0",
  "typst-timing 0.14.0",
  "typstfmt",
@@ -4774,14 +4774,14 @@ dependencies = [
  "serde",
  "serde_yaml",
  "strum 0.26.3",
- "tinymist-derive 0.13.16",
- "tinymist-std 0.13.16",
- "tinymist-world 0.13.16",
+ "tinymist-derive 0.13.17",
+ "tinymist-std 0.13.17",
+ "tinymist-world 0.13.17",
  "toml",
  "triomphe",
  "typst 0.14.0",
  "typst-macros 0.14.0",
- "typst-shim 0.13.16",
+ "typst-shim 0.13.17",
  "typst-timing 0.14.0",
  "unscanny",
 ]
@@ -4813,7 +4813,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "reflexo-typst",
- "tinymist-world 0.13.16",
+ "tinymist-world 0.13.17",
  "vergen",
  "wasm-bindgen",
 ]
@@ -4831,8 +4831,8 @@ dependencies = [
  "serde_json",
  "tinymist-analysis",
  "tinymist-debug",
- "tinymist-std 0.13.16",
- "tinymist-world 0.13.16",
+ "tinymist-std 0.13.17",
+ "tinymist-world 0.13.17",
  "typst 0.14.0",
  "typst-library 0.14.0",
 ]
@@ -4849,15 +4849,15 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-analysis",
- "tinymist-std 0.13.16",
- "tinymist-world 0.13.16",
+ "tinymist-std 0.13.17",
+ "tinymist-world 0.13.17",
  "typst 0.14.0",
  "typst-library 0.14.0",
 ]
 
 [[package]]
 name = "tinymist-derive"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "quote",
  "syn 2.0.106",
@@ -4875,7 +4875,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "anyhow",
  "clap",
@@ -4910,15 +4910,15 @@ dependencies = [
  "insta",
  "rayon",
  "tinymist-analysis",
- "tinymist-project 0.13.16",
- "tinymist-std 0.13.16",
+ "tinymist-project 0.13.17",
+ "tinymist-std 0.13.17",
  "typst 0.14.0",
  "typst-library 0.14.0",
 ]
 
 [[package]]
 name = "tinymist-package"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "base64",
  "comemo 0.5.0",
@@ -4935,7 +4935,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-std 0.13.16",
+ "tinymist-std 0.13.17",
  "toml",
  "typst 0.14.0",
  "walkdir",
@@ -4986,7 +4986,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-assets 0.13.22",
- "tinymist-std 0.13.16",
+ "tinymist-std 0.13.17",
  "tokio",
  "typst 0.14.0",
  "typst-assets 0.13.1 (git+https://github.com/typst/typst-assets?rev=edf0d64)",
@@ -4996,7 +4996,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "anyhow",
  "clap",
@@ -5011,11 +5011,11 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "tinymist-derive 0.13.16",
- "tinymist-l10n 0.13.16",
- "tinymist-std 0.13.16",
- "tinymist-task 0.13.16",
- "tinymist-world 0.13.16",
+ "tinymist-derive 0.13.17",
+ "tinymist-l10n 0.13.17",
+ "tinymist-std 0.13.17",
+ "tinymist-task 0.13.17",
+ "tinymist-world 0.13.17",
  "tokio",
  "toml",
  "typst 0.14.0",
@@ -5086,20 +5086,20 @@ dependencies = [
  "siphasher",
  "strum 0.26.3",
  "tinymist-analysis",
- "tinymist-derive 0.13.16",
- "tinymist-l10n 0.13.16",
+ "tinymist-derive 0.13.17",
+ "tinymist-l10n 0.13.17",
  "tinymist-lint",
- "tinymist-project 0.13.16",
- "tinymist-std 0.13.16",
+ "tinymist-project 0.13.17",
+ "tinymist-std 0.13.17",
  "tinymist-tests",
- "tinymist-world 0.13.16",
+ "tinymist-world 0.13.17",
  "toml",
  "ttf-parser 0.25.1",
  "typlite",
  "typst 0.14.0",
  "typst-assets 0.13.1 (git+https://github.com/typst/typst-assets?rev=edf0d64)",
  "typst-macros 0.14.0",
- "typst-shim 0.13.16",
+ "typst-shim 0.13.17",
  "typst-timing 0.14.0",
  "unscanny",
  "walkdir",
@@ -5116,12 +5116,12 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "tinymist-query",
- "tinymist-std 0.13.16",
+ "tinymist-std 0.13.17",
 ]
 
 [[package]]
 name = "tinymist-std"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "anyhow",
  "base64",
@@ -5151,7 +5151,7 @@ dependencies = [
  "time",
  "typst 0.14.0",
  "typst-html 0.14.0",
- "typst-shim 0.13.16",
+ "typst-shim 0.13.17",
  "wasm-bindgen",
  "web-time",
  "windows-sys 0.59.0",
@@ -5197,7 +5197,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "anyhow",
  "clap",
@@ -5213,9 +5213,9 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "tinymist-derive 0.13.16",
- "tinymist-std 0.13.16",
- "tinymist-world 0.13.16",
+ "tinymist-derive 0.13.17",
+ "tinymist-std 0.13.17",
+ "tinymist-world 0.13.17",
  "tokio",
  "toml",
  "typst 0.14.0",
@@ -5224,7 +5224,7 @@ dependencies = [
  "typst-html 0.14.0",
  "typst-pdf 0.14.0",
  "typst-render 0.14.0",
- "typst-shim 0.13.16",
+ "typst-shim 0.13.17",
  "typst-svg 0.14.0",
 ]
 
@@ -5271,14 +5271,14 @@ dependencies = [
  "insta",
  "rayon",
  "tinymist-analysis",
- "tinymist-project 0.13.16",
- "tinymist-std 0.13.16",
+ "tinymist-project 0.13.17",
+ "tinymist-std 0.13.17",
  "typst 0.14.0",
 ]
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "comemo 0.5.0",
  "ecow",
@@ -5288,7 +5288,7 @@ dependencies = [
  "nohash-hasher",
  "parking_lot",
  "rpds",
- "tinymist-std 0.13.16",
+ "tinymist-std 0.13.17",
  "typst 0.14.0",
  "wasm-bindgen",
  "web-sys",
@@ -5316,7 +5316,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5342,9 +5342,9 @@ dependencies = [
  "sha2",
  "strum 0.26.3",
  "tar",
- "tinymist-package 0.13.16",
- "tinymist-std 0.13.16",
- "tinymist-vfs 0.13.16",
+ "tinymist-package 0.13.17",
+ "tinymist-std 0.13.17",
+ "tinymist-vfs 0.13.17",
  "ttf-parser 0.25.1",
  "typst 0.14.0",
  "typst-assets 0.13.1 (git+https://github.com/typst/typst-assets?rev=edf0d64)",
@@ -5707,9 +5707,9 @@ dependencies = [
  "insta",
  "regex",
  "resvg 0.43.0",
- "tinymist-derive 0.13.16",
- "tinymist-project 0.13.16",
- "tinymist-std 0.13.16",
+ "tinymist-derive 0.13.17",
+ "tinymist-project 0.13.17",
+ "tinymist-std 0.13.17",
  "tinymist-tests",
  "typst 0.14.0",
  "typst-html 0.14.0",
@@ -6198,7 +6198,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.13.16"
+version = "0.13.17"
 dependencies = [
  "cfg-if",
  "comemo 0.5.0",

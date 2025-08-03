@@ -3,7 +3,7 @@ name = "typst-shim"
 description = "A compatibility layer for Typst release and mainline versions."
 authors = ["The Typst Project Developers"]
 # group: world
-version = "0.13.16"
+version = "0.13.17"
 edition = "2024"
 license.workspace = true
 homepage.workspace = true
