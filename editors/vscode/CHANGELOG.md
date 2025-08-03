@@ -80,11 +80,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.16...v0.13.18
 
-## v0.13.17-rc2 - [2025-08-02]
+## v0.13.17 - [2025-08-03]
 
-Nightly Release at [build: bump world crates to 0.13.17-rc2](https://github.com/Myriad-Dreamin/tinymist/commit/e8a72a5fe3ddf398fe80d5ec52a1a286c141255f), using [ParaN3xus/typst rev 6bc6cf6](https://github.com/ParaN3xus/typst/commit/6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277), a.k.a. [typst/typst feat: make pdf_to_png public](https://github.com/typst/typst/commit/178c3beb4eeabe23bd91037268fb77f5dfdb31f3).
+Nightly Release at [fix: use proper commit hash when generating nightly release changelog (#1965)](https://github.com/Myriad-Dreamin/tinymist/commit/2ecdbd42a5d2563caa9a833b96a748c181189567), using [ParaN3xus/typst rev 6bc6cf6](https://github.com/ParaN3xus/typst/commit/6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277), a.k.a. [typst/typst Improve Guide for LaTeX users, Query Function, and replace invisible emojis (#6620)](https://github.com/typst/typst/commit/178c3beb4eeabe23bd91037268fb77f5dfdb31f3).
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.16...v0.13.17-rc2
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.16...v0.13.17
 
 ## v0.13.16 - [2025-07-29]
 
