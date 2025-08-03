@@ -5,7 +5,7 @@
 /// Reads a theme from a preset dictionary and returns a structured theme object.
 ///
 /// - preset (dictionary): A dictionary containing theme presets.
-/// - xml (function): (Deprecated, passing `read` intead) A function to parse XML data.
+/// - xml (function): (Deprecated, passing `read` instead) A function to parse XML data.
 /// - read (function): A function to read theme files.
 /// - target (string): The target platform or style, such as "web-light", "web-dark", or "pdf".
 /// -> dictionary

@@ -19,7 +19,7 @@ pub static GIT_ROOT: LazyLock<PathBuf> =
     LazyLock::new(|| find_git_root().expect("Failed to find git root").clean());
 
 /// The CLI is the executable that already put inside of the VSCode extension's
-/// `out` directory. This is intented, to ensure that we are testing the CLI to
+/// `out` directory. This is intended, to ensure that we are testing the CLI to
 /// publish in future.
 pub static CLI: LazyLock<PathBuf> = LazyLock::new(|| {
     let cli = if cfg!(windows) {
