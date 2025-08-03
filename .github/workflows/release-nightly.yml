@@ -68,7 +68,8 @@ jobs:
         eval "$(node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . get-current-revs)"
         
         # Get latest revs
-        latest_typst_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly-content-hint" | jq -r '.sha')
+        latest_typst_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly" | jq -r '.sha')
+        latest_typst_content_hint_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly-content-hint" | jq -r '.sha')
         latest_reflexo_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst.ts/commits/nightly" | jq -r '.sha')
         latest_typstyle_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typstyle/commits/nightly" | jq -r '.sha')
         latest_typst_ansi_hl_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst-ansi-hl/commits/nightly" | jq -r '.sha')
@@ -124,6 +125,7 @@ jobs:
         
         echo "need_release=$need_release" >> $GITHUB_OUTPUT
         echo "latest_typst_rev=$latest_typst_rev" >> $GITHUB_ENV
+        echo "latest_typst_content_hint_rev=$latest_typst_content_hint_rev" >> $GITHUB_ENV
 
     - name: Calculate new version
       id: version
@@ -213,7 +215,7 @@ jobs:
         revs_json=$(cat <<EOF
         {
           "tinymist": "${world_commit}",
-          "typst": "${latest_typst_rev}"
+          "typst": "${latest_typst_content_hint_rev}"
         }
         EOF
         )
