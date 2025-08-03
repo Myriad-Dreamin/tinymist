@@ -84,7 +84,7 @@ fastrand = "2.3.0"
 
 # Data Structures
 bitvec = "1"
-comemo = "0.4"
+comemo = "0.5.0"
 # We need to freeze the version of the crate, as the raw-api feature is considered unstable
 dashmap = { version = "=5.5.3", features = ["raw-api"] }
 ecow = "0.2.3"
