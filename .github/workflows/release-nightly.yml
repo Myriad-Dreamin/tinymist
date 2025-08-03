@@ -182,10 +182,10 @@ jobs:
         )
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
 
-    - name: Update world crates version
+    - name: Bump world crates version
       if: steps.check_updates.outputs.need_release == 'true'
       run: |
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
         
         cargo update
         git add -A
@@ -205,7 +205,7 @@ jobs:
         
         new_version="$new_version"
         
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
 
         # Update typst dependencies
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
@@ -238,7 +238,7 @@ jobs:
         cd /tmp/typstyle
         git checkout nightly
         
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
           "$typst_version" \
           "$typst_assets_rev"
