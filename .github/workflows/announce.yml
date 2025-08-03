@@ -39,7 +39,8 @@ jobs:
           cache: 'yarn'
       - name: Install deps
         run: yarn install
-      - name: "Generate announcement"
+      - id: announce
+        name: "Generate announcement"
         run: |
           yarn draft-release ${{ inputs.tag }}
           echo "draft-release ran successfully"
@@ -61,9 +62,9 @@ jobs:
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ (fromJson(env.isNightly) && '--prerelease') || '' }}"
-          ANNOUNCEMENT_TITLE: "${{ inputs.tag }}"
+          ANNOUNCEMENT_TITLE: "${{ steps.announce.outputs.tag }}"
           RELEASE_COMMIT: "${{ github.sha }}"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Creating release for ${{ inputs.tag }} with PRERELEASE_FLAG=$PRERELEASE_FLAG (isNightly=$isNightly)"
-          gh release create "${{ inputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
+          echo "Creating release for ${{ steps.announce.outputs.tag }} with PRERELEASE_FLAG=$PRERELEASE_FLAG (isNightly=$isNightly)"
+          gh release create "${{ steps.announce.outputs.tag }}" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file target/announcement.gen.md --draft=true
