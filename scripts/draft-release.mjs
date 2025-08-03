@@ -111,6 +111,11 @@ const main = async () => {
     process.exit(1);
   }
 
+  if (process.env.GITHUB_OUTPUT) {
+    const output = `tag=v${versionToUpload}`;
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, output + "\n");
+  }
+
   // read version from packages.json
   const packageJson = JSON.parse(fs.readFileSync("./editors/vscode/package.json", "utf8"));
   if (packageJson.version !== versionToUpload) {
