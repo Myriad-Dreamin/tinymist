@@ -637,21 +637,22 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
 name = "comemo"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6916408a724339aa77b18214233355f3eb04c42eb895e5f8909215bd8a7a91"
+checksum = "649d7b2d867b569729c03c0f6968db10bc95921182a1f2b2012b1b549492f39d"
 dependencies = [
  "comemo-macros",
- "once_cell",
  "parking_lot",
+ "rustc-hash 2.1.1",
  "siphasher",
+ "slab",
 ]
 
 [[package]]
 name = "comemo-macros"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8936e42f9b4f5bdfaf23700609ac1f11cb03ad4c1ec128a4ee4fd0903e228db"
+checksum = "51c87fc7e85487493ddedae1a3a34b897c77ad8825375b79265a8a162c28d535"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2233,14 +2234,13 @@ dependencies = [
 [[package]]
 name = "krilla"
 version = "0.4.0"
-source = "git+https://github.com/LaurenzV/krilla?rev=37b9a00#37b9a00bfac87ed0b347b7cf8e9d37a6f68fcccd"
+source = "git+https://github.com/LaurenzV/krilla?rev=abdf031#abdf031c9e5ba89d606f6f145fad648c75812aec"
 dependencies = [
  "base64",
  "bumpalo",
  "comemo",
  "flate2",
  "float-cmp 0.10.0",
- "fxhash",
  "gif",
  "hayro-write",
  "image-webp 0.2.3",
@@ -2249,6 +2249,7 @@ dependencies = [
  "pdf-writer",
  "png",
  "rayon",
+ "rustc-hash 2.1.1",
  "rustybuzz 0.20.1",
  "siphasher",
  "skrifa",
@@ -2263,7 +2264,7 @@ dependencies = [
 [[package]]
 name = "krilla-svg"
 version = "0.1.0"
-source = "git+https://github.com/LaurenzV/krilla?rev=37b9a00#37b9a00bfac87ed0b347b7cf8e9d37a6f68fcccd"
+source = "git+https://github.com/LaurenzV/krilla?rev=abdf031#abdf031c9e5ba89d606f6f145fad648c75812aec"
 dependencies = [
  "flate2",
  "fontdb 0.23.0",
@@ -3138,7 +3139,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.6.1-rc2"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=3b1ae0adc7f35785e6d60e7fc36141dc14b9e850#3b1ae0adc7f35785e6d60e7fc36141dc14b9e850"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#62c42fe7fdbf817d366dfaa9933784f0332a4f67"
 dependencies = [
  "base64",
  "bitvec",
@@ -3164,7 +3165,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.6.1-rc2"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=3b1ae0adc7f35785e6d60e7fc36141dc14b9e850#3b1ae0adc7f35785e6d60e7fc36141dc14b9e850"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#62c42fe7fdbf817d366dfaa9933784f0332a4f67"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -3196,7 +3197,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.6.1-rc2"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=3b1ae0adc7f35785e6d60e7fc36141dc14b9e850#3b1ae0adc7f35785e6d60e7fc36141dc14b9e850"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#62c42fe7fdbf817d366dfaa9933784f0332a4f67"
 dependencies = [
  "bitvec",
  "comemo",
@@ -3224,7 +3225,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.6.1-rc2"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=3b1ae0adc7f35785e6d60e7fc36141dc14b9e850#3b1ae0adc7f35785e6d60e7fc36141dc14b9e850"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#62c42fe7fdbf817d366dfaa9933784f0332a4f67"
 dependencies = [
  "base64",
  "comemo",
@@ -5026,10 +5027,11 @@ dependencies = [
 [[package]]
 name = "typst"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "comemo",
  "ecow",
+ "rustc-hash 2.1.1",
  "typst-eval",
  "typst-html",
  "typst-layout",
@@ -5044,7 +5046,7 @@ dependencies = [
 [[package]]
 name = "typst-ansi-hl"
 version = "0.4.0"
-source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?rev=9e449696f5da46f4e911733d8a70ecc1e2f72324#9e449696f5da46f4e911733d8a70ecc1e2f72324"
+source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?branch=nightly#76546f137f13f585ee81548ebfda8a5a9be0546b"
 dependencies = [
  "ansi_colours",
  "syntect",
@@ -5062,12 +5064,13 @@ source = "git+https://github.com/typst/typst-assets?rev=fbf00f9#fbf00f9539fdb082
 [[package]]
 name = "typst-eval"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "comemo",
  "ecow",
  "if_chain",
  "indexmap 2.10.0",
+ "rustc-hash 2.1.1",
  "stacker",
  "toml",
  "typst-library",
@@ -5081,11 +5084,12 @@ dependencies = [
 [[package]]
 name = "typst-html"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "comemo",
  "ecow",
  "palette",
+ "rustc-hash 2.1.1",
  "time",
  "typst-assets",
  "typst-library",
@@ -5099,7 +5103,7 @@ dependencies = [
 [[package]]
 name = "typst-layout"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "az",
  "bumpalo",
@@ -5131,7 +5135,7 @@ dependencies = [
 [[package]]
 name = "typst-library"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "az",
  "bitflags 2.9.1",
@@ -5165,6 +5169,7 @@ dependencies = [
  "regex-syntax",
  "roxmltree",
  "rust_decimal",
+ "rustc-hash 2.1.1",
  "rustybuzz 0.20.1",
  "serde",
  "serde_json",
@@ -5193,7 +5198,7 @@ dependencies = [
 [[package]]
 name = "typst-macros"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5204,7 +5209,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -5213,6 +5218,7 @@ dependencies = [
  "infer",
  "krilla",
  "krilla-svg",
+ "rustc-hash 2.1.1",
  "serde",
  "typst-assets",
  "typst-library",
@@ -5225,7 +5231,7 @@ dependencies = [
 [[package]]
 name = "typst-realize"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -5242,7 +5248,7 @@ dependencies = [
 [[package]]
 name = "typst-render"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -5271,13 +5277,14 @@ dependencies = [
 [[package]]
 name = "typst-svg"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "base64",
  "comemo",
  "ecow",
  "flate2",
  "image",
+ "rustc-hash 2.1.1",
  "ttf-parser 0.25.1",
  "typst-assets",
  "typst-library",
@@ -5308,9 +5315,10 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "ecow",
+ "rustc-hash 2.1.1",
  "serde",
  "toml",
  "typst-timing 0.14.0",
@@ -5336,7 +5344,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "parking_lot",
  "serde",
@@ -5360,11 +5368,12 @@ dependencies = [
 [[package]]
 name = "typst-utils"
 version = "0.14.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277#6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "once_cell",
  "portable-atomic",
  "rayon",
+ "rustc-hash 2.1.1",
  "siphasher",
  "thin-vec",
  "unicode-math-class",
@@ -5388,7 +5397,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.13.16"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=86cb05a5c26264baebc0e78bfd40513b477c9538#86cb05a5c26264baebc0e78bfd40513b477c9538"
+source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#46102a2bcab7e4b49bacaae6d99f0dd5615559dc"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
