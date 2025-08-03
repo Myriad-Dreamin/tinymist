@@ -10,9 +10,9 @@ import {
   typstSupportedMimes,
   PasteResourceKind,
   pasteResourceKinds as pasteResourceKinds,
-  typstImageEditKind,
-  typstPasteLinkEditKind,
-  typstUriEditKind,
+  getTypstImageEditKind,
+  getTypstPasteLinkEditKind,
+  getTypstUriEditKind,
   Schemes,
 } from "./drop-paste.def";
 import { IContext } from "../context";
@@ -44,12 +44,12 @@ export function copyAndPasteActivate(context: SubscriptionContext) {
     return;
   }
 
-  const providedEditKinds = [typstPasteLinkEditKind, typstUriEditKind, typstImageEditKind];
+  const providedEditKinds = [getTypstPasteLinkEditKind(), getTypstUriEditKind(), getTypstImageEditKind()];
 
   const sel = typstDocumentSelector;
   context.subscriptions.push(
     vscode.languages.registerDocumentPasteEditProvider(sel, new PasteUriProvider(), {
-      providedPasteEditKinds: [typstPasteLinkEditKind],
+      providedPasteEditKinds: [getTypstPasteLinkEditKind()],
       pasteMimeTypes: PasteUriProvider.mimeTypes,
     }),
     vscode.languages.registerDocumentPasteEditProvider(sel, new PasteResourceProvider(), {
@@ -76,7 +76,7 @@ interface ResolvedEdits {
 
 class DropOrPasteContext<A extends DropPasteAction> {
   title: string;
-  editKind = typstUriEditKind;
+  editKind = getTypstUriEditKind();
 
   constructor(
     private kind: A,
@@ -143,7 +143,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
       if (mediaFiles) {
         const edit = await this.handleMediaFiles(ranges, mediaFiles);
         if (edit) {
-          this.editKind = typstImageEditKind;
+          this.editKind = getTypstImageEditKind();
           this.resolved.push(edit);
           return this.wrapRangeAsLinkContent();
         }
@@ -163,7 +163,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
   }
 
   async pasteUri(ranges: readonly vscode.Range[], dataTransfer: vscode.DataTransfer) {
-    this.editKind = typstUriEditKind;
+    this.editKind = getTypstUriEditKind();
     this.title = "Paste Link (Typst)";
     const item = dataTransfer.get(Mime.textPlain);
     const text = await item?.asString();
@@ -258,7 +258,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     if (
       uriList.entries.length === 1 &&
       [Schemes.http, Schemes.https].includes(uriList.entries[0].uri.scheme as Schemes) &&
-      !(this.context?.only as any)?.contains?.(typstUriEditKind)
+      !(this.context?.only as any)?.contains?.(getTypstUriEditKind())
     ) {
       const text = await dataTransfer.get(Mime.textPlain)?.asString();
       if (this.token.isCancellationRequested) {
