@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: tag # get the tag from package.json
         run:
-          echo "tag=$(jq -r '.version' editors/vscode/package.json)" >> $GITHUB_OUTPUT
+          echo "tag=v$(jq -r '.version' editors/vscode/package.json)" >> $GITHUB_OUTPUT
       - name: Show tag
         run: echo "Tag is ${{ steps.tag.outputs.tag }}"
   
