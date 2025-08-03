@@ -140,6 +140,7 @@ jobs:
         echo "new_version=$new_version" >> $GITHUB_ENV
 
     - uses: actions-rust-lang/setup-rust-toolchain@v1
+      if: steps.check_updates.outputs.need_release == 'true'
 
     - name: Get typst information
       id: typst_info
