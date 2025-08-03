@@ -84,7 +84,7 @@ fastrand = "2.3.0"
 
 # Data Structures
 bitvec = "1"
-comemo = "0.4"
+comemo = "0.5.0"
 # We need to freeze the version of the crate, as the raw-api feature is considered unstable
 dashmap = { version = "=5.5.3", features = ["raw-api"] }
 ecow = "0.2.3"
@@ -264,21 +264,21 @@ ignore-hidden = false
 extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277" }
-typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "9e449696f5da46f4e911733d8a70ecc1e2f72324" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "86cb05a5c26264baebc0e78bfd40513b477c9538" }
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "3b1ae0adc7f35785e6d60e7fc36141dc14b9e850" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "3b1ae0adc7f35785e6d60e7fc36141dc14b9e850" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "3b1ae0adc7f35785e6d60e7fc36141dc14b9e850" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
