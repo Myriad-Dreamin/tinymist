@@ -41,11 +41,6 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y jq --no-install-recommends
-
     - name: Determine release type
       id: release_type
       run: |
@@ -68,7 +63,8 @@ jobs:
         eval "$(node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . get-current-revs)"
         
         # Get latest revs
-        latest_typst_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly-content-hint" | jq -r '.sha')
+        latest_typst_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly" | jq -r '.sha')
+        latest_typst_content_hint_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst/commits/nightly-content-hint" | jq -r '.sha')
         latest_reflexo_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst.ts/commits/nightly" | jq -r '.sha')
         latest_typstyle_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typstyle/commits/nightly" | jq -r '.sha')
         latest_typst_ansi_hl_rev=$(curl -s "https://api.github.com/repos/ParaN3xus/typst-ansi-hl/commits/nightly" | jq -r '.sha')
@@ -124,6 +120,7 @@ jobs:
         
         echo "need_release=$need_release" >> $GITHUB_OUTPUT
         echo "latest_typst_rev=$latest_typst_rev" >> $GITHUB_ENV
+        echo "latest_typst_content_hint_rev=$latest_typst_content_hint_rev" >> $GITHUB_ENV
 
     - name: Calculate new version
       id: version
@@ -138,6 +135,7 @@ jobs:
         echo "new_version=$new_version" >> $GITHUB_ENV
 
     - uses: actions-rust-lang/setup-rust-toolchain@v1
+      if: steps.check_updates.outputs.need_release == 'true'
 
     - name: Get typst information
       id: typst_info
@@ -179,10 +177,10 @@ jobs:
         )
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-patch-revs "$revs_json"
 
-    - name: Update world crates version
+    - name: Bump world crates version
       if: steps.check_updates.outputs.need_release == 'true'
       run: |
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . bump-world-crates "$new_version"
         
         cargo update
         git add -A
@@ -202,7 +200,7 @@ jobs:
         
         new_version="$new_version"
         
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
 
         # Update typst dependencies
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
@@ -213,7 +211,7 @@ jobs:
         revs_json=$(cat <<EOF
         {
           "tinymist": "${world_commit}",
-          "typst": "${latest_typst_rev}"
+          "typst": "${latest_typst_content_hint_rev}"
         }
         EOF
         )
@@ -235,7 +233,7 @@ jobs:
         cd /tmp/typstyle
         git checkout nightly
         
-        node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
+        # node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-world-crates "$new_version"
         node $GITHUB_WORKSPACE/scripts/nightly-utils.mjs . update-typst-deps \
           "$typst_version" \
           "$typst_assets_rev"
@@ -332,10 +330,17 @@ jobs:
         cargo update
         git add -A
         git commit -m "build: bump version to ${new_version}"
+        bump_commit=$(git rev-parse HEAD)
         
-        git tag "v${new_version}"
         git push origin nightly
-        git push origin "v${new_version}"
+
+        curl -L \
+          -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.NIGHTLY_REPO_TOKEN }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          https://api.github.com/repos/${{ github.repository }}/git/refs \
+          -d "{\"ref\":\"refs/tags/v${new_version}\",\"sha\":\"${bump_commit}\"}"
         
         echo "Successfully released tinymist ${new_version}!"
 
