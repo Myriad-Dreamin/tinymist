@@ -23,12 +23,12 @@
           pname = "tinymist";
           # Please update the corresponding vscode extension when updating
           # this derivation.
-          version = "0.13.18-rc2";
+          version = "0.13.18";
 
           src = pkgs.lib.cleanSource ../../..;
 
           useFetchCargoVendor = true;
-          cargoHash = "sha256-NDt5sBZPp3hfB63kphkWTVWsv/vhq/ieUI6r54yGslw=";
+          cargoHash = "sha256-fU4b99mvLc1SgN2DgHqW27Agocc9NH3wQBPVFkGU0HY=";
 
           nativeBuildInputs = [
             pkgs.installShellFiles
