@@ -51,7 +51,6 @@
               "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.desc%",
               "type": "string",
               "enum": ["never", "auto", "always"],
-              "default": "never",
               "enumDescriptions": [
                 "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.never%",
                 "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.enum.auto%",
@@ -62,7 +61,6 @@
               "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.title%",
               "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.desc%",
               "type": "object",
-              "default": {},
               "properties": {
                 "rest": {
                   "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.object.properties.rest.title%",
