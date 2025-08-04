@@ -733,6 +733,7 @@
         "tinymist.preview.invertColors": {
           "title": "%extension.tinymist.config.tinymist.preview.invertColors.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.preview.invertColors.desc%",
+          "default": "never",
           "anyOf": [
             {
               "title": "%extension.tinymist.config.tinymist.preview.invertColors.anyOf.string.title%",
