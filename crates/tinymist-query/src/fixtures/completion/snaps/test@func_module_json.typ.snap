@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module_json.typ
     "labelDetails": {
      "description": "([json]) => any"
     },
-    "sortText": "102",
+    "sortText": "097",
     "textEdit": {
      "newText": "json(${1:})",
      "range": {

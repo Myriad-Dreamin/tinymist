@@ -1,6 +1,6 @@
 //! Completion kind analysis.
 
-use typst::foundations::{Element, Symbol};
+use typst::foundations::{Binding, Element, Symbol};
 
 use super::*;
 
@@ -355,5 +355,33 @@ impl IScope for &Type {
 }
 
 fn has_static_member(f: impl IScope) -> bool {
-    f.get_scope().is_some_and(|s| s.iter().next().is_some())
+    f.get_scope()
+        .is_some_and(|s| s.iter().any(|(_, v)| is_static_member(v)))
+}
+
+fn is_static_member(v: &Binding) -> bool {
+    match v.read() {
+        Value::Func(func) => func
+            .params()
+            .iter()
+            .copied()
+            .flatten()
+            .find(|s| s.positional)
+            .is_none_or(|s| s.name != "self"),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_fn_completion_feat() {
+        let mut feat = FnCompletionFeat::default();
+        feat.check_one(&Ty::Builtin(BuiltinTy::Type(Type::of::<i64>())), 0);
+        // int.from-bytes
+        assert!(feat.has_static_member);
+    }
 }

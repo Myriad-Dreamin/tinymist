@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module.typ
     "labelDetails": {
      "description": "(align: alignment | array | auto | function, column-gutter: array | auto | length | type, columns: array | auto | length | type, fill: color, gutter: array | auto | length | type, inset: inset, row-gutter: array | auto | length | type, rows: array | auto | length | type, stroke: stroke, ..: content) => table"
     },
-    "sortText": "215",
+    "sortText": "208",
     "textEdit": {
      "newText": "table",
      "range": {
@@ -43,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module.typ
     "labelDetails": {
      "description": "(align: alignment | array | auto | function, column-gutter: array | auto | length | type, columns: array | auto | length | type, fill: color, gutter: array | auto | length | type, inset: inset, row-gutter: array | auto | length | type, rows: array | auto | length | type, stroke: stroke, ..: content) => table"
     },
-    "sortText": "216",
+    "sortText": "209",
     "textEdit": {
      "newText": "table(${1:})",
      "range": {
