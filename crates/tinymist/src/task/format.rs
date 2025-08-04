@@ -2,9 +2,9 @@
 
 use std::iter::zip;
 
-use lsp_types::TextEdit;
+use lsp_types::{Range, TextEdit};
 use sync_ls::{just_future, SchedulableResponse};
-use tinymist_query::{to_lsp_range, PositionEncoding};
+use tinymist_query::{to_lsp_range, to_typst_range, PositionEncoding};
 use typst::syntax::Source;
 
 use super::SyncTaskFactory;
@@ -54,6 +54,31 @@ impl FormatTask {
 
             Ok(formatted.and_then(|formatted| calc_diff(src, formatted, c.position_encoding)))
         })
+    }
+
+    pub fn run_on_range(
+        &self,
+        src: Source,
+        range: Range,
+    ) -> SchedulableResponse<Option<Vec<TextEdit>>> {
+        fn format_impl(src: Source, range: Range, c: &FormatUserConfig) -> Option<Vec<TextEdit>> {
+            let typst_range = to_typst_range(range, c.position_encoding, &src)?;
+
+            match &c.config {
+                FormatterConfig::Typstyle(config) => {
+                    let format_result = typstyle_core::Typstyle::new(config.as_ref().clone())
+                        .format_source_range(src.clone(), typst_range)
+                        .ok()?;
+                    let mut new_full_text = src.text().to_owned();
+                    new_full_text.replace_range(format_result.source_range, &format_result.content);
+                    calc_diff(src, new_full_text, c.position_encoding)
+                }
+                _ => None,
+            }
+        }
+
+        let c = self.factory.task();
+        just_future(async move { Ok(format_impl(src, range, &c)) })
     }
 }
 
