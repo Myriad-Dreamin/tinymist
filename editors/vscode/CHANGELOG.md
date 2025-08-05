@@ -80,6 +80,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.16...v0.13.18
 
+## v0.13.19-rc1 - [2025-08-05]
+
+Nightly Release at [fix: use proper commit hash when generating nightly release changelog (#1965)](https://github.com/Myriad-Dreamin/tinymist/commit/2ecdbd42a5d2563caa9a833b96a748c181189567), using [ParaN3xus/typst rev 6a81e78](https://github.com/ParaN3xus/typst/commit/6a81e781b9e19fcec4a02a1d18d68d7dd1474444), a.k.a. [typst/typst Allow custom element names in HTML tag syntax  (#6676)](https://github.com/typst/typst/commit/b825df6bbc81856b979848361c4f11ce5ed61810).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.17...v0.13.19-rc1
+
 ## v0.13.17 - [2025-08-03]
 
 Nightly Release at [fix: use proper commit hash when generating nightly release changelog (#1965)](https://github.com/Myriad-Dreamin/tinymist/commit/2ecdbd42a5d2563caa9a833b96a748c181189567), using [ParaN3xus/typst rev 6bc6cf6](https://github.com/ParaN3xus/typst/commit/6bc6cf6ec210c60c3e7ff25f84cf43aa1de0a277), a.k.a. [typst/typst Improve Guide for LaTeX users, Query Function, and replace invisible emojis (#6620)](https://github.com/typst/typst/commit/178c3beb4eeabe23bd91037268fb77f5dfdb31f3).
