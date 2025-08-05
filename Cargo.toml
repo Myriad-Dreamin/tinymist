@@ -274,11 +274,11 @@ typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781
 typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
 typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
-typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "cba49e1d76de4f41f14ccebe5f26eae804225440" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "49c6d44e32e7dc0f931381ccdca8aecfb214f2a1" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "f517f1f62f209911780092facfbf6f921d9e228b" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "f517f1f62f209911780092facfbf6f921d9e228b" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "f517f1f62f209911780092facfbf6f921d9e228b" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
