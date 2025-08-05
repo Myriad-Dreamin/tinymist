@@ -23,6 +23,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 "Server Features" Were named "Compiler Features"
 
 * (Fix) Made configuration items null-safe in https://github.com/Myriad-Dreamin/tinymist/pull/1988
+* (Fix) Corrected export signal handling in https://github.com/Myriad-Dreamin/tinymist/pull/1990 and https://github.com/Myriad-Dreamin/tinymist/pull/1991
+  * This fixes the issue of exporting PDF with outdated compilations or not exporting at all.
 
 ### Misc
 
