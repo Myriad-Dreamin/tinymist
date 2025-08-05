@@ -28,7 +28,7 @@
           src = pkgs.lib.cleanSource ../../..;
 
           useFetchCargoVendor = true;
-          cargoHash = "sha256-lRG0xHP+NxoIuo53ktokQBDWvCszkCis2mLPbu28HyA=";
+          cargoHash = "sha256-FRiN2xEI1JOXW4dFgCqvQ4aG1oAfQTPDFG0blkM35NQ=";
 
           nativeBuildInputs = [
             pkgs.installShellFiles
