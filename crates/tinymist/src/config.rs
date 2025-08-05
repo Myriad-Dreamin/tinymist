@@ -874,7 +874,7 @@ pub struct PreviewFeat {
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub partial_rendering: bool,
     /// Invert colors for the preview.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub invert_colors: PreviewInvertColors,
 }
 
@@ -1116,28 +1116,21 @@ mod tests {
     }
 
     #[test]
-    fn test_null_completion() {
-        let mut config = Config::default();
-        let update = json!({
-            "completion": null
-        });
-
-        good_config(&mut config, &update);
-    }
-
-    #[test]
     fn test_null_args() {
-        fn test_good_config(path: &str) {
+        fn test_good_config(path: &str) -> Config {
             let mut obj = json!(null);
             let path = path.split('.').collect::<Vec<_>>();
             for p in path.iter().rev() {
                 obj = json!({ *p: obj });
             }
 
-            good_config(&mut Config::default(), &obj);
+            let mut c = Config::default();
+            good_config(&mut c, &obj);
+            c
         }
 
         test_good_config("root");
+        test_good_config("rootPath");
         test_good_config("colorTheme");
         test_good_config("lint");
         test_good_config("customizedShowDocument");
@@ -1181,7 +1174,11 @@ mod tests {
         test_good_config("preview.background.args");
         test_good_config("preview.refresh");
         test_good_config("preview.partialRendering");
-        test_good_config("preview.invertColors");
+        let c = test_good_config("preview.invertColors");
+        assert_eq!(
+            c.preview.invert_colors,
+            PreviewInvertColors::Enum(PreviewInvertColor::Never)
+        );
     }
 
     #[test]
