@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.6.19"
+version = "0.6.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301af1932e46185686725e0fad2f8f2aa7da69dd70bf6ecc44d6b703844a3933"
+checksum = "3ae563653d1938f79b1ab1b5e668c87c76a9930414574a6583a7b7e11a8e6192"
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -111,22 +111,22 @@ dependencies = [
 
 [[package]]
 name = "anstyle-query"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8bdeb6047d8983be085bab0ba1472e6dc604e7041dbf6fcd5e71523014fae9"
+checksum = "9e231f6134f61b71076a3eab506c379d4f36122f2af15a9ff04415ea4c3339e2"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
 name = "anstyle-wincon"
-version = "3.0.9"
+version = "3.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "403f75924867bb1033c59fbf0797484329750cfbe3c4325cd33127941fabc882"
+checksum = "3e0633414522a32ffaac8ac6cc8f748e090c5717661fddeea04219e2344f5f2a"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1086,9 +1086,9 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "ecow"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92b481eb5d59fd8e80e92ff11d057d1ca8d144b2cd8c66cc8d5bd177a3c0dc5"
+checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
 dependencies = [
  "serde",
 ]
@@ -1876,7 +1876,7 @@ dependencies = [
  "potential_utf",
  "yoke 0.8.0",
  "zerofrom",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -1889,7 +1889,7 @@ dependencies = [
  "litemap 0.8.0",
  "tinystr 0.8.1",
  "writeable 0.6.1",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -1937,7 +1937,7 @@ dependencies = [
  "icu_properties 2.0.1",
  "icu_provider 2.0.0",
  "smallvec",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -1975,7 +1975,7 @@ dependencies = [
  "icu_provider 2.0.0",
  "potential_utf",
  "zerotrie 0.2.2",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -2023,7 +2023,7 @@ dependencies = [
  "yoke 0.8.0",
  "zerofrom",
  "zerotrie 0.2.2",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -2926,7 +2926,7 @@ checksum = "3af6b589e163c5a788fab00ce0c0366f6efbb9959c2f9874b224936af7fce7e1"
 dependencies = [
  "base64",
  "indexmap 2.10.0",
- "quick-xml 0.38.0",
+ "quick-xml 0.38.1",
  "serde",
  "time",
 ]
@@ -3005,7 +3005,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5a7c30837279ca13e7c867e9e40053bc68740f988cb07f7ca6df43cc734b585"
 dependencies = [
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -3109,9 +3109,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.0"
+version = "0.38.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8927b0664f5c5a98265138b7e3f90aa19a6b21353182469ace36d4ac527b7b1b"
+checksum = "9845d9dccf565065824e69f9f235fafba1587031eda353c1f1561cd6a6be78f4"
 dependencies = [
  "memchr",
 ]
@@ -3984,9 +3984,9 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "signal-hook-registry"
-version = "1.4.5"
+version = "1.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9203b8055f63a2a00e2f593bb0510367fe707d7ff1e5c872de2f537b339e5410"
+checksum = "b2a4719bff48cee6b39d12c020eeb490953ad2443b7055bd0b21fca26bd8c28b"
 dependencies = [
  "libc",
 ]
@@ -4963,7 +4963,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d4f6d1145dcb577acf783d4e601bc1d76a13337bb54e6233add580b07344c8b"
 dependencies = [
  "displaydoc",
- "zerovec 0.11.2",
+ "zerovec 0.11.3",
 ]
 
 [[package]]
@@ -5046,9 +5046,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.15"
+version = "0.7.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
+checksum = "14307c986784f72ef81c89db7d9e28d6ac26d16213b109ea501696195e6e3ce5"
 dependencies = [
  "bytes",
  "futures-core",
@@ -5273,7 +5273,7 @@ dependencies = [
 [[package]]
 name = "typst"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "comemo",
  "ecow",
@@ -5310,7 +5310,7 @@ source = "git+https://github.com/typst/typst-assets?rev=fbf00f9#fbf00f9539fdb082
 [[package]]
 name = "typst-eval"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "comemo",
  "ecow",
@@ -5329,7 +5329,7 @@ dependencies = [
 [[package]]
 name = "typst-html"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "bumpalo",
  "comemo",
@@ -5349,7 +5349,7 @@ dependencies = [
 [[package]]
 name = "typst-layout"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "az",
  "bumpalo",
@@ -5383,7 +5383,7 @@ dependencies = [
 [[package]]
 name = "typst-library"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "az",
  "bitflags 2.9.1",
@@ -5448,7 +5448,7 @@ dependencies = [
 [[package]]
 name = "typst-macros"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5459,7 +5459,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -5481,7 +5481,7 @@ dependencies = [
 [[package]]
 name = "typst-realize"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -5498,7 +5498,7 @@ dependencies = [
 [[package]]
 name = "typst-render"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -5528,7 +5528,7 @@ dependencies = [
 [[package]]
 name = "typst-svg"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "base64",
  "comemo",
@@ -5568,7 +5568,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "ecow",
  "rustc-hash 2.1.1",
@@ -5597,7 +5597,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "parking_lot",
  "serde",
@@ -5621,7 +5621,7 @@ dependencies = [
 [[package]]
 name = "typst-utils"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
+source = "git+https://github.com/ParaN3xus/typst.git?rev=6a81e781b9e19fcec4a02a1d18d68d7dd1474444#6a81e781b9e19fcec4a02a1d18d68d7dd1474444"
 dependencies = [
  "once_cell",
  "portable-atomic",
@@ -5650,7 +5650,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.13.16"
-source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#46102a2bcab7e4b49bacaae6d99f0dd5615559dc"
+source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#3e76d860abf14005d292b86ecd246a11f750f5da"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
@@ -6644,9 +6644,9 @@ dependencies = [
 
 [[package]]
 name = "zerovec"
-version = "0.11.2"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a05eb080e015ba39cc9e23bbe5e7fb04d5fb040350f99f34e338d5fdd294428"
+checksum = "bdbb9122ea75b11bf96e7492afb723e8a7fbe12c67417aa95e7e3d18144d37cd"
 dependencies = [
  "yoke 0.8.0",
  "zerofrom",
