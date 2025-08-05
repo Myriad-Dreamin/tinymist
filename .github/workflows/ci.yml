@@ -70,7 +70,6 @@ jobs:
           name: tinymist-completion-scripts
           path: tinymist-completions.tar.gz
       - name: Test tinymist
-        continue-on-error: true
         run: cargo test --workspace -- --skip=e2e
 
   checks-windows:
@@ -95,7 +94,6 @@ jobs:
           yarn build:l10n
       - run: cargo check --workspace
       - name: Test tinymist
-        continue-on-error: true
         run: cargo test --workspace -- --skip=e2e
 
 
