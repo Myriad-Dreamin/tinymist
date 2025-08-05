@@ -40,9 +40,11 @@ notify.workspace = true
 
 fonts = ["typst-assets/fonts"]
 no-content-hint = ["tinymist-task/no-content-hint"]
-lsp = ["system", "toml"]
+lsp = ["toml"]
+# "system", 
 
 system = ["tinymist-std/system", "tinymist-world/system"]
+web = ["tinymist-std/web", "tinymist-world/web"]
 
 [lints]
 workspace = true
