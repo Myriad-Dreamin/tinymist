@@ -264,16 +264,16 @@ ignore-hidden = false
 extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
-typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
 reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
