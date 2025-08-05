@@ -626,15 +626,27 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         {
             let mut n_revs = self.notified_revision.lock();
             let (n_rev, n_signal) = n_revs.entry(art.id().clone()).or_default();
-            if *n_rev >= art.world().revision().get() && !n_signal.exclude(art.snap.signal).any() {
+
+            // If the revision is outdated, update it and notify the client.
+            if *n_rev < art.world().revision().get() {
+                *n_rev = art.world().revision().get();
+                // The signal must be reset to the current one.
+                *n_signal = art.snap.signal;
+
+                // Otherwise, if a fresh signal is found, merge and emit it.
+            } else if n_signal.exclude(art.snap.signal).any() {
+                n_signal.merge(art.snap.signal);
+
+                // Otherwise we have already notified the client for this
+                // revision.
+            } else {
                 log::info!(
-                    "Project: already notified for revision {} <= {n_rev}",
+                    "Project: already notified for revision {} <= {n_rev}, signal: {n_signal:?} contains {:?}",
                     art.world().revision(),
+                    art.snap.signal
                 );
                 return;
             }
-            *n_rev = art.world().revision().get();
-            n_signal.merge(art.snap.signal);
         }
 
         // Prints the diagnostics when we are running the compilation in standalone
