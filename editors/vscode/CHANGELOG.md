@@ -14,7 +14,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Bumped typstyle to v0.13.17 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1979
     * See full changelog at <https://typstyle-rs.github.io/typstyle/changelog.html#label-v0.13.17%20-%20[2025-08-03]>
 
-## Editor
+### Editor
 
 * (Fix) Setting VS Code default configuration for invertColors to "never" by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/1987
 
