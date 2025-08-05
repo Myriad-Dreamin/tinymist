@@ -862,19 +862,19 @@ pub enum SemanticTokensMode {
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFeat {
     /// The browsing preview options.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub browsing: BrowsingPreviewOpts,
     /// The background preview options.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub background: BackgroundPreviewOpts,
     /// When to refresh the preview.
     #[serde(default)]
     pub refresh: Option<TaskWhen>,
     /// Whether to enable partial rendering.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub partial_rendering: bool,
     /// Invert colors for the preview.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub invert_colors: PreviewInvertColors,
 }
 
@@ -911,6 +911,7 @@ pub struct BrowsingPreviewOpts {
 #[serde(rename_all = "camelCase")]
 pub struct BackgroundPreviewOpts {
     /// Whether to run the preview in the background.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub enabled: bool,
     /// The arguments for the background preview.
     pub args: Option<Vec<String>>,
@@ -955,6 +956,15 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
         ..SemanticTokensOptions::default()
     }
+}
+
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -1106,33 +1116,69 @@ mod tests {
     }
 
     #[test]
-    fn test_null_completion() {
-        let mut config = Config::default();
-        let update = json!({
-            "completion": null
-        });
+    fn test_null_args() {
+        fn test_good_config(path: &str) -> Config {
+            let mut obj = json!(null);
+            let path = path.split('.').collect::<Vec<_>>();
+            for p in path.iter().rev() {
+                obj = json!({ *p: obj });
+            }
 
-        good_config(&mut config, &update);
-    }
+            let mut c = Config::default();
+            good_config(&mut c, &obj);
+            c
+        }
 
-    #[test]
-    fn test_null_root() {
-        let mut config = Config::default();
-        let update = json!({
-            "root": null
-        });
+        test_good_config("root");
+        test_good_config("rootPath");
+        test_good_config("colorTheme");
+        test_good_config("lint");
+        test_good_config("customizedShowDocument");
+        test_good_config("projectResolution");
+        test_good_config("exportPdf");
+        test_good_config("exportTarget");
+        test_good_config("fontPaths");
+        test_good_config("formatterMode");
+        test_good_config("formatterPrintWidth");
+        test_good_config("formatterIndentSize");
+        test_good_config("formatterProseWrap");
+        test_good_config("outputPath");
+        test_good_config("semanticTokens");
+        test_good_config("delegateFsRequests");
+        test_good_config("supportHtmlInMarkdown");
+        test_good_config("supportExtendedCodeAction");
+        test_good_config("development");
+        test_good_config("systemFonts");
 
-        good_config(&mut config, &update);
-    }
+        test_good_config("completion");
+        test_good_config("completion.triggerSuggest");
+        test_good_config("completion.triggerParameterHints");
+        test_good_config("completion.triggerSuggestAndParameterHints");
+        test_good_config("completion.triggerOnSnippetPlaceholders");
+        test_good_config("completion.symbol");
+        test_good_config("completion.postfix");
+        test_good_config("completion.postfixUfcs");
+        test_good_config("completion.postfixUfcsLeft");
+        test_good_config("completion.postfixUfcsRight");
+        test_good_config("completion.postfixSnippets");
 
-    #[test]
-    fn test_null_extra_args() {
-        let mut config = Config::default();
-        let update = json!({
-            "typstExtraArgs": null
-        });
+        test_good_config("lint");
+        test_good_config("lint.enabled");
+        test_good_config("lint.when");
 
-        good_config(&mut config, &update);
+        test_good_config("preview");
+        test_good_config("preview.browsing");
+        test_good_config("preview.browsing.args");
+        test_good_config("preview.background");
+        test_good_config("preview.background.enabled");
+        test_good_config("preview.background.args");
+        test_good_config("preview.refresh");
+        test_good_config("preview.partialRendering");
+        let c = test_good_config("preview.invertColors");
+        assert_eq!(
+            c.preview.invert_colors,
+            PreviewInvertColors::Enum(PreviewInvertColor::Never)
+        );
     }
 
     #[test]
