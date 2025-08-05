@@ -70,17 +70,17 @@ type LspCompletion = CompletionItem;
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
     /// Whether to trigger completions on arguments (placeholders) of snippets.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_on_snippet_placeholders: bool,
     /// Whether supports trigger suggest completion, a.k.a. auto-completion.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_suggest: bool,
     /// Whether supports trigger parameter hint, a.k.a. signature help.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_parameter_hints: bool,
     /// Whether supports trigger the command combining suggest and parameter
     /// hints.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_suggest_and_parameter_hints: bool,
 
     /// The Way to complete symbols.
@@ -995,6 +995,15 @@ fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
 //     ctx.completions.push(compl);
 // }
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::slice_at;
@@ -1009,5 +1018,3 @@ mod tests {
         }
     }
 }
-
-// todo: doesn't complete parameter now, which is not good.
