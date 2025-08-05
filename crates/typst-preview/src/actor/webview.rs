@@ -85,7 +85,7 @@ where
         loop {
             tokio::select! {
                 Ok(msg) = self.mailbox.recv() => {
-                    log::trace!("WebviewActor: received message from mailbox: {:?}", msg);
+                    log::trace!("WebviewActor: received message from mailbox: {msg:?}");
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let msg = positions_req("jump", jump_info);
@@ -116,13 +116,13 @@ where
                     .await.log_error("WebViewActor");
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {
-                    log::trace!("WebviewActor: received message from websocket: {:?}", msg);
+                    log::trace!("WebviewActor: received message from websocket: {msg:?}");
                     let Ok(msg) = msg else {
                         log::info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
                     let WsMessage::Text(msg) = msg else {
-                        log::info!("WebviewActor: received non-text message from websocket: {:?}", msg);
+                        log::info!("WebviewActor: received non-text message from websocket: {msg:?}");
                         let _ = self.webview_websocket_conn.send(WsMessage::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
                         .await;
                         break;

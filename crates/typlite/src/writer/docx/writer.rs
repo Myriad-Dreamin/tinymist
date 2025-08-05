@@ -64,7 +64,7 @@ impl DocxWriter {
                 .image_processor
                 .process_image_data(docx, &img_data, alt_text.as_deref(), None))
         } else {
-            let placeholder = format!("[Image not found: {}]", url);
+            let placeholder = format!("[Image not found: {url}]");
             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
             Ok(docx.add_paragraph(para))
         }
@@ -103,7 +103,7 @@ impl DocxWriter {
                             }
                         } else {
                             // Image not found, show placeholder
-                            let placeholder = format!("[Image not found: {}]", url);
+                            let placeholder = format!("[Image not found: {url}]");
                             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
                             docx = docx.add_paragraph(para);
 
@@ -196,7 +196,7 @@ impl DocxWriter {
                 if let Ok(img_data) = fs::read(url.as_str()) {
                     run = self.image_processor.process_inline_image(run, &img_data)?;
                 } else {
-                    run = run.add_text(format!("[Image not found: {}]", url));
+                    run = run.add_text(format!("[Image not found: {url}]"));
                 }
             }
             Node::HtmlElement(element) => {
@@ -256,7 +256,7 @@ impl DocxWriter {
             }
             // Other inline element types
             _ => {
-                eprintln!("other inline element: {:?}", node);
+                eprintln!("other inline element: {node:?}");
             }
         }
 
@@ -465,7 +465,7 @@ impl DocxWriter {
                     .unwrap();
                 let data = base64::engine::general_purpose::STANDARD
                     .decode(&external_frame.svg)
-                    .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
+                    .map_err(|e| format!("Failed to decode SVG data: {e}"))?;
 
                 docx = self.image_processor.process_image_data(
                     docx,
@@ -690,7 +690,7 @@ impl DocxWriter {
         let mut buffer = Vec::new();
         docx_built
             .pack(&mut Cursor::new(&mut buffer))
-            .map_err(|e| format!("Failed to pack DOCX: {}", e))?;
+            .map_err(|e| format!("Failed to pack DOCX: {e}"))?;
 
         Ok(buffer)
     }

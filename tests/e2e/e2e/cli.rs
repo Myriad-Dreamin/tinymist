@@ -53,7 +53,7 @@ fn test_compile() {
         ");
 
         for i in 1..=4 {
-            let output = rel_out.join(format!("test{}.pdf", i));
+            let output = rel_out.join(format!("test{i}.pdf"));
             assert!(output.exists(), "output file should exist: {output:?}");
         }
 

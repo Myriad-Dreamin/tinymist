@@ -8,7 +8,7 @@
 # https://stackoverflow.com/a/64528456
 # https://depot.dev/blog/rust-dockerfile-best-practices
 
-ARG RUST_VERSION=1.85.1
+ARG RUST_VERSION=1.88.0
 
 FROM rust:${RUST_VERSION}-bookworm AS base
 RUN apt-get install -y git

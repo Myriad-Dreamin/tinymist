@@ -259,7 +259,7 @@ impl HtmlToAstParser {
             #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";"##;
 
         let import_prefix = if let Some(ref import_ctx) = self.feat.import_context {
-            format!("{}\n", import_ctx)
+            format!("{import_ctx}\n")
         } else {
             String::new()
         };
