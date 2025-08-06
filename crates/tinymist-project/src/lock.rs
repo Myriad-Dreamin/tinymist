@@ -343,7 +343,7 @@ impl LockFileUpdate {
                             let id_hi = id >> 12;
 
                             let hash_str =
-                                format!("{root_lo:03x}/{root_hi:013x}/{id_lo:03x}/{id_hi:016x}");
+                                format!("{root_lo:03x}/{root_hi:013x}/{id_lo:03x}/{id_hi:013x}");
 
                             let cache_dir = cache_dir.join("tinymist/projects").join(hash_str);
                             let _ = std::fs::create_dir_all(&cache_dir);
