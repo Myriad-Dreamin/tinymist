@@ -17,9 +17,14 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * (Fix) Always sending compiled interrupt to main thread in https://github.com/Myriad-Dreamin/tinymist/pull/2001
     * If such interrupt is not sent, the main thread will be stalled forever.
+* (Fix) Preventing `pending_reasons` (compilation) from cleaning up ocassionally in https://github.com/Myriad-Dreamin/tinymist/pull/2005
+    * Some `onSaved` signals are lost when the `pending_reasons` is cleaned up, which causes the issue of not exporting PDF after saving.
+* (Fix) Utilizing lsp's `onSave` to cover issue of unhandled fs changes from notify actor in https://github.com/Myriad-Dreamin/tinymist/pull/2006
+    * This fixes the issue of not exporting PDF if somebody saves the document frequently in a short time.
 
 ### Misc
 
+* small fix about translations by @sjfhsjfh in https://github.com/Myriad-Dreamin/tinymist/pull/1785
 * Made translation of pinning clearer by @rikhuijzer in https://github.com/Myriad-Dreamin/tinymist/pull/1997
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.20...v0.13.22
