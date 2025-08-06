@@ -9,6 +9,10 @@ main = "file:main.typ"
 root = "file:."
 system-fonts = true
 
+[[route]]
+id = "file:main.typ"
+priority = 256
+
 [[task]]
 document = "file:main.typ"
 id = "file:main.typ"

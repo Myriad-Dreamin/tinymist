@@ -14,6 +14,7 @@ local async_tests = require "plenary.async.tests"
 require('tinymist').setup {
   lsp = {
     init_options = {
+        projectResolution = 'lockDatabase',
         exportPdf = 'onType',
         outputPath = '/home/runner/test/$name',
         development = true,
@@ -60,6 +61,9 @@ async_tests.describe('Lockfile', function()
         vim.cmd.sleep('30m')
 
     end, 1)()
+
+    assert.is_not.same(nil, pdf_exported, 'PDF export should be triggered on type')
+    assert.is.same('onType', pdf_exported.when, 'Export is when = onType')
 
     assert.is.same(nil, vim.uv.fs_stat(pdf_sub_path), 'PDF file should not be created because of the lockfile')
     assert.is_not.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should be created after typing')
