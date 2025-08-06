@@ -365,26 +365,6 @@ impl ServerState {
 
         Ok(())
     }
-
-    #[cfg(feature = "preview")]
-    pub(crate) fn infer_pos(&self) -> LspResult<tinymist_preview::ControlPlaneMessage> {
-        use tinymist_preview::{ControlPlaneMessage, ResolveSourceLocRequest};
-
-        let focus_file = self.focusing.as_ref();
-        let focus_file = focus_file.ok_or_else(|| invalid_request("no focusing file"))?;
-
-        let focus_location = self.implicit_position.as_ref();
-        let focus_location =
-            focus_location.ok_or_else(|| invalid_request("no focusing location"))?;
-
-        Ok(ControlPlaneMessage::ResolveSourceLoc(
-            ResolveSourceLocRequest {
-                filepath: focus_file.as_ref().to_owned(),
-                line: focus_location.line,
-                character: focus_location.character,
-            },
-        ))
-    }
 }
 
 /// An event sent to the language server.

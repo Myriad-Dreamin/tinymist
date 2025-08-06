@@ -21,18 +21,15 @@ use sync_ls::{
     internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
     LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
-use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
-use tinymist::tool::testing::{coverage_main, test_main};
 use tinymist::world::TaskInputs;
 use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
-
-#[cfg(feature = "l10n")]
-use tinymist_l10n::{load_translations, set_translations};
 use typst::ecow::EcoString;
 
 use crate::args::*;
@@ -62,6 +59,7 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 /// The main entry point.
 fn main() -> Result<()> {
+    // The root allocator for heap memory profiling.
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -79,10 +77,11 @@ fn main() -> Result<()> {
 
     // Starts logging
     let _ = {
+        use log::LevelFilter::*;
+
         let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
         let is_test_no_verbose =
             matches!(&args.command, Some(Commands::Test(test)) if !test.verbose);
-        use log::LevelFilter::*;
         let base_no_info = is_transient_cmd || is_test_no_verbose;
         let base_level = if base_no_info { Warn } else { Info };
         let preview_level = if is_test_no_verbose { Warn } else { Debug };
@@ -99,31 +98,34 @@ fn main() -> Result<()> {
             .try_init()
     };
 
+    #[cfg(feature = "preview")]
+    use tinymist::tool::preview::preview_main;
+    use tinymist::tool::project::{compile_main, doc_main, generate_script_main, task_main};
+    use tinymist::tool::testing::{coverage_main, test_main};
     match args.command.unwrap_or_default() {
-        Commands::Completion(args) => completion(args),
-        Commands::Cov(args) => coverage_main(args),
-        Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
-        Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
-        Commands::GenerateScript(args) => generate_script_main(args),
-        Commands::Query(query_cmds) => query_main(query_cmds),
+        Commands::Probe => Ok(()),
+
+        Commands::Completion(args) => completion_main(args),
         Commands::Lsp(args) => lsp_main(args),
         Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
-        #[cfg(feature = "preview")]
-        Commands::Preview(args) => {
-            #[cfg(feature = "preview")]
-            use tinymist::tool::preview::preview_main;
+        Commands::Query(cmds) => query_main(cmds),
 
-            RUNTIMES.tokio_runtime.block_on(preview_main(args))
-        }
-        Commands::Doc(args) => project_main(args),
-        Commands::Task(args) => task_main(args),
-        Commands::Probe => Ok(()),
+        #[cfg(feature = "preview")]
+        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
+
+        Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
+        Commands::Doc(cmds) => doc_main(cmds),
+        Commands::GenerateScript(args) => generate_script_main(args),
+        Commands::Task(cmds) => task_main(cmds),
+
+        Commands::Cov(args) => coverage_main(args),
+        Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
     }
 }
 
 /// Generates completion script to stdout.
-pub fn completion(args: ShellCompletionArgs) -> Result<()> {
+pub fn completion_main(args: ShellCompletionArgs) -> Result<()> {
     let Some(shell) = args.shell.or_else(Shell::from_env) else {
         tinymist_std::bail!("could not infer shell");
     };
@@ -162,7 +164,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
     Ok(())
 }
 
-/// The main entry point for the language server.
+/// The main entry point for the debug adaptor.
 pub fn dap_main(args: DapArgs) -> Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
@@ -185,11 +187,11 @@ pub fn dap_main(args: DapArgs) -> Result<()> {
         .start(conn.receiver, is_replay)
     })?;
 
-    log::info!("language server did shut down");
+    log::info!("debug adaptor did shut down");
     Ok(())
 }
 
-/// The main entry point for the compiler.
+/// The main entry point for the language server with trace instrumentation.
 pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
     let inputs = args.compile.resolve_inputs();
     let mut input = PathBuf::from(match args.compile.input {

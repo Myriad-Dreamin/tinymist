@@ -117,7 +117,7 @@ impl ServerState {
         Ok(())
     }
 
-    /// Restarts a dedicate projects and returns corresponding instance id.
+    /// Restarts a dedicate project and returns corresponding instance id.
     pub fn restart_dedicate(
         &mut self,
         dedicate: &str,

@@ -364,7 +364,7 @@ fn shell_build_script(shell: Shell) -> Result<String> {
 }
 
 /// Project document commands' main
-pub fn project_main(args: DocCommands) -> Result<()> {
+pub fn doc_main(args: DocCommands) -> Result<()> {
     LockFile::update(Path::new("."), |state| {
         match args {
             DocCommands::New(args) => {
