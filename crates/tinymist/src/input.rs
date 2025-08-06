@@ -87,6 +87,13 @@ impl ServerState {
         self.update_sources(files)
     }
 
+    /// Saves a source file.
+    pub fn save_source(&mut self, path: ImmutPath) -> Result<()> {
+        self.project.interrupt(Interrupt::Save(path));
+
+        Ok(())
+    }
+
     /// Queries a source file that must be in memory.
     pub fn query_source<T>(
         &self,

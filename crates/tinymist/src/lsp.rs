@@ -113,7 +113,10 @@ impl ServerState {
         Ok(())
     }
 
-    pub(crate) fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
+    pub(crate) fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
+        let path = as_path_(params.text_document.uri).as_path().into();
+        self.save_source(path).map_err(invalid_params)?;
+
         Ok(())
     }
 }
