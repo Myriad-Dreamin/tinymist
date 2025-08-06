@@ -19,7 +19,7 @@
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
     "build:l10n": "yarn extract:l10n && node scripts/build-l10n.mjs",
-    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.22-rc2 .",
+    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.22 .",
     "build:web": "cd crates/tinymist-core && yarn build && cp pkg/tinymist_core_bg.wasm ../../editors/vscode/out/tinymist_core_bg.wasm",
     "extract:l10n": "yarn extract:l10n:ts && yarn extract:l10n:rs",
     "extract:l10n:ts": "cargo run --release --bin tinymist-l10n -- --kind ts --dir ./editors/vscode --output ./locales/tinymist-vscode-rt.toml",
