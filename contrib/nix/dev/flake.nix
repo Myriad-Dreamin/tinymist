@@ -6,91 +6,104 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    crane.url = "github:ipetkov/crane";
     rust-manifest = {
       url = "https://static.rust-lang.org/dist/channel-rust-1.88.0.toml";
       flake = false;
     };
   };
 
-  outputs = inputs @ { self, flake-parts, nixpkgs, fenix, rust-manifest, }:
+  outputs = inputs @ { self, flake-parts, nixpkgs, crane, fenix, rust-manifest, }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
     
-      perSystem = {config, lib, pkgs, system, ...}: 
+      perSystem = {self', config, lib, pkgs, system, ...}: 
       let
+        cargoToml = lib.importTOML ../../../Cargo.toml;
+        pname = "tinymist";
+        version = cargoToml.workspace.package.version;
         rust-toolchain = (fenix.packages.${system}.fromManifestFile rust-manifest).defaultToolchain;
-        tinymist = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
-          pname = "tinymist";
-          # Please update the corresponding vscode extension when updating
-          # this derivation.
-          version = "0.13.22-rc1";
+        # Crane-based Nix flake configuration.
+        # Based on https://github.com/ipetkov/crane/blob/master/examples/trunk-workspace/flake.nix
+        craneLib = (crane.mkLib pkgs).overrideToolchain rust-toolchain;
+        # Typst files to include in the derivation.
+        # Here we include Rust files, docs and tests.
+        src = lib.fileset.toSource {
+          root = ../../..;
+          fileset = lib.fileset.unions [
+            ../../../Cargo.toml
+            ../../../Cargo.lock
+            ../../../rust-toolchain.toml
+            ../../../crates
+            ../../../tests
+          ];
+        };
 
-          src = pkgs.lib.cleanSource ../../..;
+        # Typst derivation's args, used within crane's derivation generation
+        # functions.
+        commonCraneArgs = {
+          inherit src pname version;
 
-          useFetchCargoVendor = true;
-          cargoHash = "sha256-FRiN2xEI1JOXW4dFgCqvQ4aG1oAfQTPDFG0blkM35NQ=";
+          buildInputs = [
+          ] ++ (lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.darwin.apple_sdk.frameworks.CoreServices
+            pkgs.libiconv
+          ]);
 
           nativeBuildInputs = [
-            pkgs.installShellFiles
             pkgs.pkg-config
           ];
+        };
 
-          checkFlags = [
-            "--skip=e2e"
+        # Derivation with just the dependencies, so we don't have to keep
+        # re-building them.
+        cargoArtifacts = craneLib.buildDepsOnly commonCraneArgs;
 
-            # Require internet access
-            "--skip=docs::package::tests::cetz"
-            "--skip=docs::package::tests::fletcher"
-            "--skip=docs::package::tests::tidy"
-            "--skip=docs::package::tests::touying"
+        tinymist = craneLib.buildPackage (commonCraneArgs // {
+          inherit cargoArtifacts;
 
-            # Tests are flaky for unclear reasons since the 0.12.3 release
-            # Reported upstream: https://github.com/Myriad-Dreamin/tinymist/issues/868
-            "--skip=analysis::expr_tests::scope"
-            "--skip=analysis::post_type_check_tests::test"
-            "--skip=analysis::type_check_tests::test"
-            "--skip=completion::tests::test_pkgs"
-            "--skip=folding_range::tests::test"
-            "--skip=goto_definition::tests::test"
-            "--skip=hover::tests::test"
-            "--skip=inlay_hint::tests::smart"
-            "--skip=prepare_rename::tests::prepare"
-            "--skip=references::tests::test"
-            "--skip=rename::tests::test"
-            "--skip=semantic_tokens_full::tests::test"
+          nativeBuildInputs = commonCraneArgs.nativeBuildInputs ++ [
+            pkgs.installShellFiles
           ];
 
-          postInstall = lib.optionalString (pkgs.stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages) (
-            let
-              emulator = pkgs.stdenv.hostPlatform.emulator pkgs.buildPackages;
-            in
-            ''
-              installShellCompletion --cmd tinymist \
-                --bash <(${emulator} $out/bin/tinymist completion bash) \
-                --fish <(${emulator} $out/bin/tinymist completion fish) \
-                --zsh <(${emulator} $out/bin/tinymist completion zsh)
-            ''
-          );
+          # postInstall = ''
+          #   installManPage crates/typst-cli/artifacts/*.1
+          #   installShellCompletion \
+          #     crates/typst-cli/artifacts/typst.{bash,fish} \
+          #     --zsh crates/typst-cli/artifacts/_typst
+          # '';
 
-          nativeInstallCheckInputs = [
-            pkgs.versionCheckHook
-          ];
-          versionCheckProgramArg = "-V";
-          doInstallCheck = true;
+          # postInstall = lib.optionalString (pkgs.stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages) (
+          #   let
+          #     emulator = pkgs.stdenv.hostPlatform.emulator pkgs.buildPackages;
+          #   in
+          #   ''
+          #     installShellCompletion --cmd tinymist \
+          #       --bash <(${emulator} $out/bin/tinymist completion bash) \
+          #       --fish <(${emulator} $out/bin/tinymist completion fish) \
+          #       --zsh <(${emulator} $out/bin/tinymist completion zsh)
+          #   ''
+          # );
 
-          meta = {
-            description = "Tinymist is an integrated language service for Typst";
-            homepage = "https://github.com/Myriad-Dreamin/tinymist";
-            changelog = "https://github.com/Myriad-Dreamin/tinymist/blob/v${finalAttrs.version}/editors/vscode/CHANGELOG.md";
-            license = lib.licenses.asl20;
-            mainProgram = "tinymist";
-            maintainers = with lib.maintainers; [
-              GaetanLepage
-              lampros
-            ];
-          };
+          GEN_ARTIFACTS = "artifacts";
+          meta.mainProgram = "tinymist";
         });
+
       in {
+        formatter = pkgs.nixpkgs-fmt;
+
+        packages = {
+          default = tinymist;
+          tinymist-dev = self'.packages.default;
+        };
+
+        # overlayAttrs = builtins.removeAttrs self'.packages [ "default" ];
+
+        apps.default = {
+          type = "app";
+          program = lib.getExe tinymist;
+        };
+
         # export the project devshell as the default devshell
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
@@ -105,10 +118,9 @@
         };
         # Developing neovim integration requires a fresh tinymist binary
         devShells.neovim = pkgs.mkShell {
-          buildInputs = [
-            tinymist
-          ];
+          buildInputs = [ tinymist ];
           shellHook = ''
+            echo "binary installed."
             echo "Docs: docs/tinymist/nix.typ."
           '';
         };
