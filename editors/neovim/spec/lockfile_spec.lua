@@ -30,5 +30,38 @@ async_tests.describe('Lockfile', function()
   assert.is.empty(vim.lsp.get_clients { bufnr = 0, name = 'tinymist', _uninitialized = true })
 
   async_tests.it('pdf of main is created onType', function()
+    local pdf_path = '/home/runner/test/main.pdf'
+    local pdf_sub_path = '/home/runner/test/chapter1.pdf'
+    assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created before testing')
+    assert.is.same(nil, vim.uv.fs_stat(pdf_sub_path), 'PDF sub file should not be created before testing')
+
+    local pdf_exported = async.wrap(function(cb)
+      require('tinymist').subscribeDevEvent(
+        function(result)
+          if result.type == 'export' and result.needExport
+          then
+            cb(result) -- resolve the promise when the export event is received
+            return true -- unregister the callback after receiving the event
+          end
+        end)
+
+        -- defer 2000ms and resolve a nil
+        defer_swapped(2000, function()
+          cb(nil) -- resolve the promise after 2 seconds
+        end)
+
+        vim.cmd.edit(fixtures.project.some_nested_existing_file)
+        assert.is.same(1, #vim.lsp.get_clients { bufnr = 0, name = 'tinymist', _uninitialized = true })
+        --- append a text to current buffer
+        helpers.insert('This is a test export.\n')
+        vim.cmd.sleep('30m')
+        --- append a text to current buffer
+        helpers.insert('This is a test export.\n')
+        vim.cmd.sleep('30m')
+
+    end, 1)()
+
+    assert.is.same(nil, vim.uv.fs_stat(pdf_sub_path), 'PDF file should not be created because of the lockfile')
+    assert.is_not.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should be created after typing')
   end)
 end)
