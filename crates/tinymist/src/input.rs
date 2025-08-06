@@ -87,6 +87,22 @@ impl ServerState {
         self.update_sources(files)
     }
 
+    /// Saves a source file.
+    pub fn save_source(&mut self, path: ImmutPath) -> Result<()> {
+        // FIXME: this is a workaround for the issue of notify, which does not fully
+        // emit fs changes.
+        //
+        // The case to fix:
+        // When editing a file, the last compilation sync deps to notify actor (rev=N-1,
+        // actual state=S). At the time, the next fs change comes, and notifier actor
+        // reads the change (notify state=S'). Next, another fs change comes (rev=N,
+        // actual state=S'). However, since the notifier actor read the state
+        // earlier (notify state=S'), the actor will not emit a change at rev N, bang...
+        self.project.interrupt(Interrupt::Save(path));
+
+        Ok(())
+    }
+
     /// Queries a source file that must be in memory.
     pub fn query_source<T>(
         &self,

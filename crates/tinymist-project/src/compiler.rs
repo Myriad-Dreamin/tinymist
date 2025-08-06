@@ -243,6 +243,8 @@ pub enum Interrupt<F: CompilerFeat> {
     Memory(MemoryEvent),
     /// File system event.
     Fs(FilesystemEvent),
+    /// Save a file.
+    Save(ImmutPath),
 }
 
 impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
@@ -258,6 +260,7 @@ impl<F: CompilerFeat> fmt::Debug for Interrupt<F> {
             Interrupt::CreationTimestamp(ts) => write!(f, "CreationTimestamp({ts:?})"),
             Interrupt::Memory(..) => write!(f, "Memory(..)"),
             Interrupt::Fs(..) => write!(f, "Fs(..)"),
+            Interrupt::Save(path) => write!(f, "Save({path:?})"),
         }
     }
 }
@@ -624,6 +627,23 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 let err = self.dep_tx.send(event);
                 log_send_error("dep_tx", err);
             }
+            Interrupt::Save(event) => {
+                let changes = std::iter::repeat_n(&event, 1 + self.dedicates.len());
+                let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
+
+                for (proj, saved_path) in proj.zip(changes) {
+                    log::debug!(
+                        "ProjectCompiler({}, rev={}): save changes",
+                        proj.verse.revision.get(),
+                        proj.id
+                    );
+
+                    // todo: only emit if saved_path is related
+                    let _ = saved_path;
+
+                    proj.reason.merge(reason_by_fs());
+                }
+            }
             Interrupt::Fs(event) => {
                 log::debug!("ProjectCompiler: fs event incoming {event:?}");
 
@@ -634,6 +654,12 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                 let proj = std::iter::once(&mut self.primary).chain(self.dedicates.iter_mut());
 
                 for (proj, changes) in proj.zip(changes) {
+                    log::debug!(
+                        "ProjectCompiler({}, rev={}): fs changes applying",
+                        proj.verse.revision.get(),
+                        proj.id
+                    );
+
                     proj.verse.increment_revision(|verse| {
                         let mut vfs = verse.vfs();
 
@@ -649,6 +675,12 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         }
                         vfs.notify_fs_changes(changes);
                     });
+
+                    log::debug!(
+                        "ProjectCompiler({},rev={}): fs changes applied, {is_sync}",
+                        proj.id,
+                        proj.verse.revision.get(),
+                    );
 
                     if !self.ignore_first_sync || !is_sync {
                         proj.reason.merge(reason_by_fs());
