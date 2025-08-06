@@ -97,7 +97,7 @@ impl ServerState {
         // actual state=S). At the time, the next fs change comes, and notifier actor
         // reads the change (notify state=S'). Next, another fs change comes (rev=N,
         // actual state=S'). However, since the notifier actor read the state
-        // earlier (notify state=S'), the actor will now emit a change at rev N, bang...
+        // earlier (notify state=S'), the actor will not emit a change at rev N, bang...
         self.project.interrupt(Interrupt::Save(path));
 
         Ok(())
