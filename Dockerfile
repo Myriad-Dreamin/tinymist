@@ -28,7 +28,7 @@ RUN cargo install cargo-chef
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo chef prepare --recipe-path recipe.json
+    cargo +${RUST_VERSION} chef prepare --recipe-path recipe.json
 
 FROM base as builder
 WORKDIR app
@@ -36,11 +36,11 @@ RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo chef cook --release --recipe-path recipe.json
+    cargo +${RUST_VERSION} chef cook --release --recipe-path recipe.json
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo build -p tinymist --release
+    cargo +${RUST_VERSION} build -p tinymist --release
 
 FROM debian:12
 WORKDIR /app/
