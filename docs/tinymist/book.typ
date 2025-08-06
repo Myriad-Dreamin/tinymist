@@ -32,6 +32,7 @@
     - #chapter("feature/preview.typ")[Document Preview]
     - #chapter("feature/testing.typ")[Testing]
     - #chapter("feature/linting.typ")[Linting]
+    - #chapter("feature/project.typ")[Project Model (Multiple-Files Projects)]
     - #chapter("feature/language.typ")[Other Features]
     = Service Overview
     #prefix-chapter("overview.typ")[Overview of Service]
