@@ -34,6 +34,31 @@ def run_tests(test_files=None):
     subprocess.run(command, check=True)
 
 
+def prepare():
+    bookdir = os.environ.get("BOOKDIR", "/home/runner/dev/workspaces/book")
+    if not os.path.exists(bookdir):
+        print(f"Book directory {bookdir} does not exist.")
+        sys.exit(1)
+
+    # compile
+    compile_command = [
+        "tinymist",
+        "compile",
+        "--lockfile",
+        os.path.join(bookdir, "tinymist.lock"),
+        os.path.join(bookdir, "main.typ"),
+        os.path.join(bookdir, "book.pdf"),
+    ]
+
+    try:
+        subprocess.run(compile_command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Compilation failed: {e}")
+        sys.exit(1)
+
+    print("Compilation completed successfully.")
+
+
 if __name__ == "__main__":
     # Check if any test files are provided as command line arguments
     if len(sys.argv) > 1:
@@ -41,4 +66,5 @@ if __name__ == "__main__":
     else:
         test_files = None
 
+    prepare()
     run_tests(test_files)

@@ -3,7 +3,10 @@
 
 FROM debian:12 AS builder
 
-RUN apt-get update && apt-get install -y \
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y \
     git \
     file \
     ninja-build gettext cmake unzip curl build-essential
@@ -17,9 +20,19 @@ FROM myriaddreamin/tinymist:0.13.22 as tinymist
 FROM debian:12
 
 COPY --from=builder /neovim/build/nvim-linux-x86_64.deb /tmp/nvim-linux-x86_64.deb
-RUN apt-get update && apt-get install -y curl git ripgrep build-essential unzip
-RUN apt-get update && apt-get install -y python3
-RUN apt-get install -y /tmp/nvim-linux-x86_64.deb \
+
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y curl git ripgrep build-essential unzip
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y python3
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get install -y /tmp/nvim-linux-x86_64.deb \
     && rm /tmp/nvim-linux-x86_64.deb
 
 RUN useradd --create-home --shell /bin/bash runner

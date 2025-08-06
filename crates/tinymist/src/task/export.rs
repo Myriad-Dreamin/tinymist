@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 
 use reflexo::ImmutPath;
 use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
-use tinymist_project::LspWorld;
+use tinymist_project::{LspWorld, PROJECT_ROUTE_USER_ACTION_PRIORITY};
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
@@ -196,7 +196,9 @@ impl ExportTask {
         static EXPORT_ID: AtomicUsize = AtomicUsize::new(0);
         let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-        log::debug!("ExportTask({export_id}): exporting {entry:?} to {write_to:?}");
+        log::debug!(
+            "ExportTask({export_id},lock={lock_dir:?}): exporting {entry:?} to {write_to:?}"
+        );
         if let Some(e) = write_to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
@@ -204,15 +206,18 @@ impl ExportTask {
         }
 
         let _: Option<()> = lock_dir.and_then(|lock_dir| {
-            let mut updater = crate::project::update_lock(lock_dir);
+            let mut updater = crate::project::update_lock(lock_dir.clone());
+            let root = graph.world().entry_state().root()?;
 
-            let doc_id = updater.compiled(graph.world())?;
+            let doc_id = updater.compiled(graph.world(), (&root, &lock_dir))?;
 
             updater.task(ApplyProjectTask {
                 id: doc_id.clone(),
-                document: doc_id,
+                document: doc_id.clone(),
                 task: task.clone(),
             });
+            updater.update_materials(doc_id.clone(), graph.world().depended_fs_paths());
+            updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
             updater.commit();
 
             Some(())

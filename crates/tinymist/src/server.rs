@@ -454,9 +454,11 @@ impl ServerState {
 
         let update_dep = lock_dir.clone().map(|lock_dir| {
             |snap: LspComputeGraph| async move {
-                let mut updater = update_lock(lock_dir);
+                let mut updater = update_lock(lock_dir.clone());
                 let world = snap.world();
-                let doc_id = updater.compiled(world)?;
+                // todo: rootless.
+                let root_dir = world.entry_state().root()?;
+                let doc_id = updater.compiled(world, (&root_dir, &lock_dir))?;
 
                 updater.update_materials(doc_id.clone(), world.depended_fs_paths());
                 updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);

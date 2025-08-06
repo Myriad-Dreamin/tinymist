@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, LazyHash};
+use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, EntryReader, LazyHash};
 use rpds::RedBlackTreeMapSync;
 use tinymist_std::{hash::FxHashMap, ImmutPath};
 use typst::diag::EcoString;
@@ -12,6 +12,7 @@ pub struct ProjectRouteState {
     path_routes: FxHashMap<ImmutPath, RoutePathState>,
 }
 
+#[derive(Debug)]
 pub struct ProjectResolution {
     pub lock_dir: ImmutPath,
     pub project_id: Id,
@@ -95,8 +96,10 @@ impl ProjectRouteState {
         snap: &LspCompileSnapshot,
     ) -> Option<()> {
         let path_route = self.path_routes.get_mut(&lock_dir)?;
+        // todo: rootless
+        let root = snap.world.entry_state().root()?;
 
-        let id = Id::from_world(&snap.world)?;
+        let id = Id::from_world(&snap.world, (&root, &lock_dir))?;
         let deps = snap.world.depended_fs_paths();
         let material = ProjectPathMaterial::from_deps(id, deps);
 
@@ -121,7 +124,7 @@ impl ProjectRouteState {
                 return None;
             }
         });
-        log::info!("loaded lock at {path:?}");
+        log::debug!("loaded lock at {path:?}");
 
         let root: EcoString = unix_slash(path).into();
         let root_hash = tinymist_std::hash::hash128(&root);
@@ -151,7 +154,7 @@ impl ProjectRouteState {
     }
 
     fn read_material(&self, entry_path: &Path) -> Option<ProjectPathMaterial> {
-        log::info!("check material at {entry_path:?}");
+        log::debug!("check material at {entry_path:?}");
         let name = entry_path.file_name().unwrap_or(entry_path.as_os_str());
         if name != "path-material.json" {
             return None;
@@ -192,4 +195,38 @@ struct RoutePathState {
     materials: LazyHash<rpds::RedBlackTreeMapSync<Id, ProjectPathMaterial>>,
     routes: Arc<FxHashMap<ImmutPath, Id>>,
     cache_dir: Option<ImmutPath>,
+}
+
+#[cfg(test)]
+mod tests {
+    use reflexo::path::PathClean;
+
+    use super::*;
+
+    // todo: enable me
+    #[test]
+    #[ignore]
+    fn test_resolve_chapter() {
+        let mut state = ProjectRouteState::default();
+
+        let lock_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/workspaces/book/");
+        let lock_dir = lock_dir.clean();
+
+        let leaf = lock_dir.join("chapters/chapter1.typ").into();
+
+        // Resolve the path
+        let resolution = state.resolve(&leaf);
+        assert!(resolution.is_some(), "Resolution should not be None");
+        let resolution = resolution.unwrap();
+        assert_eq!(
+            resolution.lock_dir,
+            ImmutPath::from(lock_dir),
+            "Lock directory should match"
+        );
+        assert_eq!(
+            resolution.project_id,
+            Id::new("file:main.typ".to_owned()),
+            "Project ID should match"
+        );
+    }
 }

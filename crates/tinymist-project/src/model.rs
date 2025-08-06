@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ecow::EcoVec;
 use tinymist_std::error::prelude::*;
@@ -53,6 +53,9 @@ impl LockFileCompat {
 /// A lock file storing project information.
 #[derive(Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct LockFile {
+    /// The directory where stores the lock file.
+    #[serde(skip)]
+    pub lock_dir: Option<ImmutPath>,
     // The lock file version.
     // version: String,
     /// The project's document (input).
@@ -72,6 +75,9 @@ pub struct LockFile {
 pub struct ProjectInput {
     /// The project's ID.
     pub id: Id,
+    /// The cwd of the project when relative paths will be resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock_dir: Option<PathBuf>,
     /// The path to the root directory of the project.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ResourcePath>,
@@ -91,6 +97,19 @@ pub struct ProjectInput {
     /// The project's package cache path.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package_cache_path: Option<ResourcePath>,
+}
+
+impl ProjectInput {
+    /// Returns a new project input relative to the provided lock directory.
+    pub fn relative_to(&self, that: &Path) -> Self {
+        if let Some(lock_dir) = &self.lock_dir {
+            if lock_dir == that {
+                return self.clone();
+            }
+        }
+
+        todo!()
+    }
 }
 
 /// A project route specifier.
