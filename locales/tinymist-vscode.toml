@@ -86,7 +86,7 @@ zh = "将当前打开的文件导出为 PDF"
 zh-TW = "將當前打開的文件導出為 PDF"
 
 [extension.tinymist.command.tinymist.pinMainToCurrent]
-en = "Pin the Main file to the Opening Document"
+en = "Pin the Main File to the Currently Open Document"
 ar = "تثبيت الملف الرئيسي على المستند المفتوح"
 bg = "Фиксиране на основния файл към отворения документ"
 ca = "Fixar el fitxer principal al document obert"
