@@ -37,36 +37,37 @@ pub struct DocNewArgs {
 
 impl DocNewArgs {
     /// Converts to project input.
-    pub fn to_input(&self) -> ProjectInput {
-        let id: Id = (&self.id).into();
+    pub fn to_input(&self, ctx: CtxPath) -> ProjectInput {
+        let id: Id = self.id.id(ctx);
 
         let root = self
             .root
             .as_ref()
-            .map(|root| ResourcePath::from_user_sys(Path::new(root)));
-        let main = ResourcePath::from_user_sys(Path::new(&self.id.input));
+            .map(|root| ResourcePath::from_user_sys(Path::new(root), ctx));
+        let main = ResourcePath::from_user_sys(Path::new(&self.id.input), ctx);
 
         let font_paths = self
             .font
             .font_paths
             .iter()
-            .map(|p| ResourcePath::from_user_sys(p))
+            .map(|p| ResourcePath::from_user_sys(p, ctx))
             .collect::<Vec<_>>();
 
         let package_path = self
             .package
             .package_path
             .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
 
         let package_cache_path = self
             .package
             .package_cache_path
             .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
 
         ProjectInput {
             id: id.clone(),
+            lock_dir: Some(ctx.1.to_path_buf()),
             root,
             main,
             // todo: inputs
@@ -92,12 +93,13 @@ pub struct DocIdArgs {
     pub input: String,
 }
 
-impl From<&DocIdArgs> for Id {
-    fn from(args: &DocIdArgs) -> Self {
-        if let Some(id) = &args.name {
+impl DocIdArgs {
+    /// Converts to a document ID.
+    pub fn id(&self, ctx: CtxPath) -> Id {
+        if let Some(id) = &self.name {
             Id::new(id.clone())
         } else {
-            (&ResourcePath::from_user_sys(Path::new(&args.input))).into()
+            (&ResourcePath::from_user_sys(Path::new(&self.input), ctx)).into()
         }
     }
 }
@@ -172,7 +174,7 @@ pub struct TaskCompileArgs {
 
 impl TaskCompileArgs {
     /// Convert the arguments to a project task.
-    pub fn to_task(self, doc_id: Id) -> Result<ApplyProjectTask> {
+    pub fn to_task(self, doc_id: Id, cwd: &Path) -> Result<ApplyProjectTask> {
         let new_task_id = self.task_name.map(Id::new);
         let task_id = new_task_id.unwrap_or(doc_id.clone());
 
@@ -195,6 +197,17 @@ impl TaskCompileArgs {
             OutputFormat::Pdf
         };
 
+        let output = self.output.as_ref().map(|output| {
+            let output = Path::new(output);
+            let output = if output.is_absolute() {
+                output.to_path_buf()
+            } else {
+                cwd.join(output)
+            };
+
+            PathPattern::new(&output.with_extension("").to_string_lossy())
+        });
+
         let when = self.when.unwrap_or(TaskWhen::Never);
 
         let mut transforms = vec![];
@@ -207,7 +220,7 @@ impl TaskCompileArgs {
 
         let export = ExportTask {
             when,
-            output: self.output.as_deref().map(PathPattern::new),
+            output,
             transform: transforms,
         };
 

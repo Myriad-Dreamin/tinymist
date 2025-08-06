@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, LazyHash};
+use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, EntryReader, LazyHash};
 use rpds::RedBlackTreeMapSync;
 use tinymist_std::{hash::FxHashMap, ImmutPath};
 use typst::diag::EcoString;
@@ -95,8 +95,10 @@ impl ProjectRouteState {
         snap: &LspCompileSnapshot,
     ) -> Option<()> {
         let path_route = self.path_routes.get_mut(&lock_dir)?;
+        // todo: rootless
+        let root = snap.world.entry_state().root()?;
 
-        let id = Id::from_world(&snap.world)?;
+        let id = Id::from_world(&snap.world, (&root, &lock_dir))?;
         let deps = snap.world.depended_fs_paths();
         let material = ProjectPathMaterial::from_deps(id, deps);
 

@@ -8,6 +8,7 @@ use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::*;
 use tinymist_std::path::unix_slash;
 use tinymist_std::{bail, ImmutPath};
+use tinymist_task::CtxPath;
 use typst::diag::EcoString;
 use typst::World;
 
@@ -25,7 +26,9 @@ impl LockFile {
         self.task.iter().find(|i| &i.id == id)
     }
 
-    pub fn replace_document(&mut self, input: ProjectInput) {
+    pub fn replace_document(&mut self, mut input: ProjectInput) {
+        input.lock_dir = None;
+        let input = input;
         let id = input.id.clone();
         let index = self.document.iter().position(|i| i.id == id);
         if let Some(index) = index {
@@ -35,7 +38,14 @@ impl LockFile {
         }
     }
 
-    pub fn replace_task(&mut self, task: ApplyProjectTask) {
+    pub fn replace_task(&mut self, mut task: ApplyProjectTask) {
+        if let Some(pat) = task.task.as_export_mut().and_then(|t| t.output.as_mut()) {
+            let rel = pat.clone().relative_to(self.lock_dir.as_ref().unwrap());
+            *pat = rel;
+        }
+
+        let task = task;
+
         let id = task.id().clone();
         let index = self.task.iter().position(|i| *i.id() == id);
         if let Some(index) = index {
@@ -146,6 +156,8 @@ impl LockFile {
 
         let mut state = if old_data.trim().is_empty() {
             LockFile {
+                // todo: reduce cost
+                lock_dir: Some(ImmutPath::from(cwd)),
                 document: vec![],
                 task: vec![],
                 route: eco_vec![],
@@ -169,7 +181,9 @@ impl LockFile {
                 }
             }
 
-            old_state.migrate()?
+            let mut lf = old_state.migrate()?;
+            lf.lock_dir = Some(ImmutPath::from(cwd));
+            lf
         };
 
         f(&mut state)?;
@@ -213,7 +227,9 @@ impl LockFile {
         let state = toml::from_str::<LockFileCompat>(data)
             .context_ut("tinymist.lock file is not a valid TOML file")?;
 
-        state.migrate()
+        let mut lf = state.migrate()?;
+        lf.lock_dir = Some(dir.into());
+        Ok(lf)
     }
 }
 
@@ -238,17 +254,18 @@ pub struct LockFileUpdate {
 }
 
 impl LockFileUpdate {
-    pub fn compiled(&mut self, world: &LspWorld) -> Option<Id> {
-        let id = Id::from_world(world)?;
+    pub fn compiled(&mut self, world: &LspWorld, ctx: CtxPath) -> Option<Id> {
+        let id = Id::from_world(world, ctx)?;
 
-        let root = ResourcePath::from_user_sys(Path::new("."));
-        let main = ResourcePath::from_user_sys(world.path_for_id(world.main()).ok()?.as_path());
+        let root = ResourcePath::from_user_sys(Path::new("."), ctx);
+        let main =
+            ResourcePath::from_user_sys(world.path_for_id(world.main()).ok()?.as_path(), ctx);
 
         let font_resolver = &world.font_resolver;
         let font_paths = font_resolver
             .font_paths()
             .iter()
-            .map(|p| ResourcePath::from_user_sys(p))
+            .map(|p| ResourcePath::from_user_sys(p, ctx))
             .collect::<Vec<_>>();
 
         // let system_font = font_resolver.system_font();
@@ -256,10 +273,10 @@ impl LockFileUpdate {
         let registry = &world.registry;
         let package_path = registry
             .package_path()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
         let package_cache_path = registry
             .package_cache_path()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
 
         // todo: freeze the package paths
         let _ = package_cache_path;
@@ -269,6 +286,7 @@ impl LockFileUpdate {
 
         let input = ProjectInput {
             id: id.clone(),
+            lock_dir: Some(ctx.1.to_path_buf()),
             root: Some(root),
             main,
             inputs: vec![],

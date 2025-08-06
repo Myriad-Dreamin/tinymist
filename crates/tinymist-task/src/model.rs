@@ -116,6 +116,22 @@ impl ProjectTask {
         })
     }
 
+    /// Returns the export configuration of a task.
+    pub fn as_export_mut(&mut self) -> Option<&mut ExportTask> {
+        Some(match self {
+            Self::Preview(..) => return None,
+            Self::ExportPdf(task) => &mut task.export,
+            Self::ExportPng(task) => &mut task.export,
+            Self::ExportSvg(task) => &mut task.export,
+            Self::ExportHtml(task) => &mut task.export,
+            Self::ExportSvgHtml(task) => &mut task.export,
+            Self::ExportTeX(task) => &mut task.export,
+            Self::ExportMd(task) => &mut task.export,
+            Self::ExportText(task) => &mut task.export,
+            Self::Query(task) => &mut task.export,
+        })
+    }
+
     /// Returns extension of the artifact.
     pub fn extension(&self) -> &str {
         match self {

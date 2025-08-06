@@ -204,9 +204,10 @@ impl ExportTask {
         }
 
         let _: Option<()> = lock_dir.and_then(|lock_dir| {
-            let mut updater = crate::project::update_lock(lock_dir);
+            let mut updater = crate::project::update_lock(lock_dir.clone());
+            let root = graph.world().entry_state().root()?;
 
-            let doc_id = updater.compiled(graph.world())?;
+            let doc_id = updater.compiled(graph.world(), (&root, &lock_dir))?;
 
             updater.task(ApplyProjectTask {
                 id: doc_id.clone(),

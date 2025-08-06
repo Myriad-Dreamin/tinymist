@@ -77,11 +77,12 @@ impl Id {
     }
 
     /// Creates a new project Id from a world.
-    pub fn from_world<F: CompilerFeat>(world: &CompilerWorld<F>) -> Option<Self> {
+    pub fn from_world<F: CompilerFeat>(world: &CompilerWorld<F>, ctx: CtxPath) -> Option<Self> {
         let entry = world.entry_state();
         let id = unix_slash(entry.main()?.vpath().as_rootless_path());
 
-        let path = &ResourcePath::from_user_sys(Path::new(&id));
+        // todo: entry root may not be set, so we should use the cwd
+        let path = &ResourcePath::from_user_sys(Path::new(&id), ctx);
         Some(path.into())
     }
 }
@@ -119,6 +120,25 @@ impl PathPattern {
     /// Creates a new path pattern.
     pub fn new(pattern: &str) -> Self {
         Self(pattern.into())
+    }
+
+    /// Creates a new path pattern from a string.
+    pub fn relative_to(self, base: &Path) -> Self {
+        if self.0.is_empty() {
+            return self;
+        }
+
+        let path = Path::new(self.0.as_str());
+        if path.is_absolute() {
+            let rel_path = tinymist_std::path::diff(path, base);
+
+            match rel_path {
+                Some(rel) => PathPattern(unix_slash(&rel).into()),
+                None => self,
+            }
+        } else {
+            self
+        }
     }
 
     /// Substitutes the path pattern with `$root`, and `$dir/$name`.
@@ -300,18 +320,29 @@ impl<'de> serde::Deserialize<'de> for ResourcePath {
     }
 }
 
+// todo: The ctx path looks not quite maintainable. But we only target to make
+// things correct, then back to make code good.
+pub type CtxPath<'a, 'b> = (/* cwd */ &'a Path, /* lock_dir */ &'b Path);
+
 impl ResourcePath {
     /// Creates a new resource path from a user passing system path.
-    pub fn from_user_sys(inp: &Path) -> Self {
-        let rel = if inp.is_relative() {
+    pub fn from_user_sys(inp: &Path, (cwd, lock_dir): CtxPath) -> Self {
+        let abs = if inp.is_absolute() {
             inp.to_path_buf()
         } else {
-            let cwd = std::env::current_dir().unwrap();
-            tinymist_std::path::diff(inp, &cwd).unwrap()
+            cwd.join(inp)
         };
-        let rel = unix_slash(&rel);
+        let resource_path = if let Some(rel) = tinymist_std::path::diff(&abs, lock_dir) {
+            rel
+        } else {
+            abs
+        };
+        // todo: clean is not posix compatible,
+        // for example /symlink/../file is not equivalent to /file
+        let rel = unix_slash(&resource_path.clean());
         ResourcePath("file".into(), rel.to_string())
     }
+
     /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
         let package = id.package();
@@ -324,6 +355,20 @@ impl ResourcePath {
                 "file_id".into(),
                 format!("$root{}", unix_slash(id.vpath().as_rooted_path())),
             ),
+        }
+    }
+
+    pub fn relative_to(&self, base: &Path) -> Option<Self> {
+        if self.0 == "file" {
+            let path = Path::new(&self.1);
+            if path.is_absolute() {
+                let rel_path = tinymist_std::path::diff(path, base)?;
+                Some(ResourcePath(self.0.clone(), unix_slash(&rel_path)))
+            } else {
+                Some(ResourcePath(self.0.clone(), self.1.clone()))
+            }
+        } else {
+            Some(self.clone())
         }
     }
 

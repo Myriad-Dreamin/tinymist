@@ -111,22 +111,33 @@ impl LockFileExt for LockFile {
 
 /// Runs project compilation(s)
 pub async fn compile_main(args: CompileArgs) -> Result<()> {
-    // Identifies the input and output
-    let input = args.compile.declare.to_input();
-    let output = args.compile.to_task(input.id.clone())?;
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    // todo: respect the name of the lock file
 
     // Saves the lock file if the flags are set
     let save_lock = args.save_lock || args.lockfile.is_some();
-    // todo: respect the name of the lock file
+
     let lock_dir: ImmutPath = if let Some(lockfile) = args.lockfile {
-        lockfile.parent().context("no parent")?.into()
+        let lockfile = if lockfile.is_absolute() {
+            lockfile
+        } else {
+            cwd.join(lockfile)
+        };
+        lockfile
+            .parent()
+            .context("lock file must have a parent directory")?
+            .into()
     } else {
-        std::env::current_dir().context("lock directory")?.into()
+        cwd.as_path().into()
     };
+
+    // Identifies the input and output
+    let input = args.compile.declare.to_input((&cwd, &lock_dir));
+    let output = args.compile.to_task(input.id.clone(), &cwd)?;
 
     if save_lock {
         LockFile::update(&lock_dir, |state| {
-            state.replace_document(input.clone());
+            state.replace_document(input.relative_to(&lock_dir));
             state.replace_task(output.clone());
 
             Ok(())
@@ -365,13 +376,15 @@ fn shell_build_script(shell: Shell) -> Result<String> {
 
 /// Project document commands' main
 pub fn project_main(args: DocCommands) -> Result<()> {
-    LockFile::update(Path::new("."), |state| {
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let ctx: (&Path, &Path) = (&cwd, &cwd);
         match args {
             DocCommands::New(args) => {
-                state.replace_document(args.to_input());
+                state.replace_document(args.to_input(ctx));
             }
             DocCommands::Configure(args) => {
-                let id: Id = (&args.id).into();
+                let id: Id = args.id.id(ctx);
 
                 state.route.push(ProjectRoute {
                     id: id.clone(),
@@ -386,12 +399,14 @@ pub fn project_main(args: DocCommands) -> Result<()> {
 
 /// Project task commands' main
 pub fn task_main(args: TaskCommands) -> Result<()> {
-    LockFile::update(Path::new("."), |state| {
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let ctx: (&Path, &Path) = (&cwd, &cwd);
         let _ = state;
         match args {
             #[cfg(feature = "preview")]
             TaskCommands::Preview(args) => {
-                let input = args.declare.to_input();
+                let input = args.declare.to_input(ctx);
                 let id = input.id.clone();
                 state.replace_document(input);
                 let _ = state.preview(id, &args);
