@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:9409ded3fa346d873f6ab39516a53958");
+        insta::assert_snapshot!(hash, @"siphash128_13:7e4a9cdceda2bf7409ec907108d0f927");
     }
 
     {
@@ -33,7 +33,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:8d1a21c367978b11c464a58953f0a756");
+        insta::assert_snapshot!(hash, @"siphash128_13:b18199e96fd07287ead7caa2b33f777");
     }
 }
 
