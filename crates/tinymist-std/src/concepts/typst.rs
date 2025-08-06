@@ -108,5 +108,5 @@ pub use well_known::*;
 /// The prelude of the Typst module.
 pub mod prelude {
     pub use comemo::Prehashed;
-    pub use ecow::{eco_format, eco_vec, EcoString, EcoVec};
+    pub use ecow::{EcoString, EcoVec, eco_format, eco_vec};
 }

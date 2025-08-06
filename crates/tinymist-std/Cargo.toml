@@ -5,7 +5,7 @@ description = "Additional functions wrapping Rust's standard library."
 version = "0.13.16"
 authors.workspace = true
 license.workspace = true
-edition.workspace = true
+edition = "2024"
 homepage.workspace = true
 repository.workspace = true
 

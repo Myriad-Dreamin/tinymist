@@ -6,7 +6,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
 
-use ecow::{eco_format, EcoVec};
+use ecow::{EcoVec, eco_format};
 use tinymist_std::{ImmutBytes, ImmutPath};
 use typst::diag::{PackageError, PackageResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
