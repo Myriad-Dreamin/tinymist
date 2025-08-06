@@ -40,9 +40,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "099",
+    "sortText": "090",
     "textEdit": {
-     "newText": "int",
+     "newText": "int(${1:})",
      "range": {
       "end": {
        "character": 24,
