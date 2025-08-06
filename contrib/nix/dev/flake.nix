@@ -19,7 +19,10 @@
       perSystem = {config, lib, pkgs, system, ...}: 
       let
         rust-toolchain = (fenix.packages.${system}.fromManifestFile rust-manifest).defaultToolchain;
-        tinymist = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+        tinymist =  (pkgs.makeRustPlatform {
+            cargo = rust-toolchain;
+            rustc = rust-toolchain;
+          }).buildRustPackage (finalAttrs: {
           pname = "tinymist";
           # Please update the corresponding vscode extension when updating
           # this derivation.
@@ -28,7 +31,7 @@
           src = pkgs.lib.cleanSource ../../..;
 
           useFetchCargoVendor = true;
-          cargoHash = "sha256-FRiN2xEI1JOXW4dFgCqvQ4aG1oAfQTPDFG0blkM35NQ=";
+          cargoHash = "sha256-IyGYBbb8ilK+8fsFAm1N2A0Cw0qrbTqG20TgQs+1yaA=";
 
           nativeBuildInputs = [
             pkgs.installShellFiles
