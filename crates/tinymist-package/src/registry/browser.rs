@@ -3,8 +3,8 @@
 use std::{io::Read, path::Path};
 
 use js_sys::Uint8Array;
-use typst::diag::{eco_format, EcoString};
-use wasm_bindgen::{prelude::*, JsValue};
+use typst::diag::{EcoString, eco_format};
+use wasm_bindgen::{JsValue, prelude::*};
 
 use super::{PackageError, PackageRegistry, PackageSpec};
 

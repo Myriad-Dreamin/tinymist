@@ -4,14 +4,14 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
-use reqwest::blocking::Response;
 use reqwest::Certificate;
+use reqwest::blocking::Response;
 use tinymist_std::ImmutPath;
-use typst::diag::{eco_format, EcoString, PackageResult, StrResult};
+use typst::diag::{EcoString, PackageResult, StrResult, eco_format};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 
 use super::{
-    DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec, DEFAULT_REGISTRY,
+    DEFAULT_REGISTRY, DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec,
 };
 
 /// The http package registry for typst.ts.
@@ -289,7 +289,7 @@ impl PackageStorage {
             let reader = match resp.and_then(|r| r.error_for_status()) {
                 Ok(response) => response,
                 Err(err) if matches!(err.status().map(|s| s.as_u16()), Some(404)) => {
-                    return Err(PackageError::NotFound(spec.clone()))
+                    return Err(PackageError::NotFound(spec.clone()));
                 }
                 Err(err) => return Err(PackageError::NetworkFailed(Some(eco_format!("{err}")))),
             };
