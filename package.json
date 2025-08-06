@@ -33,6 +33,7 @@
     "lint-fix": "eslint editors/vscode/src --fix",
     "benches": "cargo bench --workspace",
     "bench": "cargo bench --workspace --bench",
+    "test:nvim": "cd editors/neovim && ./bootstrap.sh test",
     "test:grammar": "cd syntaxes/textmate && yarn run test",
     "build:typlite": "cargo build --bin typlite",
     "typlite": "target/debug/typlite",
