@@ -9,6 +9,22 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.22 - [2025-08-06]
+
+* Bumped MSRV to 1.88 in https://github.com/Myriad-Dreamin/tinymist/pull/1993
+
+### Server
+
+* (Fix) Always sending compiled interrupt to main thread in https://github.com/Myriad-Dreamin/tinymist/pull/2001
+    * If such interrupt is not sent, the main thread will be stalled forever.
+
+### Misc
+
+* Made translation of pinning clearer by @rikhuijzer in https://github.com/Myriad-Dreamin/tinymist/pull/1997
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.20...v0.13.22
+
+
 ## v0.13.20 - [2025-08-05]
 
 * Bumped typstyle to v0.13.17 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/1979
@@ -28,7 +44,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Misc
 
-* feat: maintain workflows for nightly releases by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/1986
+* Maintained workflows for nightly releases by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/1986
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.18...v0.13.20
 
