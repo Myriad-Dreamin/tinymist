@@ -524,6 +524,11 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
         let instances_mut = std::iter::once(&mut c.primary).chain(c.dedicates.iter_mut());
         for s in instances_mut {
+            let reason = s.reason;
+            if !reason.any() {
+                continue;
+            }
+
             let id = &s.id;
 
             if let Some(compiling_since) = &s.ext.compiling_since {
@@ -539,7 +544,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
                     if since.as_secs() > 60 {
                         log::warn!(
-                        "Project: {id:?} is compiling for more than 60 seconds, since: {since:?}, \
+                        "Project({id:?}): compiling for more than 60 seconds, since: {since:?}, \
                      pending reasons: {:?}",
                         s.ext.pending_reasons
                     );
@@ -548,8 +553,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
                 continue;
             }
-
-            let reason = s.reason;
 
             const VFS_SUB: CompileSignal = CompileSignal {
                 by_mem_events: true,
