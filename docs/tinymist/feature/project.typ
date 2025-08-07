@@ -12,18 +12,22 @@ This setting controls how Tinymist resolves projects:
   Treats each Typst file as an independent document (similar to Markdown workflows). No lock files or project caches are generated, which is suitable for most people who work with single Typst files or small projects.
 
 - *`lockDatabase`*:
-  Mimics Rust's project management by tracking compilation/preview history. Stores data in lock files and cache directories, enabling automatic main file selection based on historical context.
+  Mimics Rust's project management by tracking compilation/preview history. Stores data in lock files (`tinymist.lock`) and cache directories, enabling automatic main file selection based on historical context.
 
 = The Challenge to Handle Multiple-File Projects
 
 When working with multiple-file projects, Tinymist faces the challenge of determining which file to use as the main file for compilation and preview. This is because:
-+ All project files (entries, includes, imports) share `.typ` extensions
-+ No inherent distinction exists between entry files and dependencies
-+ Automatic detection is ambiguous without context
++ All project files (entries, includes, imports) share `.typ` extensions.
++ No inherent distinction exists between entry files and dependencies.
++ Automatic detection is ambiguous without context.
 
 This resembles the situation in C++, where the language server also struggles to determine the header files and source files in a project. In C++, the language servers and IDEs relies on the `compile_commands.json` file to understand the compilation context.
 
 Inspired by C++ and Rust, we introduced the `lockDatabase` resolution method to relieve pain of handling multiple-file projects.
+
+= Stability Notice: `tinymist.lock`
+
+We have been aware of backward compatibility issues, but any change of the schema of `tinymist.lock` may corrupt the `tinymist.lock` intentionally or unintentionally. The schema is unstable and in beta stage. You have to remove the `tinymist.lock` file to recovery from errors, and you could open an issue to discuss with us. To reliably keep compilation commands, please put `tinymist compile` commands in build system such as `Makefile` or `justfile`.
 
 = A Sample Usage of `lockDatabase`
 
@@ -78,7 +82,3 @@ The language server will load and compile route pairs and perform entry lookup b
 *Storage in memory*:
 - The language server also maintains a compilation history and project routes in memory.
 - We may enable in-memory compilation history by default in the future, which will allow Tinymist to resolve projects smarter.
-
-= Stability Notice: `tinymist.lock`
-
-We have been aware of backward compatibility issues, but the break change of the schema of `tinymist.lock` may corrupt the `tinymist.lock`. The schema is unstable and in beta stage. You have to remove the `tinymist.lock` file to recovery from errors, and optionally open an issue to discuss with us. To reliably keep compilation commands, please put `tinymist compile` commands in build system such as `Makefile` or `justfile`.
