@@ -41,6 +41,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.22...v0.13.24
 
+## v0.13.23-rc1 - [2025-08-07]
+
+Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 1b60510](https://github.com/ParaN3xus/typst/commit/1b60510e039148299d355fd5a0dd2e649f557fb0), a.k.a. [typst/typst Include numbering in PDF bookmark (#6622)](https://github.com/typst/typst/commit/3455ac7dd2f5c3cb8785692d45eac8dd4110ce79).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.22...v0.13.23-rc1
+
 ## v0.13.22 - [2025-08-06]
 
 * Bumped MSRV to 1.88 in https://github.com/Myriad-Dreamin/tinymist/pull/1993
