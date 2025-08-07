@@ -35,7 +35,7 @@ impl ProjectRouteState {
     }
 
     fn resolve_at(&mut self, lock_dir: &Path, leaf: &Path) -> Option<ProjectResolution> {
-        log::debug!("resolve: {leaf:?} at {lock_dir:?}");
+        log::info!("resolve: {leaf:?} at {lock_dir:?}");
         let (lock_dir, project_id) = match self.path_routes.get_key_value(lock_dir) {
             Some((key, path_route)) => (key.clone(), path_route.routes.get(leaf)?.clone()),
             None => {
@@ -62,7 +62,7 @@ impl ProjectRouteState {
                 new_route.routes = calculate_routes(new_route.lock.route.clone(), &materials);
                 new_route.materials = materials;
 
-                log::debug!("loaded routes at {lock_dir:?}, {:?}", new_route.routes);
+                log::info!("loaded routes at {lock_dir:?}, {:?}", new_route.routes);
                 let project_id = new_route.routes.get(leaf)?.clone();
 
                 self.path_routes.insert(lock_dir.clone(), new_route);
@@ -120,11 +120,11 @@ impl ProjectRouteState {
         let lock_data = Arc::new(match LockFile::read(path) {
             Ok(lock) => lock,
             Err(e) => {
-                log::debug!("failed to load lock at {path:?}: {e:?}");
+                log::info!("failed to load lock at {path:?}: {e:?}");
                 return None;
             }
         });
-        log::debug!("loaded lock at {path:?}");
+        log::info!("loaded lock at {path:?}");
 
         let root: EcoString = unix_slash(path).into();
         let root_hash = tinymist_std::hash::hash128(&root);
@@ -154,7 +154,7 @@ impl ProjectRouteState {
     }
 
     fn read_material(&self, entry_path: &Path) -> Option<ProjectPathMaterial> {
-        log::debug!("check material at {entry_path:?}");
+        log::info!("check material at {entry_path:?}");
         let name = entry_path.file_name().unwrap_or(entry_path.as_os_str());
         if name != "path-material.json" {
             return None;
