@@ -8,11 +8,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## Unreleased
 
-## v0.13.19-rc1 - [2025-08-05]
+## v0.13.19 - [2025-08-07]
 
 Nightly Release at [fix: use proper commit hash when generating nightly release changelog (#1965)](https://github.com/Myriad-Dreamin/tinymist/commit/2ecdbd42a5d2563caa9a833b96a748c181189567), using [ParaN3xus/typst rev 6a81e78](https://github.com/ParaN3xus/typst/commit/6a81e781b9e19fcec4a02a1d18d68d7dd1474444), a.k.a. [typst/typst Allow custom element names in HTML tag syntax  (#6676)](https://github.com/typst/typst/commit/b825df6bbc81856b979848361c4f11ce5ed61810).
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.17...v0.13.19-rc1
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.17...v0.13.19
 
 ## v0.13.17 - [2025-08-03]
 
