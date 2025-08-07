@@ -184,7 +184,7 @@ jobs:
         
         cargo update
         git add -A
-        git commit -m "build: bump world crates to $new_version"
+        git commit -m "build: bump world crates to $new_version" || true
         git push origin nightly
         
         world_commit=$(git rev-parse HEAD)
@@ -219,7 +219,7 @@ jobs:
         
         cargo update
         git add -A
-        git commit -m "build: update tinymist and typst"
+        git commit -m "build: update tinymist and typst" || true
         git push origin nightly
         
         reflexo_commit=$(git rev-parse HEAD)
@@ -250,7 +250,7 @@ jobs:
         
         cargo update
         git add -A
-        git commit -m "build: update tinymist to ${new_version}"
+        git commit -m "build: update tinymist to ${new_version}" || true
         git push origin nightly
         
         typstyle_commit=$(git rev-parse HEAD)
