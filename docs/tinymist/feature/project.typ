@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [Project Model])
 
-This section documents experimental project management features. Implementation may change in future releases.
+This section documents the experimental project management feature. Implementation may change in future releases.
 
 = The Core Configuration: `tinymist.projectResolution`
 
@@ -12,30 +12,46 @@ This setting controls how Tinymist resolves projects:
   Treats each Typst file as an independent document (similar to Markdown workflows). No lock files or project caches are generated, which is suitable for most people who work with single Typst files or small projects.
 
 - *`lockDatabase`*:
-  Mimics Rust's project management by tracking compilation/preview history. Stores data in lock files and cache directories, enabling automatic main file selection based on historical context.
+  Mimics Rust's project management by tracking compilation/preview history. Stores data in lock files (`tinymist.lock`) and cache directories, enabling automatic main file selection based on historical context.
 
 = The Challenge to Handle Multiple-File Projects
 
 When working with multiple-file projects, Tinymist faces the challenge of determining which file to use as the main file for compilation and preview. This is because:
-+ All project files (entries, includes, imports) share `.typ` extensions
-+ No inherent distinction exists between entry files and dependencies
-+ Automatic detection is ambiguous without context
++ All project files (entries, includes, imports) share `.typ` extensions.
++ No inherent distinction exists between entry files and dependencies.
++ Automatic detection is ambiguous without context.
 
 This resembles the situation in C++, where the language server also struggles to determine the header files and source files in a project. In C++, the language servers and IDEs relies on the `compile_commands.json` file to understand the compilation context.
 
 Inspired by C++ and Rust, we introduced the `lockDatabase` resolution method to relieve pain of handling multiple-file projects.
 
+= Stability Notice: `tinymist.lock`
+
+We have been aware of backward compatibility issues, but any change of the schema of `tinymist.lock` may corrupt the `tinymist.lock` intentionally or unintentionally. The schema is unstable and in beta stage. You have to remove the `tinymist.lock` file to recovery from errors, and you could open an issue to discuss with us. To reliably keep compilation commands, please put `tinymist compile` commands in build system such as `Makefile` or `justfile`.
+
+= A Sample Usage of `lockDatabase`
+
+This feature is in early development stage, and may contain bugs or incomplete features. The following sample demonstrates how to use the `lockDatabase` resolution method. Here is the related #link("https://github.com/Myriad-Dreamin/tinymist/blob/5838c7d3005e6942b2b35b30ac93b9af6b8cf25a/editors/neovim/spec/lockfile_spec.lua")[test].
+
+#let code-path(it) = it.text.split("/").map(raw).join(sym.zws)
+
++ Set ```lua projectResolution = "lockDatabase"``` in `~/.config/tinymist/config.toml`
++ Like #link("https://github.com/Myriad-Dreamin/tinymist/blob/5838c7d3005e6942b2b35b30ac93b9af6b8cf25a/scripts/test-lock.sh")[#code-path(`scripts/test-lock.sh`)], compile a file using tinymist CLI with `--save-lock` flag: `tinymist compile --save-lock main.typ`. This will create a `tinymist.lock` file in the current directory, which contains the compilation history and project routes.
++ back to the editor, editing #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/tests/workspaces/book/chapters/chapter1.typ")[#code-path(`chapters/chapter1.typ`)] will trigger PDF export of #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/tests/workspaces/book/main.typ")[#code-path(`main.typ`)] automatically.
+
+Please report issue on #link("https://github.com/Myriad-Dreamin/tinymist/issues")[GitHub] if you find any bugs, missing features, or have any questions about this feature.
+
 = Compilation History
 
-The compilation history is a set of records. Each record contains the following information about compilation:
+The compilation history (`tinymist.lock`) is a set of records. Each record contains the following information about compilation:
 - *Input Args*: Main file path, fonts, features (e.g., HTML/Paged as export target).
 - *Export Args*: Output path, PDF standard to use.
 - *Dependencies*: Source files, assets.
 
 The source of compilation history:
-1. CLI commands: `tinymist compile/preview --save-lock`, suitable for all the editor clients.
-2. LSP commands: `tinymist.exportXXX`/`previewXXX`, suitable for vscode or neovim clients, which allows client-side extension.
-- External tools: Tools that update the lock file directly. For example, the tytanic could update all example documents once executed test commands. The official typst could also do this to tell whether a test case is compiled targeting HTML or PDF.
+- (Implemented) CLI commands: `tinymist compile/preview --save-lock`, suitable for all the editor clients.
+- (Not Implemented) LSP commands: `tinymist.exportXXX`/`previewXXX`, suitable for vscode or neovim clients, which allows client-side extension.
+- (Not Implemented) External tools: Tools that update the lock file directly. For example, the tytanic could update all example documents once executed test commands. The official typst could also do this to tell whether a test case is compiled targeting HTML or PDF.
 
 = Utilizing Compilation History
 
@@ -66,7 +82,3 @@ The language server will load and compile route pairs and perform entry lookup b
 *Storage in memory*:
 - The language server also maintains a compilation history and project routes in memory.
 - We may enable in-memory compilation history by default in the future, which will allow Tinymist to resolve projects smarter.
-
-= Stability Notice: `tinymist.lock`
-
-Currently, the scheme of `tinymist.lock` is unstable and may change in the future. To reliably keep compilation commands, please put `tinymist compile` commands in build system such as `Makefile` or `justfile`.
