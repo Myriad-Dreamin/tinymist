@@ -275,7 +275,7 @@ typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e
 typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "6a81e781b9e19fcec4a02a1d18d68d7dd1474444" }
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "cb84ac13259f133365b7fcbc6239d82907fe72f7" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "bf6db731d8edf407afc7cce94d47a8057aa82a0c" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
 reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "13f4d680b9394149b44d0a93ccbaf204e0834517" }
 reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "13f4d680b9394149b44d0a93ccbaf204e0834517" }
 reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "13f4d680b9394149b44d0a93ccbaf204e0834517" }
