@@ -23,6 +23,21 @@ pub struct TidyModuleDocs {
     pub docs: EcoString,
 }
 
+fn clean_typlite_markers(text: &str) -> String {
+    let mut result = text.to_string();
+
+    while let Some(start) = result.find("<!-- typlite:") {
+        if let Some(end) = result[start..].find(" -->") {
+            let end_pos = start + end + 4; // 4 = len(" -->")
+            result.replace_range(start..end_pos, "");
+        } else {
+            break;
+        }
+    }
+
+    result
+}
+
 pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
@@ -120,7 +135,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 name: param_line.0,
                 types: param_line.1,
                 default: None,
-                docs: buf.into_iter().join("\n").into(),
+                docs: clean_typlite_markers(&buf.into_iter().join("\n")).into(),
             });
             break_line = Some(line_width);
 
@@ -129,8 +144,10 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
-        None => converted.into(),
+        Some(line_no) => {
+            clean_typlite_markers(&(lines[..line_no]).iter().copied().join("\n")).into()
+        }
+        None => clean_typlite_markers(converted).into(),
     };
 
     params.reverse();
@@ -142,7 +159,9 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
 }
 
 pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
-    Ok(TidyModuleDocs { docs })
+    Ok(TidyModuleDocs {
+        docs: clean_typlite_markers(&docs).into(),
+    })
 }
 
 fn match_brace(trim_start: &str) -> Option<(&str, &str)> {
@@ -224,9 +243,9 @@ See show-module() for outputting the results of this function.
 -> string"###), @r"
         >> docs:
         These again are dictionaries with the keys
-        - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
-        - <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 --> 
-        - <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
+        - `description` (optional): The description for the argument.
+        - `types` (optional): A list of accepted argument types. 
+        - `default` (optional): Default value for this argument.
 
         See show-module() for outputting the results of this function.
         << docs
@@ -273,7 +292,7 @@ See show-module() for outputting the results of this function.
 -> string"###), @r"
         >> docs:
         These again are dictionaries with the keys
-        - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
+        - `description` (optional): The description for the argument.
 
         See show-module() for outputting the results of this function.
         << docs
@@ -286,8 +305,8 @@ See show-module() for outputting the results of this function.
         >>arg label-prefix: auto, string
         The label-prefix for internal function
                 references. If `auto`, the label-prefix name will be the module name. 
-          - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
-          - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 -->
+          - nested something
+          - nested something 2
         << arg
         ");
     }
