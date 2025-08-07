@@ -85,9 +85,9 @@ The language server will load route entries from disk or memory, combine, and pe
 - "Project ID" is the project id.
 - "Priority" is a priority number.
 
-And the language server:
+And the language server determines a project id (main file) by the following rules:
 
-+ Highest priority routes take precedence
-+ Most recent updated commands prioritized automatically
++ Highest priority routes take precedence.
++ Most recent updated commands prioritized automatically.
 
-The cache directory contains cache of project routes. Currently, we haven't implemented a way clean up or garbage collect the project route cache, and disk cache may be gone in future. It is safe to remove all the project routes in the cache directory, as Tinymist will regenerate them when needed.
+The cache directory contains cache of project routes. Currently, we haven't implemented a way clean up or garbage collect the project route cache, and disk cache may be deprecated in future. It is safe to remove all the project routes in the cache directory, as Tinymist will regenerate them when needed.
