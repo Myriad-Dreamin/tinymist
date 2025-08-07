@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (30..31)
+description: Completion on / (45..46)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/func_builtin_args.typ
+input_file: crates/tinymist-query/src/fixtures/completion/func_module_raw.typ
 ---
 [
  {
@@ -13,21 +13,21 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_builtin_args.typ
      "command": "tinymist.triggerSuggestAndParameterHints",
      "title": ""
     },
-    "kind": 5,
-    "label": "columns",
+    "kind": 3,
+    "label": "raw",
     "labelDetails": {
-     "description": "array | auto | length | type"
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "002",
+    "sortText": "160",
     "textEdit": {
-     "newText": "columns: ${1:}",
+     "newText": "raw",
      "range": {
       "end": {
-       "character": 7,
+       "character": 2,
        "line": 2
       },
       "start": {
-       "character": 7,
+       "character": 1,
        "line": 2
       }
      }
@@ -39,20 +39,20 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_builtin_args.typ
      "title": ""
     },
     "kind": 3,
-    "label": "columns",
+    "label": "raw.paren",
     "labelDetails": {
-     "description": "(int, content, gutter: relative) => columns"
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "040",
+    "sortText": "161",
     "textEdit": {
-     "newText": "columns(${1:})",
+     "newText": "raw(${1:})",
      "range": {
       "end": {
-       "character": 7,
+       "character": 2,
        "line": 2
       },
       "start": {
-       "character": 7,
+       "character": 1,
        "line": 2
       }
      }
