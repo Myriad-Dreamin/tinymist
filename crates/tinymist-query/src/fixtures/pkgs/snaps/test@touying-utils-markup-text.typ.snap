@@ -76,9 +76,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "183",
+    "sortText": "199",
     "textEdit": {
-     "newText": "str(${1:})",
+     "newText": "str",
      "range": {
       "end": {
        "character": 19,

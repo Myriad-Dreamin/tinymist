@@ -1,6 +1,6 @@
 //! Completion kind analysis.
 
-use typst::foundations::Symbol;
+use typst::foundations::{Binding, Element, Symbol};
 
 use super::*;
 
@@ -74,6 +74,8 @@ pub(crate) struct FnCompletionFeat {
     pub has_rest: bool,
     pub next_arg_is_content: bool,
     pub is_element: bool,
+    pub has_static_member: bool,
+    pub is_type: bool,
 }
 
 impl FnCompletionFeat {
@@ -83,6 +85,15 @@ impl FnCompletionFeat {
         }
 
         self
+    }
+
+    /// Whether this function is preferred to be used as a scope (accessed with
+    /// dots).
+    ///
+    /// If it is a function, we think of it is preferred to be called
+    /// directly.
+    pub fn prefer_to_be_scope(&self, is_set: bool) -> bool {
+        !is_set && (self.has_static_member && (self.is_element || self.is_type))
     }
 
     pub fn min_pos(&self) -> usize {
@@ -107,6 +118,7 @@ impl FnCompletionFeat {
                     if func.element().is_some() {
                         self.is_element = true;
                     }
+                    self.has_static_member = has_static_member(func);
                     let sig = func_signature(func.clone()).type_sig();
                     let has_only_self = self.has_only_self;
                     self.has_only_self = has_only_self
@@ -142,8 +154,10 @@ impl FnCompletionFeat {
                 | Value::Array(..)
                 | Value::Dict(..)
                 | Value::Args(..)
-                | Value::Module(..)
                 | Value::Dyn(..) => {}
+                Value::Module(..) => {
+                    self.has_static_member = true;
+                }
             },
             Ty::Func(sig) => self.check_sig(sig, pos),
             Ty::With(w) => {
@@ -151,19 +165,24 @@ impl FnCompletionFeat {
             }
             Ty::Builtin(b) => match b {
                 BuiltinTy::Element(func) => {
+                    self.has_static_member = has_static_member(func);
                     self.is_element = true;
                     let func = (*func).into();
                     let sig = func_signature(func).type_sig();
                     self.check_sig(&sig, pos);
                 }
                 BuiltinTy::Type(ty) => {
+                    self.is_type = true;
+                    self.has_static_member = has_static_member(ty);
                     let func = ty.constructor().ok();
                     if let Some(func) = func {
                         let sig = func_signature(func).type_sig();
                         self.check_sig(&sig, pos);
                     }
                 }
-                BuiltinTy::TypeType(..) => {}
+                BuiltinTy::TypeType(..) => {
+                    self.is_type = true;
+                }
                 BuiltinTy::Clause
                 | BuiltinTy::Undef
                 | BuiltinTy::Content(..)
@@ -193,8 +212,10 @@ impl FnCompletionFeat {
                 | BuiltinTy::Outset
                 | BuiltinTy::Radius
                 | BuiltinTy::Tag(..)
-                | BuiltinTy::Module(..)
                 | BuiltinTy::Path(..) => {}
+                BuiltinTy::Module(..) => {
+                    self.has_static_member = true;
+                }
             },
             Ty::Any
             | Ty::Boolean(..)
@@ -202,7 +223,6 @@ impl FnCompletionFeat {
             | Ty::Union(..)
             | Ty::Let(..)
             | Ty::Var(..)
-            | Ty::Dict(..)
             | Ty::Array(..)
             | Ty::Tuple(..)
             | Ty::Args(..)
@@ -211,6 +231,9 @@ impl FnCompletionFeat {
             | Ty::Unary(..)
             | Ty::Binary(..)
             | Ty::If(..) => {}
+            Ty::Dict(..) => {
+                self.has_static_member = true;
+            }
         }
     }
 
@@ -306,5 +329,59 @@ pub(crate) fn value_to_completion_kind(value: &Value) -> CompletionKind {
         | Value::Dict(..)
         | Value::Args(..)
         | Value::Dyn(..) => CompletionKind::Variable,
+    }
+}
+
+trait IScope {
+    fn get_scope(&self) -> Option<&Scope>;
+}
+
+impl IScope for &Func {
+    fn get_scope(&self) -> Option<&Scope> {
+        self.scope()
+    }
+}
+
+impl IScope for &Element {
+    fn get_scope(&self) -> Option<&Scope> {
+        Some(self.scope())
+    }
+}
+
+impl IScope for &Type {
+    fn get_scope(&self) -> Option<&Scope> {
+        Some(self.scope())
+    }
+}
+
+fn has_static_member(f: impl IScope) -> bool {
+    f.get_scope()
+        .is_some_and(|s| s.iter().any(|(_, v)| is_static_member(v)))
+}
+
+fn is_static_member(v: &Binding) -> bool {
+    match v.read() {
+        Value::Func(func) => func
+            .params()
+            .iter()
+            .copied()
+            .flatten()
+            .find(|s| s.positional)
+            .is_none_or(|s| s.name != "self"),
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_fn_completion_feat() {
+        let mut feat = FnCompletionFeat::default();
+        feat.check_one(&Ty::Builtin(BuiltinTy::Type(Type::of::<i64>())), 0);
+        // int.from-bytes
+        assert!(feat.has_static_member);
     }
 }
