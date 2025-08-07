@@ -39,7 +39,7 @@ This feature is in early development stage, and may contain bugs or incomplete f
 
 #let code-path(it) = it.text.split("/").map(raw).join("/" + sym.zws)
 
-+ Set ```lua projectResolution = "lockDatabase"``` in `~/.config/tinymist/config.toml`
++ Set ```lua projectResolution = "lockDatabase"``` in LSP settings.
 + Like #link("https://github.com/Myriad-Dreamin/tinymist/blob/5838c7d3005e6942b2b35b30ac93b9af6b8cf25a/scripts/test-lock.sh")[#code-path(`scripts/test-lock.sh`)], compile a file using tinymist CLI with `--save-lock` flag: `tinymist compile --save-lock main.typ`. This will create a `tinymist.lock` file in the current directory, which contains the _Compilation History_ and project routes.
 + back to the editor, editing #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/tests/workspaces/book/chapters/chapter1.typ")[#code-path(`chapters/chapter1.typ`)] will trigger PDF export of #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/tests/workspaces/book/main.typ")[#code-path(`main.typ`)] automatically.
 
