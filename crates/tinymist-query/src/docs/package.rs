@@ -13,6 +13,8 @@ use crate::docs::{file_id_repr, module_docs, DefDocs, PackageDefInfo};
 use crate::package::{get_manifest_id, PackageInfo};
 use crate::LocalContext;
 
+use tinymist_analysis::docs::tidy::remove_list_annotations;
+
 /// Generate full documents in markdown format
 pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<String> {
     log::info!("generate_md_docs {spec:?}");
@@ -336,14 +338,6 @@ pub struct FileMeta {
 #[derive(Serialize, Deserialize)]
 struct ConvertResult {
     errors: Vec<String>,
-}
-
-fn remove_list_annotations(s: &str) -> String {
-    let s = s.to_string();
-    static REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r"<!-- typlite:(?:begin|end):[\w\-]+ \d+ -->").unwrap()
-    });
-    REG.replace_all(&s, "").to_string()
 }
 
 #[cfg(test)]
