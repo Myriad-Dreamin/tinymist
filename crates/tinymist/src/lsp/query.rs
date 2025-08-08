@@ -161,6 +161,23 @@ impl ServerState {
         self.client.schedule(req_id, self.formatter.run(source))
     }
 
+    pub(crate) fn range_formatting(
+        &mut self,
+        req_id: RequestId,
+        params: DocumentRangeFormattingParams,
+    ) -> ScheduledResult {
+        if matches!(self.config.formatter_mode, FormatterMode::Disable) {
+            return Ok(None);
+        }
+
+        let path: ImmutPath = as_path(params.text_document).as_path().into();
+        let source = self
+            .query_source(path, |source: typst::syntax::Source| Ok(source))
+            .map_err(|e| internal_error(format!("could not format document: {e}")))?;
+        self.client
+            .schedule(req_id, self.formatter.run_on_range(source, params.range))
+    }
+
     pub(crate) fn inlay_hint(
         &mut self,
         req_id: RequestId,
