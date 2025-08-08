@@ -1,5 +1,6 @@
 use std::sync::OnceLock;
 
+use ecow::EcoVec;
 use regex::Regex;
 use typst_html::{HtmlNode, HtmlTag};
 use typst_syntax::Span;
@@ -118,7 +119,7 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {
     let mut doc = doc;
-    for node in doc.root.children.iter_mut() {
+    for node in doc.root.children.make_mut().iter_mut() {
         redact_node(node);
     }
     doc
@@ -128,9 +129,9 @@ fn redact_node(node: &mut HtmlNode) {
     match node {
         HtmlNode::Element(elem) => {
             if elem.tag == HtmlTag::constant("svg") {
-                elem.children = vec![];
+                elem.children = EcoVec::new();
             } else {
-                for child in elem.children.iter_mut() {
+                for child in elem.children.make_mut().iter_mut() {
                     redact_node(child);
                 }
             }
