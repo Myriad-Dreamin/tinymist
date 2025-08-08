@@ -849,7 +849,8 @@ mod tests {
         https://typst.app/docs/reference/model/table/#definitions-vline
         https://typst.app/docs/reference/model/terms/
         https://typst.app/docs/reference/model/terms/#definitions-item
-        https://typst.app/docs/reference/pdf/embed/
+        https://typst.app/docs/reference/model/title/
+        https://typst.app/docs/reference/pdf/attach/
         https://typst.app/docs/reference/text/highlight/
         https://typst.app/docs/reference/text/linebreak/
         https://typst.app/docs/reference/text/lorem/
