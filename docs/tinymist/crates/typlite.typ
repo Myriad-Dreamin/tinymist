@@ -57,7 +57,7 @@ typlite main.typ --post-process @preview/typlite-mdx output.mdx
 
 = Feature
 
-- *Contexual Content Rendering*: Contents begin with `context` keyword will be rendered as svg output. The svg output will be embedded inline in the output file as *base64* by default, if the `--assets-path` parameter is not specified. Otherwise, the svg output will be saved in the specified folder and the path will be embedded in the output file.
+- *Contextual Content Rendering*: Contents begin with `context` keyword will be rendered as svg output. The svg output will be embedded inline in the output file as *base64* by default, if the `--assets-path` parameter is not specified. Otherwise, the svg output will be saved in the specified folder and the path will be embedded in the output file.
 
 = Typlite-Specific `sys.inputs`
 
