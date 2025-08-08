@@ -2,5 +2,5 @@
 
 mod def;
 pub use def::*;
-mod tidy;
+pub mod tidy;
 pub use tidy::*;

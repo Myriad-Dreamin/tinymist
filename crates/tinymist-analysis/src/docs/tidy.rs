@@ -23,19 +23,11 @@ pub struct TidyModuleDocs {
     pub docs: EcoString,
 }
 
-fn clean_typlite_markers(text: &str) -> String {
-    let mut result = text.to_string();
-
-    while let Some(start) = result.find("<!-- typlite:") {
-        if let Some(end) = result[start..].find(" -->") {
-            let end_pos = start + end + 4; // 4 = len(" -->")
-            result.replace_range(start..end_pos, "");
-        } else {
-            break;
-        }
-    }
-
-    result
+pub fn remove_list_annotations(s: &str) -> String {
+    static REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"<!-- typlite:(?:begin|end):[\w\-]+ \d+ -->").unwrap()
+    });
+    REG.replace_all(s, "").to_string()
 }
 
 pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
@@ -135,7 +127,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 name: param_line.0,
                 types: param_line.1,
                 default: None,
-                docs: clean_typlite_markers(&buf.into_iter().join("\n")).into(),
+                docs: remove_list_annotations(&buf.into_iter().join("\n")).into(),
             });
             break_line = Some(line_width);
 
@@ -145,9 +137,9 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
 
     let docs = match break_line {
         Some(line_no) => {
-            clean_typlite_markers(&(lines[..line_no]).iter().copied().join("\n")).into()
+            remove_list_annotations(&(lines[..line_no]).iter().copied().join("\n")).into()
         }
-        None => clean_typlite_markers(converted).into(),
+        None => remove_list_annotations(converted).into(),
     };
 
     params.reverse();
@@ -160,7 +152,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
 
 pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
     Ok(TidyModuleDocs {
-        docs: clean_typlite_markers(&docs).into(),
+        docs: remove_list_annotations(&docs).into(),
     })
 }
 
