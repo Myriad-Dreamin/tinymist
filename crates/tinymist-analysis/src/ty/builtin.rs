@@ -67,6 +67,7 @@ impl PathKind {
         static IMAGE_REGSET: RegSet = RegSet::new(|| {
             make_regex(&[
                 "ico", "bmp", "png", "webp", "jpg", "jpeg", "jfif", "tiff", "gif", "svg", "svgz",
+                "pdf",
             ])
         });
         static JSON_REGSET: RegSet = RegSet::new(|| make_regex(&["json", "jsonc", "json5"]));
