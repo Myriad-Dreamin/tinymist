@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/hover.rs
 expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/render_equation.typ
+snapshot_kind: text
 ---
 Range: 12:20:12:23
 
@@ -31,7 +32,7 @@ type: type
 ```
 
 The type of the argument.
-  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the condition of the proposition.<!-- typlite:end:list-item 1 -->
+  - It can be also regarded as the condition of the proposition.
 
 ## B (positional)
 
@@ -40,4 +41,4 @@ type: type
 ```
 
 The type of the body.
-  - <!-- typlite:begin:list-item 1 -->It can be also regarded as the conclusion of the proposition.<!-- typlite:end:list-item 1 -->
+  - It can be also regarded as the conclusion of the proposition.
