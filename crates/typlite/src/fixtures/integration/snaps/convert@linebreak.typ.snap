@@ -2,7 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/linebreak.typ
-snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -10,7 +9,7 @@ snapshot_kind: text
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><p>Text2</p><m1linebreak></m1linebreak><p>Text1</p><m1linebreak></m1linebreak><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block;">H1</span></m1heading></m1document></body>
+  <body><m1document><p>Text2</p><m1linebreak></m1linebreak><p>Text1</p><m1linebreak></m1linebreak><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">H1</span></m1heading></m1document></body>
 </html>
 
 =====
