@@ -701,6 +701,16 @@ impl<'a> SyntaxClass<'a> {
             _ => None,
         }
     }
+
+    pub fn contains_error(&self) -> bool {
+        use SyntaxClass::*;
+        match self {
+            Label { is_error, .. } => *is_error,
+            Normal(kind, _) => *kind == SyntaxKind::Error,
+            Callee(..) | VarAccess(..) => self.node().kind() == SyntaxKind::Error,
+            Ref { .. } | ImportPath(..) | IncludePath(..) => false,
+        }
+    }
 }
 
 /// Classifies node's syntax (inner syntax) that can be operated on by IDE

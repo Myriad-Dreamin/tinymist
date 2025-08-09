@@ -1,6 +1,6 @@
 use lsp_types::{
-    DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
-    RenameFile, TextDocumentEdit,
+    AnnotatedTextEdit, ChangeAnnotation, DocumentChangeOperation, DocumentChanges, OneOf,
+    OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
 use tinymist_std::path::{unix_slash, PathClean};
@@ -76,7 +76,7 @@ impl StatefulRequest for RenameRequest {
                 let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
                 do_rename_file(ctx, def_fid, diff, &mut edits);
 
-                let mut document_changes = edits_to_document_changes(edits);
+                let mut document_changes = edits_to_document_changes(edits, None);
 
                 document_changes.push(lsp_types::DocumentChangeOperation::Op(
                     lsp_types::ResourceOp::Rename(RenameFile {
@@ -94,6 +94,8 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
+                let is_label = matches!(def.decl.kind(), DefKind::Reference);
+
                 let references = find_references(ctx, &source, doc, syntax)?;
 
                 let mut edits = HashMap::new();
@@ -108,12 +110,30 @@ impl StatefulRequest for RenameRequest {
                     });
                 }
 
-                log::info!("rename edits: {edits:?}");
+                crate::log_debug_ct!("rename edits: {edits:?}");
 
-                Some(WorkspaceEdit {
-                    changes: Some(edits),
-                    ..Default::default()
-                })
+                if !is_label {
+                    Some(WorkspaceEdit {
+                        changes: Some(edits),
+                        ..Default::default()
+                    })
+                } else {
+                    let change_id = "Typst Rename Labels";
+
+                    let document_changes = edits_to_document_changes(edits, Some(change_id));
+
+                    let change_annotations = Some(create_change_annotation(
+                        change_id,
+                        true,
+                        Some("The language server searched the labels ambiguously".to_string()),
+                    ));
+
+                    Some(WorkspaceEdit {
+                        document_changes: Some(DocumentChanges::Operations(document_changes)),
+                        change_annotations,
+                        ..Default::default()
+                    })
+                }
             }
         }
     }
@@ -300,17 +320,45 @@ impl RenameFileWorker<'_> {
 
 pub(crate) fn edits_to_document_changes(
     edits: HashMap<Url, Vec<TextEdit>>,
+    change_id: Option<&str>,
 ) -> Vec<DocumentChangeOperation> {
     let mut document_changes = vec![];
 
     for (uri, edits) in edits {
         document_changes.push(lsp_types::DocumentChangeOperation::Edit(TextDocumentEdit {
             text_document: OptionalVersionedTextDocumentIdentifier { uri, version: None },
-            edits: edits.into_iter().map(OneOf::Left).collect(),
+            edits: edits
+                .into_iter()
+                .map(|edit| match change_id {
+                    Some(change_id) => OneOf::Right(AnnotatedTextEdit {
+                        text_edit: edit,
+                        annotation_id: change_id.to_owned(),
+                    }),
+                    None => OneOf::Left(edit),
+                })
+                .collect(),
         }));
     }
 
     document_changes
+}
+
+pub(crate) fn create_change_annotation(
+    label: &str,
+    needs_confirmation: bool,
+    description: Option<String>,
+) -> HashMap<String, ChangeAnnotation> {
+    let mut change_annotations = HashMap::new();
+    change_annotations.insert(
+        label.to_owned(),
+        ChangeAnnotation {
+            label: label.to_owned(),
+            needs_confirmation: Some(needs_confirmation),
+            description,
+        },
+    );
+
+    change_annotations
 }
 
 #[cfg(test)]
@@ -323,14 +371,17 @@ mod tests {
         snapshot_testing("rename", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let graph = compile_doc_for_test(ctx, &properties);
+
             let request = RenameRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
                 new_name: "new_name".to_string(),
             };
-            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
-            let mut result = request.request(ctx, snap);
+            let mut result = request.request(ctx, graph);
             // sort the edits to make the snapshot stable
             if let Some(r) = result.as_mut().and_then(|r| r.changes.as_mut()) {
                 for edits in r.values_mut() {
