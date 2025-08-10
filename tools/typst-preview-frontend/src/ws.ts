@@ -38,7 +38,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
   let disposed = false;
   let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
-  const subsribes: Subscription[] = [];
+  const subscribes: Subscription[] = [];
 
   function createSvgDocument(kModule: RenderSession) {
     const hookedElem = document.getElementById("typst-app")!;
@@ -66,10 +66,10 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
     // drag (panal resizing) -> rescaling
     // window.onresize = () => svgDoc.rescale();
-    subsribes.push(fromEvent(window, "resize").subscribe(() => svgDoc.addViewportChange()));
+    subscribes.push(fromEvent(window, "resize").subscribe(() => svgDoc.addViewportChange()));
 
     if (!isContentPreview) {
-      subsribes.push(
+      subscribes.push(
         fromEvent(window, "scroll")
           .pipe(debounceTime(500))
           .subscribe(() => svgDoc.addViewportChange()),
@@ -77,7 +77,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     }
 
     // Handle messages sent from the extension to the webview
-    subsribes.push(
+    subscribes.push(
       fromEvent<MessageEvent>(window, "message").subscribe((event) => {
         const message = event.data; // The json data that the extension sent
         switch (message.type) {
@@ -255,7 +255,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       if (index >= 0) {
         window.documents.splice(index, 1);
       }
-      for (const sub of subsribes.splice(0, subsribes.length)) {
+      for (const sub of subscribes.splice(0, subscribes.length)) {
         sub.unsubscribe();
       }
       $ws?.complete();
@@ -269,7 +269,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       complete: () => console.log("complete"), // Called when connection is closed (for whatever reason).
     });
 
-    subsribes.push(
+    subscribes.push(
       batchMessageChannel
         .pipe(buffer(batchMessageChannel.pipe(debounceTime(0))))
         .pipe(
