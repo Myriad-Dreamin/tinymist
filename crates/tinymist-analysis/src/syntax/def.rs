@@ -25,6 +25,10 @@ use crate::{
 
 use super::{ExprDescriber, ExprPrinter};
 
+/// Information about expressions in a source file.
+///
+/// This structure wraps expression analysis data and provides access to
+/// expression resolution, documentation, and scoping information.
 #[derive(Debug, Clone, Hash)]
 pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
 
@@ -42,6 +46,10 @@ impl Deref for ExprInfo {
     }
 }
 
+/// Representation of expression information for a specific file.
+///
+/// Contains all the analyzed information about expressions in a source file,
+/// including resolution maps, documentation strings, imports, and exports.
 #[derive(Debug)]
 pub struct ExprInfoRepr {
     pub fid: TypstFileId,
@@ -133,6 +141,10 @@ impl ExprInfoRepr {
     }
 }
 
+/// Represents different kinds of expressions in the language.
+///
+/// This enum covers all possible expression types that can appear in Typst
+/// source code, from basic literals to complex control flow constructs.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// A sequence of expressions
@@ -217,8 +229,15 @@ impl fmt::Display for Expr {
     }
 }
 
+/// Type alias for lexical scopes.
+///
+/// Represents a lexical scope as a persistent map from names to expressions.
 pub type LexicalScope = rpds::RedBlackTreeMapSync<Interned<str>, Expr>;
 
+/// Different types of scopes for expression evaluation.
+///
+/// Represents the various kinds of scopes that can contain variable bindings,
+/// including lexical scopes, modules, functions, and types.
 #[derive(Debug, Clone)]
 pub enum ExprScope {
     Lexical(LexicalScope),
@@ -308,6 +327,9 @@ fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
 }
 
 /// Kind of a definition.
+///
+/// Classifies different types of definitions that can appear in source code
+/// for language server features like symbols and completion.
 #[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DefKind {
@@ -339,8 +361,15 @@ impl fmt::Display for DefKind {
     }
 }
 
+/// Type alias for declaration expressions.
+///
+/// Represents an interned declaration that can be referenced throughout the analysis.
 pub type DeclExpr = Interned<Decl>;
 
+/// Represents different kinds of declarations in the language.
+///
+/// This enum covers all possible declaration types, from function and variable
+/// declarations to imports, labels, and generated definitions.
 #[derive(Clone, PartialEq, Eq, Hash, DeclEnum)]
 pub enum Decl {
     Func(SpannedDecl),
@@ -667,6 +696,9 @@ impl From<DeclExpr> for Expr {
     }
 }
 
+/// A declaration with an associated name and span location.
+///
+/// Used for most declaration types that have a simple name-span relationship.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpannedDecl {
     name: Interned<str>,
@@ -689,6 +721,9 @@ impl fmt::Debug for SpannedDecl {
     }
 }
 
+/// A declaration with a name and range information.
+///
+/// Used for declarations that need precise range information, such as bibliography entries.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
     pub name: Interned<str>,
@@ -711,6 +746,9 @@ impl fmt::Debug for NameRangeDecl {
     }
 }
 
+/// A module declaration with name and file ID.
+///
+/// Represents a module that can be imported or referenced.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDecl {
     pub name: Interned<str>,
@@ -733,6 +771,9 @@ impl fmt::Debug for ModuleDecl {
     }
 }
 
+/// A documentation declaration linking a base declaration with type variables.
+///
+/// Used for associating documentation with specific type instantiations.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DocsDecl {
     base: Interned<Decl>,
@@ -755,6 +796,9 @@ impl fmt::Debug for DocsDecl {
     }
 }
 
+/// A span-only declaration for anonymous constructs.
+///
+/// Used for declarations that don't have names but need location tracking.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpanDecl(Span);
 
@@ -774,6 +818,9 @@ impl fmt::Debug for SpanDecl {
     }
 }
 
+/// A generated declaration with a unique definition ID.
+///
+/// Used for declarations that are created programmatically rather than from source.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GeneratedDecl(DefId);
 
@@ -793,11 +840,19 @@ impl fmt::Debug for GeneratedDecl {
     }
 }
 
+/// Type alias for unary expressions.
 pub type UnExpr = UnInst<Expr>;
+/// Type alias for binary expressions.
 pub type BinExpr = BinInst<Expr>;
 
+/// Type alias for export maps.
+///
+/// Maps exported names to their corresponding expressions.
 pub type ExportMap = BTreeMap<Interned<str>, Expr>;
 
+/// Represents different kinds of function arguments.
+///
+/// Covers positional arguments, named arguments, and spread arguments.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ArgExpr {
     Pos(Expr),
@@ -806,6 +861,9 @@ pub enum ArgExpr {
     Spread(Expr),
 }
 
+/// Represents different kinds of patterns for destructuring.
+///
+/// Used in let bindings, function parameters, and other pattern-matching contexts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
     Expr(Expr),
@@ -827,6 +885,10 @@ impl Pattern {
     }
 }
 
+/// Signature pattern for function parameters.
+///
+/// Describes the structure of function parameters including positional,
+/// named, and spread parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatternSig {
     pub pos: EcoVec<Interned<Pattern>>,
@@ -839,11 +901,17 @@ impl Pattern {}
 
 impl_internable!(Decl,);
 
+/// Represents a content sequence expression.
+///
+/// Used for sequences of content elements with associated type information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentSeqExpr {
     pub ty: Ty,
 }
 
+/// Represents a reference expression.
+///
+/// Links a declaration to its usage context, including resolution steps and type information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
     pub decl: DeclExpr,
@@ -852,6 +920,9 @@ pub struct RefExpr {
     pub term: Option<Ty>,
 }
 
+/// Represents a content reference expression.
+///
+/// Used for referencing content elements like labels and citations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentRefExpr {
     pub ident: DeclExpr,
@@ -859,6 +930,9 @@ pub struct ContentRefExpr {
     pub body: Option<Expr>,
 }
 
+/// Represents a field selection expression.
+///
+/// Used for accessing fields or methods on objects (e.g., `obj.field`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectExpr {
     pub lhs: Expr,
@@ -876,6 +950,9 @@ impl SelectExpr {
     }
 }
 
+/// Represents an arguments expression.
+///
+/// Contains a list of arguments and their span information for function calls.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArgsExpr {
     pub args: Vec<ArgExpr>,
@@ -888,12 +965,18 @@ impl ArgsExpr {
     }
 }
 
+/// Represents an element expression.
+///
+/// Contains an element type and its content expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
     pub elem: Element,
     pub content: EcoVec<Expr>,
 }
 
+/// Represents a function application expression.
+///
+/// Contains the function being called, its arguments, and span information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ApplyExpr {
     pub callee: Expr,
@@ -901,6 +984,9 @@ pub struct ApplyExpr {
     pub span: Span,
 }
 
+/// Represents a function expression.
+///
+/// Contains the function declaration, parameter signature, and body.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
     pub decl: DeclExpr,
@@ -908,6 +994,9 @@ pub struct FuncExpr {
     pub body: Expr,
 }
 
+/// Represents a let binding expression.
+///
+/// Contains the pattern being bound and the optional body expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
     /// Span of the pattern
@@ -916,12 +1005,18 @@ pub struct LetExpr {
     pub body: Option<Expr>,
 }
 
+/// Represents a show rule expression.
+///
+/// Contains an optional selector and the edit function to apply.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
     pub selector: Option<Expr>,
     pub edit: Expr,
 }
 
+/// Represents a set rule expression.
+///
+/// Contains the target, arguments, and optional condition for the rule.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetExpr {
     pub target: Expr,
@@ -929,16 +1024,25 @@ pub struct SetExpr {
     pub cond: Option<Expr>,
 }
 
+/// Represents an import expression.
+///
+/// Contains the declaration representing what is being imported.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
     pub decl: Interned<RefExpr>,
 }
 
+/// Represents an include expression.
+///
+/// Contains the source expression specifying what to include.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeExpr {
     pub source: Expr,
 }
 
+/// Represents a conditional (if) expression.
+///
+/// Contains condition, then branch, and else branch expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IfExpr {
     pub cond: Expr,
@@ -946,12 +1050,18 @@ pub struct IfExpr {
     pub else_: Expr,
 }
 
+/// Represents a while loop expression.
+///
+/// Contains the loop condition and body expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WhileExpr {
     pub cond: Expr,
     pub body: Expr,
 }
 
+/// Represents a for loop expression.
+///
+/// Contains the iteration pattern, iterable expression, and loop body.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForExpr {
     pub pattern: Interned<Pattern>,
@@ -959,7 +1069,9 @@ pub struct ForExpr {
     pub body: Expr,
 }
 
-/// The kind of unary operation
+/// The kind of unary operation.
+///
+/// Represents all possible unary operations that can be applied to expressions.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum UnaryOp {
     /// The (arithmetic) positive operation
@@ -991,7 +1103,9 @@ pub enum UnaryOp {
     TypeOf,
 }
 
-/// A unary operation type
+/// A unary operation type.
+///
+/// Represents the application of a unary operator to an operand.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct UnInst<T> {
     /// The operand of the unary operation
@@ -1030,10 +1144,14 @@ impl<T> UnInst<T> {
     }
 }
 
-/// The kind of binary operation
+/// Type alias for binary operation types.
+///
+/// Reuses the binary operation types from the AST.
 pub type BinaryOp = ast::BinOp;
 
-/// A binary operation type
+/// A binary operation type.
+///
+/// Represents the application of a binary operator to two operands.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct BinInst<T> {
     /// The operands of the binary operation
