@@ -320,7 +320,7 @@ impl LockFileUpdate {
     }
 
     pub fn commit(self) {
-        super::LockFile::update(&self.root, |l| {
+        crate::LockFile::update(&self.root, |l| {
             let root: EcoString = unix_slash(&self.root).into();
             let root_hash = tinymist_std::hash::hash128(&root);
             for update in self.updates {
