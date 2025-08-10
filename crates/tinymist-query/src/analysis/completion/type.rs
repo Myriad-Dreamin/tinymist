@@ -209,13 +209,13 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::TextSize => return None,
             BuiltinTy::TextLang => {
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
-                    let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
+                    let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
-                        label_details: Some(desc.name.into()),
+                        label_details: Some(desc.name().into()),
                         ..Completion::default()
                     });
                 }
