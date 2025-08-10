@@ -31,11 +31,25 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
         return untitled_url(untitled);
     }
 
-    Url::from_file_path(path).or_else(|never| {
-        let _: () = never;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Url::from_file_path(path).or_else(|never| {
+            let _: () = never;
 
-        anyhow::bail!("could not convert path to URI: path: {path:?}",)
-    })
+            anyhow::bail!("could not convert path to URI: path: {path:?}",)
+        })
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // In WASM, create a simple file:// URL
+        let path_str = path.to_string_lossy();
+        let url_str = if path_str.starts_with('/') {
+            format!("file://{}", path_str)
+        } else {
+            format!("file:///{}", path_str)
+        };
+        Url::parse(&url_str).map_err(|e| anyhow::anyhow!("could not convert path to URI: {}", e))
+    }
 }
 
 /// Convert a path resolution to a URL.
@@ -54,9 +68,18 @@ pub fn url_to_path(uri: Url) -> PathBuf {
             return PathBuf::from("/untitled/nEoViM-BuG");
         }
 
-        return uri
-            .to_file_path()
-            .unwrap_or_else(|_| panic!("could not convert URI to path: URI: {uri:?}",));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            return uri
+                .to_file_path()
+                .unwrap_or_else(|_| panic!("could not convert URI to path: URI: {uri:?}",));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            // In WASM, manually parse the file:// URL
+            let path = uri.path();
+            return PathBuf::from(path);
+        }
     }
 
     if uri.scheme() == "untitled" {
@@ -73,7 +96,15 @@ pub fn url_to_path(uri: Url) -> PathBuf {
         return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
     }
 
-    uri.to_file_path().unwrap()
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        uri.to_file_path().unwrap()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // In WASM, manually parse the URL path
+        PathBuf::from(uri.path())
+    }
 }
 
 #[cfg(test)]
