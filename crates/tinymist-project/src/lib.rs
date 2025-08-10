@@ -11,7 +11,7 @@ mod lock;
 mod lsp;
 #[cfg(feature = "system")]
 mod watch;
-#[cfg(feature = "system")]
+
 pub mod world;
 
 pub use args::*;
