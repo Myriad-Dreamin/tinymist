@@ -1,18 +1,11 @@
 // This is important for shiroa to produce a responsive layout
 // and multiple targets.
 #import "@preview/shiroa:0.2.2": (
-  get-page-width,
-  target,
-  is-web-target,
-  is-pdf-target,
-  is-html-target,
-  plain-text,
-  shiroa-sys-target,
-  templates,
+  get-page-width, is-html-target, is-pdf-target, is-web-target, plain-text, shiroa-sys-target, target, templates,
 )
 #import templates: *
 #import "@preview/numbly:0.1.0": numbly
-#import "@preview/zebraw:0.5.2": zebraw-init, zebraw
+#import "@preview/zebraw:0.5.2": zebraw, zebraw-init
 #import "theme.typ": *
 
 // Metadata
@@ -59,7 +52,7 @@
   10.5pt
 }
 // ,
-#let heading-sizes = (22pt, 18pt, 14pt, 12pt, main-size)
+#let heading-sizes = (22pt, 18pt, 14pt, 12pt, main-size, main-size, main-size)
 #let list-indent = 0.5em
 
 #let raw-rules(body) = {

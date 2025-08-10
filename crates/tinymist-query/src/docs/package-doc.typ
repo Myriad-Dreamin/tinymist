@@ -121,25 +121,43 @@
         markdown-docs(docs.docs)
       }
       if docs.kind == "func" {
-        //                 for param in docs
-        //                     .pos
-        //                     .iter()
-        //                     .chain(docs.named.values())
-        //                     .chain(docs.rest.as_ref())
-        //                 {
-        //                     // let _ = writeln!(out, "<!-- begin:param {} -->", param.name);
-        //                     let ty = match &param.cano_type {
-        //                         Some((short, _, _)) => short,
-        //                         None => "unknown",
-        //                     };
-        //                     let title = format!("{} ({ty:?})", param.name);
-        //                     let _ = writeln!(
-        //                         out,
-        //                         "#labelled-heading(4, {title:?})\n\n#markdown-docs({:?})\n",
-        //                         param.docs
-        //                     );
-        //                     // let _ = writeln!(out, "<!-- end:param -->");
-        //                 }
+        labelled-heading(4, "Resultant")
+
+        docs.ret_ty.at(0)
+
+        labelled-heading(4, "Parameters")
+
+        let pos = docs.at("pos", default: ())
+        let named = docs.at("named", default: (:)).values()
+        let rest = docs.at("rest", default: none)
+
+        let params = pos + named
+        if rest != none {
+          params.push(rest)
+        }
+
+        for param in params {
+          labelled-heading(5, param.name)
+
+          let param-head = (param.name, ": ", param.cano_type.at(0))
+          if param.positional {
+            param-head.push(" (Positional)")
+          }
+          if param.variadic {
+            param-head.push(" (Variadic)")
+          }
+          if param.settable {
+            param-head.push(" (Settable)")
+          }
+          if param.named {
+            param-head.push(" (Named, default: ")
+            param-head.push(param.default)
+            param-head.push(")")
+          }
+          raw(block: true, param-head.join())
+
+          markdown-docs(param.docs)
+        }
       }
     }
   }
