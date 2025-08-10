@@ -8,7 +8,6 @@ use ecow::{eco_format, eco_vec, EcoVec};
 use parking_lot::Mutex;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::registry::HttpRegistry;
 use tinymist_world::package::PackageSpec;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
@@ -77,9 +76,10 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
-    registry: &HttpRegistry,
+    registry: &tinymist_world::package::registry::HttpRegistry,
     ns: EcoString,
 ) -> EcoVec<(PathBuf, PackageSpec)> {
     // search packages locally. We only search in the data
