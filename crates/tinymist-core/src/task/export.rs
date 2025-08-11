@@ -102,16 +102,21 @@ impl ServerState {
     }
 }
 
+/// Runs a export document task.
 #[derive(Clone)]
 pub struct ExportTask {
+    /// The handle running the task.
     pub handle: tokio::runtime::Handle,
+    /// The editor request sender.
     pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
+    /// The task factory for export.
     pub factory: SyncTaskFactory<ExportUserConfig>,
     export_folder: FutureFolder,
     count_word_folder: FutureFolder,
 }
 
 impl ExportTask {
+    /// Creates a new export task.
     pub fn new(
         handle: tokio::runtime::Handle,
         editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
@@ -126,6 +131,7 @@ impl ExportTask {
         }
     }
 
+    /// Changes the export configuration.
     pub fn change_config(&self, config: ExportUserConfig) {
         self.factory.mutate(|data| *data = config);
     }
@@ -238,6 +244,7 @@ impl ExportTask {
         Some(())
     }
 
+    /// Exports a document.
     pub async fn do_export(
         task: ProjectTask,
         artifact: LspCompiledArtifact,

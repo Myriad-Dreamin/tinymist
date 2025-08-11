@@ -4177,6 +4177,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-ansi-hl",
+ "typst-html",
  "typst-pdf",
  "typst-render",
  "typst-shim",

@@ -4,9 +4,8 @@ use std::{borrow::Cow, path::Path};
 
 use clap_complete::Shell;
 use reflexo::path::unix_slash;
+use tinymist_core::project::*;
 use tinymist_std::{bail, error::prelude::*};
-
-use crate::project::*;
 
 /// Arguments for generating a build script.
 #[derive(Debug, Clone, clap::Parser)]

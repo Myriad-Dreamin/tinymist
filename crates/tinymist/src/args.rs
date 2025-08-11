@@ -2,10 +2,13 @@ use std::path::Path;
 
 use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
-use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
-use tinymist::tool::testing::TestArgs;
+use tinymist::tool::project::TaskCommands;
 use tinymist::{CompileFontArgs, CompileOnceArgs};
 use tinymist_core::LONG_VERSION;
+
+use crate::compile::CompileArgs;
+use crate::generate_script::GenerateScriptArgs;
+use crate::testing::TestArgs;
 
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]

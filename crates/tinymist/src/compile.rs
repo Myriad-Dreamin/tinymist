@@ -6,9 +6,9 @@ use reflexo::ImmutPath;
 use reflexo_typst::WorldComputeGraph;
 use tinymist_std::error::prelude::*;
 
-use crate::project::*;
-use crate::task::ExportTask;
-use crate::world::system::print_diagnostics;
+use tinymist_core::project::*;
+use tinymist_core::world::system::print_diagnostics;
+use tinymist_core::ExportTask;
 
 /// Arguments for project compilation.
 #[derive(Debug, Clone, clap::Parser)]

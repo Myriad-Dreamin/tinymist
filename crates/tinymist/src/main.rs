@@ -1,6 +1,13 @@
 #![doc = include_str!("../README.md")]
 
 mod args;
+#[cfg(feature = "export")]
+mod compile;
+mod generate_script;
+#[cfg(feature = "preview")]
+mod preview;
+mod testing;
+mod utils;
 
 use core::fmt;
 use std::collections::HashMap;
@@ -21,8 +28,7 @@ use sync_ls::{
     internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
     LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
-use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
-use tinymist::tool::testing::{coverage_main, test_main};
+use tinymist::tool::project::{project_main, task_main};
 use tinymist::world::TaskInputs;
 use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
@@ -36,6 +42,13 @@ use tinymist_l10n::{load_translations, set_translations};
 use typst::ecow::EcoString;
 
 use crate::args::*;
+
+#[cfg(feature = "export")]
+use crate::compile::compile_main;
+use crate::generate_script::generate_script_main;
+#[cfg(feature = "preview")]
+use crate::preview::preview_main;
+use crate::testing::{coverage_main, test_main};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -103,6 +116,7 @@ fn main() -> Result<()> {
         Commands::Completion(args) => completion(args),
         Commands::Cov(args) => coverage_main(args),
         Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
+        #[cfg(feature = "export")]
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
@@ -111,12 +125,7 @@ fn main() -> Result<()> {
         Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
-        Commands::Preview(args) => {
-            #[cfg(feature = "preview")]
-            use tinymist::tool::preview::preview_main;
-
-            RUNTIMES.tokio_runtime.block_on(preview_main(args))
-        }
+        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
         Commands::Doc(args) => project_main(args),
         Commands::Task(args) => task_main(args),
         Commands::Probe => Ok(()),

@@ -73,6 +73,7 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
+typst-html.workspace = true
 typst-shim.workspace = true
 tinymist-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
@@ -127,7 +128,7 @@ no-content-hint = [
 
 export = ["tinymist-core/export"]
 lock = ["tinymist-core/lock"]
-preview = ["tinymist-core/preview"]
+preview = ["tinymist-core/preview", "hyper-tungstenite"]
 trace = ["tinymist-core/trace"]
 
 dap = ["tinymist-core/dap"]

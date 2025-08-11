@@ -69,15 +69,6 @@ pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
 }
 
 #[cfg(feature = "system")]
-pub fn exit_on_ctrl_c() {
-    tokio::spawn(async move {
-        let _ = tokio::signal::ctrl_c().await;
-        log::info!("Ctrl-C received, exiting");
-        std::process::exit(0);
-    });
-}
-
-#[cfg(feature = "system")]
 #[derive(Default)]
 pub(crate) struct AliveLock(Arc<AtomicU64>);
 

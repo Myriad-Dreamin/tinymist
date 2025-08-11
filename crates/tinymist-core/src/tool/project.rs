@@ -15,16 +15,6 @@ use std::path::Path;
 #[cfg(feature = "system")]
 use tinymist_std::error::prelude::*;
 
-#[cfg(all(feature = "system", feature = "export"))]
-mod compile;
-#[cfg(all(feature = "system", feature = "export"))]
-pub use compile::{compile_main, CompileArgs};
-
-#[cfg(feature = "system")]
-mod generate_script;
-#[cfg(feature = "system")]
-pub use generate_script::{generate_script_main, GenerateScriptArgs};
-
 #[cfg(feature = "preview")]
 pub use super::preview::PreviewArgs;
 #[cfg(feature = "preview")]

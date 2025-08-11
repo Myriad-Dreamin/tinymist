@@ -442,7 +442,7 @@ pub struct CompileHandlerImpl {
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, (usize, CompileSignal)>>,
 }
 
-pub(crate) trait ProjectClient: Send + Sync + 'static {
+pub trait ProjectClient: Send + Sync + 'static {
     fn interrupt(&self, event: LspInterrupt);
     #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent);
@@ -751,7 +751,7 @@ pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DevExportEvent {
+pub struct DevExportEvent {
     pub id: String,
     pub when: TaskWhen,
     pub need_export: bool,
@@ -761,7 +761,7 @@ pub(crate) struct DevExportEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub(crate) enum DevEvent {
+pub enum DevEvent {
     Export(DevExportEvent),
 }
 

@@ -10,6 +10,8 @@ pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
 #[cfg(feature = "export")]
 pub use task::export2 as export;
+#[cfg(feature = "export")]
+pub use task::ExportTask;
 #[cfg(feature = "trace")]
 pub use task::UserActionTask;
 
