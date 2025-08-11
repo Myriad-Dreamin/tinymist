@@ -11,11 +11,11 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
+use task::{FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
 use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
-use tinymist_query::{CompletionFeat, PositionEncoding};
+use tinymist_query::{url_to_path, CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
@@ -25,13 +25,17 @@ use typst_shim::utils::LazyHash;
 
 use super::*;
 use crate::project::{
-    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
-    ProjectTask, TaskWhen,
+    EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
 use crate::world::font::FontResolverImpl;
 
+#[cfg(feature = "export")]
+use task::ExportUserConfig;
 #[cfg(feature = "preview")]
 use tinymist_preview::{PreviewConfig, PreviewInvertColors};
+
+#[cfg(feature = "export")]
+use crate::project::{ExportPdfTask, ProjectTask};
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
@@ -174,13 +178,13 @@ impl Config {
         let roots = match params.workspace_folders.as_ref() {
             Some(roots) => roots
                 .iter()
-                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|root| ImmutPath::from(url_to_path(&root.uri)))
                 .collect(),
             #[allow(deprecated)] // `params.root_path` is marked as deprecated
             None => params
                 .root_uri
                 .as_ref()
-                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|uri| ImmutPath::from(url_to_path(uri)))
                 .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
                 .into_iter()
                 .collect(),
@@ -532,6 +536,7 @@ impl Config {
     }
 
     /// Gets the export configuration.
+    #[cfg(feature = "export")]
     pub(crate) fn export(&self) -> ExportUserConfig {
         let export = self.export_task();
         ExportUserConfig {

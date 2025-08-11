@@ -4,10 +4,13 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
+use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
 use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
-use tinymist_project::{LspWorld, PROJECT_ROUTE_USER_ACTION_PRIORITY};
+use sync_ls::just_future;
+use tinymist_project::LspWorld;
+use tinymist_query::OnExportRequest;
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
@@ -18,13 +21,86 @@ use typlite::{Format, Typlite};
 use typst::foundations::IntoValue;
 use typst::visualize::Color;
 
-use super::{FutureFolder, SyncTaskFactory};
+use futures::Future;
+use parking_lot::Mutex;
+use rayon::Scope;
+
+use super::SyncTaskFactory;
+use crate::lsp::query::QueryFuture;
 use crate::project::{
-    ApplyProjectTask, CompiledArtifact, DevEvent, DevExportEvent, EntryReader, ExportHtmlTask,
-    ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask, ExportTeXTask,
-    ExportTextTask, LspCompiledArtifact, ProjectClient, ProjectTask, QueryTask, TaskWhen,
+    update_lock, ApplyProjectTask, CompiledArtifact, DevEvent, DevExportEvent, EntryReader,
+    ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask as ProjectExportTask,
+    ExportTeXTask, ExportTextTask, LspCompiledArtifact, LspComputeGraph, ProjectClient,
+    ProjectTask, QueryTask, TaskWhen, PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
+use crate::world::TaskInputs;
+use crate::ServerState;
 use crate::{actor::editor::EditorRequest, tool::word_count};
+
+impl ServerState {
+    /// Exports the current document.
+    pub fn on_export(&mut self, req: OnExportRequest) -> QueryFuture {
+        let OnExportRequest { path, task, open } = req;
+        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
+        let lock_dir = self.entry_resolver().resolve_lock(&entry);
+
+        let update_dep = lock_dir.clone().map(|lock_dir| {
+            |snap: LspComputeGraph| async move {
+                let mut updater = update_lock(lock_dir.clone());
+                let world = snap.world();
+                // todo: rootless.
+                let root_dir = world.entry_state().root()?;
+                let doc_id = updater.compiled(world, (&root_dir, &lock_dir))?;
+
+                updater.update_materials(doc_id.clone(), world.depended_fs_paths());
+                updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
+
+                updater.commit();
+
+                Some(())
+            }
+        });
+
+        let snap = self.snapshot()?;
+        just_future(async move {
+            let snap = snap.task(TaskInputs {
+                entry: Some(entry),
+                ..TaskInputs::default()
+            });
+
+            let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+            let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
+            let res = ExportTask::do_export(task, artifact, lock_dir).await?;
+            if let Some(update_dep) = update_dep {
+                tokio::spawn(update_dep(snap));
+            }
+            #[cfg(not(feature = "open"))]
+            if open {
+                log::warn!("open is not supported in this build, ignoring");
+            }
+
+            #[cfg(feature = "open")]
+            {
+                // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+                // Also see https://github.com/Byron/open-rs/issues/105
+                #[cfg(not(target_os = "windows"))]
+                let do_open = ::open::that_detached;
+                #[cfg(target_os = "windows")]
+                fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+                    ::open::with_detached(path, "explorer")
+                }
+
+                if let Some(Some(path)) = open.then_some(res.as_ref()) {
+                    log::trace!("open with system default apps: {path:?}");
+                    do_open(path).log_error("failed to open with system default apps");
+                }
+            }
+
+            log::trace!("CompileActor: on export end: {path:?} as {res:?}");
+            Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct ExportTask {
@@ -487,6 +563,75 @@ fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> Result
         }
         _ => bail!("unsupported format for query: {format}"),
     })
+}
+
+type FoldFuture = Pin<Box<dyn Future<Output = Option<()>> + Send>>;
+
+#[derive(Default)]
+struct FoldingState {
+    running: bool,
+    task: Option<(usize, FoldFuture)>,
+}
+
+#[derive(Clone, Default)]
+struct FutureFolder {
+    state: Arc<Mutex<FoldingState>>,
+}
+
+impl FutureFolder {
+    async fn compute<'scope, OP, R: Send + 'static>(op: OP) -> Result<R>
+    where
+        OP: FnOnce(&Scope<'scope>) -> R + Send + 'static,
+    {
+        tokio::task::spawn_blocking(move || -> R { rayon::in_place_scope(op) })
+            .await
+            .context_ut("compute error")
+    }
+
+    #[must_use]
+    fn spawn(
+        &self,
+        revision: usize,
+        fut: impl FnOnce() -> FoldFuture,
+    ) -> Option<impl Future<Output = ()> + Send + 'static> {
+        let mut state = self.state.lock();
+        let state = state.deref_mut();
+
+        match &mut state.task {
+            Some((prev_revision, prev)) => {
+                if *prev_revision < revision {
+                    *prev = fut();
+                    *prev_revision = revision;
+                }
+
+                return None;
+            }
+            next_update => {
+                *next_update = Some((revision, fut()));
+            }
+        }
+
+        if state.running {
+            return None;
+        }
+
+        state.running = true;
+
+        let state = self.state.clone();
+        Some(async move {
+            loop {
+                let fut = {
+                    let mut state = state.lock();
+                    let Some((_, fut)) = state.task.take() else {
+                        state.running = false;
+                        return;
+                    };
+                    fut
+                };
+                fut.await;
+            }
+        })
+    }
 }
 
 #[cfg(test)]

@@ -69,7 +69,7 @@ pub struct TConnectionRx<M> {
 
 impl<M: TryFrom<Message, Error = anyhow::Error>> TConnectionRx<M> {
     /// Receives a message or an event.
-    pub(crate) fn recv(&self) -> anyhow::Result<EventOrMessage<M>> {
+    pub fn recv(&self) -> anyhow::Result<EventOrMessage<M>> {
         crossbeam_channel::select_biased! {
             recv(self.lsp) -> msg => Ok(EventOrMessage::Msg(msg?.try_into()?)),
             recv(self.event) -> event => Ok(event.map(EventOrMessage::Evt)?),
@@ -78,8 +78,10 @@ impl<M: TryFrom<Message, Error = anyhow::Error>> TConnectionRx<M> {
 }
 
 /// This is a helper enum to handle both events and messages.
-pub(crate) enum EventOrMessage<M> {
+pub enum EventOrMessage<M> {
+    /// An event received.
     Evt(Event),
+    /// A message received.
     Msg(M),
 }
 
@@ -380,7 +382,7 @@ impl LspClient {
 
     /// Finally sends the response if it is not sent before.
     /// From the definition, the response is already sent if it is `Some(())`.
-    pub(crate) fn schedule_tail(&self, req_id: RequestId, resp: ScheduledResult) {
+    pub fn schedule_tail(&self, req_id: RequestId, resp: ScheduledResult) {
         match resp {
             // Already responded
             Ok(Some(())) => {}

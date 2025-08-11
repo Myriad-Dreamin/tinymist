@@ -4,11 +4,14 @@ pub use config::*;
 pub use lsp::init::*;
 pub use server::*;
 pub use sync_ls::LspClient;
-pub use task::export2 as export;
-pub use task::UserActionTask;
 pub use tinymist_project::world;
 pub use tinymist_query as query;
 pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
+
+#[cfg(feature = "export")]
+pub use task::export2 as export;
+#[cfg(feature = "trace")]
+pub use task::UserActionTask;
 
 #[cfg(feature = "dap")]
 pub use dap::RegularInit as DapRegularInit;
@@ -23,6 +26,7 @@ pub(crate) mod config;
 pub(crate) mod dap;
 pub(crate) mod input;
 pub(crate) mod lsp;
+#[cfg(feature = "lock")]
 pub(crate) mod route;
 
 mod actor;

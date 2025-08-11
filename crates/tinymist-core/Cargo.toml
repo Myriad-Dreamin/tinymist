@@ -48,7 +48,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 strum.workspace = true
-sync-ls = { workspace = true, features = ["lsp"] }
+sync-ls = { workspace = true, features = ["lsp", "server"] }
 tinymist-assets = { workspace = true }
 tinymist-debug = { workspace = true, optional = true }
 tinymist-l10n.workspace = true
@@ -103,6 +103,7 @@ cargo_metadata = "0.18.0"
 dap = ["sync-ls/dap", "tinymist-debug"]
 default = ["web", "no-content-hint"]
 preview = [
+    "open",
     "http-body-util",
     "hyper",
     "hyper-util",
@@ -111,6 +112,9 @@ preview = [
     "tinymist-preview/clap",
     "tinymist-assets/typst-preview",
 ]
+lock = []
+export = []
+trace = []
 web = [
     "console_error_panic_hook",
     "js-sys",
@@ -118,10 +122,12 @@ web = [
     "reflexo-typst/web",
     "tinymist-project/web",
 ]
+open = ["dep:open"]
 system = [
+    "lock",
     "open",
     "reflexo-typst/system",
-    "sync-ls/server",
+    "sync-ls/system",
     "tokio/rt-multi-thread",
     "tokio/io-std",
 ]

@@ -17,7 +17,7 @@ pub use server::*;
 pub mod req_queue;
 #[cfg(feature = "server")]
 mod server;
-#[cfg(feature = "server")]
+#[cfg(all(feature = "server", feature = "system"))]
 pub mod transport;
 
 use std::any::Any;

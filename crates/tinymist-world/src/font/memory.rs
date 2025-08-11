@@ -25,6 +25,27 @@ impl MemoryFontSearcher {
         Self { fonts: vec![] }
     }
 
+    /// Create a new browser searcher with fonts in a FontResolverImpl.
+    pub fn from_resolver(resolver: FontResolverImpl) -> Self {
+        let fonts = resolver
+            .slots
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        Self { fonts }
+    }
+
     /// Adds an in-memory font.
     pub fn add_memory_font(&mut self, data: Bytes) {
         self.add_memory_fonts(rayon::iter::once(data));

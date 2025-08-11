@@ -169,6 +169,7 @@ where
     ///
     /// See [`transport::MirrorArgs`] for information about the record-replay
     /// feature.
+    #[cfg(feature = "system")]
     pub fn start(
         &mut self,
         inbox: TConnectionRx<LspMessage>,
@@ -202,6 +203,7 @@ where
     }
 
     /// Starts the language server on the given connection.
+    #[cfg(feature = "system")]
     pub fn start_(&mut self, inbox: TConnectionRx<LspMessage>) -> anyhow::Result<()> {
         use EventOrMessage::*;
         // todo: follow what rust analyzer does
@@ -273,7 +275,7 @@ where
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_lsp_request(&mut self, request_received: Instant, req: Request) {
+    pub fn on_lsp_request(&mut self, request_received: Instant, req: Request) {
         self.client
             .register_request(&req.method, &req.id, request_received);
 
@@ -353,7 +355,11 @@ where
     }
 
     /// Handles an incoming notification.
-    fn on_notification(&mut self, received_at: Instant, not: Notification) -> anyhow::Result<()> {
+    pub fn on_notification(
+        &mut self,
+        received_at: Instant,
+        not: Notification,
+    ) -> anyhow::Result<()> {
         self.client.hook.start_notification(&not.method);
         let handle = |s, Notification { method, params }: Notification| {
             let Some(handler) = self.notifications.get(method.as_str()) else {

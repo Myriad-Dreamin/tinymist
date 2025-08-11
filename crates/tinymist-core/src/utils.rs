@@ -1,12 +1,19 @@
 use core::fmt;
 
+#[cfg(feature = "system")]
 use std::pin::Pin;
+#[cfg(feature = "system")]
 use std::sync::atomic::AtomicU64;
+#[cfg(feature = "system")]
 use std::sync::Arc;
+#[cfg(feature = "system")]
 use std::task::{Context, Poll};
-
+#[cfg(feature = "system")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+#[cfg(feature = "system")]
 use tokio::net::TcpStream;
+#[cfg(feature = "system")]
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct Derived<T>(pub T);
@@ -52,7 +59,6 @@ macro_rules! get_arg_or_default {
     }};
 }
 pub(crate) use get_arg_or_default;
-use tokio_util::sync::CancellationToken;
 
 pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
     f()
@@ -62,6 +68,7 @@ pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
     f().unwrap_or(default)
 }
 
+#[cfg(feature = "system")]
 pub fn exit_on_ctrl_c() {
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -70,9 +77,11 @@ pub fn exit_on_ctrl_c() {
     });
 }
 
+#[cfg(feature = "system")]
 #[derive(Default)]
 pub(crate) struct AliveLock(Arc<AtomicU64>);
 
+#[cfg(feature = "system")]
 impl AliveLock {
     pub fn hold(cnt: Arc<AtomicU64>) -> Self {
         let held = cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -81,6 +90,7 @@ impl AliveLock {
     }
 }
 
+#[cfg(feature = "system")]
 impl Drop for AliveLock {
     fn drop(&mut self) {
         let cnt = self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -88,11 +98,13 @@ impl Drop for AliveLock {
     }
 }
 
+#[cfg(feature = "system")]
 pub(crate) struct ConnWithCancel {
     stream: TcpStream,
     pub cancel: CancellationToken,
 }
 
+#[cfg(feature = "system")]
 impl ConnWithCancel {
     pub fn new(stream: TcpStream) -> Self {
         Self {
@@ -102,12 +114,14 @@ impl ConnWithCancel {
     }
 }
 
+#[cfg(feature = "system")]
 impl Drop for ConnWithCancel {
     fn drop(&mut self) {
         self.cancel.cancel()
     }
 }
 
+#[cfg(feature = "system")]
 impl AsyncRead for ConnWithCancel {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -118,6 +132,7 @@ impl AsyncRead for ConnWithCancel {
     }
 }
 
+#[cfg(feature = "system")]
 impl AsyncWrite for ConnWithCancel {
     fn poll_write(
         self: Pin<&mut Self>,

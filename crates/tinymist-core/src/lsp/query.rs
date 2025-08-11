@@ -292,8 +292,8 @@ impl ServerState {
             .iter()
             .map(|f| {
                 Some((
-                    as_path_(Url::parse(&f.old_uri).ok()?),
-                    as_path_(Url::parse(&f.new_uri).ok()?),
+                    as_path_(&Url::parse(&f.old_uri).ok()?),
+                    as_path_(&Url::parse(&f.new_uri).ok()?),
                 ))
             })
             .collect::<Option<Vec<_>>>()
@@ -326,7 +326,12 @@ impl ServerState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
+            #[cfg(feature = "export")]
             OnExport(req) => return self.on_export(req),
+            #[cfg(not(feature = "export"))]
+            OnExport(_req) => {
+                return Err(tinymist_std::error_once!("export feature is not enabled"))
+            }
             ServerInfo(_) => return self.collect_server_info(),
             // todo: query on dedicate projects
             _ => return self.query_on(query),
@@ -360,6 +365,8 @@ impl ServerState {
         just_future(async move {
             stat.snap();
 
+            // todo: preload in web
+            #[cfg(feature = "system")]
             if matches!(query, Completion(..)) {
                 // Prefetch the package index for completion.
                 if snap.registry().cached_index().is_none() {

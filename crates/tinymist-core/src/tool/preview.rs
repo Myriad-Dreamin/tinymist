@@ -489,6 +489,7 @@ impl PreviewState {
                 is_primary,
             };
 
+            #[cfg(feature = "open")]
             if open_in_browser {
                 open::that_detached(format!("http://127.0.0.1:{}", addr.port()))
                     .log_error("failed to open browser for preview");
@@ -552,6 +553,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     let handle = tokio::runtime::Handle::current();
 
     let config = args.preview.config(&PreviewConfig::default());
+    #[cfg(feature = "open")]
     let open_in_browser = args.open_in_browser(true);
     let static_file_host =
         if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
@@ -682,6 +684,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
     log::info!("Static file server listening on: {static_server_addr}");
 
+    #[cfg(feature = "open")]
     if open_in_browser {
         open::that_detached(format!("http://{static_server_addr}"))
             .log_error("failed to open browser for preview");
