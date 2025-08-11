@@ -38,7 +38,7 @@
 }
 
 #let server-side-keys = (
-  match-region(read("/crates/tinymist/src/config.rs"), "Configuration Items")
+  match-region(read("/crates/tinymist-core/src/config.rs"), "Configuration Items")
     .matches(regex(`"([^"]+)"`.text))
     .map(m => {
       "tinymist." + m.captures.at(0)
