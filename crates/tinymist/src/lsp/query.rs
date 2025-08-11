@@ -1,6 +1,5 @@
 //! tinymist's language server
 
-use futures::future::MaybeDone;
 use lsp_types::request::GotoDeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
@@ -8,223 +7,134 @@ use sync_ls::*;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
 };
-use tinymist_std::{ImmutPath, Result};
+use tinymist_std::ImmutPath;
 
 use crate::project::{EntryState, TaskInputs, DETACHED_ENTRY};
 use crate::{as_path, as_path_, as_path_pos, FormatterMode, ServerState};
 
 /// The future type for a lsp query.
-pub type QueryFuture = Result<ResponseFuture<Result<CompilerQueryResponse>>>;
-
-pub trait LspClientExt {
-    fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult;
-}
-
-impl LspClientExt for LspClient {
-    /// Schedules a query from the client.
-    fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: SchedulableResponse<CompilerQueryResponse> = Ok(match fut {
-            MaybeDone::Done(res) => {
-                MaybeDone::Done(res.map_err(|err| internal_error(err.to_string())))
-            }
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
-    }
-}
+pub type QueryFuture = SchedulableResponse<CompilerQueryResponse>;
 
 macro_rules! run_query {
-    ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
+    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.client.untyped().schedule_query($req_id, query_fut)
+        erased_response($self.query(CompilerQueryRequest::$query(req.clone())))
     }};
 }
 pub(crate) use run_query;
 
 /// LSP Standard Language Features
 impl ServerState {
-    pub(crate) fn goto_definition(
-        &mut self,
-        req_id: RequestId,
-        params: GotoDefinitionParams,
-    ) -> ScheduledResult {
+    pub(crate) fn goto_definition(&mut self, params: GotoDefinitionParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.GotoDefinition(path, position))
+        run_query!(self.GotoDefinition(path, position))
     }
 
-    pub(crate) fn goto_declaration(
-        &mut self,
-        req_id: RequestId,
-        params: GotoDeclarationParams,
-    ) -> ScheduledResult {
+    pub(crate) fn goto_declaration(&mut self, params: GotoDeclarationParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.GotoDeclaration(path, position))
+        run_query!(self.GotoDeclaration(path, position))
     }
 
-    pub(crate) fn references(
-        &mut self,
-        req_id: RequestId,
-        params: ReferenceParams,
-    ) -> ScheduledResult {
+    pub(crate) fn references(&mut self, params: ReferenceParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position);
-        run_query!(req_id, self.References(path, position))
+        run_query!(self.References(path, position))
     }
 
-    pub(crate) fn hover(&mut self, req_id: RequestId, params: HoverParams) -> ScheduledResult {
+    pub(crate) fn hover(&mut self, params: HoverParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'h');
 
         self.implicit_position = Some(position);
-        run_query!(req_id, self.Hover(path, position))
+        run_query!(self.Hover(path, position))
     }
 
-    pub(crate) fn folding_range(
-        &mut self,
-        req_id: RequestId,
-        params: FoldingRangeParams,
-    ) -> ScheduledResult {
+    pub(crate) fn folding_range(&mut self, params: FoldingRangeParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let line_folding_only = self.const_config().doc_line_folding_only;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'f');
-        run_query!(req_id, self.FoldingRange(path, line_folding_only))
+        run_query!(self.FoldingRange(path, line_folding_only))
     }
 
-    pub(crate) fn selection_range(
-        &mut self,
-        req_id: RequestId,
-        params: SelectionRangeParams,
-    ) -> ScheduledResult {
+    pub(crate) fn selection_range(&mut self, params: SelectionRangeParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let positions = params.positions;
-        run_query!(req_id, self.SelectionRange(path, positions))
+        run_query!(self.SelectionRange(path, positions))
     }
 
-    pub(crate) fn document_highlight(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentHighlightParams,
-    ) -> ScheduledResult {
+    pub(crate) fn document_highlight(&mut self, params: DocumentHighlightParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.DocumentHighlight(path, position))
+        run_query!(self.DocumentHighlight(path, position))
     }
 
-    pub(crate) fn document_symbol(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentSymbolParams,
-    ) -> ScheduledResult {
+    pub(crate) fn document_symbol(&mut self, params: DocumentSymbolParams) -> ScheduleResult {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.DocumentSymbol(path))
+        run_query!(self.DocumentSymbol(path))
     }
 
-    pub(crate) fn semantic_tokens_full(
-        &mut self,
-        req_id: RequestId,
-        params: SemanticTokensParams,
-    ) -> ScheduledResult {
+    pub(crate) fn semantic_tokens_full(&mut self, params: SemanticTokensParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(req_id, self.SemanticTokensFull(path))
+        run_query!(self.SemanticTokensFull(path))
     }
 
     pub(crate) fn semantic_tokens_full_delta(
         &mut self,
-        req_id: RequestId,
+
         params: SemanticTokensDeltaParams,
-    ) -> ScheduledResult {
+    ) -> ScheduleResult {
         let path = as_path(params.text_document);
         let previous_result_id = params.previous_result_id;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(req_id, self.SemanticTokensDelta(path, previous_result_id))
+        run_query!(self.SemanticTokensDelta(path, previous_result_id))
     }
 
-    pub(crate) fn formatting(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentFormattingParams,
-    ) -> ScheduledResult {
+    pub(crate) fn formatting(&mut self, params: DocumentFormattingParams) -> ScheduleResult {
         if matches!(self.config.formatter_mode, FormatterMode::Disable) {
-            return Ok(None);
+            return just_ok(serde_json::Value::Null);
         }
 
         let path: ImmutPath = as_path(params.text_document).as_path().into();
-        let source = self
-            .query_source(path, |source: typst::syntax::Source| Ok(source))
-            .map_err(|e| internal_error(format!("could not format document: {e}")))?;
-        self.client.schedule(req_id, self.formatter.run(source))
+        let source = self.query_source(path, |source: typst::syntax::Source| Ok(source))?;
+        erased_response(self.formatter.run(source))
     }
 
-    pub(crate) fn inlay_hint(
-        &mut self,
-        req_id: RequestId,
-        params: InlayHintParams,
-    ) -> ScheduledResult {
+    pub(crate) fn inlay_hint(&mut self, params: InlayHintParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(req_id, self.InlayHint(path, range))
+        run_query!(self.InlayHint(path, range))
     }
 
-    pub(crate) fn document_color(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentColorParams,
-    ) -> ScheduledResult {
+    pub(crate) fn document_color(&mut self, params: DocumentColorParams) -> ScheduleResult {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.DocumentColor(path))
+        run_query!(self.DocumentColor(path))
     }
 
-    pub(crate) fn document_link(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentLinkParams,
-    ) -> ScheduledResult {
+    pub(crate) fn document_link(&mut self, params: DocumentLinkParams) -> ScheduleResult {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.DocumentLink(path))
+        run_query!(self.DocumentLink(path))
     }
 
-    pub(crate) fn color_presentation(
-        &mut self,
-        req_id: RequestId,
-        params: ColorPresentationParams,
-    ) -> ScheduledResult {
+    pub(crate) fn color_presentation(&mut self, params: ColorPresentationParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let color = params.color;
         let range = params.range;
-        run_query!(req_id, self.ColorPresentation(path, color, range))
+        run_query!(self.ColorPresentation(path, color, range))
     }
 
-    pub(crate) fn code_action(
-        &mut self,
-        req_id: RequestId,
-        params: CodeActionParams,
-    ) -> ScheduledResult {
+    pub(crate) fn code_action(&mut self, params: CodeActionParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let range = params.range;
         let context = params.context;
-        run_query!(req_id, self.CodeAction(path, range, context))
+        run_query!(self.CodeAction(path, range, context))
     }
 
-    pub(crate) fn code_lens(
-        &mut self,
-        req_id: RequestId,
-        params: CodeLensParams,
-    ) -> ScheduledResult {
+    pub(crate) fn code_lens(&mut self, params: CodeLensParams) -> ScheduleResult {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.CodeLens(path))
+        run_query!(self.CodeLens(path))
     }
 
-    pub(crate) fn completion(
-        &mut self,
-        req_id: RequestId,
-        params: CompletionParams,
-    ) -> ScheduledResult {
+    pub(crate) fn completion(&mut self, params: CompletionParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position);
         let context = params.context.as_ref();
         let explicit =
@@ -234,58 +144,39 @@ impl ServerState {
             .and_then(|c| c.chars().next());
 
         self.implicit_position = Some(position);
-        run_query!(
-            req_id,
-            self.Completion(path, position, explicit, trigger_character)
-        )
+        run_query!(self.Completion(path, position, explicit, trigger_character))
     }
 
-    pub(crate) fn signature_help(
-        &mut self,
-        req_id: RequestId,
-        params: SignatureHelpParams,
-    ) -> ScheduledResult {
+    pub(crate) fn signature_help(&mut self, params: SignatureHelpParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
 
         self.implicit_position = Some(position);
-        run_query!(req_id, self.SignatureHelp(path, position))
+        run_query!(self.SignatureHelp(path, position))
     }
 
-    pub(crate) fn rename(&mut self, req_id: RequestId, params: RenameParams) -> ScheduledResult {
+    pub(crate) fn rename(&mut self, params: RenameParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position);
         let new_name = params.new_name;
-        run_query!(req_id, self.Rename(path, position, new_name))
+        run_query!(self.Rename(path, position, new_name))
     }
 
-    pub(crate) fn prepare_rename(
-        &mut self,
-        req_id: RequestId,
-        params: TextDocumentPositionParams,
-    ) -> ScheduledResult {
+    pub(crate) fn prepare_rename(&mut self, params: TextDocumentPositionParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params);
-        run_query!(req_id, self.PrepareRename(path, position))
+        run_query!(self.PrepareRename(path, position))
     }
 
-    pub(crate) fn symbol(
-        &mut self,
-        req_id: RequestId,
-        params: WorkspaceSymbolParams,
-    ) -> ScheduledResult {
+    pub(crate) fn symbol(&mut self, params: WorkspaceSymbolParams) -> ScheduleResult {
         let pattern = (!params.query.is_empty()).then_some(params.query);
-        run_query!(req_id, self.Symbol(pattern))
+        run_query!(self.Symbol(pattern))
     }
 
-    pub(crate) fn on_enter(&mut self, req_id: RequestId, params: OnEnterParams) -> ScheduledResult {
+    pub(crate) fn on_enter(&mut self, params: OnEnterParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(req_id, self.OnEnter(path, range))
+        run_query!(self.OnEnter(path, range))
     }
 
-    pub(crate) fn will_rename_files(
-        &mut self,
-        req_id: RequestId,
-        params: RenameFilesParams,
-    ) -> ScheduledResult {
+    pub(crate) fn will_rename_files(&mut self, params: RenameFilesParams) -> ScheduleResult {
         log::info!("will rename files {params:?}");
         let paths = params
             .files
@@ -299,7 +190,7 @@ impl ServerState {
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| invalid_params("invalid urls"))?;
 
-        run_query!(req_id, self.WillRenameFiles(paths))
+        run_query!(self.WillRenameFiles(paths))
     }
 }
 
@@ -329,9 +220,7 @@ impl ServerState {
             #[cfg(feature = "export")]
             OnExport(req) => return self.on_export(req),
             #[cfg(not(feature = "export"))]
-            OnExport(_req) => {
-                return Err(tinymist_std::error_once!("export feature is not enabled"))
-            }
+            OnExport(_req) => return Err(internal_error("export feature is not enabled")),
             ServerInfo(_) => return self.collect_server_info(),
             // todo: query on dedicate projects
             _ => return self.query_on(query),
@@ -343,7 +232,9 @@ impl ServerState {
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let (mut snap, stat) = self.query_snapshot_with_stat(&query)?;
+        let (mut snap, stat) = self
+            .query_snapshot_with_stat(&query)
+            .map_err(internal_error)?;
         // todo: whether it is safe to inherit success_doc with changed entry
         if !self.is_pinning() {
             let input = query
@@ -377,7 +268,7 @@ impl ServerState {
                 }
             }
 
-            match query {
+            let res = match query {
                 SemanticTokensFull(req) => snap.run_semantic(req, R::SemanticTokensFull),
                 SemanticTokensDelta(req) => snap.run_semantic(req, R::SemanticTokensDelta),
                 InteractCodeContext(req) => snap.run_semantic(req, R::InteractCodeContext),
@@ -400,7 +291,9 @@ impl ServerState {
                 WorkspaceLabel(req) => snap.run_semantic(req, R::WorkspaceLabel),
                 DocumentMetrics(req) => snap.run_stateful(req, R::DocumentMetrics),
                 _ => unreachable!(),
-            }
+            };
+
+            res.map_err(internal_error)
         })
     }
 }

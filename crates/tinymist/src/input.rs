@@ -111,10 +111,10 @@ impl ServerState {
     pub fn query_source<T>(
         &self,
         path: ImmutPath,
-        f: impl FnOnce(Source) -> Result<T>,
-    ) -> Result<T> {
+        f: impl FnOnce(Source) -> LspResult<T>,
+    ) -> LspResult<T> {
         let snapshot = self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
+        let snapshot = snapshot.ok_or_else(|| internal_error(format!("file missing {path:?}")))?;
         let source = snapshot.clone();
         f(source)
     }

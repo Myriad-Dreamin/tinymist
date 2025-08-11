@@ -4,19 +4,6 @@ use lsp_types::{notification::Notification as Notif, request::Request as Req, *}
 
 type PureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
 
-/// Converts a `ScheduledResult` to a `SchedulableResponse`.
-macro_rules! reschedule {
-    ($expr:expr) => {
-        match $expr {
-            Ok(Some(())) => return,
-            Ok(None) => Ok(futures::future::MaybeDone::Done(Ok(
-                serde_json::Value::Null,
-            ))),
-            Err(e) => Err(e),
-        }
-    };
-}
-
 impl<S: 'static> TypedLspClient<S> {
     /// Sends a request to the client and registers a handler handled by the
     /// service `S`.
@@ -45,13 +32,7 @@ impl LspClient {
             Box::new(|s, resp| handler(s, resp.try_into().unwrap())),
         );
 
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send request: connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(request.into()) {
-            log::warn!("failed to send request: {res:?}");
-        }
+        self.sender.send_message(request.into());
     }
 
     /// Completes an client2server request in the request queue.
@@ -66,14 +47,7 @@ impl LspClient {
 
     /// Sends an untyped notification to the client.
     pub fn send_notification_(&self, notif: lsp::Notification) {
-        let method = &notif.method;
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send notification ({method}): connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(notif.into()) {
-            log::warn!("failed to send notification: {res:?}");
-        }
+        self.sender.send_message(notif.into());
     }
 }
 
@@ -87,7 +61,7 @@ where
         cmd: &'static str,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.command_handlers.insert(cmd, raw_to_boxed(handler));
+        self.command_handlers.insert(cmd, Box::new(handler));
         self
     }
 
@@ -99,7 +73,7 @@ where
     ) -> Self {
         self.command_handlers.insert(
             cmd,
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
+            Box::new(move |s, req| erased_response(handler(s, req))),
         );
         self
     }
@@ -125,7 +99,7 @@ where
     /// Registers a raw request handler that handlers a kind of untyped lsp
     /// request.
     pub fn with_raw_request<R: Req>(mut self, handler: RawHandler<Args::S, JsonValue>) -> Self {
-        self.req_handlers.insert(R::METHOD, raw_to_boxed(handler));
+        self.req_handlers.insert(R::METHOD, Box::new(handler));
         self
     }
 
@@ -134,11 +108,11 @@ where
     /// request.
     pub fn with_request_<R: Req>(
         mut self,
-        handler: fn(&mut Args::S, RequestId, R::Params) -> ScheduledResult,
+        handler: fn(&mut Args::S, R::Params) -> ScheduleResult,
     ) -> Self {
         self.req_handlers.insert(
             R::METHOD,
-            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
+            Box::new(move |s, req| handler(s, from_json(req)?)),
         );
         self
     }
@@ -150,9 +124,7 @@ where
     ) -> Self {
         self.req_handlers.insert(
             R::METHOD,
-            Box::new(move |s, client, req_id, req| {
-                client.schedule(req_id, handler(s, from_json(req)?))
-            }),
+            Box::new(move |s, req| erased_response(handler(s, from_json(req)?))),
         );
         self
     }
@@ -247,10 +219,21 @@ where
 
                     event_handler(s, &self.client, event)?;
                 }
-                Msg(LspMessage::Request(req)) => self.on_lsp_request(loop_start, req),
+                Msg(LspMessage::Request(req)) => {
+                    let client = self.client.clone();
+                    let req_id = req.id.clone();
+                    client.register_request(&req.method, &req_id, loop_start);
+                    let fut =
+                        client.schedule_tail(req_id, self.on_lsp_request(&req.method, req.params));
+                    self.client.handle.spawn(fut);
+                }
                 Msg(LspMessage::Notification(not)) => {
                     let is_exit = not.method == EXIT_METHOD;
-                    self.on_notification(loop_start, not)?;
+                    self.client.hook.start_notification(&not.method);
+                    let result = self.on_notification(&not.method, not.params);
+                    self.client
+                        .hook
+                        .stop_notification(&not.method, loop_start, result);
                     if is_exit {
                         return Ok(());
                     }
@@ -273,17 +256,44 @@ where
         Ok(())
     }
 
+    /// Handles an incoming server event.
+    pub fn on_server_event(&mut self, event_id: u32) {
+        let evt = match &self.client.sender {
+            TransportHost::Js(sender) => sender.events.lock().remove(&event_id),
+            TransportHost::System(_) => {
+                panic!("cannot send server event in system transport");
+            }
+        };
+
+        if let Some(event) = evt {
+            let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
+                log::warn!("unhandled event: {:?}", event.as_ref().type_id());
+                return;
+            };
+
+            let s = match &mut self.state {
+                State::Uninitialized(u) => ServiceState::Uninitialized(u.as_deref_mut()),
+                State::Initializing(s) | State::Ready(s) => ServiceState::Ready(s),
+                State::ShuttingDown => {
+                    log::warn!("server is shutting down");
+                    return;
+                }
+            };
+
+            let res = event_handler(s, &self.client, event);
+            if let Err(err) = res {
+                log::error!("failed to handle server event {event_id}: {err}");
+            }
+        }
+    }
+
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    pub fn on_lsp_request(&mut self, request_received: Instant, req: Request) {
-        self.client
-            .register_request(&req.method, &req.id, request_received);
-
-        let req_id = req.id.clone();
-        let resp = match (&mut self.state, &*req.method) {
+    pub fn on_lsp_request(&mut self, method: &str, params: JsonValue) -> ScheduleResult {
+        match (&mut self.state, method) {
             (State::Uninitialized(args), request::Initialize::METHOD) => {
                 // todo: what will happen if the request cannot be deserialized?
-                let params = serde_json::from_value::<Args::I>(req.params);
+                let params = serde_json::from_value::<Args::I>(params);
                 match params {
                     Ok(params) => {
                         let args = args.take().expect("already initialized");
@@ -301,11 +311,8 @@ where
                 just_result(Err(invalid_request("server is already initialized")))
             }
             // todo: generalize this
-            (State::Ready(..), request::ExecuteCommand::METHOD) => {
-                reschedule!(self.on_execute_command(req))
-            }
-            (State::Ready(s), _) => 'serve_req: {
-                let method = req.method.as_str();
+            (State::Ready(..), request::ExecuteCommand::METHOD) => self.on_execute_command(params),
+            (State::Ready(s), method) => 'serve_req: {
                 let is_shutdown = method == request::Shutdown::METHOD;
 
                 let Some(handler) = self.requests.get(method) else {
@@ -313,29 +320,25 @@ where
                     break 'serve_req just_result(Err(method_not_found()));
                 };
 
-                let result = handler(s, &self.client, req_id.clone(), req.params);
-                self.client.schedule_tail(req_id, result);
+                let resp = handler(s, params);
 
                 if is_shutdown {
                     self.state = State::ShuttingDown;
                 }
 
-                return;
+                resp
             }
             (State::ShuttingDown, _) => {
                 just_result(Err(invalid_request("server is shutting down")))
             }
-        };
-
-        let result = self.client.schedule(req_id.clone(), resp);
-        self.client.schedule_tail(req_id, result);
+        }
     }
 
     /// The entry point for the `workspace/executeCommand` request.
-    fn on_execute_command(&mut self, req: Request) -> ScheduledResult {
+    fn on_execute_command(&mut self, params: JsonValue) -> ScheduleResult {
         let s = self.state.opt_mut().ok_or_else(not_initialized)?;
 
-        let params = from_value::<ExecuteCommandParams>(req.params)
+        let params = from_value::<ExecuteCommandParams>(params)
             .map_err(|e| invalid_params(e.to_string()))?;
 
         let ExecuteCommandParams {
@@ -344,38 +347,28 @@ where
 
         // todo: generalize this
         if command == "tinymist.getResources" {
-            self.get_resources(req.id, arguments)
+            self.get_resources(arguments)
         } else {
             let Some(handler) = self.commands.get(command.as_str()) else {
                 log::error!("asked to execute unknown command: {command}");
                 return Err(method_not_found());
             };
-            handler(s, &self.client, req.id, arguments)
+            handler(s, arguments)
         }
     }
 
     /// Handles an incoming notification.
-    pub fn on_notification(
-        &mut self,
-        received_at: Instant,
-        not: Notification,
-    ) -> anyhow::Result<()> {
-        self.client.hook.start_notification(&not.method);
-        let handle = |s, Notification { method, params }: Notification| {
-            let Some(handler) = self.notifications.get(method.as_str()) else {
+    pub fn on_notification(&mut self, method: &str, params: JsonValue) -> LspResult<()> {
+        let handle = |s, method: &str, params: JsonValue| {
+            let Some(handler) = self.notifications.get(method) else {
                 log::warn!("unhandled notification: {method}");
                 return Ok(());
             };
 
-            let result = handler(s, params);
-            self.client
-                .hook
-                .stop_notification(&method, received_at, result);
-
-            Ok(())
+            handler(s, params)
         };
 
-        match (&mut self.state, &*not.method) {
+        match (&mut self.state, method) {
             (state, notification::Initialized::METHOD) => {
                 let mut s = State::ShuttingDown;
                 std::mem::swap(state, &mut s);
@@ -395,9 +388,9 @@ where
                         return Ok(());
                     }
                 };
-                handle(s, not)
+                handle(s, method, params)
             }
-            (State::Ready(state), _) => handle(state, not),
+            (State::Ready(state), method) => handle(state, method, params),
             // todo: whether it is safe to ignore notifications
             (State::Uninitialized(..) | State::Initializing(..), method) => {
                 log::warn!("server is not ready yet, while received notification {method}");

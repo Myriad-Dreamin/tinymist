@@ -32,11 +32,11 @@ jobs:
           sudo apt-get install llvm
       - name: Publish crates
         run: |
-          cargo publish --no-verify -p sync-ls || true
           cargo publish --no-verify -p typst-shim || true
           cargo publish --no-verify -p tinymist-derive || true
           cargo publish --no-verify -p tinymist-l10n || true
           cargo publish --no-verify -p tinymist-std || true
+          cargo publish --no-verify -p sync-ls || true
           cargo publish --no-verify -p tinymist-package || true
           cargo publish --no-verify -p tinymist-vfs || true
           cargo publish --no-verify -p tinymist-world || true
@@ -56,11 +56,11 @@ jobs:
           cargo publish --no-verify -p tinymist-cli || true
       - name: Verifies crate health (Optional)
         run: |
-          cargo publish --dry-run -p sync-ls
           cargo publish --dry-run -p typst-shim
           cargo publish --dry-run -p tinymist-derive
           cargo publish --dry-run -p tinymist-l10n
           cargo publish --dry-run -p tinymist-std
+          cargo publish --dry-run -p sync-ls
           cargo publish --dry-run -p tinymist-vfs
           cargo publish --dry-run -p tinymist-package
           cargo publish --dry-run -p tinymist-world

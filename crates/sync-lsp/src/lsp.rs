@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    invalid_data_fmt, read_msg_text, write_msg_text, ExtractError, LspOrDapResponse, RequestId,
-    ResponseError,
+    invalid_data_fmt, read_msg_text, write_msg_text, ExtractError, LspOrDapResponse, LspResult,
+    RequestId, ResponseError,
 };
 
 /// A message in the Language Server Protocol.
@@ -134,26 +134,19 @@ pub struct Response {
 }
 
 impl Response {
-    /// Creates a response with the success payload.
-    pub fn new_ok<R: serde::Serialize>(id: RequestId, result: R) -> Response {
-        Response {
-            id,
-            result: Some(serde_json::to_value(result).unwrap()),
-            error: None,
-        }
-    }
-
-    /// Creates a response with the failure reason.
-    pub fn new_err(id: RequestId, code: i32, message: String) -> Response {
-        let error = ResponseError {
-            code,
-            message,
-            data: None,
-        };
-        Response {
-            id,
-            result: None,
-            error: Some(error),
+    /// Creates a response
+    pub fn new(id: RequestId, result: LspResult<serde_json::Value>) -> Response {
+        match result {
+            Ok(result) => Response {
+                id,
+                result: Some(result),
+                error: None,
+            },
+            Err(err) => Response {
+                id,
+                result: None,
+                error: Some(err),
+            },
         }
     }
 }

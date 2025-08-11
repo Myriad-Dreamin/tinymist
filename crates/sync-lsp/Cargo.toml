@@ -27,12 +27,16 @@ tinymist-std.workspace = true
 clap = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt"], optional = true }
 tokio-util = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
 
 [features]
 dap = ["dapts"]
 lsp = ["lsp-types"]
 server = ["tokio"]
-system = ["tokio", "tokio/time", "tokio-util", "clap"]
+system = ["tokio", "tokio/time", "tokio-util", "clap", "tinymist-std/system"]
+web = ["js-sys", "wasm-bindgen", "serde-wasm-bindgen", "tinymist-std/web"]
 
 [package.metadata.docs.rs]
 features = ["dap", "lsp", "system", "server"]

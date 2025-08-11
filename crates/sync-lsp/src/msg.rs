@@ -185,21 +185,17 @@ pub enum MessageKind {
 /// Gets the kind of the message.
 pub trait GetMessageKind {
     /// Returns the kind of the message.
-    fn get_message_kind() -> MessageKind;
+    const MESSAGE_KIND: MessageKind;
 }
 
 #[cfg(feature = "lsp")]
 impl GetMessageKind for LspMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Lsp
-    }
+    const MESSAGE_KIND: MessageKind = MessageKind::Lsp;
 }
 
 #[cfg(feature = "dap")]
 impl GetMessageKind for DapMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Dap
-    }
+    const MESSAGE_KIND: MessageKind = MessageKind::Dap;
 }
 
 #[allow(unused)]

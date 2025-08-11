@@ -46,7 +46,7 @@ pub fn with_stdio_transport<M: TryFrom<Message, Error = anyhow::Error> + GetMess
     args: MirrorArgs,
     f: impl FnOnce(Connection<M>) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
-    with_stdio_transport_impl(args, M::get_message_kind(), |conn| f(conn.into()))
+    with_stdio_transport_impl(args, M::MESSAGE_KIND, |conn| f(conn.into()))
 }
 
 /// Note that we must have our logging only write out to stderr.
