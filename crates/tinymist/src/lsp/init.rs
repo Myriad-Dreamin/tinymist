@@ -91,10 +91,10 @@ impl Initializer for SuperInit {
         } = self;
         let const_config = config.const_config.clone();
         // Bootstrap server
-        let service = ServerState::main(client, config, err.is_none());
+        let state = ServerState::main(client, config, err.is_none());
 
         if let Some(err) = err {
-            return (service, Err(err));
+            return (state, Err(err));
         }
 
         let semantic_tokens_provider = (!const_config.tokens_dynamic_registration).then(|| {
@@ -209,6 +209,6 @@ impl Initializer for SuperInit {
         };
 
         let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
-        (service, just_result(res))
+        (state, just_result(res))
     }
 }

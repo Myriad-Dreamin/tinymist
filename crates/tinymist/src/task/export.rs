@@ -8,7 +8,7 @@ use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
 use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
-use sync_ls::just_future;
+use sync_ls::{internal_error, just_future};
 use tinymist_project::LspWorld;
 use tinymist_query::OnExportRequest;
 use tinymist_std::error::prelude::*;
@@ -61,7 +61,7 @@ impl ServerState {
             }
         });
 
-        let snap = self.snapshot()?;
+        let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
@@ -70,7 +70,9 @@ impl ServerState {
 
             let is_html = matches!(task, ProjectTask::ExportHtml { .. });
             let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
-            let res = ExportTask::do_export(task, artifact, lock_dir).await?;
+            let res = ExportTask::do_export(task, artifact, lock_dir)
+                .await
+                .map_err(internal_error)?;
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }

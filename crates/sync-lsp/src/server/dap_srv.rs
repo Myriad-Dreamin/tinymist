@@ -12,14 +12,7 @@ impl<S: 'static> TypedLspClient<S> {
 
     /// Sends an untyped dap_event to the client.
     pub fn send_dap_event_(&self, evt: dap::Event) {
-        let method = &evt.event;
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send dap event ({method}): connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(evt.into()) {
-            log::warn!("failed to send dap event: {res:?}");
-        }
+        self.sender.send_message(evt.into());
     }
 }
 
@@ -27,16 +20,6 @@ impl<Args: Initializer> LsBuilder<DapMessage, Args>
 where
     Args::S: 'static,
 {
-    /// Registers an raw event handler.
-    pub fn with_command_(
-        mut self,
-        cmd: &'static str,
-        handler: RawHandler<Args::S, Vec<JsonValue>>,
-    ) -> Self {
-        self.command_handlers.insert(cmd, raw_to_boxed(handler));
-        self
-    }
-
     /// Registers an async command handler.
     pub fn with_command<R: Serialize + 'static>(
         mut self,
@@ -45,7 +28,7 @@ where
     ) -> Self {
         self.command_handlers.insert(
             cmd,
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
+            Box::new(move |s, req| erased_response(handler(s, req))),
         );
         self
     }
@@ -56,7 +39,7 @@ where
         mut self,
         handler: RawHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.req_handlers.insert(R::COMMAND, raw_to_boxed(handler));
+        self.req_handlers.insert(R::COMMAND, Box::new(handler));
         self
     }
 
@@ -65,11 +48,11 @@ where
     /// request.
     pub fn with_request_<R: dapts::IRequest>(
         mut self,
-        handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
+        handler: fn(&mut Args::S, R::Arguments) -> ScheduleResult,
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
+            Box::new(move |s, req| handler(s, from_json(req)?)),
         );
         self
     }
@@ -81,9 +64,7 @@ where
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, client, req_id, req| {
-                client.schedule(req_id, handler(s, from_json(req)?))
-            }),
+            Box::new(move |s, req| erased_response(handler(s, from_json(req)?))),
         );
         self
     }
@@ -100,6 +81,7 @@ where
     ///
     /// See [`transport::MirrorArgs`] for information about the record-replay
     /// feature.
+    #[cfg(feature = "system")]
     pub fn start(
         &mut self,
         inbox: TConnectionRx<DapMessage>,
@@ -133,6 +115,7 @@ where
     }
 
     /// Starts the debug adaptor on the given connection.
+    #[cfg(feature = "system")]
     pub fn start_(&mut self, inbox: TConnectionRx<DapMessage>) -> anyhow::Result<()> {
         use EventOrMessage::*;
 
@@ -156,7 +139,13 @@ where
 
                     event_handler(s, &self.client, event)?;
                 }
-                Msg(DapMessage::Request(req)) => self.on_request(loop_start, req),
+                Msg(DapMessage::Request(req)) => {
+                    let client = self.client.clone();
+                    let req_id = (req.seq as i32).into();
+                    client.register_request(&req.command, &req_id, loop_start);
+                    let fut = client.schedule_tail(req_id, self.on_request(req));
+                    self.client.handle.spawn(fut);
+                }
                 Msg(DapMessage::Event(not)) => {
                     self.on_event(loop_start, not)?;
                 }
@@ -180,12 +169,8 @@ where
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_request(&mut self, request_received: Instant, req: dap::Request) {
-        let req_id = (req.seq as i32).into();
-        self.client
-            .register_request(&req.command, &req_id, request_received);
-
-        let resp = match (&mut self.state, &*req.command) {
+    fn on_request(&mut self, req: dap::Request) -> ScheduleResult {
+        match (&mut self.state, &*req.command) {
             (State::Uninitialized(args), dapts::request::Initialize::COMMAND) => {
                 // todo: what will happen if the request cannot be deserialized?
                 let params = serde_json::from_value::<Args::I>(req.arguments);
@@ -240,22 +225,18 @@ where
                     break 'serve_req just_result(Err(method_not_found()));
                 };
 
-                let result = handler(s, &self.client, req_id.clone(), req.arguments);
-                self.client.schedule_tail(req_id, result);
+                let resp = handler(s, req.arguments);
 
                 if is_disconnect {
                     self.state = State::ShuttingDown;
                 }
 
-                return;
+                resp
             }
             (State::ShuttingDown, _) => {
                 just_result(Err(invalid_request("server is shutting down")))
             }
-        };
-
-        let result = self.client.schedule(req_id.clone(), resp);
-        self.client.schedule_tail(req_id, result);
+        }
     }
 
     /// Handles an incoming event.

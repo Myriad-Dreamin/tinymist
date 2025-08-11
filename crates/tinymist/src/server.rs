@@ -438,7 +438,7 @@ impl ServerState {
         let query_stats = self.project.analysis.report_query_stats();
         let alloc_stats = self.project.analysis.report_alloc_stats();
 
-        let snap = self.snapshot()?;
+        let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
             let w = snap.world();
 

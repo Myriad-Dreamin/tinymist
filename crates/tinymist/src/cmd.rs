@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use lsp_types::TextDocumentIdentifier;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
-use sync_ls::RequestId;
 #[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
@@ -23,7 +22,7 @@ use typst::syntax::{LinkedNode, Source};
 use world::TaskInputs;
 
 use super::*;
-use crate::lsp::query::{run_query, LspClientExt};
+use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
 
 #[cfg(feature = "system")]
@@ -86,7 +85,7 @@ struct ExportSyntaxRangeOpts {
 /// Here are implemented the handlers for each command.
 impl ServerState {
     /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_pdf(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
 
         let creation_timestamp = if let Some(value) = opts.creation_timestamp {
@@ -101,7 +100,6 @@ impl ServerState {
 
         let export = self.config.export_task();
         self.export(
-            req_id,
             ProjectTask::ExportPdf(ExportPdfTask {
                 export,
                 pdf_standards: pdf_standards.unwrap_or_default(),
@@ -113,11 +111,10 @@ impl ServerState {
     }
 
     /// Export the current document as HTML file(s).
-    pub fn export_html(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_html(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
         self.export(
-            req_id,
             ProjectTask::ExportHtml(ExportHtmlTask { export }),
             opts.open.unwrap_or_default(),
             args,
@@ -125,15 +122,10 @@ impl ServerState {
     }
 
     /// Export the current document as Markdown file(s).
-    pub fn export_markdown(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn export_markdown(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
-            req_id,
             ProjectTask::ExportMd(ExportMarkdownTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -145,11 +137,10 @@ impl ServerState {
     }
 
     /// Export the current document as Tex file(s).
-    pub fn export_tex(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_tex(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
-            req_id,
             ProjectTask::ExportTeX(ExportTeXTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -161,11 +152,10 @@ impl ServerState {
     }
 
     /// Export the current document as Text file(s).
-    pub fn export_text(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_text(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
         self.export(
-            req_id,
             ProjectTask::ExportText(ExportTextTask { export }),
             opts.open.unwrap_or_default(),
             args,
@@ -173,7 +163,7 @@ impl ServerState {
     }
 
     /// Query the current document and export the result as JSON file(s).
-    pub fn export_query(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_query(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as QueryOpts);
         // todo: deprecate it
         let _ = opts.strict;
@@ -184,7 +174,6 @@ impl ServerState {
         }
 
         self.export(
-            req_id,
             ProjectTask::Query(QueryTask {
                 format: opts.format,
                 output_extension: opts.output_extension,
@@ -199,14 +188,13 @@ impl ServerState {
     }
 
     /// Export the current document as Svg file(s).
-    pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_svg(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
 
         let mut export = self.config.export_task();
         select_page(&mut export, opts.page).map_err(invalid_params)?;
 
         self.export(
-            req_id,
             ProjectTask::ExportSvg(ExportSvgTask { export }),
             opts.open.unwrap_or_default(),
             args,
@@ -214,7 +202,7 @@ impl ServerState {
     }
 
     /// Export the current document as Png file(s).
-    pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
 
         let ppi = opts.ppi.unwrap_or(144.);
@@ -227,7 +215,6 @@ impl ServerState {
         select_page(&mut export, opts.page).map_err(invalid_params)?;
 
         self.export(
-            req_id,
             ProjectTask::ExportPng(ExportPngTask {
                 fill: opts.fill,
                 ppi,
@@ -242,14 +229,14 @@ impl ServerState {
     /// for passing the correct absolute path of typst document.
     pub fn export(
         &mut self,
-        req_id: RequestId,
+
         task: ProjectTask,
         open: bool,
         mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    ) -> ScheduleResult {
         let path = get_arg!(args[0] as PathBuf);
 
-        run_query!(req_id, self.OnExport(path, open, task))
+        run_query!(self.OnExport(path, open, task))
     }
 
     /// Export a range of the current document as Ansi highlighted text.
@@ -294,9 +281,7 @@ impl ServerState {
         range: Option<LspRange>,
         f: impl Fn(Source, Option<Range<usize>>) -> LspResult<T>,
     ) -> LspResult<T> {
-        let s = self
-            .query_source(path.into(), Ok)
-            .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
+        let s = self.query_source(path.into(), Ok)?;
 
         // todo: cannot select syntax-sensitive data well
         // let node = LinkedNode::new(s.root());
@@ -512,11 +497,7 @@ impl ServerState {
     }
 
     /// Interact with the code context at the source file.
-    pub fn interact_code_context(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
         let queries = _arguments.into_iter().next().ok_or_else(|| {
             invalid_params("The first parameter is not a valid code context query array")
         })?;
@@ -533,7 +514,7 @@ impl ServerState {
         let path = as_path(params.text_document);
         let query = params.query;
 
-        run_query!(req_id, self.InteractCodeContext(path, query))
+        run_query!(self.InteractCodeContext(path, query))
     }
 
     /// Get the trace data of the document.
@@ -631,31 +612,19 @@ impl ServerState {
     }
 
     /// Get the metrics of the document.
-    pub fn get_document_metrics(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let path = get_arg!(args[0] as PathBuf);
-        run_query!(req_id, self.DocumentMetrics(path))
+        run_query!(self.DocumentMetrics(path))
     }
 
     /// Get all syntactic labels in workspace.
-    pub fn get_workspace_labels(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        run_query!(req_id, self.WorkspaceLabel())
+    pub fn get_workspace_labels(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
+        run_query!(self.WorkspaceLabel())
     }
 
     /// Get the server info.
-    pub fn get_server_info(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        run_query!(req_id, self.ServerInfo())
+    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
+        run_query!(self.ServerInfo())
     }
 }
 

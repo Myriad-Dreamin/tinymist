@@ -21,7 +21,7 @@
   "scripts": {
     "build:dev": "wasm-pack build --target web --dev -- --no-default-features --features web,no-content-hint",
     "build:node": "wasm-pack build --target nodejs -- --no-default-features --features web,no-content-hint",
-    "build": "wasm-pack build --target web -- --no-default-features --features web,no-content-hint",
+    "build": "wasm-pack build --target web  --dev -- --no-default-features --features web,no-content-hint",
     "publish:dry": "npm publish --dry-run",
     "publish:lib": "npm publish || exit 0",
     "test:chrome": "wasm-pack test --chrome --headless --release",

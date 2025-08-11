@@ -62,7 +62,7 @@ strum.workspace = true
 sync-ls = { workspace = true, features = ["lsp", "server", "system"] }
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
-tinymist-std.workspace = true
+tinymist-std = { workspace = true, default-features = false }
 tinymist = { workspace = true, default-features = false, features = ["system"] }
 tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-render.workspace = true
