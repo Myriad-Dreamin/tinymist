@@ -460,11 +460,11 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
 
         // The async scheduler is not accurate, so we need to ensure a window here
         let reserved = now - event.at_realtime;
-        if reserved < std::time::Duration::from_millis(50) {
+        if reserved < tinymist_std::time::Duration::from_millis(50) {
             let send = self.undetermined_send.clone();
             tokio::spawn(async move {
                 // todo: sleep in browser
-                tokio::time::sleep(std::time::Duration::from_millis(50) - reserved).await;
+                tokio::time::sleep(tinymist_std::time::Duration::from_millis(50) - reserved).await;
                 log_send_error("reschedule", send.send(event));
             });
             return None;

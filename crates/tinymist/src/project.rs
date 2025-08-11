@@ -565,7 +565,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                     == 0;
 
                 if check_stalled {
-                    let since = (tinymist_std::time::Time::now().duration_since(*compiling_since))
+                    let since = (tinymist_std::time::now().duration_since(*compiling_since))
                         .unwrap_or_default();
 
                     if since.as_secs() > 60 {
@@ -630,7 +630,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
-            s.ext.compiling_since = Some(tinymist_std::time::Time::now());
+            s.ext.compiling_since = Some(tinymist_std::time::now());
             rayon::spawn(move || {
                 compile_fn();
             });

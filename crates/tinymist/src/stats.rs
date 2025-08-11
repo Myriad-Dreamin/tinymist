@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
-use std::time::Duration;
+use tinymist_std::time::Duration;
 
 use parking_lot::Mutex;
 use reflexo::{hash::FxDashMap, path::unix_slash};
@@ -36,13 +36,13 @@ pub struct QueryStatBucket {
 
 pub struct QueryStatGuard {
     pub bucket: QueryStatBucket,
-    pub since: std::time::SystemTime,
-    pub snap_since: OnceLock<std::time::Duration>,
+    pub since: tinymist_std::time::Instant,
+    pub snap_since: OnceLock<tinymist_std::time::Duration>,
 }
 
 impl Drop for QueryStatGuard {
     fn drop(&mut self) {
-        let elapsed = self.since.elapsed().unwrap_or_default();
+        let elapsed = self.since.elapsed();
         let mut data = self.bucket.data.lock();
         data.query += 1;
         data.total += elapsed;
@@ -54,8 +54,7 @@ impl Drop for QueryStatGuard {
 
 impl QueryStatGuard {
     pub(crate) fn snap(&self) {
-        self.snap_since
-            .get_or_init(|| self.since.elapsed().unwrap_or_default());
+        self.snap_since.get_or_init(|| self.since.elapsed());
     }
 }
 
@@ -76,7 +75,7 @@ impl CompilerQueryStats {
         let refs2 = refs.entry(name).or_default();
         QueryStatGuard {
             bucket: refs2.clone(),
-            since: std::time::SystemTime::now(),
+            since: tinymist_std::time::Instant::now(),
             snap_since: OnceLock::new(),
         }
     }

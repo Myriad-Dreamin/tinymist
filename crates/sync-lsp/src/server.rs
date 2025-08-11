@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
-use std::time::Instant;
 
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{from_value, Value as JsonValue};
+use tinymist_std::time::Instant;
 
 #[cfg(feature = "lsp")]
 use crate::lsp::{Notification, Request};
