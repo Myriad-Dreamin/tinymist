@@ -257,6 +257,7 @@ where
     }
 
     /// Handles an incoming server event.
+    #[cfg(feature = "web")]
     pub fn on_server_event(&mut self, event_id: u32) {
         let evt = match &self.client.sender {
             TransportHost::Js(sender) => sender.events.lock().remove(&event_id),

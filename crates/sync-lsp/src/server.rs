@@ -206,6 +206,7 @@ impl LspClientRoot {
     }
 
     /// Creates a new language server host from js.
+    #[cfg(feature = "web")]
     pub fn new_js(handle: tokio::runtime::Handle, transport: JsTransportSender) -> Self {
         let dummy = dummy_transport::<LspMessage>();
 
@@ -259,6 +260,7 @@ pub struct JsTransportSender {
     pub(crate) sender_notification: js_sys::Function,
 }
 
+#[cfg(feature = "web")]
 impl JsTransportSender {
     /// Creates a new JS transport host.
     pub fn new(
