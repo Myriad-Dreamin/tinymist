@@ -2,11 +2,11 @@ use std::path::Path;
 
 use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
+use tinymist::LONG_VERSION;
 use tinymist::{CompileFontArgs, CompileOnceArgs};
-use tinymist_core::LONG_VERSION;
 
 #[cfg(feature = "preview")]
-use tinymist_core::tool::preview::PreviewArgs;
+use tinymist::tool::preview::PreviewArgs;
 #[cfg(feature = "preview")]
 use tinymist_project::DocNewArgs;
 #[cfg(feature = "preview")]

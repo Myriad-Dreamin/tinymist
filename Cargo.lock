@@ -4133,131 +4133,6 @@ dependencies = [
  "clap_mangen",
  "codespan-reporting",
  "comemo",
- "crossbeam-channel",
- "dapts",
- "dhat",
- "dirs",
- "env_logger",
- "futures",
- "http-body-util",
- "hyper",
- "hyper-tungstenite",
- "hyper-util",
- "itertools 0.13.0",
- "log",
- "lsp-types",
- "open",
- "parking_lot",
- "paste",
- "rayon",
- "reflexo",
- "reflexo-typst",
- "reflexo-vec2svg",
- "rpds",
- "serde",
- "serde_json",
- "serde_yaml",
- "strum",
- "sync-ls",
- "temp-env",
- "tinymist-assets 0.13.22 (registry+https://github.com/rust-lang/crates.io-index)",
- "tinymist-core",
- "tinymist-debug",
- "tinymist-l10n",
- "tinymist-preview",
- "tinymist-project",
- "tinymist-query",
- "tinymist-render",
- "tinymist-std",
- "tinymist-task",
- "tokio",
- "tokio-util",
- "toml",
- "ttf-parser",
- "typlite",
- "typst",
- "typst-ansi-hl",
- "typst-html",
- "typst-pdf",
- "typst-render",
- "typst-shim",
- "typst-svg",
- "typst-timing",
- "typstfmt",
- "typstyle-core",
- "unicode-script",
- "vergen",
- "walkdir",
-]
-
-[[package]]
-name = "tinymist-analysis"
-version = "0.13.22"
-dependencies = [
- "comemo",
- "dashmap",
- "ecow",
- "ena",
- "hashbrown 0.14.5",
- "if_chain",
- "insta",
- "itertools 0.13.0",
- "log",
- "lsp-types",
- "parking_lot",
- "regex",
- "rpds",
- "rustc-hash 2.1.1",
- "serde",
- "serde_yaml",
- "strum",
- "tinymist-derive",
- "tinymist-std",
- "tinymist-world",
- "toml",
- "triomphe",
- "typst",
- "typst-macros",
- "typst-shim",
- "typst-timing",
- "unscanny",
-]
-
-[[package]]
-name = "tinymist-assets"
-version = "0.13.22"
-
-[[package]]
-name = "tinymist-assets"
-version = "0.13.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67f57fcd7639be764c7493e02c7119208982057bf313f64b3595814ec99d0431"
-
-[[package]]
-name = "tinymist-bench-font-load"
-version = "0.13.22"
-dependencies = [
- "divan",
- "tinymist",
-]
-
-[[package]]
-name = "tinymist-core"
-version = "0.13.22"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "cargo_metadata",
- "chrono",
- "clap",
- "clap_builder",
- "clap_complete",
- "clap_complete_fig",
- "clap_complete_nushell",
- "clap_mangen",
- "codespan-reporting",
- "comemo",
  "console_error_panic_hook",
  "crossbeam-channel",
  "dapts",
@@ -4315,6 +4190,131 @@ dependencies = [
  "vergen",
  "walkdir",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "tinymist-analysis"
+version = "0.13.22"
+dependencies = [
+ "comemo",
+ "dashmap",
+ "ecow",
+ "ena",
+ "hashbrown 0.14.5",
+ "if_chain",
+ "insta",
+ "itertools 0.13.0",
+ "log",
+ "lsp-types",
+ "parking_lot",
+ "regex",
+ "rpds",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_yaml",
+ "strum",
+ "tinymist-derive",
+ "tinymist-std",
+ "tinymist-world",
+ "toml",
+ "triomphe",
+ "typst",
+ "typst-macros",
+ "typst-shim",
+ "typst-timing",
+ "unscanny",
+]
+
+[[package]]
+name = "tinymist-assets"
+version = "0.13.22"
+
+[[package]]
+name = "tinymist-assets"
+version = "0.13.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67f57fcd7639be764c7493e02c7119208982057bf313f64b3595814ec99d0431"
+
+[[package]]
+name = "tinymist-bench-font-load"
+version = "0.13.22"
+dependencies = [
+ "divan",
+ "tinymist",
+]
+
+[[package]]
+name = "tinymist-cli"
+version = "0.13.22"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "cargo_metadata",
+ "chrono",
+ "clap",
+ "clap_builder",
+ "clap_complete",
+ "clap_complete_fig",
+ "clap_complete_nushell",
+ "clap_mangen",
+ "codespan-reporting",
+ "comemo",
+ "crossbeam-channel",
+ "dapts",
+ "dhat",
+ "dirs",
+ "env_logger",
+ "futures",
+ "http-body-util",
+ "hyper",
+ "hyper-tungstenite",
+ "hyper-util",
+ "itertools 0.13.0",
+ "log",
+ "lsp-types",
+ "open",
+ "parking_lot",
+ "paste",
+ "rayon",
+ "reflexo",
+ "reflexo-typst",
+ "reflexo-vec2svg",
+ "rpds",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "strum",
+ "sync-ls",
+ "temp-env",
+ "tinymist",
+ "tinymist-assets 0.13.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-debug",
+ "tinymist-l10n",
+ "tinymist-preview",
+ "tinymist-project",
+ "tinymist-query",
+ "tinymist-render",
+ "tinymist-std",
+ "tinymist-task",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "ttf-parser",
+ "typlite",
+ "typst",
+ "typst-ansi-hl",
+ "typst-html",
+ "typst-pdf",
+ "typst-render",
+ "typst-shim",
+ "typst-svg",
+ "typst-timing",
+ "typstfmt",
+ "typstyle-core",
+ "unicode-script",
+ "vergen",
+ "walkdir",
 ]
 
 [[package]]

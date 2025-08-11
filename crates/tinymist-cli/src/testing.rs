@@ -24,9 +24,9 @@ use typst::syntax::{ast, LinkedNode, Source, Span};
 use typst::{utils::PicoStr, World};
 use typst_shim::eval::TypstEngine;
 
-use tinymist_core::project::*;
-use tinymist_core::tool::project::{start_project, StartProjectResult};
-use tinymist_core::world::{with_main, SourceWorld};
+use tinymist::project::*;
+use tinymist::tool::project::{start_project, StartProjectResult};
+use tinymist::world::{with_main, SourceWorld};
 
 use crate::utils::exit_on_ctrl_c;
 

@@ -9,14 +9,14 @@
     "Typst"
   ],
   "type": "module",
-  "module": "pkg/tinymist_core.js",
-  "types": "pkg/tinymist_core.d.ts",
+  "module": "pkg/tinymist.js",
+  "types": "pkg/tinymist.d.ts",
   "files": [
-    "pkg/tinymist_core_bg.wasm",
-    "pkg/tinymist_core_bg.wasm.d.ts",
-    "pkg/tinymist_core_bg.js",
-    "pkg/tinymist_core.js",
-    "pkg/tinymist_core.d.ts"
+    "pkg/tinymist_bg.wasm",
+    "pkg/tinymist_bg.wasm.d.ts",
+    "pkg/tinymist_bg.js",
+    "pkg/tinymist.js",
+    "pkg/tinymist.d.ts"
   ],
   "scripts": {
     "build:dev": "wasm-pack build --target web --dev -- --no-default-features --features web,no-content-hint",

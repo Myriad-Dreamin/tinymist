@@ -162,12 +162,12 @@ jobs:
         run: |
           npm pack > package-name
           mv $(cat package-name) tinymist-${{ env.target }}.tar.gz
-        working-directory: ./crates/tinymist-core
+        working-directory: ./crates/tinymist
       - name: Upload tinymist npm library
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}-npm
-          path: crates/tinymist-core/tinymist-${{ env.target }}.tar.gz
+          path: crates/tinymist/tinymist-${{ env.target }}.tar.gz
 
       - name: Download PDF Documentation
         uses: actions/download-artifact@v4

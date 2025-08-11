@@ -29,8 +29,8 @@ use sync_ls::{
     LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
 use tinymist::world::TaskInputs;
+use tinymist::LONG_VERSION;
 use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
-use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
