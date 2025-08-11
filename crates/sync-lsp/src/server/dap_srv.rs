@@ -110,7 +110,7 @@ where
         if is_replay {
             let client = self.client.clone();
             let _ = std::thread::spawn(move || {
-                let since = std::time::Instant::now();
+                let since = tinymist_std::time::Instant::now();
                 let timeout = std::env::var("REPLAY_TIMEOUT")
                     .ok()
                     .and_then(|s| s.parse().ok())
@@ -122,7 +122,7 @@ where
                             client.begin_panic();
                         }
 
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                        tokio::time::sleep(tinymist_std::time::Duration::from_millis(10)).await;
                     }
                 })
             })

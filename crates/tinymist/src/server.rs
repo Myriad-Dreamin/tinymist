@@ -345,7 +345,7 @@ impl ServerState {
         mut state: ServiceState<T, T::S>,
         params: LspInterrupt,
     ) -> anyhow::Result<()> {
-        let _start = std::time::Instant::now();
+        let _start = tinymist_std::time::Instant::now();
         // log::info!("incoming interrupt: {params:?}");
         let Some(ready) = state.ready() else {
             log::info!("interrupted on not ready server");
@@ -362,7 +362,7 @@ impl ServerState {
         mut state: ServiceState<T, T::S>,
         params: ServerEvent,
     ) -> anyhow::Result<()> {
-        let _start = std::time::Instant::now();
+        let _start = tinymist_std::time::Instant::now();
         // log::info!("incoming interrupt: {params:?}");
         let Some(ready) = state.ready() else {
             log::info!("server event sent to not ready server");

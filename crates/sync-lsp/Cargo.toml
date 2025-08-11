@@ -22,6 +22,7 @@ lsp-types = { workspace = true, optional = true }
 parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tinymist-std.workspace = true
 
 clap = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt"], optional = true }

@@ -180,7 +180,7 @@ where
         if is_replay {
             let client = self.client.clone();
             let _ = std::thread::spawn(move || {
-                let since = std::time::Instant::now();
+                let since = tinymist_std::time::Instant::now();
                 let timeout = std::env::var("REPLAY_TIMEOUT")
                     .ok()
                     .and_then(|s| s.parse().ok())

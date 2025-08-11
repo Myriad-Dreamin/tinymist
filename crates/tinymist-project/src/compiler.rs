@@ -825,7 +825,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         graph: Arc<WorldComputeGraph<F>>,
         export_target: ExportTarget,
     ) -> impl FnOnce() -> CompiledArtifact<F> {
-        let start = tinymist_std::time::now();
+        let start = tinymist_std::time::Instant::now();
 
         // todo unwrap main id
         let id = graph.world().main_id().unwrap();
@@ -846,7 +846,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
 
             let res = CompileStatusResult {
                 diag: (compiled.warning_cnt() + compiled.error_cnt()) as u32,
-                elapsed: start.elapsed().unwrap_or_default(),
+                elapsed: start.elapsed(),
             };
             let rep = CompileReport {
                 id: compiled.id().clone(),
@@ -898,7 +898,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
 
         // Trigger an evict task.
         rayon::spawn(move || {
-            let evict_start = std::time::Instant::now();
+            let evict_start = tinymist_std::time::Instant::now();
             if is_primary {
                 comemo::evict(10);
 

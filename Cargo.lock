@@ -3877,6 +3877,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
+ "tinymist-std",
  "tokio",
  "tokio-util",
 ]

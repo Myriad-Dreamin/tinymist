@@ -462,7 +462,12 @@ impl LsHook for TypstLsHook {
         }
     }
 
-    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: std::time::Instant) {
+    fn stop_request(
+        &self,
+        req_id: &RequestId,
+        method: &str,
+        received_at: tinymist_std::time::Instant,
+    ) {
         ().stop_request(req_id, method, received_at);
 
         if let Some(scope) = self.0.lock().remove(req_id) {
@@ -477,7 +482,7 @@ impl LsHook for TypstLsHook {
     fn stop_notification(
         &self,
         method: &str,
-        received_at: std::time::Instant,
+        received_at: tinymist_std::time::Instant,
         result: LspResult<()>,
     ) {
         ().stop_notification(method, received_at, result);

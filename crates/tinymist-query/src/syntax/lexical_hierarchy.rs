@@ -16,7 +16,7 @@ pub(crate) fn get_lexical_hierarchy(
     source: &Source,
     scope_kind: LexicalScopeKind,
 ) -> Option<EcoVec<LexicalHierarchy>> {
-    let start = std::time::Instant::now();
+    let start = tinymist_std::time::Instant::now();
     let root = LinkedNode::new(source.root());
 
     let mut worker = LexicalHierarchyWorker {

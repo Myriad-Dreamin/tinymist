@@ -180,7 +180,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
     } = start_project(verse, None, move |c, mut i, next| {
         if let Interrupt::Compiled(artifact) = &mut i {
             let mut config = ctx.lock();
-            let instant = std::time::Instant::now();
+            let instant = tinymist_std::time::Instant::now();
             // todo: well term support
             // Clear the screen and then move the cursor to the top left corner.
             eprintln!("\x1B[2J\x1B[1;1H");

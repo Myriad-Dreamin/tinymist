@@ -1,9 +1,10 @@
 //! Statistics about the analyzers
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tinymist_std::hash::FxDashMap;
+use tinymist_std::time::Duration;
 use typst::syntax::FileId;
 
 #[derive(Clone)]
@@ -35,12 +36,12 @@ pub(crate) struct QueryStatBucket {
 
 pub(crate) struct QueryStatGuard {
     pub bucket: QueryStatBucket,
-    pub since: std::time::SystemTime,
+    pub since: tinymist_std::time::Instant,
 }
 
 impl Drop for QueryStatGuard {
     fn drop(&mut self) {
-        let elapsed = self.since.elapsed().unwrap_or_default();
+        let elapsed = self.since.elapsed();
         let mut data = self.bucket.data.lock();
         data.query += 1;
         data.total += elapsed;

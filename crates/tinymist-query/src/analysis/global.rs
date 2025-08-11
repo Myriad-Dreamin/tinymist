@@ -1089,7 +1089,7 @@ impl SharedContext {
         let entry = entry.entry(query).or_default();
         QueryStatGuard {
             bucket: entry.clone(),
-            since: std::time::SystemTime::now(),
+            since: tinymist_std::time::Instant::now(),
         }
     }
 

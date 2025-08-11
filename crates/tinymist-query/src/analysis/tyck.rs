@@ -54,7 +54,7 @@ pub(crate) fn type_check(
         module_exports: Default::default(),
     };
 
-    let type_check_start = std::time::Instant::now();
+    let type_check_start = tinymist_std::time::Instant::now();
 
     checker.check(&root);
 

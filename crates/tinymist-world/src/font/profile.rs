@@ -81,7 +81,7 @@ impl FontProfileItem {
     pub fn mtime(&self) -> Option<SystemTime> {
         self.meta.get("mtime").and_then(|v| {
             let v = v.parse::<u64>().ok();
-            v.map(|v| SystemTime::UNIX_EPOCH + std::time::Duration::from_micros(v))
+            v.map(|v| SystemTime::UNIX_EPOCH + tinymist_std::time::Duration::from_micros(v))
         })
     }
 
