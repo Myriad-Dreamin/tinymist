@@ -207,8 +207,8 @@ class NightlyUtils {
                     'typlite',
                     'typst-shim',
                     'sync-lsp',
+                    'tinymist-cli',
                     'tinymist-analysis',
-                    'tinymist-core',
                     'tinymist-debug',
                     'tinymist-l10n',
                     'tinymist-package',
@@ -249,7 +249,7 @@ class NightlyUtils {
         await this.ensureInit();
 
         const nonWorldCrates = [
-            'sync-ls', 'tinymist', 'tinymist-analysis', 'tinymist-core', 'tinymist-debug',
+            'sync-ls', 'tinymist-cli', 'tinymist-analysis', 'tinymist', 'tinymist-debug',
             'tinymist-lint', 'tinymist-query', 'tinymist-render', 'tinymist-preview', 'typlite'
         ];
         await this.updateDependencies(nonWorldCrates, newVersion);
@@ -265,7 +265,7 @@ class NightlyUtils {
     async updateVersionFiles(newVersion) {
         const jsonFiles = [
             'contrib/html/editors/vscode/package.json',
-            'crates/tinymist-core/package.json',
+            'crates/tinymist/package.json',
             'editors/vscode/package.json',
             'syntaxes/textmate/package.json'
         ];

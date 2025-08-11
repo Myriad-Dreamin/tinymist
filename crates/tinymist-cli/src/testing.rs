@@ -24,9 +24,11 @@ use typst::syntax::{ast, LinkedNode, Source, Span};
 use typst::{utils::PicoStr, World};
 use typst_shim::eval::TypstEngine;
 
-use super::project::{start_project, StartProjectResult};
-use crate::world::{with_main, SourceWorld};
-use crate::{project::*, utils::exit_on_ctrl_c};
+use tinymist::project::*;
+use tinymist::tool::project::{start_project, StartProjectResult};
+use tinymist::world::{with_main, SourceWorld};
+
+use crate::utils::exit_on_ctrl_c;
 
 const TEST_EVICT_MAX_AGE: usize = 30;
 const PREFIX_LEN: usize = 7;

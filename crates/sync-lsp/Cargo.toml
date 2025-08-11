@@ -14,33 +14,27 @@ rust-version.workspace = true
 [dependencies]
 
 anyhow.workspace = true
+crossbeam-channel.workspace = true
 dapts = { workspace = true, optional = true }
+futures.workspace = true
 log.workspace = true
 lsp-types = { workspace = true, optional = true }
+parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
 clap = { workspace = true, optional = true }
-crossbeam-channel = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
-parking_lot = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["rt", "time"], optional = true }
+tokio = { workspace = true, features = ["rt"], optional = true }
 tokio-util = { workspace = true, optional = true }
 
 [features]
 dap = ["dapts"]
 lsp = ["lsp-types"]
-server = [
-    "crossbeam-channel",
-    "futures",
-    "tokio",
-    "tokio-util",
-    "clap",
-    "parking_lot",
-]
+server = ["tokio"]
+system = ["tokio", "tokio/time", "tokio-util", "clap"]
 
 [package.metadata.docs.rs]
-features = ["dap", "lsp", "server"]
+features = ["dap", "lsp", "system", "server"]
 
 [lints]
 workspace = true

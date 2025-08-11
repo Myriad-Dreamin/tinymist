@@ -43,14 +43,14 @@ pub fn path_res_to_url(path: PathResolution) -> anyhow::Result<Url> {
 }
 
 /// Convert a URL to a path.
-pub fn url_to_path(uri: Url) -> PathBuf {
+pub fn url_to_path(uri: &Url) -> PathBuf {
     if uri.scheme() == "file" {
         // typst converts an empty path to `Path::new("/")`, which is undesirable.
         if !uri.has_host() && uri.path() == "/" {
             return PathBuf::from("/untitled/nEoViM-BuG");
         }
 
-        return url_to_file_path(&uri);
+        return url_to_file_path(uri);
     }
 
     if uri.scheme() == "untitled" {
@@ -67,7 +67,7 @@ pub fn url_to_path(uri: Url) -> PathBuf {
         return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
     }
 
-    url_to_file_path(&uri)
+    url_to_file_path(uri)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -114,7 +114,7 @@ mod test {
         assert_eq!(uri.scheme(), "untitled");
         assert_eq!(uri.path(), "test");
 
-        let path = url_to_path(uri);
+        let path = url_to_path(&uri);
         assert_eq!(path, Path::new("/untitled/test").clean());
     }
 
@@ -122,7 +122,7 @@ mod test {
     fn unnamed_buffer() {
         // https://github.com/neovim/nvim-lspconfig/pull/2226
         let uri = EMPTY_URL.clone();
-        let path = url_to_path(uri);
+        let path = url_to_path(&uri);
         assert_eq!(path, Path::new("/untitled/nEoViM-BuG"));
 
         let uri2 = path_to_url(&path).unwrap();

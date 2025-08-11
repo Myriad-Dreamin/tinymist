@@ -23,7 +23,7 @@ pub struct ProjectPreviewHandler {
     /// The project id.
     pub project_id: ProjectInsId,
     /// The connection to the compiler compiling projects (language server).
-    pub(crate) client: Box<dyn ProjectClient>,
+    pub client: Box<dyn ProjectClient>,
 }
 
 impl ProjectPreviewHandler {

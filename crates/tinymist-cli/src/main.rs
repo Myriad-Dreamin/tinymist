@@ -1,6 +1,13 @@
 #![doc = include_str!("../README.md")]
 
 mod args;
+#[cfg(feature = "export")]
+mod compile;
+mod generate_script;
+#[cfg(feature = "preview")]
+mod preview;
+mod testing;
+mod utils;
 
 use core::fmt;
 use std::collections::HashMap;
@@ -21,21 +28,30 @@ use sync_ls::{
     internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
     LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
-use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
-use tinymist::tool::testing::{coverage_main, test_main};
 use tinymist::world::TaskInputs;
-use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask};
-use tinymist_core::LONG_VERSION;
+use tinymist::LONG_VERSION;
+use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
+use typst::ecow::EcoString;
 
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
-use typst::ecow::EcoString;
+#[cfg(feature = "preview")]
+use tinymist_project::LockFile;
+#[cfg(feature = "preview")]
+use tinymist_task::Id;
 
 use crate::args::*;
+
+#[cfg(feature = "export")]
+use crate::compile::compile_main;
+use crate::generate_script::generate_script_main;
+#[cfg(feature = "preview")]
+use crate::preview::preview_main;
+use crate::testing::{coverage_main, test_main};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -103,19 +119,16 @@ fn main() -> Result<()> {
         Commands::Completion(args) => completion(args),
         Commands::Cov(args) => coverage_main(args),
         Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
+        #[cfg(feature = "export")]
         Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
+        #[cfg(feature = "dap")]
         Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
-        Commands::Preview(args) => {
-            #[cfg(feature = "preview")]
-            use tinymist::tool::preview::preview_main;
-
-            RUNTIMES.tokio_runtime.block_on(preview_main(args))
-        }
+        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
         Commands::Doc(args) => project_main(args),
         Commands::Task(args) => task_main(args),
         Commands::Probe => Ok(()),
@@ -163,6 +176,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
 }
 
 /// The main entry point for the language server.
+#[cfg(feature = "dap")]
 pub fn dap_main(args: DapArgs) -> Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
@@ -175,7 +189,7 @@ pub fn dap_main(args: DapArgs) -> Result<()> {
     with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
         let client = client_root(conn.sender);
         ServerState::install_dap(DapBuilder::new(
-            DapRegularInit {
+            tinymist::DapRegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
             },
@@ -340,6 +354,85 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+#[cfg(feature = "preview")]
+trait LockFileExt {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
+}
+
+#[cfg(feature = "preview")]
+impl LockFileExt for LockFile {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
+        use tinymist_task::{ApplyProjectTask, PreviewTask, ProjectTask, TaskWhen};
+
+        let task_id = args
+            .task_name
+            .as_ref()
+            .map(|t| Id::new(t.clone()))
+            .unwrap_or(doc_id.clone());
+
+        let when = args.when.clone().unwrap_or(TaskWhen::OnType);
+        let task = ProjectTask::Preview(PreviewTask { when });
+        let task = ApplyProjectTask {
+            id: task_id.clone(),
+            document: doc_id,
+            task,
+        };
+
+        self.replace_task(task);
+
+        Ok(task_id)
+    }
+}
+
+/// Project document commands' main
+#[cfg(feature = "lock")]
+pub fn project_main(args: tinymist_project::DocCommands) -> Result<()> {
+    use tinymist_project::DocCommands;
+
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let ctx: (&Path, &Path) = (&cwd, &cwd);
+        match args {
+            DocCommands::New(args) => {
+                state.replace_document(args.to_input(ctx));
+            }
+            DocCommands::Configure(args) => {
+                use tinymist_project::ProjectRoute;
+
+                let id: Id = args.id.id(ctx);
+
+                state.route.push(ProjectRoute {
+                    id: id.clone(),
+                    priority: args.priority,
+                });
+            }
+        }
+
+        Ok(())
+    })
+}
+
+/// Project task commands' main
+#[cfg(feature = "lock")]
+pub fn task_main(args: TaskCommands) -> Result<()> {
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let _ = state;
+        match args {
+            #[cfg(feature = "preview")]
+            TaskCommands::Preview(args) => {
+                let ctx: (&Path, &Path) = (&cwd, &cwd);
+                let input = args.declare.to_input(ctx);
+                let id = input.id.clone();
+                state.replace_document(input);
+                let _ = state.preview(id, &args);
+
+                Ok(())
+            }
+        }
+    })
 }
 
 /// Creates a new language server host.

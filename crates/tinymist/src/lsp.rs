@@ -86,7 +86,7 @@ impl ServerState {
 impl ServerState {
     pub(crate) fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         log::info!("did open {}", params.text_document.uri);
-        let path: ImmutPath = as_path_(params.text_document.uri).as_path().into();
+        let path: ImmutPath = as_path_(&params.text_document.uri).as_path().into();
         let text = params.text_document.text;
 
         self.create_source(path.clone(), text)
@@ -98,14 +98,14 @@ impl ServerState {
     }
 
     pub(crate) fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri).as_path().into();
+        let path = as_path(params.text_document).as_path().into();
 
         self.remove_source(path).map_err(invalid_params)?;
         Ok(())
     }
 
     pub(crate) fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri).as_path().into();
+        let path = as_path_(&params.text_document.uri).as_path().into();
         let changes = params.content_changes;
 
         self.edit_source(path, changes, self.const_config().position_encoding)
@@ -114,7 +114,7 @@ impl ServerState {
     }
 
     pub(crate) fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri).as_path().into();
+        let path = as_path(params.text_document).as_path().into();
         self.save_source(path).map_err(invalid_params)?;
 
         Ok(())
@@ -139,9 +139,12 @@ impl ServerState {
             }
         }
 
-        let new_export_config = self.config.export();
-        if old_config.export() != new_export_config {
-            self.change_export_config(new_export_config);
+        #[cfg(feature = "export")]
+        {
+            let new_export_config = self.config.export();
+            if old_config.export() != new_export_config {
+                self.change_export_config(new_export_config);
+            }
         }
 
         if old_config.notify_status != self.config.notify_status {

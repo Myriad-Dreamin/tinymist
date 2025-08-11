@@ -2,10 +2,19 @@ use std::path::Path;
 
 use sync_ls::transport::MirrorArgs;
 use tinymist::project::DocCommands;
-use tinymist::tool::project::{CompileArgs, GenerateScriptArgs, TaskCommands};
-use tinymist::tool::testing::TestArgs;
+use tinymist::LONG_VERSION;
 use tinymist::{CompileFontArgs, CompileOnceArgs};
-use tinymist_core::LONG_VERSION;
+
+#[cfg(feature = "preview")]
+use tinymist::tool::preview::PreviewArgs;
+#[cfg(feature = "preview")]
+use tinymist_project::DocNewArgs;
+#[cfg(feature = "preview")]
+use tinymist_task::TaskWhen;
+
+use crate::compile::CompileArgs;
+use crate::generate_script::GenerateScriptArgs;
+use crate::testing::TestArgs;
 
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
@@ -196,4 +205,34 @@ pub enum QueryDocsFormat {
     #[default]
     Json,
     Markdown,
+}
+
+/// Project task commands.
+#[derive(Debug, Clone, clap::Subcommand)]
+#[clap(rename_all = "kebab-case")]
+pub enum TaskCommands {
+    /// Declare a preview task.
+    #[cfg(feature = "preview")]
+    Preview(TaskPreviewArgs),
+}
+
+/// Declare an lsp task.
+#[derive(Debug, Clone, clap::Parser)]
+#[cfg(feature = "preview")]
+pub struct TaskPreviewArgs {
+    /// Argument to identify a project.
+    #[clap(flatten)]
+    pub declare: DocNewArgs,
+
+    /// Name a task.
+    #[clap(long = "task")]
+    pub task_name: Option<String>,
+
+    /// When to run the task
+    #[arg(long = "when")]
+    pub when: Option<TaskWhen>,
+
+    /// Preview arguments
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
 }

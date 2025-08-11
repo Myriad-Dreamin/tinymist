@@ -672,7 +672,7 @@ impl SharedContext {
     }
 
     /// Get the local packages and their descriptions.
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "local-registry")]
     pub fn local_packages(&self) -> EcoVec<PackageSpec> {
         crate::package::list_package_by_namespace(&self.world.registry, eco_format!("local"))
             .into_iter()
@@ -681,7 +681,7 @@ impl SharedContext {
     }
 
     /// Get the local packages and their descriptions.
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(feature = "local-registry"))]
     pub fn local_packages(&self) -> EcoVec<PackageSpec> {
         eco_vec![]
     }

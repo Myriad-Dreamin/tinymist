@@ -34,13 +34,16 @@ impl CompletionPair<'_, '_, '_> {
             .iter()
             .map(|(spec, desc)| (spec, desc.clone()))
             .collect();
-        // local_packages to references and add them to the packages
-        let local_packages_refs = self.worker.ctx.local_packages();
-        packages.extend(
-            local_packages_refs
-                .iter()
-                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
-        );
+        #[cfg(feature = "http-registry")]
+        {
+            // local_packages to references and add them to the packages
+            let local_packages_refs = self.worker.ctx.local_packages();
+            packages.extend(
+                local_packages_refs
+                    .iter()
+                    .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
+            );
+        }
 
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {

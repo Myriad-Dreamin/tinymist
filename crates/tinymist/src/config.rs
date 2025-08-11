@@ -11,12 +11,11 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
+use task::{FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
-use tinymist_preview::{PreviewConfig, PreviewInvertColors};
 use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
-use tinymist_query::{CompletionFeat, PositionEncoding};
+use tinymist_query::{url_to_path, CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
@@ -26,10 +25,17 @@ use typst_shim::utils::LazyHash;
 
 use super::*;
 use crate::project::{
-    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
-    ProjectTask, TaskWhen,
+    EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
 use crate::world::font::FontResolverImpl;
+
+#[cfg(feature = "export")]
+use task::ExportUserConfig;
+#[cfg(feature = "preview")]
+use tinymist_preview::{PreviewConfig, PreviewInvertColors};
+
+#[cfg(feature = "export")]
+use crate::project::{ExportPdfTask, ProjectTask};
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
@@ -172,13 +178,13 @@ impl Config {
         let roots = match params.workspace_folders.as_ref() {
             Some(roots) => roots
                 .iter()
-                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|root| ImmutPath::from(url_to_path(&root.uri)))
                 .collect(),
             #[allow(deprecated)] // `params.root_path` is marked as deprecated
             None => params
                 .root_uri
                 .as_ref()
-                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|uri| ImmutPath::from(url_to_path(uri)))
                 .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
                 .into_iter()
                 .collect(),
@@ -510,6 +516,7 @@ impl Config {
     }
 
     /// Gets the preview configuration.
+    #[cfg(feature = "preview")]
     pub fn preview(&self) -> PreviewConfig {
         PreviewConfig {
             enable_partial_rendering: self.preview.partial_rendering,
@@ -529,6 +536,7 @@ impl Config {
     }
 
     /// Gets the export configuration.
+    #[cfg(feature = "export")]
     pub(crate) fn export(&self) -> ExportUserConfig {
         let export = self.export_task();
         ExportUserConfig {
@@ -675,7 +683,7 @@ impl Config {
         )
     }
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(feature = "system"))]
     fn create_physical_access_model(
         &self,
         client: &TypedLspClient<ServerState>,
@@ -683,7 +691,7 @@ impl Config {
         self.create_delegate_access_model(client)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "system")]
     fn create_physical_access_model(
         &self,
         _client: &TypedLspClient<ServerState>,
@@ -874,6 +882,7 @@ pub struct PreviewFeat {
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub partial_rendering: bool,
     /// Invert colors for the preview.
+    #[cfg(feature = "preview")]
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub invert_colors: PreviewInvertColors,
 }
@@ -971,6 +980,7 @@ where
 mod tests {
     use super::*;
     use serde_json::json;
+    #[cfg(feature = "preview")]
     use tinymist_preview::{PreviewInvertColor, PreviewInvertColorObject};
 
     fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
@@ -1174,7 +1184,9 @@ mod tests {
         test_good_config("preview.background.args");
         test_good_config("preview.refresh");
         test_good_config("preview.partialRendering");
+        #[cfg(feature = "preview")]
         let c = test_good_config("preview.invertColors");
+        #[cfg(feature = "preview")]
         assert_eq!(
             c.preview.invert_colors,
             PreviewInvertColors::Enum(PreviewInvertColor::Never)
@@ -1377,6 +1389,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_default_preview_config() {
         let config = Config::default().preview();
         assert!(!config.enable_partial_rendering);
@@ -1385,6 +1398,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_preview_config() {
         let config = Config {
             preview: PreviewFeat {
@@ -1434,6 +1448,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_invert_colors_validation() {
         fn test(s: &str) -> anyhow::Result<PreviewInvertColors> {
             Ok(serde_json::from_str(s)?)

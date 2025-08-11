@@ -19,7 +19,7 @@
 
 #![allow(missing_docs)]
 
-use reflexo_typst::{diag::print_diagnostics, TypstDocument};
+use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
 
@@ -42,8 +42,11 @@ use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosit
 use super::ServerState;
 use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
+#[cfg(feature = "export")]
 use crate::task::ExportUserConfig;
-use crate::{Config, ServerEvent};
+use crate::Config;
+#[cfg(feature = "preview")]
+use crate::ServerEvent;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -53,6 +56,7 @@ pub type LspProjectCompiler = ProjectCompiler<LspCompilerFeat, ProjectInsStateEx
 /// Project access and mutations.
 impl ServerState {
     /// Changes the export configuration.
+    #[cfg(feature = "export")]
     pub fn change_export_config(&mut self, config: ExportUserConfig) {
         self.project.export.change_config(config);
     }
@@ -138,6 +142,7 @@ impl ServerState {
         let const_config = &config.const_config;
 
         // Run Export actors before preparing cluster to avoid loss of events
+        #[cfg(feature = "export")]
         let export = crate::task::ExportTask::new(
             client.handle.clone(),
             Some(editor_tx.clone()),
@@ -150,6 +155,7 @@ impl ServerState {
             #[cfg(feature = "preview")]
             preview,
             is_standalone: false,
+            #[cfg(feature = "export")]
             export: export.clone(),
             editor_tx: editor_tx.clone(),
             client: Arc::new(client.clone().to_untyped()),
@@ -207,11 +213,20 @@ impl ServerState {
 
         // todo: unify filesystem watcher
         let (dep_tx, dep_rx) = mpsc::unbounded_channel();
-        let fs_client = client.clone().to_untyped();
-        let async_handle = client.handle.clone();
-        async_handle.spawn(watch_deps(dep_rx, move |event| {
-            fs_client.send_event(LspInterrupt::Fs(event));
-        }));
+        // todo: notify feature?
+        #[cfg(feature = "system")]
+        {
+            let fs_client = client.clone().to_untyped();
+            let async_handle = client.handle.clone();
+            async_handle.spawn(watch_deps(dep_rx, move |event| {
+                fs_client.send_event(LspInterrupt::Fs(event));
+            }));
+        }
+        #[cfg(not(feature = "system"))]
+        {
+            let _ = dep_rx;
+            log::warn!("Project: system watcher is not enabled, file changes will not be watched");
+        }
 
         // Create the actor
         let compile_handle = handle.clone();
@@ -227,9 +242,11 @@ impl ServerState {
 
         ProjectState {
             compiler,
+            #[cfg(feature = "preview")]
             preview: handle.preview.clone(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
+            #[cfg(feature = "export")]
             export: handle.export.clone(),
         }
     }
@@ -298,9 +315,11 @@ impl ProjectInsStateExt {
 
 pub struct ProjectState {
     pub compiler: LspProjectCompiler,
-    pub preview: ProjectPreviewState,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,
+    #[cfg(feature = "preview")]
+    pub preview: ProjectPreviewState,
+    #[cfg(feature = "export")]
     pub export: crate::task::ExportTask,
 }
 
@@ -414,6 +433,7 @@ pub struct CompileHandlerImpl {
     /// language server).
     pub is_standalone: bool,
 
+    #[cfg(feature = "export")]
     pub(crate) export: crate::task::ExportTask,
     pub(crate) editor_tx: EditorSender,
     pub(crate) client: Arc<dyn ProjectClient>,
@@ -422,9 +442,11 @@ pub struct CompileHandlerImpl {
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, (usize, CompileSignal)>>,
 }
 
-pub(crate) trait ProjectClient: Send + Sync + 'static {
+pub trait ProjectClient: Send + Sync + 'static {
     fn interrupt(&self, event: LspInterrupt);
+    #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent);
+    #[cfg(feature = "export")]
     fn dev_event(&self, event: DevEvent);
 }
 
@@ -433,10 +455,12 @@ impl ProjectClient for LspClient {
         self.send_event(event);
     }
 
+    #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent) {
         self.send_event(event);
     }
 
+    #[cfg(feature = "export")]
     fn dev_event(&self, event: DevEvent) {
         self.send_notification::<DevEvent>(&event);
     }
@@ -447,10 +471,12 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
         self.send(event).log_error("failed to send interrupt");
     }
 
+    #[cfg(feature = "preview")]
     fn server_event(&self, _event: ServerEvent) {
         log::warn!("ProjectClient: server_event is not implemented for mpsc::UnboundedSender<LspInterrupt>");
     }
 
+    #[cfg(feature = "export")]
     fn dev_event(&self, _event: DevEvent) {
         log::warn!(
             "ProjectClient: dev_event is not implemented for mpsc::UnboundedSender<LspInterrupt>"
@@ -696,8 +722,9 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         // Prints the diagnostics when we are running the compilation in standalone
         // CLI.
+        #[cfg(feature = "system")]
         if self.is_standalone {
-            print_diagnostics(
+            crate::project::system::print_diagnostics(
                 art.world(),
                 art.diagnostics(),
                 reflexo_typst::DiagnosticFormat::Human,
@@ -705,6 +732,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             .log_error("failed to print diagnostics");
         }
 
+        #[cfg(feature = "export")]
         self.export.signal(art, &self.client);
 
         #[cfg(feature = "preview")]
@@ -723,7 +751,7 @@ pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DevExportEvent {
+pub struct DevExportEvent {
     pub id: String,
     pub when: TaskWhen,
     pub need_export: bool,
@@ -733,7 +761,7 @@ pub(crate) struct DevExportEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub(crate) enum DevEvent {
+pub enum DevEvent {
     Export(DevExportEvent),
 }
 

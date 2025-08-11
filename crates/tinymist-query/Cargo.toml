@@ -69,6 +69,7 @@ sha2 = { version = "0.10" }
 hex = { version = "0.4" }
 
 [features]
+local-registry = ["tinymist-world/system"]
 
 [lints]
 workspace = true

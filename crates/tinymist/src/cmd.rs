@@ -1,12 +1,13 @@
 //! Tinymist LSP commands
 
-use std::ops::{Deref, Range};
+use std::ops::Range;
 use std::path::PathBuf;
 
 use lsp_types::TextDocumentIdentifier;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use sync_ls::RequestId;
+#[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_project::{
@@ -17,14 +18,20 @@ use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportMarkdownTask;
-use typst::diag::{eco_format, EcoString, StrResult};
-use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::diag::{eco_format, StrResult};
 use typst::syntax::{LinkedNode, Source};
 use world::TaskInputs;
 
 use super::*;
 use crate::lsp::query::{run_query, LspClientExt};
 use crate::tool::ast::AstRepr;
+
+#[cfg(feature = "system")]
+use typst::diag::EcoString;
+#[cfg(feature = "system")]
+use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+
+#[cfg(feature = "system")]
 use crate::tool::package::InitTask;
 
 /// See [`ProjectTask`].
@@ -416,10 +423,11 @@ impl ServerState {
     }
 
     /// Initialize a new template.
+    #[cfg(feature = "system")]
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tool::package::{self, TemplateSource};
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct InitResult {
             entry_path: PathBuf,
@@ -466,6 +474,7 @@ impl ServerState {
     }
 
     /// Get the entry of a template.
+    #[cfg(feature = "system")]
     pub fn get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tool::package::{self, TemplateSource};
 
@@ -528,7 +537,9 @@ impl ServerState {
     }
 
     /// Get the trace data of the document.
+    #[cfg(feature = "trace")]
     pub fn get_document_trace(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use std::ops::Deref;
         let path = get_arg!(args[0] as PathBuf).into();
 
         // get path to self program
@@ -573,6 +584,7 @@ impl ServerState {
     }
 
     /// Start to get the trace data of the server.
+    #[cfg(feature = "trace")]
     pub fn start_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
         let task_cell = &mut self.server_trace;
         if task_cell
@@ -595,6 +607,7 @@ impl ServerState {
     }
 
     /// Stop getting the trace data of the server.
+    #[cfg(feature = "trace")]
     pub fn stop_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
         let task_cell = &mut self.server_trace;
         if task_cell
@@ -671,6 +684,7 @@ impl ServerState {
     }
 
     /// Get directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
@@ -681,6 +695,7 @@ impl ServerState {
     }
 
     /// Get writable directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_local_package_dir(
         &mut self,
         _arguments: Vec<JsonValue>,
@@ -694,6 +709,7 @@ impl ServerState {
     }
 
     /// Get writable directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_package_by_ns(
         &mut self,
         mut arguments: Vec<JsonValue>,

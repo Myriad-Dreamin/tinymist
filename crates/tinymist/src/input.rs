@@ -5,14 +5,18 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::{diag::FileResult, syntax::Source};
 
-use crate::project::{Interrupt, ProjectResolutionKind};
-use crate::route::ProjectResolution;
+use crate::project::Interrupt;
 use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
 use crate::world::TaskInputs;
 use crate::*;
 
 mod client;
 pub use client::ClientAccessModel;
+
+#[cfg(feature = "lock")]
+use crate::project::ProjectResolutionKind;
+#[cfg(feature = "lock")]
+use crate::route::ProjectResolution;
 
 /// In memory source file management.
 impl ServerState {
@@ -232,6 +236,12 @@ impl ServerState {
             .unwrap_or_else(|| self.resolve_task_without_lock(path))
     }
 
+    #[cfg(not(feature = "lock"))]
+    pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
+        self.resolve_task_without_lock(Some(path))
+    }
+
+    #[cfg(feature = "lock")]
     pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
         let proj_input = matches!(
             self.entry_resolver().project_resolution,

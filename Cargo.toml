@@ -69,6 +69,7 @@ reqwest = { version = "^0.12", default-features = false, features = [
     "blocking",
     "multipart",
 ] }
+http-body-util = "0.1.2"
 
 # Algorithms
 base64 = "0.22"
@@ -201,9 +202,9 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.16" }
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
 sync-ls = { path = "./crates/sync-lsp", version = "0.13.22" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.22" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.22", default-features = false }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.22" }
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.22", default-features = false }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.13.22" }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.22" }
 tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.22" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.22" }

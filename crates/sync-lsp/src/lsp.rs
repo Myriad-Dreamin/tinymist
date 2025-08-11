@@ -195,7 +195,7 @@ impl Notification {
         }
     }
 
-    #[cfg(feature = "server")]
+    #[cfg(all(feature = "server", feature = "system"))]
     pub(crate) fn is_exit(&self) -> bool {
         self.method == "exit"
     }
