@@ -20,9 +20,7 @@ use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{EntryReader, DETACHED_ENTRY};
-use typst::diag::{
-    eco_format, At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult,
-};
+use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
@@ -674,11 +672,18 @@ impl SharedContext {
     }
 
     /// Get the local packages and their descriptions.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn local_packages(&self) -> EcoVec<PackageSpec> {
         crate::package::list_package_by_namespace(&self.world.registry, eco_format!("local"))
             .into_iter()
             .map(|(_, spec)| spec)
             .collect()
+    }
+
+    /// Get the local packages and their descriptions.
+    #[cfg(target_arch = "wasm32")]
+    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
+        eco_vec![]
     }
 
     pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {

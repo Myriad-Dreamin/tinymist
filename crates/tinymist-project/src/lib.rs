@@ -11,22 +11,20 @@ mod lock;
 mod lsp;
 #[cfg(feature = "system")]
 mod watch;
-#[cfg(feature = "system")]
+
 pub mod world;
 
 pub use args::*;
 pub use compiler::*;
 pub use entry::*;
-pub use model::*;
-
-#[cfg(feature = "lsp")]
 pub use lock::*;
+pub use model::*;
+pub use world::*;
+
 #[cfg(feature = "lsp")]
 pub use lsp::*;
 #[cfg(feature = "system")]
 pub use watch::*;
-#[cfg(feature = "system")]
-pub use world::*;
 
 pub use tinymist_world::{CompileSignal, CompileSnapshot, ProjectInsId};
 

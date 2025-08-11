@@ -1,23 +1,19 @@
 use std::path::Path;
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use tinymist_std::error::prelude::*;
-use tinymist_std::{bail, ImmutPath};
+use tinymist_std::ImmutPath;
 use tinymist_task::ExportTarget;
-use tinymist_world::config::CompileFontOpts;
-use tinymist_world::font::system::SystemFontSearcher;
-use tinymist_world::package::{registry::HttpRegistry, RegistryPathMapper};
-use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
+use tinymist_world::package::RegistryPathMapper;
+use tinymist_world::vfs::Vfs;
 use tinymist_world::{args::*, WorldComputeGraph};
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
 };
 use typst::diag::FileResult;
-use typst::foundations::{Bytes, Dict, Str, Value};
+use typst::foundations::{Bytes, Dict};
 use typst::utils::LazyHash;
 use typst::Features;
-
-use crate::ProjectInput;
 
 use crate::world::font::FontResolverImpl;
 use crate::{CompiledArtifact, Interrupt};
@@ -33,7 +29,11 @@ impl CompilerFeat for LspCompilerFeat {
     /// It accesses a physical file system.
     type AccessModel = DynAccessModel;
     /// It performs native HTTP requests for fetching package data.
-    type Registry = HttpRegistry;
+    #[cfg(feature = "system")]
+    type Registry = tinymist_world::package::registry::HttpRegistry;
+    // todo: registry in browser
+    #[cfg(not(feature = "system"))]
+    type Registry = tinymist_world::package::registry::DummyRegistry;
 }
 
 /// LSP universe that spawns LSP worlds.
@@ -59,6 +59,7 @@ pub trait WorldProvider {
     fn resolve(&self) -> Result<LspUniverse>;
 }
 
+#[cfg(feature = "system")]
 impl WorldProvider for CompileOnceArgs {
     fn resolve(&self) -> Result<LspUniverse> {
         let entry = self.entry()?.try_into()?;
@@ -78,7 +79,7 @@ impl WorldProvider for CompileOnceArgs {
             packages,
             fonts,
             self.creation_timestamp,
-            DynAccessModel(Arc::new(SystemAccessModel {})),
+            DynAccessModel(Arc::new(tinymist_world::vfs::system::SystemAccessModel {})),
         ))
     }
 
@@ -129,8 +130,11 @@ impl WorldProvider for CompileOnceArgs {
 }
 
 // todo: merge me with the above impl
-impl WorldProvider for (ProjectInput, ImmutPath) {
+#[cfg(feature = "system")]
+impl WorldProvider for (crate::ProjectInput, ImmutPath) {
     fn resolve(&self) -> Result<LspUniverse> {
+        use typst::foundations::{Str, Value};
+
         let (proj, lock_dir) = self;
         let entry = self.entry()?.try_into()?;
         let inputs = proj
@@ -172,7 +176,7 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             packages,
             Arc::new(fonts),
             None, // creation_timestamp - not available in project file context
-            DynAccessModel(Arc::new(SystemAccessModel {})),
+            DynAccessModel(Arc::new(tinymist_world::vfs::system::SystemAccessModel {})),
         ))
     }
 
@@ -207,6 +211,11 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
     }
 }
 
+#[cfg(not(feature = "system"))]
+type LspRegistry = tinymist_world::package::registry::DummyRegistry;
+#[cfg(feature = "system")]
+type LspRegistry = tinymist_world::package::registry::HttpRegistry;
+
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;
 
@@ -219,7 +228,7 @@ impl LspUniverseBuilder {
         export_target: ExportTarget,
         features: Features,
         inputs: ImmutDict,
-        package_registry: HttpRegistry,
+        package_registry: LspRegistry,
         font_resolver: Arc<FontResolverImpl>,
         creation_timestamp: Option<i64>,
         access_model: DynAccessModel,
@@ -246,37 +255,53 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
+    #[cfg(feature = "system")]
     pub fn only_embedded_fonts() -> Result<FontResolverImpl> {
-        let mut searcher = SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: vec![],
             no_system_fonts: true,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
 
     /// Resolve fonts from given options.
+    #[cfg(feature = "system")]
     pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
-        let mut searcher = SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
 
-    /// Resolve package registry from given options.
+    /// Resolves package registry from given options.
+    #[cfg(feature = "system")]
     pub fn resolve_package(
         cert_path: Option<ImmutPath>,
         args: Option<&CompilePackageArgs>,
-    ) -> HttpRegistry {
-        HttpRegistry::new(
+    ) -> tinymist_world::package::registry::HttpRegistry {
+        tinymist_world::package::registry::HttpRegistry::new(
             cert_path,
             args.and_then(|args| Some(args.package_path.clone()?.into())),
             args.and_then(|args| Some(args.package_cache_path.clone()?.into())),
         )
+    }
+
+    /// Resolves package registry from given options.
+    #[cfg(not(feature = "system"))]
+    pub fn resolve_package(
+        _cert_path: Option<ImmutPath>,
+        _args: Option<&CompilePackageArgs>,
+    ) -> tinymist_world::package::registry::DummyRegistry {
+        tinymist_world::package::registry::DummyRegistry
     }
 }
 

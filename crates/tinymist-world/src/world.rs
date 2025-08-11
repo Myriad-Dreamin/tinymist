@@ -814,7 +814,6 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
             if let Some(timestamp) = self.creation_timestamp {
                 tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
                     .unwrap_or_else(|_| now().into())
-                    .into()
             } else {
                 now().into()
             }
