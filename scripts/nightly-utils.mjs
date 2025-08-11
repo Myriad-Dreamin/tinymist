@@ -207,7 +207,7 @@ class NightlyUtils {
                     'typlite',
                     'typst-shim',
                     'sync-lsp',
-                    'tinymist',
+                    'tinymist-cli',
                     'tinymist-analysis',
                     'tinymist-debug',
                     'tinymist-l10n',
@@ -249,7 +249,7 @@ class NightlyUtils {
         await this.ensureInit();
 
         const nonWorldCrates = [
-            'sync-ls', 'tinymist', 'tinymist-analysis', 'tinymist', 'tinymist-debug',
+            'sync-ls', 'tinymist-cli', 'tinymist-analysis', 'tinymist', 'tinymist-debug',
             'tinymist-lint', 'tinymist-query', 'tinymist-render', 'tinymist-preview', 'typlite'
         ];
         await this.updateDependencies(nonWorldCrates, newVersion);
