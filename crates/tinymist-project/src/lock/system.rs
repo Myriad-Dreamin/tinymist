@@ -13,9 +13,7 @@ use typst::diag::EcoString;
 use typst::World;
 
 use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePath};
-use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_VERSION};
-
-pub const LOCK_FILENAME: &str = "tinymist.lock";
+use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_FILENAME, LOCK_VERSION};
 
 impl LockFile {
     pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {

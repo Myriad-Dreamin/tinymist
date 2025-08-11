@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ecow::{eco_format, EcoString};
 use tinymist_std::path::unix_slash;
-use tinymist_world::system::print_diagnostics_to_string;
+use tinymist_world::diag::print_diagnostics_to_string;
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{
     DiagnosticFormat, EntryReader, EntryState, ShadowApi, SourceWorld, TaskInputs,
