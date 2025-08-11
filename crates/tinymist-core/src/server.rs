@@ -310,6 +310,7 @@ impl ServerState {
     }
 
     /// Installs DAP handlers to the language server.
+    #[cfg(feature = "dap")]
     pub fn install_dap<T: Initializer<S = Self> + 'static>(
         provider: DapBuilder<T>,
     ) -> DapBuilder<T> {

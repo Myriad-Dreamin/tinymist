@@ -468,6 +468,7 @@ where
 
     // Create the actor
     let compile_handle = Arc::new(CompileHandlerImpl {
+        #[cfg(feature = "preview")]
         preview: opts.preview,
         is_standalone: true,
         export: crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export()),

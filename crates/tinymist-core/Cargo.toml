@@ -15,8 +15,14 @@ rust-version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [features]
+dap = ["sync-ls/dap"]
 default = ["web", "no-content-hint"]
-
+preview = [
+    "tinymist-preview",
+    "tinymist-preview/clap",
+    "tinymist-assets/typst-preview",
+    "hyper-tungstenite",
+]
 web = [
     "wasm-bindgen",
     "js-sys",
@@ -87,7 +93,7 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
-typst-html = { workspace = true, optional = true }
+typst-html.workspace = true
 typst-shim.workspace = true
 tinymist-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
@@ -104,6 +110,9 @@ dapts.workspace = true
 wasm-bindgen = { version = "0.2.100", optional = true }
 js-sys = { version = "0.3.77", optional = true }
 console_error_panic_hook = { version = "0.1.2", optional = true }
+
+[dev-dependencies]
+temp-env.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

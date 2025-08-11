@@ -71,7 +71,6 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
-typst-html = { workspace = true, optional = true }
 typst-shim.workspace = true
 tinymist-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
@@ -88,7 +87,6 @@ dapts.workspace = true
 [features]
 default = [
     "cli",
-    "html",
     "pdf",
     "l10n",
     "preview",
@@ -109,9 +107,6 @@ dhat-heap = ["dhat"]
 # into the binary.
 embed-fonts = ["tinymist-project/fonts"]
 
-# Enable the experimental HTML backend.
-html = ["dep:typst-html"]
-
 pdf = ["tinymist-task/pdf"]
 
 # Disable the default content hint.
@@ -125,14 +120,9 @@ no-content-hint = [
     "reflexo-vec2svg/no-content-hint",
 ]
 
-preview = [
-    "tinymist-preview",
-    "tinymist-preview/clap",
-    "tinymist-assets/typst-preview",
-    "hyper-tungstenite",
-]
+preview = ["tinymist-core/preview"]
 
-dap = ["sync-ls/dap"]
+dap = ["tinymist-core/dap"]
 
 l10n = ["tinymist-assets/l10n"]
 

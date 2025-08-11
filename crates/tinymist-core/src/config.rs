@@ -13,7 +13,6 @@ use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
-use tinymist_preview::{PreviewConfig, PreviewInvertColors};
 use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
 use tinymist_query::{CompletionFeat, PositionEncoding};
@@ -30,6 +29,9 @@ use crate::project::{
     ProjectTask, TaskWhen,
 };
 use crate::world::font::FontResolverImpl;
+
+#[cfg(feature = "preview")]
+use tinymist_preview::{PreviewConfig, PreviewInvertColors};
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
@@ -510,6 +512,7 @@ impl Config {
     }
 
     /// Gets the preview configuration.
+    #[cfg(feature = "preview")]
     pub fn preview(&self) -> PreviewConfig {
         PreviewConfig {
             enable_partial_rendering: self.preview.partial_rendering,
@@ -874,6 +877,7 @@ pub struct PreviewFeat {
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub partial_rendering: bool,
     /// Invert colors for the preview.
+    #[cfg(feature = "preview")]
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub invert_colors: PreviewInvertColors,
 }
@@ -971,6 +975,7 @@ where
 mod tests {
     use super::*;
     use serde_json::json;
+    #[cfg(feature = "preview")]
     use tinymist_preview::{PreviewInvertColor, PreviewInvertColorObject};
 
     fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
@@ -1174,7 +1179,9 @@ mod tests {
         test_good_config("preview.background.args");
         test_good_config("preview.refresh");
         test_good_config("preview.partialRendering");
+        #[cfg(feature = "preview")]
         let c = test_good_config("preview.invertColors");
+        #[cfg(feature = "preview")]
         assert_eq!(
             c.preview.invert_colors,
             PreviewInvertColors::Enum(PreviewInvertColor::Never)
@@ -1377,6 +1384,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_default_preview_config() {
         let config = Config::default().preview();
         assert!(!config.enable_partial_rendering);
@@ -1385,6 +1393,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_preview_config() {
         let config = Config {
             preview: PreviewFeat {
@@ -1434,6 +1443,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
     fn test_invert_colors_validation() {
         fn test(s: &str) -> anyhow::Result<PreviewInvertColors> {
             Ok(serde_json::from_str(s)?)

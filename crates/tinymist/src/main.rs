@@ -24,7 +24,7 @@ use sync_ls::{
 use tinymist::tool::project::{compile_main, generate_script_main, project_main, task_main};
 use tinymist::tool::testing::{coverage_main, test_main};
 use tinymist::world::TaskInputs;
-use tinymist::{Config, DapRegularInit, RegularInit, ServerState, SuperInit, UserActionTask};
+use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
@@ -107,6 +107,7 @@ fn main() -> Result<()> {
         Commands::GenerateScript(args) => generate_script_main(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
+        #[cfg(feature = "dap")]
         Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
@@ -163,6 +164,7 @@ pub fn lsp_main(args: LspArgs) -> Result<()> {
 }
 
 /// The main entry point for the language server.
+#[cfg(feature = "dap")]
 pub fn dap_main(args: DapArgs) -> Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
@@ -175,7 +177,7 @@ pub fn dap_main(args: DapArgs) -> Result<()> {
     with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
         let client = client_root(conn.sender);
         ServerState::install_dap(DapBuilder::new(
-            DapRegularInit {
+            tinymist::DapRegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
             },

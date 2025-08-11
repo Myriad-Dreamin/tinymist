@@ -227,6 +227,7 @@ impl ServerState {
 
         ProjectState {
             compiler,
+            #[cfg(feature = "preview")]
             preview: handle.preview.clone(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
@@ -298,6 +299,7 @@ impl ProjectInsStateExt {
 
 pub struct ProjectState {
     pub compiler: LspProjectCompiler,
+    #[cfg(feature = "preview")]
     pub preview: ProjectPreviewState,
     pub analysis: Arc<Analysis>,
     pub stats: CompilerQueryStats,

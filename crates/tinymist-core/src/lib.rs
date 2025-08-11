@@ -1,8 +1,6 @@
 //! Tinymist Core Library
 
 pub use config::*;
-pub use dap::RegularInit as DapRegularInit;
-pub use dap::SuperInit as DapSuperInit;
 pub use lsp::init::*;
 pub use server::*;
 pub use sync_ls::LspClient;
@@ -12,10 +10,16 @@ pub use tinymist_project::world;
 pub use tinymist_query as query;
 pub use world::{CompileFontArgs, CompileOnceArgs, CompilePackageArgs};
 
+#[cfg(feature = "dap")]
+pub use dap::RegularInit as DapRegularInit;
+#[cfg(feature = "dap")]
+pub use dap::SuperInit as DapSuperInit;
+
 pub mod project;
 pub mod tool;
 
 pub(crate) mod config;
+#[cfg(feature = "dap")]
 pub(crate) mod dap;
 pub(crate) mod input;
 pub(crate) mod lsp;
