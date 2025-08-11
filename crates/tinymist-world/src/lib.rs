@@ -5,6 +5,7 @@
 pub mod args;
 pub mod config;
 pub mod debug_loc;
+pub mod diag;
 pub mod entry;
 pub mod font;
 pub mod package;
