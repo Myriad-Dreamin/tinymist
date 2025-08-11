@@ -43,7 +43,9 @@ use super::ServerState;
 use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 use crate::task::ExportUserConfig;
-use crate::{Config, ServerEvent};
+use crate::Config;
+#[cfg(feature = "preview")]
+use crate::ServerEvent;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -426,6 +428,7 @@ pub struct CompileHandlerImpl {
 
 pub(crate) trait ProjectClient: Send + Sync + 'static {
     fn interrupt(&self, event: LspInterrupt);
+    #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent);
     fn dev_event(&self, event: DevEvent);
 }
@@ -435,6 +438,7 @@ impl ProjectClient for LspClient {
         self.send_event(event);
     }
 
+    #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent) {
         self.send_event(event);
     }
@@ -449,6 +453,7 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
         self.send(event).log_error("failed to send interrupt");
     }
 
+    #[cfg(feature = "preview")]
     fn server_event(&self, _event: ServerEvent) {
         log::warn!("ProjectClient: server_event is not implemented for mpsc::UnboundedSender<LspInterrupt>");
     }

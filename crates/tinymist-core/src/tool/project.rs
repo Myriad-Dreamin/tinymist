@@ -401,11 +401,11 @@ pub fn project_main(args: DocCommands) -> Result<()> {
 pub fn task_main(args: TaskCommands) -> Result<()> {
     let cwd = std::env::current_dir().context("cannot get cwd")?;
     LockFile::update(&cwd, |state| {
-        let ctx: (&Path, &Path) = (&cwd, &cwd);
         let _ = state;
         match args {
             #[cfg(feature = "preview")]
             TaskCommands::Preview(args) => {
+                let ctx: (&Path, &Path) = (&cwd, &cwd);
                 let input = args.declare.to_input(ctx);
                 let id = input.id.clone();
                 state.replace_document(input);
@@ -426,6 +426,7 @@ pub(crate) struct ProjectOpts {
     /// The shared config.
     pub config: Config,
     /// The shared preview state.
+    #[cfg(feature = "preview")]
     pub preview: ProjectPreviewState,
     /// The export target.
     pub export_target: ExportTarget,
