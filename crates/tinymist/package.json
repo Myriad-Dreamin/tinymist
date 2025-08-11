@@ -27,7 +27,15 @@
     "test:chrome": "wasm-pack test --chrome --headless --release",
     "test:firefox": "wasm-pack test --firefox --headless --release"
   },
-  "devDependencies": {
+  "dependencies": {
+    "monaco-languageclient": "^9.8.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.8",
+    "monaco-editor": "^0.43.0",
+    "bunchee": "^4.4.8",
+    "typescript": "^5.0.0",
     "turbo": "^2.3.3"
   }
 }
