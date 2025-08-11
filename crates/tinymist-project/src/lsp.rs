@@ -296,6 +296,14 @@ impl LspUniverseBuilder {
         Ok(searcher.build())
     }
 
+    /// Resolve fonts from given options.
+    #[cfg(not(any(feature = "system", feature = "web")))]
+    pub fn resolve_fonts(_args: CompileFontArgs) -> Result<FontResolverImpl> {
+        let mut searcher = tinymist_world::font::memory::MemoryFontSearcher::default();
+        searcher.add_memory_fonts(typst_assets::fonts().map(Bytes::new).collect::<Vec<_>>());
+        Ok(searcher.build())
+    }
+
     /// Resolves package registry from given options.
     #[cfg(feature = "system")]
     pub fn resolve_package(

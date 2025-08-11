@@ -127,6 +127,8 @@ system = [
     "lock",
     "open",
     "reflexo-typst/system",
+    "tinymist-project/system",
+    "tinymist-query/local-registry",
     "sync-ls/system",
     "tokio/rt-multi-thread",
     "tokio/io-std",

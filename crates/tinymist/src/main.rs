@@ -28,7 +28,6 @@ use sync_ls::{
     internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
     LspMessage, LspResult, Message, RequestId, TConnectionTx,
 };
-use tinymist::tool::project::{project_main, task_main};
 use tinymist::world::TaskInputs;
 use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_core::LONG_VERSION;
@@ -36,10 +35,14 @@ use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
+use typst::ecow::EcoString;
 
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
-use typst::ecow::EcoString;
+#[cfg(feature = "preview")]
+use tinymist_project::LockFile;
+#[cfg(feature = "preview")]
+use tinymist_task::Id;
 
 use crate::args::*;
 
@@ -351,6 +354,85 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
     })?;
 
     Ok(())
+}
+
+#[cfg(feature = "preview")]
+trait LockFileExt {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
+}
+
+#[cfg(feature = "preview")]
+impl LockFileExt for LockFile {
+    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
+        use tinymist_task::{ApplyProjectTask, PreviewTask, ProjectTask, TaskWhen};
+
+        let task_id = args
+            .task_name
+            .as_ref()
+            .map(|t| Id::new(t.clone()))
+            .unwrap_or(doc_id.clone());
+
+        let when = args.when.clone().unwrap_or(TaskWhen::OnType);
+        let task = ProjectTask::Preview(PreviewTask { when });
+        let task = ApplyProjectTask {
+            id: task_id.clone(),
+            document: doc_id,
+            task,
+        };
+
+        self.replace_task(task);
+
+        Ok(task_id)
+    }
+}
+
+/// Project document commands' main
+#[cfg(feature = "lock")]
+pub fn project_main(args: tinymist_project::DocCommands) -> Result<()> {
+    use tinymist_project::DocCommands;
+
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let ctx: (&Path, &Path) = (&cwd, &cwd);
+        match args {
+            DocCommands::New(args) => {
+                state.replace_document(args.to_input(ctx));
+            }
+            DocCommands::Configure(args) => {
+                use tinymist_project::ProjectRoute;
+
+                let id: Id = args.id.id(ctx);
+
+                state.route.push(ProjectRoute {
+                    id: id.clone(),
+                    priority: args.priority,
+                });
+            }
+        }
+
+        Ok(())
+    })
+}
+
+/// Project task commands' main
+#[cfg(feature = "lock")]
+pub fn task_main(args: TaskCommands) -> Result<()> {
+    let cwd = std::env::current_dir().context("cannot get cwd")?;
+    LockFile::update(&cwd, |state| {
+        let _ = state;
+        match args {
+            #[cfg(feature = "preview")]
+            TaskCommands::Preview(args) => {
+                let ctx: (&Path, &Path) = (&cwd, &cwd);
+                let input = args.declare.to_input(ctx);
+                let id = input.id.clone();
+                state.replace_document(input);
+                let _ = state.preview(id, &args);
+
+                Ok(())
+            }
+        }
+    })
 }
 
 /// Creates a new language server host.

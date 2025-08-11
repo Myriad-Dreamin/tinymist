@@ -73,7 +73,7 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
     Ok(())
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
     registry: &tinymist_world::package::registry::HttpRegistry,

@@ -683,7 +683,7 @@ impl Config {
         )
     }
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(feature = "system"))]
     fn create_physical_access_model(
         &self,
         client: &TypedLspClient<ServerState>,
@@ -691,7 +691,7 @@ impl Config {
         self.create_delegate_access_model(client)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "system")]
     fn create_physical_access_model(
         &self,
         _client: &TypedLspClient<ServerState>,

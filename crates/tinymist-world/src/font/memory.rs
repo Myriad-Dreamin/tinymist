@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use typst::foundations::Bytes;
 use typst::text::{FontBook, FontInfo};
 
@@ -52,11 +52,14 @@ impl MemoryFontSearcher {
     }
 
     /// Adds in-memory fonts.
-    pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
+    pub fn add_memory_fonts(&mut self, data: impl IntoParallelIterator<Item = Bytes>) {
         let source = DataSource::Memory(MemoryDataSource {
             name: "<memory>".to_owned(),
         });
-        self.extend_bytes(data.map(|data| (data, Some(source.clone()))));
+        self.extend_bytes(
+            data.into_par_iter()
+                .map(|data| (data, Some(source.clone()))),
+        );
     }
 
     /// Adds a number of raw font resources.

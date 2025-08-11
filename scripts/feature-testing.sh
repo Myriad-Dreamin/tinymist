@@ -8,5 +8,7 @@ cargo clippy -p typlite --no-default-features --features=cli,docx,no-content-hin
 
 cargo clippy -p tinymist-core --no-default-features --features=no-content-hint
 cargo clippy -p tinymist-core --no-default-features --features=no-content-hint,preview
+# cargo clippy -p tinymist-core --no-default-features --features=no-content-hint,export
+# cargo clippy -p tinymist-core --no-default-features --features=no-content-hint,trace
 cargo clippy -p tinymist-core --no-default-features --features=no-content-hint,dap
 cargo clippy -p tinymist-core --no-default-features --features=no-content-hint,web
