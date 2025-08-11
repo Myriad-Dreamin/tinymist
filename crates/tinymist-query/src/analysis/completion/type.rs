@@ -362,7 +362,7 @@ impl GetName for rust_iso639::LanguageCode<'_> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(direct_wasm, target_arch = "wasm32")))]
 impl GetName for rust_iso3166::CountryCode {
     fn get_name(&self) -> EcoString {
         self.name.into()
@@ -370,13 +370,13 @@ impl GetName for rust_iso3166::CountryCode {
 }
 
 #[cfg(target_arch = "wasm32")]
-impl GetName for rust_iso639::LanguageCode<'_> {
+impl GetName for rust_iso639::LanguageCode {
     fn get_name(&self) -> EcoString {
         self.name().into()
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(direct_wasm, target_arch = "wasm32"))]
 impl GetName for rust_iso3166::CountryCode {
     fn get_name(&self) -> EcoString {
         self.name().into()

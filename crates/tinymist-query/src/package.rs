@@ -1,11 +1,8 @@
 //! Package management tools.
 
-use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::OnceLock;
 
-use ecow::{eco_format, eco_vec, EcoVec};
-use parking_lot::Mutex;
+use ecow::eco_format;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::PackageSpec;
@@ -81,7 +78,42 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 pub fn list_package_by_namespace(
     registry: &tinymist_world::package::registry::HttpRegistry,
     ns: EcoString,
-) -> EcoVec<(PathBuf, PackageSpec)> {
+) -> ecow::EcoVec<(PathBuf, PackageSpec)> {
+    use std::collections::HashSet;
+    use std::sync::OnceLock;
+
+    use ecow::eco_vec;
+    use parking_lot::Mutex;
+
+    trait IsDirFollowLinks {
+        fn is_dir_follow_links(&self) -> bool;
+    }
+
+    impl IsDirFollowLinks for PathBuf {
+        fn is_dir_follow_links(&self) -> bool {
+            // Although `canonicalize` is heavy, we must use it because `symlink_metadata`
+            // is not reliable.
+            self.canonicalize()
+                .map(|meta| meta.is_dir())
+                .unwrap_or(false)
+        }
+    }
+
+    fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {
+        let err = match result {
+            Ok(value) => return Some(value),
+            Err(err) => err,
+        };
+
+        static ONCE: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+        let mut once = ONCE.get_or_init(Default::default).lock();
+        if once.insert(site) {
+            log::error!("failed to perform {site}: {err}");
+        }
+
+        None
+    }
+
     // search packages locally. We only search in the data
     // directory and not the cache directory, because the latter is not
     // intended for storage of local packages.
@@ -147,33 +179,4 @@ pub fn list_package_by_namespace(
     }
 
     packages
-}
-
-trait IsDirFollowLinks {
-    fn is_dir_follow_links(&self) -> bool;
-}
-
-impl IsDirFollowLinks for PathBuf {
-    fn is_dir_follow_links(&self) -> bool {
-        // Although `canonicalize` is heavy, we must use it because `symlink_metadata`
-        // is not reliable.
-        self.canonicalize()
-            .map(|meta| meta.is_dir())
-            .unwrap_or(false)
-    }
-}
-
-fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {
-    let err = match result {
-        Ok(value) => return Some(value),
-        Err(err) => err,
-    };
-
-    static ONCE: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    let mut once = ONCE.get_or_init(Default::default).lock();
-    if once.insert(site) {
-        log::error!("failed to perform {site}: {err}");
-    }
-
-    None
 }

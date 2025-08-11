@@ -1,10 +1,9 @@
 use std::path::Path;
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use tinymist_std::error::prelude::*;
-use tinymist_std::{bail, ImmutPath};
+use tinymist_std::ImmutPath;
 use tinymist_task::ExportTarget;
-use tinymist_world::config::CompileFontOpts;
 use tinymist_world::package::RegistryPathMapper;
 use tinymist_world::vfs::Vfs;
 use tinymist_world::{args::*, WorldComputeGraph};
@@ -12,11 +11,9 @@ use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
 };
 use typst::diag::FileResult;
-use typst::foundations::{Bytes, Dict, Str, Value};
+use typst::foundations::{Bytes, Dict};
 use typst::utils::LazyHash;
 use typst::Features;
-
-use crate::ProjectInput;
 
 use crate::world::font::FontResolverImpl;
 use crate::{CompiledArtifact, Interrupt};
@@ -134,8 +131,10 @@ impl WorldProvider for CompileOnceArgs {
 
 // todo: merge me with the above impl
 #[cfg(feature = "system")]
-impl WorldProvider for (ProjectInput, ImmutPath) {
+impl WorldProvider for (crate::ProjectInput, ImmutPath) {
     fn resolve(&self) -> Result<LspUniverse> {
+        use typst::foundations::{Str, Value};
+
         let (proj, lock_dir) = self;
         let entry = self.entry()?.try_into()?;
         let inputs = proj
@@ -259,10 +258,12 @@ impl LspUniverseBuilder {
     #[cfg(feature = "system")]
     pub fn only_embedded_fonts() -> Result<FontResolverImpl> {
         let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: vec![],
             no_system_fonts: true,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
@@ -271,15 +272,17 @@ impl LspUniverseBuilder {
     #[cfg(feature = "system")]
     pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
         let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
 
-    /// Resolve package registry from given options.
+    /// Resolves package registry from given options.
     #[cfg(feature = "system")]
     pub fn resolve_package(
         cert_path: Option<ImmutPath>,
@@ -292,10 +295,11 @@ impl LspUniverseBuilder {
         )
     }
 
+    /// Resolves package registry from given options.
     #[cfg(not(feature = "system"))]
     pub fn resolve_package(
-        cert_path: Option<ImmutPath>,
-        args: Option<&CompilePackageArgs>,
+        _cert_path: Option<ImmutPath>,
+        _args: Option<&CompilePackageArgs>,
     ) -> tinymist_world::package::registry::DummyRegistry {
         tinymist_world::package::registry::DummyRegistry
     }

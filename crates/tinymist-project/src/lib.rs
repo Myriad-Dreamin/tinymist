@@ -17,11 +17,10 @@ pub mod world;
 pub use args::*;
 pub use compiler::*;
 pub use entry::*;
+pub use lock::*;
 pub use model::*;
 pub use world::*;
 
-#[cfg(feature = "lsp")]
-pub use lock::*;
 #[cfg(feature = "lsp")]
 pub use lsp::*;
 #[cfg(feature = "system")]
