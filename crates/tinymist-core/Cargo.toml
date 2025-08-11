@@ -14,26 +14,6 @@ rust-version.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-dap = ["sync-ls/dap"]
-default = ["web", "no-content-hint"]
-preview = [
-    "tinymist-preview",
-    "tinymist-preview/clap",
-    "tinymist-assets/typst-preview",
-    "hyper-tungstenite",
-]
-web = [
-    "wasm-bindgen",
-    "js-sys",
-    "console_error_panic_hook",
-    "no-content-hint",
-    "tinymist-project/web",
-    "reflexo-typst/web",
-]
-
-no-content-hint = ["reflexo-typst/no-content-hint"]
-
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
@@ -48,42 +28,37 @@ clap_mangen.workspace = true
 crossbeam-channel.workspace = true
 codespan-reporting.workspace = true
 comemo.workspace = true
+dapts.workspace = true
 dhat = { workspace = true, optional = true }
 dirs.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-hyper.workspace = true
-hyper-util = { workspace = true, features = [
-    "server",
-    "http1",
-    "http2",
-    "server-graceful",
-    "server-auto",
-] }
-http-body-util = "0.1.2"
-hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
 lsp-types.workspace = true
 log.workspace = true
-open.workspace = true
+open = { workspace = true, optional = true }
 parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
 reflexo.workspace = true
-reflexo-typst = { workspace = true, features = ["system", "svg"] }
+reflexo-typst = { workspace = true, features = ["svg"] }
 reflexo-vec2svg.workspace = true
 rpds.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 strum.workspace = true
-sync-ls = { workspace = true, features = ["lsp", "server"] }
+sync-ls = { workspace = true, features = ["lsp"] }
 tinymist-assets = { workspace = true }
+tinymist-debug = { workspace = true, optional = true }
+tinymist-l10n.workspace = true
 tinymist-query.workspace = true
 tinymist-std.workspace = true
+tinymist-preview = { workspace = true, optional = true }
 tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-render.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "io-std"] }
+tinymist-task.workspace = true
+tokio = { workspace = true }
 tokio-util.workspace = true
 toml.workspace = true
 ttf-parser.workspace = true
@@ -95,21 +70,26 @@ typst-render.workspace = true
 typst-timing.workspace = true
 typst-html.workspace = true
 typst-shim.workspace = true
-tinymist-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
-tinymist-task.workspace = true
-tinymist-debug.workspace = true
 typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
-tinymist-l10n.workspace = true
 
-dapts.workspace = true
+http-body-util = { workspace = true, optional = true }
+hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, features = [
+    "server",
+    "http1",
+    "http2",
+    "server-graceful",
+    "server-auto",
+] }
+hyper-tungstenite = { workspace = true, optional = true }
 
-wasm-bindgen = { version = "0.2.100", optional = true }
-js-sys = { version = "0.3.77", optional = true }
 console_error_panic_hook = { version = "0.1.2", optional = true }
+js-sys = { version = "0.3.77", optional = true }
+wasm-bindgen = { version = "0.2.100", optional = true }
 
 [dev-dependencies]
 temp-env.workspace = true
@@ -118,6 +98,35 @@ temp-env.workspace = true
 anyhow.workspace = true
 vergen.workspace = true
 cargo_metadata = "0.18.0"
+
+[features]
+dap = ["sync-ls/dap", "tinymist-debug"]
+default = ["web", "no-content-hint"]
+preview = [
+    "http-body-util",
+    "hyper",
+    "hyper-util",
+    "hyper-tungstenite",
+    "tinymist-preview",
+    "tinymist-preview/clap",
+    "tinymist-assets/typst-preview",
+]
+web = [
+    "console_error_panic_hook",
+    "js-sys",
+    "wasm-bindgen",
+    "reflexo-typst/web",
+    "tinymist-project/web",
+]
+system = [
+    "open",
+    "reflexo-typst/system",
+    "sync-ls/server",
+    "tokio/rt-multi-thread",
+    "tokio/io-std",
+]
+
+no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]
 workspace = true
