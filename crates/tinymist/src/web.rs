@@ -79,13 +79,13 @@ impl TinymistLanguageServer {
     /// Update or add a document in the language server's storage
     pub fn update_document(&mut self, uri: String, content: String) {
         self.documents.insert(uri.clone(), content);
-        log::info!("Document updated: {}", uri);
+        log::info!("Document updated: {uri}");
     }
 
     /// Remove a document from the language server's storage
     pub fn remove_document(&mut self, uri: String) {
         self.documents.remove(&uri);
-        log::info!("Document removed: {}", uri);
+        log::info!("Document removed: {uri}");
     }
 
     // LSP feature implementations
@@ -173,9 +173,9 @@ impl TinymistLanguageServer {
                 js_sys::Reflect::set(&contents, &"kind".into(), &"markdown".into()).unwrap();
 
                 let value = if !node_text.trim().is_empty() && node_text.len() < 50 {
-                    format!("**{}**: `{}`", kind_name, node_text.trim())
+                    format!("**{kind_name}**: `{}`", node_text.trim())
                 } else {
-                    format!("**{}**", kind_name)
+                    format!("**{kind_name}**")
                 };
 
                 js_sys::Reflect::set(&contents, &"value".into(), &value.into()).unwrap();
@@ -1293,5 +1293,11 @@ impl TinymistLanguageServer {
         }
 
         js_range
+    }
+}
+
+impl Default for TinymistLanguageServer {
+    fn default() -> Self {
+        Self::new()
     }
 }
