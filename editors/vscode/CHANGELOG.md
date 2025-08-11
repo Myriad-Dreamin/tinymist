@@ -9,11 +9,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.13.27-rc1 - [2025-08-10]
+## v0.13.27 - [2025-08-11]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 1aaf4f4](https://github.com/ParaN3xus/typst/commit/1aaf4f4b154a07b4281886680cbb552241593a02), a.k.a. [typst/typst Encoding fixes for HTML raw text elements (#6720)](https://github.com/typst/typst/commit/bcc71ddb9b5146b97cb3078ecdb5406f31781ea2).
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.25...v0.13.27-rc1
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.25...v0.13.27
 
 ## v0.13.25 - [2025-08-10]
 
