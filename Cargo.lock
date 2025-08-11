@@ -3872,14 +3872,17 @@ dependencies = [
  "crossbeam-channel",
  "dapts",
  "futures",
+ "js-sys",
  "log",
  "lsp-types",
  "parking_lot",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
  "tinymist-std",
  "tokio",
  "tokio-util",
+ "wasm-bindgen",
 ]
 
 [[package]]
