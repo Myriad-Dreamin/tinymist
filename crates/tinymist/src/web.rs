@@ -2,7 +2,9 @@
 
 #![allow(unused)]
 
-use js_sys::{Function, Promise};
+use js_sys::{Array, Function, Object, Promise};
+use lsp_types::{DocumentSymbol, DocumentSymbolResponse};
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use crate::LONG_VERSION;
@@ -13,18 +15,13 @@ pub fn version() -> String {
     LONG_VERSION.clone()
 }
 
-/// The Tinymist Language Server for WebAssembly.
-#[wasm_bindgen]
-pub struct TinymistLanguageServer {
-    send_diagnostics: Function,
-    send_request: Function,
-    send_notification: Function,
-}
-
 /// TinymistLanguageServer implements the LSP protocol for Typst documents
 /// in a WebAssembly environment
 #[wasm_bindgen]
 pub struct TinymistLanguageServer {
+    // send_diagnostics: Function,
+    // send_request: Function,
+    // send_notification: Function,
     version: String,
     /// Store document contents by URI
     documents: HashMap<String, String>,
@@ -43,21 +40,21 @@ impl TinymistLanguageServer {
         }
     }
 
-    /// Creates a new instance of the Tinymist Language Server.
+    // Creates a new instance of the Tinymist Language Server.
     // #[wasm_bindgen(constructor)]
-    pub fn new_xxx(
-        send_diagnostics: Function,
-        send_request: Function,
-        send_notification: Function,
-    ) -> Self {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    // pub fn new_xxx(
+    //     send_diagnostics: Function,
+    //     send_request: Function,
+    //     send_notification: Function,
+    // ) -> Self {
+    //     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        Self {
-            send_diagnostics,
-            send_request,
-            send_notification,
-        }
-    }
+    //     Self {
+    //         send_diagnostics,
+    //         send_request,
+    //         send_notification,
+    //     }
+    // }
 
     /// Handles incoming requests.
     pub fn on_request(&self, method: String, js_params: JsValue) -> Result<JsValue, JsValue> {
@@ -82,13 +79,13 @@ impl TinymistLanguageServer {
     /// Update or add a document in the language server's storage
     pub fn update_document(&mut self, uri: String, content: String) {
         self.documents.insert(uri.clone(), content);
-        web_sys::console::log_1(&format!("Document updated: {}", uri).into());
+        log::info!("Document updated: {}", uri);
     }
 
     /// Remove a document from the language server's storage
     pub fn remove_document(&mut self, uri: String) {
         self.documents.remove(&uri);
-        web_sys::console::log_1(&format!("Document removed: {}", uri).into());
+        log::info!("Document removed: {}", uri);
     }
 
     // LSP feature implementations
@@ -1159,9 +1156,7 @@ impl TinymistLanguageServer {
                                     // For WASM, we can validate and prepare basic file renames
                                     // In a full implementation, this would update imports and
                                     // references
-                                    web_sys::console::log_1(
-                                        &format!("File rename: {} -> {}", old_str, new_str).into(),
-                                    );
+                                    log::info!("File rename: {old_str} -> {new_str}");
                                 }
                             }
                         }
