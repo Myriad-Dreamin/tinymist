@@ -284,8 +284,34 @@ export class LanguageState {
       throw new Error("Language client is not set");
     }
 
+    // todo: move registering to initClient to avoid unhandled errors.
     client.onRequest("tinymist/fs/content", (params: FsReadRequest) => {
-      const fsUrl = vscode.Uri.file(params.path);
+      console.log(
+        "fs read request",
+        params,
+        vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
+      );
+
+      const fsUrl = vscode.Uri.file(
+        // replace escaped root on windows
+        params.path.replace(/[\\\/](\w+)%3A/g, (_, p1) => `${p1}:`),
+      );
+      const targetLib = vscode.Uri.joinPath(
+        vscode.workspace.workspaceFolders![0].uri,
+        "target/lib.typ",
+      );
+      vscode.workspace.fs.readFile(targetLib).then((res) => {
+        console.log(
+          "read target/lib.typ",
+          targetLib.toString(),
+          "v.s",
+          fsUrl.toString(),
+          params.path,
+          res.length,
+          "bytes",
+        );
+      });
+
       return vscode.workspace.fs.readFile(fsUrl).then(
         (data) => ({ content: bytesBase64Encode(data) }),
         (err) => {

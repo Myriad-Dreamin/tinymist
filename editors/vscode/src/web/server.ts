@@ -36,12 +36,34 @@ import wasmURL from "../../out/tinymist_bg.wasm";
   const bridge = new TinymistLanguageServer({
     sendEvent: (event: any): void => void events.push(event),
     sendRequest({ id, method, params }: any): void {
+      console.log("do sendRequest", id, method, params);
       connection
         .sendRequest(method, params)
         .then((result: any) => bridge.on_response({ id, result }))
         .catch((err: any) =>
           bridge.on_response({ id, error: { code: -32603, message: err.toString() } }),
         );
+    },
+    fsContent(path: string): any {
+      console.log("do fsContent", path);
+      // return connection.sendRequest("tinymist/fs/content", { path });
+
+      // use xmlHttpRequest to get the file content synchronously
+      // @ts-ignore
+      const xhr = new XMLHttpRequest();
+      // /tinymist-worker/
+
+      xhr.open("GET", `/tinymist-worker/fs/content?path=${encodeURIComponent(path)}`, false);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.send();
+
+      if (xhr.status !== 200) {
+        const msg = `Failed to get file content: ${xhr.status} ${xhr.statusText}`;
+        throw new Error(msg);
+      }
+      const content = JSON.parse(xhr.responseText);
+
+      return content;
     },
     sendNotification: ({ method, params }: any): void =>
       void connection.sendNotification(method, params),

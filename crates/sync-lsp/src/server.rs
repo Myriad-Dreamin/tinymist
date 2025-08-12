@@ -17,7 +17,7 @@ use std::sync::{Arc, Weak};
 
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value as JsonValue};
 use tinymist_std::time::Instant;
 
@@ -266,6 +266,8 @@ pub struct JsTransportSender {
     pub(crate) send_event: js_sys::Function,
     #[serde(with = "serde_wasm_bindgen::preserve")]
     pub(crate) send_request: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) fs_content: js_sys::Function,
     #[serde(with = "serde_wasm_bindgen::preserve")]
     pub(crate) send_notification: js_sys::Function,
 }
@@ -519,6 +521,83 @@ impl LspClient {
             }
         }
     }
+
+    /// Blocks on a future and returns the result.
+    pub fn content(&self, src: &Path) -> std::io::Result<DelegateFileContent> {
+        #[cfg(not(feature = "web"))]
+        {
+            panic!("content is not supported in this environment");
+        }
+        match &self.sender {
+            #[cfg(feature = "web")]
+            TransportHost::Js { sender, .. } => {
+                // let sender.fs_content;
+
+                let res = sender
+                    .fs_content
+                    .call1(
+                        &wasm_bindgen::JsValue::UNDEFINED,
+                        &src.to_string_lossy().as_ref().into(),
+                    )
+                    .map_err(|err| {
+                        std::io::Error::other(format!("failed to send fs content request: {err:?}"))
+                    })?;
+
+                let meta: DelegateFileContent =
+                    serde_wasm_bindgen::from_value(res).map_err(|err| {
+                        std::io::Error::other(format!("failed to deserialize fs content: {err:?}"))
+                    })?;
+
+                Ok(meta)
+            }
+
+            TransportHost::System(_) => {
+                panic!("content is not supported in this environment");
+            }
+        }
+
+        // let client = self.client.clone();
+        // let req = FsReadRequest {
+        //     path: src.to_owned(),
+        // };
+        // let (tx, rx) = tokio::sync::oneshot::channel();
+        // client.send_lsp_request::<FsReadRequest>(req, |_stat, resp| {
+        //     let res = tx.send(resp);
+        //     if let Err(e) = res {
+        //         log::error!("Failed to send response for file stat request:
+        // {e:?}");     }
+        // });
+        // let res = self.client.block_on(async move {
+        //     let rx = rx.await.map_err(|_| {
+        //         std::io::Error::other("Failed to receive response for file
+        // stat request")     })?;
+        //     log::info!("Requested file content");
+        //     let result = rx.result.ok_or_else(|| {
+        //         std::io::Error::other("Failed to get file stat result from
+        // response")     })?;
+        //     let meta: DelegateFileContent = serde_json::from_value(result)
+        //         .map_err(|_| std::io::Error::other("Failed to deserialize
+        // file stat result"))?;
+
+        //     let content = base64::engine::general_purpose::STANDARD
+        //         .decode(meta.content)
+        //         .map_err(|_| std::io::Error::other("Failed to decode file
+        // content"))?;
+
+        //     Ok(Bytes::new(content))
+        // });
+
+        // res.map_err(|e| FileError::Other(Some(e.to_string().into())))?
+        //     .map_err(|e| FileError::from_io(e, src))
+    }
+}
+
+/// The file content request for the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegateFileContent {
+    /// The resulting file content.
+    /// default encoding is base64
+    pub content: String,
 }
 
 /// A trait that defines the hook for the language server.

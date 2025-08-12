@@ -3883,6 +3883,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
