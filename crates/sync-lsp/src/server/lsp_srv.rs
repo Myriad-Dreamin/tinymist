@@ -260,7 +260,7 @@ where
     #[cfg(feature = "web")]
     pub fn on_server_event(&mut self, event_id: u32) {
         let evt = match &self.client.sender {
-            TransportHost::Js(sender) => sender.events.lock().remove(&event_id),
+            TransportHost::Js { events, .. } => events.lock().remove(&event_id),
             TransportHost::System(_) => {
                 panic!("cannot send server event in system transport");
             }
@@ -402,5 +402,16 @@ where
                 Ok(())
             }
         }
+    }
+
+    /// Handles an incoming response.
+    pub fn on_lsp_response(&mut self, resp: lsp::Response) {
+        let client = self.client.clone();
+        let Some(s) = self.state_mut() else {
+            log::warn!("server is not ready yet, while received response");
+            return;
+        };
+
+        client.complete_lsp_request(s, resp)
     }
 }

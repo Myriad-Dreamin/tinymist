@@ -5,7 +5,6 @@ import {
 } from "vscode-languageserver/browser";
 
 import { InitializeRequest } from "vscode-languageserver";
-import type { Connection } from "vscode-languageserver";
 
 if ("stackTraceLimit" in Error) {
   Error.stackTraceLimit = 64;
@@ -24,58 +23,42 @@ import wasmURL from "../../out/tinymist_bg.wasm";
     new BrowserMessageWriter(self),
   );
 
-  let events: any[] = [];
-  const send_event = (event: any) => {
-    events.push(event);
-  };
-
   // const wasmModule = fetch(wasmURL, {
   //   headers: {
   //     "Accept-Encoding": "Accept-Encoding: gzip",
   //   },
   // }).then((wasm) => wasm.arrayBuffer());
   // initSync(await wasmModule);
-  console.log("Initializing Tinymist WebAssembly module...");
   initSync(wasmURL);
-  console.log("Initialized Tinymist WebAssembly module...");
+  console.log(`tinymist-web ${TinymistLanguageServer.version()} wasm is loaded...`);
 
-  const bridge = new TinymistLanguageServer(
-    send_event,
-    connection.sendNotification,
-    connection.sendRequest,
-  );
+  let events: any[] = [];
+  const bridge = new TinymistLanguageServer({
+    sendEvent: (event: any): void => void events.push(event),
+    sendRequest({ id, method, params }: any): void {
+      connection
+        .sendRequest(method, params)
+        .then((result: any) => bridge.on_response({ id, result }))
+        .catch((err: any) =>
+          bridge.on_response({ id, error: { code: -32603, message: err.toString() } }),
+        );
+    },
+    sendNotification: ({ method, params }: any): void =>
+      void connection.sendNotification(method, params),
+  });
+
+  const h = <T>(res: T): T => {
+    for (const event of events.splice(0)) {
+      bridge.on_event(event);
+    }
+    return res;
+  };
+
+  connection.onInitialize((params) => h(bridge.on_request(InitializeRequest.method, params)));
+  connection.onRequest((m, p) => h(bridge.on_request(m, p)));
+  connection.onNotification((m, p) => h(bridge.on_notification(m, p)));
+
   connection.sendNotification("serverWorkerReady");
-  // todo: output channel
-
-  connection.onInitialize((params) => {
-    const res = bridge.on_request(InitializeRequest.method, params);
-    console.log("[tinymist] onInitialize response:", res);
-    for (const event of events.splice(0)) {
-      bridge.on_server_event(event);
-    }
-    return res;
-  });
-  connection.onRequest((m, p) => {
-    console.log("[tinymist] onRequest:", m, p);
-    const res = bridge.on_request(m, p);
-    console.log("[tinymist] onRequest response:", res);
-    for (const event of events.splice(0)) {
-      bridge.on_server_event(event);
-    }
-    return res;
-  });
-  connection.onNotification((m, p) => {
-    console.log("[tinymist] onNotification:", m, p);
-    bridge.on_notification(m, p);
-    // No response needed for notifications
-    console.log("[tinymist] onNotification processed");
-    for (const event of events.splice(0)) {
-      bridge.on_server_event(event);
-    }
-  });
-
   // Starts the language server
   connection.listen();
-
-  console.log("Language server worker running...");
 })();

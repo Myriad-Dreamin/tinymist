@@ -1,14 +1,11 @@
 //! Tinymist Web APIs.
 
-#![allow(unused)]
+use std::sync::LazyLock;
 
 use futures::future::MaybeDone;
-use js_sys::{Array, Function, Object, Promise};
-use lsp_types::{DocumentSymbol, DocumentSymbolResponse};
-use std::{collections::HashMap, sync::LazyLock};
 use sync_ls::{
-    erased_response, internal_error, invalid_params, lsp, GetMessageKind, JsTransportSender,
-    LsDriver, LspBuilder, LspClientRoot, LspMessage, Message, ResponseError, TConnectionTx,
+    internal_error, invalid_params, JsTransportSender, LsDriver, LspBuilder, LspClientRoot,
+    LspMessage, ResponseError,
 };
 use tinymist_project::CompileFontArgs;
 use wasm_bindgen::prelude::*;
@@ -25,7 +22,9 @@ pub fn version() -> String {
 /// in a WebAssembly environment
 #[wasm_bindgen]
 pub struct TinymistLanguageServer {
-    version: String,
+    /// The client root that strongly references the LSP client.
+    _client: LspClientRoot,
+    /// The mutable state of the server.
     state: LsDriver<LspMessage, RegularInit>,
 }
 
@@ -33,25 +32,30 @@ pub struct TinymistLanguageServer {
 impl TinymistLanguageServer {
     /// Creates a new language server.
     #[wasm_bindgen(constructor)]
-    pub fn new(send_event: Function, send_request: Function, send_notification: Function) -> Self {
+    pub fn new(init_opts: JsValue) -> Result<Self, JsValue> {
+        let sender = serde_wasm_bindgen::from_value::<JsTransportSender>(init_opts)
+            .map_err(|err| JsValue::from_str(&format!("Failed to deserialize init opts: {err}")))?;
+
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let client = client_root(send_event, send_request, send_notification);
+        let _client = LspClientRoot::new_js(RUNTIMES.tokio_runtime.handle().clone(), sender);
+        // Starts logging
+        let _ = crate::init_log(crate::InitLogOpts {
+            is_transient_cmd: false,
+            is_test_no_verbose: false,
+            output: Some(_client.weak()),
+        });
         let state = ServerState::install_lsp(LspBuilder::new(
             RegularInit {
-                client: client.weak().to_typed(),
+                client: _client.weak().to_typed(),
                 font_opts: CompileFontArgs::default(),
                 exec_cmds: Vec::new(),
             },
-            client.weak(),
+            _client.weak(),
         ))
         .build();
-        // .start(conn.receiver, is_replay)
 
-        Self {
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            state,
-        }
+        Ok(Self { _client, state })
     }
 
     /// Handles internal events.
@@ -106,27 +110,23 @@ impl TinymistLanguageServer {
         }
     }
 
+    /// Handles incoming responses.
+    pub fn on_response(&mut self, js_result: JsValue) {
+        let result = serde_wasm_bindgen::from_value::<sync_ls::lsp::Response>(js_result);
+        let resp = match result {
+            Ok(r) => r,
+            Err(err) => {
+                log::error!("Failed to deserialize response: {err}");
+                return;
+            }
+        };
+        self.state.on_lsp_response(resp);
+    }
+
     /// Get the version of the language server.
-    pub fn version(&self) -> String {
-        self.version.clone()
+    pub fn version() -> String {
+        env!("CARGO_PKG_VERSION").to_string()
     }
-
-    /// Get a greeting message.
-    pub fn greet(&self) -> String {
-        format!("Hello from Tinymist WASM v{}!", self.version)
-    }
-}
-
-/// Creates a new language server host.
-fn client_root(
-    send_event: Function,
-    send_request: Function,
-    send_notification: Function,
-) -> LspClientRoot {
-    LspClientRoot::new_js(
-        RUNTIMES.tokio_runtime.handle().clone(),
-        JsTransportSender::new(send_event, send_request, send_notification),
-    )
 }
 
 /// The runtimes used by the application.
