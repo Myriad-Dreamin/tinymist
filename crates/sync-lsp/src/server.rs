@@ -17,7 +17,7 @@ use std::sync::{Arc, Weak};
 
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value as JsonValue};
 use tinymist_std::time::Instant;
 
@@ -207,14 +207,18 @@ impl LspClientRoot {
 
     /// Creates a new language server host from js.
     #[cfg(feature = "web")]
-    pub fn new_js(handle: tokio::runtime::Handle, transport: JsTransportSender) -> Self {
+    pub fn new_js(handle: tokio::runtime::Handle, sender: JsTransportSender) -> Self {
         let dummy = dummy_transport::<LspMessage>();
 
         let _strong = Arc::new(dummy.sender.into());
         let weak = LspClient {
             handle,
             msg_kind: LspMessage::MESSAGE_KIND,
-            sender: TransportHost::Js(transport),
+            sender: TransportHost::Js {
+                event_id: Arc::new(AtomicU32::new(0)),
+                events: Arc::new(Mutex::new(HashMap::new())),
+                sender,
+            },
             req_queue: Arc::new(Mutex::new(ReqQueue::default())),
 
             hook: Arc::new(()),
@@ -241,7 +245,11 @@ type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
 enum TransportHost {
     System(SystemTransportSender),
     #[cfg(feature = "web")]
-    Js(JsTransportSender),
+    Js {
+        event_id: Arc<AtomicU32>,
+        events: Arc<Mutex<HashMap<u32, Event>>>,
+        sender: JsTransportSender,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -251,31 +259,17 @@ struct SystemTransportSender {
 
 /// Creates a new js transport host.
 #[cfg(feature = "web")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JsTransportSender {
-    event_id: Arc<AtomicU32>,
-    events: Arc<Mutex<HashMap<u32, Event>>>,
-    pub(crate) sender_event: js_sys::Function,
-    pub(crate) sender_request: js_sys::Function,
-    pub(crate) sender_notification: js_sys::Function,
-}
-
-#[cfg(feature = "web")]
-impl JsTransportSender {
-    /// Creates a new JS transport host.
-    pub fn new(
-        sender_event: js_sys::Function,
-        sender_request: js_sys::Function,
-        sender_notification: js_sys::Function,
-    ) -> Self {
-        Self {
-            event_id: Arc::new(AtomicU32::new(0)),
-            events: Arc::new(Mutex::new(HashMap::new())),
-            sender_event,
-            sender_request,
-            sender_notification,
-        }
-    }
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_event: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_request: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) fs_content: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_notification: js_sys::Function,
 }
 
 #[cfg(feature = "web")]
@@ -303,17 +297,19 @@ impl TransportHost {
                 }
             }
             #[cfg(feature = "web")]
-            TransportHost::Js(host) => {
+            TransportHost::Js {
+                event_id,
+                sender,
+                events,
+            } => {
                 let event_id = {
-                    let event_id = host
-                        .event_id
-                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let mut lg = host.events.lock();
+                    let event_id = event_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    let mut lg = events.lock();
                     lg.insert(event_id, Box::new(event));
                     js_sys::Number::from(event_id)
                 };
-                if let Err(err) = host
-                    .sender_event
+                if let Err(err) = sender
+                    .send_event
                     .call1(&wasm_bindgen::JsValue::UNDEFINED, &event_id.into())
                 {
                     log::error!("failed to send event: {err:?}");
@@ -334,12 +330,12 @@ impl TransportHost {
                 }
             }
             #[cfg(feature = "web")]
-            TransportHost::Js(host) => match response {
+            TransportHost::Js { sender, .. } => match response {
                 #[cfg(feature = "lsp")]
                 Message::Lsp(lsp::Message::Request(req)) => {
                     let msg = to_js_value(&req).expect("failed to serialize request to js value");
-                    if let Err(err) = host
-                        .sender_request
+                    if let Err(err) = sender
+                        .send_request
                         .call1(&wasm_bindgen::JsValue::UNDEFINED, &msg)
                     {
                         log::error!("failed to send request: {err:?}");
@@ -348,8 +344,8 @@ impl TransportHost {
                 #[cfg(feature = "lsp")]
                 Message::Lsp(lsp::Message::Notification(req)) => {
                     let msg = to_js_value(&req).expect("failed to serialize request to js value");
-                    if let Err(err) = host
-                        .sender_notification
+                    if let Err(err) = sender
+                        .send_notification
                         .call1(&wasm_bindgen::JsValue::UNDEFINED, &msg)
                     {
                         log::error!("failed to send request: {err:?}");
@@ -362,8 +358,8 @@ impl TransportHost {
                 #[cfg(feature = "dap")]
                 Message::Dap(dap::Message::Request(req)) => {
                     let msg = to_js_value(&req).expect("failed to serialize request to js value");
-                    if let Err(err) = host
-                        .sender_request
+                    if let Err(err) = sender
+                        .send_request
                         .call1(&wasm_bindgen::JsValue::UNDEFINED, &msg)
                     {
                         log::error!("failed to send request: {err:?}");
@@ -372,8 +368,8 @@ impl TransportHost {
                 #[cfg(feature = "dap")]
                 Message::Dap(dap::Message::Event(req)) => {
                     let msg = to_js_value(&req).expect("failed to serialize request to js value");
-                    if let Err(err) = host
-                        .sender_notification
+                    if let Err(err) = sender
+                        .send_notification
                         .call1(&wasm_bindgen::JsValue::UNDEFINED, &msg)
                     {
                         log::error!("failed to send request: {err:?}");
@@ -525,6 +521,83 @@ impl LspClient {
             }
         }
     }
+
+    /// Blocks on a future and returns the result.
+    pub fn content(&self, src: &Path) -> std::io::Result<DelegateFileContent> {
+        #[cfg(not(feature = "web"))]
+        {
+            panic!("content is not supported in this environment");
+        }
+        match &self.sender {
+            #[cfg(feature = "web")]
+            TransportHost::Js { sender, .. } => {
+                // let sender.fs_content;
+
+                let res = sender
+                    .fs_content
+                    .call1(
+                        &wasm_bindgen::JsValue::UNDEFINED,
+                        &src.to_string_lossy().as_ref().into(),
+                    )
+                    .map_err(|err| {
+                        std::io::Error::other(format!("failed to send fs content request: {err:?}"))
+                    })?;
+
+                let meta: DelegateFileContent =
+                    serde_wasm_bindgen::from_value(res).map_err(|err| {
+                        std::io::Error::other(format!("failed to deserialize fs content: {err:?}"))
+                    })?;
+
+                Ok(meta)
+            }
+
+            TransportHost::System(_) => {
+                panic!("content is not supported in this environment");
+            }
+        }
+
+        // let client = self.client.clone();
+        // let req = FsReadRequest {
+        //     path: src.to_owned(),
+        // };
+        // let (tx, rx) = tokio::sync::oneshot::channel();
+        // client.send_lsp_request::<FsReadRequest>(req, |_stat, resp| {
+        //     let res = tx.send(resp);
+        //     if let Err(e) = res {
+        //         log::error!("Failed to send response for file stat request:
+        // {e:?}");     }
+        // });
+        // let res = self.client.block_on(async move {
+        //     let rx = rx.await.map_err(|_| {
+        //         std::io::Error::other("Failed to receive response for file
+        // stat request")     })?;
+        //     log::info!("Requested file content");
+        //     let result = rx.result.ok_or_else(|| {
+        //         std::io::Error::other("Failed to get file stat result from
+        // response")     })?;
+        //     let meta: DelegateFileContent = serde_json::from_value(result)
+        //         .map_err(|_| std::io::Error::other("Failed to deserialize
+        // file stat result"))?;
+
+        //     let content = base64::engine::general_purpose::STANDARD
+        //         .decode(meta.content)
+        //         .map_err(|_| std::io::Error::other("Failed to decode file
+        // content"))?;
+
+        //     Ok(Bytes::new(content))
+        // });
+
+        // res.map_err(|e| FileError::Other(Some(e.to_string().into())))?
+        //     .map_err(|e| FileError::from_io(e, src))
+    }
+}
+
+/// The file content request for the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegateFileContent {
+    /// The resulting file content.
+    /// default encoding is base64
+    pub content: String,
 }
 
 /// A trait that defines the hook for the language server.

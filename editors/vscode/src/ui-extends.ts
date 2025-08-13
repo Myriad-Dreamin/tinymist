@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { statusBarFormatString } from "./extension";
+import { statusBarFormatString } from "./extension.shared";
 
 let statusBarItem: vscode.StatusBarItem;
 

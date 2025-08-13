@@ -77,7 +77,7 @@ impl SemanticRequest for CodeActionRequest {
     type Response = Vec<CodeAction>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        log::info!("requested code action: {self:?}");
+        log::trace!("requested code action: {self:?}");
 
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;

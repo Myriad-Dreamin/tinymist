@@ -23,36 +23,36 @@ impl ClientAccessModel {
 
 impl PathAccessModel for ClientAccessModel {
     fn content(&self, src: &Path) -> FileResult<Bytes> {
-        let client = self.client.clone();
-        let req = FsReadRequest {
-            path: src.to_owned(),
-        };
-        let res = futures::executor::block_on(self.client.handle.spawn(async move {
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            client.send_lsp_request::<FsReadRequest>(req, |_stat, resp| {
-                let res = tx.send(resp);
-                if let Err(e) = res {
-                    log::error!("Failed to send response for file stat request: {e:?}");
-                }
-            });
-            let rx = rx.await.map_err(|_| {
-                std::io::Error::other("Failed to receive response for file stat request")
-            })?;
-            let result = rx.result.ok_or_else(|| {
-                std::io::Error::other("Failed to get file stat result from response")
-            })?;
-            let meta: DelegateFileContent = serde_json::from_value(result)
-                .map_err(|_| std::io::Error::other("Failed to deserialize file stat result"))?;
+        log::info!("Requesting file content for {src:?}");
+        #[cfg(feature = "web")]
+        {
+            // let (tx, rx) = tokio::sync::oneshot::channel();
+            // client.send_lsp_request::<FsReadRequest>(req, |_stat, resp| {
+            //     let res = tx.send(resp);
+            //     if let Err(e) = res {
+            //         log::error!("Failed to send response for file stat request:
+            // {e:?}");     }
+            // });
 
-            let content = base64::engine::general_purpose::STANDARD
-                .decode(meta.content)
-                .map_err(|_| std::io::Error::other("Failed to decode file content"))?;
-
-            Ok(Bytes::new(content))
-        }));
-
-        res.map_err(|e| FileError::Other(Some(e.to_string().into())))?
-            .map_err(|e| FileError::from_io(e, src))
+            let res = self
+                .client
+                .content(src)
+                .and_then(|res| {
+                    base64::engine::general_purpose::STANDARD
+                        .decode(res.content)
+                        .map_err(|err| {
+                            std::io::Error::other(format!("Failed to decode file content: {err}"))
+                        })
+                        .map(Bytes::new)
+                })
+                .map_err(|e| FileError::from_io(e, src));
+            log::info!("Requested file content for {src:?} => {res:?}");
+            res
+        }
+        #[cfg(not(feature = "web"))]
+        {
+            todo!()
+        }
     }
 }
 
