@@ -25,6 +25,8 @@ pub struct OnEnterRequest {
     pub path: PathBuf,
     /// The source code range to request for.
     pub range: LspRange,
+    /// Whether to handle list and enum items.
+    pub handle_list: bool,
 }
 
 impl SyntaxRequest for OnEnterRequest {
@@ -54,8 +56,10 @@ impl SyntaxRequest for OnEnterRequest {
         let case = node_ancestors(&leaf).find_map(|node| match node.kind() {
             SyntaxKind::LineComment => Some(Cases::LineComment(node.clone())),
             SyntaxKind::Equation => Some(Cases::Equation(node.clone())),
-            SyntaxKind::ListItem | SyntaxKind::EnumItem => Some(Cases::ListOrEnum(node.clone())),
-            SyntaxKind::Space | SyntaxKind::Parbreak => {
+            SyntaxKind::ListItem | SyntaxKind::EnumItem if self.handle_list => {
+                Some(Cases::ListOrEnum(node.clone()))
+            }
+            SyntaxKind::Space | SyntaxKind::Parbreak if self.handle_list => {
                 let prev_leaf = node.prev_sibling()?;
 
                 let inter_space = node.offset()..rng.start;
@@ -78,13 +82,7 @@ impl SyntaxRequest for OnEnterRequest {
         match case {
             Some(Cases::LineComment(node)) => worker.enter_line_doc_comment(node, rng),
             Some(Cases::Equation(node)) => worker.enter_block_math(node, rng),
-            Some(Cases::ListOrEnum(node)) => {
-                let _ = node;
-                let _ = OnEnterWorker::enter_list_or_enum;
-
-                // worker.enter_list_or_enum(node, rng)
-                None
-            }
+            Some(Cases::ListOrEnum(node)) => worker.enter_list_or_enum(node, rng),
             _ => None,
         }
     }
@@ -175,6 +173,15 @@ impl OnEnterWorker<'_> {
     }
 
     fn enter_list_or_enum(&self, node: LinkedNode<'_>, rng: Range<usize>) -> Option<Vec<TextEdit>> {
+        let rng_end = rng.end;
+        let node_end = node.range().end;
+        let in_middle_of_node = rng_end < node_end
+            && self.source.text()[rng_end..node_end].contains(|c: char| !c.is_whitespace());
+
+        if in_middle_of_node {
+            return None;
+        }
+
         let indent = self.indent_of(node.range().start);
 
         let is_list = matches!(node.kind(), SyntaxKind::ListItem);
@@ -202,6 +209,7 @@ mod tests {
             let request = OnEnterRequest {
                 path: path.clone(),
                 range: find_test_range(&source),
+                handle_list: true,
             };
 
             let result = request.request(&source, PositionEncoding::Utf16);

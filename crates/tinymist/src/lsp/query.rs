@@ -173,7 +173,8 @@ impl ServerState {
     pub(crate) fn on_enter(&mut self, params: OnEnterParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(self.OnEnter(path, range))
+        let handle_list = self.config.on_enter.handle_list;
+        run_query!(self.OnEnter(path, range, handle_list))
     }
 
     pub(crate) fn will_rename_files(&mut self, params: RenameFilesParams) -> ScheduleResult {

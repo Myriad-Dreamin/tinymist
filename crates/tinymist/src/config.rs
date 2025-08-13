@@ -53,6 +53,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "formatterIndentSize",
     "formatterProseWrap",
     "hoverPeriscope",
+    "onEnter",
     "outputPath",
     "preview",
     "projectResolution",
@@ -108,8 +109,10 @@ pub struct Config {
     pub completion: CompletionFeat,
     /// Tinymist's preview features.
     pub preview: PreviewFeat,
-    /// When to trigger the lint checks.
+    /// Tinymist's lint features.
     pub lint: LintFeat,
+    /// Tinymist's on-enter features.
+    pub on_enter: OnEnterFeat,
 
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
@@ -329,6 +332,7 @@ impl Config {
         assign_config!(color_theme := "colorTheme"?: Option<String>);
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(completion := "completion"?: CompletionFeat);
+        assign_config!(on_enter := "onEnter"?: OnEnterFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
@@ -905,6 +909,13 @@ impl LintFeat {
 
         self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
     }
+}
+/// The lint features.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct OnEnterFeat {
+    /// Whether to handle list.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub handle_list: bool,
 }
 
 /// Options for browsing preview.
