@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use lsp_types::request::WorkspaceConfiguration;
+use lsp_types::request::*;
 use lsp_types::*;
 use reflexo::ImmutPath;
 use request::{RegisterCapability, UnregisterCapability};
@@ -305,12 +305,20 @@ impl ServerState {
         }
 
         const FORMATTING_REGISTRATION_ID: &str = "formatting";
-        const DOCUMENT_FORMATTING_METHOD_ID: &str = "textDocument/formatting";
+        const RANGE_FORMATTING_REGISTRATION_ID: &str = "rangeFormatting";
 
         pub fn get_formatting_registration() -> Registration {
             Registration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                method: Formatting::METHOD.to_owned(),
+                register_options: None,
+            }
+        }
+
+        pub fn get_range_formatting_registration() -> Registration {
+            Registration {
+                id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
+                method: RangeFormatting::METHOD.to_owned(),
                 register_options: None,
             }
         }
@@ -318,22 +326,35 @@ impl ServerState {
         pub fn get_formatting_unregistration() -> Unregistration {
             Unregistration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                method: Formatting::METHOD.to_owned(),
+            }
+        }
+
+        pub fn get_range_formatting_unregistration() -> Unregistration {
+            Unregistration {
+                id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
+                method: RangeFormatting::METHOD.to_owned(),
             }
         }
 
         match (enable, self.formatter_registered) {
             (true, false) => {
                 log::trace!("registering formatter");
-                self.register_capability(vec![get_formatting_registration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not register formatter")
+                self.register_capability(vec![
+                    get_formatting_registration(),
+                    get_range_formatting_registration(),
+                ])
+                .inspect(|_| self.formatter_registered = enable)
+                .context("could not register formatter")
             }
             (false, true) => {
                 log::trace!("unregistering formatter");
-                self.unregister_capability(vec![get_formatting_unregistration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not unregister formatter")
+                self.unregister_capability(vec![
+                    get_formatting_unregistration(),
+                    get_range_formatting_unregistration(),
+                ])
+                .inspect(|_| self.formatter_registered = enable)
+                .context("could not unregister formatter")
             }
             _ => Ok(()),
         }

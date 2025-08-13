@@ -99,6 +99,19 @@ impl ServerState {
         erased_response(self.formatter.run(source))
     }
 
+    pub(crate) fn range_formatting(
+        &mut self,
+        params: DocumentRangeFormattingParams,
+    ) -> ScheduleResult {
+        if matches!(self.config.formatter_mode, FormatterMode::Disable) {
+            return just_ok(serde_json::Value::Null);
+        }
+
+        let path: ImmutPath = as_path(params.text_document).as_path().into();
+        let source = self.query_source(path, Ok)?;
+        erased_response(self.formatter.run_on_range(source, params.range))
+    }
+
     pub(crate) fn inlay_hint(&mut self, params: InlayHintParams) -> ScheduleResult {
         let path = as_path(params.text_document);
         let range = params.range;
