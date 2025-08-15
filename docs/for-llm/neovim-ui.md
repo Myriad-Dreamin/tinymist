@@ -190,7 +190,6 @@ This configuration item can be one of following types:
     - `"never"` : Never
     - `"auto"` : Inferring from the browser settings
     - `"always"` : Always
-  - **Default**: `"never"`
 - Invert colors of the preview in a more fine-grained way.
   - **Type**: `object`
   - **Properties**:
@@ -208,7 +207,7 @@ This configuration item can be one of following types:
         - `"auto"` : Inferring from the browser settings
         - `"always"` : Always
       - **Default**: `"never"`
-  - **Default**: `{}`
+- **Default**: `"never"`
 
 ## `preview.partialRendering`
 
