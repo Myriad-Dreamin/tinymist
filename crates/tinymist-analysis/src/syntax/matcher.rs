@@ -394,7 +394,7 @@ pub enum DefClass<'a> {
 
 impl DefClass<'_> {
     /// Gets the node of the def class.
-    pub fn node(&self) -> &LinkedNode {
+    pub fn node(&self) -> &LinkedNode<'_> {
         match self {
             DefClass::Let(node) => node,
             DefClass::Import(node) => node,
@@ -402,7 +402,7 @@ impl DefClass<'_> {
     }
 
     /// Gets the name node of the def class.
-    pub fn name(&self) -> Option<LinkedNode> {
+    pub fn name(&self) -> Option<LinkedNode<'_>> {
         match self {
             DefClass::Let(node) => {
                 let lb: ast::LetBinding<'_> = node.cast()?;
@@ -433,17 +433,17 @@ impl DefClass<'_> {
 
 // todo: whether we should distinguish between strict and loose def classes
 /// Classifies a definition loosely.
-pub fn classify_def_loosely(node: LinkedNode) -> Option<DefClass<'_>> {
+pub fn classify_def_loosely(node: LinkedNode<'_>) -> Option<DefClass<'_>> {
     classify_def_(node, false)
 }
 
 /// Classifies a definition strictly.
-pub fn classify_def(node: LinkedNode) -> Option<DefClass<'_>> {
+pub fn classify_def(node: LinkedNode<'_>) -> Option<DefClass<'_>> {
     classify_def_(node, true)
 }
 
 /// The internal implementation of classifying a definition.
-fn classify_def_(node: LinkedNode, strict: bool) -> Option<DefClass<'_>> {
+fn classify_def_(node: LinkedNode<'_>, strict: bool) -> Option<DefClass<'_>> {
     let mut ancestor = node;
     if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
         ancestor = ancestor.prev_sibling()?;
@@ -715,7 +715,7 @@ impl<'a> SyntaxClass<'a> {
 
 /// Classifies node's syntax (inner syntax) that can be operated on by IDE
 /// functionality.
-pub fn classify_syntax(node: LinkedNode, cursor: usize) -> Option<SyntaxClass<'_>> {
+pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClass<'_>> {
     if matches!(node.kind(), SyntaxKind::Error) && node.text().starts_with('<') {
         return Some(SyntaxClass::error_as_label(node));
     }
@@ -1233,7 +1233,7 @@ pub fn classify_context_outer<'a>(
 
 /// Classifies node's context (outer syntax) that can be operated on by IDE
 /// functionality.
-pub fn classify_context(node: LinkedNode, cursor: Option<usize>) -> Option<SyntaxContext<'_>> {
+pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<SyntaxContext<'_>> {
     let mut node = node;
     if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
         loop {
