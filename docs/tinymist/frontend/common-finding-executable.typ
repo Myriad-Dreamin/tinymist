@@ -13,5 +13,5 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
   You can also compile and install *latest* `tinymist` by #link("https://www.rust-lang.org/tools/install")[Cargo];.
 
   ```bash
-  cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
+  cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist-cli
   ```

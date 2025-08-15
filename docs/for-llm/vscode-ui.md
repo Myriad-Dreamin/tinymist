@@ -7,31 +7,17 @@ This document describes the software specification of the VS Code extension for 
 
 There are following user interfaces for Tinymist:
 
-- In the activity bar, there is a Tinymist icon that show up the [_Tinymist Views_](#tinymist-views)
-  .
-- In the status bar, there is a [_Document Status Indicator_](#document-status-indicator)
-   and a general [_Problem Indicator_](#problem-indicator)
-  .
-- You can press `Ctrl+Shift+P` to open the command palette and type `Typst` to see all [_Typst-Related Commands_](#typst-related-commands)
-  .
-- You can also perform some contextual actions in the editor, such as [_Drag and Drop_](#drag-and-drop)
-   a file to the editor, or `Right Click` in the editor to see the [_Context Menu_](#context-menu)
-  .
-- There are tools in the [_Tool View_](#tool-view)
-   that you can use to automate typst tasks.
-- You can interacts with the [_Tinymist LSP_](#tinymist-lsp)
-   under the state model [_Entry File_](#entry-file)
-  , [_Focus State_](#focus-state)
-  , [_Pin State_](#pin-state)
-  , and [_Preview State_](#preview-state)
-  .
-- You can configure the extension and the language server by the [_Typst-Specific VS Code Configurations_](#typst-specific-vs-code-configurations)
-  .
+- In the activity bar, there is a Tinymist icon that show up the [_Tinymist Views_](#tinymist-views).
+- In the status bar, there is a [_Document Status Indicator_](#document-status-indicator) and a general [_Problem Indicator_](#problem-indicator).
+- You can press `Ctrl+Shift+P` to open the command palette and type `Typst` to see all [_Typst-Related Commands_](#typst-related-commands).
+- You can also perform some contextual actions in the editor, such as [_Drag and Drop_](#drag-and-drop) a file to the editor, or `Right Click` in the editor to see the [_Context Menu_](#context-menu).
+- There are tools in the [_Tool View_](#tool-view) that you can use to automate typst tasks.
+- You can interacts with the [_Tinymist LSP_](#tinymist-lsp) under the state model [_Entry File_](#entry-file), [_Focus State_](#focus-state), [_Pin State_](#pin-state), and [_Preview State_](#preview-state).
+- You can configure the extension and the language server by the [_Typst-Specific VS Code Configurations_](#typst-specific-vs-code-configurations).
 
 ## Tinymist Views
 
-There are following views in the [_Tinymist Views_](#tinymist-views)
-:
+There are following views in the [_Tinymist Views_](#tinymist-views):
 
 - [_Symbol View_](#symbol-view)
 - [_Tool View_](#tool-view)
@@ -42,8 +28,7 @@ There are following views in the [_Tinymist Views_](#tinymist-views)
 
 ### Symbol View
 
-There are following actions that you can perform in the [_Symbol View_](#symbol-view)
-:
+There are following actions that you can perform in the [_Symbol View_](#symbol-view):
 
 - Search Symbol by Names: You can search for a symbol by its name. The search is case-insensitive and supports partial matching.
 - Search Symbol by Handwritten Strokes: You can draw a symbol and search for it. The symbol will be highlighted.
@@ -51,60 +36,44 @@ There are following actions that you can perform in the [_Symbol View_](#symbol-
 
 ### Tool View
 
-There are following tools that you can use in the [_Tool View_](#tool-view)
-:
+There are following tools that you can use in the [_Tool View_](#tool-view):
 
-- [_Template Gallery_](#template-gallery)
-  : You can use this tool to show the template gallery.
-- [_Document Summary_](#document-summary)
-  : You can use this tool to show the document summary.
-- [_Symbol View_](#symbol-view)
-  : You can open the [_Symbol View_](#symbol-view)
-   to the side.
-- [_Font View_](#font-view)
-  : You can use this tool to show the font view.
-- [_Profiling_](#profiling)
-  : You can use this tool to profile the current file.
-- [_Profiling Server_](#profiling-server)
-  : You can use this tool to profile the language server.
+- [_Template Gallery_](#template-gallery): You can use this tool to show the template gallery.
+- [_Document Summary_](#document-summary): You can use this tool to show the document summary.
+- [_Symbol View_](#symbol-view): You can open the [_Symbol View_](#symbol-view) to the side.
+- [_Font View_](#font-view): You can use this tool to show the font view.
+- [_Profiling_](#profiling): You can use this tool to profile the current file.
+- [_Profiling Server_](#profiling-server): You can use this tool to profile the language server.
 
 ### Package View
 
-There are following actions that you can perform in the [_Package View_](#package-view)
-:
+There are following actions that you can perform in the [_Package View_](#package-view):
 
 - Create a new local package: You can create a new local package by clicking the `Create Local Package` button in the `commands` group.
 - Open a local package: You can open a local package by clicking the `Open Local Package` button in the `commands` group.
 - Get a tree view of the package: You can view packages in `@preview` and `@local` namespaces in tree.
-- Check documentation of a package: You can check the documentation of a package by clicking the [_Documentation_](#documentation)
-   button associated with the package in the tree view.
+- Check documentation of a package: You can check the documentation of a package by clicking the [_Documentation_](#documentation) button associated with the package in the tree view.
 - Open a package in the editor: You can open a package in the editor by clicking the `Open` button associated with the package in the tree view.
 - Open a package in the file explorer: You can open a package in the file explorer by clicking the `Reveal in File Explorer` button associated with the package in the tree view.
 - Check exported symbols of a package: You can check the exported symbols of a package by expanding the `symbols` node in the tree view.
 
 ### Content View
 
-You can get a thumbnail of the current document in the [_Content View_](#content-view)
- if [_Preview State_](#preview-state)
- is enabled.
+You can get a thumbnail of the current document in the [_Content View_](#content-view) if [_Preview State_](#preview-state) is enabled.
 
 ### Label View
 
-You can find all syntatical labels in the workspaces in the [_Label View_](#label-view)
-. The labels are grouped by prefix.
+You can find all syntatical labels in the workspaces in the [_Label View_](#label-view). The labels are grouped by prefix.
 
 ### Outline View
 
-You can get the document outline in the [_Outline View_](#outline-view)
- if [_Preview State_](#preview-state)
- is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP's syntax outline which shows language syntax structure in the current opened document.
+You can get the document outline in the [_Outline View_](#outline-view) if [_Preview State_](#preview-state) is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP's syntax outline which shows language syntax structure in the current opened document.
 
 ## Tools
 
 ### Template Gallery
 
-The [_Template Gallery_](#template-gallery)
- connects to the typst universe and shows the templates that are available in the universe.
+The [_Template Gallery_](#template-gallery) connects to the typst universe and shows the templates that are available in the universe.
 
 - You can search for a template by its name.
 - You can filter templates by their categories.
@@ -113,8 +82,7 @@ The [_Template Gallery_](#template-gallery)
 
 ### Document Summary
 
-The [_Document Summary_](#document-summary)
- shows the summary of the current document. It includes:
+The [_Document Summary_](#document-summary) shows the summary of the current document. It includes:
 
 - The fonts and related information used by the document. The related information includes:
   - The font family, size, and style.
@@ -125,14 +93,12 @@ The [_Document Summary_](#document-summary)
 
 ### Font View
 
-The [_Font View_](#font-view)
- shows all of the fonts and related information recognized by the LSP server. The related information includes:
+The [_Font View_](#font-view) shows all of the fonts and related information recognized by the LSP server. The related information includes:
 
 - The font family, size, and style.
 - The font file name and path.
 
-There are following actions that you can perform in the [_Font View_](#font-view)
-:
+There are following actions that you can perform in the [_Font View_](#font-view):
 
 - Click `Show Number`: You can click the `Show Number` button to show or hide accurate number of font weights.
 - Click `Copy`: You can click the `Copy` button to copy the typst family name of the font to the clipboard.
@@ -141,14 +107,11 @@ There are following actions that you can perform in the [_Font View_](#font-view
 
 ### Profiling
 
-The [_Profiling_](#profiling)
- tool allows you to profile the current file. It shows the time taken to compile the document by flame graph.
+The [_Profiling_](#profiling) tool allows you to profile the current file. It shows the time taken to compile the document by flame graph.
 
 ### Profiling Server
 
-The [_Profiling Server_](#profiling-server)
- tool allows you to profile the language server. When you click the `Profiling Server` button in the tool view, the server will start profiling and you can see the profiling results in the [_Profiling_](#profiling)
- tool. You can stop profiling by clicking the `Stop Profiling` button.
+The [_Profiling Server_](#profiling-server) tool allows you to profile the language server. When you click the `Profiling Server` button in the tool view, the server will start profiling and you can see the profiling results in the [_Profiling_](#profiling) tool. You can stop profiling by clicking the `Stop Profiling` button.
 
 ## Typst-Specific VS Code Configurations
 
@@ -381,7 +344,6 @@ This configuration item can be one of following types:
     - `"never"` : Never
     - `"auto"` : Inferring from the browser settings
     - `"always"` : Always
-  - **Default**: `"never"`
 - Invert colors of the preview in a more fine-grained way.
   - **Type**: `object`
   - **Properties**:
@@ -399,7 +361,7 @@ This configuration item can be one of following types:
         - `"auto"` : Inferring from the browser settings
         - `"always"` : Always
       - **Default**: `"never"`
-  - **Default**: `{}`
+- **Default**: `"never"`
 
 ## `tinymist.preview.partialRendering`
 
