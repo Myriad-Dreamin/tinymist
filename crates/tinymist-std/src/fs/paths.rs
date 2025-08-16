@@ -360,10 +360,10 @@ impl<'a> Iterator for PathAncestors<'a> {
         if let Some(path) = self.current {
             self.current = path.parent();
 
-            if let Some(ref stop_at) = self.stop_at {
-                if path == stop_at {
-                    self.current = None;
-                }
+            if let Some(ref stop_at) = self.stop_at
+                && path == stop_at
+            {
+                self.current = None;
             }
 
             Some(path)
@@ -668,11 +668,11 @@ pub fn create_dir_all_excluded_from_backups_atomic(p: impl AsRef<Path>) -> Resul
     // existing behavior. If we get an error at rename() and suddenly the
     // directory (which didn't exist a moment earlier) exists we can infer from
     // it's another cargo process doing work.
-    if let Err(e) = fs::rename(tempdir.path(), path) {
-        if !path.exists() {
-            return Err(anyhow::Error::from(e))
-                .with_context(|| format!("failed to create directory `{}`", path.display()));
-        }
+    if let Err(e) = fs::rename(tempdir.path(), path)
+        && !path.exists()
+    {
+        return Err(anyhow::Error::from(e))
+            .with_context(|| format!("failed to create directory `{}`", path.display()));
     }
     Ok(())
 }

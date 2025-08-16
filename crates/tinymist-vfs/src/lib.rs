@@ -324,7 +324,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
 
     /// Obtains an object to revise. The object will update the original vfs
     /// when it is dropped.
-    pub fn revise(&mut self) -> RevisingVfs<M> {
+    pub fn revise(&mut self) -> RevisingVfs<'_, M> {
         let managed = self.managed.lock().clone();
         let paths = self.paths.lock().clone();
         let goal_revision = self.revision.checked_add(1).expect("revision overflowed");
@@ -339,7 +339,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     }
 
     /// Obtains an object to display.
-    pub fn display(&self) -> DisplayVfs<M> {
+    pub fn display(&self) -> DisplayVfs<'_, M> {
         DisplayVfs { inner: self }
     }
 
@@ -604,7 +604,7 @@ impl EntryMap {
         }
     }
 
-    fn display(&self) -> DisplayEntryMap {
+    fn display(&self) -> DisplayEntryMap<'_> {
         DisplayEntryMap { map: self }
     }
 }
@@ -660,7 +660,7 @@ impl PathMap {
         self.paths.get(path)
     }
 
-    fn display(&self) -> DisplayPathMap {
+    fn display(&self) -> DisplayPathMap<'_> {
         DisplayPathMap { map: self }
     }
 }
