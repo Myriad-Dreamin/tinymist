@@ -324,11 +324,10 @@ impl LspUniverseBuilder {
     pub fn resolve_package(
         _cert_path: Option<ImmutPath>,
         _args: Option<&CompilePackageArgs>,
-        context: ProxyContext,
         resolve_fn: js_sys::Function,
     ) -> tinymist_world::package::registry::JsRegistry {
         tinymist_world::package::registry::JsRegistry {
-            context,
+            context: ProxyContext::new(wasm_bindgen::JsValue::NULL),
             real_resolve_fn: resolve_fn,
         }
     }

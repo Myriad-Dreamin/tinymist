@@ -4472,6 +4472,7 @@ dependencies = [
  "toml",
  "typst",
  "typst-assets",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -102,7 +102,6 @@ impl ServerState {
                     self.client.clone(),
                     #[cfg(feature = "preview")]
                     self.preview.watchers.clone(),
-                    ProxyContext::new(sender.context),
                     sender.resolve_fn,
                 )
             } else {
@@ -160,7 +159,6 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
-        #[cfg(feature = "web")] context: ProxyContext,
         #[cfg(feature = "web")] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
@@ -224,12 +222,8 @@ impl ServerState {
         let fonts = config.fonts();
 
         #[cfg(feature = "web")]
-        let packages = LspUniverseBuilder::resolve_package(
-            cert_path.clone(),
-            Some(&package),
-            context,
-            resolve_fn,
-        );
+        let packages =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
 
         #[cfg(not(feature = "web"))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
@@ -314,6 +308,7 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
     ) -> bool {
         let Some(last_compilation) = self.last_compilation.as_ref() else {
+            log::info!("skipping emit bcuz there's no last_compilation");
             return false;
         };
 
@@ -325,6 +320,7 @@ impl ProjectInsStateExt {
 
         let pending_reasons = self.pending_reasons.exclude(self.emitted_reasons);
         if !pending_reasons.any() {
+            log::info!("skipping emit bcuz there's no reason");
             return false;
         }
         self.emitted_reasons.merge(self.pending_reasons);
