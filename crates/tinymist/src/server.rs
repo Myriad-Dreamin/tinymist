@@ -352,7 +352,7 @@ impl ServerState {
     #[cfg(not(feature = "system"))]
     /// Schedules the async tasks of the server on some paths. This is used to
     /// run the server in passive context, for example, in the web
-    /// environment where the server is run in background.
+    /// environment where the server is not run in background.
     pub(crate) fn schedule_async(&mut self) {
         if let Some(editor_actor) = self.editor_actor.as_mut() {
             editor_actor.step();
