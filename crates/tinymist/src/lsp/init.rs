@@ -102,6 +102,8 @@ impl Initializer for SuperInit {
         });
         let document_formatting_provider =
             (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
+        let document_range_formatting_provider =
+            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
 
         let file_operations = const_config.notify_will_rename_files.then(|| {
             WorkspaceFileOperationsServerCapabilities {
@@ -194,6 +196,7 @@ impl Initializer for SuperInit {
                     file_operations,
                 }),
                 document_formatting_provider,
+                document_range_formatting_provider,
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 code_lens_provider: Some(CodeLensOptions {

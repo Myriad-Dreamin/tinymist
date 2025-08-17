@@ -255,6 +255,7 @@ impl ServerState {
             .with_request_::<DocumentSymbolRequest>(State::document_symbol)
             // Sync for low latency
             .with_request_::<Formatting>(State::formatting)
+            .with_request_::<RangeFormatting>(State::range_formatting)
             .with_request_::<SelectionRangeRequest>(State::selection_range)
             // latency insensitive
             .with_request_::<InlayHintRequest>(State::inlay_hint)
