@@ -133,7 +133,7 @@ impl ServerState {
         self.project
             .interrupt(Interrupt::Memory(MemoryEvent::Update(snapshot)));
 
-        rayon::spawn(move || {
+        spawn_cpu(move || {
             old_project.stop();
         });
 
@@ -218,11 +218,11 @@ impl ServerState {
 
         let fonts = config.fonts();
 
-        #[cfg(feature = "web")]
+        #[cfg(not(feature = "system"))]
         let packages =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
 
-        #[cfg(not(feature = "web"))]
+        #[cfg(feature = "system")]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
 
         let creation_timestamp = config.creation_timestamp();
@@ -565,7 +565,7 @@ impl CompileHandlerImpl {
             let snap = art.clone();
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
-            rayon::spawn(move || {
+            spawn_cpu(move || {
                 let world = snap.world().clone();
                 let mut ctx = analysis.enter(world);
 
@@ -632,7 +632,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
             let is_vfs_sub = reason.any() && !reason.exclude(VFS_SUB).any();
 
-            log::info!("Step 10: reasons: {:?}", reason);
+            log::info!("Step 10: reasons: {reason:?}");
 
             if is_vfs_sub
                 && 'vfs_is_clean: {
@@ -677,8 +677,9 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
+
             s.ext.compiling_since = Some(tinymist_std::time::now());
-            rayon::spawn(move || {
+            spawn_cpu(move || {
                 compile_fn();
             });
         }
