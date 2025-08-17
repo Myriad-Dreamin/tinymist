@@ -50,6 +50,9 @@ pub struct EditorActor {
     diagnostics: HashMap<Url, HashMap<ProjectInsId, EcoVec<Diagnostic>>>,
     /// The map from project ID to the affected files.
     affect_map: HashMap<ProjectInsId, Vec<Url>>,
+
+    /// The local state.
+    status: StatusAll,
 }
 
 impl EditorActor {
@@ -65,68 +68,77 @@ impl EditorActor {
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
             config: EditorActorConfig { notify_status },
+
+            status: StatusAll {
+                status: CompileStatusEnum::Compiling,
+                path: "".to_owned(),
+                page_count: 0,
+                words_count: None,
+            },
         }
     }
 
     /// Runs the editor actor in background. It exits when the editor channel
     /// is closed.
     pub async fn run(mut self) {
-        // The local state.
-        let mut status = StatusAll {
-            status: CompileStatusEnum::Compiling,
-            path: "".to_owned(),
-            page_count: 0,
-            words_count: None,
-        };
-
         while let Some(req) = self.editor_rx.recv().await {
-            match req {
-                EditorRequest::Config(config) => {
-                    log::info!("received config request: {config:?}");
-                    self.config = config;
-                }
-                EditorRequest::Diag(version, diagnostics) => {
-                    log::debug!(
-                        "received diagnostics from {version:?}: diag({:?})",
-                        diagnostics.as_ref().map(|files| files.len())
-                    );
-
-                    self.publish(version.id, diagnostics).await;
-                }
-                EditorRequest::Status(compile_status) => {
-                    log::trace!("received status request: {compile_status:?}");
-                    if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
-                        use tinymist_project::CompileStatusEnum::*;
-
-                        status.path = compile_status
-                            .compiling_id
-                            .map_or_default(|fid| unix_slash(fid.vpath().as_rooted_path()));
-                        status.page_count = compile_status.page_count;
-                        status.status = match &compile_status.status {
-                            Compiling => CompileStatusEnum::Compiling,
-                            Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
-                            ExportError { .. } | CompileError { .. } => {
-                                CompileStatusEnum::CompileError
-                            }
-                        };
-                        self.client.send_notification::<StatusAll>(&status);
-                    }
-                }
-                EditorRequest::WordCount(id, count) => {
-                    log::trace!("received word count request");
-                    if self.config.notify_status && id == ProjectInsId::PRIMARY {
-                        status.words_count = Some(count);
-                        self.client.send_notification::<StatusAll>(&status);
-                    }
-                }
-            }
+            self.handle(req);
         }
 
         log::info!("editor actor is stopped");
     }
 
+    #[cfg(not(feature = "system"))]
+    pub fn step(&mut self) {
+        while let Ok(req) = self.editor_rx.try_recv() {
+            self.handle(req);
+        }
+    }
+
+    fn handle(&mut self, req: EditorRequest) {
+        match req {
+            EditorRequest::Config(config) => {
+                log::info!("received config request: {config:?}");
+                self.config = config;
+            }
+            EditorRequest::Diag(version, diagnostics) => {
+                log::debug!(
+                    "received diagnostics from {version:?}: diag({:?})",
+                    diagnostics.as_ref().map(|files| files.len())
+                );
+
+                log::info!("Step 2: EditorActor received diag!");
+                self.publish(version.id, diagnostics);
+            }
+            EditorRequest::Status(compile_status) => {
+                log::trace!("received status request: {compile_status:?}");
+                if self.config.notify_status && compile_status.id == ProjectInsId::PRIMARY {
+                    use tinymist_project::CompileStatusEnum::*;
+
+                    self.status.path = compile_status
+                        .compiling_id
+                        .map_or_default(|fid| unix_slash(fid.vpath().as_rooted_path()));
+                    self.status.page_count = compile_status.page_count;
+                    self.status.status = match &compile_status.status {
+                        Compiling => CompileStatusEnum::Compiling,
+                        Suspend | CompileSuccess { .. } => CompileStatusEnum::CompileSuccess,
+                        ExportError { .. } | CompileError { .. } => CompileStatusEnum::CompileError,
+                    };
+                    self.client.send_notification::<StatusAll>(&self.status);
+                }
+            }
+            EditorRequest::WordCount(id, count) => {
+                log::trace!("received word count request");
+                if self.config.notify_status && id == ProjectInsId::PRIMARY {
+                    self.status.words_count = Some(count);
+                    self.client.send_notification::<StatusAll>(&self.status);
+                }
+            }
+        }
+    }
+
     /// Publishes diagnostics of a project to the editor.
-    pub async fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
+    pub fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
         let affected = match next_diag.as_ref() {
             Some(next_diag) => self
                 .affect_map
