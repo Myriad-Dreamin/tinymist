@@ -200,7 +200,9 @@ impl ServerState {
             #[cfg(feature = "preview")]
             server.background_preview();
 
-            // Run the cluster in the background after we referencing it
+            // Runs the editor actor. If the server is not running in the system, we do not
+            // spawn the editor actor and run it in the background, but steps it
+            // in the main thread using `Self::schedule_async`.
             if cfg!(feature = "system") {
                 client.handle.spawn(editor_actor.run());
             } else {
