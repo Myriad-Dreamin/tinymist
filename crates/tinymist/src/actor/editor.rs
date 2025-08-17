@@ -71,6 +71,7 @@ impl EditorActor {
     /// Runs the editor actor in background. It exits when the editor channel
     /// is closed.
     pub async fn run(mut self) {
+        log::info!("!!!!!!!!! spawned editor actor");
         // The local state.
         let mut status = StatusAll {
             status: CompileStatusEnum::Compiling,
@@ -91,6 +92,7 @@ impl EditorActor {
                         diagnostics.as_ref().map(|files| files.len())
                     );
 
+                    log::info!("Step 2: EditorActor received diag!");
                     self.publish(version.id, diagnostics).await;
                 }
                 EditorRequest::Status(compile_status) => {
@@ -127,6 +129,8 @@ impl EditorActor {
 
     /// Publishes diagnostics of a project to the editor.
     pub async fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
+        log::info!("Step 1: Publishing");
+
         let affected = match next_diag.as_ref() {
             Some(next_diag) => self
                 .affect_map
@@ -178,6 +182,7 @@ impl EditorActor {
         };
 
         // Publishes the diagnostics
+        log::info!("Step 0: Finally sending notification");
         self.client
             .send_notification::<PublishDiagnostics>(&PublishDiagnosticsParams {
                 uri,

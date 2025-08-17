@@ -101,7 +101,6 @@ impl ServerState {
                     self.client.clone(),
                     #[cfg(feature = "preview")]
                     self.preview.watchers.clone(),
-                    ProxyContext::new(sender.context),
                     sender.resolve_fn,
                 )
             } else {
@@ -157,7 +156,6 @@ impl ServerState {
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
-        #[cfg(feature = "web")] context: ProxyContext,
         #[cfg(feature = "web")] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
@@ -221,12 +219,8 @@ impl ServerState {
         let fonts = config.fonts();
 
         #[cfg(feature = "web")]
-        let packages = LspUniverseBuilder::resolve_package(
-            cert_path.clone(),
-            Some(&package),
-            context,
-            resolve_fn,
-        );
+        let packages =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
 
         #[cfg(not(feature = "web"))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
@@ -302,6 +296,7 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
         compilation: &LspCompiledArtifact,
     ) {
+        // log::info!("Step 9A: compiled!");
         self.compiling_since = None;
 
         let rev = compilation.world().revision().get();
@@ -312,6 +307,7 @@ impl ProjectInsStateExt {
 
         self.last_compilation = Some(compilation.clone());
 
+        // log::info!("Step 8A: calling emit_pending_reasons");
         self.emit_pending_reasons(revision, handler);
     }
 
@@ -321,7 +317,10 @@ impl ProjectInsStateExt {
         revision: &NonZeroUsize,
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
     ) -> bool {
+        log::info!("Step 7: called emit_pending_reasons");
+
         let Some(last_compilation) = self.last_compilation.as_ref() else {
+            log::info!("skipping emit bcuz there's no last_compilation");
             return false;
         };
 
@@ -333,11 +332,13 @@ impl ProjectInsStateExt {
 
         let pending_reasons = self.pending_reasons.exclude(self.emitted_reasons);
         if !pending_reasons.any() {
+            log::info!("skipping emit bcuz there's no reason");
             return false;
         }
         self.emitted_reasons.merge(self.pending_reasons);
         let last_compilation = last_compilation.clone().with_signal(pending_reasons);
 
+        log::info!("Step 6: Calling notify_compile");
         handler.notify_compile(&last_compilation);
         self.pending_reasons = CompileSignal::default();
 
@@ -373,9 +374,12 @@ impl ProjectState {
     }
 
     pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
+        // log::info!("Step 12A: called do_interrupt with {:?}", intr);
         if let Interrupt::Compiled(compiled) = &intr {
+            // log::info!("Step 11A: intr is Interrupt::Compiled");
             let proj = compiler.projects().find(|p| &p.id == compiled.id());
             if let Some(proj) = proj {
+                // log::info!("Step 10A: calling compiled");
                 proj.ext
                     .compiled(&proj.verse.revision, proj.handler.as_ref(), compiled);
             } else {
@@ -524,6 +528,8 @@ impl CompileHandlerImpl {
     }
 
     fn notify_diagnostics(&self, art: &LspCompiledArtifact) {
+        log::info!("Step 3: Called notify_diagnostics");
+
         let dv = ProjVersion {
             id: art.id().clone(),
             revision: art.world().revision().get(),
@@ -580,12 +586,17 @@ impl CompileHandlerImpl {
 
 impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl {
     fn on_any_compile_reason(&self, c: &mut LspProjectCompiler) {
+        // log::info!("Step 11: on_any_compile_reason");
+
         let instances_mut = std::iter::once(&mut c.primary).chain(c.dedicates.iter_mut());
         for s in instances_mut {
+            // log::info!("Step 10: Inside for loop");
+
             let reason = s.reason;
             if !reason.any() {
                 continue;
             }
+            // log::info!("Step 9: Reasoned!");
 
             let id = &s.id;
 
@@ -609,6 +620,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                     }
                 }
 
+                // log::info!("Step 9: compile since, continued");
                 continue;
             }
 
@@ -619,6 +631,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             };
 
             let is_vfs_sub = reason.any() && !reason.exclude(VFS_SUB).any();
+
+            log::info!("Step 10: reasons: {:?}", reason);
 
             if is_vfs_sub
                 && 'vfs_is_clean: {
@@ -641,6 +655,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 s.ext.pending_reasons.merge(reason);
                 s.reason = CompileSignal::default();
 
+                log::info!("Step 8: calling emit_pending_reasons");
                 let pending_reasons = s.ext.pending_reasons.exclude(s.ext.emitted_reasons);
                 let emitted = s
                     .ext
@@ -718,6 +733,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     }
 
     fn notify_compile(&self, art: &LspCompiledArtifact) {
+        log::info!("Step 5: Called notify_compile");
+
         // NOTE: we have to inform the main thread about the compilation. If such
         // interrupt is not sent, the main thread will be stalled forever.
         self.client.interrupt(LspInterrupt::Compiled(art.clone()));
@@ -775,6 +792,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             log::debug!("Project: no preview for {:?}", art.id());
         }
 
+        log::info!("Step 4: Calling notify_diagnostics");
         self.notify_diagnostics(art);
     }
 }

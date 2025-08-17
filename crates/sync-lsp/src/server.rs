@@ -273,8 +273,6 @@ pub struct JsTransportSender {
     #[serde(with = "serde_wasm_bindgen::preserve")]
     pub(crate) send_notification: js_sys::Function,
     #[serde(with = "serde_wasm_bindgen::preserve")]
-    pub context: JsValue,
-    #[serde(with = "serde_wasm_bindgen::preserve")]
     pub resolve_fn: js_sys::Function,
 }
 

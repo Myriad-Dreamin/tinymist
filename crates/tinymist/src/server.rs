@@ -113,13 +113,14 @@ impl ServerState {
 
         #[cfg(feature = "web")]
         let handle = if let TransportHost::Js { sender, .. } = client.clone().to_untyped().sender {
+            use wasm_bindgen::JsValue;
+
             Self::project(
                 &config,
                 editor_tx.clone(),
                 client.clone(),
                 #[cfg(feature = "preview")]
                 watchers.clone(),
-                ProxyContext::new(sender.context),
                 sender.resolve_fn,
             )
         } else {
@@ -216,7 +217,9 @@ impl ServerState {
             server.background_preview();
 
             // Run the cluster in the background after we referencing it
+            log::info!("!!!!!!!!! spawning editor actor");
             client.handle.spawn(editor_actor.run());
+            // editor_actor.run()
         }
 
         server
