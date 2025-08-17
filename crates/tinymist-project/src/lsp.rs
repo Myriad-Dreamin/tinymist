@@ -4,6 +4,8 @@ use std::sync::Arc;
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tinymist_task::ExportTarget;
+#[cfg(not(feature = "system"))]
+use tinymist_world::package::registry::ProxyContext;
 use tinymist_world::package::RegistryPathMapper;
 use tinymist_world::vfs::Vfs;
 use tinymist_world::{args::*, WorldComputeGraph};
@@ -33,7 +35,7 @@ impl CompilerFeat for LspCompilerFeat {
     type Registry = tinymist_world::package::registry::HttpRegistry;
     // todo: registry in browser
     #[cfg(not(feature = "system"))]
-    type Registry = tinymist_world::package::registry::DummyRegistry;
+    type Registry = tinymist_world::package::registry::JsRegistry;
 }
 
 /// LSP universe that spawns LSP worlds.
@@ -212,7 +214,7 @@ impl WorldProvider for (crate::ProjectInput, ImmutPath) {
 }
 
 #[cfg(not(feature = "system"))]
-type LspRegistry = tinymist_world::package::registry::DummyRegistry;
+type LspRegistry = tinymist_world::package::registry::JsRegistry;
 #[cfg(feature = "system")]
 type LspRegistry = tinymist_world::package::registry::HttpRegistry;
 
@@ -322,8 +324,13 @@ impl LspUniverseBuilder {
     pub fn resolve_package(
         _cert_path: Option<ImmutPath>,
         _args: Option<&CompilePackageArgs>,
-    ) -> tinymist_world::package::registry::DummyRegistry {
-        tinymist_world::package::registry::DummyRegistry
+        context: ProxyContext,
+        resolve_fn: js_sys::Function,
+    ) -> tinymist_world::package::registry::JsRegistry {
+        tinymist_world::package::registry::JsRegistry {
+            context,
+            real_resolve_fn: resolve_fn,
+        }
     }
 }
 

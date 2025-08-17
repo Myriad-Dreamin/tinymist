@@ -20,6 +20,8 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value as JsonValue};
 use tinymist_std::time::Instant;
+#[cfg(feature = "web")]
+use wasm_bindgen::JsValue;
 
 use crate::msg::*;
 use crate::req_queue;
@@ -242,7 +244,7 @@ type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, LspOrDapResponse) + Se
 type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
 
 #[derive(Debug, Clone)]
-enum TransportHost {
+pub enum TransportHost {
     System(SystemTransportSender),
     #[cfg(feature = "web")]
     Js {
@@ -253,7 +255,7 @@ enum TransportHost {
 }
 
 #[derive(Debug, Clone)]
-struct SystemTransportSender {
+pub(crate) struct SystemTransportSender {
     pub(crate) sender: Weak<ConnectionTx>,
 }
 
@@ -270,6 +272,10 @@ pub struct JsTransportSender {
     pub(crate) fs_content: js_sys::Function,
     #[serde(with = "serde_wasm_bindgen::preserve")]
     pub(crate) send_notification: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub context: JsValue,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub resolve_fn: js_sys::Function,
 }
 
 #[cfg(feature = "web")]
@@ -400,7 +406,7 @@ pub struct LspClient {
     pub handle: tokio::runtime::Handle,
 
     pub(crate) msg_kind: MessageKind,
-    sender: TransportHost,
+    pub sender: TransportHost,
     pub(crate) req_queue: Arc<Mutex<ReqQueue>>,
 
     pub(crate) hook: Arc<dyn LsHook>,

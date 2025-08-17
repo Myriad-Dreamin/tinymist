@@ -4457,6 +4457,7 @@ dependencies = [
  "comemo",
  "dirs",
  "ecow",
+ "js-sys",
  "log",
  "notify",
  "parking_lot",
