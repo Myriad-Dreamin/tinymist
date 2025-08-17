@@ -60,6 +60,7 @@ impl ServerState {
             .log_error("could not register to watch config changes");
         }
 
+        self.schedule_async();
         log::info!("server initialized");
         Ok(())
     }
@@ -94,6 +95,8 @@ impl ServerState {
 
         // Focus after opening
         self.implicit_focus_entry(|| Some(path), 'o');
+
+        self.schedule_async();
         Ok(())
     }
 
@@ -101,6 +104,7 @@ impl ServerState {
         let path = as_path(params.text_document).as_path().into();
 
         self.remove_source(path).map_err(invalid_params)?;
+        self.schedule_async();
         Ok(())
     }
 
@@ -110,6 +114,7 @@ impl ServerState {
 
         self.edit_source(path, changes, self.const_config().position_encoding)
             .map_err(invalid_params)?;
+        self.schedule_async();
         Ok(())
     }
 
@@ -117,6 +122,7 @@ impl ServerState {
         let path = as_path(params.text_document).as_path().into();
         self.save_source(path).map_err(invalid_params)?;
 
+        self.schedule_async();
         Ok(())
     }
 }
@@ -176,6 +182,7 @@ impl ServerState {
         }
 
         log::info!("new settings applied");
+        self.schedule_async();
         Ok(())
     }
 
