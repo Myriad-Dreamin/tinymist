@@ -17,6 +17,10 @@
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
 
+#![allow(missing_docs)]
+
+#[cfg(feature = "web")]
+use reflexo_typst::package::registry::ProxyContext;
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -26,7 +30,7 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::hash::FxHashMap;
-use sync_ls::{LspClient, TypedLspClient};
+use sync_ls::{LspClient, TransportHost, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
@@ -89,6 +93,23 @@ impl ServerState {
         self.preview.stop_all();
         let editor_tx = self.editor_tx.clone();
 
+        #[cfg(feature = "web")]
+        let new_project =
+            if let TransportHost::Js { sender, .. } = self.client.clone().to_untyped().sender {
+                Self::project(
+                    &self.config,
+                    editor_tx,
+                    self.client.clone(),
+                    #[cfg(feature = "preview")]
+                    self.preview.watchers.clone(),
+                    ProxyContext::new(sender.context),
+                    sender.resolve_fn,
+                )
+            } else {
+                panic!("Expected Js TransportHost")
+            };
+
+        #[cfg(not(feature = "web"))]
         let new_project = Self::project(
             &self.config,
             editor_tx,
@@ -139,6 +160,8 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
+        #[cfg(feature = "web")] context: ProxyContext,
+        #[cfg(feature = "web")] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -199,7 +222,18 @@ impl ServerState {
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         let fonts = config.fonts();
+
+        #[cfg(feature = "web")]
+        let packages = LspUniverseBuilder::resolve_package(
+            cert_path.clone(),
+            Some(&package),
+            context,
+            resolve_fn,
+        );
+
+        #[cfg(not(feature = "web"))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+
         let creation_timestamp = config.creation_timestamp();
         let verse = LspUniverseBuilder::build(
             entry,
