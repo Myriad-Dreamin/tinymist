@@ -92,8 +92,11 @@ pub struct ServerState {
     pub config: Config,
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, Source>,
+
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
+    /// The editor actor state
+    editor_actor: Option<EditorActor>,
 }
 
 /// Getters and the main loop.
@@ -147,6 +150,7 @@ impl ServerState {
             focusing: None,
             implicit_position: None,
             formatter,
+            editor_actor: None,
         }
     }
 
@@ -196,8 +200,14 @@ impl ServerState {
             #[cfg(feature = "preview")]
             server.background_preview();
 
-            // Run the cluster in the background after we referencing it
-            client.handle.spawn(editor_actor.run());
+            // Runs the editor actor. If the server is not running in the system, we do not
+            // spawn the editor actor and run it in the background, but steps it
+            // in the main thread using `Self::schedule_async`.
+            if cfg!(feature = "system") {
+                client.handle.spawn(editor_actor.run());
+            } else {
+                server.editor_actor = Some(editor_actor);
+            }
         }
 
         server
@@ -341,6 +351,20 @@ impl ServerState {
             .with_request::<request::Threads>(Self::debug_threads)
     }
 
+    #[cfg(not(feature = "system"))]
+    /// Schedules the async tasks of the server on some paths. This is used to
+    /// run the server in passive context, for example, in the web
+    /// environment where the server is not run in background.
+    pub(crate) fn schedule_async(&mut self) {
+        if let Some(editor_actor) = self.editor_actor.as_mut() {
+            editor_actor.step();
+        }
+    }
+
+    #[cfg(feature = "system")]
+    #[inline(always)]
+    pub(crate) fn schedule_async(&mut self) {}
+
     /// Handles the project interrupts.
     fn compile_interrupt<T: Initializer<S = Self>>(
         mut state: ServiceState<T, T::S>,
@@ -354,6 +378,9 @@ impl ServerState {
         };
 
         ready.project.interrupt(params);
+
+        ready.schedule_async();
+
         // log::info!("interrupted in {:?}", _start.elapsed());
         Ok(())
     }
