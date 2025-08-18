@@ -7,8 +7,6 @@ pub(crate) use futures::Future;
 use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
-#[cfg(feature = "web")]
-use reflexo_typst::package::registry::ProxyContext;
 use sync_ls::*;
 use tinymist_query::ServerInfoResponse;
 use tinymist_std::error::prelude::*;
@@ -134,10 +132,8 @@ impl ServerState {
         #[cfg(feature = "preview")]
         let watchers = crate::project::ProjectPreviewState::default();
 
-        #[cfg(feature = "web")]
+        #[cfg(not(feature = "system"))]
         let handle = if let TransportHost::Js { sender, .. } = client.clone().to_untyped().sender {
-            use wasm_bindgen::JsValue;
-
             Self::project(
                 &config,
                 editor_tx.clone(),
@@ -150,7 +146,7 @@ impl ServerState {
             panic!("Expected Js TransportHost")
         };
 
-        #[cfg(not(feature = "web"))]
+        #[cfg(feature = "system")]
         let handle = Self::project(
             &config,
             editor_tx.clone(),

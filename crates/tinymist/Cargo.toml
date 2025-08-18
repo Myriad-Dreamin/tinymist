@@ -11,9 +11,6 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = false
-
 [lib]
 crate-type = ["cdylib", "rlib"]
 

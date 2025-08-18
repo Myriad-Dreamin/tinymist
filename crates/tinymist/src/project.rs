@@ -19,8 +19,6 @@
 
 #![allow(missing_docs)]
 
-#[cfg(feature = "web")]
-use reflexo_typst::package::registry::ProxyContext;
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -30,7 +28,9 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::hash::FxHashMap;
-use sync_ls::{LspClient, TransportHost, TypedLspClient};
+#[cfg(not(feature = "system"))]
+use sync_ls::TransportHost;
+use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
@@ -93,7 +93,7 @@ impl ServerState {
         self.preview.stop_all();
         let editor_tx = self.editor_tx.clone();
 
-        #[cfg(feature = "web")]
+        #[cfg(not(feature = "system"))]
         let new_project =
             if let TransportHost::Js { sender, .. } = self.client.clone().to_untyped().sender {
                 Self::project(
@@ -108,7 +108,7 @@ impl ServerState {
                 panic!("Expected Js TransportHost")
             };
 
-        #[cfg(not(feature = "web"))]
+        #[cfg(feature = "system")]
         let new_project = Self::project(
             &self.config,
             editor_tx,
@@ -159,7 +159,7 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
-        #[cfg(feature = "web")] resolve_fn: js_sys::Function,
+        #[cfg(not(feature = "system"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
