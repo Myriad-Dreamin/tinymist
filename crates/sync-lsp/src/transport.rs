@@ -5,7 +5,7 @@ use std::{
     thread,
 };
 
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 
 use crate::{Connection, ConnectionRx, ConnectionTx, GetMessageKind, Message};
 

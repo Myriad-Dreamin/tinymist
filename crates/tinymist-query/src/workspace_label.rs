@@ -1,9 +1,9 @@
 use crate::{
+    SemanticRequest,
     prelude::*,
     syntax::{
-        get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind,
+        LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind, get_lexical_hierarchy,
     },
-    SemanticRequest,
 };
 
 /// The `workspace/label` request resembles [`workspace/symbol`] request but is

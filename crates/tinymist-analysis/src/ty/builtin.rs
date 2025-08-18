@@ -2,7 +2,7 @@ use core::fmt;
 use std::path::Path;
 use std::sync::LazyLock;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::{CastInfo, Regex};

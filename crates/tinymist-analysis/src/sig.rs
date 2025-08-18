@@ -4,10 +4,10 @@ use core::fmt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use ecow::{eco_format, eco_vec, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_format, eco_vec};
 use typst::foundations::{Closure, Func};
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, SyntaxKind};
+use typst::syntax::{SyntaxKind, ast};
 use typst::utils::LazyHash;
 
 // use super::{BoundChecker, Definition};
@@ -44,16 +44,14 @@ impl Signature {
 
     /// Returns the all parameters of the signature.
     pub fn params(&self) -> impl Iterator<Item = (&Interned<ParamTy>, Option<&Ty>)> {
-        let primary = self.primary().params();
         // todo: with stack
-        primary
+        self.primary().params()
     }
 
     /// Returns the type of the signature.
     pub fn type_sig(&self) -> Interned<SigTy> {
-        let primary = self.primary().sig_ty.clone();
         // todo: with stack
-        primary
+        self.primary().sig_ty.clone()
     }
 
     /// Returns the shift applied to the signature.

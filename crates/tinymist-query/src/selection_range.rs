@@ -1,6 +1,6 @@
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, SyntaxRequest};
+use crate::{SyntaxRequest, prelude::*};
 
 /// The [`textDocument/selectionRange`] request is sent from the client to the
 /// server to return suggested selection ranges at an array of given positions.

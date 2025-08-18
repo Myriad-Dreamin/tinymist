@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use parking_lot::RwLock;
-use tinymist_std::path::PathClean;
 use tinymist_std::ImmutPath;
-use typst::diag::{eco_format, EcoString, FileError, FileResult};
-use typst::syntax::package::{PackageSpec, PackageVersion};
+use tinymist_std::path::PathClean;
+use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::VirtualPath;
+use typst::syntax::package::{PackageSpec, PackageVersion};
 
 use super::FileId;
 
@@ -75,7 +75,7 @@ pub trait RootResolver {
                 self.resolve_package_root(file_id.package().expect("not a file in package"))?
             }
             UntitledRooted(..) | Rootless => {
-                return Ok(PathResolution::Rootless(Cow::Borrowed(file_id.vpath())))
+                return Ok(PathResolution::Rootless(Cow::Borrowed(file_id.vpath())));
             }
         };
 

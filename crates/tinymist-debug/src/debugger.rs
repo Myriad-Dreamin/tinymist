@@ -8,11 +8,11 @@ use comemo::Tracked;
 use parking_lot::RwLock;
 use tinymist_std::hash::{FxHashMap, FxHashSet};
 use tinymist_world::vfs::FileId;
+use typst::World;
 use typst::diag::FileResult;
 use typst::engine::Engine;
-use typst::foundations::{func, Binding, Context, Dict, Scopes};
+use typst::foundations::{Binding, Context, Dict, Scopes, func};
 use typst::syntax::{Source, Span};
-use typst::World;
 
 use crate::instrument::Instrumenter;
 

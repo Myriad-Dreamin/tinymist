@@ -1,6 +1,6 @@
 use tinymist_project::LspCompiledArtifact;
 
-use crate::{prelude::*, DiagWorker, DiagnosticsMap, SemanticRequest};
+use crate::{DiagWorker, DiagnosticsMap, SemanticRequest, prelude::*};
 
 /// A request to check the document for errors and lints.
 #[derive(Clone)]

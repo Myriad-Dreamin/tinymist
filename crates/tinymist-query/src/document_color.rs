@@ -1,4 +1,4 @@
-use crate::{analysis::ColorExprWorker, prelude::*, SemanticRequest};
+use crate::{SemanticRequest, analysis::ColorExprWorker, prelude::*};
 
 /// The [`textDocument/documentColor`] request is sent from the client to the
 /// server to list all color references found in a given text document. Along

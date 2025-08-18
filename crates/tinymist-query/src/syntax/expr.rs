@@ -11,7 +11,7 @@ use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
-    syntax::{ast::MathTextKind, Span, SyntaxNode},
+    syntax::{Span, SyntaxNode, ast::MathTextKind},
     text::LinebreakElem,
     utils::LazyHash,
 };
@@ -20,11 +20,11 @@ use crate::{
     analysis::{QueryStatGuard, SharedContext},
     docs::DocString,
     prelude::*,
-    syntax::{find_module_level_docs, resolve_id_by_path, DefKind},
+    syntax::{DefKind, find_module_level_docs, resolve_id_by_path},
     ty::{BuiltinTy, InsTy, Ty},
 };
 
-use super::{def::*, DocCommentMatcher, InterpretMode};
+use super::{DocCommentMatcher, InterpretMode, def::*};
 
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
@@ -672,7 +672,7 @@ impl ExprWorker<'_> {
                 self.check_import_source_val(source, &val.val, Some(&src_expr), is_import)
             }
             Expr::Decl(decl) if matches!(decl.as_ref(), Decl::Module { .. }) => {
-                return Some(src_expr.clone())
+                return Some(src_expr.clone());
             }
 
             _ => None,

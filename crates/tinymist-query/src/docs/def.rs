@@ -1,8 +1,8 @@
 use std::sync::OnceLock;
 
-use tinymist_analysis::docs::{format_ty, ParamDocs, SignatureDocs, VarDocs};
-use tinymist_analysis::ty::DocSource;
 use tinymist_analysis::Signature;
+use tinymist_analysis::docs::{ParamDocs, SignatureDocs, VarDocs, format_ty};
+use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
 
 use crate::LocalContext;

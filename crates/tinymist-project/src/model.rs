@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use ecow::EcoVec;
 use tinymist_std::error::prelude::*;
-use tinymist_std::{bail, ImmutPath};
+use tinymist_std::{ImmutPath, bail};
 use typst::diag::EcoString;
 
 pub use task::*;

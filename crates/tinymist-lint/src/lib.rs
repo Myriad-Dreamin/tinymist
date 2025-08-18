@@ -8,11 +8,11 @@ use tinymist_analysis::{
 };
 use tinymist_project::LspWorld;
 use typst::{
-    diag::{eco_format, EcoString, SourceDiagnostic, Tracepoint},
+    diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
     syntax::{
-        ast::{self, AstNode},
         FileId, Span, Spanned, SyntaxNode,
+        ast::{self, AstNode},
     },
 };
 

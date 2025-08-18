@@ -1,7 +1,7 @@
 use crate::{
-    prelude::*,
-    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
     SyntaxRequest,
+    prelude::*,
+    syntax::{LexicalHierarchy, LexicalScopeKind, get_lexical_hierarchy},
 };
 
 /// The [`textDocument/documentSymbol`] request is sent from the client to the

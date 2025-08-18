@@ -9,11 +9,11 @@ use std::{
 
 use clap::Parser;
 use tinymist_project::{
-    base::print_diagnostics, DiagnosticFormat, LspWorld, SourceWorld, WorldProvider,
+    DiagnosticFormat, LspWorld, SourceWorld, WorldProvider, base::print_diagnostics,
 };
-use tinymist_std::{error::prelude::*, Result};
-use typlite::{common::Format, TypliteFeat};
+use tinymist_std::{Result, error::prelude::*};
 use typlite::{CompileOnceArgs, Typlite};
+use typlite::{TypliteFeat, common::Format};
 use typst::foundations::Bytes;
 
 /// Common arguments of compile, watch, and query.

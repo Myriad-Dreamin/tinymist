@@ -1,8 +1,8 @@
 //! Hybrid analysis for function calls.
 
-use super::prelude::*;
 use super::Signature;
-use crate::analysis::{analyze_signature, PrimarySignature, SignatureTarget};
+use super::prelude::*;
+use crate::analysis::{PrimarySignature, SignatureTarget, analyze_signature};
 
 /// Describes kind of a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]

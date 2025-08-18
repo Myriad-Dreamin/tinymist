@@ -18,7 +18,7 @@ use std::sync::{Arc, Weak};
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use serde::Serialize;
-use serde_json::{from_value, Value as JsonValue};
+use serde_json::{Value as JsonValue, from_value};
 use tinymist_std::time::Instant;
 
 use crate::msg::*;

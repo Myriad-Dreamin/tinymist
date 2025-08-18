@@ -70,9 +70,11 @@ pub fn to_typst_position(
 
         if should_warning {
             log::warn!(
-                    "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
-                    lsp_position, typst_source.len_lines(), typst_source.line_to_range(typst_source.len_lines() - 1),
-                );
+                "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
+                lsp_position,
+                typst_source.len_lines(),
+                typst_source.line_to_range(typst_source.len_lines() - 1),
+            );
         }
 
         return Some(typst_source.len_bytes());

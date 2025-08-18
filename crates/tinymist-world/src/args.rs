@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use clap::{builder::ValueParser, ArgAction, Parser, ValueEnum};
+use clap::{ArgAction, Parser, ValueEnum, builder::ValueParser};
 use serde::{Deserialize, Serialize};
 use tinymist_std::{bail, error::prelude::*};
 use tinymist_vfs::ImmutDict;

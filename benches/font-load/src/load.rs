@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tinymist::{project::LspUniverseBuilder, Config};
+use tinymist::{Config, project::LspUniverseBuilder};
 
 fn main() {
     // initialize global variables

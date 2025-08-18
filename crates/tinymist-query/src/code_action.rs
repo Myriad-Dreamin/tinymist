@@ -1,6 +1,6 @@
 use lsp_types::CodeActionContext;
 
-use crate::{analysis::CodeActionWorker, prelude::*, SemanticRequest};
+use crate::{SemanticRequest, analysis::CodeActionWorker, prelude::*};
 
 pub(crate) mod proto;
 pub use proto::*;

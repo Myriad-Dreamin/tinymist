@@ -1,14 +1,14 @@
 use std::{path::PathBuf, sync::Arc};
 
 use tinymist_vfs::browser::ProxyAccessModel;
+use typst::Features;
 use typst::foundations::Dict as TypstDict;
 use typst::utils::LazyHash;
-use typst::Features;
 
 use crate::entry::EntryState;
 use crate::font::FontResolverImpl;
-use crate::package::registry::JsRegistry;
 use crate::package::RegistryPathMapper;
+use crate::package::registry::JsRegistry;
 
 /// A world that provides access to the browser.
 /// It is under development.

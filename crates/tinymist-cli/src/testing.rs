@@ -4,15 +4,15 @@ use core::fmt;
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::Path;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::{Arc, atomic::AtomicBool};
 
 use itertools::Either;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use reflexo::ImmutPath;
-use reflexo_typst::{vfs::FileId, TypstDocument, TypstHtmlDocument};
+use reflexo_typst::{TypstDocument, TypstHtmlDocument, vfs::FileId};
 use tinymist_debug::CoverageResult;
-use tinymist_project::world::{system::print_diagnostics, DiagnosticFormat};
+use tinymist_project::world::{DiagnosticFormat, system::print_diagnostics};
 use tinymist_query::analysis::Analysis;
 use tinymist_query::syntax::{cast_include_expr, find_source_by_expr, node_ancestors};
 use tinymist_query::testing::{TestCaseKind, TestSuites};
@@ -20,13 +20,13 @@ use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::Typs
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
-use typst::syntax::{ast, LinkedNode, Source, Span};
-use typst::{utils::PicoStr, World};
+use typst::syntax::{LinkedNode, Source, Span, ast};
+use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
 
 use tinymist::project::*;
-use tinymist::tool::project::{start_project, StartProjectResult};
-use tinymist::world::{with_main, SourceWorld};
+use tinymist::tool::project::{StartProjectResult, start_project};
+use tinymist::world::{SourceWorld, with_main};
 
 use crate::utils::exit_on_ctrl_c;
 

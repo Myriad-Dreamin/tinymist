@@ -6,8 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    prelude::*, BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
-    TypeVarBounds,
+    BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
+    TypeVarBounds, prelude::*,
 };
 use crate::{
     syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},

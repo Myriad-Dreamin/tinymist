@@ -4,7 +4,7 @@ use core::fmt;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use tinymist_std::{hash::FxHashMap, QueryRef};
+use tinymist_std::{QueryRef, hash::FxHashMap};
 use tinymist_vfs::{Bytes, FileId, FsProvider};
 use typst::diag::{FileError, FileResult};
 use typst::syntax::Source;

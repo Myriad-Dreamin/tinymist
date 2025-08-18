@@ -3,8 +3,8 @@
 use cmark_writer::ast::Node;
 use ecow::EcoString;
 
-use crate::common::{ExternalFrameNode, FigureNode, FormatWriter};
 use crate::Result;
+use crate::common::{ExternalFrameNode, FigureNode, FormatWriter};
 
 /// Text writer implementation
 #[derive(Default)]

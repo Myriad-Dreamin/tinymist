@@ -3,10 +3,10 @@ use std::{collections::BTreeMap, ops::Deref, sync::LazyLock};
 use ecow::eco_format;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
-use crate::{adt::interner::Interned, StrRef};
+use crate::{StrRef, adt::interner::Interned};
 use crate::{adt::snapshot_map::SnapshotMap, analysis::SharedContext};
 use crate::{
-    docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, DocString, VarDoc},
+    docs::{DocString, VarDoc, convert_docs, identify_pat_docs, identify_tidy_module_docs},
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{BuiltinTy, DynTypeBounds, InsTy, PackageId, SigTy, Ty, TypeVar, TypeVarBounds},

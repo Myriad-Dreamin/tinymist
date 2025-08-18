@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::{path::Path, str::FromStr};
 
 use serde::{Deserialize, Serialize};
-use tinymist_std::error::prelude::*;
-use tinymist_std::path::{unix_slash, PathClean};
 use tinymist_std::ImmutPath;
+use tinymist_std::error::prelude::*;
+use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;

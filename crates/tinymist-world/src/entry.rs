@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
-use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{WorkspaceResolution, WorkspaceResolver};
 use typst::diag::SourceResult;
 use typst::syntax::{FileId, VirtualPath};
@@ -123,7 +123,7 @@ impl EntryState {
                 Err(err) => {
                     return Err(
                         error_once!("entry file is not in workspace", err: err, entry: path.display(), root: root.display()),
-                    )
+                    );
                 }
             },
             None => EntryState::new_rooted_by_parent(path.into()),

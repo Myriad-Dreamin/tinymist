@@ -6,12 +6,12 @@ use std::{
 };
 
 use tinymist_project::{
-    base::ShadowApi, font::FontResolverImpl, vfs::system::SystemAccessModel, CompileFontArgs,
-    DynAccessModel, EntryManager, EntryState, ExportTarget, LspUniverse, LspUniverseBuilder,
+    CompileFontArgs, DynAccessModel, EntryManager, EntryState, ExportTarget, LspUniverse,
+    LspUniverseBuilder, base::ShadowApi, font::FontResolverImpl, vfs::system::SystemAccessModel,
 };
 use typst::{foundations::Bytes, syntax::VirtualPath};
 
-pub use insta::{assert_debug_snapshot, assert_snapshot, glob, with_settings, Settings};
+pub use insta::{Settings, assert_debug_snapshot, assert_snapshot, glob, with_settings};
 
 /// Runs snapshot tests.
 #[macro_export]

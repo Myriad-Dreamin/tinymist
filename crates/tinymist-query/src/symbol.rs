@@ -1,7 +1,7 @@
 use crate::{
-    prelude::*,
-    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
     SemanticRequest,
+    prelude::*,
+    syntax::{LexicalHierarchy, LexicalScopeKind, get_lexical_hierarchy},
 };
 
 /// The [`workspace/symbol`] request is sent from the client to the server to

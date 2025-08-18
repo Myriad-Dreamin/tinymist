@@ -5,10 +5,10 @@ use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_link_exprs_in;
-use crate::bib::{render_citation_string, RenderedBibCitation};
+use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
 use crate::prelude::*;
-use crate::upstream::{route_of_value, truncated_repr, Tooltip};
+use crate::upstream::{Tooltip, route_of_value, truncated_repr};
 
 /// The [`textDocument/hover`] request asks the server for hover information at
 /// a given text document position.

@@ -111,7 +111,9 @@ mod tests {
                     );
                 } else if prev_line_number == line_number && prev_end_character > start_character {
                     // this token overlaps with the previous token
-                    panic!("Overlapping semantic tokens at line {line_number}, character {start_character}, previous line {prev_line_number}, previous end {prev_end_character}");
+                    panic!(
+                        "Overlapping semantic tokens at line {line_number}, character {start_character}, previous line {prev_line_number}, previous end {prev_end_character}"
+                    );
                 } else {
                     prev_line_number = line_number;
                     prev_end_character = end_character;

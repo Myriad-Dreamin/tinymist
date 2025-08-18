@@ -12,9 +12,9 @@ use std::sync::{Arc, OnceLock};
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
 use futures::sink::SinkExt;
+use reflexo_typst::Error;
 use reflexo_typst::args::TaskWhen;
 use reflexo_typst::debug_loc::{DocumentPosition, SourceSpanOffset};
-use reflexo_typst::Error;
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;

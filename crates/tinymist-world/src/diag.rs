@@ -7,7 +7,7 @@ use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{NoColor, WriteColor};
 use tinymist_std::Result;
 use tinymist_vfs::FileId;
-use typst::diag::{eco_format, Severity, SourceDiagnostic, StrResult};
+use typst::diag::{Severity, SourceDiagnostic, StrResult, eco_format};
 use typst::syntax::Span;
 
 use crate::{CodeSpanReportWorld, DiagnosticFormat, SourceWorld};

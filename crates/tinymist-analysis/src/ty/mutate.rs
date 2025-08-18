@@ -39,11 +39,7 @@ pub trait TyMutator {
             }
         }
 
-        if mutated {
-            Some(types.into())
-        } else {
-            None
-        }
+        if mutated { Some(types.into()) } else { None }
     }
 
     fn mutate_option(&mut self, ty: Option<&Ty>, pol: bool) -> Option<Option<Ty>> {

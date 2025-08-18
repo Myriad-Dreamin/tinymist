@@ -4,37 +4,37 @@ pub use std::ops::Range;
 pub use std::path::{Path, PathBuf};
 pub use std::sync::{Arc, LazyLock, OnceLock};
 
-pub use ecow::{eco_vec, EcoVec};
+pub use ecow::{EcoVec, eco_vec};
 pub use itertools::Itertools;
 pub use lsp_types::{
-    request::GotoDeclarationResponse, CodeActionKind, CodeLens, ColorInformation,
-    ColorPresentation, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
-    DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
-    FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint, Location as LspLocation,
-    LocationLink, MarkedString, MarkupContent, MarkupKind, ParameterInformation,
-    Position as LspPosition, PrepareRenameResponse, SelectionRange, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
-    SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
+    CodeActionKind, CodeLens, ColorInformation, ColorPresentation, Diagnostic,
+    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentLink,
+    DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
+    Hover, HoverContents, InlayHint, Location as LspLocation, LocationLink, MarkedString,
+    MarkupContent, MarkupKind, ParameterInformation, Position as LspPosition,
+    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
+    SymbolInformation, TextEdit, Url, WorkspaceEdit, request::GotoDeclarationResponse,
 };
 pub use serde_json::Value as JsonValue;
 pub use tinymist_project::LspComputeGraph;
 pub use tinymist_std::DefId;
+pub use typst::World;
 pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;
 pub use typst::syntax::ast::{self, AstNode};
 pub use typst::syntax::{
     FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
-pub use typst::World;
 pub use typst_shim::syntax::LinkedNodeExt;
 
 pub use crate::analysis::{Definition, LocalContext};
 pub use crate::code_action::proto::*;
 pub use crate::docs::DefDocs;
 pub use crate::lsp_typst_boundary::{
-    path_to_url, to_lsp_position, to_lsp_range, to_typst_position, to_typst_range, LspRange,
-    PositionEncoding,
+    LspRange, PositionEncoding, path_to_url, to_lsp_position, to_lsp_range, to_typst_position,
+    to_typst_range,
 };
-pub use crate::syntax::{classify_syntax, Decl, DefKind};
+pub use crate::syntax::{Decl, DefKind, classify_syntax};
 pub(crate) use crate::ty::PathPreference;
 pub use crate::{SemanticRequest, StatefulRequest};

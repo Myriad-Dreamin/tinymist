@@ -1,4 +1,4 @@
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use tinymist_std::hash::hash128;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::foundations::Repr;

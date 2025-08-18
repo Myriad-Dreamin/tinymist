@@ -7,13 +7,13 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_world::package::PackageSpec;
-use typst::diag::{eco_format, StrResult};
+use typst::diag::{StrResult, eco_format};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, Span};
 
-use crate::docs::{file_id_repr, module_docs, DefDocs, PackageDefInfo};
-use crate::package::{get_manifest_id, PackageInfo};
 use crate::LocalContext;
+use crate::docs::{DefDocs, PackageDefInfo, file_id_repr, module_docs};
+use crate::package::{PackageInfo, get_manifest_id};
 
 /// Documentation Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,10 +318,10 @@ pub fn package_docs_md(doc: &PackageDoc) -> StrResult<String> {
                                 None => "unknown",
                             };
                             let _ = writeln!(
-                                    out,
-                                    "#### {} ({ty:?})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
-                                    param.name, param.name, param.docs, param.name
-                                );
+                                out,
+                                "#### {} ({ty:?})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
+                                param.name, param.name, param.docs, param.name
+                            );
                             let _ = writeln!(out, "<!-- end:param -->");
                         }
                     }
@@ -434,7 +434,7 @@ struct ConvertResult {
 mod tests {
     use tinymist_world::package::{PackageRegistry, PackageSpec};
 
-    use super::{package_docs, package_docs_md, package_docs_typ, PackageInfo};
+    use super::{PackageInfo, package_docs, package_docs_md, package_docs_typ};
     use crate::tests::*;
 
     fn test(pkg: PackageSpec) {

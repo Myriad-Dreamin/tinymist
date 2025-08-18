@@ -3,12 +3,12 @@
 use comemo::Track;
 use ecow::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
-use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
-use typst::World;
+use typst::syntax::{LinkedNode, Span, SyntaxKind, SyntaxNode, ast};
 use typst_shim::eval::Vm;
 
 /// Try to determine a set of possible values for an expression.

@@ -1,7 +1,7 @@
 //! From <https://github.com/nvarner/typst-lsp/blob/cc7bad9bd9764bfea783f2fab415cb3061fd8bff/src/server/semantic_tokens/mod.rs>
 
 use strum::IntoEnumIterator;
-use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
+use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 
 use super::modifier_set::ModifierSet;
 use super::typst_tokens::{Modifier, TokenType};

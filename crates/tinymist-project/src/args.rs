@@ -5,8 +5,8 @@ use tinymist_std::{bail, error::prelude::Result};
 
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
 
-use crate::model::*;
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
+use crate::model::*;
 
 /// Project document commands.
 #[derive(Debug, Clone, clap::Subcommand)]

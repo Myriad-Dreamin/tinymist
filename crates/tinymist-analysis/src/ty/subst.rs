@@ -59,8 +59,8 @@ mod tests {
     use tinymist_derive::BindTyCtx;
 
     use super::{DynTypeBounds, Interned, Ty, TyCtx, TypeInfo, TypeVar};
-    use crate::ty::tests::*;
     use crate::ty::ApplyChecker;
+    use crate::ty::tests::*;
     #[test]
     fn test_ty() {
         use super::*;

@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
@@ -15,11 +15,11 @@ use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
 use tinymist_lint::LintInfo;
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
-use tinymist_std::hash::{hash128, FxDashMap};
+use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
-use tinymist_world::{EntryReader, DETACHED_ENTRY};
+use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
@@ -27,23 +27,23 @@ use typst::layout::Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{Span, VirtualPath};
-use typst_shim::eval::{eval_compat, Eval};
+use typst_shim::eval::{Eval, eval_compat};
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_signature, bib_info, definition, post_type_check, AnalysisStats, BibInfo,
-    CompletionFeat, Definition, PathPreference, QueryStatGuard, SemanticTokenCache,
-    SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty, TypeInfo,
+    AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
+    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
+    TypeInfo, analyze_signature, bib_info, definition, post_type_check,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
+    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
     classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
-    scan_workspace_files, Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency,
-    SyntaxClass,
+    scan_workspace_files,
 };
-use crate::upstream::{tooltip_, Tooltip};
+use crate::upstream::{Tooltip, tooltip_};
 use crate::{
     ColorTheme, CompilerQueryRequest, LspPosition, LspRange, LspWorldExt, PositionEncoding,
 };
@@ -823,7 +823,7 @@ impl SharedContext {
             .terms
             .m
             .get(&hash128(&cache_key))
-            .and_then(|slot| (cache_key == &slot.1 .0).then_some(slot.1 .1.clone()));
+            .and_then(|slot| (cache_key == &slot.1.0).then_some(slot.1.1.clone()));
         if let Some(cached) = cached {
             return cached;
         }

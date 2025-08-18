@@ -3,9 +3,9 @@
 use cmark_writer::ast::Node;
 use typst::html::HtmlElement;
 
+use crate::Result;
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
 use crate::common::{CenterNode, FigureNode, HighlightNode};
-use crate::Result;
 
 use super::core::HtmlToAstParser;
 

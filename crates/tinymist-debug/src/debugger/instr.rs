@@ -1,6 +1,6 @@
 use typst::diag::FileError;
-use typst::syntax::ast::{self, AstNode};
 use typst::syntax::SyntaxNode;
+use typst::syntax::ast::{self, AstNode};
 
 use super::*;
 

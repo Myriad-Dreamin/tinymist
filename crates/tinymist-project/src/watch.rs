@@ -12,15 +12,15 @@
 use std::collections::HashMap;
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use tinymist_std::{error::IgnoreLogging, ImmutPath};
+use tinymist_std::{ImmutPath, error::IgnoreLogging};
 use tinymist_world::vfs::notify::NotifyDeps;
 use tokio::sync::mpsc;
 use typst::diag::FileError;
 
 use tinymist_world::vfs::{
+    FileChangeSet, FileSnapshot, PathAccessModel,
     notify::{FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
-    FileChangeSet, FileSnapshot, PathAccessModel,
 };
 
 type WatcherPair = (RecommendedWatcher, mpsc::UnboundedReceiver<NotifyEvent>);

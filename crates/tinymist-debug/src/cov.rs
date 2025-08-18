@@ -13,7 +13,7 @@ use tinymist_world::{CompilerFeat, CompilerWorld};
 use typst::diag::FileResult;
 use typst::foundations::func;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, Source, Span, SyntaxNode};
+use typst::syntax::{Source, Span, SyntaxNode, ast};
 use typst::{World, WorldExt};
 
 use crate::instrument::Instrumenter;

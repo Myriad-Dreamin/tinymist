@@ -1,12 +1,12 @@
 //! Markdown writer implementation
 
+use cmark_writer::WriterOptions;
 use cmark_writer::ast::Node;
 use cmark_writer::writer::CommonMarkWriter;
-use cmark_writer::WriterOptions;
 use ecow::EcoString;
 
-use crate::common::FormatWriter;
 use crate::Result;
+use crate::common::FormatWriter;
 
 /// Markdown writer implementation
 #[derive(Default)]

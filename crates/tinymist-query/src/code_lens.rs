@@ -1,6 +1,6 @@
 use lsp_types::Command;
 
-use crate::{prelude::*, SemanticRequest};
+use crate::{SemanticRequest, prelude::*};
 
 /// The [`textDocument/codeLens`] request is sent from the client to the server
 /// to compute code lenses for a given text document.

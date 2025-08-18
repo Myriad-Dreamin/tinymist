@@ -1,10 +1,10 @@
 //! Analysis of function signatures.
 
 use itertools::Either;
-use tinymist_analysis::{func_signature, ArgInfo, ArgsInfo, PartialSignature};
+use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
 use tinymist_derive::BindTyCtx;
 
-use super::{prelude::*, Definition, SharedContext};
+use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::classify_def_loosely;

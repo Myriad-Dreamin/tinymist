@@ -5,10 +5,10 @@ use tinymist_std::typst::TypstDocument;
 use typst::syntax::Span;
 
 use crate::{
+    StrRef,
     analysis::{Definition, SearchCtx},
     prelude::*,
-    syntax::{get_index_info, RefExpr, SyntaxClass},
-    StrRef,
+    syntax::{RefExpr, SyntaxClass, get_index_info},
 };
 
 /// The [`textDocument/references`] request is sent from the client to the

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use sync_ls::transport::MirrorArgs;
-use tinymist::project::DocCommands;
 use tinymist::LONG_VERSION;
+use tinymist::project::DocCommands;
 use tinymist::{CompileFontArgs, CompileOnceArgs};
 
 #[cfg(feature = "preview")]

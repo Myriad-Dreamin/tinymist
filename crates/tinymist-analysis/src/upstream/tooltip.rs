@@ -1,15 +1,15 @@
 use std::fmt::Write;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use if_chain::if_chain;
-use typst::engine::Sink;
-use typst::foundations::{repr, Capturer, Value};
-use typst::layout::Length;
-use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::World;
+use typst::engine::Sink;
+use typst::foundations::{Capturer, Value, repr};
+use typst::layout::Length;
+use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 use typst_shim::eval::CapturesVisitor;
 use typst_shim::syntax::LinkedNodeExt;
-use typst_shim::utils::{round_2, Numeric};
+use typst_shim::utils::{Numeric, round_2};
 
 use super::{summarize_font_family, truncated_repr};
 use crate::analyze_expr;

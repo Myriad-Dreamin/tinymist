@@ -16,22 +16,22 @@
 
 pub use tinymist_debug::BreakpointKind;
 
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 use comemo::Track;
 use comemo::Tracked;
 use parking_lot::Mutex;
-use tinymist_debug::{set_debug_session, DebugSession, DebugSessionHandler};
+use tinymist_debug::{DebugSession, DebugSessionHandler, set_debug_session};
 use tinymist_std::typst_shim::eval::{Eval, Vm};
 use tinymist_world::{CompilerFeat, CompilerWorld};
 use typst::{
+    __bail as bail, World,
     diag::{SourceResult, Warned},
     engine::{Engine, Route, Sink, Traced},
     foundations::{Context, Scopes, Value},
     introspection::Introspector,
     layout::PagedDocument,
-    syntax::{ast, parse_code, Span},
-    World, __bail as bail,
+    syntax::{Span, ast, parse_code},
 };
 
 type RequestId = i64;

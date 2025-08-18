@@ -23,13 +23,13 @@ use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use reflexo::ImmutPath;
 use reflexo_typst::package::PackageSpec;
-use sync_ls::transport::{with_stdio_transport, MirrorArgs};
+use sync_ls::transport::{MirrorArgs, with_stdio_transport};
 use sync_ls::{
-    internal_error, DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot,
-    LspMessage, LspResult, Message, RequestId, TConnectionTx,
+    DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot, LspMessage,
+    LspResult, Message, RequestId, TConnectionTx, internal_error,
 };
-use tinymist::world::TaskInputs;
 use tinymist::LONG_VERSION;
+use tinymist::world::TaskInputs;
 use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
 use tinymist_project::EntryResolver;
 use tinymist_query::package::PackageInfo;

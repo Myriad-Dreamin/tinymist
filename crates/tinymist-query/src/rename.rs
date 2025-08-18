@@ -3,7 +3,7 @@ use lsp_types::{
     OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
-use tinymist_std::path::{unix_slash, PathClean};
+use tinymist_std::path::{PathClean, unix_slash};
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,
@@ -11,11 +11,11 @@ use typst::{
 
 use crate::adt::interner::Interned;
 use crate::{
-    analysis::{get_link_exprs, LinkObject, LinkTarget},
+    analysis::{LinkObject, LinkTarget, get_link_exprs},
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
+    syntax::{Decl, RefExpr, SyntaxClass, first_ancestor_expr, get_index_info, node_ancestors},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -64,7 +64,9 @@ impl StatefulRequest for RenameRequest {
                 let rename_loc = Path::new(ref_path_str.as_str());
                 let diff = tinymist_std::path::diff(new_path, rename_loc)?;
                 if diff.is_absolute() {
-                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}");
+                    log::info!(
+                        "bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}"
+                    );
                     return None;
                 }
 

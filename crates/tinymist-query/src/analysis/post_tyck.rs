@@ -3,12 +3,12 @@
 use std::collections::HashSet;
 use tinymist_derive::BindTyCtx;
 
-use super::{prelude::*, DynTypeBounds, ParamAttrs, ParamTy, SharedContext};
 use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
     TypeInfo, TypeVar,
 };
-use crate::syntax::{classify_context, classify_context_outer, ArgClass, SyntaxContext, VarClass};
+use super::{DynTypeBounds, ParamAttrs, ParamTy, SharedContext, prelude::*};
+use crate::syntax::{ArgClass, SyntaxContext, VarClass, classify_context, classify_context_outer};
 use crate::ty::BuiltinTy;
 
 /// With given type information, check the type of a literal expression again by
