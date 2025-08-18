@@ -325,7 +325,7 @@ impl ServerState {
             self.preview
                 .start(cli_args, previewer, id, false, is_background)
         } else {
-            return Err(internal_error("entry file must be provided"));
+            Err(internal_error("entry file must be provided"))
         }
     }
 }

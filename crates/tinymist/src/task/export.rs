@@ -141,7 +141,7 @@ impl ExportTask {
     pub(crate) fn signal(
         &self,
         snap: &LspCompiledArtifact,
-        client: &std::sync::Arc<(dyn ProjectClient + 'static)>,
+        client: &std::sync::Arc<dyn ProjectClient + 'static>,
     ) {
         let config = self.factory.task();
 
@@ -153,7 +153,7 @@ impl ExportTask {
         &self,
         artifact: &LspCompiledArtifact,
         config: &Arc<ExportUserConfig>,
-        client: &std::sync::Arc<(dyn ProjectClient + 'static)>,
+        client: &std::sync::Arc<dyn ProjectClient + 'static>,
     ) -> Option<()> {
         let doc = artifact.doc.as_ref()?;
         let s = artifact.snap.signal;

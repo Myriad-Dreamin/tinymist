@@ -102,10 +102,10 @@ impl Write for FileLock {
 
 impl Drop for FileLock {
     fn drop(&mut self) {
-        if let Some(f) = self.f.take() {
-            if let Err(e) = unlock(&f) {
-                log::warn!("failed to release lock: {e:?}");
-            }
+        if let Some(f) = self.f.take()
+            && let Err(e) = unlock(&f)
+        {
+            log::warn!("failed to release lock: {e:?}");
         }
     }
 }

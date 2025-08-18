@@ -420,7 +420,7 @@ impl LocalContext {
     }
 
     /// Fork a new context for searching in the workspace.
-    pub fn fork_for_search(&mut self) -> SearchCtx {
+    pub fn fork_for_search(&mut self) -> SearchCtx<'_> {
         SearchCtx {
             ctx: self,
             searched: Default::default(),

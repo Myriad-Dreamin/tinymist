@@ -72,11 +72,11 @@ pub trait PackFs: fmt::Debug {
         f: &mut (dyn FnMut(&str, PackFile) -> PackageResult<()> + Send + Sync),
     ) -> PackageResult<()>;
     /// Read a file from the package.
-    fn read(&self, _path: &str) -> io::Result<PackFile> {
+    fn read(&self, _path: &str) -> io::Result<PackFile<'_>> {
         Err(unsupported())
     }
     /// Read entries from the package.
-    fn entries(&self) -> io::Result<PackEntries> {
+    fn entries(&self) -> io::Result<PackEntries<'_>> {
         Err(unsupported())
     }
 }
