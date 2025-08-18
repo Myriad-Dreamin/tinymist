@@ -107,7 +107,6 @@ impl EditorActor {
                     diagnostics.as_ref().map(|files| files.len())
                 );
 
-                log::info!("Step 2: EditorActor received diag!");
                 self.publish(version.id, diagnostics);
             }
             EditorRequest::Status(compile_status) => {
