@@ -590,7 +590,7 @@ impl Decl {
 impl Ord for Decl {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let base = match (self, other) {
-            (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
+            (Self::Generated(l), Self::Generated(r)) => l.0.0.cmp(&r.0.0),
             (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
             (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
             _ => self.span().into_raw().cmp(&other.span().into_raw()),
@@ -609,7 +609,7 @@ trait StrictCmp {
 impl Decl {
     pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
         let base = match (self, other) {
-            (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
+            (Self::Generated(l), Self::Generated(r)) => l.0.0.cmp(&r.0.0),
             (Self::Module(l), Self::Module(r)) => l.fid.strict_cmp(&r.fid),
             (Self::Docs(l), Self::Docs(r)) => l
                 .var

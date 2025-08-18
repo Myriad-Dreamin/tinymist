@@ -6,8 +6,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    invalid_data_fmt, read_msg_text, write_msg_text, ExtractError, LspOrDapResponse, LspResult,
-    RequestId, ResponseError,
+    ExtractError, LspOrDapResponse, LspResult, RequestId, ResponseError, invalid_data_fmt,
+    read_msg_text, write_msg_text,
 };
 
 /// A message in the Language Server Protocol.

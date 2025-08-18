@@ -7,10 +7,10 @@ use ecow::EcoString;
 use std::fs;
 use std::io::Cursor;
 
+use crate::Result;
 use crate::common::{
     CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode, VerbatimNode,
 };
-use crate::Result;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;

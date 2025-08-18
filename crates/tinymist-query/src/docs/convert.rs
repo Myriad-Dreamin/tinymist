@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use tinymist_std::path::unix_slash;
 use tinymist_world::diag::print_diagnostics_to_string;
 use tinymist_world::vfs::WorkspaceResolver;
@@ -9,10 +9,10 @@ use tinymist_world::{
     DiagnosticFormat, EntryReader, EntryState, ShadowApi, SourceWorld, TaskInputs,
 };
 use typlite::{Format, TypliteFeat};
+use typst::World;
 use typst::diag::StrResult;
 use typst::foundations::Bytes;
 use typst::syntax::FileId;
-use typst::World;
 
 use crate::analysis::SharedContext;
 

@@ -2,18 +2,18 @@
 
 use std::collections::HashMap;
 
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
-use typst::syntax::package::PackageSpec;
 use typst::syntax::FileId;
+use typst::syntax::package::PackageSpec;
 
+use crate::LocalContext;
 use crate::adt::interner::Interned;
 use crate::docs::file_id_repr;
-use crate::package::{get_manifest_id, PackageInfo};
+use crate::package::{PackageInfo, get_manifest_id};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
-use crate::LocalContext;
 
 use super::DefDocs;
 

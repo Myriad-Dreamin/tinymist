@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub use dapts::{Event, Request, Response};
 
-use crate::{invalid_data_fmt, read_msg_text, write_msg_text, LspOrDapResponse};
+use crate::{LspOrDapResponse, invalid_data_fmt, read_msg_text, write_msg_text};
 
 /// A message in the Debug Adaptor Protocol.
 #[derive(Serialize, Deserialize, Debug, Clone)]

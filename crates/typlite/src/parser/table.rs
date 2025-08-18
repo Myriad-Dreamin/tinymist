@@ -3,12 +3,12 @@
 use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
 use ecow::EcoString;
-use typst::html::{tag, HtmlElement, HtmlNode};
+use typst::html::{HtmlElement, HtmlNode, tag};
 use typst::utils::PicoStr;
 
+use crate::Result;
 use crate::common::InlineNode;
 use crate::tags::md_tag;
-use crate::Result;
 
 use super::core::HtmlToAstParser;
 

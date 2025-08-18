@@ -6,13 +6,13 @@ use ecow::EcoString;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
 use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
+use typst::World;
 use typst::diag::{SourceResult, StrResult};
 use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
 use typst::layout::Abs;
 use typst::routines::EvalMode;
-use typst::syntax::{ast, Span, SyntaxNode};
+use typst::syntax::{Span, SyntaxNode, ast};
 use typst::visualize::Color;
-use typst::World;
 use typst_eval::eval_string;
 
 use crate::model::{ExportHtmlTask, ExportPngTask, ExportSvgTask};

@@ -1,6 +1,6 @@
 use core::fmt;
 use std::sync::Arc;
-use typst::html::{tag, HtmlNode::*};
+use typst::html::{HtmlNode::*, tag};
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;

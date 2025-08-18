@@ -14,7 +14,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
     foundations::{Content, Element, ParamInfo, Type, Value},
-    syntax::{ast, FileId, Span, SyntaxKind, SyntaxNode},
+    syntax::{FileId, Span, SyntaxKind, SyntaxNode, ast},
 };
 
 use super::{BoundPred, BuiltinTy, PackageId};
@@ -381,25 +381,27 @@ impl NameBone {
         let mut lhs = lhs_iter.next();
         let mut rhs = rhs_iter.next();
 
-        std::iter::from_fn(move || 'name_scanning: loop {
-            if let (Some((idx, lhs_key)), Some((j, rhs_key))) = (lhs, rhs) {
-                match lhs_key.cmp(rhs_key) {
-                    std::cmp::Ordering::Less => {
-                        lhs = lhs_iter.next();
-                        continue 'name_scanning;
-                    }
-                    std::cmp::Ordering::Greater => {
-                        rhs = rhs_iter.next();
-                        continue 'name_scanning;
-                    }
-                    std::cmp::Ordering::Equal => {
-                        lhs = lhs_iter.next();
-                        rhs = rhs_iter.next();
-                        return Some((idx, j));
+        std::iter::from_fn(move || {
+            'name_scanning: loop {
+                if let (Some((idx, lhs_key)), Some((j, rhs_key))) = (lhs, rhs) {
+                    match lhs_key.cmp(rhs_key) {
+                        std::cmp::Ordering::Less => {
+                            lhs = lhs_iter.next();
+                            continue 'name_scanning;
+                        }
+                        std::cmp::Ordering::Greater => {
+                            rhs = rhs_iter.next();
+                            continue 'name_scanning;
+                        }
+                        std::cmp::Ordering::Equal => {
+                            lhs = lhs_iter.next();
+                            rhs = rhs_iter.next();
+                            return Some((idx, j));
+                        }
                     }
                 }
+                return None;
             }
-            return None;
         })
     }
 }

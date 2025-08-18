@@ -1,7 +1,7 @@
 use lsp_types::{InlayHintKind, InlayHintLabel};
 
 use crate::{
-    analysis::{analyze_call, ParamKind},
+    analysis::{ParamKind, analyze_call},
     prelude::*,
 };
 
@@ -215,7 +215,7 @@ impl InlayHintWorker<'_> {
                         ParamKind::Positional
                             if call_info.signature.primary().has_fill_or_size_or_stroke =>
                         {
-                            continue
+                            continue;
                         }
                         ParamKind::Positional
                             if !SMART.on_pos_args
@@ -224,7 +224,7 @@ impl InlayHintWorker<'_> {
                                         || disable_by_single_line_content_block))
                                 || (!info.is_content_block && disable_by_single_pos_arg) =>
                         {
-                            continue
+                            continue;
                         }
                         ParamKind::Rest
                             if (!SMART.on_variadic_args

@@ -2,7 +2,7 @@
 
 pub use cov::CoverageResult;
 pub use debugger::{
-    set_debug_session, with_debug_session, BreakpointKind, DebugSession, DebugSessionHandler,
+    BreakpointKind, DebugSession, DebugSessionHandler, set_debug_session, with_debug_session,
 };
 
 mod cov;
@@ -16,11 +16,11 @@ use debugger::BreakpointInstr;
 use parking_lot::Mutex;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
-use tinymist_world::{print_diagnostics, CompilerFeat, CompilerWorld};
+use tinymist_world::{CompilerFeat, CompilerWorld, print_diagnostics};
+use typst::Library;
 use typst::diag::EcoString;
 use typst::syntax::package::PackageVersion;
 use typst::utils::LazyHash;
-use typst::Library;
 
 use cov::*;
 use instrument::InstrumentWorld;

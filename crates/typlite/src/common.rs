@@ -1,7 +1,5 @@
 //! Common types and interfaces for the conversion system
 
-use cmark_writer::ast::Node;
-use cmark_writer::custom_node;
 use cmark_writer::CommonMarkWriter;
 use cmark_writer::HtmlAttribute;
 use cmark_writer::HtmlElement;
@@ -10,8 +8,10 @@ use cmark_writer::HtmlWriter;
 use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
 use cmark_writer::WriterOptions;
-use ecow::eco_format;
+use cmark_writer::ast::Node;
+use cmark_writer::custom_node;
 use ecow::EcoString;
+use ecow::eco_format;
 use std::path::PathBuf;
 
 use crate::Result;

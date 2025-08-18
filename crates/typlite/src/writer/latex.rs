@@ -6,11 +6,11 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
+use crate::Result;
 use crate::common::{
     CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, InlineNode, ListState,
     VerbatimNode,
 };
-use crate::Result;
 
 /// LaTeX writer implementation
 pub struct LaTeXWriter {

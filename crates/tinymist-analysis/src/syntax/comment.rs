@@ -174,8 +174,7 @@ impl DocCommentMatcher {
         let comments = comments.iter().map(|comment| match comment {
             RawComment::Line(line) => {
                 // strip all slash prefix
-                let text = line.trim_start_matches('/');
-                text
+                line.trim_start_matches('/')
             }
             RawComment::Block(block) => {
                 fn remove_comment(text: &str) -> Option<&str> {

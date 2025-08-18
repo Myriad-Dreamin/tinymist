@@ -1,15 +1,15 @@
 use std::ops::{Deref, Range};
 
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
 use typst::syntax::{
-    ast::{self},
     LinkedNode, Source, SyntaxKind,
+    ast::{self},
 };
 use typst_shim::utils::LazyHash;
 
-use super::{is_mark, CommentGroupMatcher};
+use super::{CommentGroupMatcher, is_mark};
 
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn get_lexical_hierarchy(

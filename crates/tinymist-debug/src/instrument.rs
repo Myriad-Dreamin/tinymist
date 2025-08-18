@@ -4,15 +4,15 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tinymist_std::hash::FxHashMap;
-use tinymist_world::vfs::PathResolution;
 use tinymist_world::SourceWorld;
-use tinymist_world::{vfs::FileId, CompilerFeat, CompilerWorld};
+use tinymist_world::vfs::PathResolution;
+use tinymist_world::{CompilerFeat, CompilerWorld, vfs::FileId};
+use typst::Library;
 use typst::diag::FileResult;
 use typst::foundations::{Bytes, Datetime};
 use typst::syntax::Source;
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
-use typst::Library;
 
 pub trait Instrumenter: Send + Sync {
     fn instrument(&self, source: Source) -> FileResult<Source>;

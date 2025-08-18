@@ -18,9 +18,9 @@ use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
+use typst::World;
 use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
-use typst::World;
 use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;

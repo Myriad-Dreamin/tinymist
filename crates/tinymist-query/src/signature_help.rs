@@ -1,10 +1,10 @@
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
+    SemanticRequest,
     adt::interner::Interned,
     prelude::*,
-    syntax::{classify_context, classify_syntax, ArgClass, SyntaxContext},
-    SemanticRequest,
+    syntax::{ArgClass, SyntaxContext, classify_context, classify_syntax},
 };
 
 /// The [`textDocument/signatureHelp`] request is sent from the client to the

@@ -109,9 +109,10 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
 
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
-    let res = reg.replace_all(&res, |_captures: &regex::Captures| {
-        "data:image-hash/svg+xml;base64,redacted"
-    });
+    let res = reg.replace_all(
+        &res,
+        |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
+    );
 
     [repr.as_str(), res.as_ref()].join("\n=====\n")
 }

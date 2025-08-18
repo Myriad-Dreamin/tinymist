@@ -38,13 +38,13 @@ use std::sync::Arc;
 use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
-use tinymist_std::{bail, Result};
+use tinymist_std::{Result, bail};
 use tinymist_world::{EntryReader, TaskInputs};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::{path_res_to_url, CompilerQueryResponse, SemanticRequest, StatefulRequest};
+use crate::{CompilerQueryResponse, SemanticRequest, StatefulRequest, path_res_to_url};
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -472,7 +472,7 @@ mod signature_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::{analyze_signature, Signature, SignatureTarget};
+    use crate::analysis::{Signature, SignatureTarget, analyze_signature};
     use crate::syntax::classify_syntax;
     use crate::tests::*;
 

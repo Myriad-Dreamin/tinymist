@@ -5,13 +5,13 @@ use hyper_tungstenite::tungstenite::Message;
 use tinymist::{
     project::ProjectPreviewState,
     tool::{
-        preview::{bind_streams, make_http_server, PreviewCliArgs, ProjectPreviewHandler},
-        project::{start_project, ProjectOpts, StartProjectResult},
+        preview::{PreviewCliArgs, ProjectPreviewHandler, bind_streams, make_http_server},
+        project::{ProjectOpts, StartProjectResult, start_project},
     },
 };
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_preview::{
-    frontend_html, ControlPlaneMessage, ControlPlaneTx, PreviewBuilder, PreviewConfig,
+    ControlPlaneMessage, ControlPlaneTx, PreviewBuilder, PreviewConfig, frontend_html,
 };
 use tinymist_project::WorldProvider;
 use tinymist_std::error::prelude::*;
@@ -143,7 +143,9 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
 
     let static_server = if let Some(static_file_host) = static_file_host {
-        log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
+        log::warn!(
+            "--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead."
+        );
         let html = frontend_html.clone();
         Some(make_http_server(html, static_file_host, websocket_tx.clone()).await)
     } else {

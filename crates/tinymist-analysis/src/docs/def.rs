@@ -2,7 +2,7 @@ use core::fmt;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use serde::{Deserialize, Serialize};
 
 use super::tidy::*;

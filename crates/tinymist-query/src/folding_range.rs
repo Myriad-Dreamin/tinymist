@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::{
-    prelude::*,
-    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind},
     SyntaxRequest,
+    prelude::*,
+    syntax::{LexicalHierarchy, LexicalKind, LexicalScopeKind, get_lexical_hierarchy},
 };
 
 /// The [`textDocument/foldingRange`] request is sent from the client to the
@@ -83,7 +83,9 @@ impl SyntaxRequest for FoldingRangeRequest {
             results.reverse();
         }
 
-        crate::log_debug_ct!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {hierarchy:#?} results: {results:#?}");
+        crate::log_debug_ct!(
+            "FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {hierarchy:#?} results: {results:#?}"
+        );
 
         Some(results)
     }

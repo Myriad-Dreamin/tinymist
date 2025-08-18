@@ -9,7 +9,7 @@ use std::{
 };
 
 use regex::{Regex, Replacer};
-use serde_json::{ser::PrettyFormatter, Serializer, Value};
+use serde_json::{Serializer, Value, ser::PrettyFormatter};
 use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
@@ -28,8 +28,8 @@ pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
 pub use crate::syntax::find_module_level_docs;
-use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
-use crate::{to_lsp_position, to_typst_position, CompletionFeat};
+use crate::{CompletionFeat, to_lsp_position, to_typst_position};
+use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
@@ -338,9 +338,10 @@ impl JsonRepr {
             LazyLock::new(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
         static REG2: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r#"C:\\?\\dummy-root\\?\\"#).unwrap());
-        let v = REG.replace_all(v, |_captures: &regex::Captures| {
-            "data:image-hash/svg+xml;base64,redacted"
-        });
+        let v = REG.replace_all(
+            v,
+            |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
+        );
         REG2.replace_all_cow(v, "/dummy-root/")
     }
 

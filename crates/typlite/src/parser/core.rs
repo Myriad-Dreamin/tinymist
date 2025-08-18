@@ -6,13 +6,13 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use cmark_writer::{CommonMarkWriter, WriteResult};
 use ecow::EcoString;
 use tinymist_project::LspWorld;
-use typst::html::{tag, HtmlElement, HtmlNode};
+use typst::html::{HtmlElement, HtmlNode, tag};
 
-use crate::attributes::{md_attr, AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser};
-use crate::common::{AlertNode, CenterNode, VerbatimNode};
-use crate::tags::md_tag;
 use crate::Result;
 use crate::TypliteFeat;
+use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
+use crate::common::{AlertNode, CenterNode, VerbatimNode};
+use crate::tags::md_tag;
 
 use super::{list::ListParser, table::TableParser};
 

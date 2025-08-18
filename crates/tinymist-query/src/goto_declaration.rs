@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{prelude::*, syntax::SyntaxClass, SemanticRequest};
+use crate::{SemanticRequest, prelude::*, syntax::SyntaxClass};
 
 /// The [`textDocument/declaration`] request asks the server for the declaration
 /// location of a symbol at a given text document position.

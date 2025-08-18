@@ -4,7 +4,7 @@ use ecow::eco_format;
 use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
 use regex::Regex;
 use tinymist_analysis::syntax::{
-    adjust_expr, node_ancestors, previous_items, PreviousItem, SyntaxClass,
+    PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
 };
 use tinymist_std::path::{diff, unix_slash};
 use typst::syntax::Side;
@@ -12,7 +12,7 @@ use typst::syntax::Side;
 use super::get_link_exprs_in;
 use crate::analysis::LinkTarget;
 use crate::prelude::*;
-use crate::syntax::{interpret_mode_at, InterpretMode};
+use crate::syntax::{InterpretMode, interpret_mode_at};
 
 /// Analyzes the document and provides code actions.
 pub struct CodeActionWorker<'a> {

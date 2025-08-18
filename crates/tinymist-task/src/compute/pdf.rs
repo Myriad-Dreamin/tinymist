@@ -1,6 +1,6 @@
 use tinymist_std::time::ToUtcDateTime;
-pub use typst_pdf::pdf;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
+pub use typst_pdf::pdf;
 
 use typst_pdf::{PdfOptions, PdfStandards, Timestamp};
 

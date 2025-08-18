@@ -24,7 +24,7 @@ use std::{
 
 use dashmap::{DashMap, SharedValue};
 use ecow::{EcoString, EcoVec};
-use hashbrown::{hash_map::RawEntryMut, HashMap};
+use hashbrown::{HashMap, hash_map::RawEntryMut};
 use parking_lot::Mutex;
 use rustc_hash::FxHasher;
 use triomphe::Arc;

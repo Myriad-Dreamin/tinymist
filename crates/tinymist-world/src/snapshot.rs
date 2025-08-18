@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use crate::{args::TaskWhen, CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
+use crate::{CompilerFeat, CompilerWorld, EntryReader, TaskInputs, args::TaskWhen};
 use ecow::EcoString;
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;

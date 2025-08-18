@@ -1,15 +1,15 @@
 use std::{borrow::Cow, sync::Arc};
 
-use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{system::SystemAccessModel, ImmutDict, Vfs};
-use typst::{utils::LazyHash, Features};
+use tinymist_std::{ImmutPath, error::prelude::*};
+use tinymist_vfs::{ImmutDict, Vfs, system::SystemAccessModel};
+use typst::{Features, utils::LazyHash};
 
 use crate::{
+    EntryState,
     args::{CompileFontArgs, CompilePackageArgs},
     config::{CompileFontOpts, CompileOpts},
-    font::{system::SystemFontSearcher, FontResolverImpl},
-    package::{registry::HttpRegistry, RegistryPathMapper},
-    EntryState,
+    font::{FontResolverImpl, system::SystemFontSearcher},
+    package::{RegistryPathMapper, registry::HttpRegistry},
 };
 
 mod diag;

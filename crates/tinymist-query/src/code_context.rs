@@ -6,7 +6,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     prelude::*,
-    syntax::{interpret_mode_at, InterpretMode},
+    syntax::{InterpretMode, interpret_mode_at},
 };
 
 /// A query to get the mode at a specific position in a text document.

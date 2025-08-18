@@ -13,13 +13,13 @@ use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use parking_lot::Mutex;
 use strum::EnumIter;
 use tinymist_std::ImmutPath;
-use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
+use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 
 use crate::{
+    LocalContext, LspPosition, PositionEncoding,
     adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot},
     syntax::{Expr, ExprInfo},
     ty::Ty,
-    LocalContext, LspPosition, PositionEncoding,
 };
 
 /// A shared semantic tokens object.

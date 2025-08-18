@@ -6,11 +6,11 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::FileId;
 use typst::{
+    World,
     foundations::{Func, Label, Module, Selector, Value},
     introspection::MetadataElem,
     syntax::Source,
     utils::PicoStr,
-    World,
 };
 
 use crate::LocalContext;

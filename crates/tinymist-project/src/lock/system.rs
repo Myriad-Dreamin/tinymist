@@ -4,16 +4,16 @@ use std::cmp::Ordering;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::{path::Path, sync::Arc};
 
-use ecow::{eco_vec, EcoVec};
+use ecow::{EcoVec, eco_vec};
 use tinymist_std::error::prelude::*;
 use tinymist_std::path::unix_slash;
-use tinymist_std::{bail, ImmutPath};
+use tinymist_std::{ImmutPath, bail};
 use tinymist_task::CtxPath;
-use typst::diag::EcoString;
 use typst::World;
+use typst::diag::EcoString;
 
 use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePath};
-use crate::{LockFile, LockFileCompat, LspWorld, ProjectPathMaterial, LOCK_FILENAME, LOCK_VERSION};
+use crate::{LOCK_FILENAME, LOCK_VERSION, LockFile, LockFileCompat, LspWorld, ProjectPathMaterial};
 
 impl LockFile {
     pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {
@@ -169,13 +169,13 @@ impl LockFile {
                 Some(Ordering::Equal | Ordering::Less) => {}
                 Some(Ordering::Greater) => {
                     bail!(
-                    "trying to update lock file having a future version, current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
-                );
+                        "trying to update lock file having a future version, current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+                    );
                 }
                 None => {
                     bail!(
-                    "cannot compare version, are version strings in right format? current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
-                );
+                        "cannot compare version, are version strings in right format? current tinymist-cli supports {LOCK_VERSION}, the lock file is {version}",
+                    );
                 }
             }
 

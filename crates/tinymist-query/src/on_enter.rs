@@ -2,7 +2,7 @@
 
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, syntax::node_ancestors, SyntaxRequest};
+use crate::{SyntaxRequest, prelude::*, syntax::node_ancestors};
 
 /// The [`experimental/onEnter`] request is sent from client to server to handle
 /// the <kbd>Enter</kbd> key press.
@@ -69,7 +69,7 @@ impl SyntaxRequest for OnEnterRequest {
 
                 match prev_leaf.kind() {
                     SyntaxKind::ListItem | SyntaxKind::EnumItem => {
-                        return Some(Cases::ListOrEnum(prev_leaf))
+                        return Some(Cases::ListOrEnum(prev_leaf));
                     }
                     _ => {}
                 }

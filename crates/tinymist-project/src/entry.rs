@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tinymist_l10n::DebugL10n;
+use tinymist_std::ImmutPath;
 use tinymist_std::error::prelude::*;
 use tinymist_std::hash::FxDashMap;
-use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
 use typst::syntax::VirtualPath;
 
@@ -131,7 +131,9 @@ impl EntryResolver {
                     Some(VirtualPath::new(stripped)),
                 )),
                 Err(err) => {
-                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    log::info!(
+                        "Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}"
+                    );
                     EntryState::new_rooted_by_parent(entry)
                 }
             },

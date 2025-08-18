@@ -4,7 +4,7 @@ use tinymist_std::typst::TypstDocument;
 use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
 
-use super::{prelude::*, InsTy, SharedContext};
+use super::{InsTy, SharedContext, prelude::*};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
 

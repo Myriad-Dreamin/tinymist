@@ -13,14 +13,14 @@
 use anyhow::Context as ContextTrait;
 use comemo::Track;
 use criterion::Criterion;
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst_shim::eval::eval_compat;
+use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Value};
 use typst::introspection::Introspector;
-use typst::World;
 
 /// Runs benchmarks on the given world. An entry point must be provided in the
 /// world.

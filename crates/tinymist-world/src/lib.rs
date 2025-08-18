@@ -27,7 +27,7 @@ mod snapshot;
 #[cfg(feature = "system")]
 pub mod system;
 #[cfg(feature = "system")]
-pub use system::{print_diagnostics, SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld};
+pub use system::{SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld, print_diagnostics};
 
 /// Run the compiler in the browser environment.
 #[cfg(feature = "browser")]

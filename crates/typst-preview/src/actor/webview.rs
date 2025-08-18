@@ -5,8 +5,8 @@ use tokio::sync::{broadcast, mpsc};
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
 use crate::{
-    actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
     WsMessage,
+    actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
 };
 
 // pub type CursorPosition = DocumentPosition;

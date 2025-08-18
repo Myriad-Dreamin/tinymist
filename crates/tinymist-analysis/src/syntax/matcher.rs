@@ -1349,7 +1349,7 @@ fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<Sy
         use SyntaxKind::*;
         match parent.kind() {
             ContentBlock | CodeBlock | Str | Raw | LineComment | BlockComment => {
-                return Option::None
+                return Option::None;
             }
             Args if parent.range() == args.range() => {
                 break;
@@ -1490,7 +1490,7 @@ pub fn bad_completion_cursor(
 mod tests {
     use super::*;
     use insta::assert_snapshot;
-    use typst::syntax::{is_newline, Side, Source};
+    use typst::syntax::{Side, Source, is_newline};
 
     fn map_node(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
