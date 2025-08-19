@@ -9,6 +9,42 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.24 - [2025-08-23]
+
+### Server
+
+* Compiled tinymist crate for wasm32 target in https://github.com/Myriad-Dreamin/tinymist/pull/2025, https://github.com/Myriad-Dreamin/tinymist/pull/2026, https://github.com/Myriad-Dreamin/tinymist/pull/1947, and https://github.com/Myriad-Dreamin/tinymist/pull/2027
+* Using `tinymist_std::time` for wasm32 targets in https://github.com/Myriad-Dreamin/tinymist/pull/2028
+* Added js transport to sync-ls in https://github.com/Myriad-Dreamin/tinymist/pull/2029
+
+### tinymist.lock
+
+* (Fix) Ensuring that the lockfile is respected in https://github.com/Myriad-Dreamin/tinymist/pull/2000
+* Added docs about project model (tinymist.lock) in https://github.com/Myriad-Dreamin/tinymist/pull/2009, https://github.com/Myriad-Dreamin/tinymist/pull/2011, https://github.com/Myriad-Dreamin/tinymist/pull/2012, and https://github.com/Myriad-Dreamin/tinymist/pull/2016
+
+### Formatting
+
+* Added range formatting support to the language server by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/1984
+
+### Completion
+
+* Completing both `#f` and `#f.paren` in some cases (#1940) in https://github.com/Myriad-Dreamin/tinymist/pull/2014
+
+### Rename
+
+* Renaming labels in https://github.com/Myriad-Dreamin/tinymist/pull/1858
+
+### Docstring
+
+* (Fix) Cleaning typlite markers from doc strings by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2017
+* Exporting package docs to json format and render to html in https://github.com/Myriad-Dreamin/tinymist/pull/1809
+
+### On Enter
+
+* Made enter feature in list or enum work in https://github.com/Myriad-Dreamin/tinymist/pull/2022
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.22...v0.13.24
+
 ## v0.13.22 - [2025-08-06]
 
 * Bumped MSRV to 1.88 in https://github.com/Myriad-Dreamin/tinymist/pull/1993
