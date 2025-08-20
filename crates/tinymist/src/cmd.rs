@@ -14,7 +14,7 @@ use tinymist_project::{
     ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
 };
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{LocalContextGuard, LspRange};
+use tinymist_query::{LocalContextGuard, LspPosition, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportMarkdownTask;
 use typst::diag::{eco_format, StrResult};
@@ -80,6 +80,12 @@ struct QueryOpts {
 #[serde(rename_all = "camelCase")]
 struct ExportSyntaxRangeOpts {
     range: Option<LspRange>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportValueOpts {
+    position: Option<LspPosition>,
 }
 
 /// Here are implemented the handlers for each command.
@@ -273,6 +279,17 @@ impl ServerState {
         })?;
 
         just_ok(JsonValue::String(output))
+    }
+
+    /// Export the full tracked value at a specific position.
+    pub fn export_value(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as ExportValueOpts);
+        let position = opts
+            .position
+            .ok_or_else(|| internal_error("no position provided"))?;
+
+        run_query!(self.ShowFullValue(path, position))
     }
 
     fn select_range<T>(
