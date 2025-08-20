@@ -112,3 +112,11 @@ pub fn query_main(cmds: QueryCommands) -> Result<()> {
 
     Ok(())
 }
+
+#[derive(Debug, Clone, Default, clap::ValueEnum)]
+#[clap(rename_all = "camelCase")]
+enum QueryDocsFormat {
+    #[default]
+    Json,
+    Markdown,
+}

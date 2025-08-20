@@ -118,12 +118,6 @@ enum Commands {
     Task(crate::task::TaskCommands),
 }
 
-impl Default for Commands {
-    fn default() -> Self {
-        Self::Lsp(crate::lsp::LspArgs::default())
-    }
-}
-
 /// The main entry point.
 fn main() -> Result<()> {
     // The root allocator for heap memory profiling.
@@ -165,7 +159,10 @@ fn main() -> Result<()> {
             .try_init()
     };
 
-    match args.command.unwrap_or_default() {
+    match args
+        .command
+        .unwrap_or_else(|| Commands::Lsp(Default::default()))
+    {
         Commands::Probe => Ok(()),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
@@ -189,14 +186,6 @@ fn main() -> Result<()> {
         Commands::Cov(args) => crate::cov::cov_main(args),
         Commands::Test(args) => block_on(crate::test::test_main(args)),
     }
-}
-
-#[derive(Debug, Clone, Default, clap::ValueEnum)]
-#[clap(rename_all = "camelCase")]
-enum QueryDocsFormat {
-    #[default]
-    Json,
-    Markdown,
 }
 
 /// Creates a new language server host.
