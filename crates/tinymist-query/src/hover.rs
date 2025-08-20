@@ -1,9 +1,11 @@
 use core::fmt::{self, Write};
 use std::cmp::Reverse;
 
+use serde_json::Value as JsonValue;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::foundations::repr::separated_list;
+use typst::syntax::{LinkedNode, ast};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_link_exprs_in;
@@ -188,10 +190,23 @@ impl HoverWorker<'_> {
     /// Dynamic analysis results
     fn dynamic_analysis(&mut self) -> Option<()> {
         let typst_tooltip = self.ctx.tooltip(&self.source, self.cursor)?;
+
         self.value.push(match typst_tooltip {
             Tooltip::Text(text) => text.to_string(),
-            Tooltip::Code(code) => format!("### Sampled Values\n```typc\n{code}\n```"),
+            Tooltip::Code(code) => {
+                // Add a button to show full value when we have tracked code values
+                self.actions.push(CommandLink {
+                    title: Some("Show Full Value".to_string()),
+                    command_or_links: vec![CommandOrLink::Command {
+                        id: "tinymist.showFullValue".to_string(),
+                        args: vec![],
+                    }],
+                });
+
+                format!("### Sampled Values\n```typc\n{code}\n```")
+            }
         });
+
         Some(())
     }
 
