@@ -16,19 +16,19 @@ pub fn client_root<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
     sender: TConnectionTx<M>,
 ) -> LspClientRoot {
     LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), sender)
-        .with_hook(Arc::new(TypstLsHook::default()))
+        .with_hook(Arc::new(TinymistHook::default()))
 }
 
 #[derive(Default)]
-struct TypstLsHook(Mutex<FxHashMap<RequestId, typst_timing::TimingScope>>);
+struct TinymistHook(Mutex<FxHashMap<RequestId, typst_timing::TimingScope>>);
 
-impl fmt::Debug for TypstLsHook {
+impl fmt::Debug for TinymistHook {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TypstLsHook").finish()
+        f.debug_struct("TinymistHook").finish()
     }
 }
 
-impl LsHook for TypstLsHook {
+impl LsHook for TinymistHook {
     fn start_request(&self, req_id: &RequestId, method: &str) {
         ().start_request(req_id, method);
 
