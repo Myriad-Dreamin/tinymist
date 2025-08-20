@@ -725,6 +725,7 @@ impl From<DeclExpr> for Expr {
     }
 }
 
+/// Represents a declaration with a name and span.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpannedDecl {
     name: Interned<str>,
@@ -747,9 +748,12 @@ impl fmt::Debug for SpannedDecl {
     }
 }
 
+/// Represents a declaration with a name and range information.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
+    /// Name of the declaration.
     pub name: Interned<str>,
+    /// File ID, name range, and optional full range.
     pub at: Box<(TypstFileId, Range<usize>, Option<Range<usize>>)>,
 }
 
@@ -769,9 +773,12 @@ impl fmt::Debug for NameRangeDecl {
     }
 }
 
+/// Represents a module declaration with a name and file identifier.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDecl {
+    /// Name of the module.
     pub name: Interned<str>,
+    /// File identifier.
     pub fid: TypstFileId,
 }
 
@@ -791,6 +798,7 @@ impl fmt::Debug for ModuleDecl {
     }
 }
 
+/// Represents a documentation declaration with a base and type variable.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DocsDecl {
     base: Interned<Decl>,
@@ -813,6 +821,7 @@ impl fmt::Debug for DocsDecl {
     }
 }
 
+/// Represents a declaration identified only by a span.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpanDecl(Span);
 
@@ -832,6 +841,7 @@ impl fmt::Debug for SpanDecl {
     }
 }
 
+/// Represents a generated declaration with a definition ID.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GeneratedDecl(DefId);
 
@@ -851,11 +861,15 @@ impl fmt::Debug for GeneratedDecl {
     }
 }
 
+/// Type alias for unary expressions.
 pub type UnExpr = UnInst<Expr>;
+/// Type alias for binary expressions.
 pub type BinExpr = BinInst<Expr>;
 
+/// Type alias for export maps that map names to expressions.
 pub type ExportMap = BTreeMap<Interned<str>, Expr>;
 
+/// Represents different types of argument expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ArgExpr {
     Pos(Expr),
@@ -864,6 +878,7 @@ pub enum ArgExpr {
     Spread(Expr),
 }
 
+/// Represents different types of patterns.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
     Expr(Expr),
@@ -878,6 +893,7 @@ impl fmt::Display for Pattern {
 }
 
 impl Pattern {
+    /// Gets a textual representation of the pattern.
     pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_pattern(self);
@@ -885,11 +901,16 @@ impl Pattern {
     }
 }
 
+/// Represents a pattern signature with positional and named parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatternSig {
+    /// Positional patterns.
     pub pos: EcoVec<Interned<Pattern>>,
+    /// Named patterns.
     pub named: EcoVec<(DeclExpr, Interned<Pattern>)>,
+    /// Left spread pattern.
     pub spread_left: Option<(DeclExpr, Interned<Pattern>)>,
+    /// Right spread pattern.
     pub spread_right: Option<(DeclExpr, Interned<Pattern>)>,
 }
 
@@ -897,34 +918,50 @@ impl Pattern {}
 
 impl_internable!(Decl,);
 
+/// Represents a content sequence expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentSeqExpr {
+    /// Type of the content sequence.
     pub ty: Ty,
 }
 
+/// Represents a reference expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
+    /// Declaration being referenced.
     pub decl: DeclExpr,
+    /// Optional step in the reference chain.
     pub step: Option<Expr>,
+    /// Root expression of the reference.
     pub root: Option<Expr>,
+    /// Term type information.
     pub term: Option<Ty>,
 }
 
+/// Represents a content reference expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentRefExpr {
+    /// Identifier being referenced.
     pub ident: DeclExpr,
+    /// Optional declaration this refers to.
     pub of: Option<DeclExpr>,
+    /// Optional body expression.
     pub body: Option<Expr>,
 }
 
+/// Represents a select expression for accessing members.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectExpr {
+    /// Left-hand side expression.
     pub lhs: Expr,
+    /// Key being selected.
     pub key: DeclExpr,
+    /// Span of the select operation.
     pub span: Span,
 }
 
 impl SelectExpr {
+    /// Creates a new select expression.
     pub fn new(key: DeclExpr, lhs: Expr) -> Interned<Self> {
         Interned::new(Self {
             key,
@@ -934,90 +971,130 @@ impl SelectExpr {
     }
 }
 
+/// Represents an arguments expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArgsExpr {
+    /// List of arguments.
     pub args: Vec<ArgExpr>,
+    /// Span of the arguments.
     pub span: Span,
 }
 
 impl ArgsExpr {
+    /// Creates a new arguments expression.
     pub fn new(span: Span, args: Vec<ArgExpr>) -> Interned<Self> {
         Interned::new(Self { args, span })
     }
 }
 
+/// Represents an element expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
+    /// The element type.
     pub elem: Element,
+    /// Content expressions.
     pub content: EcoVec<Expr>,
 }
 
+/// Represents a function application expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ApplyExpr {
+    /// Function being called.
     pub callee: Expr,
+    /// Arguments passed to the function.
     pub args: Expr,
+    /// Span of the application.
     pub span: Span,
 }
 
+/// Represents a function expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
+    /// Function declaration.
     pub decl: DeclExpr,
+    /// Function parameters.
     pub params: PatternSig,
+    /// Function body.
     pub body: Expr,
 }
 
+/// Represents a let expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
-    /// Span of the pattern
+    /// Span of the pattern.
     pub span: Span,
+    /// Pattern being bound.
     pub pattern: Interned<Pattern>,
+    /// Optional body expression.
     pub body: Option<Expr>,
 }
 
+/// Represents a show expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
+    /// Optional selector expression.
     pub selector: Option<Expr>,
+    /// Edit expression.
     pub edit: Expr,
 }
 
+/// Represents a set expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetExpr {
+    /// Target expression.
     pub target: Expr,
+    /// Arguments for the set.
     pub args: Expr,
+    /// Optional condition.
     pub cond: Option<Expr>,
 }
 
+/// Represents an import expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
+    /// Declaration of the import.
     pub decl: Interned<RefExpr>,
 }
 
+/// Represents an include expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeExpr {
+    /// Source expression to include.
     pub source: Expr,
 }
 
+/// Represents an if expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IfExpr {
+    /// Condition expression.
     pub cond: Expr,
+    /// Then branch expression.
     pub then: Expr,
+    /// Else branch expression.
     pub else_: Expr,
 }
 
+/// Represents a while loop expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WhileExpr {
+    /// Condition expression.
     pub cond: Expr,
+    /// Body expression.
     pub body: Expr,
 }
 
+/// Represents a for loop expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForExpr {
+    /// Pattern for iteration variable.
     pub pattern: Interned<Pattern>,
+    /// Iterator expression.
     pub iter: Expr,
+    /// Body expression.
     pub body: Expr,
 }
 
-/// The kind of unary operation
+/// Represents the kinds of unary operations.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum UnaryOp {
     /// The (arithmetic) positive operation
@@ -1049,12 +1126,12 @@ pub enum UnaryOp {
     TypeOf,
 }
 
-/// A unary operation type
+/// Represents a unary operation with an operand.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct UnInst<T> {
-    /// The operand of the unary operation
+    /// The operand of the unary operation.
     pub lhs: T,
-    /// The kind of the unary operation
+    /// The kind of the unary operation.
     pub op: UnaryOp,
 }
 
@@ -1075,28 +1152,28 @@ impl<T: Ord> Ord for UnInst<T> {
 }
 
 impl UnInst<Expr> {
-    /// Create a unary operation type
+    /// Creates a unary operation expression.
     pub fn new(op: UnaryOp, lhs: Expr) -> Interned<Self> {
         Interned::new(Self { lhs, op })
     }
 }
 
 impl<T> UnInst<T> {
-    /// Get the operands of the unary operation
+    /// Gets the operands of the unary operation.
     pub fn operands(&self) -> [&T; 1] {
         [&self.lhs]
     }
 }
 
-/// The kind of binary operation
+/// Type alias for binary operations from the AST.
 pub type BinaryOp = ast::BinOp;
 
-/// A binary operation type
+/// Represents a binary operation with two operands.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct BinInst<T> {
-    /// The operands of the binary operation
+    /// The operands of the binary operation.
     pub operands: (T, T),
-    /// The kind of the binary operation
+    /// The kind of the binary operation.
     pub op: BinaryOp,
 }
 
@@ -1117,7 +1194,7 @@ impl<T: Ord> Ord for BinInst<T> {
 }
 
 impl BinInst<Expr> {
-    /// Create a binary operation type
+    /// Creates a binary operation expression.
     pub fn new(op: BinaryOp, lhs: Expr, rhs: Expr) -> Interned<Self> {
         Interned::new(Self {
             operands: (lhs, rhs),
@@ -1127,7 +1204,7 @@ impl BinInst<Expr> {
 }
 
 impl<T> BinInst<T> {
-    /// Get the operands of the binary operation
+    /// Gets the operands of the binary operation.
     pub fn operands(&self) -> [&T; 2] {
         [&self.operands.0, &self.operands.1]
     }
