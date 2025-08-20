@@ -62,3 +62,51 @@ Available types:
 2. Maintain existing code structure and organization
 4. Write unit tests for new functionality. Use snapshot-based unit tests when possible.
 5. Document public APIs and complex logic in code comments
+
+## Development Guidelines
+
+### `tools/editor-tools`
+
+The frontend-side and backend-side can be developed independently. For example, a data object passed from backend to frontend can be coded as `van.state<T>` as follows:
+
+- Intermediate arguments:
+
+  ```ts
+  const documentMetricsData = `:[[preview:DocumentMetrics]]:`;
+  const docMetrics = van.state<DocumentMetrics>(
+    documentMetricsData.startsWith(":") ? DOC_MOCK : JSON.parse(base64Decode(documentMetricsData)),
+  );
+  ```
+
+- Server-pushing arguments (e.g. `programTrace` in `tools/editor-tools/src/vscode.ts`):
+
+  ```ts
+  export const programTrace = van.state<TraceReport | undefined>(undefined /* init value */);
+
+  export function setupVscodeChannel() {
+    if (vscodeAPI?.postMessage) {
+      // Handle messages sent from the extension to the webview
+      window.addEventListener("message", (event: any) => {
+        switch (event.data.type) {
+          case "traceData": {
+            programTrace.val = event.data.data;
+            break;
+          }
+          // other cases
+        }
+      });
+    }
+  }
+  ```
+
+- Tool request arguments (e.g. `requestSaveFontsExportConfigure` in `tools/editor-tools/src/vscode.ts`):
+
+  ```ts
+  export function requestSaveFontsExportConfigure(data: fontsExportConfigure) {
+    if (vscodeAPI?.postMessage) {
+      vscodeAPI.postMessage({ type: "saveFontsExportConfigure", data });
+    }
+  }
+  ```
+
+`DOC_MOCK` is a mock data object for the frontend to display so that the frontend can be developed directly with `yarn dev`.
