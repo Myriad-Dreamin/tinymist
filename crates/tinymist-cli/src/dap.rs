@@ -1,36 +1,29 @@
-use sync_ls::transport::{MirrorArgs, with_stdio_transport};
-use sync_ls::{LspBuilder, LspMessage};
+use sync_ls::transport::with_stdio_transport;
+use sync_ls::{DapBuilder, DapMessage};
 use tinymist::LONG_VERSION;
-use tinymist::world::CompileFontArgs;
-use tinymist::{RegularInit, ServerState};
+use tinymist::ServerState;
+use tinymist_std::error::prelude::*;
 
 use crate::*;
 
-#[derive(Debug, Clone, Default, clap::Parser)]
-pub struct LspArgs {
-    #[clap(flatten)]
-    pub mirror: MirrorArgs,
-    #[clap(flatten)]
-    pub font: CompileFontArgs,
-}
+pub type DapArgs = crate::lsp::LspArgs;
 
 /// The main entry point for the language server.
-pub fn lsp_main(args: LspArgs) -> Result<()> {
+pub fn dap_main(args: DapArgs) -> Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
         .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     log::info!("tinymist version information: {pairs:?}");
-    log::info!("starting language server: {args:?}");
+    log::info!("starting debug adaptor: {args:?}");
 
     let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
+    with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
         let client = client_root(conn.sender);
-        ServerState::install_lsp(LspBuilder::new(
-            RegularInit {
+        ServerState::install_dap(DapBuilder::new(
+            tinymist::DapRegularInit {
                 client: client.weak().to_typed(),
                 font_opts: args.font,
-                exec_cmds: Vec::new(),
             },
             client.weak(),
         ))

@@ -5,46 +5,42 @@ mod args;
 mod compile;
 mod completion;
 mod cov;
+#[cfg(feature = "dap")]
+mod dap;
 mod generate_script;
 mod lsp;
 #[cfg(feature = "preview")]
 mod preview;
+mod query;
 mod test;
+mod trace_lsp;
 mod utils;
+
+#[cfg(feature = "lock")]
+mod doc;
+#[cfg(feature = "lock")]
+mod task;
 
 use core::fmt;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 
 use clap::Parser;
-use futures::future::MaybeDone;
 use parking_lot::Mutex;
-use reflexo::ImmutPath;
-use reflexo_typst::package::PackageSpec;
-use sync_ls::transport::{MirrorArgs, with_stdio_transport};
 use sync_ls::{
-    DapBuilder, DapMessage, GetMessageKind, LsHook, LspBuilder, LspClientRoot, LspMessage,
-    LspResult, Message, RequestId, TConnectionTx, internal_error,
+    GetMessageKind, LsHook, LspClientRoot, LspResult, Message, RequestId, TConnectionTx,
 };
 use tinymist::LONG_VERSION;
+use tinymist::project::DocCommands;
 use tinymist::world::system::print_diagnostics;
-use tinymist::world::{DiagnosticFormat, SourceWorld, TaskInputs};
-use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
+use tinymist::world::{DiagnosticFormat, SourceWorld};
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
-use tinymist_project::EntryResolver;
-#[cfg(feature = "preview")]
-use tinymist_project::LockFile;
-use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
-#[cfg(feature = "preview")]
-use tinymist_task::Id;
 use typst::ecow::EcoString;
 
-use crate::args::*;
+use crate::compile::CompileArgs;
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -68,6 +64,65 @@ impl Default for Runtimes {
 }
 
 static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
+
+#[derive(Debug, Clone, clap::Parser)]
+#[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
+struct CliArguments {
+    /// Mode of the binary
+    #[clap(subcommand)]
+    pub command: Option<Commands>,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+#[clap(rename_all = "kebab-case")]
+enum Commands {
+    /// Probes existence (Nop run)
+    Probe,
+
+    /// Generates completion script to stdout
+    Completion(crate::completion::ShellCompletionArgs),
+    /// Runs language server
+    Lsp(crate::lsp::LspArgs),
+    /// Runs debug adapter
+    #[cfg(feature = "dap")]
+    Dap(crate::dap::DapArgs),
+    /// Runs language server for tracing some typst program.
+    #[clap(hide(true))]
+    TraceLsp(crate::trace_lsp::TraceLspArgs),
+    /// Runs preview server
+    #[cfg(feature = "preview")]
+    Preview(tinymist::tool::preview::PreviewCliArgs),
+
+    /// Execute a document and collect coverage
+    #[clap(hide(true))] // still in development
+    Cov(crate::cov::CovArgs),
+    /// Test a document and gives summary
+    Test(crate::test::TestArgs),
+    /// Runs compile command like `typst-cli compile`
+    Compile(CompileArgs),
+    /// Generates build script for compilation
+    #[clap(hide(true))] // still in development
+    GenerateScript(crate::generate_script::GenerateScriptArgs),
+    /// Runs language query
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Query(crate::query::QueryCommands),
+    /// Runs documents
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Doc(DocCommands),
+    /// Runs tasks
+    #[cfg(feature = "lock")]
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Task(crate::task::TaskCommands),
+}
+
+impl Default for Commands {
+    fn default() -> Self {
+        Self::Lsp(crate::lsp::LspArgs::default())
+    }
+}
 
 /// The main entry point.
 fn main() -> Result<()> {
@@ -114,284 +169,34 @@ fn main() -> Result<()> {
         Commands::Probe => Ok(()),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
-        Commands::Lsp(args) => lsp_main(args),
+        Commands::Lsp(args) => crate::lsp::lsp_main(args),
         #[cfg(feature = "dap")]
-        Commands::Dap(args) => dap_main(args),
-        Commands::TraceLsp(args) => trace_lsp_main(args),
-        Commands::Query(cmds) => query_main(cmds),
+        Commands::Dap(args) => crate::dap::dap_main(args),
+        Commands::TraceLsp(args) => crate::trace_lsp::trace_lsp_main(args),
+        Commands::Query(cmds) => crate::query::query_main(cmds),
 
         #[cfg(feature = "preview")]
         Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
 
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
-        Commands::Doc(cmds) => doc_main(cmds),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),
-        Commands::Task(cmds) => task_main(cmds),
+        #[cfg(feature = "lock")]
+        Commands::Doc(cmds) => crate::doc::doc_main(cmds),
+        #[cfg(feature = "lock")]
+        Commands::Task(cmds) => crate::task::task_main(cmds),
 
         Commands::Cov(args) => crate::cov::cov_main(args),
         Commands::Test(args) => block_on(crate::test::test_main(args)),
     }
 }
 
-/// The main entry point for the language server.
-#[cfg(feature = "dap")]
-pub fn dap_main(args: DapArgs) -> Result<()> {
-    let pairs = LONG_VERSION.trim().split('\n');
-    let pairs = pairs
-        .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
-    log::info!("tinymist version information: {pairs:?}");
-    log::info!("starting debug adaptor: {args:?}");
-
-    let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport::<DapMessage>(args.mirror.clone(), |conn| {
-        let client = client_root(conn.sender);
-        ServerState::install_dap(DapBuilder::new(
-            tinymist::DapRegularInit {
-                client: client.weak().to_typed(),
-                font_opts: args.font,
-            },
-            client.weak(),
-        ))
-        .build()
-        .start(conn.receiver, is_replay)
-    })?;
-
-    log::info!("language server did shut down");
-    Ok(())
-}
-
-/// The main entry point for the compiler.
-pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
-    let inputs = args.compile.resolve_inputs();
-    let mut input = PathBuf::from(match args.compile.input {
-        Some(value) => value,
-        None => Err(anyhow::anyhow!("provide a valid path"))?,
-    });
-    let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
-
-    if root_path.is_relative() {
-        root_path = std::env::current_dir().context("cwd")?.join(root_path);
-    }
-    if input.is_relative() {
-        input = std::env::current_dir().context("cwd")?.join(input);
-    }
-    if !input.starts_with(&root_path) {
-        bail!("input file is not within the root path: {input:?} not in {root_path:?}");
-    }
-
-    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
-        let client_root = client_root(conn.sender);
-        let client = client_root.weak();
-        let roots = vec![ImmutPath::from(root_path)];
-        let config = Config {
-            entry_resolver: EntryResolver {
-                roots,
-                ..EntryResolver::default()
-            },
-            font_opts: args.compile.font,
-            ..Config::default()
-        };
-
-        let mut service = ServerState::install_lsp(LspBuilder::new(
-            SuperInit {
-                client: client.to_typed(),
-                exec_cmds: Vec::new(),
-                config,
-                err: None,
-            },
-            client.clone(),
-        ))
-        .build();
-
-        let resp = service.ready(()).unwrap();
-        let MaybeDone::Done(resp) = resp else {
-            anyhow::bail!("internal error: not sync init")
-        };
-        resp.unwrap();
-
-        // todo: persist
-        let request_received = reflexo::time::Instant::now();
-
-        let req_id: RequestId = 0.into();
-        client.register_request("tinymistExt/documentProfiling", &req_id, request_received);
-
-        let state = service.state_mut().unwrap();
-
-        let entry = state.entry_resolver().resolve(Some(input.as_path().into()));
-
-        let snap = state.snapshot().unwrap();
-
-        RUNTIMES.tokio_runtime.block_on(async {
-            let w = snap.world().clone().task(TaskInputs {
-                entry: Some(entry),
-                inputs,
-            });
-
-            UserActionTask::trace_main(client, state, &w, args.rpc_kind, req_id).await
-        });
-
-        Ok(())
-    })?;
-
-    Ok(())
-}
-
-/// The main entry point for language server queries.
-pub fn query_main(cmds: QueryCommands) -> Result<()> {
-    use tinymist_project::package::PackageRegistry;
-
-    with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
-        let client_root = client_root(conn.sender);
-        let client = client_root.weak();
-
-        // todo: roots, inputs, font_opts
-        let config = Config::default();
-
-        let mut service = ServerState::install_lsp(LspBuilder::new(
-            SuperInit {
-                client: client.to_typed(),
-                exec_cmds: Vec::new(),
-                config,
-                err: None,
-            },
-            client.clone(),
-        ))
-        .build();
-
-        let resp = service.ready(()).unwrap();
-        let MaybeDone::Done(resp) = resp else {
-            anyhow::bail!("internal error: not sync init")
-        };
-        resp.unwrap();
-
-        let state = service.state_mut().unwrap();
-
-        let snap = state.snapshot().unwrap();
-        let res = RUNTIMES.tokio_runtime.block_on(async move {
-            match cmds {
-                QueryCommands::PackageDocs(args) => {
-                    let pkg = PackageSpec::from_str(&args.id).unwrap();
-                    let path = args.path.map(PathBuf::from);
-                    let path = path
-                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
-
-                    let res = state
-                        .resource_package_docs_(PackageInfo {
-                            path,
-                            namespace: pkg.namespace,
-                            name: pkg.name,
-                            version: pkg.version.to_string(),
-                        })?
-                        .await?;
-
-                    let output_path = Path::new(&args.output);
-                    std::fs::write(output_path, res).map_err(internal_error)?;
-                }
-                QueryCommands::CheckPackage(args) => {
-                    let pkg = PackageSpec::from_str(&args.id).unwrap();
-                    let path = args.path.map(PathBuf::from);
-                    let path = path
-                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
-
-                    state
-                        .check_package(PackageInfo {
-                            path,
-                            namespace: pkg.namespace,
-                            name: pkg.name,
-                            version: pkg.version.to_string(),
-                        })?
-                        .await?;
-                }
-            };
-
-            LspResult::Ok(())
-        });
-
-        res.map_err(|e| anyhow::anyhow!("{e:?}"))
-    })?;
-
-    Ok(())
-}
-
-#[cfg(feature = "preview")]
-trait LockFileExt {
-    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id>;
-}
-
-#[cfg(feature = "preview")]
-impl LockFileExt for LockFile {
-    fn preview(&mut self, doc_id: Id, args: &TaskPreviewArgs) -> Result<Id> {
-        use tinymist_task::{ApplyProjectTask, PreviewTask, ProjectTask, TaskWhen};
-
-        let task_id = args
-            .task_name
-            .as_ref()
-            .map(|t| Id::new(t.clone()))
-            .unwrap_or(doc_id.clone());
-
-        let when = args.when.clone().unwrap_or(TaskWhen::OnType);
-        let task = ProjectTask::Preview(PreviewTask { when });
-        let task = ApplyProjectTask {
-            id: task_id.clone(),
-            document: doc_id,
-            task,
-        };
-
-        self.replace_task(task);
-
-        Ok(task_id)
-    }
-}
-
-/// Project document commands' main
-#[cfg(feature = "lock")]
-pub fn doc_main(args: tinymist_project::DocCommands) -> Result<()> {
-    use tinymist_project::DocCommands;
-
-    let cwd = std::env::current_dir().context("cannot get cwd")?;
-    LockFile::update(&cwd, |state| {
-        let ctx: (&Path, &Path) = (&cwd, &cwd);
-        match args {
-            DocCommands::New(args) => {
-                state.replace_document(args.to_input(ctx));
-            }
-            DocCommands::Configure(args) => {
-                use tinymist_project::ProjectRoute;
-
-                let id: Id = args.id.id(ctx);
-
-                state.route.push(ProjectRoute {
-                    id: id.clone(),
-                    priority: args.priority,
-                });
-            }
-        }
-
-        Ok(())
-    })
-}
-
-/// Project task commands' main
-#[cfg(feature = "lock")]
-pub fn task_main(args: TaskCommands) -> Result<()> {
-    let cwd = std::env::current_dir().context("cannot get cwd")?;
-    LockFile::update(&cwd, |state| {
-        let _ = state;
-        match args {
-            #[cfg(feature = "preview")]
-            TaskCommands::Preview(args) => {
-                let ctx: (&Path, &Path) = (&cwd, &cwd);
-                let input = args.declare.to_input(ctx);
-                let id = input.id.clone();
-                state.replace_document(input);
-                let _ = state.preview(id, &args);
-
-                Ok(())
-            }
-        }
-    })
+#[derive(Debug, Clone, Default, clap::ValueEnum)]
+#[clap(rename_all = "camelCase")]
+enum QueryDocsFormat {
+    #[default]
+    Json,
+    Markdown,
 }
 
 /// Creates a new language server host.

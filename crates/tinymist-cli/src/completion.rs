@@ -4,7 +4,7 @@ use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use tinymist_std::error::prelude::*;
 
-use crate::args::CliArguments;
+use crate::CliArguments;
 
 #[derive(Debug, Clone, clap::Parser)]
 pub struct ShellCompletionArgs {
