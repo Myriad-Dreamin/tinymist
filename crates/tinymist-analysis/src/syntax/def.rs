@@ -33,9 +33,11 @@ use super::{ExprDescriber, ExprPrinter};
 pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
 
 impl ExprInfo {
-    /// Creates a new ExprInfo instance from expression information representation.
+    /// Creates a new [`ExprInfo`] instance from expression information
+    /// representation.
     ///
-    /// Wraps the provided representation in an Arc and LazyHash for efficient sharing and hashing.
+    /// Wraps the provided representation in an Arc and LazyHash for efficient
+    /// sharing and hashing.
     pub fn new(repr: ExprInfoRepr) -> Self {
         Self(Arc::new(LazyHash::new(repr)))
     }
@@ -49,10 +51,10 @@ impl Deref for ExprInfo {
     }
 }
 
-/// Representation of expression information for a specific file.
+/// Representation of [`ExprInfo`] for a specific file.
 ///
-/// Contains all the analyzed information about expressions in a source file,
-/// including resolution maps, documentation strings, imports, and exports.
+/// Contains all the analyzed information including resolution maps,
+/// documentation strings, imports, and exports.
 #[derive(Debug)]
 pub struct ExprInfoRepr {
     /// The file ID this expression information belongs to
@@ -61,28 +63,30 @@ pub struct ExprInfoRepr {
     pub revision: usize,
     /// The source code content
     pub source: Source,
-    /// Map from spans to resolved reference expressions
-    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
-    /// Documentation string for the module
-    pub module_docstring: Arc<DocString>,
-    /// Map from declarations to their documentation strings
-    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
-    /// Map from spans to expressions for scope analysis
-    pub exprs: FxHashMap<Span, Expr>,
-    /// Map from file IDs to imported lexical scopes
-    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
-    /// The lexical scope of exported symbols from this file
-    pub exports: Arc<LazyHash<LexicalScope>>,
     /// The root expression of the file
     pub root: Expr,
+    /// Documentation string for the module
+    pub module_docstring: Arc<DocString>,
+    /// The lexical scope of exported symbols from this file
+    pub exports: Arc<LazyHash<LexicalScope>>,
+    /// Map from file IDs to imported lexical scopes
+    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+    /// Map from spans to expressions for scope analysis
+    pub exprs: FxHashMap<Span, Expr>,
+    /// Map from spans to resolved reference expressions
+    pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    /// Map from declarations to their documentation strings
+    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
 }
 
 impl std::hash::Hash for ExprInfoRepr {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // already contained in the source.
+        // self.fid.hash(state);
         self.revision.hash(state);
         self.source.hash(state);
-        self.exports.hash(state);
         self.root.hash(state);
+        self.exports.hash(state);
         let mut resolves = self.resolves.iter().collect::<Vec<_>>();
         resolves.sort_by_key(|(fid, _)| fid.into_raw());
         resolves.hash(state);
@@ -94,9 +98,6 @@ impl std::hash::Hash for ExprInfoRepr {
 
 impl ExprInfoRepr {
     /// Gets the definition expression for a given declaration.
-    ///
-    /// Returns the declaration itself if it's a definition, otherwise
-    /// looks up the resolved reference expression.
     pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
         if decl.is_def() {
             return Some(Expr::Decl(decl.clone()));
@@ -106,9 +107,6 @@ impl ExprInfoRepr {
     }
 
     /// Gets all references to a given declaration.
-    ///
-    /// Returns an iterator over spans and reference expressions that
-    /// reference the provided declaration, with special handling for labels.
     pub fn get_refs(
         &self,
         decl: Interned<Decl>,
@@ -125,8 +123,6 @@ impl ExprInfoRepr {
     }
 
     /// Checks if a declaration is exported from this module.
-    ///
-    /// Returns true if the declaration appears in the module's export scope.
     pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
         let of = Expr::Decl(decl.clone());
         self.exports
@@ -225,9 +221,6 @@ pub enum Expr {
 
 impl Expr {
     /// Returns a string representation of the expression.
-    ///
-    /// Uses the ExprDescriber to create a human-readable representation
-    /// of the expression for debugging and display purposes.
     pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_expr(self);
@@ -235,9 +228,6 @@ impl Expr {
     }
 
     /// Returns the span location of the expression.
-    ///
-    /// For most expressions returns a detached span, but declarations,
-    /// selections, and applications have specific span information.
     pub fn span(&self) -> Span {
         match self {
             Expr::Decl(decl) => decl.span(),
@@ -248,9 +238,6 @@ impl Expr {
     }
 
     /// Returns the file ID associated with this expression, if any.
-    ///
-    /// Attempts to extract file ID from declarations first, then falls back
-    /// to the span's file ID.
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Expr::Decl(decl) => decl.file_id(),
@@ -284,15 +271,11 @@ pub enum ExprScope {
 
 impl ExprScope {
     /// Creates an empty lexical scope.
-    ///
-    /// Returns a new ExprScope containing an empty lexical scope map.
     pub fn empty() -> Self {
         ExprScope::Lexical(LexicalScope::default())
     }
 
     /// Checks if the scope contains no bindings.
-    ///
-    /// Returns true if the scope has no variables, functions, or other bindings.
     pub fn is_empty(&self) -> bool {
         match self {
             ExprScope::Lexical(scope) => scope.is_empty(),
@@ -302,10 +285,8 @@ impl ExprScope {
         }
     }
 
-    /// Looks up a name in the scope and returns both expression and type information.
-    ///
-    /// Returns a tuple of (expression, type) where either may be None depending
-    /// on the scope type and whether the name is found.
+    /// Looks up a name in the scope and returns both expression and type
+    /// information.
     pub fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
             ExprScope::Lexical(scope) => {
@@ -334,9 +315,6 @@ impl ExprScope {
     }
 
     /// Merges all bindings from this scope into the provided export map.
-    ///
-    /// Copies all name-expression bindings from this scope into the exports,
-    /// converting values from modules, functions, and types as needed.
     pub fn merge_into(&self, exports: &mut LexicalScope) {
         match self {
             ExprScope::Lexical(scope) => {
@@ -377,9 +355,6 @@ fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
 }
 
 /// Kind of a definition.
-///
-/// Classifies different types of definitions that can appear in source code
-/// for language server features like symbols and completion.
 #[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DefKind {
@@ -412,14 +387,9 @@ impl fmt::Display for DefKind {
 }
 
 /// Type alias for declaration expressions.
-///
-/// Represents an interned declaration that can be referenced throughout the analysis.
 pub type DeclExpr = Interned<Decl>;
 
 /// Represents different kinds of declarations in the language.
-///
-/// This enum covers all possible declaration types, from function and variable
-/// declarations to imports, labels, and generated definitions.
 #[derive(Clone, PartialEq, Eq, Hash, DeclEnum)]
 pub enum Decl {
     Func(SpannedDecl),
@@ -448,9 +418,6 @@ pub enum Decl {
 
 impl Decl {
     /// Creates a function declaration from an identifier.
-    ///
-    /// Extracts the name and span from the AST identifier to create
-    /// a function declaration.
     pub fn func(ident: ast::Ident) -> Self {
         Self::Func(SpannedDecl {
             name: ident.get().into(),
@@ -459,9 +426,6 @@ impl Decl {
     }
 
     /// Creates a variable declaration from a string literal.
-    ///
-    /// Creates a variable declaration with the given name and a detached span.
-    /// Used for synthetic or generated variable declarations.
     pub fn lit(name: &str) -> Self {
         Self::Var(SpannedDecl {
             name: name.into(),
@@ -470,9 +434,6 @@ impl Decl {
     }
 
     /// Creates a variable declaration from an interned string.
-    ///
-    /// Similar to `lit` but takes an already interned string name.
-    /// Used for synthetic or generated variable declarations.
     pub fn lit_(name: Interned<str>) -> Self {
         Self::Var(SpannedDecl {
             name,
@@ -481,9 +442,6 @@ impl Decl {
     }
 
     /// Creates a variable declaration from an identifier.
-    ///
-    /// Extracts the name and span from the AST identifier to create
-    /// a variable declaration.
     pub fn var(ident: ast::Ident) -> Self {
         Self::Var(SpannedDecl {
             name: ident.get().into(),
@@ -492,8 +450,6 @@ impl Decl {
     }
 
     /// Creates an import alias declaration from an identifier.
-    ///
-    /// Used when an import statement creates an alias for the imported item.
     pub fn import_alias(ident: ast::Ident) -> Self {
         Self::ImportAlias(SpannedDecl {
             name: ident.get().into(),
@@ -502,8 +458,6 @@ impl Decl {
     }
 
     /// Creates an identifier reference declaration from an identifier.
-    ///
-    /// Used for references to identifiers in expressions, not definitions.
     pub fn ident_ref(ident: ast::Ident) -> Self {
         Self::IdentRef(SpannedDecl {
             name: ident.get().into(),
@@ -512,8 +466,6 @@ impl Decl {
     }
 
     /// Creates an identifier reference declaration from a math identifier.
-    ///
-    /// Similar to `ident_ref` but for mathematical identifiers in math mode.
     pub fn math_ident_ref(ident: ast::MathIdent) -> Self {
         Self::IdentRef(SpannedDecl {
             name: ident.get().into(),
@@ -522,15 +474,11 @@ impl Decl {
     }
 
     /// Creates a module declaration with a name and file ID.
-    ///
-    /// Associates a module name with its corresponding file ID for imports and references.
     pub fn module(name: Interned<str>, fid: TypstFileId) -> Self {
         Self::Module(ModuleDecl { name, fid })
     }
 
     /// Creates a module alias declaration from an identifier.
-    ///
-    /// Used when importing a module with an alias (e.g., `import "file.typ" as alias`).
     pub fn module_alias(ident: ast::Ident) -> Self {
         Self::ModuleAlias(SpannedDecl {
             name: ident.get().into(),
@@ -539,8 +487,6 @@ impl Decl {
     }
 
     /// Creates an import declaration from an identifier.
-    ///
-    /// Represents a name being imported from another module.
     pub fn import(ident: ast::Ident) -> Self {
         Self::Import(SpannedDecl {
             name: ident.get().into(),
@@ -549,8 +495,6 @@ impl Decl {
     }
 
     /// Creates a label declaration with a name and span.
-    ///
-    /// Used for labels that can be referenced by content references.
     pub fn label(name: &str, at: Span) -> Self {
         Self::Label(SpannedDecl {
             name: name.into(),
@@ -559,9 +503,6 @@ impl Decl {
     }
 
     /// Creates a content reference declaration from a reference AST node.
-    ///
-    /// Extracts the target name and span from the reference to create
-    /// a content reference declaration.
     pub fn ref_(ident: ast::Ref) -> Self {
         Self::ContentRef(SpannedDecl {
             name: ident.target().into(),
@@ -570,8 +511,6 @@ impl Decl {
     }
 
     /// Creates a string name declaration from a syntax node and name.
-    ///
-    /// Used for declarations identified by string names in specific contexts.
     pub fn str_name(s: SyntaxNode, name: &str) -> Decl {
         Self::StrName(SpannedDecl {
             name: name.into(),
@@ -582,7 +521,8 @@ impl Decl {
     /// Calculates the path stem from a string path or package specification.
     ///
     /// For package specs (starting with '@'), extracts the package name.
-    /// For file paths, extracts the file stem. Returns empty string if extraction fails.
+    /// For file paths, extracts the file stem. Returns empty string if
+    /// extraction fails.
     pub fn calc_path_stem(s: &str) -> Interned<str> {
         use std::str::FromStr;
         let name = if s.starts_with('@') {
@@ -596,85 +536,62 @@ impl Decl {
     }
 
     /// Creates a path stem declaration from a syntax node and name.
-    ///
-    /// Used for representing the stem of an import or include path.
     pub fn path_stem(s: SyntaxNode, name: Interned<str>) -> Self {
         Self::PathStem(SpannedDecl { name, at: s.span() })
     }
 
     /// Creates an import path declaration with a span and name.
-    ///
-    /// Represents a path being imported in an import statement.
     pub fn import_path(s: Span, name: Interned<str>) -> Self {
         Self::ImportPath(SpannedDecl { name, at: s })
     }
 
     /// Creates an include path declaration with a span and name.
-    ///
-    /// Represents a path being included in an include statement.
     pub fn include_path(s: Span, name: Interned<str>) -> Self {
         Self::IncludePath(SpannedDecl { name, at: s })
     }
 
     /// Creates a module import declaration with just a span.
-    ///
-    /// Used for anonymous module imports that don't have specific names.
     pub fn module_import(s: Span) -> Self {
         Self::ModuleImport(SpanDecl(s))
     }
 
     /// Creates a closure declaration with just a span.
-    ///
-    /// Represents an anonymous function or closure definition.
     pub fn closure(s: Span) -> Self {
         Self::Closure(SpanDecl(s))
     }
 
     /// Creates a pattern declaration with just a span.
-    ///
-    /// Used for pattern matching constructs in let bindings and function parameters.
     pub fn pattern(s: Span) -> Self {
         Self::Pattern(SpanDecl(s))
     }
 
     /// Creates a spread declaration with just a span.
-    ///
-    /// Represents a spread operator in argument lists or destructuring.
     pub fn spread(s: Span) -> Self {
         Self::Spread(SpanDecl(s))
     }
 
     /// Creates a content declaration with just a span.
-    ///
-    /// Used for content elements that don't have specific identifiers.
     pub fn content(s: Span) -> Self {
         Self::Content(SpanDecl(s))
     }
 
     /// Creates a constant declaration with just a span.
-    ///
-    /// Represents constant values or expressions.
     pub fn constant(s: Span) -> Self {
         Self::Constant(SpanDecl(s))
     }
 
-    /// Creates a documentation declaration linking a base declaration with a type variable.
-    ///
-    /// Used for associating documentation with specific type instantiations.
+    /// Creates a documentation declaration linking a base declaration with a
+    /// type variable.
     pub fn docs(base: Interned<Decl>, var: Interned<TypeVar>) -> Self {
         Self::Docs(DocsDecl { base, var })
     }
 
     /// Creates a generated declaration with a definition ID.
-    ///
-    /// Used for declarations that are created programmatically rather than from source.
     pub fn generated(def_id: DefId) -> Self {
         Self::Generated(GeneratedDecl(def_id))
     }
 
     /// Creates a bibliography entry declaration.
-    ///
-    /// Used for citations and bibliography entries with precise range information.
     pub fn bib_entry(
         name: Interned<str>,
         fid: TypstFileId,
@@ -687,10 +604,8 @@ impl Decl {
         })
     }
 
-    /// Checks if this declaration represents a definition rather than a reference.
-    ///
-    /// Returns true for declarations that define new symbols (functions, variables, labels, etc.)
-    /// and false for references to existing symbols.
+    /// Checks if this declaration represents a definition rather than a
+    /// reference (usage of a definition).
     pub fn is_def(&self) -> bool {
         matches!(
             self,
@@ -711,9 +626,6 @@ impl Decl {
     }
 
     /// Returns the kind of definition this declaration represents.
-    ///
-    /// Classifies the declaration into categories like function, variable, module, etc.
-    /// for use in language server features.
     pub fn kind(&self) -> DefKind {
         use Decl::*;
         match self {
@@ -730,8 +642,6 @@ impl Decl {
     }
 
     /// Gets file location of the declaration.
-    ///
-    /// Returns the file ID where this declaration is located, if available.
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Self::Module(ModuleDecl { fid, .. }) => Some(*fid),
@@ -741,9 +651,6 @@ impl Decl {
     }
 
     /// Gets full range of the declaration.
-    ///
-    /// Returns the complete range in the source file for declarations that track it,
-    /// currently only bibliography entries.
     pub fn full_range(&self) -> Option<Range<usize>> {
         if let Decl::BibEntry(decl) = self {
             return decl.at.2.clone();
@@ -753,9 +660,6 @@ impl Decl {
     }
 
     /// Creates a reference expression that points to this declaration.
-    ///
-    /// Constructs a RefExpr that represents a reference to this declaration,
-    /// optionally with type information.
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
         let def: Expr = this.clone().into();
         Interned::new(RefExpr {
@@ -788,9 +692,6 @@ trait StrictCmp {
 
 impl Decl {
     /// Low-performance comparison that is free from concurrency issues.
-    ///
-    /// This comparison method is only used for making stable test snapshots
-    /// and avoids potential race conditions in concurrent scenarios.
     pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
         let base = match (self, other) {
             (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
@@ -852,8 +753,6 @@ impl From<DeclExpr> for Expr {
 }
 
 /// A declaration with an associated name and span location.
-///
-/// Used for most declaration types that have a simple name-span relationship.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpannedDecl {
     name: Interned<str>,
@@ -877,8 +776,6 @@ impl fmt::Debug for SpannedDecl {
 }
 
 /// A declaration with a name and range information.
-///
-/// Used for declarations that need precise range information, such as bibliography entries.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
     /// The name of the declaration
@@ -904,8 +801,6 @@ impl fmt::Debug for NameRangeDecl {
 }
 
 /// A module declaration with name and file ID.
-///
-/// Represents a module that can be imported or referenced.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDecl {
     /// The name of the module
@@ -931,8 +826,6 @@ impl fmt::Debug for ModuleDecl {
 }
 
 /// A documentation declaration linking a base declaration with type variables.
-///
-/// Used for associating documentation with specific type instantiations.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DocsDecl {
     base: Interned<Decl>,
@@ -956,8 +849,6 @@ impl fmt::Debug for DocsDecl {
 }
 
 /// A span-only declaration for anonymous constructs.
-///
-/// Used for declarations that don't have names but need location tracking.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpanDecl(Span);
 
@@ -978,8 +869,6 @@ impl fmt::Debug for SpanDecl {
 }
 
 /// A generated declaration with a unique definition ID.
-///
-/// Used for declarations that are created programmatically rather than from source.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GeneratedDecl(DefId);
 
@@ -1021,8 +910,6 @@ pub enum ArgExpr {
 }
 
 /// Represents different kinds of patterns for destructuring.
-///
-/// Used in let bindings, function parameters, and other pattern-matching contexts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
     Expr(Expr),
@@ -1038,9 +925,6 @@ impl fmt::Display for Pattern {
 
 impl Pattern {
     /// Returns a string representation of the pattern.
-    ///
-    /// Uses the ExprDescriber to create a human-readable representation
-    /// of the pattern for debugging and display purposes.
     pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_pattern(self);
@@ -1079,7 +963,9 @@ pub struct ContentSeqExpr {
 
 /// Represents a reference expression.
 ///
-/// Links a declaration to its usage context, including resolution steps and type information.
+/// The step resolution is the intermediate step in resolution (if any).
+/// The root expression is the root expression of the reference chain.
+/// The term is the final resolved type of the reference.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
     /// The declaration being referenced
@@ -1093,8 +979,6 @@ pub struct RefExpr {
 }
 
 /// Represents a content reference expression.
-///
-/// Used for referencing content elements like labels and citations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentRefExpr {
     /// The identifier being referenced
@@ -1106,8 +990,6 @@ pub struct ContentRefExpr {
 }
 
 /// Represents a field selection expression.
-///
-/// Used for accessing fields or methods on objects (e.g., `obj.field`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectExpr {
     /// The left-hand side expression being selected from
@@ -1120,8 +1002,6 @@ pub struct SelectExpr {
 
 impl SelectExpr {
     /// Creates a new SelectExpr with the given key and left-hand side.
-    ///
-    /// The span is set to detached since it's not provided.
     pub fn new(key: DeclExpr, lhs: Expr) -> Interned<Self> {
         Interned::new(Self {
             key,
@@ -1132,8 +1012,6 @@ impl SelectExpr {
 }
 
 /// Represents an arguments expression.
-///
-/// Contains a list of arguments and their span information for function calls.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArgsExpr {
     /// The list of arguments
@@ -1144,16 +1022,12 @@ pub struct ArgsExpr {
 
 impl ArgsExpr {
     /// Creates a new ArgsExpr with the given span and arguments.
-    ///
-    /// Wraps the arguments in an interned type for efficient sharing.
     pub fn new(span: Span, args: Vec<ArgExpr>) -> Interned<Self> {
         Interned::new(Self { args, span })
     }
 }
 
 /// Represents an element expression.
-///
-/// Contains an element type and its content expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
     /// The Typst element type
@@ -1163,8 +1037,6 @@ pub struct ElementExpr {
 }
 
 /// Represents a function application expression.
-///
-/// Contains the function being called, its arguments, and span information.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ApplyExpr {
     /// The function expression being called
@@ -1176,8 +1048,6 @@ pub struct ApplyExpr {
 }
 
 /// Represents a function expression.
-///
-/// Contains the function declaration, parameter signature, and body.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
     /// The declaration for this function
@@ -1189,8 +1059,6 @@ pub struct FuncExpr {
 }
 
 /// Represents a let binding expression.
-///
-/// Contains the pattern being bound and the optional body expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
     /// Span of the pattern
@@ -1202,8 +1070,6 @@ pub struct LetExpr {
 }
 
 /// Represents a show rule expression.
-///
-/// Contains an optional selector and the edit function to apply.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
     /// Optional selector expression to determine what to show
@@ -1213,8 +1079,6 @@ pub struct ShowExpr {
 }
 
 /// Represents a set rule expression.
-///
-/// Contains the target, arguments, and optional condition for the rule.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetExpr {
     /// The target element or function to set
@@ -1226,8 +1090,6 @@ pub struct SetExpr {
 }
 
 /// Represents an import expression.
-///
-/// Contains the declaration representing what is being imported.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
     /// The reference expression for what is being imported
@@ -1235,8 +1097,6 @@ pub struct ImportExpr {
 }
 
 /// Represents an include expression.
-///
-/// Contains the source expression specifying what to include.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeExpr {
     /// The source expression indicating what file or content to include
@@ -1244,8 +1104,6 @@ pub struct IncludeExpr {
 }
 
 /// Represents a conditional (if) expression.
-///
-/// Contains condition, then branch, and else branch expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IfExpr {
     /// The condition expression to evaluate
@@ -1257,8 +1115,6 @@ pub struct IfExpr {
 }
 
 /// Represents a while loop expression.
-///
-/// Contains the loop condition and body expressions.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WhileExpr {
     /// The condition expression evaluated each iteration
@@ -1268,8 +1124,6 @@ pub struct WhileExpr {
 }
 
 /// Represents a for loop expression.
-///
-/// Contains the iteration pattern, iterable expression, and loop body.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForExpr {
     /// The pattern to match each iteration value against
@@ -1281,8 +1135,6 @@ pub struct ForExpr {
 }
 
 /// The kind of unary operation.
-///
-/// Represents all possible unary operations that can be applied to expressions.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum UnaryOp {
     /// The (arithmetic) positive operation
@@ -1315,8 +1167,6 @@ pub enum UnaryOp {
 }
 
 /// A unary operation type.
-///
-/// Represents the application of a unary operator to an operand.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct UnInst<T> {
     /// The operand of the unary operation
@@ -1342,31 +1192,23 @@ impl<T: Ord> Ord for UnInst<T> {
 }
 
 impl UnInst<Expr> {
-    /// Create a unary operation type with the given operator and operand.
-    ///
-    /// Returns an interned unary operation for efficient sharing.
+    /// Creates a unary operation type with the given operator and operand.
     pub fn new(op: UnaryOp, lhs: Expr) -> Interned<Self> {
         Interned::new(Self { lhs, op })
     }
 }
 
 impl<T> UnInst<T> {
-    /// Get the operands of the unary operation.
-    ///
-    /// Returns an array containing a reference to the single operand.
+    /// Gets the operands of the unary operation.
     pub fn operands(&self) -> [&T; 1] {
         [&self.lhs]
     }
 }
 
 /// Type alias for binary operation types.
-///
-/// Reuses the binary operation types from the AST.
 pub type BinaryOp = ast::BinOp;
 
 /// A binary operation type.
-///
-/// Represents the application of a binary operator to two operands.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct BinInst<T> {
     /// The operands of the binary operation (left, right)
@@ -1392,9 +1234,7 @@ impl<T: Ord> Ord for BinInst<T> {
 }
 
 impl BinInst<Expr> {
-    /// Create a binary operation type with the given operator and operands.
-    ///
-    /// Returns an interned binary operation for efficient sharing.
+    /// Creates a binary operation type with the given operator and operands.
     pub fn new(op: BinaryOp, lhs: Expr, rhs: Expr) -> Interned<Self> {
         Interned::new(Self {
             operands: (lhs, rhs),
@@ -1404,9 +1244,7 @@ impl BinInst<Expr> {
 }
 
 impl<T> BinInst<T> {
-    /// Get the operands of the binary operation.
-    ///
-    /// Returns an array containing references to both operands (left, right).
+    /// Gets the operands of the binary operation.
     pub fn operands(&self) -> [&T; 2] {
         [&self.operands.0, &self.operands.1]
     }
