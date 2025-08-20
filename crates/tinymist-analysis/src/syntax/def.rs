@@ -25,10 +25,12 @@ use crate::{
 
 use super::{ExprDescriber, ExprPrinter};
 
+/// Represents expression information with lazy evaluation support.
 #[derive(Debug, Clone, Hash)]
 pub struct ExprInfo(Arc<LazyHash<ExprInfoRepr>>);
 
 impl ExprInfo {
+    /// Creates a new expression info wrapper.
     pub fn new(repr: ExprInfoRepr) -> Self {
         Self(Arc::new(LazyHash::new(repr)))
     }
@@ -42,17 +44,28 @@ impl Deref for ExprInfo {
     }
 }
 
+/// Contains the internal representation of expression information.
 #[derive(Debug)]
 pub struct ExprInfoRepr {
+    /// File identifier.
     pub fid: TypstFileId,
+    /// Revision number.
     pub revision: usize,
+    /// Source file.
     pub source: Source,
+    /// Resolved reference expressions mapped by span.
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    /// Module-level documentation string.
     pub module_docstring: Arc<DocString>,
+    /// Documentation strings for declarations.
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    /// Expressions mapped by span.
     pub exprs: FxHashMap<Span, Expr>,
+    /// Imported scopes from other files.
     pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+    /// Exported scope for this file.
     pub exports: Arc<LazyHash<LexicalScope>>,
+    /// Root expression.
     pub root: Expr,
 }
 
@@ -72,6 +85,7 @@ impl std::hash::Hash for ExprInfoRepr {
 }
 
 impl ExprInfoRepr {
+    /// Gets the definition expression for a declaration.
     pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
         if decl.is_def() {
             return Some(Expr::Decl(decl.clone()));
@@ -80,6 +94,7 @@ impl ExprInfoRepr {
         Some(Expr::Ref(resolved.clone()))
     }
 
+    /// Gets references to a given declaration.
     pub fn get_refs(
         &self,
         decl: Interned<Decl>,
@@ -95,6 +110,7 @@ impl ExprInfoRepr {
             })
     }
 
+    /// Checks if a declaration is exported from this module.
     pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
         let of = Expr::Decl(decl.clone());
         self.exports
@@ -133,6 +149,7 @@ impl ExprInfoRepr {
     }
 }
 
+/// Represents different types of expressions in the syntax tree.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// A sequence of expressions
@@ -188,12 +205,14 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// Gets a textual representation of the expression.
     pub fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
         let _ = ExprDescriber::new(&mut s).write_expr(self);
         s
     }
 
+    /// Gets the span of the expression.
     pub fn span(&self) -> Span {
         match self {
             Expr::Decl(decl) => decl.span(),
@@ -203,6 +222,7 @@ impl Expr {
         }
     }
 
+    /// Gets the file identifier of the expression.
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Expr::Decl(decl) => decl.file_id(),
@@ -217,8 +237,10 @@ impl fmt::Display for Expr {
     }
 }
 
+/// Type alias for lexical scope mapping names to expressions.
 pub type LexicalScope = rpds::RedBlackTreeMapSync<Interned<str>, Expr>;
 
+/// Represents different types of scopes for expressions.
 #[derive(Debug, Clone)]
 pub enum ExprScope {
     Lexical(LexicalScope),
@@ -228,10 +250,12 @@ pub enum ExprScope {
 }
 
 impl ExprScope {
+    /// Creates an empty lexical scope.
     pub fn empty() -> Self {
         ExprScope::Lexical(LexicalScope::default())
     }
 
+    /// Checks if the scope is empty.
     pub fn is_empty(&self) -> bool {
         match self {
             ExprScope::Lexical(scope) => scope.is_empty(),
@@ -241,6 +265,7 @@ impl ExprScope {
         }
     }
 
+    /// Gets an expression and type from the scope by name.
     pub fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
             ExprScope::Lexical(scope) => {
@@ -268,6 +293,7 @@ impl ExprScope {
         )
     }
 
+    /// Merges this scope into the given exports scope.
     pub fn merge_into(&self, exports: &mut LexicalScope) {
         match self {
             ExprScope::Lexical(scope) => {
@@ -307,7 +333,7 @@ fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
     Expr::Type(Ty::Select(SelectTy::new(source, name)))
 }
 
-/// Kind of a definition.
+/// Represents the kind of a definition.
 #[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DefKind {
@@ -339,8 +365,10 @@ impl fmt::Display for DefKind {
     }
 }
 
+/// Type alias for interned declaration expressions.
 pub type DeclExpr = Interned<Decl>;
 
+/// Represents different types of declarations in the syntax tree.
 #[derive(Clone, PartialEq, Eq, Hash, DeclEnum)]
 pub enum Decl {
     Func(SpannedDecl),
