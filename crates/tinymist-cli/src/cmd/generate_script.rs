@@ -2,8 +2,8 @@
 
 use std::{borrow::Cow, path::Path};
 
-use reflexo::path::unix_slash;
 use tinymist::project::*;
+use tinymist_std::path::unix_slash;
 use tinymist_std::{bail, error::prelude::*};
 
 /// Arguments for generating a build script.
