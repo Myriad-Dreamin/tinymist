@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-mod args;
 #[cfg(feature = "export")]
 mod compile;
 mod completion;
