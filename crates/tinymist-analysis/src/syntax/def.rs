@@ -396,6 +396,7 @@ pub enum Decl {
 }
 
 impl Decl {
+    /// Creates a function declaration from an identifier.
     pub fn func(ident: ast::Ident) -> Self {
         Self::Func(SpannedDecl {
             name: ident.get().into(),
@@ -403,6 +404,7 @@ impl Decl {
         })
     }
 
+    /// Creates a literal variable declaration from a string name.
     pub fn lit(name: &str) -> Self {
         Self::Var(SpannedDecl {
             name: name.into(),
@@ -410,6 +412,7 @@ impl Decl {
         })
     }
 
+    /// Creates a literal variable declaration from an interned string.
     pub fn lit_(name: Interned<str>) -> Self {
         Self::Var(SpannedDecl {
             name,
@@ -417,6 +420,7 @@ impl Decl {
         })
     }
 
+    /// Creates a variable declaration from an identifier.
     pub fn var(ident: ast::Ident) -> Self {
         Self::Var(SpannedDecl {
             name: ident.get().into(),
@@ -424,6 +428,7 @@ impl Decl {
         })
     }
 
+    /// Creates an import alias declaration from an identifier.
     pub fn import_alias(ident: ast::Ident) -> Self {
         Self::ImportAlias(SpannedDecl {
             name: ident.get().into(),
@@ -431,6 +436,7 @@ impl Decl {
         })
     }
 
+    /// Creates an identifier reference declaration from an identifier.
     pub fn ident_ref(ident: ast::Ident) -> Self {
         Self::IdentRef(SpannedDecl {
             name: ident.get().into(),
@@ -438,6 +444,7 @@ impl Decl {
         })
     }
 
+    /// Creates an identifier reference declaration from a math identifier.
     pub fn math_ident_ref(ident: ast::MathIdent) -> Self {
         Self::IdentRef(SpannedDecl {
             name: ident.get().into(),
@@ -445,10 +452,12 @@ impl Decl {
         })
     }
 
+    /// Creates a module declaration with a name and file identifier.
     pub fn module(name: Interned<str>, fid: TypstFileId) -> Self {
         Self::Module(ModuleDecl { name, fid })
     }
 
+    /// Creates a module alias declaration from an identifier.
     pub fn module_alias(ident: ast::Ident) -> Self {
         Self::ModuleAlias(SpannedDecl {
             name: ident.get().into(),
@@ -456,6 +465,7 @@ impl Decl {
         })
     }
 
+    /// Creates an import declaration from an identifier.
     pub fn import(ident: ast::Ident) -> Self {
         Self::Import(SpannedDecl {
             name: ident.get().into(),
@@ -463,6 +473,7 @@ impl Decl {
         })
     }
 
+    /// Creates a label declaration with a name and span.
     pub fn label(name: &str, at: Span) -> Self {
         Self::Label(SpannedDecl {
             name: name.into(),
@@ -470,6 +481,7 @@ impl Decl {
         })
     }
 
+    /// Creates a content reference declaration from a reference AST node.
     pub fn ref_(ident: ast::Ref) -> Self {
         Self::ContentRef(SpannedDecl {
             name: ident.target().into(),
@@ -477,6 +489,7 @@ impl Decl {
         })
     }
 
+    /// Creates a string name declaration from a syntax node and name.
     pub fn str_name(s: SyntaxNode, name: &str) -> Decl {
         Self::StrName(SpannedDecl {
             name: name.into(),
@@ -484,6 +497,7 @@ impl Decl {
         })
     }
 
+    /// Calculates the path stem from a string path.
     pub fn calc_path_stem(s: &str) -> Interned<str> {
         use std::str::FromStr;
         let name = if s.starts_with('@') {
@@ -496,50 +510,62 @@ impl Decl {
         name.unwrap_or_default()
     }
 
+    /// Creates a path stem declaration from a syntax node and name.
     pub fn path_stem(s: SyntaxNode, name: Interned<str>) -> Self {
         Self::PathStem(SpannedDecl { name, at: s.span() })
     }
 
+    /// Creates an import path declaration from a span and name.
     pub fn import_path(s: Span, name: Interned<str>) -> Self {
         Self::ImportPath(SpannedDecl { name, at: s })
     }
 
+    /// Creates an include path declaration from a span and name.
     pub fn include_path(s: Span, name: Interned<str>) -> Self {
         Self::IncludePath(SpannedDecl { name, at: s })
     }
 
+    /// Creates a module import declaration from a span.
     pub fn module_import(s: Span) -> Self {
         Self::ModuleImport(SpanDecl(s))
     }
 
+    /// Creates a closure declaration from a span.
     pub fn closure(s: Span) -> Self {
         Self::Closure(SpanDecl(s))
     }
 
+    /// Creates a pattern declaration from a span.
     pub fn pattern(s: Span) -> Self {
         Self::Pattern(SpanDecl(s))
     }
 
+    /// Creates a spread declaration from a span.
     pub fn spread(s: Span) -> Self {
         Self::Spread(SpanDecl(s))
     }
 
+    /// Creates a content declaration from a span.
     pub fn content(s: Span) -> Self {
         Self::Content(SpanDecl(s))
     }
 
+    /// Creates a constant declaration from a span.
     pub fn constant(s: Span) -> Self {
         Self::Constant(SpanDecl(s))
     }
 
+    /// Creates a documentation declaration with a base declaration and type variable.
     pub fn docs(base: Interned<Decl>, var: Interned<TypeVar>) -> Self {
         Self::Docs(DocsDecl { base, var })
     }
 
+    /// Creates a generated declaration from a definition ID.
     pub fn generated(def_id: DefId) -> Self {
         Self::Generated(GeneratedDecl(def_id))
     }
 
+    /// Creates a bibliography entry declaration.
     pub fn bib_entry(
         name: Interned<str>,
         fid: TypstFileId,
@@ -552,6 +578,7 @@ impl Decl {
         })
     }
 
+    /// Checks if this declaration represents a definition.
     pub fn is_def(&self) -> bool {
         matches!(
             self,
@@ -571,6 +598,7 @@ impl Decl {
         )
     }
 
+    /// Gets the kind of this declaration.
     pub fn kind(&self) -> DefKind {
         use Decl::*;
         match self {
@@ -595,7 +623,7 @@ impl Decl {
         }
     }
 
-    /// Gets full range of the declaration.
+    /// Gets the full range of the declaration.
     pub fn full_range(&self) -> Option<Range<usize>> {
         if let Decl::BibEntry(decl) = self {
             return decl.at.2.clone();
@@ -604,6 +632,7 @@ impl Decl {
         None
     }
 
+    /// Creates a reference expression from this declaration.
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
         let def: Expr = this.clone().into();
         Interned::new(RefExpr {
@@ -635,6 +664,7 @@ trait StrictCmp {
 }
 
 impl Decl {
+    /// Performs a strict comparison for stable sorting.
     pub fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
         let base = match (self, other) {
             (Self::Generated(l), Self::Generated(r)) => l.0.0.cmp(&r.0.0),
