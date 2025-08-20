@@ -4,8 +4,9 @@ use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use tinymist_std::error::prelude::*;
 
-use crate::CliArguments;
+use crate::Args;
 
+/// Arguments for shell completion.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct ShellCompletionArgs {
     /// The shell to generate the completion script for. If not provided, it
@@ -20,7 +21,7 @@ pub fn completion_main(args: ShellCompletionArgs) -> Result<()> {
         tinymist_std::bail!("could not infer shell");
     };
 
-    let mut cmd = CliArguments::command();
+    let mut cmd = Args::command();
     generate(shell, &mut cmd, "tinymist", &mut io::stdout());
 
     Ok(())

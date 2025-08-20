@@ -1,45 +1,60 @@
-#![doc = include_str!("../README.md")]
+//! # tinymist
+//!
+//! This crate provides a CLI that starts services for [Typst](https://typst.app/). It provides:
+//! + `tinymist lsp`: A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+//! + `tinymist preview`: A preview server for Typst.
+//!
+//! ## Usage
+//!
+//! See [Features: Command Line Interface](https://myriad-dreamin.github.io/tinymist/feature/cli.html).
+//!
+//! ## Documentation
+//!
+//! See [Crate Docs](https://myriad-dreamin.github.io/tinymist/rs/tinymist/index.html).
+//!
+//! Also see [Developer Guide: Tinymist LSP](https://myriad-dreamin.github.io/tinymist/module/lsp.html).
+//!
+//! ## Contributing
+//!
+//! See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).
 
-#[cfg(feature = "export")]
-mod compile;
-mod completion;
-mod cov;
-#[cfg(feature = "dap")]
-mod dap;
-mod generate_script;
-mod lsp;
-#[cfg(feature = "preview")]
-mod preview;
-mod query;
-mod test;
-mod trace_lsp;
+mod transport;
 mod utils;
+mod cmd {
+    #[cfg(feature = "export")]
+    pub mod compile;
+    pub mod completion;
+    pub mod cov;
+    #[cfg(feature = "dap")]
+    pub mod dap;
+    pub mod generate_script;
+    pub mod lsp;
+    #[cfg(feature = "preview")]
+    pub mod preview;
+    pub mod query;
+    pub mod test;
+    pub mod trace_lsp;
 
-#[cfg(feature = "lock")]
-mod doc;
-#[cfg(feature = "lock")]
-mod task;
+    #[cfg(feature = "lock")]
+    pub mod doc;
+    #[cfg(feature = "lock")]
+    pub mod task;
+}
+use cmd::*;
 
-use core::fmt;
-use std::collections::HashMap;
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use clap::Parser;
-use parking_lot::Mutex;
-use sync_ls::{
-    GetMessageKind, LsHook, LspClientRoot, LspResult, Message, RequestId, TConnectionTx,
-};
 use tinymist::LONG_VERSION;
 use tinymist::project::DocCommands;
 use tinymist::world::system::print_diagnostics;
 use tinymist::world::{DiagnosticFormat, SourceWorld};
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
-use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
-use typst::ecow::EcoString;
 
 use crate::compile::CompileArgs;
+use crate::transport::client_root;
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -66,10 +81,10 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
-struct CliArguments {
+struct Args {
     /// Mode of the binary
     #[clap(subcommand)]
-    pub command: Option<Commands>,
+    pub cmd: Option<Commands>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -124,10 +139,11 @@ fn main() -> Result<()> {
     let _profiler = dhat::Profiler::new_heap();
 
     // Parses command line arguments
-    let args = CliArguments::parse();
+    let cmd = Args::parse().cmd;
+    let cmd = cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
 
     // Probes soon to avoid other initializations causing errors
-    if matches!(args.command, Some(Commands::Probe)) {
+    if matches!(cmd, Commands::Probe) {
         return Ok(());
     }
 
@@ -139,9 +155,8 @@ fn main() -> Result<()> {
     let _ = {
         use log::LevelFilter::*;
 
-        let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
-        let is_test_no_verbose =
-            matches!(&args.command, Some(Commands::Test(test)) if !test.verbose);
+        let is_transient_cmd = matches!(cmd, Commands::Compile(..));
+        let is_test_no_verbose = matches!(&cmd, Commands::Test(test) if !test.verbose);
         let base_no_info = is_transient_cmd || is_test_no_verbose;
         let base_level = if base_no_info { Warn } else { Info };
         let preview_level = if is_test_no_verbose { Warn } else { Debug };
@@ -158,10 +173,7 @@ fn main() -> Result<()> {
             .try_init()
     };
 
-    match args
-        .command
-        .unwrap_or_else(|| Commands::Lsp(Default::default()))
-    {
+    match cmd {
         Commands::Probe => Ok(()),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
@@ -187,76 +199,8 @@ fn main() -> Result<()> {
     }
 }
 
-/// Creates a new language server host.
-fn client_root<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
-    sender: TConnectionTx<M>,
-) -> LspClientRoot {
-    LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), sender)
-        .with_hook(Arc::new(TypstLsHook::default()))
-}
-
-#[derive(Default)]
-struct TypstLsHook(Mutex<FxHashMap<RequestId, typst_timing::TimingScope>>);
-
-impl fmt::Debug for TypstLsHook {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TypstLsHook").finish()
-    }
-}
-
-impl LsHook for TypstLsHook {
-    fn start_request(&self, req_id: &RequestId, method: &str) {
-        ().start_request(req_id, method);
-
-        if let Some(scope) = typst_timing::TimingScope::new(static_str(method)) {
-            let mut map = self.0.lock();
-            map.insert(req_id.clone(), scope);
-        }
-    }
-
-    fn stop_request(
-        &self,
-        req_id: &RequestId,
-        method: &str,
-        received_at: tinymist_std::time::Instant,
-    ) {
-        ().stop_request(req_id, method, received_at);
-
-        if let Some(scope) = self.0.lock().remove(req_id) {
-            let _ = scope;
-        }
-    }
-
-    fn start_notification(&self, method: &str) {
-        ().start_notification(method);
-    }
-
-    fn stop_notification(
-        &self,
-        method: &str,
-        received_at: tinymist_std::time::Instant,
-        result: LspResult<()>,
-    ) {
-        ().stop_notification(method, received_at, result);
-    }
-}
-
 fn block_on<F: Future>(future: F) -> F::Output {
     RUNTIMES.tokio_runtime.block_on(future)
-}
-
-fn static_str(s: &str) -> &'static str {
-    static STRS: Mutex<FxHashMap<EcoString, &'static str>> =
-        Mutex::new(HashMap::with_hasher(FxBuildHasher));
-
-    let mut strs = STRS.lock();
-    if let Some(&s) = strs.get(s) {
-        return s;
-    }
-
-    let static_ref: &'static str = String::from(s).leak();
-    strs.insert(static_ref.into(), static_ref);
-    static_ref
 }
 
 fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {

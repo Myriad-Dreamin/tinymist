@@ -6,10 +6,13 @@ use tinymist::{RegularInit, ServerState};
 
 use crate::*;
 
+/// Arguments for starting LSP server.
 #[derive(Debug, Clone, Default, clap::Parser)]
 pub struct LspArgs {
+    /// Arguments for mirroring the transport.
     #[clap(flatten)]
     pub mirror: MirrorArgs,
+    /// Arguments for font.
     #[clap(flatten)]
     pub font: CompileFontArgs,
 }

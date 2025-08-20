@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use reflexo_typst::TypstPagedDocument;
-use tinymist_cli::CompileOnceArgs;
+use tinymist::CompileOnceArgs;
 use tinymist_project::WorldProvider;
 use tinymist_std::error::prelude::*;
 

@@ -6,6 +6,7 @@ use tinymist_std::error::prelude::*;
 
 use crate::*;
 
+/// Arguments for dap.
 pub type DapArgs = crate::lsp::LspArgs;
 
 /// The main entry point for the language server.
