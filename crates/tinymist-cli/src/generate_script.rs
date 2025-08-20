@@ -2,7 +2,6 @@
 
 use std::{borrow::Cow, path::Path};
 
-use clap_complete::Shell;
 use reflexo::path::unix_slash;
 use tinymist::project::*;
 use tinymist_std::{bail, error::prelude::*};
@@ -40,6 +39,76 @@ pub fn generate_script_main(args: GenerateScriptArgs) -> Result<()> {
     std::fs::write(output, script).context("write script")?;
 
     Ok(())
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, clap::ValueEnum)]
+#[clap(rename_all = "lowercase")]
+pub enum Shell {
+    Bash,
+    Elvish,
+    Fig,
+    Fish,
+    PowerShell,
+    Zsh,
+    Nushell,
+}
+
+impl Shell {
+    pub fn from_env() -> Option<Self> {
+        if let Some(env_shell) = std::env::var_os("SHELL") {
+            let name = Path::new(&env_shell).file_stem()?.to_str()?;
+
+            match name {
+                "bash" => Some(Shell::Bash),
+                "zsh" => Some(Shell::Zsh),
+                "fig" => Some(Shell::Fig),
+                "fish" => Some(Shell::Fish),
+                "elvish" => Some(Shell::Elvish),
+                "powershell" | "powershell_ise" => Some(Shell::PowerShell),
+                "nushell" => Some(Shell::Nushell),
+                _ => None,
+            }
+        } else if cfg!(windows) {
+            Some(Shell::PowerShell)
+        } else {
+            None
+        }
+    }
+}
+
+impl clap_complete::Generator for Shell {
+    fn file_name(&self, name: &str) -> String {
+        use clap_complete::shells::{Bash, Elvish, Fish, PowerShell, Zsh};
+        use clap_complete_fig::Fig;
+        use clap_complete_nushell::Nushell;
+
+        match self {
+            Shell::Bash => Bash.file_name(name),
+            Shell::Elvish => Elvish.file_name(name),
+            Shell::Fig => Fig.file_name(name),
+            Shell::Fish => Fish.file_name(name),
+            Shell::PowerShell => PowerShell.file_name(name),
+            Shell::Zsh => Zsh.file_name(name),
+            Shell::Nushell => Nushell.file_name(name),
+        }
+    }
+
+    fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
+        use clap_complete::shells::{Bash, Elvish, Fish, PowerShell, Zsh};
+        use clap_complete_fig::Fig;
+        use clap_complete_nushell::Nushell;
+
+        match self {
+            Shell::Bash => Bash.generate(cmd, buf),
+            Shell::Elvish => Elvish.generate(cmd, buf),
+            Shell::Fig => Fig.generate(cmd, buf),
+            Shell::Fish => Fish.generate(cmd, buf),
+            Shell::PowerShell => PowerShell.generate(cmd, buf),
+            Shell::Zsh => Zsh.generate(cmd, buf),
+            Shell::Nushell => Nushell.generate(cmd, buf),
+        }
+    }
 }
 
 /// Generates a build script for shell-like shells

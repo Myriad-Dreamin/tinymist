@@ -3,22 +3,22 @@
 mod args;
 #[cfg(feature = "export")]
 mod compile;
+mod completion;
+mod cov;
 mod generate_script;
+mod lsp;
 #[cfg(feature = "preview")]
 mod preview;
-mod testing;
+mod test;
 mod utils;
 
 use core::fmt;
 use std::collections::HashMap;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 
 use clap::Parser;
-use clap_builder::CommandFactory;
-use clap_complete::generate;
 use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use reflexo::ImmutPath;
@@ -29,29 +29,22 @@ use sync_ls::{
     LspResult, Message, RequestId, TConnectionTx, internal_error,
 };
 use tinymist::LONG_VERSION;
-use tinymist::world::TaskInputs;
+use tinymist::world::system::print_diagnostics;
+use tinymist::world::{DiagnosticFormat, SourceWorld, TaskInputs};
 use tinymist::{Config, RegularInit, ServerState, SuperInit, UserActionTask};
+#[cfg(feature = "l10n")]
+use tinymist_l10n::{load_translations, set_translations};
 use tinymist_project::EntryResolver;
+#[cfg(feature = "preview")]
+use tinymist_project::LockFile;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::hash::{FxBuildHasher, FxHashMap};
 use tinymist_std::{bail, error::prelude::*};
-use typst::ecow::EcoString;
-
-#[cfg(feature = "l10n")]
-use tinymist_l10n::{load_translations, set_translations};
-#[cfg(feature = "preview")]
-use tinymist_project::LockFile;
 #[cfg(feature = "preview")]
 use tinymist_task::Id;
+use typst::ecow::EcoString;
 
 use crate::args::*;
-
-#[cfg(feature = "export")]
-use crate::compile::compile_main;
-use crate::generate_script::generate_script_main;
-#[cfg(feature = "preview")]
-use crate::preview::preview_main;
-use crate::testing::{coverage_main, test_main};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -78,6 +71,7 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 /// The main entry point.
 fn main() -> Result<()> {
+    // The root allocator for heap memory profiling.
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -95,10 +89,11 @@ fn main() -> Result<()> {
 
     // Starts logging
     let _ = {
+        use log::LevelFilter::*;
+
         let is_transient_cmd = matches!(args.command, Some(Commands::Compile(..)));
         let is_test_no_verbose =
             matches!(&args.command, Some(Commands::Test(test)) if !test.verbose);
-        use log::LevelFilter::*;
         let base_no_info = is_transient_cmd || is_test_no_verbose;
         let base_level = if base_no_info { Warn } else { Info };
         let preview_level = if is_test_no_verbose { Warn } else { Debug };
@@ -116,63 +111,27 @@ fn main() -> Result<()> {
     };
 
     match args.command.unwrap_or_default() {
-        Commands::Completion(args) => completion(args),
-        Commands::Cov(args) => coverage_main(args),
-        Commands::Test(args) => RUNTIMES.tokio_runtime.block_on(test_main(args)),
-        #[cfg(feature = "export")]
-        Commands::Compile(args) => RUNTIMES.tokio_runtime.block_on(compile_main(args)),
-        Commands::GenerateScript(args) => generate_script_main(args),
-        Commands::Query(query_cmds) => query_main(query_cmds),
+        Commands::Probe => Ok(()),
+
+        Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::Lsp(args) => lsp_main(args),
         #[cfg(feature = "dap")]
         Commands::Dap(args) => dap_main(args),
         Commands::TraceLsp(args) => trace_lsp_main(args),
+        Commands::Query(cmds) => query_main(cmds),
+
         #[cfg(feature = "preview")]
-        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
-        Commands::Doc(args) => project_main(args),
-        Commands::Task(args) => task_main(args),
-        Commands::Probe => Ok(()),
+        Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
+
+        #[cfg(feature = "export")]
+        Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
+        Commands::Doc(cmds) => doc_main(cmds),
+        Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),
+        Commands::Task(cmds) => task_main(cmds),
+
+        Commands::Cov(args) => crate::cov::cov_main(args),
+        Commands::Test(args) => block_on(crate::test::test_main(args)),
     }
-}
-
-/// Generates completion script to stdout.
-pub fn completion(args: ShellCompletionArgs) -> Result<()> {
-    let Some(shell) = args.shell.or_else(Shell::from_env) else {
-        tinymist_std::bail!("could not infer shell");
-    };
-
-    let mut cmd = CliArguments::command();
-    generate(shell, &mut cmd, "tinymist", &mut io::stdout());
-
-    Ok(())
-}
-
-/// The main entry point for the language server.
-pub fn lsp_main(args: LspArgs) -> Result<()> {
-    let pairs = LONG_VERSION.trim().split('\n');
-    let pairs = pairs
-        .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
-    log::info!("tinymist version information: {pairs:?}");
-    log::info!("starting language server: {args:?}");
-
-    let is_replay = !args.mirror.replay.is_empty();
-    with_stdio_transport::<LspMessage>(args.mirror.clone(), |conn| {
-        let client = client_root(conn.sender);
-        ServerState::install_lsp(LspBuilder::new(
-            RegularInit {
-                client: client.weak().to_typed(),
-                font_opts: args.font,
-                exec_cmds: Vec::new(),
-            },
-            client.weak(),
-        ))
-        .build()
-        .start(conn.receiver, is_replay)
-    })?;
-
-    log::info!("language server did shut down");
-    Ok(())
 }
 
 /// The main entry point for the language server.
@@ -388,7 +347,7 @@ impl LockFileExt for LockFile {
 
 /// Project document commands' main
 #[cfg(feature = "lock")]
-pub fn project_main(args: tinymist_project::DocCommands) -> Result<()> {
+pub fn doc_main(args: tinymist_project::DocCommands) -> Result<()> {
     use tinymist_project::DocCommands;
 
     let cwd = std::env::current_dir().context("cannot get cwd")?;
@@ -489,6 +448,10 @@ impl LsHook for TypstLsHook {
     }
 }
 
+fn block_on<F: Future>(future: F) -> F::Output {
+    RUNTIMES.tokio_runtime.block_on(future)
+}
+
 fn static_str(s: &str) -> &'static str {
     static STRS: Mutex<FxHashMap<EcoString, &'static str>> =
         Mutex::new(HashMap::with_hasher(FxBuildHasher));
@@ -501,4 +464,19 @@ fn static_str(s: &str) -> &'static str {
     let static_ref: &'static str = String::from(s).leak();
     strs.insert(static_ref.into(), static_ref);
     static_ref
+}
+
+fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(err) => {
+            if let Some(diagnostics) = err.diagnostics() {
+                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
+                    .context_ut("print diagnostics")?;
+                bail!("");
+            }
+
+            Err(err)
+        }
+    }
 }

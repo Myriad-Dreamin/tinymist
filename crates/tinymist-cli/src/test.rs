@@ -28,30 +28,11 @@ use tinymist::project::*;
 use tinymist::tool::project::{StartProjectResult, start_project};
 use tinymist::world::{SourceWorld, with_main};
 
+use crate::print_diag_or_error;
 use crate::utils::exit_on_ctrl_c;
 
 const TEST_EVICT_MAX_AGE: usize = 30;
 const PREFIX_LEN: usize = 7;
-
-/// Runs coverage test on a document
-pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
-    // Prepares for the compilation
-    let universe = args.resolve()?;
-    let world = universe.snapshot();
-
-    let result = Ok(()).and_then(|_| -> Result<()> {
-        let res = tinymist_debug::collect_coverage::<TypstPagedDocument, _>(&world)?;
-        let cov_path = Path::new("target/coverage.json");
-        let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
-
-        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
-        std::fs::write(cov_path, res).context("write coverage")?;
-
-        Ok(())
-    });
-
-    print_diag_or_error(&world, result)
-}
 
 /// Testing arguments
 #[derive(Debug, Clone, clap::Parser)]
@@ -593,21 +574,6 @@ fn get_example_file(world: &dyn World, name: &str, id: FileId, span: Span) -> Re
     let included =
         cast_include_expr(name, closure.body()).context("cannot find example function")?;
     find_source_by_expr(world, id, included).context("cannot find example file")
-}
-
-fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
-    match result {
-        Ok(v) => Ok(v),
-        Err(err) => {
-            if let Some(diagnostics) = err.diagnostics() {
-                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                    .context_ut("print diagnostics")?;
-                bail!("");
-            }
-
-            Err(err)
-        }
-    }
 }
 
 enum Level {
