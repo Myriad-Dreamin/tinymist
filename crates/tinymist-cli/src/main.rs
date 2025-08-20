@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 
-mod transport;
+mod conn;
 mod utils;
 mod cmd {
     #[cfg(feature = "export")]
@@ -22,21 +22,18 @@ mod cmd {
     #[cfg(feature = "lock")]
     pub mod task;
 }
-use cmd::*;
 
 use std::sync::LazyLock;
 
 use clap::Parser;
-use tinymist::LONG_VERSION;
-use tinymist::project::DocCommands;
-use tinymist::world::system::print_diagnostics;
-use tinymist::world::{DiagnosticFormat, SourceWorld};
 #[cfg(feature = "l10n")]
 use tinymist_l10n::{load_translations, set_translations};
-use tinymist_std::{bail, error::prelude::*};
+use tinymist_std::error::prelude::*;
 
+use crate::cmd::*;
 use crate::compile::CompileArgs;
-use crate::transport::client_root;
+use crate::conn::client_root;
+use crate::utils::*;
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -62,7 +59,7 @@ impl Default for Runtimes {
 static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 
 #[derive(Debug, Clone, clap::Parser)]
-#[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
+#[clap(name = "tinymist", author, version, about, long_version(tinymist::LONG_VERSION.as_str()))]
 struct Args {
     /// Mode of the binary
     #[clap(subcommand)]
@@ -75,8 +72,6 @@ enum Commands {
     /// Probes existence (Nop run)
     Probe,
 
-    /// Generates completion script to stdout
-    Completion(crate::completion::ShellCompletionArgs),
     /// Runs language server
     Lsp(crate::lsp::LspArgs),
     /// Runs debug adapter
@@ -85,33 +80,38 @@ enum Commands {
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(crate::trace_lsp::TraceLspArgs),
+
+    /// Runs language query
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Query(crate::query::QueryCommands),
     /// Runs preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
+    /// Runs compile command like `typst-cli compile`
+    Compile(CompileArgs),
+
+    /// Generates completion script to stdout
+    Completion(crate::completion::ShellCompletionArgs),
+    /// Generates build script for compilation
+    #[clap(hide(true))] // still in development
+    GenerateScript(crate::generate_script::GenerateScriptArgs),
+
+    /// Runs documents
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Doc(tinymist::project::DocCommands),
+    /// Runs tasks
+    #[cfg(feature = "lock")]
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Task(crate::task::TaskCommands),
 
     /// Execute a document and collect coverage
     #[clap(hide(true))] // still in development
     Cov(crate::cov::CovArgs),
     /// Test a document and gives summary
     Test(crate::test::TestArgs),
-    /// Runs compile command like `typst-cli compile`
-    Compile(CompileArgs),
-    /// Generates build script for compilation
-    #[clap(hide(true))] // still in development
-    GenerateScript(crate::generate_script::GenerateScriptArgs),
-    /// Runs language query
-    #[clap(hide(true))] // still in development
-    #[clap(subcommand)]
-    Query(crate::query::QueryCommands),
-    /// Runs documents
-    #[clap(hide(true))] // still in development
-    #[clap(subcommand)]
-    Doc(DocCommands),
-    /// Runs tasks
-    #[cfg(feature = "lock")]
-    #[clap(hide(true))] // still in development
-    #[clap(subcommand)]
-    Task(crate::task::TaskCommands),
 }
 
 /// The main entry point.
@@ -158,19 +158,20 @@ fn main() -> Result<()> {
     match cmd {
         Commands::Probe => Ok(()),
 
-        Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::Lsp(args) => crate::lsp::lsp_main(args),
         #[cfg(feature = "dap")]
         Commands::Dap(args) => crate::dap::dap_main(args),
         Commands::TraceLsp(args) => crate::trace_lsp::trace_lsp_main(args),
-        Commands::Query(cmds) => crate::query::query_main(cmds),
 
+        Commands::Query(cmds) => crate::query::query_main(cmds),
         #[cfg(feature = "preview")]
         Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
-
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
+
+        Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),
+
         #[cfg(feature = "lock")]
         Commands::Doc(cmds) => crate::doc::doc_main(cmds),
         #[cfg(feature = "lock")]
@@ -178,24 +179,5 @@ fn main() -> Result<()> {
 
         Commands::Cov(args) => crate::cov::cov_main(args),
         Commands::Test(args) => block_on(crate::test::test_main(args)),
-    }
-}
-
-fn block_on<F: Future>(future: F) -> F::Output {
-    RUNTIMES.tokio_runtime.block_on(future)
-}
-
-fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
-    match result {
-        Ok(v) => Ok(v),
-        Err(err) => {
-            if let Some(diagnostics) = err.diagnostics() {
-                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                    .context_ut("print diagnostics")?;
-                bail!("");
-            }
-
-            Err(err)
-        }
     }
 }

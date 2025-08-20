@@ -11,7 +11,7 @@ use typst::ecow::EcoString;
 
 use crate::*;
 
-/// Creates a new client root.
+/// Creates a new client root (connection).
 pub fn client_root<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
     sender: TConnectionTx<M>,
 ) -> LspClientRoot {
