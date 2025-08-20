@@ -26,7 +26,8 @@ use crate::{
 
 use super::{DocCommentMatcher, InterpretMode, def::*};
 
-/// Maps file identifiers to their lexical scopes for expression analysis routing.
+/// Maps file identifiers to their lexical scopes for expression analysis
+/// routing.
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
 /// Analyzes expressions in a source file and produces expression information.
@@ -165,9 +166,6 @@ impl Default for LexicalContext {
 }
 
 /// Worker for processing expressions during source file analysis.
-///
-/// Handles expression checking, scope management, symbol resolution,
-/// and docstring collection for a single source file.
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
     ctx: Arc<SharedContext>,
