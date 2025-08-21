@@ -11,6 +11,11 @@ use typst_shim::utils::LazyHash;
 
 use super::{CommentGroupMatcher, is_mark};
 
+/// Extracts the lexical hierarchy from a Typst source file.
+///
+/// Analyzes the source code to build a hierarchical structure of symbols, headings,
+/// and other lexical elements that can be used for document outline, symbol navigation,
+/// and other language server features.
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn get_lexical_hierarchy(
     source: &Source,
@@ -47,6 +52,10 @@ pub(crate) fn get_lexical_hierarchy(
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 
+/// Represents different kinds of variable-like lexical elements in Typst source code.
+///
+/// Distinguishes between various forms of identifiers and references that can appear
+/// in Typst syntax, each with different semantic meanings and scoping rules.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexicalVarKind {
     /// `#foo`
@@ -69,6 +78,10 @@ pub enum LexicalVarKind {
     Function,
 }
 
+/// Represents the different categories of lexical elements in Typst source code.
+///
+/// Defines the main types of symbols and structural elements that can be identified
+/// during lexical analysis, including headings, variables, blocks, and comment groups.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexicalKind {
     Heading(i16),
@@ -78,18 +91,25 @@ pub enum LexicalKind {
 }
 
 impl LexicalKind {
+    /// Creates a label lexical kind.
     const fn label() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Label)
     }
 
+    /// Creates a function lexical kind.
     const fn function() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Function)
     }
 
+    /// Creates a variable lexical kind.
     const fn variable() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Variable)
     }
 
+    /// Determines if this lexical kind represents a valid LSP symbol.
+    ///
+    /// Returns `false` for blocks and comment groups, which are structural
+    /// elements but not meaningful symbols for language server features.
     pub fn is_valid_lsp_symbol(&self) -> bool {
         !matches!(self, LexicalKind::Block | LexicalKind::CommentGroup)
     }
@@ -108,6 +128,10 @@ impl From<LexicalKind> for SymbolKind {
     }
 }
 
+/// Defines the scope behavior for lexical hierarchy analysis.
+///
+/// Controls which types of lexical elements are analyzed and included
+/// in the hierarchy based on the intended use case.
 #[derive(Debug, Clone, Copy, Hash, Default, PartialEq, Eq)]
 pub(crate) enum LexicalScopeKind {
     #[default]
@@ -116,27 +140,36 @@ pub(crate) enum LexicalScopeKind {
 }
 
 impl LexicalScopeKind {
+    /// Checks if this scope kind affects symbol analysis.
     fn affect_symbol(&self) -> bool {
         matches!(self, Self::Symbol)
     }
 
+    /// Checks if this scope kind affects markup analysis.
     fn affect_markup(&self) -> bool {
         matches!(self, Self::Braced)
     }
 
+    /// Checks if this scope kind affects block analysis.
     fn affect_block(&self) -> bool {
         matches!(self, Self::Braced)
     }
 
+    /// Checks if this scope kind affects expression analysis.
     fn affect_expr(&self) -> bool {
         matches!(self, Self::Braced)
     }
 
+    /// Checks if this scope kind affects heading analysis.
     fn affect_heading(&self) -> bool {
         matches!(self, Self::Symbol | Self::Braced)
     }
 }
 
+/// Contains information about a lexical element in the source code.
+///
+/// Stores the essential metadata for a symbol or structural element,
+/// including its name, type, and location in the source.
 #[derive(Debug, Clone, Hash)]
 pub(crate) struct LexicalInfo {
     pub name: EcoString,
@@ -144,12 +177,21 @@ pub(crate) struct LexicalInfo {
     pub range: Range<usize>,
 }
 
+/// Represents a node in the lexical hierarchy tree.
+///
+/// Contains lexical information for a single element and optionally
+/// references to its child elements, forming a hierarchical structure
+/// of the source code's lexical organization.
 #[derive(Debug, Clone, Hash)]
 pub(crate) struct LexicalHierarchy {
     pub info: LexicalInfo,
     pub children: Option<LazyHash<EcoVec<LexicalHierarchy>>>,
 }
 
+/// Provides custom serialization for `LexicalHierarchy`.
+///
+/// Serializes the hierarchy structure while handling the optional children
+/// field appropriately for external consumers.
 impl Serialize for LexicalHierarchy {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
@@ -164,6 +206,10 @@ impl Serialize for LexicalHierarchy {
     }
 }
 
+/// Provides custom deserialization for `LexicalHierarchy`.
+///
+/// Reconstructs the hierarchy structure from serialized data, properly
+/// handling the optional children field and ensuring data integrity.
 impl<'de> Deserialize<'de> for LexicalHierarchy {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::MapAccess;
@@ -207,6 +253,10 @@ impl<'de> Deserialize<'de> for LexicalHierarchy {
     }
 }
 
+/// Tracks the context for identifier analysis during hierarchy building.
+///
+/// Determines how identifiers should be interpreted based on their
+/// syntactic context within the source code structure.
 #[derive(Debug, Clone, Copy, Hash, Default, PartialEq, Eq)]
 enum IdentContext {
     #[default]
@@ -216,6 +266,10 @@ enum IdentContext {
     Params,
 }
 
+/// Manages the state and operations for building lexical hierarchies.
+///
+/// Maintains a stack-based approach to track nested scopes and contexts
+/// while traversing the syntax tree to build the hierarchical structure.
 #[derive(Default)]
 struct LexicalHierarchyWorker {
     sk: LexicalScopeKind,
@@ -224,11 +278,18 @@ struct LexicalHierarchyWorker {
 }
 
 impl LexicalHierarchyWorker {
+    /// Checks if a syntax kind represents a plain token that doesn't need analysis.
+    ///
+    /// Returns `true` for trivia, keywords, marks, and error tokens that
+    /// don't contribute to the lexical hierarchy structure.
     fn is_plain_token(kind: SyntaxKind) -> bool {
         kind.is_trivia() || kind.is_keyword() || is_mark(kind) || kind.is_error()
     }
 
-    /// Finish the current top of the stack.
+    /// Completes the current hierarchy level and adds it to the parent.
+    ///
+    /// Pops the current symbol and its children from the stack, creates
+    /// a hierarchy node, and adds it to the parent level.
     fn finish_hierarchy(&mut self) {
         let (symbol, children) = self.stack.pop().unwrap();
         let current = &mut self.stack.last_mut().unwrap().1;
@@ -236,7 +297,11 @@ impl LexicalHierarchyWorker {
         current.push(finish_hierarchy(symbol, children));
     }
 
-    /// Enter a node and setup the context.
+    /// Enters a syntax node and updates the identifier context.
+    ///
+    /// Adjusts the current identifier context based on the node type,
+    /// enabling proper interpretation of identifiers within different
+    /// syntactic structures. Returns the previous context for restoration.
     fn enter_node(&mut self, node: &LinkedNode) -> Option<IdentContext> {
         let checkpoint = self.ident_context;
         match node.kind() {
@@ -250,13 +315,19 @@ impl LexicalHierarchyWorker {
         Some(checkpoint)
     }
 
-    /// Exit a node and restore the context.
+    /// Exits a syntax node and restores the previous identifier context.
+    ///
+    /// Restores the identifier context to its state before entering
+    /// the current node, maintaining proper context tracking.
     fn exit_node(&mut self, checkpoint: IdentContext) -> Option<()> {
         self.ident_context = checkpoint;
         Some(())
     }
 
-    /// Check nodes in a list recursively.
+    /// Processes child nodes recursively with comment group detection.
+    ///
+    /// Analyzes all child nodes of a given node, handling comment groups
+    /// specially and recursively processing other significant elements.
     fn check_nodes(&mut self, node: LinkedNode) -> Option<()> {
         let mut group_matcher = CommentGroupMatcher::default();
         let mut comment_range: Option<Range<usize>> = None;
@@ -293,7 +364,11 @@ impl LexicalHierarchyWorker {
         Some(())
     }
 
-    /// Check lexical hierarchy a node recursively.
+    /// Analyzes a syntax node and builds its lexical hierarchy.
+    ///
+    /// Processes a single node to extract lexical information and recursively
+    /// analyze its children, handling special cases for different node types
+    /// and maintaining proper hierarchy structure.
     fn check_node(&mut self, node: LinkedNode) -> Option<()> {
         let own_symbol = self.get_ident(&node)?;
 
@@ -424,7 +499,10 @@ impl LexicalHierarchyWorker {
         Some(())
     }
 
-    /// Check a possible node with a specific context.
+    /// Processes an optional node with a specific identifier context.
+    ///
+    /// Convenience method that applies a specific context to a node
+    /// if it exists, otherwise does nothing.
     #[inline(always)]
     fn check_opt_node_with(
         &mut self,
@@ -438,8 +516,11 @@ impl LexicalHierarchyWorker {
         Some(())
     }
 
-    /// Check the first sub-expression of a node. If an offset is provided, it
-    /// only checks the sub-expression if it starts after the offset.
+    /// Finds and processes the first sub-expression in a node sequence.
+    ///
+    /// Locates the first expression node in the given iterator and processes
+    /// it, optionally checking that it appears after a specified offset.
+    /// Used for handling expression order in complex syntax structures.
     fn check_first_sub_expr<'a>(
         &mut self,
         mut nodes: impl Iterator<Item = LinkedNode<'a>>,
@@ -456,7 +537,10 @@ impl LexicalHierarchyWorker {
         Some(())
     }
 
-    /// Check a node with a specific context.
+    /// Processes a node with a temporarily modified identifier context.
+    ///
+    /// Changes the identifier context for processing a specific node,
+    /// then restores the original context afterward.
     fn check_node_with(&mut self, node: LinkedNode, context: IdentContext) -> Option<()> {
         let parent_context = self.ident_context;
         self.ident_context = context;
@@ -467,8 +551,11 @@ impl LexicalHierarchyWorker {
         res
     }
 
-    /// Get symbol for a leaf node of a valid type, or `None` if the node is an
-    /// invalid type.
+    /// Extracts lexical information from a syntax node.
+    ///
+    /// Analyzes a node to determine if it represents a meaningful lexical
+    /// element and extracts its name, type, and range. Returns `None` for
+    /// nodes that don't contribute to the lexical hierarchy.
     #[allow(deprecated)]
     fn get_ident(&self, node: &LinkedNode) -> Option<Option<LexicalInfo>> {
         let (name, kind) = match node.kind() {
@@ -550,6 +637,10 @@ impl LexicalHierarchyWorker {
     }
 }
 
+/// Creates a hierarchy node from lexical information and child nodes.
+///
+/// Constructs a `LexicalHierarchy` from the provided symbol information
+/// and children, handling the case where no children exist.
 fn finish_hierarchy(sym: LexicalInfo, curr: EcoVec<LexicalHierarchy>) -> LexicalHierarchy {
     LexicalHierarchy {
         info: sym,
