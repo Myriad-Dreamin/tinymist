@@ -405,11 +405,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             ext: Default::default(),
             verse,
             reason: no_reason(),
-            snapshot: None,
             handler,
             export_target,
             deps: Default::default(),
             latest_compilation: None,
+            cached_snapshot: None,
         }
     }
 
@@ -742,14 +742,14 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub export_target: ExportTarget,
     /// The reason to compile.
     pub reason: CompileSignal,
-    /// The latest compute graph (snapshot).
-    snapshot: Option<Arc<WorldComputeGraph<F>>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
     latest_compilation: Option<CompilationState>,
+    /// The latest compute graph (snapshot), derived lazily from `latest_compilation` as needed.
+    cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
 }
 
 /// Information about a completed compilation.
@@ -760,18 +760,20 @@ struct CompilationState {
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
-    /// Creates a snapshot of the project.
+    /// Gets a snapshot of the project.
     pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
-        match self.snapshot.as_ref() {
-            Some(snap) if snap.world().revision() == self.verse.revision => snap.clone(),
+        // Try to use the cached snapshot if possible.
+        match self.cached_snapshot.as_ref() {
+            Some(cached) if cached.world().revision() == self.verse.revision => cached.clone(),
             _ => {
                 let snap = self.make_snapshot();
-                self.snapshot = Some(snap.clone());
+                self.cached_snapshot = Some(snap.clone());
                 snap
             }
         }
     }
 
+    /// Create a new snapshot of the project derived from `latest_compilation`.
     fn make_snapshot(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.verse.snapshot();
         let snap = CompileSnapshot {
