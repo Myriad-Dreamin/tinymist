@@ -885,6 +885,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             revision: compiled_revision,
             doc,
         });
+        self.cached_snapshot = None; // invalidate; will be recomputed on demand
 
         // Notify the new file dependencies.
         let mut deps = eco_vec![];
