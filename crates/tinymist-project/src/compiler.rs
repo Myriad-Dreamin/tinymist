@@ -408,9 +408,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             snapshot: None,
             handler,
             export_target,
-            latest_success_doc: None,
             deps: Default::default(),
-            committed_revision: 0,
+            latest_compilation: None,
         }
     }
 
@@ -543,8 +542,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         });
                     }
 
-                    // Reset the watch state and document state.
-                    proj.latest_success_doc = None;
+                    // Forget the old compilation state.
+                    proj.latest_compilation = None;
                 }
 
                 proj.reason.merge(reason_by_entry_change());
@@ -750,10 +749,14 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
-    /// The latest successly compiled document.
-    latest_success_doc: Option<TypstDocument>,
+    latest_compilation: Option<CompilationState>,
+}
 
-    committed_revision: usize,
+/// Information about a completed compilation.
+struct CompilationState {
+    revision: usize,
+    /// The document, if it compiled successfully.
+    doc: Option<TypstDocument>,
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
@@ -775,7 +778,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             id: self.id.clone(),
             world,
             signal: self.reason,
-            success_doc: self.latest_success_doc.clone(),
+            success_doc: self.latest_compilation.as_ref().and_then(|c| c.doc.clone()),
         };
         WorldComputeGraph::new(snap)
     }
@@ -868,16 +871,18 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>) -> bool {
         let world = &artifact.snap.world;
         let compiled_revision = world.revision().get();
-        if self.committed_revision >= compiled_revision {
+        if let Some(cur) = &self.latest_compilation
+            && cur.revision >= compiled_revision
+        {
             return false;
         }
 
         // Update state.
         let doc = artifact.doc.clone();
-        self.committed_revision = compiled_revision;
-        if doc.is_some() {
-            self.latest_success_doc = doc;
-        }
+        self.latest_compilation = Some(CompilationState {
+            revision: compiled_revision,
+            doc,
+        });
 
         // Notify the new file dependencies.
         let mut deps = eco_vec![];
