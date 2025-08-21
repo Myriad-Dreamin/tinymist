@@ -99,7 +99,15 @@ impl<'a> CodeActionWorker<'a> {
     ) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
+        self.create_missing_variable(root, &node);
+        Some(())
+    }
 
+    fn create_missing_variable(
+        &mut self,
+        root: &LinkedNode<'_>,
+        node: &LinkedNode<'_>,
+    ) -> Option<()> {
         let ident = 'determine_ident: {
             if let Some(ident) = node.cast::<ast::Ident>() {
                 break 'determine_ident ident.get().clone();
@@ -117,7 +125,7 @@ impl<'a> CodeActionWorker<'a> {
             Bad,
         }
 
-        let previous_decl = previous_items(node, |item| {
+        let previous_decl = previous_items(node.clone(), |item| {
             match item {
                 PreviousItem::Parent(parent, ..) => match parent.kind() {
                     SyntaxKind::LetBinding => {
