@@ -1,0 +1,262 @@
+/* Font View Styles - VSCode compatible */
+
+.font-view-container {
+  width: 100%;
+  padding: 1em;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+}
+
+.font-view-header {
+  gap: 0.75em;
+  margin-bottom: 1.25em;
+  padding: 0.75em;
+  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+  border-radius: 6px;
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.font-view-controls {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.font-search-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-input-background, #2d2d30);
+  color: var(--vscode-input-foreground, #cccccc);
+  font-size: 0.85em;
+  outline: none;
+}
+
+.font-search-input:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+
+.font-search-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #767676);
+}
+
+.font-filter-group {
+  display: flex;
+  gap: 0.5em;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.font-filter-select {
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--vscode-dropdown-border, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-dropdown-background, #2d2d30);
+  color: var(--vscode-dropdown-foreground, #cccccc);
+  font-size: 0.8em;
+  min-width: 120px;
+}
+
+.font-filter-select:focus {
+  outline: 1px solid var(--vscode-focusBorder, #007acc);
+}
+
+.font-stats {
+  font-size: 0.8em;
+  color: var(--vscode-descriptionForeground, #999999);
+  margin-top: 0.5em;
+}
+
+.font-families-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.font-family-card {
+  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  padding: 1em;
+  transition: all 0.2s ease;
+}
+
+.font-family-card:hover {
+  border-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
+}
+
+.font-family-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75em;
+  gap: 0.75em;
+}
+
+.font-family-name {
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+  margin: 0;
+  flex: 1;
+  min-width: 0; /* Allow text to truncate */
+}
+
+.font-family-actions {
+  display: flex;
+  gap: 0.5em;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.font-action-button {
+  padding: 0.35em 0.6em;
+  border: 1px solid var(--vscode-button-secondaryBorder, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  font-size: 0.75em;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.font-action-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
+  border-color: var(--vscode-inputOption-activeBorder, #007acc);
+}
+
+.font-action-button:active {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border-color: var(--vscode-button-background, #0e639c);
+  transform: scale(0.95);
+}
+
+.font-action-button.toggle-button {
+  background: var(--vscode-button-secondaryBackground, #5a5d5e);
+}
+
+.font-action-button.toggle-button.activated {
+  background: var(--vscode-inputOption-activeBackground, #094771);
+  border-color: var(--vscode-inputOption-activeBorder, #007acc);
+}
+
+.font-variants-container {
+  margin-top: 8px;
+}
+
+.font-demo {
+  font-size: 14px;
+  margin: 12px 0;
+  padding: 8px;
+  background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.font-variant-summary {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground, #999999);
+}
+
+.font-variant-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.font-variant-item:last-child {
+  border-bottom: none;
+}
+
+.font-variant-info {
+  flex: 1;
+  gap: 4px;
+  min-width: 0; /* Allow text to truncate */
+}
+
+.font-variant-name {
+  font-size: 14px;
+  color: var(--vscode-editor-foreground);
+  cursor: pointer;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.font-variant-name:hover {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+}
+
+.font-variant-details {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #999999);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.font-variant-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.font-file-info {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #999999);
+  font-family: var(--vscode-editor-font-family, "Courier New", monospace);
+  background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));
+  margin-left: 2em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  word-break: break-all;
+}
+
+.no-fonts-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--vscode-descriptionForeground, #999999);
+  font-style: italic;
+}
+
+.filter-clear-button {
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-button-secondaryBorder, #3c3c3c);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-clear-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .font-filter-group {
+    justify-content: stretch;
+  }
+
+  .font-filter-select {
+    flex: 1;
+    min-width: auto;
+  }
+
+  .font-search-input {
+    min-width: auto;
+  }
+}

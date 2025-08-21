@@ -4,7 +4,8 @@ import { requestRevealPath, requestSaveFontsExportConfigure, saveDataToFile } fr
 import { CopyIcon } from "../icons";
 import { startModal } from "../components/modal";
 import { base64Decode, base64Encode } from "../utils";
-import { FontSource, humanStretch, humanStyle, humanWeight } from "../types";
+import type { FontSource } from "../types";
+import {  humanStretch, humanStyle, humanWeight } from "../utils/font-format";
 const { div, a, span, code, br, button, form, textarea, label, input } = van.tags;
 
 interface ServerInfo {
