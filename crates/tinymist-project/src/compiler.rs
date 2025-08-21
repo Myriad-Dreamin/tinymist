@@ -169,15 +169,14 @@ pub struct CompileStatusResult {
     elapsed: tinymist_std::time::Duration,
 }
 
-#[allow(missing_docs)]
 impl CompileReport {
-    /// Get the status message.
+    /// Gets the status message.
     pub fn message(&self) -> CompileReportMsg<'_> {
         CompileReportMsg(self)
     }
 }
 
-#[allow(missing_docs)]
+/// A message of the compilation status.
 pub struct CompileReportMsg<'a>(&'a CompileReport);
 
 impl fmt::Display for CompileReportMsg<'_> {

@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::cmp::Ordering;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::{path::Path, sync::Arc};
@@ -16,14 +14,17 @@ use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePat
 use crate::{LOCK_FILENAME, LOCK_VERSION, LockFile, LockFileCompat, LspWorld, ProjectPathMaterial};
 
 impl LockFile {
+    /// Gets the input by the id.
     pub fn get_document(&self, id: &Id) -> Option<&ProjectInput> {
         self.document.iter().find(|i| &i.id == id)
     }
 
+    /// Gets the task by the id.
     pub fn get_task(&self, id: &Id) -> Option<&ApplyProjectTask> {
         self.task.iter().find(|i| &i.id == id)
     }
 
+    /// Replaces the input by the id.
     pub fn replace_document(&mut self, mut input: ProjectInput) {
         input.lock_dir = None;
         let input = input;
@@ -36,6 +37,7 @@ impl LockFile {
         }
     }
 
+    /// Replaces the task by the id.
     pub fn replace_task(&mut self, mut task: ApplyProjectTask) {
         if let Some(pat) = task.task.as_export_mut().and_then(|t| t.output.as_mut()) {
             let rel = pat.clone().relative_to(self.lock_dir.as_ref().unwrap());
@@ -53,6 +55,7 @@ impl LockFile {
         }
     }
 
+    /// Replaces the route by the id.
     pub fn replace_route(&mut self, route: ProjectRoute) {
         let id = route.id.clone();
 
@@ -60,6 +63,7 @@ impl LockFile {
         self.route.push(route);
     }
 
+    /// Sorts the document, task, and route.
     pub fn sort(&mut self) {
         self.document.sort_by(|a, b| a.id.cmp(&b.id));
         self.task
@@ -67,6 +71,7 @@ impl LockFile {
         // the route's order is important, so we don't sort them.
     }
 
+    /// Serializes the lock file.
     pub fn serialize_resolve(&self) -> String {
         let content = toml::Table::try_from(self).unwrap();
 
@@ -139,6 +144,7 @@ impl LockFile {
         }
     }
 
+    /// Updates the lock file.
     pub fn update(cwd: &Path, f: impl FnOnce(&mut Self) -> Result<()>) -> Result<()> {
         let fs = tinymist_std::fs::flock::Filesystem::new(cwd.to_owned());
 
@@ -210,6 +216,7 @@ impl LockFile {
         Ok(())
     }
 
+    /// Reads the lock file.
     pub fn read(dir: &Path) -> Result<Self> {
         let fs = tinymist_std::fs::flock::Filesystem::new(dir.to_owned());
 
@@ -246,12 +253,14 @@ enum LockUpdate {
     Route(ProjectRoute),
 }
 
+/// A lock file update.
 pub struct LockFileUpdate {
     root: Arc<Path>,
     updates: Vec<LockUpdate>,
 }
 
 impl LockFileUpdate {
+    /// Compiles the lock file.
     pub fn compiled(&mut self, world: &LspWorld, ctx: CtxPath) -> Option<Id> {
         let id = Id::from_world(world, ctx)?;
 
@@ -299,10 +308,12 @@ impl LockFileUpdate {
         Some(id)
     }
 
+    /// Adds a task to the lock file.
     pub fn task(&mut self, task: ApplyProjectTask) {
         self.updates.push(LockUpdate::Task(task));
     }
 
+    /// Adds a material to the lock file.
     pub fn update_materials(&mut self, doc_id: Id, files: EcoVec<ImmutPath>) {
         self.updates
             .push(LockUpdate::Material(ProjectPathMaterial::from_deps(
@@ -310,6 +321,7 @@ impl LockFileUpdate {
             )));
     }
 
+    /// Adds a route to the lock file.
     pub fn route(&mut self, doc_id: Id, priority: u32) {
         self.updates.push(LockUpdate::Route(ProjectRoute {
             id: doc_id,
@@ -317,6 +329,7 @@ impl LockFileUpdate {
         }));
     }
 
+    /// Commits the lock file.
     pub fn commit(self) {
         crate::LockFile::update(&self.root, |l| {
             let root: EcoString = unix_slash(&self.root).into();
@@ -367,6 +380,9 @@ impl LockFileUpdate {
     }
 }
 
+/// A version string conforming to the [semver] standard.
+///
+/// [semver]: https://semver.org
 struct Version<'a>(&'a str);
 
 impl PartialEq for Version<'_> {

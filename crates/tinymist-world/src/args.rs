@@ -1,3 +1,5 @@
+//! Shared arguments to create a world.
+
 use core::fmt;
 use std::{
     path::{Path, PathBuf},
@@ -14,7 +16,7 @@ use crate::EntryOpts;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
-/// The font arguments for the compiler.
+/// The font arguments for the world.
 #[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileFontArgs {
@@ -107,10 +109,12 @@ pub struct CompileOnceArgs {
 }
 
 impl CompileOnceArgs {
+    /// Resolves the features.
     pub fn resolve_features(&self) -> typst::Features {
         typst::Features::from_iter(self.features.iter().map(|f| (*f).into()))
     }
 
+    /// Resolves the inputs.
     pub fn resolve_inputs(&self) -> Option<ImmutDict> {
         if self.inputs.is_empty() {
             return None;
@@ -318,6 +322,7 @@ display_possible_values!(PdfStandard);
 /// An in-development feature that may be changed or removed at any time.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, ValueEnum)]
 pub enum Feature {
+    /// The HTML feature.
     Html,
 }
 

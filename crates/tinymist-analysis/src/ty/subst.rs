@@ -2,6 +2,7 @@ use super::{Sig, SigShape, TyMutator};
 use crate::ty::prelude::*;
 
 impl Sig<'_> {
+    /// Calls the signature with the given arguments.
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         crate::log_debug_ct!("call {self:?} {args:?} {pol:?}");
         ctx.with_scope(|ctx| {
@@ -13,6 +14,7 @@ impl Sig<'_> {
         })
     }
 
+    /// Checks the binding of the signature.
     pub fn check_bind(&self, args: &Interned<ArgsTy>, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         let SigShape { sig, withs } = self.shape(ctx)?;
 
@@ -30,11 +32,13 @@ impl Sig<'_> {
     }
 }
 
+/// A checker to substitute the bound variables.
 struct SubstituteChecker<'a, T: TyCtxMut> {
     ctx: &'a mut T,
 }
 
 impl<T: TyCtxMut> SubstituteChecker<'_, T> {
+    /// Substitutes the bound variables in the given type.
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
     }

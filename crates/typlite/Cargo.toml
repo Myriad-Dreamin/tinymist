@@ -66,5 +66,5 @@ web = ["tinymist-project/web"]
 # into the binary.
 fonts = ["tinymist-project/fonts"]
 
-# [lints]
-# workspace = true
+[lints]
+workspace = true

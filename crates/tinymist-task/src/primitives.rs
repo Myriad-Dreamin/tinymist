@@ -320,6 +320,7 @@ impl<'de> serde::Deserialize<'de> for ResourcePath {
     }
 }
 
+/// The path context.
 // todo: The ctx path looks not quite maintainable. But we only target to make
 // things correct, then back to make code good.
 pub type CtxPath<'a, 'b> = (/* cwd */ &'a Path, /* lock_dir */ &'b Path);
@@ -358,6 +359,8 @@ impl ResourcePath {
         }
     }
 
+    /// Converts the resource path to a path relative to the `base` (usually the
+    /// directory storing the lockfile).
     pub fn relative_to(&self, base: &Path) -> Option<Self> {
         if self.0 == "file" {
             let path = Path::new(&self.1);

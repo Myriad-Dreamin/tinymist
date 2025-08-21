@@ -1,4 +1,5 @@
-#![allow(missing_docs)]
+//! Next generation of the export task. Not used because it is still
+//! complicated.
 
 use std::sync::Arc;
 
@@ -18,10 +19,12 @@ use crate::world::base::{
     OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
 };
 
+/// A task that checks if the project needs to be compiled.
 #[derive(Clone, Copy, Default)]
 pub struct ProjectCompilation;
 
 impl ProjectCompilation {
+    /// Preconfigures the timings for the project compilation.
     pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
         let paged_diag = Some(TaskWhen::OnType);
@@ -80,9 +83,11 @@ impl<F: CompilerFeat> WorldComputable<F> for ProjectCompilation {
     }
 }
 
+/// A task that runs the export.
 pub struct ProjectExport;
 
 impl ProjectExport {
+    /// Exports the document to bytes artifact.
     fn export_bytes<
         D: typst::Document + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
@@ -102,6 +107,7 @@ impl ProjectExport {
         res.transpose()
     }
 
+    /// Exports the document to string artifact.
     fn export_string<
         D: typst::Document + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = String>,
@@ -189,6 +195,7 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
     }
 }
 
+/// A task that exports the document to a specific format by typlite.
 pub struct TypliteExport<const FORMAT: char>;
 
 const fn typlite_format(f: char) -> Format {
@@ -226,5 +233,7 @@ impl<const F: char> WorldComputable<LspCompilerFeat> for TypliteExport<F> {
     }
 }
 
+/// A task that exports the document to markdown.
 pub type TypliteMdExport = TypliteExport<'m'>;
+/// A task that exports the document to LaTeX.
 pub type TypliteTeXExport = TypliteExport<'x'>;

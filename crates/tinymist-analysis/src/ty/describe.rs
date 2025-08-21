@@ -7,7 +7,7 @@ use super::{is_plain_value, term_value};
 use crate::{ty::prelude::*, upstream::truncated_repr_};
 
 impl Ty {
-    /// Describe the given type.
+    /// Describes the given type.
     pub fn repr(&self) -> Option<EcoString> {
         let mut worker = TypeDescriber {
             repr: true,
@@ -16,7 +16,7 @@ impl Ty {
         worker.describe_root(self)
     }
 
-    /// Describe available value instances of the given type.
+    /// Describes available value instances of the given type.
     pub fn value_repr(&self) -> Option<EcoString> {
         let mut worker = TypeDescriber {
             repr: true,
@@ -48,16 +48,23 @@ impl Ty {
     // };
 }
 
+/// A worker to describe types.
 #[derive(Default)]
 struct TypeDescriber {
+    /// Whether to describe the representation of the type.
     repr: bool,
+    /// Whether to describe the value instances of the type.
     value: bool,
+    /// The cache to describe types.
     described: HashMap<u128, EcoString>,
+    /// The results of the description.
     results: HashSet<EcoString>,
+    /// The functions to describe.
     functions: Vec<Interned<SigTy>>,
 }
 
 impl TypeDescriber {
+    /// Describes the given type.
     fn describe_root(&mut self, ty: &Ty) -> Option<EcoString> {
         let _ = TypeDescriber::describe_iter;
         // recursive structure
@@ -132,6 +139,7 @@ impl TypeDescriber {
         Some(res)
     }
 
+    /// Describes the given types.
     fn describe_iter(&mut self, ty: &[Ty]) {
         for ty in ty.iter() {
             let desc = self.describe(ty);
@@ -141,6 +149,7 @@ impl TypeDescriber {
         }
     }
 
+    /// Describes the given type.
     fn describe(&mut self, ty: &Ty) -> EcoString {
         match ty {
             Ty::Var(..) => {}

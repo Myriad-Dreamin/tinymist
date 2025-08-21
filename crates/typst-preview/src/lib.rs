@@ -1,3 +1,6 @@
+// todo: remove me
+#![allow(missing_docs)]
+
 mod actor;
 mod debug_loc;
 mod outline;

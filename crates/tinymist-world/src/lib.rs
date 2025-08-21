@@ -1,7 +1,5 @@
 //! World implementation of typst for tinymist.
 
-#![allow(missing_docs)]
-
 pub mod args;
 pub mod config;
 pub mod debug_loc;
@@ -48,37 +46,39 @@ use package::PackageRegistry;
 
 /// Latest version of the shadow api, which is in beta.
 pub trait ShadowApi {
-    /// Get the shadow files.
+    /// Gets the shadow files.
     fn shadow_paths(&self) -> Vec<Arc<Path>>;
-    /// Get the shadow files by file id.
+    /// Gets the shadow files by file id.
     fn shadow_ids(&self) -> Vec<FileId>;
 
-    /// Reset the shadow files.
+    /// Resets the shadow files.
     fn reset_shadow(&mut self) {
         for path in self.shadow_paths() {
             self.unmap_shadow(&path).unwrap();
         }
     }
 
-    /// Add a shadow file to the driver.
+    /// Adds a shadow file to the driver.
     fn map_shadow(&mut self, path: &Path, content: Bytes) -> FileResult<()>;
 
-    /// Add a shadow file to the driver.
+    /// Removes a shadow file from the driver.
     fn unmap_shadow(&mut self, path: &Path) -> FileResult<()>;
 
-    /// Add a shadow file to the driver by file id.
+    /// Adds a shadow file to the driver by file id.
     /// Note: If a *path* is both shadowed by id and by path, the shadow by id
     /// will be used.
     fn map_shadow_by_id(&mut self, file_id: FileId, content: Bytes) -> FileResult<()>;
 
-    /// Add a shadow file to the driver by file id.
+    /// Removes a shadow file from the driver by file id.
     /// Note: If a *path* is both shadowed by id and by path, the shadow by id
     /// will be used.
     fn unmap_shadow_by_id(&mut self, file_id: FileId) -> FileResult<()>;
 }
 
+/// The extension trait for the shadow api.
 pub trait ShadowApiExt {
-    /// Wrap the driver with a given shadow file and run the inner function.
+    /// Wraps the universe or world with a given shadow file and runs the inner
+    /// function.
     fn with_shadow_file<T>(
         &mut self,
         file_path: &Path,
@@ -86,8 +86,8 @@ pub trait ShadowApiExt {
         f: impl FnOnce(&mut Self) -> SourceResult<T>,
     ) -> SourceResult<T>;
 
-    /// Wrap the driver with a given shadow file and run the inner function by
-    /// file id.
+    /// Wraps the universe or world with a given shadow file and runs the inner
+    /// function by file id.
     /// Note: to enable this function, `ShadowApi` must implement
     /// `_shadow_map_id`.
     fn with_shadow_file_by_id<T>(
@@ -99,7 +99,8 @@ pub trait ShadowApiExt {
 }
 
 impl<C: ShadowApi> ShadowApiExt for C {
-    /// Wrap the driver with a given shadow file and run the inner function.
+    /// Wraps the universe or world with a given shadow file and runs the inner
+    /// function.
     fn with_shadow_file<T>(
         &mut self,
         file_path: &Path,
@@ -112,8 +113,8 @@ impl<C: ShadowApi> ShadowApiExt for C {
         res
     }
 
-    /// Wrap the driver with a given shadow file and run the inner function by
-    /// file id.
+    /// Wraps the universe or world with a given shadow file and runs the inner
+    /// function by file id.
     /// Note: to enable this function, `ShadowApi` must implement
     /// `_shadow_map_id`.
     fn with_shadow_file_by_id<T>(
@@ -132,28 +133,32 @@ impl<C: ShadowApi> ShadowApiExt for C {
 
 /// Latest version of the world dependencies api, which is in beta.
 pub trait WorldDeps {
+    /// Iterates over the dependencies of the world.
     fn iter_dependencies(&self, f: &mut dyn FnMut(FileId));
 }
 
-/// type trait interface of [`CompilerWorld`].
+/// The type trait interface of [`CompilerWorld`].
 pub trait CompilerFeat: Send + Sync + 'static {
-    /// Specify the font resolver for typst compiler.
+    /// The font resolver for the typst compiler.
     type FontResolver: FontResolver + Send + Sync + Sized;
-    /// Specify the access model for VFS.
+    /// The access model for the VFS.
     type AccessModel: VfsAccessModel + Clone + Send + Sync + Sized;
-    /// Specify the package registry.
+    /// The package registry for the typst compiler.
     type Registry: PackageRegistry + Send + Sync + Sized;
 }
 
-/// Which format to use for diagnostics.
+/// The format to use for diagnostics.
 #[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DiagnosticFormat {
+    /// The human-readable format.
     #[default]
     Human,
+    /// The short (Unix-flavor) format.
     Short,
 }
 
+/// The build information of the world crate.
 pub mod build_info {
-    /// The version of the reflexo-world crate.
+    /// The version of the world crate.
     pub static VERSION: &str = env!("CARGO_PKG_VERSION");
 }

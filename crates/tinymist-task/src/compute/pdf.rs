@@ -1,3 +1,5 @@
+//! The computation for pdf export.
+
 use tinymist_std::time::ToUtcDateTime;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
 pub use typst_pdf::pdf;
@@ -7,6 +9,7 @@ use typst_pdf::{PdfOptions, PdfStandards, Timestamp};
 use super::*;
 use crate::model::ExportPdfTask;
 
+/// The computation for pdf export.
 pub struct PdfExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {

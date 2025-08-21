@@ -5,12 +5,15 @@ use crate::Bytes;
 
 /// A FontLoader helps load a font from somewhere.
 pub trait FontLoader {
+    /// Loads a font.
     fn load(&mut self) -> Option<Font>;
 }
 
-/// Loads font from a buffer.
+/// Loads a font from a buffer.
 pub struct BufferFontLoader {
+    /// The buffer to load the font from.
     pub buffer: Option<Bytes>,
+    /// The index in a font file.
     pub index: u32,
 }
 
@@ -20,13 +23,16 @@ impl FontLoader for BufferFontLoader {
     }
 }
 
-/// Loads font from a reader.
+/// Loads a font from a reader.
 pub struct LazyBufferFontLoader<R> {
+    /// The reader to load the font from.
     pub read: Option<R>,
+    /// The index in a font file.
     pub index: u32,
 }
 
 impl<R: ReadAllOnce + Sized> LazyBufferFontLoader<R> {
+    /// Creates a new lazy buffer font loader.
     pub fn new(read: R, index: u32) -> Self {
         Self {
             read: Some(read),

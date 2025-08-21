@@ -28,7 +28,7 @@ use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
+use crate::analysis::{BuiltinTy, LocalContext, PathKind, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
     DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoTextEdit, ParsedSnippet, PostfixSnippet,
@@ -632,7 +632,7 @@ impl CompletionPair<'_, '_, '_> {
                     self.package_completions(all_versions);
                     return Some(());
                 } else {
-                    let paths = self.complete_path(&crate::analysis::PathPreference::Source {
+                    let paths = self.complete_path(&crate::analysis::PathKind::Source {
                         allow_package: true,
                     });
                     // todo: remove ctx.completions

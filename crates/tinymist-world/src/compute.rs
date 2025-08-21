@@ -36,6 +36,7 @@ pub struct WorldComputeGraph<F: CompilerFeat> {
 
 /// A world computable trait.
 pub trait WorldComputable<F: CompilerFeat>: std::any::Any + Send + Sync + Sized {
+    /// The output type.
     type Output: Send + Sync + 'static;
 
     /// The computation implementation.
@@ -128,6 +129,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         computed.get().cloned().map(WorldComputeEntry::cast)
     }
 
+    /// Provides an exact instance.
     pub fn exact_provide<T: WorldComputable<F>>(&self, ins: Result<Arc<T::Output>>) {
         if self.provide::<T>(ins).is_err() {
             panic!(
@@ -166,29 +168,39 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
         }
     }
 
+    /// Gets the world.
     pub fn world(&self) -> &CompilerWorld<F> {
         &self.snap.world
     }
 
+    /// Gets the registry.
     pub fn registry(&self) -> &Arc<F::Registry> {
         &self.snap.world.registry
     }
 
+    /// Gets the library.
     pub fn library(&self) -> &typst::Library {
         &self.snap.world.library
     }
 }
 
+/// A trait to detect the export of a document.
 pub trait ExportDetection<F: CompilerFeat, D> {
+    /// The configuration type.
     type Config: Send + Sync + 'static;
 
+    /// Determines whether the export needs to be computed.
     fn needs_run(graph: &Arc<WorldComputeGraph<F>>, config: &Self::Config) -> bool;
 }
 
+/// A trait to compute the export of a document.
 pub trait ExportComputation<F: CompilerFeat, D> {
+    /// The output type.
     type Output;
+    /// The configuration type.
     type Config: Send + Sync + 'static;
 
+    /// Runs the export computation.
     fn run_with<C: WorldComputable<F, Output = Option<Arc<D>>>>(
         g: &Arc<WorldComputeGraph<F>>,
         config: &Self::Config,
@@ -198,6 +210,7 @@ pub trait ExportComputation<F: CompilerFeat, D> {
         Self::run(g, doc, config)
     }
 
+    /// Runs the export computation with a caster.
     fn cast_run<'a>(
         g: &Arc<WorldComputeGraph<F>>,
         doc: impl TryInto<&'a Arc<D>, Error = tinymist_std::Error>,
@@ -209,6 +222,7 @@ pub trait ExportComputation<F: CompilerFeat, D> {
         Self::run(g, doc.try_into()?, config)
     }
 
+    /// Runs the export computation.
     fn run(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<D>,
@@ -216,6 +230,7 @@ pub trait ExportComputation<F: CompilerFeat, D> {
     ) -> Result<Self::Output>;
 }
 
+/// A task that computes a configuration.
 pub struct ConfigTask<T>(pub T);
 
 impl<F: CompilerFeat, T: Send + Sync + 'static> WorldComputable<F> for ConfigTask<T> {
@@ -227,13 +242,19 @@ impl<F: CompilerFeat, T: Send + Sync + 'static> WorldComputable<F> for ConfigTas
     }
 }
 
+/// A task that computes a flag.
 pub type FlagTask<T> = ConfigTask<TaskFlagBase<T>>;
+
+/// A base task flag.
 pub struct TaskFlagBase<T> {
+    /// Whether the task is enabled.
     pub enabled: bool,
+    /// The phantom data.
     _phantom: std::marker::PhantomData<T>,
 }
 
 impl<T> FlagTask<T> {
+    /// Creates a new flag task.
     pub fn flag(flag: bool) -> Arc<TaskFlagBase<T>> {
         Arc::new(TaskFlagBase {
             enabled: flag,
@@ -242,18 +263,24 @@ impl<T> FlagTask<T> {
     }
 }
 
+/// A task that compiles a paged document.
 pub type PagedCompilationTask = CompilationTask<TypstPagedDocument>;
+
+/// A task that compiles an HTML document.
 pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 
+/// A task that compiles a document.
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
 impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
+    /// Ensures the main document.
     pub fn ensure_main<F: CompilerFeat>(world: &CompilerWorld<F>) -> SourceResult<()> {
         let main_id = world.main_id();
         let checked = main_id.ok_or_else(|| typst::diag::eco_format!("entry file is not set"));
         checked.at(Span::detached()).map(|_| ())
     }
 
+    /// Executes the compilation.
     pub fn execute<F: CompilerFeat>(world: &CompilerWorld<F>) -> Warned<SourceResult<Arc<D>>> {
         let res = Self::ensure_main(world);
         if let Err(err) = res {
@@ -311,6 +338,7 @@ where
     }
 }
 
+/// A task that computes an optional document.
 pub struct OptionDocumentTask<D>(std::marker::PhantomData<D>);
 
 impl<F: CompilerFeat, D> WorldComputable<F> for OptionDocumentTask<D>
@@ -332,12 +360,14 @@ where
 
 impl<D> OptionDocumentTask<D> where D: typst::Document + Send + Sync + 'static {}
 
+/// A task that computes the diagnostics of a document.
 struct CompilationDiagnostics {
     errors: Option<EcoVec<typst::diag::SourceDiagnostic>>,
     warnings: Option<EcoVec<typst::diag::SourceDiagnostic>>,
 }
 
 impl CompilationDiagnostics {
+    /// Creates a new diagnostics from a result.
     fn from_result<T>(result: &Option<Warned<SourceResult<T>>>) -> Self {
         let errors = result
             .as_ref()
@@ -348,6 +378,7 @@ impl CompilationDiagnostics {
     }
 }
 
+/// A task that computes the diagnostics of a document.
 pub struct DiagnosticsTask {
     paged: CompilationDiagnostics,
     html: CompilationDiagnostics,
@@ -368,16 +399,19 @@ impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
 }
 
 impl DiagnosticsTask {
+    /// Gets the number of errors.
     pub fn error_cnt(&self) -> usize {
         self.paged.errors.as_ref().map_or(0, |e| e.len())
             + self.html.errors.as_ref().map_or(0, |e| e.len())
     }
 
+    /// Gets the number of warnings.
     pub fn warning_cnt(&self) -> usize {
         self.paged.warnings.as_ref().map_or(0, |e| e.len())
             + self.html.warnings.as_ref().map_or(0, |e| e.len())
     }
 
+    /// Gets the diagnostics.
     pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
         self.paged
             .errors
@@ -390,40 +424,42 @@ impl DiagnosticsTask {
 }
 
 impl<F: CompilerFeat> WorldComputeGraph<F> {
+    /// Ensures the main document.
     pub fn ensure_main(&self) -> SourceResult<()> {
         CompilationTask::<TypstPagedDocument>::ensure_main(&self.snap.world)
     }
 
-    /// Compile once from scratch.
+    /// Compiles once from scratch.
     pub fn pure_compile<D: ::typst::Document + Send + Sync + 'static>(
         &self,
     ) -> Warned<SourceResult<Arc<D>>> {
         CompilationTask::<D>::execute(&self.snap.world)
     }
 
-    /// Compile once from scratch.
+    /// Compiles once from scratch.
     pub fn compile(&self) -> Warned<SourceResult<Arc<TypstPagedDocument>>> {
         self.pure_compile()
     }
 
-    /// Compile to html once from scratch.
+    /// Compiles to html once from scratch.
     pub fn compile_html(&self) -> Warned<SourceResult<Arc<TypstHtmlDocument>>> {
         self.pure_compile()
     }
 
-    /// Compile paged document with cache
+    /// Compiles paged document with cache
     pub fn shared_compile(self: &Arc<Self>) -> Result<Option<Arc<TypstPagedDocument>>> {
         let doc = self.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
         Ok(doc.as_ref().clone())
     }
 
-    /// Compile HTML document with cache
+    /// Compiles HTML document with cache
     pub fn shared_compile_html(self: &Arc<Self>) -> Result<Option<Arc<TypstHtmlDocument>>> {
         let doc = self.compute::<OptionDocumentTask<TypstHtmlDocument>>()?;
         Ok(doc.as_ref().clone())
     }
 
     /// Gets the diagnostics from shared compilation.
+    #[must_use = "the result must be checked"]
     pub fn shared_diagnostics(self: &Arc<Self>) -> Result<Arc<DiagnosticsTask>> {
         self.compute::<DiagnosticsTask>()
     }
