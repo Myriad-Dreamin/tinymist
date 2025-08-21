@@ -24,14 +24,14 @@ impl StatefulRequest for ShowFullValueRequest {
         let cursor = offset + 1;
 
         let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+        let expr = get_inspected_expr(&leaf)?;
+        let content = format_values(&ctx.world(), expr)?;
 
-        let tooltip = expr_tooltip(&ctx.world(), &leaf)?;
-
-        Some(tooltip)
+        Some(content)
     }
 }
 
-fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<String> {
+fn get_inspected_expr<'a>(leaf: &'a LinkedNode<'a>) -> Option<&'a LinkedNode<'a>> {
     let mut ancestor = leaf;
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?;
@@ -42,35 +42,33 @@ fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<String> {
         return None;
     }
 
-    let values = analyze_expr(world, ancestor);
+    Some(ancestor)
+}
 
+fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
     struct Piece<'a> {
         value: &'a Value,
-        #[allow(unused)]
-        first_occur: usize,
         count: usize,
     }
 
+    let values = analyze_expr(world, expr);
+
     let mut pieces: Vec<Piece<'_>> = vec![];
     let mut last = None;
-    for (i, (value, _)) in values.iter().enumerate() {
+    for (value, _) in values.iter() {
         if last.replace(value).is_some_and(|last| *last == *value) {
             pieces.last_mut().unwrap().count += 1;
         } else {
-            pieces.push(Piece {
-                value,
-                first_occur: i,
-                count: 1,
-            });
+            pieces.push(Piece { value, count: 1 });
         }
     }
 
-    const SIZE_LIMIT: usize = 512 * 1024 * 1024 * 1024; // 512MB
+    const SIZE_LIMIT: usize = 512 * 1024 * 1024; // 512MB
 
     let mut buf = String::new();
     let mut limited = false;
     for piece in pieces {
-        let item_repr = truncated_repr_::<{ SIZE_LIMIT }>(piece.value);
+        let item_repr = truncated_repr_::<SIZE_LIMIT>(piece.value);
         if buf.len() + item_repr.len() + 50 > SIZE_LIMIT {
             buf.push_str("... (reached size limit)\n");
             limited = true;
