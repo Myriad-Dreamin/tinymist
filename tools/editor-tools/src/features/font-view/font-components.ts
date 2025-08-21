@@ -48,13 +48,11 @@ function getFileInfo(
   fontResources: FontResources,
 ): {
   fileName: string;
-  filePath: string;
   canReveal: boolean;
 } {
   if (typeof font.source !== "number") {
     return {
       fileName: "Unknown source",
-      filePath: "",
       canReveal: false,
     };
   }
@@ -63,7 +61,6 @@ function getFileInfo(
   if (!source) {
     return {
       fileName: "Invalid source",
-      filePath: "",
       canReveal: false,
     };
   }
@@ -71,27 +68,14 @@ function getFileInfo(
   if (source.kind === "fs") {
     return {
       fileName: source.path.split(/[\\/]/g).pop() || "Unknown file",
-      filePath: source.path,
       canReveal: true,
     };
   } else {
     return {
       fileName: `Embedded: ${source.name}`,
-      filePath: source.name,
       canReveal: false,
     };
   }
-}
-
-/**
- * Creates a tooltip text for font variant information
- */
-function createTooltipText(font: FontInfo, filePath: string): string {
-  const weight = font.weight ?? FONT_DEFAULTS.WEIGHT;
-  const stretch = font.stretch ?? FONT_DEFAULTS.STRETCH;
-  const style = font.style ?? FONT_DEFAULTS.STYLE;
-
-  return `Weight: ${weight}, Stretch: ${stretch}, Style: ${style}\nFile: ${filePath}`;
 }
 
 /**
@@ -102,18 +86,12 @@ export const FontSlot = (
   fontResources: FontResources,
   showNumberOpt: { showNumber: boolean },
 ) => {
-  const { fileName, filePath, canReveal } = getFileInfo(font, fontResources);
-
-  const weightText = humanWeight(font.weight, showNumberOpt);
-  const stretchText = humanStretch(font.stretch, showNumberOpt);
-  const styleText = humanStyle(font.style);
-  const tooltipText = createTooltipText(font, filePath);
+  const { fileName, canReveal } = getFileInfo(font, fontResources);
 
   const variantElement = canReveal
     ? a(
         {
           class: "font-variant-name",
-          title: tooltipText,
           onclick() {
             const source = fontResources.sources[font.source as number];
             if (source?.kind === "fs") {
@@ -123,25 +101,22 @@ export const FontSlot = (
         },
         font.name,
       )
-    : span(
-        {
-          class: "font-variant-name",
-          title: tooltipText,
-        },
-        font.name,
-      );
+    : span({ class: "font-variant-name" }, font.name);
 
   return div(
     { class: "font-variant-item" },
     div(
-      { class: "font-variant-info flex-col" },
-      div(variantElement, span({ class: "font-file-info" }, fileName)),
-      div(
+      { class: "font-variant-info flex-row" },
+      variantElement,
+      span(
         { class: "font-variant-details" },
-        span({ class: "font-variant-detail" }, "Weight: ", weightText),
-        span({ class: "font-variant-detail" }, "Stretch: ", stretchText),
-        styleText !== "Regular" ? span({ class: "font-variant-detail" }, "Style: ", styleText) : "",
+        span(humanWeight(font.weight, showNumberOpt)),
+        font.stretch && font.stretch !== FONT_DEFAULTS.STRETCH
+          ? span(humanStretch(font.stretch, showNumberOpt))
+          : null,
+        font.style && font.style !== FONT_DEFAULTS.STYLE ? span(humanStyle(font.style)) : null,
       ),
+      span({ class: "font-file-info" }, fileName),
     ),
   );
 };

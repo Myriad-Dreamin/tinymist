@@ -170,7 +170,9 @@
 
 .font-variant-info {
   flex: 1;
-  gap: 4px;
+  gap: 0.25em 1em;
+  flex-wrap: wrap;
+  align-items: center;
   min-width: 0; /* Allow text to truncate */
 }
 
@@ -190,16 +192,9 @@
 .font-variant-details {
   font-size: 12px;
   color: var(--vscode-descriptionForeground, #999999);
-  display: flex;
-  gap: 12px;
+  display: inline-flex;
+  gap: 0.5em;
   flex-wrap: wrap;
-}
-
-.font-variant-detail {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
 }
 
 .font-file-info {
@@ -207,7 +202,6 @@
   color: var(--vscode-descriptionForeground, #999999);
   font-family: var(--vscode-editor-font-family, "Courier New", monospace);
   background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));
-  margin-left: 2em;
   padding: 2px 6px;
   border-radius: 3px;
   border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));

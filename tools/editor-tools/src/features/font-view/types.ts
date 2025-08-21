@@ -1,12 +1,13 @@
 import type { FontSource } from "../../types";
 
 export interface FontInfo {
-  name: string;
-  style?: string;
-  weight?: number;
-  stretch?: number;
-  source?: number;
   index?: number;
+  name: string;
+  fixedFamily?: string;
+  source?: number;
+  style?: string;
+  stretch?: number;
+  weight?: number;
 }
 
 export interface FontFamily {
