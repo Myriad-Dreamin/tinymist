@@ -6,14 +6,18 @@ use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 use super::modifier_set::ModifierSet;
 use super::typst_tokens::{Modifier, TokenType};
 
+/// The legend of the semantic tokens.
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct SemanticTokensLegend {
+    /// The token types.
     #[serde(rename = "tokenTypes")]
     pub token_types: Vec<String>,
+    /// The token modifiers.
     #[serde(rename = "tokenModifiers")]
     pub token_modifiers: Vec<String>,
 }
 
+/// Gets the legend of the semantic tokens.
 pub fn get_semantic_tokens_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
         token_types: TokenType::iter()
@@ -33,12 +37,16 @@ pub fn get_semantic_tokens_legend() -> SemanticTokensLegend {
     }
 }
 
+/// The encoding of the offset.
 #[derive(Debug, Clone, Copy)]
 pub enum OffsetEncoding {
+    /// The UTF-8 encoding.
     Utf8,
+    /// The UTF-16 encoding.
     Utf16,
 }
 
+/// Gets the full semantic tokens.
 pub fn get_semantic_tokens_full(source: &Source, encoding: OffsetEncoding) -> Vec<SemanticToken> {
     let root = LinkedNode::new(source.root());
     let mut full = tokenize_tree(&root, ModifierSet::empty());
@@ -65,6 +73,7 @@ pub fn get_semantic_tokens_full(source: &Source, encoding: OffsetEncoding) -> Ve
     full
 }
 
+/// Tokenizes a single node.
 fn tokenize_single_node(node: &LinkedNode, modifiers: ModifierSet) -> Option<SemanticToken> {
     let is_leaf = node.children().next().is_none();
 
@@ -73,7 +82,7 @@ fn tokenize_single_node(node: &LinkedNode, modifiers: ModifierSet) -> Option<Sem
         .map(|token_type| SemanticToken::new(token_type, modifiers, node))
 }
 
-/// Tokenize a node and its children
+/// Tokenizes a node and its children.
 fn tokenize_tree(root: &LinkedNode<'_>, parent_modifiers: ModifierSet) -> Vec<SemanticToken> {
     let modifiers = parent_modifiers | modifiers_from_node(root);
 
@@ -84,16 +93,23 @@ fn tokenize_tree(root: &LinkedNode<'_>, parent_modifiers: ModifierSet) -> Vec<Se
     token.chain(children).collect()
 }
 
+/// A semantic token.
 #[derive(Debug, Clone, Copy)]
 pub struct SemanticToken {
+    /// The delta line.
     pub delta_line: u32,
+    /// The delta start character.
     pub delta_start_character: u32,
+    /// The length.
     pub length: u32,
+    /// The token type.
     pub token_type: u32,
+    /// The token modifiers.
     pub token_modifiers: u32,
 }
 
 impl SemanticToken {
+    /// Creates a new semantic token.
     fn new(token_type: TokenType, modifiers: ModifierSet, node: &LinkedNode) -> Self {
         let source = node.get().clone().into_text();
 
@@ -111,6 +127,8 @@ impl SemanticToken {
 }
 
 /// Determines the [`Modifier`]s to be applied to a node and all its children.
+///
+/// Returns `ModifierSet::empty()` if the node is not a valid node.
 ///
 /// Note that this does not recurse up, so calling it on a child node may not
 /// return a modifier that should be applied to it due to a parent.
@@ -170,7 +188,9 @@ fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
     }
 }
 
-// TODO: differentiate also using tokens in scope, not just context
+/// Checks if the identifier is a function.
+///
+/// TODO: differentiate also using tokens in scope, not just context
 fn is_function_ident(ident: &LinkedNode) -> bool {
     let Some(next) = ident.next_leaf() else {
         return false;
@@ -185,6 +205,7 @@ fn is_function_ident(ident: &LinkedNode) -> bool {
     function_call || function_content
 }
 
+/// Gets the token type from an identifier.
 fn token_from_ident(ident: &LinkedNode) -> TokenType {
     if is_function_ident(ident) {
         TokenType::Function
@@ -193,6 +214,7 @@ fn token_from_ident(ident: &LinkedNode) -> TokenType {
     }
 }
 
+/// Gets the expression following a hashtag.
 fn get_expr_following_hashtag<'a>(hashtag: &LinkedNode<'a>) -> Option<LinkedNode<'a>> {
     hashtag
         .next_sibling()
@@ -200,12 +222,14 @@ fn get_expr_following_hashtag<'a>(hashtag: &LinkedNode<'a>) -> Option<LinkedNode
         .and_then(|node| node.leftmost_leaf())
 }
 
+/// Gets the token type from a hashtag.
 fn token_from_hashtag(hashtag: &LinkedNode) -> Option<TokenType> {
     get_expr_following_hashtag(hashtag)
         .as_ref()
         .and_then(token_from_node)
 }
 
+/// Converts an offset to a position in UTF-8.
 fn offset_to_position_utf8(typst_offset: usize, typst_source: &Source) -> (u32, u32) {
     let line_index = typst_source.byte_to_line(typst_offset).unwrap();
     let column_index = typst_source.byte_to_column(typst_offset).unwrap();
@@ -213,6 +237,7 @@ fn offset_to_position_utf8(typst_offset: usize, typst_source: &Source) -> (u32, 
     (line_index as u32, column_index as u32)
 }
 
+/// Converts an offset to a position in UTF-16.
 fn offset_to_position_utf16(typst_offset: usize, typst_source: &Source) -> (u32, u32) {
     let line_index = typst_source.byte_to_line(typst_offset).unwrap();
 

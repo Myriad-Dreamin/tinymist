@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;

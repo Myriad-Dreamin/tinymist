@@ -15,3 +15,6 @@ include = ["src/**/*"]
 [features]
 typst-preview = []
 l10n = []
+
+[lints]
+workspace = true

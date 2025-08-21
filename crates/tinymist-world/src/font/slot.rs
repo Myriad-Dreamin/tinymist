@@ -16,16 +16,17 @@ type FontSlotInner = QueryRef<Option<Font>, (), Box<dyn FontLoader + Send>>;
 #[derive(Clone)]
 pub struct FontSlot {
     inner: Arc<FontSlotInner>,
+    /// The description of the font slot.
     pub description: Option<Arc<DataSource>>,
 }
 
 impl FontSlot {
-    /// Creates a font slot to load.
+    /// Creates a new font slot to load.
     pub fn new<F: FontLoader + Send + 'static>(f: F) -> Self {
         Self::new_boxed(Box::new(f))
     }
 
-    /// Creates a font slot from a boxed font loader trait object.
+    /// Creates a new font slot from a boxed font loader trait object.
     pub fn new_boxed(f: Box<dyn FontLoader + Send>) -> Self {
         Self {
             inner: Arc::new(FontSlotInner::with_context(f)),
@@ -33,7 +34,7 @@ impl FontSlot {
         }
     }
 
-    /// Creates a font slot with a loaded font.
+    /// Creates a new font slot with a loaded font.
     pub fn new_loaded(f: Option<Font>) -> Self {
         Self {
             inner: Arc::new(FontSlotInner::with_value(f)),
@@ -41,12 +42,12 @@ impl FontSlot {
         }
     }
 
-    /// Attaches a description to the font slot.
+    /// Attaches a description to the font slot and returns a new slot.
     pub fn with_describe(self, desc: DataSource) -> Self {
         self.with_describe_arc(Arc::new(desc))
     }
 
-    /// Attaches a description to the font slot.
+    /// Attaches a description to the font slot and returns a new slot.
     pub fn with_describe_arc(self, desc: Arc<DataSource>) -> Self {
         Self {
             inner: self.inner,
@@ -54,13 +55,13 @@ impl FontSlot {
         }
     }
 
-    /// Gets or make the font load result.
+    /// Gets or makes the font load result.
     pub fn get_or_init(&self) -> Option<Font> {
         let res = self.inner.compute_with_context(|mut c| Ok(c.load()));
         res.unwrap().clone()
     }
 
-    /// Gets the reference to the font load result (possible uninitialized).
+    /// Gets the reference to the font load result (possibly uninitialized).
     ///
     /// Returns `None` if the cell is empty, or being initialized. This
     /// method never blocks.

@@ -2,7 +2,7 @@
 
 use crate::prelude::*;
 
-/// Resolve a file id by its import path.
+/// Resolves a file id by its import path.
 pub fn resolve_id_by_path(
     world: &dyn World,
     current: TypstFileId,
@@ -10,14 +10,14 @@ pub fn resolve_id_by_path(
 ) -> Option<TypstFileId> {
     if import_path.starts_with('@') {
         let spec = import_path.parse::<PackageSpec>().ok()?;
-        // Evaluate the manifest.
+        // Evaluates the manifest.
         let manifest_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
         let bytes = world.file(manifest_id).ok()?;
         let string = std::str::from_utf8(&bytes).map_err(FileError::from).ok()?;
         let manifest: PackageManifest = toml::from_str(string).ok()?;
         manifest.validate(&spec).ok()?;
 
-        // Evaluate the entry point.
+        // Evaluates the entry point.
         return Some(manifest_id.join(&manifest.package.entrypoint));
     }
 
@@ -31,7 +31,7 @@ pub fn resolve_id_by_path(
     Some(TypstFileId::new(current.package().cloned(), vpath))
 }
 
-/// Find a source instance by its import node.
+/// Finds a source instance by its import node.
 pub fn find_source_by_expr(
     world: &dyn World,
     current: TypstFileId,
@@ -46,7 +46,7 @@ pub fn find_source_by_expr(
     }
 }
 
-/// Casts node to a single include expression.
+/// Casts a node to a single include expression.
 pub fn cast_include_expr<'a>(name: &str, node: ast::Expr<'a>) -> Option<ast::Expr<'a>> {
     match node {
         ast::Expr::Include(inc) => Some(inc.source()),

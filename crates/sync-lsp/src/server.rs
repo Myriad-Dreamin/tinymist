@@ -690,7 +690,6 @@ impl<A, S> ServiceState<'_, A, S> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 enum State<Args, S> {
     Uninitialized(Option<Box<Args>>),
     Initializing(S),

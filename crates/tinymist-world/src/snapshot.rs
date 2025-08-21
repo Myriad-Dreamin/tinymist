@@ -23,10 +23,11 @@ impl ProjectInsId {
     pub const PRIMARY: ProjectInsId = ProjectInsId(EcoString::inline("primary"));
 }
 
+/// The export signal for the document.
 #[deprecated(note = "Use `CompileSignal` directly.")]
 pub type ExportSignal = CompileSignal;
 
-/// A signal that possibly triggers an compile (export).
+/// A signal that possibly triggers a compile (export).
 ///
 /// Whether to compile (export) depends on the current state of the document and
 /// the user settings.
@@ -42,7 +43,7 @@ pub struct CompileSignal {
 }
 
 impl CompileSignal {
-    /// Merge two signals.
+    /// Merges two signals.
     pub fn merge(&mut self, other: CompileSignal) {
         self.by_mem_events |= other.by_mem_events;
         self.by_fs_events |= other.by_fs_events;
@@ -50,11 +51,13 @@ impl CompileSignal {
     }
 
     /// Whether there is any reason to compile (export).
+    ///
+    /// This is used to determine if the document should be compiled.
     pub fn any(&self) -> bool {
         self.by_mem_events || self.by_fs_events || self.by_entry_update
     }
 
-    /// Exclude some signals.
+    /// Excludes some signals.
     pub fn exclude(&self, excluded: Self) -> Self {
         Self {
             by_mem_events: self.by_mem_events && !excluded.by_mem_events,
@@ -63,6 +66,7 @@ impl CompileSignal {
         }
     }
 
+    /// Whether the task should run.
     pub fn should_run_task_dyn(
         &self,
         when: &TaskWhen,
@@ -75,6 +79,7 @@ impl CompileSignal {
         }
     }
 
+    /// Whether the task should run.
     pub fn should_run_task<D: typst::Document>(
         &self,
         when: &TaskWhen,
@@ -95,12 +100,14 @@ impl CompileSignal {
 }
 
 /// A snapshot of the project and compilation state.
+///
+/// This is used to store the state of the project and compilation.
 pub struct CompileSnapshot<F: CompilerFeat> {
     /// The project id.
     pub id: ProjectInsId,
     /// The export signal for the document.
     pub signal: CompileSignal,
-    /// Using world
+    /// The world.
     pub world: CompilerWorld<F>,
     /// The last successfully compiled document.
     pub success_doc: Option<TypstDocument>,

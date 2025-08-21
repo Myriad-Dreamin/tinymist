@@ -1,5 +1,8 @@
 //! # Typlite
 
+// todo: remove me
+#![allow(missing_docs)]
+
 pub mod attributes;
 pub mod common;
 mod error;

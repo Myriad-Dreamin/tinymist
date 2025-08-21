@@ -1,3 +1,5 @@
+//! The computations for the tasks.
+
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -28,13 +30,18 @@ pub mod text;
 #[cfg(feature = "text")]
 pub use text::*;
 
+/// The flag indicating that the svg export is needed.
 pub struct SvgFlag;
+/// The flag indicating that the png export is needed.
 pub struct PngFlag;
+/// The flag indicating that the html export is needed.
 pub struct HtmlFlag;
 
+/// The computation to check if the export is needed.
 pub struct ExportTimings;
 
 impl ExportTimings {
+    /// Checks if the export is needed.
     pub fn needs_run<F: CompilerFeat, D: typst::Document>(
         snap: &CompileSnapshot<F>,
         timing: Option<&TaskWhen>,
@@ -45,6 +52,7 @@ impl ExportTimings {
     }
 }
 
+/// The computation for svg export.
 pub struct SvgExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
@@ -80,6 +88,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
 //     }
 // }
 
+/// The computation for png export.
 pub struct PngExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
@@ -130,6 +139,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
 //     }
 // }
 
+/// The computation for html export.
 pub struct HtmlExport;
 
 impl<F: CompilerFeat> ExportComputation<F, TypstHtmlDocument> for HtmlExport {
@@ -153,6 +163,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstHtmlDocument> for HtmlExport {
 //     }
 // }
 
+/// The computation for document query.
 pub struct DocumentQuery;
 
 impl DocumentQuery {
@@ -210,6 +221,7 @@ impl DocumentQuery {
             .collect())
     }
 
+    /// Queries the document and returns the result as a value.
     pub fn doc_get_as_value<F: CompilerFeat>(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &TypstDocument,
@@ -221,6 +233,7 @@ impl DocumentQuery {
         }
     }
 
+    /// Queries the document and returns the result as a value.
     pub fn get_as_value<F: CompilerFeat, D: typst::Document>(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<D>,

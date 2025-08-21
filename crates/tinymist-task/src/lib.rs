@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! The task system of tinymist.
 
 mod model;
 pub use model::*;

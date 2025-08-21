@@ -1,28 +1,42 @@
+//! The documentation models for tidy.
+
 use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 
+/// A parameter documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
+    /// The name of the parameter.
     pub name: EcoString,
+    /// The documentation of the parameter.
     pub docs: EcoString,
+    /// The types of the parameter.
     pub types: EcoString,
+    /// The default value of the parameter.
     pub default: Option<EcoString>,
 }
 
+/// A pattern documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyPatDocs {
+    /// The documentation of the pattern.
     pub docs: EcoString,
+    /// The return type of the pattern.
     pub return_ty: Option<EcoString>,
+    /// The parameters of the pattern.
     pub params: Vec<TidyParamDocs>,
 }
 
+/// A module documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyModuleDocs {
+    /// The documentation of the module.
     pub docs: EcoString,
 }
 
+/// Removes the list annotations from the string.
 pub fn remove_list_annotations(s: &str) -> String {
     static REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
         regex::Regex::new(r"<!-- typlite:(?:begin|end):[\w\-]+ \d+ -->").unwrap()
@@ -30,6 +44,7 @@ pub fn remove_list_annotations(s: &str) -> String {
     REG.replace_all(s, "").to_string()
 }
 
+/// Identifies the pattern documentation. For example, `#let (a, b) = x`.
 pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
@@ -150,6 +165,7 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     })
 }
 
+/// Identifies the module documentation.
 pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
     Ok(TidyModuleDocs {
         docs: remove_list_annotations(&docs).into(),

@@ -311,11 +311,11 @@ impl<'a> PostTypeChecker<'a> {
                 crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
-            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => Some(Ty::Builtin(
-                BuiltinTy::Path(crate::ty::PathPreference::Source {
+            SyntaxContext::ImportPath(..) | SyntaxContext::IncludePath(..) => {
+                Some(Ty::Builtin(BuiltinTy::Path(crate::ty::PathKind::Source {
                     allow_package: true,
-                }),
-            )),
+                })))
+            }
             SyntaxContext::VarAccess(VarClass::Ident(node))
             | SyntaxContext::VarAccess(VarClass::FieldAccess(node))
             | SyntaxContext::VarAccess(VarClass::DotAccess(node))

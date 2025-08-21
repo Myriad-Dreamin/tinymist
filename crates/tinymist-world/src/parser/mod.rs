@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! The legacy parser of the world.
 
 mod modifier_set;
 mod semantic_tokens;

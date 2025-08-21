@@ -1,3 +1,5 @@
+//! The font searcher to run the compiler in the system environment.
+
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -14,7 +16,7 @@ use super::{FontResolverImpl, FontSlot, LazyBufferFontLoader};
 use crate::config::CompileFontOpts;
 use crate::debug_loc::{DataSource, FsDataSource};
 
-/// Searches for fonts in system.
+/// Searches for fonts in the system.
 #[derive(Debug)]
 pub struct SystemFontSearcher {
     /// The base font searcher.
@@ -27,7 +29,7 @@ pub struct SystemFontSearcher {
 }
 
 impl SystemFontSearcher {
-    /// Creates a system searcher.
+    /// Creates a new searcher.
     pub fn new() -> Self {
         Self {
             base: MemoryFontSearcher::default(),
@@ -36,14 +38,14 @@ impl SystemFontSearcher {
         }
     }
 
-    /// Builds a FontResolverImpl.
+    /// Builds a font resolver.
     pub fn build(self) -> FontResolverImpl {
         self.base.build().with_font_paths(self.font_paths)
     }
 }
 
 impl SystemFontSearcher {
-    /// Resolve fonts from given options.
+    /// Resolves fonts from given options.
     pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> Result<()> {
         // Note: the order of adding fonts is important.
         // See: https://github.com/typst/typst/blob/9c7f31870b4e1bf37df79ebbe1df9a56df83d878/src/font/book.rs#L151-L154
@@ -75,6 +77,7 @@ impl SystemFontSearcher {
         Ok(())
     }
 
+    /// Flushes the searcher, needed before adding fonts in memory.
     pub fn flush(&mut self) {
         use fontdb::Source;
 
@@ -103,7 +106,7 @@ impl SystemFontSearcher {
         self.db = Database::new();
     }
 
-    /// Add an in-memory font.
+    /// Adds an in-memory font to the searcher.
     pub fn add_memory_font(&mut self, data: Bytes) {
         if !self.db.is_empty() {
             panic!("dirty font search state, please flush the searcher before adding memory fonts");
@@ -112,7 +115,7 @@ impl SystemFontSearcher {
         self.base.add_memory_font(data);
     }
 
-    /// Adds in-memory fonts.
+    /// Adds in-memory fonts to the searcher.
     pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
         if !self.db.is_empty() {
             panic!("dirty font search state, please flush the searcher before adding memory fonts");
@@ -121,10 +124,12 @@ impl SystemFontSearcher {
         self.base.add_memory_fonts(data);
     }
 
+    /// Searches for fonts in the system and adds them to the searcher.
     pub fn search_system(&mut self) {
         self.db.load_system_fonts();
     }
 
+    /// Records a path to the searcher.
     fn record_path(&mut self, path: &Path) {
         self.font_paths.push(if !path.is_relative() {
             path.to_owned()
@@ -137,14 +142,14 @@ impl SystemFontSearcher {
         });
     }
 
-    /// Search for all fonts in a directory recursively.
+    /// Searches for all fonts in a directory recursively.
     pub fn search_dir(&mut self, path: impl AsRef<Path>) {
         self.record_path(path.as_ref());
 
         self.db.load_fonts_dir(path);
     }
 
-    /// Index the fonts in the file at the given path.
+    /// Indexes the fonts in the file at the given path.
     pub fn search_file(&mut self, path: impl AsRef<Path>) -> FileResult<()> {
         self.record_path(path.as_ref());
 

@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! The documentation analyzers.
 
 mod def;
 pub use def::*;

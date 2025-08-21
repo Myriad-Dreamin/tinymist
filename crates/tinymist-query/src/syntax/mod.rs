@@ -2,8 +2,6 @@
 //!
 //! This module must hide all **AST details** from the rest of the codebase.
 
-#![allow(missing_docs)]
-
 pub(crate) mod docs;
 pub(crate) mod expr;
 pub(crate) mod index;

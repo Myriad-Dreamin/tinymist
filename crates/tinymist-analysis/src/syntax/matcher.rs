@@ -1,7 +1,7 @@
 //! Convenient utilities to match syntax structures of code.
 //! - Iterators/Finders to traverse nodes.
 //! - Predicates to check nodes' properties.
-//! - Classifiers to check nodes' syntax.
+//! - Classifiers to check nodes' syntaxes.
 //!
 //! ## Classifiers of syntax structures
 //!
@@ -223,7 +223,7 @@ pub fn previous_decls<T>(
                     _ => {}
                 }
 
-                // import it self
+                // import itself
                 if let Some(new_name) = import.new_name() {
                     if let Some(t) = recv(PreviousDecl::Ident(new_name)) {
                         return Some(t);
@@ -284,7 +284,7 @@ pub fn previous_decls<T>(
     })
 }
 
-/// Whether the node can be recognized as a mark.
+/// Checks if the node can be recognized as a mark.
 pub fn is_mark(sk: SyntaxKind) -> bool {
     use SyntaxKind::*;
     #[allow(clippy::match_like_matches_macro)]
@@ -297,7 +297,7 @@ pub fn is_mark(sk: SyntaxKind) -> bool {
     }
 }
 
-/// Whether the node can be recognized as an identifier.
+/// Checks if the node can be recognized as an identifier.
 pub fn is_ident_like(node: &SyntaxNode) -> bool {
     fn can_be_ident(node: &SyntaxNode) -> bool {
         typst::syntax::is_ident(node.text())
@@ -328,7 +328,8 @@ pub enum InterpretMode {
     Math,
 }
 
-/// Determine the interpretation mode at the given position (context-sensitive).
+/// Determines the interpretation mode at the given position
+/// (context-sensitive).
 pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
     loop {
         crate::log_debug_ct!("leaf for mode: {leaf:?}");
@@ -351,7 +352,7 @@ pub fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
     }
 }
 
-/// Determine the interpretation mode at the given kind (context-free).
+/// Determines the interpretation mode at the given kind (context-free).
 pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> {
     use SyntaxKind::*;
     Some(match kind {
@@ -702,6 +703,7 @@ impl<'a> SyntaxClass<'a> {
         }
     }
 
+    /// Checks if the syntax class contains an error node.
     pub fn contains_error(&self) -> bool {
         use SyntaxClass::*;
         match self {
@@ -860,15 +862,15 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         }
     }
 
-    // Move to the first ancestor that is an expression.
+    // Moves to the first ancestor that is an expression.
     let ancestor = first_ancestor_expr(node)?;
     crate::log_debug_ct!("first_ancestor_expr: {ancestor:?}");
 
-    // Unwrap all parentheses to get the actual expression.
+    // Unwraps all parentheses to get the actual expression.
     let adjusted = adjust_expr(ancestor)?;
     crate::log_debug_ct!("adjust_expr: {adjusted:?}");
 
-    // Identify convenient expression kinds.
+    // Identifies convenient expression kinds.
     let expr = adjusted.cast::<ast::Expr>()?;
     Some(match expr {
         ast::Expr::Label(..) => SyntaxClass::label(adjusted),
@@ -901,7 +903,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
     })
 }
 
-/// Whether the node might be in code trivia. This is a bit internal so please
+/// Checks if the node might be in code trivia. This is a bit internal so please
 /// check the caller to understand it.
 fn possible_in_code_trivia(kind: SyntaxKind) -> bool {
     !matches!(
@@ -937,7 +939,7 @@ impl ArgClass<'_> {
     }
 }
 
-// todo: whether we can merge `SurroundingSyntax` and `SyntaxContext`?
+// todo: check if we can merge `SurroundingSyntax` and `SyntaxContext`?
 /// Classes of syntax context (outer syntax) that can be operated on by IDE
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, strum::EnumIter)]
 pub enum SurroundingSyntax {
@@ -957,7 +959,7 @@ pub enum SurroundingSyntax {
     ParamList,
 }
 
-/// Determines the surrounding syntax of the node at the position.
+/// Determines the surrounding syntax of the node at the given position.
 pub fn surrounding_syntax(node: &LinkedNode) -> SurroundingSyntax {
     check_previous_syntax(node)
         .or_else(|| check_surrounding_syntax(node))
@@ -1060,6 +1062,7 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
     None
 }
 
+/// Checks the previous syntax of the node.
 fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
     let mut leaf = leaf.clone();
     if leaf.kind().is_trivia() {
@@ -1085,6 +1088,7 @@ fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
     None
 }
 
+/// Checks if the node is enclosed by the given span.
 fn enclosed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool {
     s.and_then(|s| parent.find(s)?.find(leaf.span())).is_some()
 }
@@ -1195,8 +1199,8 @@ enum ArgSourceKind {
     Dict,
 }
 
-/// Classifies node's context (outer syntax) by outer node that can be operated
-/// on by IDE functionality.
+/// Classifies the context (outer syntax) of the node by the outer node that
+/// can be operated on by IDE functionality.
 pub fn classify_context_outer<'a>(
     outer: LinkedNode<'a>,
     node: LinkedNode<'a>,
@@ -1231,8 +1235,8 @@ pub fn classify_context_outer<'a>(
     }
 }
 
-/// Classifies node's context (outer syntax) that can be operated on by IDE
-/// functionality.
+/// Classifies the context (outer syntax) of the node that can be operated on
+/// by IDE functionality.
 pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<SyntaxContext<'_>> {
     let mut node = node;
     if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
@@ -1335,6 +1339,7 @@ pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<S
     }
 }
 
+/// Classifies the context of the callee node.
 fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<SyntaxContext<'a>> {
     let parent = callee.parent()?;
     let args = match parent.cast::<ast::Expr>() {
@@ -1370,6 +1375,7 @@ fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<Sy
     })
 }
 
+/// Classifies the context of the argument node.
 fn arg_context<'a>(
     args_node: LinkedNode<'a>,
     mut node: LinkedNode<'a>,
@@ -1455,7 +1461,7 @@ fn arg_context<'a>(
     }
 }
 
-/// The cursor is on an invalid position.
+/// The cursor is on an invalid position for completion.
 pub enum BadCompletionCursor {
     /// The cursor is outside of the argument list.
     ArgListPos,

@@ -47,49 +47,65 @@ pub(crate) fn get_lexical_hierarchy(
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 
+/// The kind of a variable.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexicalVarKind {
+    /// A value reference.
     /// `#foo`
     ///   ^^^
     ValRef,
+    /// A label reference.
     /// `@foo`
     ///   ^^^
     LabelRef,
+    /// A label.
     /// `<foo>`
     ///   ^^^
     Label,
+    /// A bib key.
     /// `x:`
     ///  ^^
     BibKey,
+    /// A variable.
     /// `let foo`
     ///      ^^^
     Variable,
+    /// A function.
     /// `let foo()`
     ///      ^^^
     Function,
 }
 
+/// The kind of a lexical hierarchy recogized by the analyzers.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexicalKind {
+    /// A heading.
     Heading(i16),
+    /// A variable.
     Var(LexicalVarKind),
+    /// A block.
     Block,
+    /// A comment group.
     CommentGroup,
 }
 
 impl LexicalKind {
+    /// Creates a label.
     const fn label() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Label)
     }
 
+    /// Creates a function.
     const fn function() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Function)
     }
 
+    /// Creates a variable.
     const fn variable() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Variable)
     }
 
+    /// Checks if the kind is a valid LSP symbol.
     pub fn is_valid_lsp_symbol(&self) -> bool {
         !matches!(self, LexicalKind::Block | LexicalKind::CommentGroup)
     }

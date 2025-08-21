@@ -248,7 +248,7 @@ impl HoverWorker<'_> {
                     args: vec![JsonValue::String(target.to_string())],
                 }],
             });
-            if let Some(kind) = PathPreference::from_ext(target.path()) {
+            if let Some(kind) = PathKind::from_ext(target.path()) {
                 self.def.push(format!("A `{kind:?}` file."));
             }
         }
