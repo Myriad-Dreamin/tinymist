@@ -408,7 +408,6 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             snapshot: None,
             handler,
             export_target,
-            compilation: OnceLock::default(),
             latest_success_doc: None,
             deps: Default::default(),
             committed_revision: 0,
@@ -746,8 +745,6 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub reason: CompileSignal,
     /// The latest compute graph (snapshot).
     snapshot: Option<Arc<WorldComputeGraph<F>>>,
-    /// The latest compilation.
-    pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
