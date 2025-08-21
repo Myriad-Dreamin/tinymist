@@ -3,7 +3,6 @@ import { base64Decode } from "../../utils";
 import { type StyleAtCursor, styleAtCursor } from "../../vscode";
 import {
   ClearFiltersButton,
-  DemoTextInput,
   SearchInput,
   StretchFilter,
   StyleFilter,
@@ -26,7 +25,6 @@ function createFilterStates() {
     weightFilter: van.state(""),
     styleFilter: van.state(""),
     stretchFilter: van.state(""),
-    demoText: van.state("The quick brown fox jumps over the lazy dog"),
   };
 }
 
@@ -72,7 +70,6 @@ function createFontFamiliesContent(
   filteredFamilies: State<FontFamily[]>,
   fontResources: State<FontResources>,
   showNumberOpt: State<{ showNumber: boolean }>,
-  demoText: State<string>,
 ) {
   return (_dom?: Element) =>
     div(
@@ -80,7 +77,7 @@ function createFontFamiliesContent(
       filteredFamilies.val.length === 0
         ? div({ class: "no-fonts-message" }, "No fonts match the current filters")
         : filteredFamilies.val.map((family: FontFamily) =>
-            FontFamilySlot(family, fontResources.val, showNumberOpt.val, demoText.val),
+            FontFamilySlot(family, fontResources.val, showNumberOpt.val),
           ),
     );
 }
@@ -158,7 +155,6 @@ export const FontView = () => {
     filteredFamilies,
     fontResources,
     showNumberOpt,
-    filterStates.demoText,
   );
 
   return div(
@@ -184,7 +180,6 @@ export const FontView = () => {
           ClearFiltersButton(clearFilters),
         ),
       ),
-      div({ style: "display: flex" }, DemoTextInput(filterStates.demoText)),
       div({ class: "font-stats" }, fontStats),
     ),
     fontFamiliesContent,

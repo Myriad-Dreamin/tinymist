@@ -184,7 +184,6 @@ export const FontFamilySlot = (
   family: FontFamily,
   fontResources: FontResources,
   showNumberOpt: { showNumber: boolean },
-  demoText: string,
 ) => {
   if (!family?.name) {
     console.warn("FontFamilySlot: Invalid family data", family);
@@ -209,13 +208,6 @@ export const FontFamilySlot = (
     ),
     div(
       { class: "font-variants-container" },
-      div(
-        {
-          class: "font-demo",
-          style: `font-family: "${family.name}", sans-serif`,
-        },
-        demoText,
-      ),
       p({ class: "font-variant-summary" }, variantText),
       ...family.infos.map((font) => FontSlot(font, fontResources, showNumberOpt)),
     ),

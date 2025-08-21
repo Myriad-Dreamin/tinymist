@@ -89,19 +89,3 @@ export const ClearFiltersButton = (clearFilters: () => void) => {
     "Clear Filters",
   );
 };
-
-/**
- * Creates a customizable demo text input
- */
-export const DemoTextInput = (demoText: State<string>) => {
-  return input({
-    class: "font-search-input",
-    type: "text",
-    placeholder: "Custom preview text...",
-    value: demoText,
-    oninput: (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      demoText.val = target.value;
-    },
-  });
-};
