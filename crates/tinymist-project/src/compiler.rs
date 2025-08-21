@@ -891,6 +891,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         if doc.is_some() {
             self.latest_success_doc = doc;
         }
+        self.cached_snapshot = None; // invalidate; will be recomputed on demand
 
         // Notify the new file dependencies.
         let mut deps = eco_vec![];
