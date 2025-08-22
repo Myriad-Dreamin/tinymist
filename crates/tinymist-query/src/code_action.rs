@@ -93,6 +93,7 @@ impl SemanticRequest for CodeActionRequest {
 
 #[cfg(test)]
 mod tests {
+    use tinymist_lint::KnownLintIssues;
     use typst::{diag::Warned, layout::PagedDocument};
 
     use super::*;
@@ -131,8 +132,9 @@ mod tests {
         let compiler_diagnostics = warnings.iter().chain(errors.iter());
 
         // Run the linter for additional diagnostics as well.
+        let known_issues = KnownLintIssues::from_compiler_diagnostics(compiler_diagnostics.clone());
         let diagnostics = DiagWorker::new(ctx)
-            .check(source)
+            .check(source, &known_issues)
             .convert_all(compiler_diagnostics)
             .into_values()
             .flatten();

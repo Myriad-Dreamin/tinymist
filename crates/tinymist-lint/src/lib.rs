@@ -2,11 +2,14 @@
 
 use std::sync::Arc;
 
+use itertools::Itertools;
 use tinymist_analysis::{
-    syntax::ExprInfo,
+    adt::interner::Interned,
+    syntax::{Decl, Expr, ExprInfo},
     ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
+use tinymist_std::hash::FxHashSet;
 use typst::{
     diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
@@ -31,28 +34,74 @@ pub struct LintInfo {
 }
 
 /// Performs linting check on file and returns a vector of diagnostics.
-pub fn lint_file(world: &LspWorld, expr: &ExprInfo, ti: Arc<TypeInfo>) -> LintInfo {
-    let diagnostics = Linter::new(world, ti).lint(expr.source.root());
+pub fn lint_file(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    ti: Arc<TypeInfo>,
+    known_issues: &KnownLintIssues,
+) -> LintInfo {
+    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
     LintInfo {
-        revision: expr.revision,
-        fid: expr.fid,
+        revision: ei.revision,
+        fid: ei.fid,
         diagnostics,
     }
 }
 
-struct Linter<'w> {
+/// Information about issues the linter checks for that will already be reported to the user via
+/// other means (such as compiler diagnostics), to avoid duplicating warnings.
+pub struct KnownLintIssues {
+    unknown_vars: FxHashSet<Span>,
+}
+
+impl KnownLintIssues {
+    /// Creates an empty set of known lint issues. The linter will report all warnings.
+    pub fn none() -> Self {
+        Self {
+            unknown_vars: FxHashSet::default(),
+        }
+    }
+
+    /// Collects known lint issues from the given compiler diagnostics.
+    pub fn from_compiler_diagnostics<'a>(
+        diags: impl Iterator<Item = &'a SourceDiagnostic> + Clone,
+    ) -> Self {
+        let mut unknown_vars = FxHashSet::default();
+        for diag in diags {
+            if diag.message.starts_with("unknown variable") {
+                unknown_vars.insert(diag.span);
+            }
+        }
+        Self { unknown_vars }
+    }
+
+    pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
+        self.unknown_vars.contains(&ident.span())
+    }
+}
+
+struct Linter<'w, 'k> {
     world: &'w LspWorld,
+    ei: ExprInfo,
     ti: Arc<TypeInfo>,
+    known_issues: &'k KnownLintIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 }
 
-impl<'w> Linter<'w> {
-    fn new(world: &'w LspWorld, ti: Arc<TypeInfo>) -> Self {
+impl<'w, 'k> Linter<'w, 'k> {
+    fn new(
+        world: &'w LspWorld,
+        ei: ExprInfo,
+        ti: Arc<TypeInfo>,
+        known_issues: &'k KnownLintIssues,
+    ) -> Self {
         Self {
             world,
+            ei,
             ti,
+            known_issues,
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
@@ -260,7 +309,7 @@ impl<'w> Linter<'w> {
     }
 }
 
-impl DataFlowVisitor for Linter<'_> {
+impl DataFlowVisitor for Linter<'_, '_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs {
             self.expr(expr);
@@ -388,16 +437,61 @@ impl DataFlowVisitor for Linter<'_> {
         }
         Some(())
     }
+
+    fn math_ident(&mut self, ident: ast::MathIdent<'_>) -> Option<()> {
+        let resolved = self.ei.get_def(&Interned::new(Decl::math_ident_ref(ident)));
+        let is_defined = match resolved {
+            Some(Expr::Ref(refs)) => refs.root.is_some() || refs.term.is_some(),
+            _ => false,
+        };
+
+        if !is_defined && !self.known_issues.has_unknown_math_ident(ident) {
+            let var = ident.as_str();
+            let mut warning = SourceDiagnostic::warning(
+                ident.span(),
+                eco_format!("potentially unknown variable: {var}"),
+            );
+
+            // Try to produce the same hints as the corresponding Typst compiler error.
+            // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:
+            // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
+            let in_global = self.world.library.global.scope().get(var).is_some();
+            if matches!(var, "none" | "auto" | "false" | "true") {
+                warning.hint(eco_format!(
+                    "if you meant to use a literal, \
+                     try adding a hash before it: `#{var}`",
+                ));
+            } else if in_global {
+                warning.hint(eco_format!(
+                    "`{var}` is not available directly in math, \
+                     try adding a hash before it: `#{var}`",
+                ));
+            } else {
+                warning.hint(eco_format!(
+                    "if you meant to display multiple letters as is, \
+                     try adding spaces between each letter: `{}`",
+                    var.chars().join(" ")
+                ));
+                warning.hint(eco_format!(
+                    "or if you meant to display this as text, \
+                     try placing it in quotes: `\"{var}\"`"
+                ));
+            }
+            self.diag.push(warning);
+        }
+
+        Some(())
+    }
 }
 
-struct LateFuncLinter<'a, 'b> {
-    linter: &'a mut Linter<'b>,
+struct LateFuncLinter<'a, 'b, 'c> {
+    linter: &'a mut Linter<'b, 'c>,
     func_info: FuncInfo,
     return_block_info: Option<ReturnBlockInfo>,
     expr_context: ExprContext,
 }
 
-impl LateFuncLinter<'_, '_> {
+impl LateFuncLinter<'_, '_, '_> {
     fn late_closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
         if !self.func_info.has_return {
             return Some(());
@@ -445,7 +539,7 @@ impl LateFuncLinter<'_, '_> {
     }
 }
 
-impl DataFlowVisitor for LateFuncLinter<'_, '_> {
+impl DataFlowVisitor for LateFuncLinter<'_, '_, '_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs.rev() {
             self.expr(expr);
